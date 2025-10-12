@@ -1,0 +1,25 @@
+{
+  "name": "todo-app",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm exec tsc",
+    "dev": "pnpm exec tsc --watch",
+    "start": "pnpm exec node dist/main.js",
+    "generate": "pnpm exec node ../../packages/psl/dist/cli.js emit schema.psl > .prisma/schema.json && pnpm exec node -e \"const { emitSchemaAndTypes } = require('../../packages/schema-emitter/dist/index.js'); const fs = require('fs'); const ast = JSON.parse(fs.readFileSync('.prisma/schema.json', 'utf-8')); const { types } = emitSchemaAndTypes(ast); fs.writeFileSync('.prisma/schema.d.ts', types);\"",
+    "test": "vitest run",
+    "lint": "eslint 'src/**/*.ts'",
+    "typecheck": "pnpm exec tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/relational-ir": "workspace:*",
+    "@prisma/psl": "workspace:*",
+    "@prisma/schema-emitter": "workspace:*",
+    "@prisma/sql": "workspace:*",
+    "@prisma/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@prisma/relational-ir",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "../../node_modules/.bin/tsc",
+    "dev": "pnpm exec tsup src/index.ts --watch --format esm --dts",
+    "test": "vitest run",
+    "lint": "eslint 'src/**/*.ts'",
+    "typecheck": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "zod": "^3.23.8",
+    "typescript": "^5.6.2"
+  },
+  "devDependencies": {
+    "tsup": "^8.2.4",
+    "vitest": "^2.1.1"
+  }
+}
