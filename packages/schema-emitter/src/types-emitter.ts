@@ -2,12 +2,17 @@ import { Schema, Model, Field } from '@prisma/relational-ir';
 
 export function emitTypes(schema: Schema): string {
   const modelTypes = schema.models.map(emitModelType).join('\n\n');
+  const tableTypes = emitTableTypes(schema);
   const tableAccessors = emitTableAccessors(schema);
 
   return `// Generated TypeScript definitions
 // This file is auto-generated. Do not edit manually.
 
+import { Column, Table, Tables } from '@prisma/sql';
+
 ${modelTypes}
+
+${tableTypes}
 
 ${tableAccessors}
 
@@ -52,19 +57,42 @@ function hasDefaultValue(field: Field): boolean {
   return field.attributes.some((attr) => attr.name === 'default');
 }
 
+function emitTableTypes(schema: Schema): string {
+  const tableShapes = schema.models
+    .map((model) => {
+      const fieldTypes = model.fields
+        .map((field) => {
+          const tsType = mapToTypeScriptType(field.type);
+          const optional = hasDefaultValue(field) ? '?' : '';
+          return `  ${field.name}${optional}: ${tsType};`;
+        })
+        .join('\n');
+
+      return `export interface ${model.name}Shape {
+${fieldTypes}
+}`;
+    })
+    .join('\n\n');
+
+  return tableShapes;
+}
+
 function emitTableAccessors(schema: Schema): string {
   const accessors = schema.models
     .map((model) => {
       const fieldAccessors = model.fields
         .map((field) => {
+          const tsType = mapToTypeScriptType(field.type);
           return `    ${field.name}: {
-      eq: (value: ${mapToTypeScriptType(field.type)}) => ({ type: 'eq', field: '${field.name}', value }),
-      ne: (value: ${mapToTypeScriptType(field.type)}) => ({ type: 'ne', field: '${field.name}', value }),
-      gt: (value: ${mapToTypeScriptType(field.type)}) => ({ type: 'gt', field: '${field.name}', value }),
-      lt: (value: ${mapToTypeScriptType(field.type)}) => ({ type: 'lt', field: '${field.name}', value }),
-      gte: (value: ${mapToTypeScriptType(field.type)}) => ({ type: 'gte', field: '${field.name}', value }),
-      lte: (value: ${mapToTypeScriptType(field.type)}) => ({ type: 'lte', field: '${field.name}', value }),
-      in: (values: ${mapToTypeScriptType(field.type)}[]) => ({ type: 'in', field: '${field.name}', values }),
+      table: '${model.name.toLowerCase()}',
+      name: '${field.name}',
+      eq: (value: ${tsType}) => ({ type: 'eq' as const, field: '${field.name}', value }),
+      ne: (value: ${tsType}) => ({ type: 'ne' as const, field: '${field.name}', value }),
+      gt: (value: ${tsType}) => ({ type: 'gt' as const, field: '${field.name}', value }),
+      lt: (value: ${tsType}) => ({ type: 'lt' as const, field: '${field.name}', value }),
+      gte: (value: ${tsType}) => ({ type: 'gte' as const, field: '${field.name}', value }),
+      lte: (value: ${tsType}) => ({ type: 'lte' as const, field: '${field.name}', value }),
+      in: (values: ${tsType}[]) => ({ type: 'in' as const, field: '${field.name}', values }),
     }`;
         })
         .join(',\n');
@@ -75,7 +103,7 @@ ${fieldAccessors}
     })
     .join(',\n');
 
-  return `export const t = {
+  return `export const t: Tables = {
 ${accessors}
 };
 

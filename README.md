@@ -8,7 +8,7 @@ This project implements a complete pipeline from Prisma Schema Language (PSL) pa
 
 1. **PSL Parser** - Parses `.psl` files into an Abstract Syntax Tree (AST)
 2. **IR Emitter** - Transforms AST into a validated Intermediate Representation (IR) and generates TypeScript types
-3. **Query Builder** - Provides a fluent API for building type-safe SQL queries
+3. **Query Builder** - Provides a fluent API for building type-safe SQL queries using Column objects
 4. **Runtime** - Executes queries against PostgreSQL with schema verification
 
 ## Architecture
@@ -67,9 +67,14 @@ pnpm test
    );
    ```
 
-3. **Run the example**:
+3. **Generate schema files**:
    ```bash
    cd examples/todo-app
+   pnpm generate
+   ```
+
+4. **Run the example**:
+   ```bash
    pnpm start
    ```
 
@@ -88,14 +93,16 @@ model User {
 
 ### 2. Generate IR and Types
 
-```typescript
+```bash
+# Using CLI
+psl emit schema.psl
+
+# Or programmatically
 import { parse } from '@prisma/psl';
 import { emitSchemaAndTypes } from '@prisma/schema-emitter';
 
 const ast = parse(pslContent);
 const { schema, types } = emitSchemaAndTypes(ast);
-
-// Write schema.json and schema.d.ts
 ```
 
 ### 3. Build Type-Safe Queries
@@ -107,13 +114,111 @@ import ir from './schema.json' assert { type: 'json' };
 
 const db = connect({ ir, verify: 'onFirstUse' });
 
+// Type-safe query with Column objects
 const query = sql()
   .from('user')
   .where(t.user.active.eq(true))
-  .select({ id: 'id', email: 'email' });
+  .select({ id: t.user.id, email: t.user.email });
 
-const results = await db.execute(query);
+// Return type is inferred as Array<{ id: number; email: string }>
+const results = await db.execute(query.build());
 ```
+
+## Type Safety Features
+
+### Column-Based API
+
+The query builder uses Column objects that provide:
+
+- **Type-safe field access**: `t.user.id` has type `Column<number>`
+- **Type-safe expressions**: `t.user.active.eq(true)` returns `Expression<boolean>`
+- **Automatic type inference**: Select results are typed based on Column types
+
+### Generated Types
+
+The schema emitter generates:
+
+```typescript
+// Generated schema.d.ts
+export interface User {
+  id: number;
+  email: string;
+  active?: boolean;
+  createdAt?: Date;
+}
+
+export interface UserShape {
+  id: number;
+  email: string;
+  active?: boolean;
+  createdAt?: Date;
+}
+
+export const t: Tables = {
+  user: {
+    id: { table: 'user', name: 'id', eq: (value: number) => ... },
+    email: { table: 'user', name: 'email', eq: (value: string) => ... },
+    // ... other fields
+  }
+};
+```
+
+### Query Examples
+
+```typescript
+// Simple select with type inference
+const activeUsers = sql()
+  .from('user')
+  .where(t.user.active.eq(true))
+  .select({ id: t.user.id, email: t.user.email });
+// Returns: Array<{ id: number; email: string }>
+
+// Complex query with multiple conditions
+const users = sql()
+  .from('user')
+  .where(t.user.id.gt(5))
+  .select({ id: t.user.id, email: t.user.email, active: t.user.active })
+  .orderBy('createdAt', 'DESC')
+  .limit(10);
+// Returns: Array<{ id: number; email: string; active: boolean }>
+
+// IN expressions
+const specificUsers = sql()
+  .from('user')
+  .where(t.user.id.in([1, 2, 3]))
+  .select({ id: t.user.id, email: t.user.email });
+```
+
+## Testing
+
+### Unit Tests
+
+Each package includes comprehensive unit tests:
+
+```bash
+# Test specific package
+cd packages/sql
+pnpm test
+
+# Test all packages
+pnpm test
+```
+
+### Integration Tests
+
+The example app includes full integration tests using `@prisma/dev`:
+
+```bash
+cd examples/todo-app
+pnpm test:integration
+```
+
+Integration tests:
+- Spin up PostgreSQL using `@prisma/dev`
+- Create tables and insert test data
+- Execute type-safe queries
+- Verify return types and values
+- Test error handling for unknown tables/columns
 
 ## Development
 
@@ -128,7 +233,7 @@ prisma-next-proto/
 │   ├── sql/               # Query builder and SQL compiler
 │   └── runtime/           # Database runtime
 ├── examples/
-│   └── todo-app/          # Example application
+│   └── todo-app/          # Example application with integration tests
 └── .github/workflows/     # CI configuration
 ```
 
@@ -148,17 +253,66 @@ prisma-next-proto/
 3. **New query operations**: Extend the query builder in `@prisma/sql`
 4. **New database support**: Implement new runtime in `@prisma/runtime`
 
-## Testing
+## API Reference
 
-Each package includes unit tests using Vitest:
+### Query Builder
 
-```bash
-# Test specific package
-cd packages/psl
-pnpm test
+```typescript
+// Create a query builder
+const query = sql().from('tableName');
 
-# Test all packages
-pnpm test
+// Add conditions
+query.where(t.table.column.eq(value));
+
+// Select specific fields
+query.select({ alias: t.table.column });
+
+// Add ordering and limits
+query.orderBy('column', 'ASC').limit(10);
+
+// Build the query
+const { sql, params, rowType } = query.build();
+```
+
+### Column Expressions
+
+```typescript
+// Equality
+t.user.id.eq(1)
+
+// Comparison
+t.user.id.gt(5)
+t.user.id.lt(10)
+t.user.id.gte(1)
+t.user.id.lte(100)
+t.user.email.ne('test@example.com')
+
+// Membership
+t.user.id.in([1, 2, 3])
+```
+
+### Runtime Connection
+
+```typescript
+import { connect } from '@prisma/runtime';
+
+const db = connect({
+  ir: schemaIR,
+  verify: 'onFirstUse', // or 'never'
+  database: {
+    host: 'localhost',
+    port: 5432,
+    database: 'postgres',
+    user: 'postgres',
+    password: 'postgres',
+  },
+});
+
+// Execute queries
+const results = await db.execute(query.build());
+
+// Clean up
+await db.end();
 ```
 
 ## Contributing

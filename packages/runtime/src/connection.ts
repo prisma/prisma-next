@@ -32,7 +32,17 @@ export class DatabaseConnection {
     });
   }
 
-  async execute(query: QueryAST): Promise<any[]> {
+  async execute(query: QueryAST | { type: 'raw'; sql: string }): Promise<any[]> {
+    if (query.type === 'raw') {
+      const client = await this.pool.connect();
+      try {
+        const result = await client.query(query.sql);
+        return result.rows;
+      } finally {
+        client.release();
+      }
+    }
+
     if (!this.verified) {
       await this.verifySchema();
       this.verified = true;

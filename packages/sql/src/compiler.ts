@@ -1,4 +1,4 @@
-import { QueryAST, FieldExpression } from './types';
+import { QueryAST, Column, Expression } from './types';
 
 export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   const params: any[] = [];
@@ -9,7 +9,12 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   // Handle SELECT clause
   if (query.select && query.select.fields) {
     const fieldList = Object.entries(query.select.fields)
-      .map(([alias, field]) => `${field} AS ${alias}`)
+      .map(([alias, column]) => {
+        if (isColumn(column)) {
+          return `${column.name} AS ${alias}`;
+        }
+        return `${column} AS ${alias}`;
+      })
       .join(', ');
     sql += fieldList;
   } else {
@@ -21,7 +26,7 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
 
   // Handle WHERE clause
   if (query.where) {
-    sql += ' WHERE ' + compileCondition(query.where.condition, params, paramIndex);
+    sql += ' WHERE ' + compileExpression(query.where.condition, params, paramIndex);
     paramIndex += getParamCount(query.where.condition);
   }
 
@@ -41,42 +46,112 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   return { sql, params };
 }
 
-function compileCondition(condition: FieldExpression, params: any[], paramIndex: number): string {
-  const field = condition.field;
+function compileExpression(expr: Expression<any>, params: any[], paramIndex: number): string {
+  // Handle Column expressions (from t.user.id.eq(value))
+  if (isColumnExpression(expr)) {
+    return compileColumnExpression(expr, params, paramIndex);
+  }
+  
+  // Handle legacy FieldExpression
+  if (isFieldExpression(expr)) {
+    return compileFieldExpression(expr, params, paramIndex);
+  }
 
-  switch (condition.type) {
+  throw new Error(`Unknown expression type: ${JSON.stringify(expr)}`);
+}
+
+function compileColumnExpression(expr: any, params: any[], paramIndex: number): string {
+  const field = expr.field;
+  
+  switch (expr.type) {
     case 'eq':
-      params.push(condition.value);
+      params.push(expr.value);
       return `${field} = $${paramIndex}`;
     case 'ne':
-      params.push(condition.value);
+      params.push(expr.value);
       return `${field} != $${paramIndex}`;
     case 'gt':
-      params.push(condition.value);
+      params.push(expr.value);
       return `${field} > $${paramIndex}`;
     case 'lt':
-      params.push(condition.value);
+      params.push(expr.value);
       return `${field} < $${paramIndex}`;
     case 'gte':
-      params.push(condition.value);
+      params.push(expr.value);
       return `${field} >= $${paramIndex}`;
     case 'lte':
-      params.push(condition.value);
+      params.push(expr.value);
       return `${field} <= $${paramIndex}`;
     case 'in':
-      const placeholders = condition.values!.map((_, i) => `$${paramIndex + i}`).join(', ');
-      params.push(...condition.values!);
+      const placeholders = expr.values!.map((_: any, i: number) => `$${paramIndex + i}`).join(', ');
+      params.push(...expr.values!);
       return `${field} IN (${placeholders})`;
     default:
-      throw new Error(`Unknown condition type: ${(condition as any).type}`);
+      throw new Error(`Unknown condition type: ${expr.type}`);
   }
 }
 
-function getParamCount(condition: FieldExpression): number {
-  switch (condition.type) {
+function compileFieldExpression(expr: any, params: any[], paramIndex: number): string {
+  const field = expr.field;
+
+  switch (expr.type) {
+    case 'eq':
+      params.push(expr.value);
+      return `${field} = $${paramIndex}`;
+    case 'ne':
+      params.push(expr.value);
+      return `${field} != $${paramIndex}`;
+    case 'gt':
+      params.push(expr.value);
+      return `${field} > $${paramIndex}`;
+    case 'lt':
+      params.push(expr.value);
+      return `${field} < $${paramIndex}`;
+    case 'gte':
+      params.push(expr.value);
+      return `${field} >= $${paramIndex}`;
+    case 'lte':
+      params.push(expr.value);
+      return `${field} <= $${paramIndex}`;
     case 'in':
-      return condition.values!.length;
+      const placeholders = expr.values!.map((_: any, i: number) => `$${paramIndex + i}`).join(', ');
+      params.push(...expr.values!);
+      return `${field} IN (${placeholders})`;
     default:
-      return 1;
+      throw new Error(`Unknown condition type: ${expr.type}`);
   }
+}
+
+function getParamCount(expr: Expression<any>): number {
+  if (isFieldExpression(expr)) {
+    switch ((expr as any).type) {
+      case 'in':
+        return (expr as any).values!.length;
+      default:
+        return 1;
+    }
+  }
+  
+  if (isColumnExpression(expr)) {
+    switch ((expr as any).type) {
+      case 'in':
+        return (expr as any).values!.length;
+      default:
+        return 1;
+    }
+  }
+  
+  return 1;
+}
+
+function isColumn(obj: any): obj is Column<any> {
+  return obj && typeof obj === 'object' && 'table' in obj && 'name' in obj;
+}
+
+function isColumnExpression(obj: any): boolean {
+  return obj && typeof obj === 'object' && 'type' in obj && 'field' in obj && 'value' in obj;
+}
+
+function isFieldExpression(obj: any): boolean {
+  return obj && typeof obj === 'object' && 'type' in obj && 'field' in obj;
 }

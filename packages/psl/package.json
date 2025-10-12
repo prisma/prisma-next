@@ -8,7 +8,7 @@
     "psl": "./bin/psl.js"
   },
   "scripts": {
-    "build": "../../node_modules/.bin/tsc",
+    "build": "pnpm exec tsc",
     "dev": "npx tsup src/index.ts --watch --format esm --dts",
     "test": "vitest run",
     "lint": "eslint 'src/**/*.ts'",

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { parse } from './index';
 
 function main() {
@@ -22,11 +22,11 @@ function main() {
     const input = readFileSync(schemaFile, 'utf-8');
     const ast = parse(input);
 
-    // For now, just output the AST as JSON
-    // In a real implementation, this would emit to IR format
+    // Output AST as JSON for now
+    // In a real implementation, this would integrate with schema-emitter
     console.log(JSON.stringify(ast, null, 2));
   } catch (error) {
-    console.error('Error parsing schema:', error);
+    console.error('Error processing schema:', error);
     process.exit(1);
   }
 }
