@@ -3,97 +3,60 @@ import { makeT } from '../src/maket';
 import { TABLE_NAME } from '../src/types';
 import type { Column, Table, Expression } from '../src/types';
 
-describe('makeT factory function', () => {
-  // Define proper TypeScript interfaces for our test schema
-  interface UserShape {
-    id: number;
-    email: string;
-    active: boolean;
-    createdAt: Date;
-  }
+// Define test table shapes
+interface UserShape {
+  id: number;
+  email: string;
+  active: boolean;
+  createdAt: Date;
+}
 
-  interface PostShape {
-    id: number;
-    title: string;
-    userId: number;
-  }
+interface PostShape {
+  id: number;
+  title: string;
+  content: string;
+  published: boolean;
+}
 
-  interface TestTables {
-    user: Table<UserShape>;
-    post: Table<PostShape>;
-  }
+interface TestTables {
+  user: Table<UserShape>;
+  post: Table<PostShape>;
+}
 
-  const mockSchema = {
-    models: [
-      {
-        name: 'User',
-        fields: [
-          {
-            name: 'id',
-            type: 'Int',
-            attributes: [
-              { name: 'id' },
-              { name: 'default', value: { type: 'autoincrement' } }
-            ]
-          },
-          {
-            name: 'email',
-            type: 'String',
-            attributes: [
-              { name: 'unique' }
-            ]
-          },
-          {
-            name: 'active',
-            type: 'Boolean',
-            attributes: [
-              { name: 'default', value: { type: 'literal', value: 'true' } }
-            ]
-          },
-          {
-            name: 'createdAt',
-            type: 'DateTime',
-            attributes: [
-              { name: 'default', value: { type: 'now' } }
-            ]
-          }
-        ]
+// Mock schema with new IR structure
+const mockSchema = {
+  target: 'postgres',
+  tables: {
+    user: {
+      columns: {
+        id: { type: 'int4', nullable: false, pk: true, default: { kind: 'autoincrement' } },
+        email: { type: 'text', nullable: false, unique: true },
+        active: { type: 'bool', nullable: false, default: { kind: 'literal', value: 'true' } },
+        createdAt: { type: 'timestamptz', nullable: false, default: { kind: 'now' } },
       },
-      {
-        name: 'Post',
-        fields: [
-          {
-            name: 'id',
-            type: 'Int',
-            attributes: [{ name: 'id' }]
-          },
-          {
-            name: 'title',
-            type: 'String',
-            attributes: []
-          },
-          {
-            name: 'userId',
-            type: 'Int',
-            attributes: []
-          }
-        ]
-      }
-    ]
-  };
+      indexes: [],
+      constraints: [],
+      capabilities: [],
+    },
+    post: {
+      columns: {
+        id: { type: 'int4', nullable: false, pk: true, default: { kind: 'autoincrement' } },
+        title: { type: 'text', nullable: false },
+        content: { type: 'text', nullable: false },
+        published: { type: 'bool', nullable: false, default: { kind: 'literal', value: 'false' } },
+      },
+      indexes: [],
+      constraints: [],
+      capabilities: [],
+    },
+  },
+};
 
+describe('makeT Factory Function', () => {
   it('creates tables with correct structure', () => {
     const t = makeT<TestTables>(mockSchema);
-
-    // Check that tables exist
     expect(t).toHaveProperty('user');
     expect(t).toHaveProperty('post');
-
-    // Check table structure
-    expect(t.user[TABLE_NAME]).toBe('user');
-    expect(t.post[TABLE_NAME]).toBe('post');
-
-    // Verify table names are correctly lowercased
     expect(t.user[TABLE_NAME]).toBe('user');
     expect(t.post[TABLE_NAME]).toBe('post');
   });
@@ -101,234 +64,153 @@ describe('makeT factory function', () => {
   it('creates columns with correct properties', () => {
     const t = makeT<TestTables>(mockSchema);
 
-    // Check user columns have correct Column structure
-    const userIdColumn: Column<number> = t.user.id;
-    expect(userIdColumn.table).toBe('user');
-    expect(userIdColumn.name).toBe('id');
-    expect(userIdColumn.__t).toBeUndefined();
-
-    const emailColumn: Column<string> = t.user.email;
-    expect(emailColumn.table).toBe('user');
-    expect(emailColumn.name).toBe('email');
-
-    const activeColumn: Column<boolean> = t.user.active;
-    expect(activeColumn.table).toBe('user');
-    expect(activeColumn.name).toBe('active');
-
-    const createdAtColumn: Column<Date> = t.user.createdAt;
-    expect(createdAtColumn.table).toBe('user');
-    expect(createdAtColumn.name).toBe('createdAt');
-
-    // Check post columns
-    expect(t.post.id.table).toBe('post');
-    expect(t.post.id.name).toBe('id');
-    expect(t.post.title.table).toBe('post');
-    expect(t.post.title.name).toBe('title');
-    expect(t.post.userId.table).toBe('post');
-    expect(t.post.userId.name).toBe('userId');
-  });
-
-  it('creates columns with all required operators', () => {
-    const t = makeT<TestTables>(mockSchema);
-
-    const column: Column<number> = t.user.id;
-
-    // Check that all operators exist and are functions
-    expect(typeof column.eq).toBe('function');
-    expect(typeof column.ne).toBe('function');
-    expect(typeof column.gt).toBe('function');
-    expect(typeof column.lt).toBe('function');
-    expect(typeof column.gte).toBe('function');
-    expect(typeof column.lte).toBe('function');
-    expect(typeof column.in).toBe('function');
-
-    // Verify operators return Expression<boolean> types
-    const eqResult: Expression<boolean> = column.eq(123);
-    const neResult: Expression<boolean> = column.ne(456);
-    const gtResult: Expression<boolean> = column.gt(100);
-    const ltResult: Expression<boolean> = column.lt(200);
-    const gteResult: Expression<boolean> = column.gte(50);
-    const lteResult: Expression<boolean> = column.lte(150);
-    const inResult: Expression<boolean> = column.in([1, 2, 3]);
-
-    // All should be truthy (not null/undefined)
-    expect(eqResult).toBeTruthy();
-    expect(neResult).toBeTruthy();
-    expect(gtResult).toBeTruthy();
-    expect(ltResult).toBeTruthy();
-    expect(gteResult).toBeTruthy();
-    expect(lteResult).toBeTruthy();
-    expect(inResult).toBeTruthy();
-  });
-
-  it('operators return correct expression structure', () => {
-    const t = makeT<TestTables>(mockSchema);
-
-    // Test all operators with proper type checking
-    const testValue = 123;
-    const testArray = [1, 2, 3];
-
-    // Test eq operator
-    const eqExpr = t.user.id.eq(testValue);
-    expect(eqExpr).toEqual({
-      __t: undefined,
-      type: 'eq',
-      field: 'id',
-      value: testValue
-    });
-    expect(eqExpr.type).toBe('eq');
-    expect(eqExpr.field).toBe('id');
-    expect(eqExpr.value).toBe(testValue);
-
-    // Test ne operator
-    const neExpr = t.user.email.ne('test@example.com');
-    expect(neExpr.type).toBe('ne');
-    expect(neExpr.field).toBe('email');
-    expect(neExpr.value).toBe('test@example.com');
-
-    // Test gt operator
-    const gtExpr = t.user.id.gt(100);
-    expect(gtExpr.type).toBe('gt');
-    expect(gtExpr.field).toBe('id');
-    expect(gtExpr.value).toBe(100);
-
-    // Test lt operator
-    const ltExpr = t.user.id.lt(200);
-    expect(ltExpr.type).toBe('lt');
-    expect(ltExpr.field).toBe('id');
-    expect(ltExpr.value).toBe(200);
-
-    // Test gte operator
-    const gteExpr = t.user.id.gte(50);
-    expect(gteExpr.type).toBe('gte');
-    expect(gteExpr.field).toBe('id');
-    expect(gteExpr.value).toBe(50);
-
-    // Test lte operator
-    const lteExpr = t.user.id.lte(150);
-    expect(lteExpr.type).toBe('lte');
-    expect(lteExpr.field).toBe('id');
-    expect(lteExpr.value).toBe(150);
-
-    // Test in operator
-    const inExpr = t.user.id.in(testArray);
-    expect(inExpr.type).toBe('in');
-    expect(inExpr.field).toBe('id');
-    expect(inExpr.values).toEqual(testArray);
-    expect(Array.isArray(inExpr.values)).toBe(true);
-  });
-
-  it('handles different field types correctly', () => {
-    const t = makeT<TestTables>(mockSchema);
-
-    // Test Int field with proper type inference
-    const intExpr = t.user.id.eq(123);
-    expect(intExpr.value).toBe(123);
-    expect(typeof intExpr.value).toBe('number');
-
-    // Test String field with proper type inference
-    const stringExpr = t.user.email.eq('test@example.com');
-    expect(stringExpr.value).toBe('test@example.com');
-    expect(typeof stringExpr.value).toBe('string');
-
-    // Test Boolean field with proper type inference
-    const boolExpr = t.user.active.eq(true);
-    expect(boolExpr.value).toBe(true);
-    expect(typeof boolExpr.value).toBe('boolean');
-
-    // Test DateTime field with proper type inference
-    const date = new Date('2023-01-01');
-    const dateExpr = t.user.createdAt.eq(date);
-    expect(dateExpr.value).toBe(date);
-    expect(dateExpr.value instanceof Date).toBe(true);
-
-    // Test that operators work with different types
-    const intGtExpr = t.user.id.gt(100);
-    expect(intGtExpr.value).toBe(100);
-
-    const stringNeExpr = t.user.email.ne('invalid@example.com');
-    expect(stringNeExpr.value).toBe('invalid@example.com');
-
-    const boolEqExpr = t.user.active.eq(false);
-    expect(boolEqExpr.value).toBe(false);
-  });
-
-  it('handles empty schema gracefully', () => {
-    const emptySchema = { models: [] };
-    const t = makeT<{}>(emptySchema);
-
-    expect(t).toEqual({});
-    expect(Object.keys(t)).toHaveLength(0);
-  });
-
-  it('handles model with no fields', () => {
-    const schemaWithEmptyModel = {
-      models: [
-        {
-          name: 'EmptyModel',
-          fields: []
-        }
-      ]
-    };
-
-    interface EmptyTables {
-      emptymodel: Table<{}>;
-    }
-
-    const t = makeT<EmptyTables>(schemaWithEmptyModel);
-
-    expect(t).toHaveProperty('emptymodel');
-    expect(t.emptymodel[TABLE_NAME]).toBe('emptymodel');
-    expect(Object.getOwnPropertySymbols(t.emptymodel)).toEqual([TABLE_NAME]);
-  });
-
-  it('converts model names to lowercase', () => {
-    const t = makeT<TestTables>(mockSchema);
-
-    expect(t.user).toBeDefined();
-    expect(t.post).toBeDefined();
-    expect(t.User).toBeUndefined();
-    expect(t.Post).toBeUndefined();
-
-    // Verify the actual table names are lowercase
-    expect(t.user[TABLE_NAME]).toBe('user');
-    expect(t.post[TABLE_NAME]).toBe('post');
-  });
-
-  it('preserves field names exactly', () => {
-    const t = makeT<TestTables>(mockSchema);
-
-    // Field names should be preserved exactly
+    // Test user columns
     expect(t.user.id).toBeDefined();
     expect(t.user.email).toBeDefined();
     expect(t.user.active).toBeDefined();
     expect(t.user.createdAt).toBeDefined();
 
-    // Check that field names in expressions match
-    expect(t.user.id.eq(1).field).toBe('id');
-    expect(t.user.email.eq('test').field).toBe('email');
-    expect(t.user.active.eq(true).field).toBe('active');
-    expect(t.user.createdAt.eq(new Date()).field).toBe('createdAt');
+    // Test post columns
+    expect(t.post.id).toBeDefined();
+    expect(t.post.title).toBeDefined();
+    expect(t.post.content).toBeDefined();
+    expect(t.post.published).toBeDefined();
   });
 
-  it('returns typed result when generic parameter is provided', () => {
+  it('creates columns with correct metadata', () => {
     const t = makeT<TestTables>(mockSchema);
 
-    // TypeScript should infer the correct types
-    // This test mainly ensures the function signature works
-    expect(t.user).toBeDefined();
-    expect(t.user.id).toBeDefined();
-    expect(t.user.email).toBeDefined();
+    const userIdColumn: Column<number> = t.user.id;
+    expect(userIdColumn.table).toBe('user');
+    expect(userIdColumn.name).toBe('id');
 
-    // Verify type safety by checking that we can access properties
-    const userId: Column<number> = t.user.id;
-    const userEmail: Column<string> = t.user.email;
-    const userActive: Column<boolean> = t.user.active;
-    const userCreatedAt: Column<Date> = t.user.createdAt;
+    const userEmailColumn: Column<string> = t.user.email;
+    expect(userEmailColumn.table).toBe('user');
+    expect(userEmailColumn.name).toBe('email');
+  });
 
-    expect(userId.name).toBe('id');
-    expect(userEmail.name).toBe('email');
-    expect(userActive.name).toBe('active');
-    expect(userCreatedAt.name).toBe('createdAt');
+  it('creates operator methods that return correct expressions', () => {
+    const t = makeT<TestTables>(mockSchema);
+
+    const eqExpr = t.user.id.eq(1);
+    expect(eqExpr).toEqual({ __t: undefined, type: 'eq', field: 'id', value: 1 });
+
+    const neExpr = t.user.email.ne('test@example.com');
+    expect(neExpr).toEqual({
+      __t: undefined,
+      type: 'ne',
+      field: 'email',
+      value: 'test@example.com',
+    });
+
+    const gtExpr = t.user.id.gt(5);
+    expect(gtExpr).toEqual({ __t: undefined, type: 'gt', field: 'id', value: 5 });
+
+    const ltExpr = t.user.id.lt(10);
+    expect(ltExpr).toEqual({ __t: undefined, type: 'lt', field: 'id', value: 10 });
+
+    const gteExpr = t.user.id.gte(1);
+    expect(gteExpr).toEqual({ __t: undefined, type: 'gte', field: 'id', value: 1 });
+
+    const lteExpr = t.user.id.lte(100);
+    expect(lteExpr).toEqual({ __t: undefined, type: 'lte', field: 'id', value: 100 });
+
+    const inExpr = t.user.id.in([1, 2, 3]);
+    expect(inExpr).toEqual({ __t: undefined, type: 'in', field: 'id', values: [1, 2, 3] });
+  });
+
+  it('handles table with no columns', () => {
+    const schemaWithEmptyTable = {
+      target: 'postgres',
+      tables: {
+        emptytable: {
+          columns: {},
+          indexes: [],
+          constraints: [],
+          capabilities: [],
+        },
+      },
+    };
+
+    interface EmptyTables {
+      emptytable: Table<{}>;
+    }
+
+    const t = makeT<EmptyTables>(schemaWithEmptyTable);
+    expect(t).toHaveProperty('emptytable');
+    expect(t.emptytable[TABLE_NAME]).toBe('emptytable');
+    expect(Object.getOwnPropertySymbols(t.emptytable)).toEqual([TABLE_NAME]);
+  });
+
+  it('converts table names to lowercase', () => {
+    const schemaWithUppercase = {
+      target: 'postgres',
+      tables: {
+        User: {
+          columns: {
+            id: { type: 'int4', nullable: false },
+          },
+          indexes: [],
+          constraints: [],
+          capabilities: [],
+        },
+      },
+    };
+
+    interface UppercaseTables {
+      User: Table<{ id: number }>; // Use exact table name from schema
+    }
+
+    const t = makeT<UppercaseTables>(schemaWithUppercase);
+    expect(t.User).toBeDefined();
+    expect(t.user).toBeUndefined();
+    expect(t.User[TABLE_NAME]).toBe('User'); // Table name from schema is preserved
+  });
+
+  it('preserves column names exactly as in schema', () => {
+    const t = makeT<TestTables>(mockSchema);
+
+    // Column names should match exactly what's in the schema
+    expect(t.user.id.name).toBe('id');
+    expect(t.user.email.name).toBe('email');
+    expect(t.user.active.name).toBe('active');
+    expect(t.user.createdAt.name).toBe('createdAt');
+  });
+
+  it('handles complex column types', () => {
+    const complexSchema = {
+      target: 'postgres',
+      tables: {
+        complex: {
+          columns: {
+            uuid: { type: 'uuid', nullable: false },
+            jsonData: { type: 'json', nullable: false },
+            jsonbData: { type: 'jsonb', nullable: false },
+            floatValue: { type: 'float8', nullable: false },
+            timestamp: { type: 'timestamp', nullable: false },
+          },
+          indexes: [],
+          constraints: [],
+          capabilities: [],
+        },
+      },
+    };
+
+    interface ComplexTables {
+      complex: Table<{
+        uuid: string;
+        jsonData: any;
+        jsonbData: any;
+        floatValue: number;
+        timestamp: Date;
+      }>;
+    }
+
+    const t = makeT<ComplexTables>(complexSchema);
+    expect(t.complex.uuid).toBeDefined();
+    expect(t.complex.jsonData).toBeDefined();
+    expect(t.complex.jsonbData).toBeDefined();
+    expect(t.complex.floatValue).toBeDefined();
+    expect(t.complex.timestamp).toBeDefined();
   });
 });

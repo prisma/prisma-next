@@ -32,8 +32,10 @@ export class DatabaseConnection {
     });
   }
 
-  async execute(query: QueryAST | { type: 'raw'; sql: string }): Promise<any[]> {
-    if (query.type === 'raw') {
+  async execute(
+    query: QueryAST | { type: 'raw'; sql: string } | { sql: string; params: unknown[] },
+  ): Promise<any[]> {
+    if ('type' in query && query.type === 'raw') {
       const client = await this.pool.connect();
       try {
         const result = await client.query(query.sql);
@@ -43,12 +45,24 @@ export class DatabaseConnection {
       }
     }
 
+    if ('sql' in query && 'params' in query && !('type' in query)) {
+      // This is a compiled query object from query.build()
+      const client = await this.pool.connect();
+      try {
+        const result = await client.query(query.sql, query.params);
+        return result.rows;
+      } finally {
+        client.release();
+      }
+    }
+
+    // This is a QueryAST
     if (!this.verified) {
       await this.verifySchema();
       this.verified = true;
     }
 
-    const { sql, params } = compileToSQL(query);
+    const { sql, params } = compileToSQL(query as QueryAST);
     const client = await this.pool.connect();
 
     try {
@@ -68,8 +82,7 @@ export class DatabaseConnection {
 
     try {
       // Check if tables exist
-      for (const model of this.ir.models) {
-        const tableName = model.name.toLowerCase();
+      for (const [tableName, table] of Object.entries(this.ir.tables)) {
         const result = await client.query(
           'SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)',
           [tableName],
@@ -80,14 +93,14 @@ export class DatabaseConnection {
         }
 
         // Check if columns exist
-        for (const field of model.fields) {
+        for (const [columnName, column] of Object.entries(table.columns)) {
           const columnResult = await client.query(
             'SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = $1 AND column_name = $2)',
-            [tableName, field.name],
+            [tableName, columnName],
           );
 
           if (!columnResult.rows[0].exists) {
-            throw new Error(`Column '${field.name}' does not exist in table '${tableName}'`);
+            throw new Error(`Column '${columnName}' does not exist in table '${tableName}'`);
           }
         }
       }

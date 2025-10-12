@@ -100,3 +100,24 @@ globs: ["**/*"]
 - Column objects in where/select for complete type inference
 - Static operators in library, applied to runtime columns
 - AI-friendly: simple JSON IR, explicit construction pattern
+
+## Intermediate Representation (IR) Structure
+
+**Decision**: Tables/columns structure instead of models/fields
+- IR uses `tables` object with `columns` as direct properties for clarity
+- PostgreSQL-specific types (`int4`, `text`, `bool`, `timestamptz`, `float8`)
+- Flat column properties (`nullable`, `pk`, `unique`, `default`) for simplicity
+- Deterministic JSON format with ordered keys for diffing and signing
+- Table-level metadata (`indexes`, `constraints`, `capabilities`, `meta`)
+
+**Decision**: PostgreSQL-first with extensibility
+- `target: "postgres"` property in schema IR
+- PostgreSQL-specific column types for precise mapping
+- Future dialects can be added by changing `target` and type mappings
+- Keeps prototype simple while maintaining architectural flexibility
+
+**Decision**: Rich metadata for verification and tooling
+- Column properties enable runtime verification (table/column existence, type compatibility)
+- Table metadata supports migration planning and IDE tooling
+- Capabilities array for database-specific features (extensions, functions)
+- Source tracking in meta for debugging and schema evolution

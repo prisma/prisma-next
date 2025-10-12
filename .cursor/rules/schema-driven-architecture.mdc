@@ -13,12 +13,13 @@ The architecture strictly separates compile-time type information from runtime d
 
 1. **`schema.json` (Runtime Intermediate Representation - IR)**:
    - **Purpose**: This JSON file is the canonical runtime representation of the database schema, emitted by the `@prisma/cli` from a PSL file.
-   - **Content**: It contains metadata about models (tables) and their fields (columns), including names, types, and attributes.
+   - **Content**: It contains metadata about tables and their columns, including PostgreSQL-specific types, constraints, and attributes.
+   - **Structure**: Uses `tables` object with `columns` as direct properties, flat column properties (`nullable`, `pk`, `unique`, `default`), and table-level metadata.
    - **Usage**: It is loaded at runtime by the application (e.g., `import ir from '../.prisma/schema.json' assert { type: 'json' };`) and passed to the `makeT` factory function.
 
 2. **`schema.d.ts` (Compile-Time Type Definitions)**:
    - **Purpose**: This TypeScript declaration file provides static type information for the DSL, enabling autocompletion, type checking, and compile-time errors. It is also emitted by the `@prisma/cli`.
-   - **Content**: It defines TypeScript interfaces for models (e.g., `User`), their shapes (e.g., `UserShape`), and the `Tables` interface.
+   - **Content**: It defines TypeScript interfaces for table shapes (e.g., `UserShape`) and the `Tables` interface.
    - **Usage**: TypeScript consumes this file during compilation. It is *not* imported at runtime for its value.
 
 ## The `t` Object: Bridging Runtime and Compile-Time
@@ -59,6 +60,49 @@ The `t` object is the central point of interaction for building type-safe querie
 3. **Multiple Schemas**: Different schemas can coexist in the same application by using different `Tables` types.
 4. **AI-Friendly**: The simple JSON IR and explicit factory pattern make it easy for AI systems to understand and generate code.
 5. **Type Safety**: Full compile-time type checking with runtime verification as a safety net.
+
+## New IR Structure Example
+
+The new IR structure uses a `tables`/`columns` format with PostgreSQL-specific types:
+
+```json
+{
+  "target": "postgres",
+  "tables": {
+    "user": {
+      "columns": {
+        "id": {
+          "type": "int4",
+          "nullable": false,
+          "pk": true,
+          "default": { "kind": "autoincrement" }
+        },
+        "email": {
+          "type": "text",
+          "nullable": false,
+          "unique": true
+        },
+        "active": {
+          "type": "bool",
+          "nullable": false,
+          "default": { "kind": "literal", "value": "true" }
+        },
+        "createdAt": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": { "kind": "now" }
+        }
+      },
+      "indexes": [],
+      "constraints": [],
+      "capabilities": [],
+      "meta": {
+        "source": "model User"
+      }
+    }
+  }
+}
+```
 
 ## Example Implementation
 

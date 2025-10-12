@@ -13,9 +13,9 @@ describe('Integration Tests', () => {
 
   beforeAll(async () => {
     // Start PostgreSQL using @prisma/dev
-    postgresProcess = spawn('npx', ['@prisma/dev', 'postgres'], {
+    postgresProcess = spawn('pnpx', ['@prisma/dev', 'postgres'], {
       stdio: 'pipe',
-      env: { ...process.env, POSTGRES_PASSWORD: 'postgres' }
+      env: { ...process.env, POSTGRES_PASSWORD: 'postgres' },
     });
 
     // Wait for PostgreSQL to be ready
@@ -52,6 +52,7 @@ describe('Integration Tests', () => {
     });
 
     // Create table
+    console.log('Creating table...');
     await db.execute({
       type: 'raw',
       sql: `
@@ -63,6 +64,17 @@ describe('Integration Tests', () => {
         );
       `,
     });
+
+    // Check if table was created
+    console.log('Checking table structure...');
+    const tableCheck = await db.execute({
+      type: 'raw',
+      sql: "SELECT column_name FROM information_schema.columns WHERE table_name = 'user' ORDER BY ordinal_position;",
+    });
+    console.log(
+      'Table columns:',
+      tableCheck.map((r: any) => r.column_name),
+    );
 
     // Insert test data
     await db.execute({
@@ -114,10 +126,12 @@ describe('Integration Tests', () => {
   });
 
   it('executes getUserById query', async () => {
-    const query = sql()
-      .from(t.user)
-      .where(t.user.id.eq(1))
-      .select({ id: t.user.id, email: t.user.email, active: t.user.active, createdAt: t.user.createdAt });
+    const query = sql().from(t.user).where(t.user.id.eq(1)).select({
+      id: t.user.id,
+      email: t.user.email,
+      active: t.user.active,
+      createdAt: t.user.createdAt,
+    });
 
     const results = await db.execute(query.build());
 
@@ -142,10 +156,7 @@ describe('Integration Tests', () => {
   });
 
   it('handles queries with LIMIT', async () => {
-    const query = sql()
-      .from(t.user)
-      .select({ id: t.user.id, email: t.user.email })
-      .limit(2);
+    const query = sql().from(t.user).select({ id: t.user.id, email: t.user.email }).limit(2);
 
     const results = await db.execute(query.build());
 

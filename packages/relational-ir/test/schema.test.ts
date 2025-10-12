@@ -1,53 +1,149 @@
 import { describe, it, expect } from 'vitest';
-import { validateSchema, validateModel, validateField } from '../src/schema';
+import {
+  validateSchema,
+  validateTable,
+  validateColumn,
+  ColumnTypeSchema,
+  DefaultValueSchema,
+} from '../src/schema';
 
 describe('Schema Validation', () => {
-  it('should validate a complete schema', () => {
+  it('validates a complete schema with new IR structure', () => {
     const schema = {
-      models: [
-        {
-          name: 'User',
-          fields: [
-            {
-              name: 'id',
-              type: 'Int',
-              attributes: [{ name: 'id' }],
+      target: 'postgres',
+      tables: {
+        user: {
+          columns: {
+            id: {
+              type: 'int4',
+              nullable: false,
+              pk: true,
+              default: { kind: 'autoincrement' },
             },
-            {
-              name: 'email',
-              type: 'String',
-              attributes: [{ name: 'unique' }],
+            email: {
+              type: 'text',
+              nullable: false,
+              unique: true,
             },
-          ],
+            active: {
+              type: 'bool',
+              nullable: false,
+              default: { kind: 'literal', value: 'true' },
+            },
+            createdAt: {
+              type: 'timestamptz',
+              nullable: false,
+              default: { kind: 'now' },
+            },
+          },
+          indexes: [],
+          constraints: [],
+          capabilities: [],
+          meta: {
+            source: 'model User',
+          },
         },
-      ],
+      },
     };
 
     expect(() => validateSchema(schema)).not.toThrow();
   });
 
-  it('should validate a model', () => {
-    const model = {
-      name: 'User',
-      fields: [
-        {
-          name: 'id',
-          type: 'Int',
-          attributes: [],
+  it('validates a table', () => {
+    const table = {
+      columns: {
+        id: {
+          type: 'int4',
+          nullable: false,
+          pk: true,
         },
-      ],
+        email: {
+          type: 'text',
+          nullable: false,
+          unique: true,
+        },
+      },
+      indexes: [],
+      constraints: [],
+      capabilities: [],
     };
 
-    expect(() => validateModel(model)).not.toThrow();
+    expect(() => validateTable(table)).not.toThrow();
   });
 
-  it('should validate a field', () => {
-    const field = {
-      name: 'email',
-      type: 'String',
-      attributes: [{ name: 'unique' }],
+  it('validates a column', () => {
+    const column = {
+      type: 'text',
+      nullable: false,
+      unique: true,
     };
 
-    expect(() => validateField(field)).not.toThrow();
+    expect(() => validateColumn(column)).not.toThrow();
+  });
+
+  it('validates PostgreSQL column types', () => {
+    const validTypes = [
+      'int4',
+      'int8',
+      'text',
+      'varchar',
+      'bool',
+      'timestamptz',
+      'timestamp',
+      'float8',
+      'float4',
+      'uuid',
+      'json',
+      'jsonb',
+    ];
+
+    validTypes.forEach((type) => {
+      expect(() => ColumnTypeSchema.parse(type)).not.toThrow();
+    });
+  });
+
+  it('validates default value kinds', () => {
+    const autoincrement = { kind: 'autoincrement' };
+    const now = { kind: 'now' };
+    const literal = { kind: 'literal', value: 'test' };
+
+    expect(() => DefaultValueSchema.parse(autoincrement)).not.toThrow();
+    expect(() => DefaultValueSchema.parse(now)).not.toThrow();
+    expect(() => DefaultValueSchema.parse(literal)).not.toThrow();
+  });
+
+  it('rejects invalid schema without target', () => {
+    const invalidSchema = {
+      tables: {
+        user: {
+          columns: {
+            id: { type: 'int4', nullable: false },
+          },
+          indexes: [],
+          constraints: [],
+          capabilities: [],
+        },
+      },
+    };
+
+    expect(() => validateSchema(invalidSchema)).toThrow();
+  });
+
+  it('rejects invalid target', () => {
+    const invalidSchema = {
+      target: 'mysql',
+      tables: {},
+    };
+
+    expect(() => validateSchema(invalidSchema)).toThrow();
+  });
+
+  it('rejects invalid column type', () => {
+    const invalidColumn = {
+      type: 'invalid_type',
+      nullable: false,
+    };
+
+    expect(() => validateColumn(invalidColumn)).toThrow();
   });
 });

@@ -1,68 +1,69 @@
 import { describe, it, expect } from 'vitest';
-import { sql, makeT, type Tables } from '../src/index';
+import { sql, makeT, compileToSQL, type Tables, TABLE_NAME } from '../src/index';
+import type { Column, FieldExpression } from '../src/types';
 
-// Define the expected Tables type for our test schema
+interface UserShape {
+  id: number;
+  email: string;
+  active: boolean;
+  createdAt: Date;
+}
+
 interface TestTables extends Tables {
   user: {
-    name: string;
-    id: { table: string; name: string; eq: (v: any) => any; ne: (v: any) => any; gt: (v: any) => any; lt: (v: any) => any; gte: (v: any) => any; lte: (v: any) => any; in: (v: any[]) => any; };
-    email: { table: string; name: string; eq: (v: any) => any; ne: (v: any) => any; gt: (v: any) => any; lt: (v: any) => any; gte: (v: any) => any; lte: (v: any) => any; in: (v: any[]) => any; };
-    active: { table: string; name: string; eq: (v: any) => any; ne: (v: any) => any; gt: (v: any) => any; lt: (v: any) => any; gte: (v: any) => any; lte: (v: any) => any; in: (v: any[]) => any; };
-    createdAt: { table: string; name: string; eq: (v: any) => any; ne: (v: any) => any; gt: (v: any) => any; lt: (v: any) => any; gte: (v: any) => any; lte: (v: any) => any; in: (v: any[]) => any; };
+    [TABLE_NAME]: string;
+    id: Column<number>;
+    email: Column<string>;
+    active: Column<boolean>;
+    createdAt: Column<Date>;
   };
 }
 
-// Create a mock schema for testing
 const mockSchema = {
-  models: [
-    {
-      name: 'User',
-      fields: [
-        { name: 'id', type: 'Int', attributes: [{ name: 'id' }] },
-        { name: 'email', type: 'String', attributes: [{ name: 'unique' }] },
-        { name: 'active', type: 'Boolean', attributes: [{ name: 'default', value: { type: 'literal', value: 'true' } }] },
-        { name: 'createdAt', type: 'DateTime', attributes: [{ name: 'default', value: { type: 'now' } }] }
-      ]
-    }
-  ]
+  target: 'postgres',
+  tables: {
+    user: {
+      columns: {
+        id: { type: 'int4', nullable: false, pk: true, default: { kind: 'autoincrement' } },
+        email: { type: 'text', nullable: false, unique: true },
+        active: { type: 'bool', nullable: false, default: { kind: 'literal', value: 'true' } },
+        createdAt: { type: 'timestamptz', nullable: false, default: { kind: 'now' } },
+      },
+      indexes: [],
+      constraints: [],
+      capabilities: [],
+    },
+  },
 };
 
-// Create typed tables for testing
 const t = makeT<TestTables>(mockSchema);
 
 describe('SQL Query Builder', () => {
   it('builds a simple SELECT query with Column objects', () => {
-    const query = sql()
-      .from(t.user)
-      .select({ id: t.user.id, email: t.user.email });
+    const query = sql().from(t.user).select({ id: t.user.id, email: t.user.email });
 
-    const result = query.build();
+    const { sql: generatedSQL, params } = query.build();
 
-    expect(result.sql).toBe('SELECT id AS id, email AS email FROM user');
-    expect(result.params).toHaveLength(0);
+    expect(generatedSQL).toBe('SELECT id AS id, email AS email FROM user');
+    expect(params).toHaveLength(0);
   });
 
   it('builds a query with WHERE clause using Column expressions', () => {
-    const query = sql()
-      .from(t.user)
-      .where(t.user.active.eq(true));
+    const query = sql().from(t.user).where(t.user.active.eq(true));
 
-    const result = query.build();
+    const { sql: generatedSQL, params } = query.build();
 
-    expect(result.sql).toBe('SELECT * FROM user WHERE active = $1');
-    expect(result.params).toEqual([true]);
+    expect(generatedSQL).toBe('SELECT * FROM user WHERE active = $1');
+    expect(params).toEqual([true]);
   });
 
   it('builds a query with ORDER BY and LIMIT', () => {
-    const query = sql()
-      .from(t.user)
-      .orderBy('createdAt', 'DESC')
-      .limit(10);
+    const query = sql().from(t.user).orderBy('createdAt', 'DESC').limit(10);
 
-    const result = query.build();
+    const { sql: generatedSQL, params } = query.build();
 
-    expect(result.sql).toBe('SELECT * FROM user ORDER BY createdAt DESC LIMIT 10');
-    expect(result.params).toHaveLength(0);
+    expect(generatedSQL).toBe('SELECT * FROM user ORDER BY createdAt DESC LIMIT $1');
+    expect(params).toEqual([10]);
   });
 
   it('builds a complex query with Column objects', () => {
@@ -73,12 +74,12 @@ describe('SQL Query Builder', () => {
       .orderBy('createdAt', 'DESC')
       .limit(5);
 
-    const result = query.build();
+    const { sql: generatedSQL, params } = query.build();
 
-    expect(result.sql).toBe(
-      'SELECT id AS id, email AS email FROM user WHERE active = $1 ORDER BY createdAt DESC LIMIT 5',
+    expect(generatedSQL).toBe(
+      'SELECT id AS id, email AS email FROM user WHERE active = $1 ORDER BY createdAt DESC LIMIT $2',
     );
-    expect(result.params).toEqual([true]);
+    expect(params).toEqual([true, 5]);
   });
 
   it('handles IN expressions with Column objects', () => {
@@ -86,10 +87,10 @@ describe('SQL Query Builder', () => {
       .from(t.user)
       .where(t.user.id.in([1, 2, 3]));
 
-    const result = query.build();
+    const { sql: generatedSQL, params } = query.build();
 
-    expect(result.sql).toBe('SELECT * FROM user WHERE id IN ($1, $2, $3)');
-    expect(result.params).toEqual([1, 2, 3]);
+    expect(generatedSQL).toBe('SELECT * FROM user WHERE id IN ($1, $2, $3)');
+    expect(params).toEqual([1, 2, 3]);
   });
 
   it('handles multiple comparison operators', () => {
@@ -110,9 +111,43 @@ describe('SQL Query Builder', () => {
     ];
 
     queries.forEach((query, index) => {
-      const result = query.build();
-      expect(result.sql).toBe(expectedSQLs[index]);
-      expect(result.params).toHaveLength(1);
+      const { sql: generatedSQL, params } = query.build();
+      expect(generatedSQL).toBe(expectedSQLs[index]);
+      expect(params).toHaveLength(1);
     });
+  });
+
+  it('handles queries with all column types', () => {
+    const query = sql().from(t.user).select({
+      id: t.user.id,
+      email: t.user.email,
+      active: t.user.active,
+      createdAt: t.user.createdAt,
+    });
+
+    const { sql: generatedSQL, params } = query.build();
+
+    expect(generatedSQL).toBe(
+      'SELECT id AS id, email AS email, active AS active, "createdAt" AS "createdAt" FROM user',
+    );
+    expect(params).toHaveLength(0);
+  });
+
+  it('handles boolean values in WHERE clauses', () => {
+    const query = sql().from(t.user).where(t.user.active.eq(false));
+
+    const { sql: generatedSQL, params } = query.build();
+
+    expect(generatedSQL).toBe('SELECT * FROM user WHERE active = $1');
+    expect(params).toEqual([false]);
+  });
+
+  it('handles string values with special characters', () => {
+    const query = sql().from(t.user).where(t.user.email.eq('test@example.com'));
+
+    const { sql: generatedSQL, params } = query.build();
+
+    expect(generatedSQL).toBe('SELECT * FROM user WHERE email = $1');
+    expect(params).toEqual(['test@example.com']);
   });
 });

@@ -1,44 +1,64 @@
 import { z } from 'zod';
 
-// Field types
-export const FieldTypeSchema = z.enum(['Int', 'String', 'Boolean', 'DateTime', 'Float']);
-export type FieldType = z.infer<typeof FieldTypeSchema>;
-
-// Default values
-export const DefaultValueSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('autoincrement') }),
-  z.object({ type: z.literal('now') }),
-  z.object({ type: z.literal('literal'), value: z.string() }),
+// PostgreSQL-specific column types
+export const ColumnTypeSchema = z.enum([
+  'int4',
+  'int8',
+  'text',
+  'varchar',
+  'bool',
+  'timestamptz',
+  'timestamp',
+  'float8',
+  'float4',
+  'uuid',
+  'json',
+  'jsonb',
 ]);
+
+export type ColumnType = z.infer<typeof ColumnTypeSchema>;
+
+// Default value kinds
+export const DefaultValueSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('autoincrement') }),
+  z.object({ kind: z.literal('now') }),
+  z.object({ kind: z.literal('literal'), value: z.string() }),
+]);
+
 export type DefaultValue = z.infer<typeof DefaultValueSchema>;
 
-// Attributes
-export const AttributeSchema = z.discriminatedUnion('name', [
-  z.object({ name: z.literal('id') }),
-  z.object({ name: z.literal('unique') }),
-  z.object({ name: z.literal('default'), value: DefaultValueSchema }),
-]);
-export type Attribute = z.infer<typeof AttributeSchema>;
-
-// Field definition
-export const FieldSchema = z.object({
-  name: z.string(),
-  type: FieldTypeSchema,
-  attributes: z.array(AttributeSchema).default([]),
+// Column definition
+export const ColumnSchema = z.object({
+  type: ColumnTypeSchema,
+  nullable: z.boolean(),
+  pk: z.boolean().optional(),
+  unique: z.boolean().optional(),
+  default: DefaultValueSchema.optional(),
 });
-export type Field = z.infer<typeof FieldSchema>;
 
-// Model definition
-export const ModelSchema = z.object({
-  name: z.string(),
-  fields: z.array(FieldSchema),
+export type Column = z.infer<typeof ColumnSchema>;
+
+// Table definition
+export const TableSchema = z.object({
+  columns: z.record(z.string(), ColumnSchema),
+  indexes: z.array(z.any()).default([]),
+  constraints: z.array(z.any()).default([]),
+  capabilities: z.array(z.string()).default([]),
+  meta: z
+    .object({
+      source: z.string().optional(),
+    })
+    .optional(),
 });
-export type Model = z.infer<typeof ModelSchema>;
+
+export type Table = z.infer<typeof TableSchema>;
 
 // Complete schema
 export const SchemaSchema = z.object({
-  models: z.array(ModelSchema),
+  target: z.literal('postgres'),
+  tables: z.record(z.string(), TableSchema),
 });
+
 export type Schema = z.infer<typeof SchemaSchema>;
 
 // Validation functions
@@ -46,11 +66,10 @@ export function validateSchema(data: unknown): Schema {
   return SchemaSchema.parse(data);
 }
 
-export function validateModel(data: unknown): Model {
-  return ModelSchema.parse(data);
+export function validateTable(data: unknown): Table {
+  return TableSchema.parse(data);
 }
 
-export function validateField(data: unknown): Field {
-  return FieldSchema.parse(data);
+export function validateColumn(data: unknown): Column {
+  return ColumnSchema.parse(data);
 }
-

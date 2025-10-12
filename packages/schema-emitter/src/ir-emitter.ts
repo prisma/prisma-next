@@ -1,89 +1,80 @@
-import { SchemaAST, ModelDeclaration, FieldDeclaration, AttributeDeclaration } from '@prisma/psl';
-import {
-  Schema,
-  Model,
-  Field,
-  FieldType,
-  Attribute,
-  DefaultValue,
-  validateSchema,
-} from '@prisma/relational-ir';
+import { SchemaAST, ModelDeclaration, FieldDeclaration } from '@prisma/psl';
+import { Schema, validateSchema } from '@prisma/relational-ir';
 
 export function emitSchema(ast: SchemaAST): Schema {
-  const models: Model[] = ast.models.map(emitModel);
+  const tables: Record<string, any> = {};
 
-  const schema: Schema = { models };
+  for (const model of ast.models) {
+    const tableName = model.name.toLowerCase();
+    tables[tableName] = emitTable(model);
+  }
 
-  // Validate the emitted schema
+  const schema: Schema = {
+    target: 'postgres',
+    tables,
+  };
+
   return validateSchema(schema);
 }
 
-function emitModel(modelAst: ModelDeclaration): Model {
-  const fields: Field[] = modelAst.fields.map(emitField);
+function emitTable(model: ModelDeclaration) {
+  const columns: Record<string, any> = {};
 
-  return {
-    name: modelAst.name,
-    fields,
-  };
-}
-
-function emitField(fieldAst: FieldDeclaration): Field {
-  const fieldType = mapFieldType(fieldAst.fieldType);
-  const attributes: Attribute[] = fieldAst.attributes.map(emitAttribute);
-
-  return {
-    name: fieldAst.name,
-    type: fieldType,
-    attributes,
-  };
-}
-
-function emitAttribute(attrAst: AttributeDeclaration): Attribute {
-  switch (attrAst.name) {
-    case 'id':
-      return { name: 'id' };
-    case 'unique':
-      return { name: 'unique' };
-    case 'default':
-      const defaultValue = emitDefaultValue(attrAst.args?.[0]?.value);
-      return { name: 'default', value: defaultValue };
-    default:
-      throw new Error(`Unknown attribute: ${attrAst.name}`);
+  for (const field of model.fields) {
+    columns[field.name] = emitColumn(field);
   }
+
+  return {
+    columns,
+    indexes: [],
+    constraints: [],
+    capabilities: [],
+    meta: {
+      source: `model ${model.name}`,
+    },
+  };
 }
 
-function emitDefaultValue(value: any): DefaultValue {
-  if (typeof value === 'string') {
-    switch (value) {
-      case 'autoincrement':
-        return { type: 'autoincrement' };
-      case 'now':
-        return { type: 'now' };
-      default:
-        return { type: 'literal', value };
+function emitColumn(field: FieldDeclaration) {
+  const column: any = {
+    type: mapToPgType(field.fieldType),
+    nullable: false, // PSL fields are non-nullable by default
+  };
+
+  for (const attr of field.attributes) {
+    if (attr.name === 'id') {
+      column.pk = true;
+    } else if (attr.name === 'unique') {
+      column.unique = true;
+    } else if (attr.name === 'default') {
+      column.default = emitDefaultValue(attr.args?.[0]?.value);
     }
   }
 
-  if (typeof value === 'boolean') {
-    return { type: 'literal', value: value.toString() };
-  }
-
-  throw new Error(`Invalid default value: ${value}`);
+  return column;
 }
 
-function mapFieldType(astType: string): FieldType {
-  switch (astType) {
+function mapToPgType(pslType: string): string {
+  switch (pslType) {
     case 'Int':
-      return 'Int';
+      return 'int4';
+    case 'BigInt':
+      return 'int8';
     case 'String':
-      return 'String';
+      return 'text';
     case 'Boolean':
-      return 'Boolean';
+      return 'bool';
     case 'DateTime':
-      return 'DateTime';
+      return 'timestamptz';
     case 'Float':
-      return 'Float';
+      return 'float8';
     default:
-      throw new Error(`Unknown field type: ${astType}`);
+      throw new Error(`Unknown PSL type: ${pslType}`);
   }
+}
+
+function emitDefaultValue(value: any) {
+  if (value === 'autoincrement') return { kind: 'autoincrement' };
+  if (value === 'now') return { kind: 'now' };
+  return { kind: 'literal', value: String(value) };
 }

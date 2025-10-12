@@ -11,7 +11,9 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
     const fieldList = Object.entries(query.select.fields)
       .map(([alias, column]) => {
         if (isColumn(column)) {
-          return `${column.name} AS ${alias}`;
+          const quotedName = quoteIdentifier(column.name);
+          const quotedAlias = quoteIdentifier(alias);
+          return `${quotedName} AS ${quotedAlias}`;
         }
         return `${column} AS ${alias}`;
       })
@@ -22,7 +24,7 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   }
 
   // Handle FROM clause
-  sql += ` FROM ${query.from}`;
+  sql += ` FROM ${quoteIdentifier(query.from)}`;
 
   // Handle WHERE clause
   if (query.where) {
@@ -40,7 +42,8 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
 
   // Handle LIMIT clause
   if (query.limit) {
-    sql += ` LIMIT ${query.limit.count}`;
+    params.push(query.limit.count);
+    sql += ` LIMIT $${paramIndex}`;
   }
 
   return { sql, params };
@@ -61,7 +64,7 @@ function compileExpression(expr: FieldExpression, params: any[], paramIndex: num
 }
 
 function compileColumnExpression(expr: any, params: any[], paramIndex: number): string {
-  const field = expr.field;
+  const field = quoteIdentifier(expr.field);
 
   switch (expr.type) {
     case 'eq':
@@ -92,7 +95,7 @@ function compileColumnExpression(expr: any, params: any[], paramIndex: number): 
 }
 
 function compileFieldExpression(expr: any, params: any[], paramIndex: number): string {
-  const field = expr.field;
+  const field = quoteIdentifier(expr.field);
 
   switch (expr.type) {
     case 'eq':
@@ -154,4 +157,68 @@ function isColumnExpression(obj: any): boolean {
 
 function isFieldExpression(obj: any): boolean {
   return obj && typeof obj === 'object' && 'type' in obj && 'field' in obj;
+}
+
+function quoteIdentifier(identifier: string): string {
+  // PostgreSQL reserved words that should always be quoted
+  const reservedWords = new Set([
+    'user',
+    'order',
+    'group',
+    'select',
+    'from',
+    'where',
+    'having',
+    'limit',
+    'offset',
+    'table',
+    'column',
+    'index',
+    'constraint',
+    'primary',
+    'foreign',
+    'key',
+    'unique',
+    'check',
+    'default',
+    'null',
+    'not',
+    'and',
+    'or',
+    'in',
+    'exists',
+    'between',
+    'like',
+    'ilike',
+    'similar',
+    'to',
+    'is',
+    'as',
+    'asc',
+    'desc',
+    'case',
+    'when',
+    'then',
+    'else',
+    'end',
+    'cast',
+    'extract',
+    'current_date',
+    'current_time',
+    'current_timestamp',
+    'now',
+    'true',
+    'false',
+    'unknown',
+  ]);
+
+  // Quote identifiers that contain mixed case, special characters, or are reserved words
+  if (
+    identifier !== identifier.toLowerCase() ||
+    /[^a-zA-Z0-9_]/.test(identifier) ||
+    reservedWords.has(identifier.toLowerCase())
+  ) {
+    return `"${identifier}"`;
+  }
+  return identifier;
 }

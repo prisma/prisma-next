@@ -1,83 +1,63 @@
-import { Schema, Model, Field } from '@prisma/relational-ir';
+import { Schema } from '@prisma/relational-ir';
 
 export function emitTypes(schema: Schema): string {
-  const modelTypes = schema.models.map(emitModelType).join('\n\n');
-  const tableTypes = emitTableTypes(schema);
-  const tablesInterface = emitTablesInterface(schema);
+  const interfaces: string[] = [];
+
+  // Generate shape interfaces
+  for (const [tableName, table] of Object.entries(schema.tables)) {
+    const shapeName = capitalize(tableName) + 'Shape';
+    const fields: string[] = [];
+
+    for (const [colName, col] of Object.entries(table.columns)) {
+      const tsType = mapPgTypeToTS(col.type);
+      fields.push(`  ${colName}: ${tsType};`);
+    }
+
+    interfaces.push(`export interface ${shapeName} {\n${fields.join('\n')}\n}`);
+  }
+
+  // Generate Tables interface
+  const tableEntries: string[] = [];
+  for (const tableName of Object.keys(schema.tables)) {
+    const shapeName = capitalize(tableName) + 'Shape';
+    tableEntries.push(`  ${tableName}: Table<${shapeName}>;`);
+  }
+
+  interfaces.push(`export interface Tables {\n${tableEntries.join('\n')}\n}`);
 
   return `// Generated TypeScript definitions
 // This file is auto-generated. Do not edit manually.
 
 import { Column, Table } from '@prisma/sql';
 
-${modelTypes}
-
-${tableTypes}
-
-${tablesInterface}
+${interfaces.join('\n\n')}
 `;
 }
 
-function emitModelType(model: Model): string {
-  const fieldTypes = model.fields.map(emitFieldType).join('\n  ');
-
-  return `export interface ${model.name} {
-  ${fieldTypes}
-}`;
-}
-
-function emitFieldType(field: Field): string {
-  const tsType = mapToTypeScriptType(field.type);
-  // Don't make fields optional - all fields are always present in the table
-  return `${field.name}: ${tsType};`;
-}
-
-function emitTableTypes(schema: Schema): string {
-  const tableShapes = schema.models
-    .map((model) => {
-      const fieldTypes = model.fields
-        .map((field) => {
-          const tsType = mapToTypeScriptType(field.type);
-          // Don't make fields optional - all fields are always present in the table
-          return `  ${field.name}: ${tsType};`;
-        })
-        .join('\n');
-
-      return `export interface ${model.name}Shape {
-${fieldTypes}
-}`;
-    })
-    .join('\n\n');
-
-  return tableShapes;
-}
-
-function emitTablesInterface(schema: Schema): string {
-  const tableEntries = schema.models
-    .map((model) => {
-      return `  ${model.name.toLowerCase()}: Table<${model.name}Shape>;`;
-    })
-    .join('\n');
-
-  return `export interface Tables {
-${tableEntries}
-}`;
-}
-
-function mapToTypeScriptType(fieldType: string): string {
-  switch (fieldType) {
-    case 'Int':
+function mapPgTypeToTS(pgType: string): string {
+  switch (pgType) {
+    case 'int4':
+    case 'int8':
+    case 'float4':
+    case 'float8':
       return 'number';
-    case 'String':
+    case 'text':
+    case 'varchar':
+    case 'uuid':
       return 'string';
-    case 'Boolean':
+    case 'bool':
       return 'boolean';
-    case 'DateTime':
+    case 'timestamptz':
+    case 'timestamp':
       return 'Date';
-    case 'Float':
-      return 'number';
-    default:
+    case 'json':
+    case 'jsonb':
       return 'any';
+    default:
+      return 'unknown';
   }
 }
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
