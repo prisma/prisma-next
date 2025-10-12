@@ -1,4 +1,5 @@
-import { QueryAST, Column, Expression, InferSelectResult, InferTableShape, Table } from './types';
+import { QueryAST, Column, FieldExpression, InferSelectResult, InferTableShape, Table } from './types';
+import { compileToSQL } from './compiler';
 
 export class QueryBuilder<TTable extends Table<any>> {
   private ast: QueryAST;
@@ -17,7 +18,7 @@ export class QueryBuilder<TTable extends Table<any>> {
     return this as any;
   }
 
-  where(condition: Expression<boolean>): QueryBuilder<TTable> {
+  where(condition: FieldExpression): QueryBuilder<TTable> {
     this.ast.where = { type: 'where', condition };
     return this;
   }
@@ -35,8 +36,9 @@ export class QueryBuilder<TTable extends Table<any>> {
     return this;
   }
 
-  build(): QueryAST {
-    return this.ast;
+  build(): { sql: string; params: unknown[]; rowType: InferSelectResult<any> } {
+    const { sql, params } = compileToSQL(this.ast);
+    return { sql, params, rowType: {} as any };
   }
 }
 
@@ -44,7 +46,7 @@ export interface FromBuilder<TTable extends Table<any>> {
   select<TSelect extends Record<string, Column<any>>>(
     fields: TSelect
   ): QueryBuilder<TTable> & { build(): { sql: string; params: unknown[]; rowType: InferSelectResult<TSelect> } };
-  where(condition: Expression<boolean>): FromBuilder<TTable>;
+  where(condition: FieldExpression): FromBuilder<TTable>;
   orderBy(field: string, direction?: 'ASC' | 'DESC'): FromBuilder<TTable>;
   limit(count: number): FromBuilder<TTable>;
 }

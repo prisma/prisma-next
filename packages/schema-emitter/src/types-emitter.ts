@@ -81,9 +81,3 @@ function mapToTypeScriptType(fieldType: string): string {
   }
 }
 
-function hasDefaultValue(field: Field): boolean {
-  return field.attributes.some(attr =>
-    attr.name === 'default' ||
-    attr.name === 'id'
-  );
-}

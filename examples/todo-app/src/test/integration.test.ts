@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { parse } from '@prisma/psl';
 import { emitSchemaAndTypes } from '@prisma/schema-emitter';
 import { connect } from '@prisma/runtime';
-import { sql } from '@prisma/sql';
+import { sql, TABLE_NAME } from '@prisma/sql';
 import { t } from '../schema';
 
 describe('Integration Tests', () => {
@@ -91,6 +91,11 @@ describe('Integration Tests', () => {
       .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email });
+
+    console.log('Debug - t.user:', t.user);
+    console.log('Debug - t.user[TABLE_NAME]:', t.user[TABLE_NAME]);
+    console.log('Debug - Generated SQL:', query.build().sql);
+    console.log('Debug - Parameters:', query.build().params);
 
     const results = await db.execute(query.build());
 

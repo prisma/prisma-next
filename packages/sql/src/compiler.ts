@@ -1,4 +1,4 @@
-import { QueryAST, Column, Expression } from './types';
+import { QueryAST, Column, FieldExpression } from './types';
 
 export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   const params: any[] = [];
@@ -46,7 +46,7 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   return { sql, params };
 }
 
-function compileExpression(expr: Expression<any>, params: any[], paramIndex: number): string {
+function compileExpression(expr: FieldExpression, params: any[], paramIndex: number): string {
   // Handle Column expressions (from t.user.id.eq(value))
   if (isColumnExpression(expr)) {
     return compileColumnExpression(expr, params, paramIndex);
@@ -122,7 +122,7 @@ function compileFieldExpression(expr: any, params: any[], paramIndex: number): s
   }
 }
 
-function getParamCount(expr: Expression<any>): number {
+function getParamCount(expr: FieldExpression): number {
   if (isFieldExpression(expr)) {
     switch ((expr as any).type) {
       case 'in':

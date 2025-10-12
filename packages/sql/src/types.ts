@@ -6,21 +6,30 @@ import { Schema } from '@prisma/relational-ir';
 export type SchemaIR = Schema;
 
 // Helper type for type-safe table names
+export type TableName<TTables> = keyof TTables & string;
 
 export interface Expression<T> {
   readonly __t?: T;
 }
 
+// Legacy types for backward compatibility during transition
+export interface FieldExpression {
+  type: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in';
+  field: string;
+  value?: any;
+  values?: any[];
+}
+
 export interface Column<T> extends Expression<T> {
   readonly table: string;
   readonly name: string;
-  eq(value: T): Expression<boolean>;
-  ne(value: T): Expression<boolean>;
-  gt(value: T): Expression<boolean>;
-  lt(value: T): Expression<boolean>;
-  gte(value: T): Expression<boolean>;
-  lte(value: T): Expression<boolean>;
-  in(values: T[]): Expression<boolean>;
+  eq(value: T): FieldExpression;
+  ne(value: T): FieldExpression;
+  gt(value: T): FieldExpression;
+  lt(value: T): FieldExpression;
+  gte(value: T): FieldExpression;
+  lte(value: T): FieldExpression;
+  in(values: T[]): FieldExpression;
 }
 
 export const TABLE_NAME = Symbol('tableName');
@@ -36,13 +45,6 @@ export interface Tables {
 }
 
 // Legacy types for backward compatibility during transition
-export interface FieldExpression {
-  type: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in';
-  field: string;
-  value?: any;
-  values?: any[];
-}
-
 export interface SelectClause {
   type: 'select';
   fields: Record<string, Column<any>>;
@@ -50,7 +52,7 @@ export interface SelectClause {
 
 export interface WhereClause {
   type: 'where';
-  condition: Expression<boolean>;
+  condition: FieldExpression;
 }
 
 export interface OrderByClause {

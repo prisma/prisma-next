@@ -1,214 +1,87 @@
 ---
-description: Schema-driven architecture for Prisma Next - how makeT creates runtime typed tables from JSON IR
+description: Comprehensive documentation on the schema-driven architecture for Prisma Next prototype
 globs: ["**/*"]
 ---
 
-# Schema-Driven Architecture
+# Schema-Driven Architecture for Prisma Next Prototype
 
-## Overview
+This document details the architectural pattern for integrating the Prisma Schema Language (PSL) with the TypeScript Query DSL, focusing on type safety and runtime efficiency.
 
-Prisma Next uses a schema-driven architecture where runtime typed tables are created from JSON Intermediate Representation (IR) rather than generated code. This approach provides clean separation between types and runtime, supports multiple schemas, and is AI-friendly.
+## Core Principle: Separation of Concerns
 
-## Architecture Components
+The architecture strictly separates compile-time type information from runtime data.
 
-### 1. Schema JSON (Runtime Source of Truth)
-- **File**: `.prisma/schema.json`
-- **Purpose**: Contains the complete schema IR as JSON
-- **Usage**: Imported by `makeT()` to create runtime typed tables
-- **Format**: Standard relational IR with models, fields, attributes
+1. **`schema.json` (Runtime Intermediate Representation - IR)**:
+   - **Purpose**: This JSON file is the canonical runtime representation of the database schema, emitted by the `@prisma/cli` from a PSL file.
+   - **Content**: It contains metadata about models (tables) and their fields (columns), including names, types, and attributes.
+   - **Usage**: It is loaded at runtime by the application (e.g., `import ir from '../.prisma/schema.json' assert { type: 'json' };`) and passed to the `makeT` factory function.
 
-### 2. Schema TypeScript Definitions (Compile-time Types)
-- **File**: `.prisma/schema.d.ts`
-- **Purpose**: Provides TypeScript type definitions only
-- **Contents**:
-  - Model interfaces (`User`, `Order`, etc.)
-  - Shape interfaces (`UserShape`, `OrderShape`, etc.)
-  - Tables interface (`Tables` with typed table definitions)
-- **No runtime code**: Only type definitions
+2. **`schema.d.ts` (Compile-Time Type Definitions)**:
+   - **Purpose**: This TypeScript declaration file provides static type information for the DSL, enabling autocompletion, type checking, and compile-time errors. It is also emitted by the `@prisma/cli`.
+   - **Content**: It defines TypeScript interfaces for models (e.g., `User`), their shapes (e.g., `UserShape`), and the `Tables` interface.
+   - **Usage**: TypeScript consumes this file during compilation. It is *not* imported at runtime for its value.
 
-### 3. makeT Factory Function (Runtime Construction)
-- **Location**: `@prisma/sql` package
-- **Signature**: `makeT<TTables>(ir: SchemaIR): TTables`
-- **Purpose**: Creates runtime typed tables from JSON IR
-- **Process**:
-  1. Iterates through schema IR models
-  2. Creates table objects with `name` property
-  3. Creates Column objects for each field with:
-     - `__t: undefined as any` (phantom type marker)
-     - `table: string` (lowercased model name)
-     - `name: string` (field name)
-     - Static operator methods (`.eq()`, `.ne()`, `.gt()`, etc.)
+## The `t` Object: Bridging Runtime and Compile-Time
 
-## Type Flow
+The `t` object is the central point of interaction for building type-safe queries. It is a runtime object that *appears* to TypeScript as if it has the static shape defined in `schema.d.ts`.
 
-```
-PSL Schema → Schema IR (JSON) → makeT<Tables>(ir) → Typed Runtime Object
-     ↓
-Schema.d.ts → Tables Interface → Type Parameter → Full Type Safety
-```
+1. **`makeT(ir: SchemaIR): Tables` (Factory Function in `@prisma/sql`)**:
+   - **Role**: This function takes the `schema.json` (parsed as `SchemaIR`) and dynamically constructs a JavaScript object.
+   - **Output**: The returned object (`t`) has properties corresponding to each table (e.g., `t.user`, `t.post`), and each table property contains `Column` objects for its fields (e.g., `t.user.id`, `t.user.email`).
+   - **Runtime Behavior**: Each `Column` object is a plain JavaScript object that includes the column's `table` name, `name`, and methods for comparison operators (`eq`, `ne`, `gt`, etc.). These operator methods dynamically create `Expression` objects.
 
-### Example Usage Pattern
+2. **Type Flow**:
+   - **Compile-Time**: The `Tables` interface in `schema.d.ts` defines the static shape that TypeScript expects.
+   - **Runtime**: The `makeT` function creates an object that matches this shape dynamically from the JSON IR.
+   - **Type Safety**: When `makeT<Tables>(ir)` is called, TypeScript infers the return type as the `Tables` interface, providing full autocompletion and type safety.
+
+## Type Flow and Safety
+
+- **Compile-Time Safety**:
+  - **Table References**: When using `sql().from(t.user)`, TypeScript ensures that `t.user` exists and is a valid `Table` object based on the `Tables` interface.
+  - **Column References**: Accessing `t.user.id` is type-checked. If `id` doesn't exist on `UserShape`, a compile-time error occurs.
+  - **Operator Arguments**: `Column<T>['eq'](value: T)` enforces that the value passed to an operator matches the column's type (e.g., `t.user.active.eq('yes')` would be a compile-time error if `active` is `boolean`).
+
+- **Runtime Safety**:
+  - **On-First-Use Verification**: Although compile-time checks are strong, a runtime verifier (part of `@prisma/runtime`) still performs a light check against the `schema.json` on the first execution of a query. This acts as a safety net for scenarios that might bypass compile-time checks (e.g., `any` casts, or if the `schema.json` and `schema.d.ts` somehow get out of sync).
+  - **Dynamic `t` Object**: The `makeT` function ensures that the runtime `t` object accurately reflects the structure defined in `schema.json`.
+
+## Usage Patterns
+
+- **Prefer Table References**: Always use `sql().from(t.TableName)` instead of `sql().from("tableName")` to leverage full compile-time type safety.
+- **Column Objects in Queries**: Use `Column` objects (e.g., `t.user.id`) directly in `select` and `where` clauses for precise type inference and validation.
+- **Static Operators**: The comparison operators (`eq`, `lt`, `in`, etc.) are part of the `@prisma/sql` library and are consistently available on all `Column` objects.
+
+## Benefits
+
+1. **No Generated Runtime Code**: Unlike traditional ORMs, there's no generated client code to maintain. The `t` object is created dynamically from JSON.
+2. **Clean Separation**: Types (`.d.ts`) and runtime data (`.json`) are completely separate, making the system easier to understand and debug.
+3. **Multiple Schemas**: Different schemas can coexist in the same application by using different `Tables` types.
+4. **AI-Friendly**: The simple JSON IR and explicit factory pattern make it easy for AI systems to understand and generate code.
+5. **Type Safety**: Full compile-time type checking with runtime verification as a safety net.
+
+## Example Implementation
 
 ```typescript
-// src/schema.ts
+// schema.ts - Runtime object creation
 import ir from '../.prisma/schema.json' assert { type: 'json' };
 import { makeT } from '@prisma/sql';
 import type { Tables } from '../.prisma/schema.d.ts';
 
 export const t = makeT<Tables>(ir);
-```
 
-```typescript
-// src/queries.ts
+// queries.ts - Type-safe query building
 import { sql } from '@prisma/sql';
 import { t } from './schema';
 
 export async function getActiveUsers() {
   const query = sql()
-    .from('user')  // or t.user for full type safety
-    .where(t.user.active.eq(true))
-    .select({ id: t.user.id, email: t.user.email });
+    .from(t.user)  // Type-safe table reference
+    .where(t.user.active.eq(true))  // Type-safe column and value
+    .select({ id: t.user.id, email: t.user.email });  // Type-safe projection
 
-  return db.execute(query.build());
+  return await db.execute(query.build());
 }
 ```
 
-## Operator Design
-
-### Static Operators in Library
-- **Location**: `@prisma/sql` package
-- **Scope**: Fixed set of operators (`.eq()`, `.ne()`, `.gt()`, `.lt()`, `.gte()`, `.lte()`, `.in()`)
-- **Purpose**: Provide consistent API across all schemas
-- **Implementation**: Each operator returns `Expression<boolean>` with IR structure
-
-### Runtime Column Creation
-- **Source**: Schema IR (JSON)
-- **Process**: `makeT()` creates Column objects with static operators attached
-- **Type Safety**: `Column<T>` enforces correct value types at compile-time
-
-## Type Safety Layers
-
-### Compile-time Safety
-1. **Column Value Types**: `Column<T>['eq'](value: T)` enforces correct value types
-2. **Table Names**: `keyof Tables` restricts table names to those in schema
-3. **Select Projections**: `{ id: Column<number> }` → `{ id: number }` type inference
-
-### Runtime Safety (Belt-and-Suspenders)
-1. **First-use Verification**: Checks table/column existence against schema.json
-2. **Parameter Validation**: Light type checking for obviously wrong types
-3. **Graceful Fallback**: Re-verification when schema changes
-
-## Multi-Schema Support
-
-### Type Parameter Pattern
-```typescript
-// Schema A
-import irA from './schema-a.json' assert { type: 'json' };
-import type { Tables as TablesA } from './schema-a.d.ts';
-export const tA = makeT<TablesA>(irA);
-
-// Schema B
-import irB from './schema-b.json' assert { type: 'json' };
-import type { Tables as TablesB } from './schema-b.d.ts';
-export const tB = makeT<TablesB>(irB);
-```
-
-### Benefits
-- **No Namespace Conflicts**: Each schema has its own type parameter
-- **Independent Evolution**: Schemas can change without affecting each other
-- **Type Safety**: Each `t` object is fully typed for its specific schema
-
-## Usage Patterns
-
-### Preferred Patterns
-```typescript
-// ✅ Prefer typed table objects
-sql().from(t.user)
-
-// ✅ Use column objects in predicates and selects
-.where(t.user.active.eq(true))
-.select({ id: t.user.id, email: t.user.email })
-
-// ✅ Full type safety with Column<T>
-t.user.id.eq(123)  // TypeScript knows id is number
-```
-
-### Alternative Patterns
-```typescript
-// ✅ Also supported: string table names (typed as keyof Tables)
-sql().from('user')
-
-// ✅ Runtime verification catches any issues
-```
-
-## Benefits
-
-### 1. No Generated Runtime Code
-- **Cleaner**: No complex generated code to maintain
-- **Debuggable**: Runtime objects are simple, inspectable
-- **Flexible**: Easy to extend with custom operators
-
-### 2. Clean Separation
-- **Types**: Pure TypeScript definitions in `.d.ts`
-- **Runtime**: Simple JSON IR
-- **Construction**: Explicit factory pattern
-
-### 3. Multiple Schema Support
-- **Coexistence**: Multiple schemas in same application
-- **Type Safety**: Each schema fully typed independently
-- **No Conflicts**: No global namespace pollution
-
-### 4. AI-Friendly
-- **Simple IR**: Easy to understand JSON structure
-- **Explicit Patterns**: Clear factory function usage
-- **Predictable**: Consistent operator API across schemas
-
-## Implementation Details
-
-### makeT Factory Function
-```typescript
-export function makeT<TTables>(ir: SchemaIR): TTables {
-  const tables: any = {};
-
-  for (const model of ir.models) {
-    const tableName = model.name.toLowerCase();
-    const table: any = { name: tableName };
-
-    for (const field of model.fields) {
-      table[field.name] = {
-        __t: undefined as any,
-        table: tableName,
-        name: field.name,
-        eq: (value: any) => ({ __t: undefined as any, type: 'eq', field: field.name, value }),
-        // ... other operators
-      } as Column<any>;
-    }
-
-    tables[tableName] = table;
-  }
-
-  return tables as TTables;
-}
-```
-
-### Schema Emitter Output
-```typescript
-// .prisma/schema.d.ts
-export interface User {
-  id?: number;
-  email: string;
-  active?: boolean;
-}
-
-export interface UserShape {
-  id?: number;
-  email: string;
-  active?: boolean;
-}
-
-export interface Tables {
-  user: Table<UserShape>;
-}
-```
-
-This architecture provides a clean, type-safe, and maintainable foundation for the Prisma Next query DSL while supporting multiple schemas and being friendly to both human developers and AI systems.
+This architecture provides a powerful combination of dynamic runtime flexibility with robust compile-time type safety, making the DSL both easy to use and highly reliable.

@@ -1,10 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { sql, t } from '../src/index';
+import { sql, makeT } from '../src/index';
+
+// Create a mock schema for testing
+const mockSchema = {
+  models: [
+    {
+      name: 'User',
+      fields: [
+        { name: 'id', type: 'Int', attributes: [{ name: 'id' }] },
+        { name: 'email', type: 'String', attributes: [{ name: 'unique' }] },
+        { name: 'active', type: 'Boolean', attributes: [{ name: 'default', value: { type: 'literal', value: 'true' } }] },
+        { name: 'createdAt', type: 'DateTime', attributes: [{ name: 'default', value: { type: 'now' } }] }
+      ]
+    }
+  ]
+};
+
+// Create typed tables for testing
+const t = makeT(mockSchema);
 
 describe('Type Inference Tests', () => {
   it('infers correct return type for simple select', () => {
     const query = sql()
-      .from('user')
+      .from(t.user)
       .select({ id: t.user.id, email: t.user.email });
 
     // This test verifies that TypeScript can infer the correct types
@@ -12,15 +30,13 @@ describe('Type Inference Tests', () => {
     const result = query.build();
 
     // Verify the query structure
-    expect(result.type).toBe('select');
-    expect(result.from).toBe('user');
-    expect(result.select?.fields).toHaveProperty('id');
-    expect(result.select?.fields).toHaveProperty('email');
+    expect(result.sql).toBe('SELECT id AS id, email AS email FROM user');
+    expect(result.params).toHaveLength(0);
   });
 
   it('infers correct return type for select with all fields', () => {
     const query = sql()
-      .from('user')
+      .from(t.user)
       .select({
         id: t.user.id,
         email: t.user.email,
@@ -30,53 +46,44 @@ describe('Type Inference Tests', () => {
 
     const result = query.build();
 
-    expect(result.type).toBe('select');
-    expect(result.from).toBe('user');
-    expect(result.select?.fields).toHaveProperty('id');
-    expect(result.select?.fields).toHaveProperty('email');
-    expect(result.select?.fields).toHaveProperty('active');
-    expect(result.select?.fields).toHaveProperty('createdAt');
+    expect(result.sql).toBe('SELECT id AS id, email AS email, active AS active, createdAt AS createdAt FROM user');
+    expect(result.params).toHaveLength(0);
   });
 
   it('infers correct return type for query with where clause', () => {
     const query = sql()
-      .from('user')
+      .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email });
 
     const result = query.build();
 
-    expect(result.type).toBe('select');
-    expect(result.where?.condition).toBeDefined();
-    expect(result.select?.fields).toHaveProperty('id');
-    expect(result.select?.fields).toHaveProperty('email');
+    expect(result.sql).toBe('SELECT id AS id, email AS email FROM user WHERE active = $1');
+    expect(result.params).toEqual([true]);
   });
 
   it('infers correct return type for query with limit', () => {
     const query = sql()
-      .from('user')
+      .from(t.user)
       .select({ id: t.user.id })
       .limit(10);
 
     const result = query.build();
 
-    expect(result.type).toBe('select');
-    expect(result.limit?.count).toBe(10);
-    expect(result.select?.fields).toHaveProperty('id');
+    expect(result.sql).toBe('SELECT id AS id FROM user LIMIT 10');
+    expect(result.params).toHaveLength(0);
   });
 
   it('infers correct return type for query with order by', () => {
     const query = sql()
-      .from('user')
+      .from(t.user)
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('id', 'ASC');
 
     const result = query.build();
 
-    expect(result.type).toBe('select');
-    expect(result.orderBy).toHaveLength(1);
-    expect(result.orderBy?.[0].field).toBe('id');
-    expect(result.orderBy?.[0].direction).toBe('ASC');
+    expect(result.sql).toBe('SELECT id AS id, email AS email FROM user ORDER BY id ASC');
+    expect(result.params).toHaveLength(0);
   });
 
   it('verifies Column objects have correct structure', () => {

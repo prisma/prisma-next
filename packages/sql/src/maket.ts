@@ -1,4 +1,4 @@
-import { Column, TABLE_NAME } from './types';
+import { Column, TABLE_NAME, SchemaIR } from './types';
 
 // Factory function to create typed tables from schema IR
 export function makeT<TTables>(ir: any): TTables {
