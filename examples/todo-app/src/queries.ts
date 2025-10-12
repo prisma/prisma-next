@@ -1,4 +1,5 @@
-import { sql, t } from '@prisma/sql';
+import { sql } from '@prisma/sql';
+import { t } from '../.prisma/schema.d.ts';
 import { db } from './db';
 
 export async function getActiveUsers() {

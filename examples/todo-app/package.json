@@ -6,21 +6,24 @@
     "build": "pnpm exec tsc",
     "dev": "pnpm exec tsc --watch",
     "start": "pnpm exec node dist/main.js",
-    "generate": "pnpm exec node --input-type=module -e \"import { parse } from '../../packages/psl/dist/index.js'; import { emitSchemaAndTypes } from '../../packages/schema-emitter/dist/index.js'; import fs from 'fs'; const pslContent = fs.readFileSync('schema.psl', 'utf-8'); const ast = parse(pslContent); const { schema, types } = emitSchemaAndTypes(ast); fs.mkdirSync('.prisma', { recursive: true }); fs.writeFileSync('.prisma/schema.json', schema); fs.writeFileSync('.prisma/schema.d.ts', types); console.log('✅ Generated schema files');\"",
+    "generate": "pnpm exec prisma-next generate schema.psl",
+    "dev:schema": "pnpm exec prisma-next dev schema.psl",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.config.ts",
     "lint": "eslint 'src/**/*.ts'",
     "typecheck": "pnpm exec tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/relational-ir": "workspace:*",
+    "@prisma/cli": "workspace:*",
+    "@prisma/dev": "^0.11.0",
     "@prisma/psl": "workspace:*",
-    "@prisma/schema-emitter": "workspace:*",
-    "@prisma/sql": "workspace:*",
+    "@prisma/relational-ir": "workspace:*",
     "@prisma/runtime": "workspace:*",
-    "@prisma/dev": "^5.0.0"
+    "@prisma/schema-emitter": "workspace:*",
+    "@prisma/sql": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^24.7.2",
     "typescript": "^5.6.2",
     "vitest": "^2.1.1"
   }
