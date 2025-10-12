@@ -79,9 +79,24 @@ globs: ["**/*"]
 - Clear error messages for type mismatches
 - Graceful fallback when schema changes (re-verification)
 
-## CLI Design
+## Schema-Driven Architecture
 
-**Decision**: Programmatic API alongside CLI commands
-- Export `emitSchemaAndTypes()` function for programmatic use
-- CLI commands use the same programmatic API
-- Support both `generate` and `dev` commands for different workflows
+**Decision**: Runtime typed tables created from JSON IR via makeT factory
+- `makeT<TTables>(ir: SchemaIR): TTables` builds runtime `t` object from JSON
+- schema.d.ts provides types via `Tables` interface (no module augmentation)
+- Operators are static in library; columns/tables come from IR
+- Compile-time: `Column<T>` enforces value types, `keyof Tables` enforces table names
+- Runtime: verification on first execute as safety net
+- Multiple schemas supported via generic type parameter
+
+**Decision**: Clean separation of concerns
+- Schema JSON (.json) = runtime source of truth
+- Schema types (.d.ts) = compile-time type definitions only
+- No generated runtime code - explicit factory pattern
+- Users call `makeT(ir)` to get typed tables
+
+**Decision**: Type-safe usage patterns
+- Prefer `t.user` over `'user'` strings for full type safety
+- Column objects in where/select for complete type inference
+- Static operators in library, applied to runtime columns
+- AI-friendly: simple JSON IR, explicit construction pattern

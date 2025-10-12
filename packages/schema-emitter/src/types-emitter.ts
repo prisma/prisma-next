@@ -3,21 +3,18 @@ import { Schema, Model, Field } from '@prisma/relational-ir';
 export function emitTypes(schema: Schema): string {
   const modelTypes = schema.models.map(emitModelType).join('\n\n');
   const tableTypes = emitTableTypes(schema);
-  const tableAccessors = emitTableAccessors(schema);
+  const tablesInterface = emitTablesInterface(schema);
 
   return `// Generated TypeScript definitions
 // This file is auto-generated. Do not edit manually.
 
-import { Column, Table, Tables } from '@prisma/sql';
+import { Column, Table } from '@prisma/sql';
 
 ${modelTypes}
 
 ${tableTypes}
 
-${tableAccessors}
-
-// Export schema for runtime use
-export default schema;
+${tablesInterface}
 `;
 }
 
@@ -31,9 +28,40 @@ function emitModelType(model: Model): string {
 
 function emitFieldType(field: Field): string {
   const tsType = mapToTypeScriptType(field.type);
-  const optional = hasDefaultValue(field) ? '?' : '';
+  // Don't make fields optional - all fields are always present in the table
+  return `${field.name}: ${tsType};`;
+}
 
-  return `${field.name}${optional}: ${tsType};`;
+function emitTableTypes(schema: Schema): string {
+  const tableShapes = schema.models
+    .map((model) => {
+      const fieldTypes = model.fields
+        .map((field) => {
+          const tsType = mapToTypeScriptType(field.type);
+          // Don't make fields optional - all fields are always present in the table
+          return `  ${field.name}: ${tsType};`;
+        })
+        .join('\n');
+
+      return `export interface ${model.name}Shape {
+${fieldTypes}
+}`;
+    })
+    .join('\n\n');
+
+  return tableShapes;
+}
+
+function emitTablesInterface(schema: Schema): string {
+  const tableEntries = schema.models
+    .map((model) => {
+      return `  ${model.name.toLowerCase()}: Table<${model.name}Shape>;`;
+    })
+    .join('\n');
+
+  return `export interface Tables {
+${tableEntries}
+}`;
 }
 
 function mapToTypeScriptType(fieldType: string): string {
@@ -49,64 +77,13 @@ function mapToTypeScriptType(fieldType: string): string {
     case 'Float':
       return 'number';
     default:
-      return 'unknown';
+      return 'any';
   }
 }
 
 function hasDefaultValue(field: Field): boolean {
-  return field.attributes.some((attr) => attr.name === 'default');
-}
-
-function emitTableTypes(schema: Schema): string {
-  const tableShapes = schema.models
-    .map((model) => {
-      const fieldTypes = model.fields
-        .map((field) => {
-          const tsType = mapToTypeScriptType(field.type);
-          const optional = hasDefaultValue(field) ? '?' : '';
-          return `  ${field.name}${optional}: ${tsType};`;
-        })
-        .join('\n');
-
-      return `export interface ${model.name}Shape {
-${fieldTypes}
-}`;
-    })
-    .join('\n\n');
-
-  return tableShapes;
-}
-
-function emitTableAccessors(schema: Schema): string {
-  const accessors = schema.models
-    .map((model) => {
-      const fieldAccessors = model.fields
-        .map((field) => {
-          const tsType = mapToTypeScriptType(field.type);
-          return `    ${field.name}: {
-      table: '${model.name.toLowerCase()}',
-      name: '${field.name}',
-      eq: (value: ${tsType}) => ({ type: 'eq' as const, field: '${field.name}', value }),
-      ne: (value: ${tsType}) => ({ type: 'ne' as const, field: '${field.name}', value }),
-      gt: (value: ${tsType}) => ({ type: 'gt' as const, field: '${field.name}', value }),
-      lt: (value: ${tsType}) => ({ type: 'lt' as const, field: '${field.name}', value }),
-      gte: (value: ${tsType}) => ({ type: 'gte' as const, field: '${field.name}', value }),
-      lte: (value: ${tsType}) => ({ type: 'lte' as const, field: '${field.name}', value }),
-      in: (values: ${tsType}[]) => ({ type: 'in' as const, field: '${field.name}', values }),
-    }`;
-        })
-        .join(',\n');
-
-      return `  ${model.name.toLowerCase()}: {
-${fieldAccessors}
-  }`;
-    })
-    .join(',\n');
-
-  return `export const t: Tables = {
-${accessors}
-};
-
-// Schema object for runtime
-const schema = ${JSON.stringify(schema, null, 2)} as const;`;
+  return field.attributes.some(attr =>
+    attr.name === 'default' ||
+    attr.name === 'id'
+  );
 }

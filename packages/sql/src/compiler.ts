@@ -51,7 +51,7 @@ function compileExpression(expr: Expression<any>, params: any[], paramIndex: num
   if (isColumnExpression(expr)) {
     return compileColumnExpression(expr, params, paramIndex);
   }
-  
+
   // Handle legacy FieldExpression
   if (isFieldExpression(expr)) {
     return compileFieldExpression(expr, params, paramIndex);
@@ -62,7 +62,7 @@ function compileExpression(expr: Expression<any>, params: any[], paramIndex: num
 
 function compileColumnExpression(expr: any, params: any[], paramIndex: number): string {
   const field = expr.field;
-  
+
   switch (expr.type) {
     case 'eq':
       params.push(expr.value);
@@ -131,7 +131,7 @@ function getParamCount(expr: Expression<any>): number {
         return 1;
     }
   }
-  
+
   if (isColumnExpression(expr)) {
     switch ((expr as any).type) {
       case 'in':
@@ -140,7 +140,7 @@ function getParamCount(expr: Expression<any>): number {
         return 1;
     }
   }
-  
+
   return 1;
 }
 

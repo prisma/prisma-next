@@ -101,11 +101,11 @@ export async function getUserById(id: number) {
   const query = sql()
     .from('user')
     .where(t.user.id.eq(id))
-    .select({ 
-      id: t.user.id, 
-      email: t.user.email, 
-      active: t.user.active, 
-      createdAt: t.user.createdAt 
+    .select({
+      id: t.user.id,
+      email: t.user.email,
+      active: t.user.active,
+      createdAt: t.user.createdAt
     });
 
   const results = await db.execute(query.build());
@@ -193,7 +193,7 @@ describe('Integration Tests', () => {
       .select({ id: t.user.id, email: t.user.email });
 
     const results = await db.execute(query.build());
-    
+
     // Type should be inferred as Array<{ id: number; email: string }>
     expect(results).toHaveLength(2);
     expect(typeof results[0].id).toBe('number');

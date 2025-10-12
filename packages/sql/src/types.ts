@@ -1,5 +1,12 @@
 // Core type system for type-safe query building
 
+import { Schema } from '@prisma/relational-ir';
+
+// Type alias for schema IR
+export type SchemaIR = Schema;
+
+// Helper type for type-safe table names
+
 export interface Expression<T> {
   readonly __t?: T;
 }
@@ -16,8 +23,10 @@ export interface Column<T> extends Expression<T> {
   in(values: T[]): Expression<boolean>;
 }
 
+export const TABLE_NAME = Symbol('tableName');
+
 export type Table<TShape> = {
-  readonly name: string;
+  readonly [TABLE_NAME]: string;
 } & {
   readonly [K in keyof TShape]: Column<TShape[K]>;
 };

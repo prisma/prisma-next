@@ -1,0 +1,214 @@
+---
+description: Schema-driven architecture for Prisma Next - how makeT creates runtime typed tables from JSON IR
+globs: ["**/*"]
+---
+
+# Schema-Driven Architecture
+
+## Overview
+
+Prisma Next uses a schema-driven architecture where runtime typed tables are created from JSON Intermediate Representation (IR) rather than generated code. This approach provides clean separation between types and runtime, supports multiple schemas, and is AI-friendly.
+
+## Architecture Components
+
+### 1. Schema JSON (Runtime Source of Truth)
+- **File**: `.prisma/schema.json`
+- **Purpose**: Contains the complete schema IR as JSON
+- **Usage**: Imported by `makeT()` to create runtime typed tables
+- **Format**: Standard relational IR with models, fields, attributes
+
+### 2. Schema TypeScript Definitions (Compile-time Types)
+- **File**: `.prisma/schema.d.ts`
+- **Purpose**: Provides TypeScript type definitions only
+- **Contents**:
+  - Model interfaces (`User`, `Order`, etc.)
+  - Shape interfaces (`UserShape`, `OrderShape`, etc.)
+  - Tables interface (`Tables` with typed table definitions)
+- **No runtime code**: Only type definitions
+
+### 3. makeT Factory Function (Runtime Construction)
+- **Location**: `@prisma/sql` package
+- **Signature**: `makeT<TTables>(ir: SchemaIR): TTables`
+- **Purpose**: Creates runtime typed tables from JSON IR
+- **Process**:
+  1. Iterates through schema IR models
+  2. Creates table objects with `name` property
+  3. Creates Column objects for each field with:
+     - `__t: undefined as any` (phantom type marker)
+     - `table: string` (lowercased model name)
+     - `name: string` (field name)
+     - Static operator methods (`.eq()`, `.ne()`, `.gt()`, etc.)
+
+## Type Flow
+
+```
+PSL Schema → Schema IR (JSON) → makeT<Tables>(ir) → Typed Runtime Object
+     ↓
+Schema.d.ts → Tables Interface → Type Parameter → Full Type Safety
+```
+
+### Example Usage Pattern
+
+```typescript
+// src/schema.ts
+import ir from '../.prisma/schema.json' assert { type: 'json' };
+import { makeT } from '@prisma/sql';
+import type { Tables } from '../.prisma/schema.d.ts';
+
+export const t = makeT<Tables>(ir);
+```
+
+```typescript
+// src/queries.ts
+import { sql } from '@prisma/sql';
+import { t } from './schema';
+
+export async function getActiveUsers() {
+  const query = sql()
+    .from('user')  // or t.user for full type safety
+    .where(t.user.active.eq(true))
+    .select({ id: t.user.id, email: t.user.email });
+
+  return db.execute(query.build());
+}
+```
+
+## Operator Design
+
+### Static Operators in Library
+- **Location**: `@prisma/sql` package
+- **Scope**: Fixed set of operators (`.eq()`, `.ne()`, `.gt()`, `.lt()`, `.gte()`, `.lte()`, `.in()`)
+- **Purpose**: Provide consistent API across all schemas
+- **Implementation**: Each operator returns `Expression<boolean>` with IR structure
+
+### Runtime Column Creation
+- **Source**: Schema IR (JSON)
+- **Process**: `makeT()` creates Column objects with static operators attached
+- **Type Safety**: `Column<T>` enforces correct value types at compile-time
+
+## Type Safety Layers
+
+### Compile-time Safety
+1. **Column Value Types**: `Column<T>['eq'](value: T)` enforces correct value types
+2. **Table Names**: `keyof Tables` restricts table names to those in schema
+3. **Select Projections**: `{ id: Column<number> }` → `{ id: number }` type inference
+
+### Runtime Safety (Belt-and-Suspenders)
+1. **First-use Verification**: Checks table/column existence against schema.json
+2. **Parameter Validation**: Light type checking for obviously wrong types
+3. **Graceful Fallback**: Re-verification when schema changes
+
+## Multi-Schema Support
+
+### Type Parameter Pattern
+```typescript
+// Schema A
+import irA from './schema-a.json' assert { type: 'json' };
+import type { Tables as TablesA } from './schema-a.d.ts';
+export const tA = makeT<TablesA>(irA);
+
+// Schema B
+import irB from './schema-b.json' assert { type: 'json' };
+import type { Tables as TablesB } from './schema-b.d.ts';
+export const tB = makeT<TablesB>(irB);
+```
+
+### Benefits
+- **No Namespace Conflicts**: Each schema has its own type parameter
+- **Independent Evolution**: Schemas can change without affecting each other
+- **Type Safety**: Each `t` object is fully typed for its specific schema
+
+## Usage Patterns
+
+### Preferred Patterns
+```typescript
+// ✅ Prefer typed table objects
+sql().from(t.user)
+
+// ✅ Use column objects in predicates and selects
+.where(t.user.active.eq(true))
+.select({ id: t.user.id, email: t.user.email })
+
+// ✅ Full type safety with Column<T>
+t.user.id.eq(123)  // TypeScript knows id is number
+```
+
+### Alternative Patterns
+```typescript
+// ✅ Also supported: string table names (typed as keyof Tables)
+sql().from('user')
+
+// ✅ Runtime verification catches any issues
+```
+
+## Benefits
+
+### 1. No Generated Runtime Code
+- **Cleaner**: No complex generated code to maintain
+- **Debuggable**: Runtime objects are simple, inspectable
+- **Flexible**: Easy to extend with custom operators
+
+### 2. Clean Separation
+- **Types**: Pure TypeScript definitions in `.d.ts`
+- **Runtime**: Simple JSON IR
+- **Construction**: Explicit factory pattern
+
+### 3. Multiple Schema Support
+- **Coexistence**: Multiple schemas in same application
+- **Type Safety**: Each schema fully typed independently
+- **No Conflicts**: No global namespace pollution
+
+### 4. AI-Friendly
+- **Simple IR**: Easy to understand JSON structure
+- **Explicit Patterns**: Clear factory function usage
+- **Predictable**: Consistent operator API across schemas
+
+## Implementation Details
+
+### makeT Factory Function
+```typescript
+export function makeT<TTables>(ir: SchemaIR): TTables {
+  const tables: any = {};
+
+  for (const model of ir.models) {
+    const tableName = model.name.toLowerCase();
+    const table: any = { name: tableName };
+
+    for (const field of model.fields) {
+      table[field.name] = {
+        __t: undefined as any,
+        table: tableName,
+        name: field.name,
+        eq: (value: any) => ({ __t: undefined as any, type: 'eq', field: field.name, value }),
+        // ... other operators
+      } as Column<any>;
+    }
+
+    tables[tableName] = table;
+  }
+
+  return tables as TTables;
+}
+```
+
+### Schema Emitter Output
+```typescript
+// .prisma/schema.d.ts
+export interface User {
+  id?: number;
+  email: string;
+  active?: boolean;
+}
+
+export interface UserShape {
+  id?: number;
+  email: string;
+  active?: boolean;
+}
+
+export interface Tables {
+  user: Table<UserShape>;
+}
+```
+
+This architecture provides a clean, type-safe, and maintainable foundation for the Prisma Next query DSL while supporting multiple schemas and being friendly to both human developers and AI systems.

@@ -10,7 +10,7 @@ describe('Type Inference Tests', () => {
     // This test verifies that TypeScript can infer the correct types
     // The actual type checking happens at compile time
     const result = query.build();
-    
+
     // Verify the query structure
     expect(result.type).toBe('select');
     expect(result.from).toBe('user');
@@ -21,15 +21,15 @@ describe('Type Inference Tests', () => {
   it('infers correct return type for select with all fields', () => {
     const query = sql()
       .from('user')
-      .select({ 
-        id: t.user.id, 
-        email: t.user.email, 
-        active: t.user.active, 
-        createdAt: t.user.createdAt 
+      .select({
+        id: t.user.id,
+        email: t.user.email,
+        active: t.user.active,
+        createdAt: t.user.createdAt
       });
 
     const result = query.build();
-    
+
     expect(result.type).toBe('select');
     expect(result.from).toBe('user');
     expect(result.select?.fields).toHaveProperty('id');
@@ -45,7 +45,7 @@ describe('Type Inference Tests', () => {
       .select({ id: t.user.id, email: t.user.email });
 
     const result = query.build();
-    
+
     expect(result.type).toBe('select');
     expect(result.where?.condition).toBeDefined();
     expect(result.select?.fields).toHaveProperty('id');
@@ -59,7 +59,7 @@ describe('Type Inference Tests', () => {
       .limit(10);
 
     const result = query.build();
-    
+
     expect(result.type).toBe('select');
     expect(result.limit?.count).toBe(10);
     expect(result.select?.fields).toHaveProperty('id');
@@ -72,7 +72,7 @@ describe('Type Inference Tests', () => {
       .orderBy('id', 'ASC');
 
     const result = query.build();
-    
+
     expect(result.type).toBe('select');
     expect(result.orderBy).toHaveLength(1);
     expect(result.orderBy?.[0].field).toBe('id');

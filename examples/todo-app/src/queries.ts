@@ -1,10 +1,10 @@
 import { sql } from '@prisma/sql';
-import { t } from '../.prisma/schema.d.ts';
+import { t } from './schema';
 import { db } from './db';
 
 export async function getActiveUsers() {
   const query = sql()
-    .from('user')
+    .from(t.user)
     .where(t.user.active.eq(true))
     .select({ id: t.user.id, email: t.user.email });
 
@@ -13,7 +13,7 @@ export async function getActiveUsers() {
 
 export async function getUserById(id: number) {
   const query = sql()
-    .from('user')
+    .from(t.user)
     .where(t.user.id.eq(id))
     .select({ id: t.user.id, email: t.user.email, active: t.user.active, createdAt: t.user.createdAt });
 
@@ -23,7 +23,7 @@ export async function getUserById(id: number) {
 
 export async function getUsersByEmail(email: string) {
   const query = sql()
-    .from('user')
+    .from(t.user)
     .where(t.user.email.eq(email))
     .select({ id: t.user.id, email: t.user.email, active: t.user.active });
 

@@ -51,7 +51,7 @@ export interface FromBuilder<TTable extends Table<any>> {
 
 export function createFromBuilder<TTable extends Table<any>>(tableName: string): FromBuilder<TTable> {
   const builder = new QueryBuilder<TTable>(tableName);
-  
+
   return {
     select: builder.select.bind(builder),
     where: builder.where.bind(builder),
