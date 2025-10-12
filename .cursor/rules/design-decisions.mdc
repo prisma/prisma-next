@@ -1,0 +1,87 @@
+---
+description: Design decisions and architectural choices for the Prisma Next prototype
+globs: ["**/*"]
+---
+
+# Design Decisions for Prisma Next Prototype
+
+## Module System
+
+**Decision**: Use ES modules throughout the project
+- All packages use `"type": "module"` in package.json
+- TypeScript configured with `"module": "ESNext"` and `"moduleResolution": "Bundler"`
+- Do NOT add `.js` extensions to TypeScript source files
+- Do NOT convert to CommonJS - ES modules are the modern standard
+
+## Type System Architecture
+
+**Decision**: Column-only API for type safety
+- The `select()` method ONLY accepts `Column<T>` objects (e.g., `t.user.id`)
+- Do NOT support string literals in select (e.g., `'id'`) - this simplifies the API and ensures type safety
+- All column access goes through the typed `t` object generated from PSL
+
+**Decision**: Generic type preservation through query builder chain
+- `QueryBuilder<TTable>` preserves table shape through method chaining
+- `select()` method infers return types from `Column<T>` objects
+- Type inference: `{ id: Column<number> }` → `{ id: number }`
+
+## Query DSL Design
+
+**Decision**: Transparent SQL compilation with verification
+- Queries compile to SQL on first execution, not at build time
+- Runtime verification checks table/column existence and type compatibility
+- No hidden abstractions - developers see the actual SQL being generated
+
+**Decision**: Expression-based WHERE clauses
+- `where()` method accepts `Expression<boolean>` objects
+- Column comparison methods (`.eq()`, `.ne()`, etc.) return typed expressions
+- No string-based condition building
+
+## Schema Contract Model
+
+**Decision**: PSL as data contract, not just schema definition
+- PSL defines the complete data model including policies, invariants, and capabilities
+- Emits both `schema.d.ts` (types) and `schema.json` (runtime metadata)
+- Schema is the single source of truth for all verification
+
+## Package Architecture
+
+**Decision**: Monorepo with clear package boundaries
+- `@prisma/psl` - PSL parser and AST
+- `@prisma/relational-ir` - Schema representation
+- `@prisma/schema-emitter` - Type and JSON generation
+- `@prisma/sql` - Query DSL and types
+- `@prisma/runtime` - Database connection and verification
+- `@prisma/cli` - Command-line interface
+
+**Decision**: No circular dependencies
+- Each package has a clear responsibility
+- Schema emission moved to CLI package to avoid PSL ↔ schema-emitter circular dependency
+
+## Testing Strategy
+
+**Decision**: Integration tests with @prisma/dev
+- Use `@prisma/dev` for PostgreSQL instance in tests
+- Full integration tests that spin up database, create tables, insert data, run queries
+- Unit tests focus on type inference and individual component behavior
+
+## Build System
+
+**Decision**: pnpm workspaces with TypeScript
+- Use `pnpm exec tsc` for building packages
+- Build packages in dependency order
+- Each package has its own tsconfig.json extending a base configuration
+
+## Error Handling
+
+**Decision**: Explicit verification over implicit safety
+- Runtime verification catches unknown tables/columns
+- Clear error messages for type mismatches
+- Graceful fallback when schema changes (re-verification)
+
+## CLI Design
+
+**Decision**: Programmatic API alongside CLI commands
+- Export `emitSchemaAndTypes()` function for programmatic use
+- CLI commands use the same programmatic API
+- Support both `generate` and `dev` commands for different workflows
