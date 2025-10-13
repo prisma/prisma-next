@@ -26,7 +26,7 @@ describe('Integration Tests', () => {
     // Generate schema files
     const pslContent = readFileSync('schema.psl', 'utf-8');
     const ast = parse(pslContent);
-    const { contract, types } = await emitContractAndTypes(ast);
+    const { contract, contractTypes } = await emitContractAndTypes(ast);
 
     // Ensure .prisma directory exists
     try {
@@ -37,7 +37,7 @@ describe('Integration Tests', () => {
 
     // Write contract files
     writeFileSync('.prisma/contract.json', contract);
-    writeFileSync('.prisma/types.d.ts', types);
+    writeFileSync('.prisma/contract.d.ts', contractTypes);
 
     // Connect to database
     contractIR = parseIR(contract);

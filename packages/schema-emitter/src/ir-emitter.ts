@@ -1,5 +1,5 @@
 import { SchemaAST, ModelDeclaration, FieldDeclaration, RelationFieldType } from '@prisma/psl';
-import { Schema, validateSchema, Table } from '@prisma/relational-ir';
+import { Schema, validateContract, Table } from '@prisma/relational-ir';
 import { canonicalJSONStringify } from './canonicalize';
 import { sha256Hex } from './hash';
 
@@ -25,7 +25,6 @@ export async function emitSchema(ast: SchemaAST): Promise<Schema> {
         {
           columns: table.columns,
           indexes: table.indexes,
-          constraints: table.constraints,
           capabilities: table.capabilities,
           // Exclude meta.source from hash
         },
@@ -44,7 +43,7 @@ export async function emitSchema(ast: SchemaAST): Promise<Schema> {
     contractHash,
   };
 
-  return validateSchema(schemaWithHash);
+  return validateContract(schemaWithHash);
 }
 
 function emitTable(model: ModelDeclaration) {

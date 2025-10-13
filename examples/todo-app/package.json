@@ -9,6 +9,7 @@
     "dev:contract": "pnpm exec prisma-next dev schema.psl",
     "setup-db": "pnpm exec node dist/setup-db.js",
     "test": "vitest run",
+    "clean": "rm -rf dist .prisma",
     "test:integration": "vitest run --config vitest.config.ts",
     "lint": "eslint 'src/**/*.ts'",
     "typecheck": "pnpm exec tsc --noEmit && pnpm exec tsc --noEmit --skipLibCheck $(find src -name '*.ts' 2>/dev/null || true)"

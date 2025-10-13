@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  validateSchema,
+  validateContract,
   validateTable,
   validateColumn,
   ColumnTypeSchema,
@@ -46,7 +46,7 @@ describe('Schema Validation', () => {
       },
     };
 
-    expect(() => validateSchema(schema)).not.toThrow();
+    expect(() => validateContract(schema)).not.toThrow();
   });
 
   it('validates a table', () => {
@@ -126,7 +126,7 @@ describe('Schema Validation', () => {
       },
     };
 
-    expect(() => validateSchema(invalidSchema)).toThrow();
+    expect(() => validateContract(invalidSchema)).toThrow();
   });
 
   it('rejects invalid target', () => {
@@ -135,7 +135,7 @@ describe('Schema Validation', () => {
       tables: {},
     };
 
-    expect(() => validateSchema(invalidSchema)).toThrow();
+    expect(() => validateContract(invalidSchema)).toThrow();
   });
 
   it('rejects invalid column type', () => {

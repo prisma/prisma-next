@@ -24,19 +24,15 @@ async function main() {
 
   // Step 2: Emit data contract and TypeScript types
   console.log('2. Emitting data contract and TypeScript types...');
-  const { contract: contractJson, types, relations } = await emitContractAndTypes(ast);
+  const { contract: contractJson, contractTypes } = await emitContractAndTypes(ast);
 
   // Write contract.json
   writeFileSync('.prisma/contract.json', contractJson);
   console.log('✅ contract.json generated');
 
-  // Write types.d.ts
-  writeFileSync('.prisma/types.d.ts', types);
-  console.log('✅ types.d.ts generated');
-
-  // Write relations.d.ts
-  writeFileSync('.prisma/relations.d.ts', relations);
-  console.log('✅ relations.d.ts generated\n');
+  // Write contract.d.ts
+  writeFileSync('.prisma/contract.d.ts', contractTypes);
+  console.log('✅ contract.d.ts generated\n');
 
   // Step 3: Contract verification (one line!)
   console.log('3. Verifying data contract...');

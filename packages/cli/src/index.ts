@@ -24,7 +24,7 @@ program
       const ast = parse(pslContent);
 
       console.log('⚡ Generating data contract and types...');
-      const { contract, types, relations } = await emitContractAndTypes(ast);
+      const { contract, contractTypes } = await emitContractAndTypes(ast);
 
       // Ensure output directory exists
       mkdirSync(options.outputDir, { recursive: true });
@@ -34,15 +34,10 @@ program
       writeFileSync(contractPath, contract);
       console.log(`✅ Generated ${contractPath}`);
 
-      // Write types.d.ts
-      const typesPath = `${options.outputDir}/types.d.ts`;
-      writeFileSync(typesPath, types);
-      console.log(`✅ Generated ${typesPath}`);
-
-      // Write relations.d.ts
-      const relationsPath = `${options.outputDir}/relations.d.ts`;
-      writeFileSync(relationsPath, relations);
-      console.log(`✅ Generated ${relationsPath}`);
+      // Write contract.d.ts
+      const contractTypesPath = `${options.outputDir}/contract.d.ts`;
+      writeFileSync(contractTypesPath, contractTypes);
+      console.log(`✅ Generated ${contractTypesPath}`);
 
       console.log('🎉 Data contract generation complete!');
     } catch (error) {
@@ -66,12 +61,11 @@ program
     try {
       const pslContent = readFileSync(pslFile, 'utf-8');
       const ast = parse(pslContent);
-      const { contract, types, relations } = await emitContractAndTypes(ast);
+      const { contract, contractTypes } = await emitContractAndTypes(ast);
 
       mkdirSync(options.outputDir, { recursive: true });
       writeFileSync(`${options.outputDir}/contract.json`, contract);
-      writeFileSync(`${options.outputDir}/types.d.ts`, types);
-      writeFileSync(`${options.outputDir}/relations.d.ts`, relations);
+      writeFileSync(`${options.outputDir}/contract.d.ts`, contractTypes);
 
       console.log('✅ Initial generation complete!');
       console.log('💡 Tip: Re-run this command when you modify your PSL');
