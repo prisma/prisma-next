@@ -102,11 +102,45 @@ export const TableSchema = z.object({
 
 export type Table = z.infer<typeof TableSchema>;
 
+// Model field definition
+export const ModelFieldSchema = z.object({
+  type: z.string(), // PSL type: 'Int', 'String', 'DateTime', etc.
+  isList: z.boolean().optional(),
+  isOptional: z.boolean().optional(),
+  mappedTo: z.string().optional(), // column name in storage
+  isRelation: z.boolean().optional(), // true for relation fields
+  relationTarget: z.string().optional(), // target model name for relations
+});
+
+// Model storage mapping
+export const ModelStorageSchema = z.object({
+  kind: z.enum(['table', 'view', 'collection']),
+  target: z.string(), // table/view/collection name
+});
+
+// Model definition
+export const ModelSchema = z.object({
+  name: z.string(),
+  storage: ModelStorageSchema,
+  fields: z.record(z.string(), ModelFieldSchema),
+  meta: z
+    .object({
+      source: z.string().optional(),
+      comments: z.string().optional(),
+    })
+    .optional(),
+});
+
+export type ModelField = z.infer<typeof ModelFieldSchema>;
+export type ModelStorage = z.infer<typeof ModelStorageSchema>;
+export type Model = z.infer<typeof ModelSchema>;
+
 // Complete schema
 export const ContractSchema = z.object({
   target: z.literal('postgres'),
   contractHash: z.string().optional(),
   tables: z.record(z.string(), TableSchema),
+  models: z.record(z.string(), ModelSchema).optional(), // additive
   capabilities: z
     .object({
       postgres: z
@@ -149,4 +183,28 @@ export function validateTable(data: unknown): Table {
 
 export function validateColumn(data: unknown): Column {
   return ColumnSchema.parse(data);
+}
+
+export function validateModelMappings(schema: Schema): void {
+  if (!schema.models) return;
+
+  for (const [modelName, model] of Object.entries(schema.models)) {
+    const targetTable = schema.tables[model.storage.target];
+
+    if (!targetTable) {
+      throw new Error(
+        `Model '${modelName}' references non-existent table '${model.storage.target}'`,
+      );
+    }
+
+    for (const [fieldName, field] of Object.entries(model.fields)) {
+      if (field.isRelation) continue; // skip relation fields
+
+      if (field.mappedTo && !targetTable.columns[field.mappedTo]) {
+        throw new Error(
+          `Model '${modelName}' field '${fieldName}' maps to non-existent column '${field.mappedTo}' in table '${model.storage.target}'`,
+        );
+      }
+    }
+  }
 }

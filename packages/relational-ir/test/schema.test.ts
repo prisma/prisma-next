@@ -3,8 +3,12 @@ import {
   validateContract,
   validateTable,
   validateColumn,
+  validateModelMappings,
   ColumnTypeSchema,
   DefaultValueSchema,
+  ModelFieldSchema,
+  ModelStorageSchema,
+  ModelSchema,
 } from '../src/schema';
 
 describe('Schema Validation', () => {
@@ -145,5 +149,222 @@ describe('Schema Validation', () => {
     };
 
     expect(() => validateColumn(invalidColumn)).toThrow();
+  });
+
+  describe('Model Schema Validation', () => {
+    it('validates a complete schema with models', () => {
+      const schema = {
+        target: 'postgres',
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'int4', nullable: false, pk: true },
+              email: { type: 'text', nullable: false, unique: true },
+            },
+            primaryKey: { kind: 'primaryKey', columns: ['id'] },
+            uniques: [{ kind: 'unique', columns: ['email'] }],
+            foreignKeys: [],
+            indexes: [],
+            capabilities: [],
+          },
+        },
+        models: {
+          User: {
+            name: 'User',
+            storage: { kind: 'table', target: 'user' },
+            fields: {
+              id: { type: 'Int', mappedTo: 'id' },
+              email: { type: 'String', mappedTo: 'email' },
+              posts: { type: 'Post', isList: true, isRelation: true, relationTarget: 'Post' },
+            },
+            meta: { source: 'model User' },
+          },
+        },
+      };
+
+      expect(() => validateContract(schema)).not.toThrow();
+    });
+
+    it('validates model field schema', () => {
+      const scalarField = {
+        type: 'String',
+        isOptional: true,
+        mappedTo: 'email',
+      };
+
+      const relationField = {
+        type: 'Post',
+        isList: true,
+        isRelation: true,
+        relationTarget: 'Post',
+      };
+
+      expect(() => ModelFieldSchema.parse(scalarField)).not.toThrow();
+      expect(() => ModelFieldSchema.parse(relationField)).not.toThrow();
+    });
+
+    it('validates model storage schema', () => {
+      const tableStorage = { kind: 'table', target: 'users' };
+      const viewStorage = { kind: 'view', target: 'user_view' };
+      const collectionStorage = { kind: 'collection', target: 'users' };
+
+      expect(() => ModelStorageSchema.parse(tableStorage)).not.toThrow();
+      expect(() => ModelStorageSchema.parse(viewStorage)).not.toThrow();
+      expect(() => ModelStorageSchema.parse(collectionStorage)).not.toThrow();
+    });
+
+    it('validates model schema', () => {
+      const model = {
+        name: 'User',
+        storage: { kind: 'table', target: 'user' },
+        fields: {
+          id: { type: 'Int', mappedTo: 'id' },
+          email: { type: 'String', mappedTo: 'email' },
+        },
+        meta: { source: 'model User' },
+      };
+
+      expect(() => ModelSchema.parse(model)).not.toThrow();
+    });
+
+    it('validates model mappings against tables', () => {
+      const schema = {
+        target: 'postgres' as const,
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'int4', nullable: false },
+              email: { type: 'text', nullable: false },
+            },
+            primaryKey: { kind: 'primaryKey', columns: ['id'] },
+            uniques: [],
+            foreignKeys: [],
+            indexes: [],
+            capabilities: [],
+          },
+        },
+        models: {
+          User: {
+            name: 'User',
+            storage: { kind: 'table', target: 'user' },
+            fields: {
+              id: { type: 'Int', mappedTo: 'id' },
+              email: { type: 'String', mappedTo: 'email' },
+            },
+          },
+        },
+      };
+
+      expect(() => validateModelMappings(schema)).not.toThrow();
+    });
+
+    it('throws error for model referencing non-existent table', () => {
+      const schema = {
+        target: 'postgres' as const,
+        tables: {
+          user: {
+            columns: { id: { type: 'int4', nullable: false } },
+            primaryKey: { kind: 'primaryKey', columns: ['id'] },
+            uniques: [],
+            foreignKeys: [],
+            indexes: [],
+            capabilities: [],
+          },
+        },
+        models: {
+          User: {
+            name: 'User',
+            storage: { kind: 'table', target: 'nonexistent' },
+            fields: {
+              id: { type: 'Int', mappedTo: 'id' },
+            },
+          },
+        },
+      };
+
+      expect(() => validateModelMappings(schema)).toThrow(
+        "Model 'User' references non-existent table 'nonexistent'",
+      );
+    });
+
+    it('throws error for field mapping to non-existent column', () => {
+      const schema = {
+        target: 'postgres' as const,
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'int4', nullable: false },
+            },
+            primaryKey: { kind: 'primaryKey', columns: ['id'] },
+            uniques: [],
+            foreignKeys: [],
+            indexes: [],
+            capabilities: [],
+          },
+        },
+        models: {
+          User: {
+            name: 'User',
+            storage: { kind: 'table', target: 'user' },
+            fields: {
+              id: { type: 'Int', mappedTo: 'id' },
+              email: { type: 'String', mappedTo: 'nonexistent' },
+            },
+          },
+        },
+      };
+
+      expect(() => validateModelMappings(schema)).toThrow(
+        "Model 'User' field 'email' maps to non-existent column 'nonexistent' in table 'user'",
+      );
+    });
+
+    it('skips validation for relation fields', () => {
+      const schema = {
+        target: 'postgres' as const,
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'int4', nullable: false },
+            },
+            primaryKey: { kind: 'primaryKey', columns: ['id'] },
+            uniques: [],
+            foreignKeys: [],
+            indexes: [],
+            capabilities: [],
+          },
+        },
+        models: {
+          User: {
+            name: 'User',
+            storage: { kind: 'table', target: 'user' },
+            fields: {
+              id: { type: 'Int', mappedTo: 'id' },
+              posts: { type: 'Post', isRelation: true, relationTarget: 'Post' },
+            },
+          },
+        },
+      };
+
+      expect(() => validateModelMappings(schema)).not.toThrow();
+    });
+
+    it('handles schema without models', () => {
+      const schema = {
+        target: 'postgres' as const,
+        tables: {
+          user: {
+            columns: { id: { type: 'int4', nullable: false } },
+            primaryKey: { kind: 'primaryKey', columns: ['id'] },
+            uniques: [],
+            foreignKeys: [],
+            indexes: [],
+            capabilities: [],
+          },
+        },
+      };
+
+      expect(() => validateModelMappings(schema)).not.toThrow();
+    });
   });
 });

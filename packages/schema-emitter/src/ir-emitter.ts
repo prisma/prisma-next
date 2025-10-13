@@ -3,17 +3,20 @@ import { Schema, validateContract, Table } from '@prisma/relational-ir';
 import { canonicalJSONStringify } from './canonicalize';
 import { sha256Hex } from './hash';
 
-export async function emitSchema(ast: SchemaAST): Promise<Schema> {
+export async function emitContract(ast: SchemaAST): Promise<Schema> {
   const tables: Record<string, any> = {};
+  const models: Record<string, any> = {};
 
   for (const model of ast.models) {
     const tableName = model.name.toLowerCase();
     tables[tableName] = emitTable(model);
+    models[model.name] = emitModel(model);
   }
 
   const schema: Schema = {
     target: 'postgres',
     tables,
+    models,
   };
 
   // Build clean IR for hashing (exclude meta.source fields)
@@ -165,4 +168,46 @@ function emitDefaultValue(value: any) {
   if (value === 'autoincrement') return { kind: 'autoincrement' };
   if (value === 'now') return { kind: 'now' };
   return { kind: 'literal', value: String(value) };
+}
+
+function emitModel(model: ModelDeclaration) {
+  const fields: Record<string, any> = {};
+
+  for (const field of model.fields) {
+    if (typeof field.fieldType === 'object' && field.fieldType.type === 'RelationFieldType') {
+      // Relation field
+      const relationType = field.fieldType as RelationFieldType;
+      fields[field.name] = {
+        type: relationType.targetModel,
+        isList: relationType.isArray,
+        isRelation: true,
+        relationTarget: relationType.targetModel,
+      };
+    } else {
+      // Scalar field
+      const mappedColumnName = field.name; // 1:1 mapping for MVP
+      fields[field.name] = {
+        type: field.fieldType as string,
+        isOptional: hasOptionalAttribute(field),
+        mappedTo: mappedColumnName,
+      };
+    }
+  }
+
+  return {
+    name: model.name,
+    storage: {
+      kind: 'table',
+      target: model.name.toLowerCase(),
+    },
+    fields,
+    meta: {
+      source: `model ${model.name}`,
+    },
+  };
+}
+
+function hasOptionalAttribute(field: FieldDeclaration): boolean {
+  // Check if field type ends with '?' or has optional attribute
+  return field.attributes.some((attr) => attr.name === 'optional');
 }

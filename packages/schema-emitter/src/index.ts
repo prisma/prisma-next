@@ -1,12 +1,14 @@
 import { SchemaAST } from '@prisma/psl';
-import { emitSchema } from './ir-emitter';
+import { emitContract } from './ir-emitter';
 import { emitContractTypes } from './contract-types-emitter';
+
+export { emitContract };
 
 export async function emitContractAndTypes(
   ast: SchemaAST,
   namespace?: string,
 ): Promise<{ contract: string; contractTypes: string }> {
-  const contract = await emitSchema(ast);
+  const contract = await emitContract(ast);
   const contractTypes = emitContractTypes(contract, namespace);
 
   return {
