@@ -1,0 +1,7 @@
+---
+description: Use the tools the codebase is configured for
+alwaysApply: true
+---
+
+- Use pnpm not npm
+- We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
