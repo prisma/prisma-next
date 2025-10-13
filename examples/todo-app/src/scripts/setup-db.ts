@@ -16,7 +16,6 @@ export async function setupDatabase() {
   // Connect to database
   const db = connect({
     ir: ir as Schema,
-    verify: 'never', // Skip verification during setup
     database: {
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '5432'),
