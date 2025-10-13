@@ -54,7 +54,9 @@ describe('Runtime Verification Tests', () => {
       },
     };
 
-    await expect(db.execute(query)).rejects.toThrow("Table 'nonexistent' does not exist in database");
+    await expect(db.execute(query)).rejects.toThrow(
+      "Table 'nonexistent' does not exist in database",
+    );
   });
 
   it('throws error for unknown column', async () => {
@@ -67,7 +69,9 @@ describe('Runtime Verification Tests', () => {
       },
     };
 
-    await expect(db.execute(query)).rejects.toThrow("Column 'nonexistent' does not exist in table 'user'");
+    await expect(db.execute(query)).rejects.toThrow(
+      "Column 'nonexistent' does not exist in table 'user'",
+    );
   });
 
   it('verifies schema on first use', async () => {

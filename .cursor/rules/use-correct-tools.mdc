@@ -5,4 +5,4 @@ alwaysApply: true
 
 - Use pnpm not npm!
 - We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
-- Note that tsc doesn't check test files by default - keep in mind if you want to check types
+- When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc` commands from scratch

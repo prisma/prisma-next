@@ -2,12 +2,12 @@
   "name": "@prisma/sql",
   "version": "0.0.0",
   "type": "module",
-  "main": "dist/builder.js",
-  "types": "dist/builder.d.ts",
+  "main": "dist/exports/index.js",
+  "types": "dist/exports/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/builder.d.ts",
-      "import": "./dist/builder.js"
+      "types": "./dist/exports/index.d.ts",
+      "import": "./dist/exports/index.js"
     },
     "./builder": {
       "types": "./dist/builder.d.ts",
@@ -31,7 +31,7 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "lint": "eslint 'src/**/*.ts'",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit --skipLibCheck $(find src test -name '*.ts' 2>/dev/null || true)",
     "clean": "rm -rf dist"
   },
   "dependencies": {

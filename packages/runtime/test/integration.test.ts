@@ -29,8 +29,16 @@ describe('Runtime Integration Tests', () => {
         columns: {
           id: { type: 'int4' as const, nullable: false, pk: true },
           email: { type: 'text' as const, nullable: false, unique: true },
-          active: { type: 'bool' as const, nullable: false, default: { kind: 'literal' as const, value: 'true' } },
-          createdAt: { type: 'timestamptz' as const, nullable: false, default: { kind: 'now' as const } },
+          active: {
+            type: 'bool' as const,
+            nullable: false,
+            default: { kind: 'literal' as const, value: 'true' },
+          },
+          createdAt: {
+            type: 'timestamptz' as const,
+            nullable: false,
+            default: { kind: 'now' as const },
+          },
         },
         indexes: [],
         constraints: [],
@@ -43,7 +51,7 @@ describe('Runtime Integration Tests', () => {
     // Start PostgreSQL using @prisma/dev
     postgresProcess = spawn('npx', ['@prisma/dev', 'postgres'], {
       stdio: 'pipe',
-      env: { ...process.env }
+      env: { ...process.env },
     });
 
     // Wait for PostgreSQL to be ready
@@ -58,8 +66,8 @@ describe('Runtime Integration Tests', () => {
         port: 5432,
         database: 'postgres',
         user: 'postgres',
-        password: 'postgres'
-      }
+        password: 'postgres',
+      },
     });
 
     // Create test table

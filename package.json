@@ -8,6 +8,9 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "typecheck:all": "turbo run typecheck --include-examples",
+    "typecheck:packages": "turbo run typecheck --filter='!./examples/**'",
+    "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
     "clean": "turbo run clean"
   },
   "devDependencies": {

@@ -15,7 +15,7 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "lint": "eslint 'src/**/*.ts'",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit --skipLibCheck $(find src test -name '*.ts' 2>/dev/null || true)",
     "clean": "rm -rf dist"
   },
   "dependencies": {

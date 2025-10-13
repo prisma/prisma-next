@@ -12,7 +12,7 @@
     "dev": "npx tsup src/index.ts --watch --format esm --dts",
     "test": "vitest run",
     "lint": "eslint 'src/**/*.ts'",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc --noEmit --skipLibCheck $(find src test -name '*.ts' 2>/dev/null || true)",
     "clean": "rm -rf dist"
   },
   "dependencies": {

@@ -16,7 +16,7 @@
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "tsconfig.json"]
+      "inputs": ["src/**", "test/**", "tsconfig.json"]
     },
     "lint": {
       "inputs": ["src/**", "test/**"]
