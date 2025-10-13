@@ -121,6 +121,23 @@ export const ContractSchema = z.object({
 
 export type Schema = z.infer<typeof ContractSchema>;
 
+// Contract type structure for generated relations.d.ts
+export interface Contract {
+  Tables: Record<string, Record<string, any>>;
+  Relations: Record<
+    string,
+    Record<
+      string,
+      {
+        to: string;
+        cardinality: '1:N' | 'N:1';
+        on: { parentCols: string[]; childCols: string[] };
+      }
+    >
+  >;
+  Uniques: Record<string, string[]>;
+}
+
 // Validation functions
 export function validateContract(data: unknown): Schema {
   return ContractSchema.parse(data);

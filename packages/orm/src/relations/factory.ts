@@ -1,8 +1,8 @@
-import { Schema, buildRelationGraph } from '@prisma/relational-ir';
+import { Schema, buildRelationGraph, Contract } from '@prisma/relational-ir';
 import { Table } from '@prisma/sql';
 import { buildRelationHandles, RelationHandles, RelationHandle } from './handles';
 import { OrmBuilder } from './builder';
-import { TypedOrmBuilder, TypedRelationHandle, TypedOrmFactory, Contract } from '../typed-builder';
+import { TypedOrmBuilder, TypedRelationHandle, TypedOrmFactory } from '../typed-builder';
 
 export interface OrmFactory {
   from<T>(table: Table<T>): OrmBuilder<T>;

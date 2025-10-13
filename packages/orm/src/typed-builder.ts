@@ -1,25 +1,8 @@
-import { Schema, RelationGraph } from '@prisma/relational-ir';
+import { Schema, RelationGraph, Contract } from '@prisma/relational-ir';
 import { Table, Column, FieldExpression, Plan, TABLE_NAME } from '@prisma/sql';
 import { OrmQueryAST, IncludeNode, RelationHandle } from './ast/types';
 import { lowerRelations } from './lowering/lower-relations';
 import { compileToSQL } from '@prisma/sql';
-
-// Generic contract types - these should match the generated relations.d.ts
-export interface Contract {
-  Tables: Record<string, Record<string, any>>;
-  Relations: Record<
-    string,
-    Record<
-      string,
-      {
-        to: string;
-        cardinality: '1:N' | 'N:1';
-        on: { parentCols: string[]; childCols: string[] };
-      }
-    >
-  >;
-  Uniques: Record<string, string[]>;
-}
 
 // Type-safe relation handle
 export interface TypedRelationHandle<
