@@ -6,9 +6,12 @@ export interface SqlOptions {
   onContractMismatch?: ContractMismatchMode;
 }
 
-export function sql(ir: Schema, opts?: SqlOptions): {
+export function sql(
+  ir: Schema,
+  opts?: SqlOptions,
+): {
   from<TTables extends Tables>(
-    table: Table<any> | TableName<TTables>
+    table: Table<any> | TableName<TTables>,
   ): ReturnType<typeof createFromBuilder<any>>;
 } {
   const contractHash = ir.contractHash;
@@ -17,21 +20,21 @@ export function sql(ir: Schema, opts?: SqlOptions): {
   return {
     from<TTables extends Tables>(table: Table<any> | TableName<TTables>) {
       const tableName = typeof table === 'string' ? table : table[TABLE_NAME];
-      
+
       // Verify table has matching contract hash
       if (typeof table !== 'string' && table.__contractHash !== contractHash) {
         const msg =
           `E_CONTRACT_MISMATCH: contract hash mismatch in from()\n` +
           `→ expected: ${contractHash || 'undefined'}\n→ got: ${table.__contractHash || 'undefined'}\n` +
           `Hint: ensure all DSL elements come from the same IR`;
-        
+
         if (onContractMismatch === 'warn') {
           console.warn(msg);
         } else {
           throw new Error(msg);
         }
       }
-      
+
       return createFromBuilder(tableName, { contractHash, onContractMismatch }) as any;
     },
   };

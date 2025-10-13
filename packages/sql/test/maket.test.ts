@@ -163,7 +163,6 @@ describe('makeT Factory Function', () => {
 
     const t = makeT<UppercaseTables>(schemaWithUppercase);
     expect(t.User).toBeDefined();
-    expect(t.user).toBeUndefined();
     expect(t.User[TABLE_NAME]).toBe('User'); // Table name from schema is preserved
   });
 

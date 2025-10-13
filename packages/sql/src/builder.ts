@@ -14,12 +14,17 @@ export interface BuilderContext {
   onContractMismatch: ContractMismatchMode;
 }
 
-function handleMismatch(where: string, expected: string, got: string, mode: ContractMismatchMode): void {
+function handleMismatch(
+  where: string,
+  expected: string,
+  got: string,
+  mode: ContractMismatchMode,
+): void {
   const msg =
     `E_CONTRACT_MISMATCH: contract hash mismatch in ${where}\n` +
     `→ expected: ${expected}\n→ got: ${got}\n` +
     `Hint: ensure all DSL elements come from the same IR`;
-  
+
   if (mode === 'warn') {
     console.warn(msg);
   } else {
@@ -52,11 +57,11 @@ export class QueryBuilder<TTable extends Table<any>> {
           'select()',
           this.context.contractHash || 'undefined',
           column.__contractHash || 'undefined',
-          this.context.onContractMismatch
+          this.context.onContractMismatch,
         );
       }
     }
-    
+
     this.ast.select = { type: 'select', fields };
     return this as any;
   }
@@ -84,15 +89,15 @@ export class QueryBuilder<TTable extends Table<any>> {
   build(): { sql: string; params: unknown[]; rowType: InferSelectResult<any> } {
     // Final verification: check all column references have matching contract hash
     const references: Column<any>[] = [];
-    
+
     // Collect from select fields
     if (this.ast.select) {
       references.push(...Object.values(this.ast.select.fields));
     }
-    
+
     // Note: FieldExpression doesn't carry contract hash directly, but we could
     // add verification here if needed. For now, the select() verification is sufficient.
-    
+
     // Verify all collected references
     for (const ref of references) {
       if (ref.__contractHash !== this.context.contractHash) {
@@ -100,11 +105,11 @@ export class QueryBuilder<TTable extends Table<any>> {
           'build()',
           this.context.contractHash || 'undefined',
           ref.__contractHash || 'undefined',
-          this.context.onContractMismatch
+          this.context.onContractMismatch,
         );
       }
     }
-    
+
     const { sql, params } = compileToSQL(this.ast);
     return { sql, params, rowType: {} as any };
   }

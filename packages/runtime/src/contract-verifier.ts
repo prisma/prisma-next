@@ -104,34 +104,38 @@ export async function assertContract(options: ContractVerifierOptions): Promise<
 
   const { mode = 'error' } = options;
 
-  if (result.code === 'E_CONTRACT_MISSING') {
-    const error = new Error(
-      `E_CONTRACT_MISSING: No contract hash row found at ${options.schema || 'prisma_contract'}.${options.table || 'version'}(id=${options.id || 1}).\n` +
-        `expected: ${result.expected}\n` +
-        `fix: apply migrations or seed ${options.schema || 'prisma_contract'}.${options.table || 'version'} with the expected hash.`,
-    );
+  if (!result.ok) {
+    const errorResult = result as Extract<ContractVerification, { ok: false }>;
 
-    if (mode === 'warn') {
-      console.warn(error.message);
-      return;
+    if (errorResult.code === 'E_CONTRACT_MISSING') {
+      const error = new Error(
+        `E_CONTRACT_MISSING: No contract hash row found at ${options.schema || 'prisma_contract'}.${options.table || 'version'}(id=${options.id || 1}).\n` +
+          `expected: ${errorResult.expected}\n` +
+          `fix: apply migrations or seed ${options.schema || 'prisma_contract'}.${options.table || 'version'} with the expected hash.`,
+      );
+
+      if (mode === 'warn') {
+        console.warn(error.message);
+        return;
+      }
+
+      throw error;
     }
 
-    throw error;
-  }
+    if (errorResult.code === 'E_CONTRACT_MISMATCH') {
+      const error = new Error(
+        `E_CONTRACT_MISMATCH: Database contract hash differs from application.\n` +
+          `app: ${errorResult.expected}\n` +
+          `db : ${errorResult.dbHash}\n` +
+          `fix: apply migrations for the current contract or deploy the matching build.`,
+      );
 
-  if (result.code === 'E_CONTRACT_MISMATCH') {
-    const error = new Error(
-      `E_CONTRACT_MISMATCH: Database contract hash differs from application.\n` +
-        `app: ${result.expected}\n` +
-        `db : ${result.dbHash}\n` +
-        `fix: apply migrations for the current contract or deploy the matching build.`,
-    );
+      if (mode === 'warn') {
+        console.warn(error.message);
+        return;
+      }
 
-    if (mode === 'warn') {
-      console.warn(error.message);
-      return;
+      throw error;
     }
-
-    throw error;
   }
 }

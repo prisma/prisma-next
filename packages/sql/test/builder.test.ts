@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { sql, makeT, compileToSQL, type Tables, TABLE_NAME } from '../src/index';
-import type { Column, FieldExpression } from '../src/types';
+import { sql, makeT, compileToSQL, TABLE_NAME } from '../src/exports';
+import type { Column, FieldExpression, Tables, Table } from '../src/types';
 
 interface UserShape {
   id: number;
@@ -9,25 +9,19 @@ interface UserShape {
   createdAt: Date;
 }
 
-interface TestTables extends Tables {
-  user: {
-    [TABLE_NAME]: string;
-    id: Column<number>;
-    email: Column<string>;
-    active: Column<boolean>;
-    createdAt: Column<Date>;
-  };
+interface TestTables {
+  user: Table<UserShape>;
 }
 
 const mockSchema = {
-  target: 'postgres',
+  target: 'postgres' as const,
   tables: {
     user: {
       columns: {
-        id: { type: 'int4', nullable: false, pk: true, default: { kind: 'autoincrement' } },
-        email: { type: 'text', nullable: false, unique: true },
-        active: { type: 'bool', nullable: false, default: { kind: 'literal', value: 'true' } },
-        createdAt: { type: 'timestamptz', nullable: false, default: { kind: 'now' } },
+        id: { type: 'int4' as const, nullable: false, pk: true, default: { kind: 'autoincrement' as const } },
+        email: { type: 'text' as const, nullable: false, unique: true },
+        active: { type: 'bool' as const, nullable: false, default: { kind: 'literal' as const, value: 'true' } },
+        createdAt: { type: 'timestamptz' as const, nullable: false, default: { kind: 'now' as const } },
       },
       indexes: [],
       constraints: [],
@@ -40,7 +34,7 @@ const t = makeT<TestTables>(mockSchema);
 
 describe('SQL Query Builder', () => {
   it('builds a simple SELECT query with Column objects', () => {
-    const query = sql().from(t.user).select({ id: t.user.id, email: t.user.email });
+    const query = sql(mockSchema).from(t.user).select({ id: t.user.id, email: t.user.email });
 
     const { sql: generatedSQL, params } = query.build();
 
@@ -49,7 +43,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('builds a query with WHERE clause using Column expressions', () => {
-    const query = sql().from(t.user).where(t.user.active.eq(true)).select({});
+    const query = sql(mockSchema).from(t.user).where(t.user.active.eq(true)).select({});
 
     const { sql: generatedSQL, params } = query.build();
 
@@ -58,7 +52,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('builds a query with ORDER BY and LIMIT', () => {
-    const query = sql().from(t.user).orderBy('createdAt', 'DESC').limit(10).select({});
+    const query = sql(mockSchema).from(t.user).orderBy('createdAt', 'DESC').limit(10).select({});
 
     const { sql: generatedSQL, params } = query.build();
 
@@ -67,7 +61,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('builds a complex query with Column objects', () => {
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email })
@@ -83,7 +77,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('handles IN expressions with Column objects', () => {
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
       .where(t.user.id.in([1, 2, 3]))
       .select({});
@@ -96,11 +90,11 @@ describe('SQL Query Builder', () => {
 
   it('handles multiple comparison operators', () => {
     const queries = [
-      sql().from(t.user).where(t.user.id.gt(5)).select({}),
-      sql().from(t.user).where(t.user.id.lt(10)).select({}),
-      sql().from(t.user).where(t.user.id.gte(1)).select({}),
-      sql().from(t.user).where(t.user.id.lte(100)).select({}),
-      sql().from(t.user).where(t.user.email.ne('test@example.com')).select({}),
+      sql(mockSchema).from(t.user).where(t.user.id.gt(5)).select({}),
+      sql(mockSchema).from(t.user).where(t.user.id.lt(10)).select({}),
+      sql(mockSchema).from(t.user).where(t.user.id.gte(1)).select({}),
+      sql(mockSchema).from(t.user).where(t.user.id.lte(100)).select({}),
+      sql(mockSchema).from(t.user).where(t.user.email.ne('test@example.com')).select({}),
     ];
 
     const expectedSQLs = [
@@ -119,7 +113,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('handles queries with all column types', () => {
-    const query = sql().from(t.user).select({
+    const query = sql(mockSchema).from(t.user).select({
       id: t.user.id,
       email: t.user.email,
       active: t.user.active,
@@ -135,7 +129,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('handles boolean values in WHERE clauses', () => {
-    const query = sql().from(t.user).where(t.user.active.eq(false)).select({});
+    const query = sql(mockSchema).from(t.user).where(t.user.active.eq(false)).select({});
 
     const { sql: generatedSQL, params } = query.build();
 
@@ -144,7 +138,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('handles string values with special characters', () => {
-    const query = sql().from(t.user).where(t.user.email.eq('test@example.com')).select({});
+    const query = sql(mockSchema).from(t.user).where(t.user.email.eq('test@example.com')).select({});
 
     const { sql: generatedSQL, params } = query.build();
 

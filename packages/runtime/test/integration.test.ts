@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn } from 'child_process';
 import { sql } from '@prisma/sql';
 import { makeT } from '@prisma/sql';
-import { connect } from '../src/index';
 import type { Table } from '@prisma/sql';
+import { connect } from '../src/exports';
 
 describe('Runtime Integration Tests', () => {
   let db: any;
@@ -22,42 +22,21 @@ describe('Runtime Integration Tests', () => {
   }
 
   const mockSchema = {
-    models: [
-      {
-        name: 'User',
-        fields: [
-          {
-            name: 'id',
-            type: 'Int',
-            attributes: [
-              { name: 'id' },
-              { name: 'default', value: { type: 'autoincrement' } }
-            ]
-          },
-          {
-            name: 'email',
-            type: 'String',
-            attributes: [
-              { name: 'unique' }
-            ]
-          },
-          {
-            name: 'active',
-            type: 'Boolean',
-            attributes: [
-              { name: 'default', value: { type: 'literal', value: 'true' } }
-            ]
-          },
-          {
-            name: 'createdAt',
-            type: 'DateTime',
-            attributes: [
-              { name: 'default', value: { type: 'now' } }
-            ]
-          }
-        ]
-      }
-    ]
+    target: 'postgres' as const,
+    contractHash: 'sha256:test123',
+    tables: {
+      user: {
+        columns: {
+          id: { type: 'int4' as const, nullable: false, pk: true },
+          email: { type: 'text' as const, nullable: false, unique: true },
+          active: { type: 'bool' as const, nullable: false, default: { kind: 'literal' as const, value: 'true' } },
+          createdAt: { type: 'timestamptz' as const, nullable: false, default: { kind: 'now' as const } },
+        },
+        indexes: [],
+        constraints: [],
+        capabilities: [],
+      },
+    },
   };
 
   beforeAll(async () => {
@@ -118,7 +97,7 @@ describe('Runtime Integration Tests', () => {
   it('executes basic SELECT query with makeT and sql', async () => {
     const t = makeT<TestTables>(mockSchema);
 
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email });
@@ -146,7 +125,7 @@ describe('Runtime Integration Tests', () => {
     const t = makeT<TestTables>(mockSchema);
 
     // Test eq operator
-    const eqQuery = sql()
+    const eqQuery = sql(mockSchema)
       .from(t.user)
       .where(t.user.email.eq('test1@example.com'))
       .select({ id: t.user.id, email: t.user.email });
@@ -156,7 +135,7 @@ describe('Runtime Integration Tests', () => {
     expect(eqResults[0].email).toBe('test1@example.com');
 
     // Test ne operator
-    const neQuery = sql()
+    const neQuery = sql(mockSchema)
       .from(t.user)
       .where(t.user.email.ne('test1@example.com'))
       .select({ id: t.user.id, email: t.user.email });
@@ -166,7 +145,7 @@ describe('Runtime Integration Tests', () => {
     expect(neResults.every((r: any) => r.email !== 'test1@example.com')).toBe(true);
 
     // Test gt operator (on id)
-    const gtQuery = sql()
+    const gtQuery = sql(mockSchema)
       .from(t.user)
       .where(t.user.id.gt(1))
       .select({ id: t.user.id, email: t.user.email });
@@ -179,7 +158,7 @@ describe('Runtime Integration Tests', () => {
   it('executes query with LIMIT clause', async () => {
     const t = makeT<TestTables>(mockSchema);
 
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
       .select({ id: t.user.id, email: t.user.email })
       .limit(2);
@@ -191,7 +170,7 @@ describe('Runtime Integration Tests', () => {
   it('executes query with ORDER BY clause', async () => {
     const t = makeT<TestTables>(mockSchema);
 
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('id', 'ASC');
@@ -208,7 +187,7 @@ describe('Runtime Integration Tests', () => {
   it('executes query with IN operator', async () => {
     const t = makeT<TestTables>(mockSchema);
 
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
       .where(t.user.id.in([1, 3]))
       .select({ id: t.user.id, email: t.user.email });
@@ -225,7 +204,7 @@ describe('Runtime Integration Tests', () => {
   it('handles complex queries with multiple clauses', async () => {
     const t = makeT<TestTables>(mockSchema);
 
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email })
@@ -241,22 +220,22 @@ describe('Runtime Integration Tests', () => {
     const t = makeT<TestTables>(mockSchema);
 
     // These should compile without TypeScript errors
-    const query1 = sql()
+    const query1 = sql(mockSchema)
       .from(t.user)
       .where(t.user.id.eq(123)) // number
       .select({ id: t.user.id, email: t.user.email });
 
-    const query2 = sql()
+    const query2 = sql(mockSchema)
       .from(t.user)
       .where(t.user.email.eq('test@example.com')) // string
       .select({ id: t.user.id, email: t.user.email });
 
-    const query3 = sql()
+    const query3 = sql(mockSchema)
       .from(t.user)
       .where(t.user.active.eq(true)) // boolean
       .select({ id: t.user.id, email: t.user.email });
 
-    const query4 = sql()
+    const query4 = sql(mockSchema)
       .from(t.user)
       .where(t.user.createdAt.eq(new Date())) // Date
       .select({ id: t.user.id, email: t.user.email });

@@ -8,17 +8,21 @@ describe('Runtime Verification Tests', () => {
 
   beforeEach(() => {
     mockSchema = {
-      models: [
-        {
-          name: 'User',
-          fields: [
-            { name: 'id', type: 'Int', attributes: [{ name: 'id' }] },
-            { name: 'email', type: 'String', attributes: [{ name: 'unique' }] },
-            { name: 'active', type: 'Boolean', attributes: [{ name: 'default', value: { type: 'literal', value: 'true' } }] },
-            { name: 'createdAt', type: 'DateTime', attributes: [{ name: 'default', value: { type: 'now' } }] },
-          ],
+      target: 'postgres',
+      contractHash: 'sha256:test123',
+      tables: {
+        user: {
+          columns: {
+            id: { type: 'int4', nullable: false, pk: true },
+            email: { type: 'text', nullable: false, unique: true },
+            active: { type: 'bool', nullable: false, default: { kind: 'literal', value: 'true' } },
+            createdAt: { type: 'timestamptz', nullable: false, default: { kind: 'now' } },
+          },
+          indexes: [],
+          constraints: [],
+          capabilities: [],
         },
-      ],
+      },
     };
 
     db = new DatabaseConnection({

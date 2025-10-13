@@ -40,6 +40,8 @@ export type Table<TShape> = {
   readonly __contractHash?: string;
 } & {
   readonly [K in keyof TShape]: Column<TShape[K]>;
+} & {
+  readonly [x: string]: Column<any>;
 };
 
 export interface Tables {

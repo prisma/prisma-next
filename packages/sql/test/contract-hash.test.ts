@@ -1,7 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { sql } from '../src/sql';
 import { makeT } from '../src/maket';
+import { Table } from '../src/types';
 import { Schema } from '@prisma/relational-ir';
+
+// Define the table shape for type safety
+interface UserShape {
+  id: number;
+  email: string;
+  active: boolean;
+}
+
+interface TestTables {
+  user: Table<UserShape>;
+}
 
 describe('Contract Hash Verification', () => {
   const mockIr1: Schema = {
@@ -39,7 +51,7 @@ describe('Contract Hash Verification', () => {
 
   describe('makeT()', () => {
     it('adds contract hash to tables and columns', () => {
-      const t = makeT(mockIr1);
+      const t = makeT<TestTables>(mockIr1);
 
       expect(t.user.__contractHash).toBe('sha256:abc123');
       expect(t.user.id.__contractHash).toBe('sha256:abc123');
@@ -49,7 +61,7 @@ describe('Contract Hash Verification', () => {
 
     it('handles undefined contract hash', () => {
       const irWithoutHash = { ...mockIr1, contractHash: undefined };
-      const t = makeT(irWithoutHash);
+      const t = makeT<TestTables>(irWithoutHash);
 
       expect(t.user.__contractHash).toBeUndefined();
       expect(t.user.id.__contractHash).toBeUndefined();
@@ -58,8 +70,8 @@ describe('Contract Hash Verification', () => {
 
   describe('sql.from()', () => {
     it('detects hash mismatch in table reference', () => {
-      const t1 = makeT(mockIr1);
-      const t2 = makeT(mockIr2);
+      const t1 = makeT<TestTables>(mockIr1);
+      const t2 = makeT<TestTables>(mockIr2);
 
       expect(() => {
         sql(mockIr1).from(t2.user);
@@ -67,7 +79,7 @@ describe('Contract Hash Verification', () => {
     });
 
     it('allows matching hash', () => {
-      const t = makeT(mockIr1);
+      const t = makeT<TestTables>(mockIr1);
 
       expect(() => {
         sql(mockIr1).from(t.user);
@@ -75,8 +87,8 @@ describe('Contract Hash Verification', () => {
     });
 
     it('handles warn mode', () => {
-      const t1 = makeT(mockIr1);
-      const t2 = makeT(mockIr2);
+      const t1 = makeT<TestTables>(mockIr1);
+      const t2 = makeT<TestTables>(mockIr2);
 
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -100,8 +112,8 @@ describe('Contract Hash Verification', () => {
 
   describe('QueryBuilder.build()', () => {
     it('detects hash mismatch in select columns', () => {
-      const t1 = makeT(mockIr1);
-      const t2 = makeT(mockIr2);
+      const t1 = makeT<TestTables>(mockIr1);
+      const t2 = makeT<TestTables>(mockIr2);
 
       expect(() => {
         sql(mockIr1).from(t1.user).select({
@@ -112,7 +124,7 @@ describe('Contract Hash Verification', () => {
     });
 
     it('allows matching hash in all columns', () => {
-      const t = makeT(mockIr1);
+      const t = makeT<TestTables>(mockIr1);
 
       const query = sql(mockIr1).from(t.user).select({
         id: t.user.id,
@@ -126,8 +138,8 @@ describe('Contract Hash Verification', () => {
     });
 
     it('handles warn mode in build()', () => {
-      const t1 = makeT(mockIr1);
-      const t2 = makeT(mockIr2);
+      const t1 = makeT<TestTables>(mockIr1);
+      const t2 = makeT<TestTables>(mockIr2);
 
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -150,7 +162,7 @@ describe('Contract Hash Verification', () => {
 
   describe('QueryAST contract hash', () => {
     it('embeds contract hash in AST', () => {
-      const t = makeT(mockIr1);
+      const t = makeT<TestTables>(mockIr1);
 
       const query = sql(mockIr1).from(t.user).select({ id: t.user.id });
 
@@ -164,8 +176,8 @@ describe('Contract Hash Verification', () => {
 
   describe('Mixed IR scenarios', () => {
     it('prevents mixing columns from different IR versions', () => {
-      const t1 = makeT(mockIr1);
-      const t2 = makeT(mockIr2);
+      const t1 = makeT<TestTables>(mockIr1);
+      const t2 = makeT<TestTables>(mockIr2);
 
       // This should fail at from() level
       expect(() => {
@@ -184,8 +196,8 @@ describe('Contract Hash Verification', () => {
 
   describe('Error messages', () => {
     it('provides actionable error messages', () => {
-      const t1 = makeT(mockIr1);
-      const t2 = makeT(mockIr2);
+      const t1 = makeT<TestTables>(mockIr1);
+      const t2 = makeT<TestTables>(mockIr2);
 
       try {
         sql(mockIr1).from(t2.user);

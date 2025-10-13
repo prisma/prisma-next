@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { sql, makeT, TABLE_NAME } from '../src/index';
-import type { Column, FieldExpression, Tables } from '../src/types';
+import { sql, makeT, TABLE_NAME } from '../src/exports';
+import type { Column, FieldExpression, Tables, Table } from '../src/types';
 
 interface UserShape {
   id: number;
@@ -9,25 +9,19 @@ interface UserShape {
   createdAt: Date;
 }
 
-interface TestTables extends Tables {
-  user: {
-    [TABLE_NAME]: string;
-    id: Column<number>;
-    email: Column<string>;
-    active: Column<boolean>;
-    createdAt: Column<Date>;
-  };
+interface TestTables {
+  user: Table<UserShape>;
 }
 
 const mockSchema = {
-  target: 'postgres',
+  target: 'postgres' as const,
   tables: {
     user: {
       columns: {
-        id: { type: 'int4', nullable: false, pk: true, default: { kind: 'autoincrement' } },
-        email: { type: 'text', nullable: false, unique: true },
-        active: { type: 'bool', nullable: false, default: { kind: 'literal', value: 'true' } },
-        createdAt: { type: 'timestamptz', nullable: false, default: { kind: 'now' } },
+        id: { type: 'int4' as const, nullable: false, pk: true, default: { kind: 'autoincrement' as const } },
+        email: { type: 'text' as const, nullable: false, unique: true },
+        active: { type: 'bool' as const, nullable: false, default: { kind: 'literal' as const, value: 'true' } },
+        createdAt: { type: 'timestamptz' as const, nullable: false, default: { kind: 'now' as const } },
       },
       indexes: [],
       constraints: [],
@@ -40,7 +34,7 @@ const t = makeT<TestTables>(mockSchema);
 
 describe('Type Inference Tests', () => {
   it('infers correct return type for simple select', () => {
-    const query = sql().from(t.user).select({ id: t.user.id, email: t.user.email });
+    const query = sql(mockSchema).from(t.user as any).select({ id: t.user.id, email: t.user.email });
 
     const { sql: generatedSQL, params, rowType } = query.build();
 
@@ -51,7 +45,7 @@ describe('Type Inference Tests', () => {
   });
 
   it('infers correct return type for select with all fields', () => {
-    const query = sql().from(t.user).select({
+    const query = sql(mockSchema).from(t.user).select({
       id: t.user.id,
       email: t.user.email,
       active: t.user.active,
@@ -68,10 +62,10 @@ describe('Type Inference Tests', () => {
   });
 
   it('infers correct return type for query with where clause', () => {
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
-      .where(t.user.active.eq(true))
-      .select({ id: t.user.id, email: t.user.email });
+      .where((t.user).active.eq(true))
+      .select({ id: (t.user).id, email: (t.user).email });
 
     const { sql: generatedSQL, params, rowType } = query.build();
 
@@ -81,7 +75,7 @@ describe('Type Inference Tests', () => {
   });
 
   it('infers correct return type for query with limit', () => {
-    const query = sql().from(t.user).select({ id: t.user.id }).limit(10);
+    const query = sql(mockSchema).from(t.user).select({ id: t.user.id }).limit(10);
 
     const { sql: generatedSQL, params, rowType } = query.build();
 
@@ -91,7 +85,7 @@ describe('Type Inference Tests', () => {
   });
 
   it('infers correct return type for query with order by', () => {
-    const query = sql()
+    const query = sql(mockSchema)
       .from(t.user)
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('id', 'ASC');

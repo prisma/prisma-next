@@ -3,5 +3,6 @@ description: Use the tools the codebase is configured for
 alwaysApply: true
 ---
 
-- Use pnpm not npm
+- Use pnpm not npm!
 - We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
+- Note that tsc doesn't check test files by default - keep in mind if you want to check types
