@@ -1,14 +1,14 @@
-import { Schema } from '@prisma/relational-ir';
+import { Schema, Table, Column } from '@prisma/relational-ir';
 
 export function emitTypes(schema: Schema): string {
   const interfaces: string[] = [];
 
   // Generate shape interfaces
-  for (const [tableName, table] of Object.entries(schema.tables)) {
+  for (const [tableName, table] of Object.entries(schema.tables) as [string, Table][]) {
     const shapeName = capitalize(tableName) + 'Shape';
     const fields: string[] = [];
 
-    for (const [colName, col] of Object.entries(table.columns)) {
+    for (const [colName, col] of Object.entries(table.columns) as [string, Column][]) {
       const tsType = mapPgTypeToTS(col.type);
       fields.push(`  ${colName}: ${tsType};`);
     }

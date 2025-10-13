@@ -15,7 +15,7 @@ async function main() {
 
   // Step 2: Emit IR and TypeScript types
   console.log('2. Emitting IR and TypeScript types...');
-  const { schema, types } = emitSchemaAndTypes(ast);
+  const { schema, types } = await emitSchemaAndTypes(ast);
 
   // Write schema.json
   writeFileSync('.prisma/schema.json', schema);

@@ -24,7 +24,7 @@ program
       const ast = parse(pslContent);
 
       console.log('⚡ Generating schema and types...');
-      const { schema, types } = emitSchemaAndTypes(ast);
+      const { schema, types } = await emitSchemaAndTypes(ast);
 
       // Ensure output directory exists
       mkdirSync(options.outputDir, { recursive: true });
@@ -61,7 +61,7 @@ program
     try {
       const pslContent = readFileSync(schemaFile, 'utf-8');
       const ast = parse(pslContent);
-      const { schema, types } = emitSchemaAndTypes(ast);
+      const { schema, types } = await emitSchemaAndTypes(ast);
 
       mkdirSync(options.outputDir, { recursive: true });
       writeFileSync(`${options.outputDir}/schema.json`, schema);

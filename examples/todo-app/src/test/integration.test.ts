@@ -24,7 +24,7 @@ describe('Integration Tests', () => {
     // Generate schema files
     const pslContent = readFileSync('schema.psl', 'utf-8');
     const ast = parse(pslContent);
-    const { schema, types } = emitSchemaAndTypes(ast);
+    const { schema, types } = await emitSchemaAndTypes(ast);
 
     // Ensure .prisma directory exists
     try {

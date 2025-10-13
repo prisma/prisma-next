@@ -1,7 +1,9 @@
 import { SchemaAST, ModelDeclaration, FieldDeclaration } from '@prisma/psl';
-import { Schema, validateSchema } from '@prisma/relational-ir';
+import { Schema, validateSchema, Table } from '@prisma/relational-ir';
+import { canonicalJSONStringify } from './canonicalize';
+import { sha256Hex } from './hash';
 
-export function emitSchema(ast: SchemaAST): Schema {
+export async function emitSchema(ast: SchemaAST): Promise<Schema> {
   const tables: Record<string, any> = {};
 
   for (const model of ast.models) {
@@ -14,7 +16,35 @@ export function emitSchema(ast: SchemaAST): Schema {
     tables,
   };
 
-  return validateSchema(schema);
+  // Build clean IR for hashing (exclude meta.source fields)
+  const cleanSchema = {
+    target: schema.target,
+    tables: Object.fromEntries(
+      Object.entries(schema.tables).map(([tableName, table]: [string, Table]) => [
+        tableName,
+        {
+          columns: table.columns,
+          indexes: table.indexes,
+          constraints: table.constraints,
+          capabilities: table.capabilities,
+          // Exclude meta.source from hash
+        },
+      ])
+    ),
+  };
+
+  // Compute canonical hash
+  const canonical = canonicalJSONStringify(cleanSchema);
+  const hash = await sha256Hex(canonical);
+  const contractHash = `sha256:${hash}`;
+
+  // Return schema with contract hash
+  const schemaWithHash = {
+    ...schema,
+    contractHash,
+  };
+
+  return validateSchema(schemaWithHash);
 }
 
 function emitTable(model: ModelDeclaration) {

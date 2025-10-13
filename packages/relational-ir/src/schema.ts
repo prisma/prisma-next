@@ -56,6 +56,7 @@ export type Table = z.infer<typeof TableSchema>;
 // Complete schema
 export const SchemaSchema = z.object({
   target: z.literal('postgres'),
+  contractHash: z.string().optional(),
   tables: z.record(z.string(), TableSchema),
 });
 

@@ -15,9 +15,9 @@ export interface ConnectionConfig {
 }
 
 export class DatabaseConnection {
-  private pool: Pool;
-  private ir: Schema;
-  private verified: boolean = false;
+  public pool: Pool;
+  public ir: Schema;
+  public verified: boolean = false;
 
   constructor(config: ConnectionConfig) {
     this.ir = config.ir;
@@ -77,7 +77,7 @@ export class DatabaseConnection {
     await this.pool.end();
   }
 
-  private async verifySchema(): Promise<void> {
+  public async verifySchema(): Promise<void> {
     const client = await this.pool.connect();
 
     try {
