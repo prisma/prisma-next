@@ -1,7 +1,12 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/scripts/main.ts', 'src/scripts/setup-db.ts', 'src/scripts/verify-db.ts'],
+  entry: [
+    'src/scripts/main.ts',
+    'src/scripts/migrate.ts',
+    'src/scripts/reset-db.ts',
+    'src/scripts/verify-db.ts',
+  ],
   outDir: 'dist',
   format: ['esm'],
   target: 'es2022',
@@ -13,6 +18,7 @@ export default defineConfig({
   external: [
     // Keep workspace packages external since they're already built
     '@prisma/cli',
+    '@prisma/migrate',
     '@prisma/orm',
     '@prisma/psl',
     '@prisma/relational-ir',

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { setupDatabase } from '../scripts/setup-db';
+import { migrateDatabase } from '../scripts/migrate';
 import { connect } from '@prisma/runtime';
 import { rawQuery, table } from '@prisma/sql';
 import ir from '../../.prisma/contract.json';
@@ -19,7 +19,7 @@ describe('End-to-End Tests', () => {
 
   beforeAll(async () => {
     // Setup database with test data
-    await setupDatabase();
+    await migrateDatabase();
 
     // Create a new connection for tests
     db = connect({

@@ -1,6 +1,15 @@
 import { createHash } from 'crypto';
 import { compileToSQL } from '@prisma/sql';
-import { ScriptAST, StatementAST, DdlAST, RawStmtAST, TxBlockAST, ColumnSpec, ConstraintSpec, IndexCol } from '../script-ast';
+import {
+  ScriptAST,
+  StatementAST,
+  DdlAST,
+  RawStmtAST,
+  TxBlockAST,
+  ColumnSpec,
+  ConstraintSpec,
+  IndexCol,
+} from '../script-ast';
 
 // Quote identifier for PostgreSQL
 function quoteIdentifier(identifier: string): string {
@@ -11,26 +20,39 @@ function quoteIdentifier(identifier: string): string {
 // Render column type to PostgreSQL
 function renderColumnType(type: string): string {
   switch (type) {
-    case 'int4': return 'INTEGER';
-    case 'int8': return 'BIGINT';
-    case 'text': return 'TEXT';
-    case 'varchar': return 'VARCHAR(255)';
-    case 'bool': return 'BOOLEAN';
-    case 'timestamptz': return 'TIMESTAMPTZ';
-    case 'timestamp': return 'TIMESTAMP';
-    case 'float8': return 'DOUBLE PRECISION';
-    case 'float4': return 'REAL';
-    case 'uuid': return 'UUID';
-    case 'json': return 'JSON';
-    case 'jsonb': return 'JSONB';
-    default: return type.toUpperCase();
+    case 'int4':
+      return 'INTEGER';
+    case 'int8':
+      return 'BIGINT';
+    case 'text':
+      return 'TEXT';
+    case 'varchar':
+      return 'VARCHAR(255)';
+    case 'bool':
+      return 'BOOLEAN';
+    case 'timestamptz':
+      return 'TIMESTAMPTZ';
+    case 'timestamp':
+      return 'TIMESTAMP';
+    case 'float8':
+      return 'DOUBLE PRECISION';
+    case 'float4':
+      return 'REAL';
+    case 'uuid':
+      return 'UUID';
+    case 'json':
+      return 'JSON';
+    case 'jsonb':
+      return 'JSONB';
+    default:
+      return type.toUpperCase();
   }
 }
 
 // Render default value
 function renderDefault(defaultValue: ColumnSpec['default']): string {
   if (!defaultValue) return '';
-  
+
   switch (defaultValue.kind) {
     case 'autoincrement':
       return 'SERIAL';
@@ -46,22 +68,22 @@ function renderDefault(defaultValue: ColumnSpec['default']): string {
 // Render column specification
 function renderColumn(column: ColumnSpec): string {
   let sql = `${quoteIdentifier(column.name)} `;
-  
+
   // Handle autoincrement specially
   if (column.default?.kind === 'autoincrement') {
     sql += renderColumnType(column.type).replace('INTEGER', 'SERIAL');
   } else {
     sql += renderColumnType(column.type);
   }
-  
+
   if (!column.nullable) {
     sql += ' NOT NULL';
   }
-  
+
   if (column.default && column.default.kind !== 'autoincrement') {
     sql += ` ${renderDefault(column.default)}`;
   }
-  
+
   return sql;
 }
 
@@ -71,23 +93,23 @@ function renderConstraint(constraint: ConstraintSpec): string {
     case 'primaryKey':
       const pkName = constraint.name ? `CONSTRAINT ${quoteIdentifier(constraint.name)} ` : '';
       return `${pkName}PRIMARY KEY (${constraint.columns.map(quoteIdentifier).join(', ')})`;
-    
+
     case 'unique':
       const uniqueName = constraint.name ? `CONSTRAINT ${quoteIdentifier(constraint.name)} ` : '';
       return `${uniqueName}UNIQUE (${constraint.columns.map(quoteIdentifier).join(', ')})`;
-    
+
     case 'foreignKey':
       const fkName = constraint.name ? `CONSTRAINT ${quoteIdentifier(constraint.name)} ` : '';
       let fkSql = `${fkName}FOREIGN KEY (${constraint.columns.map(quoteIdentifier).join(', ')}) `;
       fkSql += `REFERENCES ${quoteIdentifier(constraint.ref.table)} (${constraint.ref.columns.map(quoteIdentifier).join(', ')})`;
-      
+
       if (constraint.onDelete) {
         fkSql += ` ON DELETE ${constraint.onDelete.toUpperCase()}`;
       }
       if (constraint.onUpdate) {
         fkSql += ` ON UPDATE ${constraint.onUpdate.toUpperCase()}`;
       }
-      
+
       return fkSql;
   }
 }
@@ -99,35 +121,35 @@ function renderDdlStatement(ddl: DdlAST): string {
       let sql = 'CREATE TABLE';
       if (ddl.ifNotExists) sql += ' IF NOT EXISTS';
       sql += ` ${quoteIdentifier(ddl.name.name)} (`;
-      
+
       const parts: string[] = [];
-      
+
       // Add columns
       for (const column of ddl.columns) {
         parts.push(renderColumn(column));
       }
-      
+
       // Add constraints
       if (ddl.constraints) {
         for (const constraint of ddl.constraints) {
           parts.push(renderConstraint(constraint));
         }
       }
-      
+
       sql += parts.join(', ');
       sql += ')';
       return sql;
     }
-    
+
     case 'dropTable': {
       let sql = 'DROP TABLE';
       if (ddl.ifExists) sql += ' IF EXISTS';
       sql += ` ${quoteIdentifier(ddl.name.name)}`;
       return sql;
     }
-    
+
     case 'alterTable': {
-      const alters = ddl.alters.map(alter => {
+      const alters = ddl.alters.map((alter) => {
         switch (alter.kind) {
           case 'addColumn':
             return `ADD COLUMN ${renderColumn(alter.column)}`;
@@ -144,29 +166,29 @@ function renderDdlStatement(ddl: DdlAST): string {
           }
         }
       });
-      
+
       return `ALTER TABLE ${quoteIdentifier(ddl.name.name)} ${alters.join(', ')}`;
     }
-    
+
     case 'createIndex': {
       let sql = 'CREATE';
       if (ddl.unique) sql += ' UNIQUE';
       sql += ' INDEX';
       if (ddl.concurrently) sql += ' CONCURRENTLY';
       sql += ` ${quoteIdentifier(ddl.name.name)} ON ${quoteIdentifier(ddl.table.name)} (`;
-      
-      const indexCols = ddl.columns.map(col => {
+
+      const indexCols = ddl.columns.map((col) => {
         let colSql = quoteIdentifier(col.name);
         if (col.order) colSql += ` ${col.order.toUpperCase()}`;
         if (col.opclass) colSql += ` ${col.opclass}`;
         return colSql;
       });
-      
+
       sql += indexCols.join(', ');
       sql += ')';
       return sql;
     }
-    
+
     case 'dropIndex': {
       let sql = 'DROP INDEX';
       if (ddl.concurrently) sql += ' CONCURRENTLY';
@@ -174,11 +196,11 @@ function renderDdlStatement(ddl: DdlAST): string {
       sql += ` ${quoteIdentifier(ddl.name.name)}`;
       return sql;
     }
-    
+
     case 'addConstraint': {
       return `ALTER TABLE ${quoteIdentifier(ddl.table.name)} ADD ${renderConstraint(ddl.spec)}`;
     }
-    
+
     case 'dropConstraint': {
       return `ALTER TABLE ${quoteIdentifier(ddl.table.name)} DROP CONSTRAINT ${quoteIdentifier(ddl.name.name)}`;
     }
@@ -192,34 +214,38 @@ function renderStatement(stmt: StatementAST): string {
       const statements = stmt.statements.map(renderDdlStatement);
       return `BEGIN;\n${statements.join(';\n')};\nCOMMIT;`;
     }
-    
+
     case 'raw': {
       // Use existing raw SQL compilation
       const { sql } = compileToSQL({
         type: 'raw',
-        template: stmt.template
+        template: stmt.template,
       });
       return sql;
     }
-    
+
     default:
       return renderDdlStatement(stmt as DdlAST);
   }
 }
 
 // Main render function
-export function renderScript(script: ScriptAST): { sql: string; params: unknown[]; sqlHash: string } {
+export function renderScript(script: ScriptAST): {
+  sql: string;
+  params: unknown[];
+  sqlHash: string;
+} {
   const statements = script.statements.map(renderStatement);
   const sql = statements.join(';\n');
-  
+
   // Compute deterministic hash
   const hash = createHash('sha256');
   hash.update(sql);
   const sqlHash = `sha256:${hash.digest('hex')}`;
-  
+
   return {
     sql,
     params: [], // DDL doesn't use parameters
-    sqlHash
+    sqlHash,
   };
 }

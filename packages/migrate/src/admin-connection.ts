@@ -5,7 +5,9 @@ import { renderScript } from './lowering/renderer';
 export interface AdminConnection {
   target: 'postgres';
   withAdvisoryLock<T>(key: string, f: () => Promise<T>): Promise<T>;
-  executeScript(script: ScriptAST): Promise<{ sql: string; params: unknown[]; sqlHash: `sha256:${string}` }>;
+  executeScript(
+    script: ScriptAST,
+  ): Promise<{ sql: string; params: unknown[]; sqlHash: `sha256:${string}` }>;
   readContract(): Promise<{ hash: `sha256:${string}` | null }>;
   writeContract(hash: `sha256:${string}`): Promise<void>;
   close(): Promise<void>;
@@ -14,30 +16,33 @@ export interface AdminConnection {
 export async function connectAdmin(url: string): Promise<AdminConnection> {
   const pool = new Pool({ connectionString: url });
   const client = await pool.connect();
-  
+
   // Set session guards
-  await client.query('SET lock_timeout = \'5s\'');
-  await client.query('SET statement_timeout = \'5min\'');
-  await client.query('SET idle_in_transaction_session_timeout = \'60s\'');
-  await client.query('SET client_min_messages = \'warning\'');
-  
+  await client.query("SET lock_timeout = '5s'");
+  await client.query("SET statement_timeout = '5min'");
+  await client.query("SET idle_in_transaction_session_timeout = '60s'");
+  await client.query("SET client_min_messages = 'warning'");
+
   let hasContractTable = false;
-  
+
   return {
     target: 'postgres',
-    
+
     async withAdvisoryLock<T>(key: string, f: () => Promise<T>): Promise<T> {
       try {
         // Generate stable advisory lock key
-        const lockKeyResult = await client.query(`
+        const lockKeyResult = await client.query(
+          `
           SELECT hashtext(current_database() || '') # hashtext($1) as lock_key
-        `, ['prisma:migrate']);
-        
+        `,
+          ['prisma:migrate'],
+        );
+
         const lockKey = lockKeyResult.rows[0].lock_key;
-        
+
         // Acquire advisory lock
         await client.query('SELECT pg_advisory_lock($1)', [lockKey]);
-        
+
         try {
           return await f();
         } finally {
@@ -48,10 +53,12 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
         throw new Error(`Advisory lock operation failed: ${error}`);
       }
     },
-    
-    async executeScript(script: ScriptAST): Promise<{ sql: string; params: unknown[]; sqlHash: `sha256:${string}` }> {
+
+    async executeScript(
+      script: ScriptAST,
+    ): Promise<{ sql: string; params: unknown[]; sqlHash: `sha256:${string}` }> {
       const { sql, params, sqlHash } = renderScript(script);
-      
+
       try {
         await client.query(sql);
         return { sql, params, sqlHash: sqlHash as `sha256:${string}` };
@@ -59,20 +66,20 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
         throw new Error(`Script execution failed: ${error}\nSQL: ${sql}`);
       }
     },
-    
+
     async readContract(): Promise<{ hash: `sha256:${string}` | null }> {
       try {
         const result = await client.query(`
-          SELECT contract_hash FROM prisma_contract 
-          ORDER BY updated_at DESC 
+          SELECT contract_hash FROM prisma_contract
+          ORDER BY updated_at DESC
           LIMIT 1
         `);
-        
+
         if (result.rows.length === 0) {
           hasContractTable = false;
           return { hash: null };
         }
-        
+
         hasContractTable = true;
         return { hash: result.rows[0].contract_hash as `sha256:${string}` };
       } catch (error) {
@@ -81,29 +88,33 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
         return { hash: null };
       }
     },
-    
+
     async writeContract(hash: `sha256:${string}`): Promise<void> {
       // Create contract table if it doesn't exist
       if (!hasContractTable) {
         await client.query(`
           CREATE TABLE IF NOT EXISTS prisma_contract (
-            contract_hash text NOT NULL PRIMARY KEY,
+            id SERIAL PRIMARY KEY,
+            contract_hash text NOT NULL,
             updated_at timestamptz NOT NULL DEFAULT now()
           )
         `);
         hasContractTable = true;
       }
-      
+
       // Insert contract hash (simple INSERT for now)
-      await client.query(`
-        INSERT INTO prisma_contract (contract_hash) 
+      await client.query(
+        `
+        INSERT INTO prisma_contract (contract_hash)
         VALUES ($1)
-      `, [hash]);
+      `,
+        [hash],
+      );
     },
-    
+
     async close(): Promise<void> {
       client.release();
       await pool.end();
-    }
+    },
   };
 }

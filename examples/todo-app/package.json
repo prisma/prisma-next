@@ -6,8 +6,10 @@
     "build": "tsup",
     "dev": "pnpm exec node dist/main.js",
     "generate": "pnpm exec prisma-next generate schema.psl",
-    "setup-db": "pnpm exec node dist/setup-db.js",
-    "test": "vitest run",
+    "migrate": "pnpm exec node dist/migrate.js",
+    "reset-db": "pnpm exec node dist/reset-db.js",
+    "test:migration": "pnpm reset-db && pnpm migrate",
+    "test:migration-twice": "pnpm reset-db && pnpm migrate && pnpm migrate",
     "clean": "rm -rf dist .prisma",
     "lint": "eslint 'src/**/*.ts'",
     "typecheck": "pnpm exec tsc --noEmit && pnpm exec tsc --noEmit --skipLibCheck $(find src -name '*.ts' 2>/dev/null || true)"

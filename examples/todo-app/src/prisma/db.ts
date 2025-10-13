@@ -8,7 +8,7 @@ import { orm } from '@prisma/orm';
 
 export const dataContract = validateContract(_ir);
 
-// Export the raw connection for scripts that need it (like setup-db.ts)
+// Export the raw connection for scripts that need it (like migrate.ts)
 export const db = connect({
   ir: dataContract,
   database: {

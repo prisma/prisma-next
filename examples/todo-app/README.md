@@ -44,17 +44,46 @@ This example demonstrates the complete TypeScript query DSL prototype with type-
 
 2. **Set up the database with contract verification**:
    ```bash
-   pnpm setup-db
+   pnpm migrate
    ```
    This creates:
    - `prisma_contract.version` table for contract hash storage
    - `user` table from your schema
    - Seeds the contract hash from your generated schema
 
-3. **Run the example**:
+3. **Reset database to empty state** (for testing):
+   ```bash
+   pnpm reset-db
+   ```
+   This safely drops all tables and clears contract state for fresh testing.
+
+4. **Run the example**:
    ```bash
    pnpm start
    ```
+
+### Testing Migrations
+
+The migration runner includes comprehensive testing capabilities:
+
+```bash
+# Test fresh migration application
+pnpm test:migration
+
+# Test migration idempotency (run twice)
+pnpm test:migration-twice
+
+# Manual testing workflow
+pnpm reset-db    # Reset to empty state
+pnpm migrate      # Apply migrations
+pnpm migrate      # Verify idempotency (should skip)
+```
+
+This validates:
+- ✅ Fresh migration application on empty database
+- ✅ Contract hash verification and storage
+- ✅ Idempotency (running twice is safe)
+- ✅ Advisory locking prevents concurrent operations
 
 ### Running Tests
 
@@ -273,7 +302,10 @@ describe('Integration Tests', () => {
 - `pnpm dev` - Watch mode for development
 - `pnpm start` - Run the example application with contract verification
 - `pnpm generate` - Generate schema files from PSL
-- `pnpm setup-db` - Set up database with contract version table
+- `pnpm migrate` - Apply database migrations using the migration runner
+- `pnpm reset-db` - Reset database to empty state (for testing)
+- `pnpm test:migration` - Reset database and run migration (fresh test)
+- `pnpm test:migration-twice` - Test migration idempotency
 - `pnpm test` - Run unit tests
 - `pnpm test:integration` - Run integration tests
 - `pnpm lint` - Lint TypeScript files
