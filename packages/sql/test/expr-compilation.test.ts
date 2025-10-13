@@ -18,8 +18,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM "user" WHERE "user"."id" = 1');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE "user"."id" = $1');
+      expect(result.params).toEqual([1]);
     });
 
     it('compiles not equal expressions', () => {
@@ -36,8 +36,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM "user" WHERE "active" != false');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE "active" != $1');
+      expect(result.params).toEqual([false]);
     });
 
     it('compiles greater than expressions', () => {
@@ -54,8 +54,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM "user" WHERE age > 18');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE age > $1');
+      expect(result.params).toEqual([18]);
     });
 
     it('compiles less than expressions', () => {
@@ -72,8 +72,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM "user" WHERE score < 100');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE score < $1');
+      expect(result.params).toEqual([100]);
     });
 
     it('compiles greater than or equal expressions', () => {
@@ -90,8 +90,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM product WHERE price >= 10.5');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM product WHERE price >= $1');
+      expect(result.params).toEqual([10.5]);
     });
 
     it('compiles less than or equal expressions', () => {
@@ -108,8 +108,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM inventory WHERE quantity <= 5');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM inventory WHERE quantity <= $1');
+      expect(result.params).toEqual([5]);
     });
   });
 
@@ -136,8 +136,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM "user" WHERE ("active" = true AND age > 18)');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE ("active" = $1 AND age > $2)');
+      expect(result.params).toEqual([true, 18]);
     });
 
     it('compiles OR expressions', () => {
@@ -162,10 +162,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe(
-        "SELECT * FROM \"user\" WHERE (role = 'admin' OR role = 'moderator')",
-      );
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE (role = $1 OR role = $2)');
+      expect(result.params).toEqual(['admin', 'moderator']);
     });
 
     it('compiles nested logical expressions', () => {
@@ -199,9 +197,9 @@ describe('Expression Compilation', () => {
 
       const result = compileToSQL(query);
       expect(result.sql).toBe(
-        'SELECT * FROM "user" WHERE ("active" = true AND (role = \'admin\' OR role = \'user\'))',
+        'SELECT * FROM "user" WHERE ("active" = $1 AND (role = $2 OR role = $3))',
       );
-      expect(result.params).toEqual([]);
+      expect(result.params).toEqual([true, 'admin', 'user']);
     });
   });
 
@@ -238,8 +236,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM "user" WHERE "id" = 1');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE "id" = $1');
+      expect(result.params).toEqual([1]);
     });
   });
 
@@ -258,8 +256,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe("SELECT * FROM \"user\" WHERE name = 'O''Connor'");
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE name = $1');
+      expect(result.params).toEqual(["O'Connor"]);
     });
 
     it('compiles null literals', () => {
@@ -276,8 +274,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM "user" WHERE deleted_at = NULL');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE deleted_at = $1');
+      expect(result.params).toEqual([null]);
     });
 
     it('compiles boolean literals', () => {
@@ -294,8 +292,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM "user" WHERE "active" = true');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM "user" WHERE "active" = $1');
+      expect(result.params).toEqual([true]);
     });
 
     it('compiles numeric literals', () => {
@@ -312,8 +310,8 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.sql).toBe('SELECT * FROM counter WHERE count = 42');
-      expect(result.params).toEqual([]);
+      expect(result.sql).toBe('SELECT * FROM counter WHERE count = $1');
+      expect(result.params).toEqual([42]);
     });
   });
 
@@ -349,9 +347,9 @@ describe('Expression Compilation', () => {
 
       const result = compileToSQL(query);
       expect(result.sql).toBe(
-        "SELECT * FROM \"user\" WHERE ((status = 'active' OR status = 'pending') AND score >= 80)",
+        'SELECT * FROM "user" WHERE ((status = $1 OR status = $2) AND score >= $3)',
       );
-      expect(result.params).toEqual([]);
+      expect(result.params).toEqual(['active', 'pending', 80]);
     });
   });
 
@@ -380,7 +378,7 @@ describe('Expression Compilation', () => {
       };
 
       const result = compileToSQL(query);
-      expect(result.params).toEqual([]);
+      expect(result.params).toEqual([1, true]);
     });
   });
 

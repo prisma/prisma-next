@@ -31,9 +31,9 @@ function compileSelect(query: QueryAST): { sql: string; params: any[] } {
       // New ProjectionItem[] format
       const fieldList = query.select
         .map((item) => {
-          const expr = compileExpr(item.expr, params, paramIndex);
-          paramIndex += getExprParamCount(item.expr);
-          return `${expr} AS ${quoteIdentifier(item.alias)}`;
+          const result = compileExpr(item.expr, params, paramIndex);
+          paramIndex = result.paramIndex;
+          return `${result.sql} AS ${quoteIdentifier(item.alias)}`;
         })
         .join(', ');
       sql += fieldList;
@@ -67,33 +67,17 @@ function compileSelect(query: QueryAST): { sql: string; params: any[] } {
         sql += ` LEFT JOIN ${quoteIdentifier(join.table)}`;
         if (join.alias) sql += ` ${quoteIdentifier(join.alias)}`;
         if (join.on) {
-          if ('type' in join.on && join.on.type === 'literal') {
-            sql += ` ON ${join.on.value}`;
-          } else if ('kind' in join.on) {
-            // New Expr system
-            sql += ` ON ${compileExpr(join.on, params, paramIndex)}`;
-            paramIndex += getExprParamCount(join.on);
-          } else {
-            // Old FieldExpression system
-            sql += ` ON ${compileExpression(join.on, params, paramIndex)}`;
-            paramIndex += getParamCount(join.on);
-          }
+          const result = compileExpr(join.on, params, paramIndex);
+          paramIndex = result.paramIndex;
+          sql += ` ON ${result.sql}`;
         }
       } else if (join.type === 'join') {
         sql += ` JOIN ${quoteIdentifier(join.table)}`;
         if (join.alias) sql += ` ${quoteIdentifier(join.alias)}`;
         if (join.on) {
-          if ('type' in join.on && join.on.type === 'literal') {
-            sql += ` ON ${join.on.value}`;
-          } else if ('kind' in join.on) {
-            // New Expr system
-            sql += ` ON ${compileExpr(join.on, params, paramIndex)}`;
-            paramIndex += getExprParamCount(join.on);
-          } else {
-            // Old FieldExpression system
-            sql += ` ON ${compileExpression(join.on, params, paramIndex)}`;
-            paramIndex += getParamCount(join.on);
-          }
+          const result = compileExpr(join.on, params, paramIndex);
+          paramIndex = result.paramIndex;
+          sql += ` ON ${result.sql}`;
         }
       }
     }
@@ -101,14 +85,9 @@ function compileSelect(query: QueryAST): { sql: string; params: any[] } {
 
   // Handle WHERE clause
   if (query.where) {
-    // Check if it's an Expr object (new system) or FieldExpression (old system)
-    if ('kind' in query.where.condition) {
-      sql += ' WHERE ' + compileExpr(query.where.condition, params, paramIndex);
-      paramIndex += getExprParamCount(query.where.condition);
-    } else {
-      sql += ' WHERE ' + compileExpression(query.where.condition, params, paramIndex);
-      paramIndex += getParamCount(query.where.condition);
-    }
+    const result = compileExpr(query.where.condition, params, paramIndex);
+    paramIndex = result.paramIndex;
+    sql += ' WHERE ' + result.sql;
   }
 
   // Handle ORDER BY clause
@@ -123,119 +102,14 @@ function compileSelect(query: QueryAST): { sql: string; params: any[] } {
   if (query.limit) {
     params.push(query.limit.count);
     sql += ` LIMIT $${paramIndex}`;
+    paramIndex++;
   }
 
   return { sql, params };
 }
 
-function compileExpression(expr: FieldExpression, params: any[], paramIndex: number): string {
-  // Handle Column expressions (from t.user.id.eq(value))
-  if (isColumnExpression(expr)) {
-    return compileColumnExpression(expr, params, paramIndex);
-  }
-
-  // Handle legacy FieldExpression
-  if (isFieldExpression(expr)) {
-    return compileFieldExpression(expr, params, paramIndex);
-  }
-
-  throw new Error(`Unknown expression type: ${JSON.stringify(expr)}`);
-}
-
-function compileColumnExpression(expr: any, params: any[], paramIndex: number): string {
-  const field = quoteIdentifier(expr.field);
-
-  switch (expr.type) {
-    case 'eq':
-      params.push(expr.value);
-      return `${field} = $${paramIndex}`;
-    case 'ne':
-      params.push(expr.value);
-      return `${field} != $${paramIndex}`;
-    case 'gt':
-      params.push(expr.value);
-      return `${field} > $${paramIndex}`;
-    case 'lt':
-      params.push(expr.value);
-      return `${field} < $${paramIndex}`;
-    case 'gte':
-      params.push(expr.value);
-      return `${field} >= $${paramIndex}`;
-    case 'lte':
-      params.push(expr.value);
-      return `${field} <= $${paramIndex}`;
-    case 'in':
-      const placeholders = expr.values!.map((_: any, i: number) => `$${paramIndex + i}`).join(', ');
-      params.push(...expr.values!);
-      return `${field} IN (${placeholders})`;
-    default:
-      throw new Error(`Unknown condition type: ${expr.type}`);
-  }
-}
-
-function compileFieldExpression(expr: any, params: any[], paramIndex: number): string {
-  const field = quoteIdentifier(expr.field);
-
-  switch (expr.type) {
-    case 'eq':
-      params.push(expr.value);
-      return `${field} = $${paramIndex}`;
-    case 'ne':
-      params.push(expr.value);
-      return `${field} != $${paramIndex}`;
-    case 'gt':
-      params.push(expr.value);
-      return `${field} > $${paramIndex}`;
-    case 'lt':
-      params.push(expr.value);
-      return `${field} < $${paramIndex}`;
-    case 'gte':
-      params.push(expr.value);
-      return `${field} >= $${paramIndex}`;
-    case 'lte':
-      params.push(expr.value);
-      return `${field} <= $${paramIndex}`;
-    case 'in':
-      const placeholders = expr.values!.map((_: any, i: number) => `$${paramIndex + i}`).join(', ');
-      params.push(...expr.values!);
-      return `${field} IN (${placeholders})`;
-    default:
-      throw new Error(`Unknown condition type: ${expr.type}`);
-  }
-}
-
-function getParamCount(expr: FieldExpression): number {
-  if (isFieldExpression(expr)) {
-    switch ((expr as any).type) {
-      case 'in':
-        return (expr as any).values!.length;
-      default:
-        return 1;
-    }
-  }
-
-  if (isColumnExpression(expr)) {
-    switch ((expr as any).type) {
-      case 'in':
-        return (expr as any).values!.length;
-      default:
-        return 1;
-    }
-  }
-
-  return 1;
-}
-
 function isColumn(obj: any): obj is Column<any, any, any> {
   return obj && typeof obj === 'object' && 'table' in obj && 'name' in obj;
-}
-
-function isColumnExpression(obj: any): boolean {
-  return obj && typeof obj === 'object' && 'type' in obj && 'field' in obj && 'value' in obj;
-}
-
-function isFieldExpression(obj: any): boolean {
-  return obj && typeof obj === 'object' && 'type' in obj && 'field' in obj;
 }
 
 function quoteIdentifier(identifier: string): string {
@@ -315,7 +189,11 @@ function quoteIdentifier(identifier: string): string {
 }
 
 // New expression compilation functions
-function compileExpr(expr: Expr, params: any[], paramIndex: number): string {
+function compileExpr(
+  expr: Expr,
+  params: any[],
+  paramIndex: number,
+): { sql: string; paramIndex: number } {
   if (!expr || typeof expr !== 'object' || !expr.kind) {
     console.error('Invalid expression:', expr);
     throw new Error(`Invalid expression: ${JSON.stringify(expr)}`);
@@ -324,47 +202,90 @@ function compileExpr(expr: Expr, params: any[], paramIndex: number): string {
   switch (expr.kind) {
     case 'column':
       const tablePrefix = expr.table ? `${quoteIdentifier(expr.table)}.` : '';
-      return `${tablePrefix}${quoteIdentifier(expr.name)}`;
+      return { sql: `${tablePrefix}${quoteIdentifier(expr.name)}`, paramIndex };
 
     case 'call':
-      const args = expr.args.map((arg) => compileExpr(arg, params, paramIndex)).join(', ');
-      return `${expr.fn}(${args})`;
+      let callParamIndex = paramIndex;
+      const args = expr.args
+        .map((arg) => {
+          const result = compileExpr(arg, params, callParamIndex);
+          callParamIndex = result.paramIndex;
+          return result.sql;
+        })
+        .join(', ');
+      return { sql: `${expr.fn}(${args})`, paramIndex: callParamIndex };
 
     case 'literal':
-      if (expr.value === null) return 'NULL';
-      if (typeof expr.value === 'string') return `'${expr.value.replace(/'/g, "''")}'`;
-      return String(expr.value);
+      params.push(expr.value);
+      return { sql: `$${paramIndex}`, paramIndex: paramIndex + 1 };
 
     case 'subquery':
       const { sql: subSql, params: subParams } = compileToSQL(expr.query);
+      // Renumber subquery parameters to continue from current paramIndex
+      const renumberedSubSql = subSql.replace(/\$(\d+)/g, (match, num) => {
+        const newIndex = paramIndex + parseInt(num) - 1;
+        return `$${newIndex}`;
+      });
       params.push(...subParams);
-      return `(${subSql})`;
+      return { sql: `(${renumberedSubSql})`, paramIndex: paramIndex + subParams.length };
 
     case 'jsonObject':
+      let jsonParamIndex = paramIndex;
       const fields = Object.entries(expr.fields)
-        .map(([key, value]) => `'${key}', ${compileExpr(value, params, paramIndex)}`)
+        .map(([key, value]) => {
+          const result = compileExpr(value, params, jsonParamIndex);
+          jsonParamIndex = result.paramIndex;
+          return `'${key}', ${result.sql}`;
+        })
         .join(', ');
-      return `json_build_object(${fields})`;
+      return { sql: `json_build_object(${fields})`, paramIndex: jsonParamIndex };
 
     case 'raw':
       return compileExprRaw(expr, params, paramIndex);
 
     case 'eq':
-      return `${compileExpr(expr.left, params, paramIndex)} = ${compileExpr(expr.right, params, paramIndex)}`;
+      const eqLeft = compileExpr(expr.left, params, paramIndex);
+      const eqRight = compileExpr(expr.right, params, eqLeft.paramIndex);
+      return { sql: `${eqLeft.sql} = ${eqRight.sql}`, paramIndex: eqRight.paramIndex };
     case 'ne':
-      return `${compileExpr(expr.left, params, paramIndex)} != ${compileExpr(expr.right, params, paramIndex)}`;
+      const neLeft = compileExpr(expr.left, params, paramIndex);
+      const neRight = compileExpr(expr.right, params, neLeft.paramIndex);
+      return { sql: `${neLeft.sql} != ${neRight.sql}`, paramIndex: neRight.paramIndex };
     case 'gt':
-      return `${compileExpr(expr.left, params, paramIndex)} > ${compileExpr(expr.right, params, paramIndex)}`;
+      const gtLeft = compileExpr(expr.left, params, paramIndex);
+      const gtRight = compileExpr(expr.right, params, gtLeft.paramIndex);
+      return { sql: `${gtLeft.sql} > ${gtRight.sql}`, paramIndex: gtRight.paramIndex };
     case 'lt':
-      return `${compileExpr(expr.left, params, paramIndex)} < ${compileExpr(expr.right, params, paramIndex)}`;
+      const ltLeft = compileExpr(expr.left, params, paramIndex);
+      const ltRight = compileExpr(expr.right, params, ltLeft.paramIndex);
+      return { sql: `${ltLeft.sql} < ${ltRight.sql}`, paramIndex: ltRight.paramIndex };
     case 'gte':
-      return `${compileExpr(expr.left, params, paramIndex)} >= ${compileExpr(expr.right, params, paramIndex)}`;
+      const gteLeft = compileExpr(expr.left, params, paramIndex);
+      const gteRight = compileExpr(expr.right, params, gteLeft.paramIndex);
+      return { sql: `${gteLeft.sql} >= ${gteRight.sql}`, paramIndex: gteRight.paramIndex };
     case 'lte':
-      return `${compileExpr(expr.left, params, paramIndex)} <= ${compileExpr(expr.right, params, paramIndex)}`;
+      const lteLeft = compileExpr(expr.left, params, paramIndex);
+      const lteRight = compileExpr(expr.right, params, lteLeft.paramIndex);
+      return { sql: `${lteLeft.sql} <= ${lteRight.sql}`, paramIndex: lteRight.paramIndex };
+    case 'in':
+      const inLeft = compileExpr(expr.left, params, paramIndex);
+      let inParamIndex = inLeft.paramIndex;
+      const rightSql = expr.right
+        .map((e) => {
+          const result = compileExpr(e, params, inParamIndex);
+          inParamIndex = result.paramIndex;
+          return result.sql;
+        })
+        .join(', ');
+      return { sql: `${inLeft.sql} IN (${rightSql})`, paramIndex: inParamIndex };
     case 'and':
-      return `(${compileExpr(expr.left, params, paramIndex)} AND ${compileExpr(expr.right, params, paramIndex)})`;
+      const andLeft = compileExpr(expr.left, params, paramIndex);
+      const andRight = compileExpr(expr.right, params, andLeft.paramIndex);
+      return { sql: `(${andLeft.sql} AND ${andRight.sql})`, paramIndex: andRight.paramIndex };
     case 'or':
-      return `(${compileExpr(expr.left, params, paramIndex)} OR ${compileExpr(expr.right, params, paramIndex)})`;
+      const orLeft = compileExpr(expr.left, params, paramIndex);
+      const orRight = compileExpr(expr.right, params, orLeft.paramIndex);
+      return { sql: `(${orLeft.sql} OR ${orRight.sql})`, paramIndex: orRight.paramIndex };
 
     default:
       throw new Error(`Unknown expression kind: ${(expr as any).kind}`);
@@ -374,8 +295,10 @@ function compileExpr(expr: Expr, params: any[], paramIndex: number): string {
 function getExprParamCount(expr: Expr): number {
   switch (expr.kind) {
     case 'column':
-    case 'literal':
       return 0;
+
+    case 'literal':
+      return 1;
 
     case 'call':
       return expr.args.reduce((sum, arg) => sum + getExprParamCount(arg), 0);
@@ -399,6 +322,11 @@ function getExprParamCount(expr: Expr): number {
     case 'and':
     case 'or':
       return getExprParamCount(expr.left) + getExprParamCount(expr.right);
+
+    case 'in':
+      return (
+        getExprParamCount(expr.left) + expr.right.reduce((sum, e) => sum + getExprParamCount(e), 0)
+      );
 
     default:
       return 0;
@@ -447,7 +375,11 @@ function compileRaw(ast: RawQueryAST): { sql: string; params: any[] } {
   return { sql, params };
 }
 
-function compileExprRaw(expr: ExprRaw, params: any[], paramIndex: number): string {
+function compileExprRaw(
+  expr: ExprRaw,
+  params: any[],
+  paramIndex: number,
+): { sql: string; paramIndex: number } {
   const parts: string[] = [];
   let currentParamIndex = paramIndex;
 
@@ -482,7 +414,7 @@ function compileExprRaw(expr: ExprRaw, params: any[], paramIndex: number): strin
     }
   }
 
-  return parts.join('');
+  return { sql: parts.join(''), paramIndex: currentParamIndex };
 }
 
 function renderPlaceholder(paramIndex: number, dialect: Dialect): string {

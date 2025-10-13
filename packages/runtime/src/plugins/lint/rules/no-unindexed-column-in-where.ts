@@ -9,9 +9,9 @@ export const noUnindexedColumnInWhere: LintRule = {
 
     // Extract column from WHERE predicate (simple eq check)
     const condition = plan.ast.where.condition;
-    if (condition.type === 'eq') {
+    if (condition.kind === 'eq' && condition.left.kind === 'column') {
       const tableName = plan.ast.from;
-      const columnName = condition.field;
+      const columnName = condition.left.name;
       const table = ir.tables[tableName];
       const column = table?.columns[columnName];
 

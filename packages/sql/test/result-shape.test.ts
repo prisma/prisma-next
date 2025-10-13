@@ -79,11 +79,11 @@ describe('Result Shape Verification', () => {
     it('infers correct result type for single column selection', () => {
       const query = sql(mockSchema).from(t.user).select({ id: t.user.id });
       const plan = query.build();
-      
+
       // TypeScript should infer this as Plan<{ id: number }>
       const planType: Plan<{ id: number }> = plan;
       expect(planType).toBeDefined();
-      
+
       // Verify the plan has the expected structure
       expect(plan.sql).toBe('SELECT "id" AS "id" FROM "user"');
       expect(plan.params).toHaveLength(0);
@@ -93,14 +93,16 @@ describe('Result Shape Verification', () => {
       const query = sql(mockSchema)
         .from(t.user)
         .select({ id: t.user.id, email: t.user.email, active: t.user.active });
-      
+
       const plan = query.build();
-      
+
       // TypeScript should infer this as Plan<{ id: number; email: string; active: boolean }>
       const planType: Plan<{ id: number; email: string; active: boolean }> = plan;
       expect(planType).toBeDefined();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email", "active" AS "active" FROM "user"');
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "id", "email" AS "email", "active" AS "active" FROM "user"',
+      );
     });
 
     it('infers correct result type for all columns selection', () => {
@@ -110,25 +112,27 @@ describe('Result Shape Verification', () => {
         active: t.user.active,
         createdAt: t.user.createdAt,
       });
-      
+
       const plan = query.build();
-      
+
       // TypeScript should infer this as Plan<UserShape>
       const planType: Plan<UserShape> = plan;
       expect(planType).toBeDefined();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email", "active" AS "active", "createdAt" AS "createdAt" FROM "user"');
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "id", "email" AS "email", "active" AS "active", "createdAt" AS "createdAt" FROM "user"',
+      );
     });
 
     it('infers correct result type for different table', () => {
       const query = sql(mockSchema).from(t.post).select({ id: t.post.id, title: t.post.title });
-      
+
       const plan = query.build();
-      
+
       // TypeScript should infer this as Plan<{ id: number; title: string }>
       const planType: Plan<{ id: number; title: string }> = plan;
       expect(planType).toBeDefined();
-      
+
       expect(plan.sql).toBe('SELECT "id" AS "id", "title" AS "title" FROM "post"');
     });
 
@@ -139,25 +143,27 @@ describe('Result Shape Verification', () => {
         .select({ id: t.user.id, email: t.user.email })
         .orderBy('createdAt', 'DESC')
         .limit(10);
-      
+
       const plan = query.build();
-      
+
       // Should still be Plan<{ id: number; email: string }> after all operations
       const planType: Plan<{ id: number; email: string }> = plan;
       expect(planType).toBeDefined();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email" FROM "user" WHERE "active" = $1 ORDER BY "createdAt" DESC LIMIT $2');
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "id", "email" AS "email" FROM "user" WHERE "active" = $1 ORDER BY "createdAt" DESC LIMIT $2',
+      );
       expect(plan.params).toEqual([true, 10]);
     });
 
     it('returns Plan<never> when no select() is called', () => {
       const query = sql(mockSchema).from(t.user);
       const plan = query.build();
-      
+
       // TypeScript should infer this as Plan<never>
       const planType: Plan<never> = plan;
       expect(planType).toBeDefined();
-      
+
       // Should still generate SQL with SELECT *
       expect(plan.sql).toBe('SELECT * FROM "user"');
     });
@@ -165,11 +171,11 @@ describe('Result Shape Verification', () => {
     it('prevents execution of Plan<never> at compile time', () => {
       const query = sql(mockSchema).from(t.user);
       const plan = query.build(); // Plan<never>
-      
+
       // This demonstrates the compile-time safety
       // If you uncomment the line below, TypeScript will error:
       // const result = await runtime.execute(plan); // Error: Argument of type 'Plan<never>' is not assignable to parameter of type 'Plan<TResult>'
-      
+
       // Instead, we verify the type is never
       const planType: Plan<never> = plan;
       expect(planType).toBeDefined();
@@ -180,7 +186,7 @@ describe('Result Shape Verification', () => {
     it('generates correct SQL for single column selection', () => {
       const query = sql(mockSchema).from(t.user).select({ id: t.user.id });
       const plan = query.build();
-      
+
       expect(plan.sql).toBe('SELECT "id" AS "id" FROM "user"');
       expect(plan.params).toHaveLength(0);
       expect(plan.meta.refs.columns).toContain('user.id');
@@ -191,10 +197,12 @@ describe('Result Shape Verification', () => {
       const query = sql(mockSchema)
         .from(t.user)
         .select({ id: t.user.id, email: t.user.email, active: t.user.active });
-      
+
       const plan = query.build();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email", "active" AS "active" FROM "user"');
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "id", "email" AS "email", "active" AS "active" FROM "user"',
+      );
       expect(plan.params).toHaveLength(0);
       expect(plan.meta.refs.columns).toContain('user.id');
       expect(plan.meta.refs.columns).toContain('user.email');
@@ -206,10 +214,12 @@ describe('Result Shape Verification', () => {
         .from(t.user)
         .where(t.user.active.eq(true))
         .select({ id: t.user.id, email: t.user.email });
-      
+
       const plan = query.build();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email" FROM "user" WHERE "active" = $1');
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "id", "email" AS "email" FROM "user" WHERE "active" = $1',
+      );
       expect(plan.params).toEqual([true]);
     });
 
@@ -219,10 +229,12 @@ describe('Result Shape Verification', () => {
         .select({ id: t.user.id, email: t.user.email })
         .orderBy('createdAt', 'DESC')
         .limit(5);
-      
+
       const plan = query.build();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email" FROM "user" ORDER BY "createdAt" DESC LIMIT $1');
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "id", "email" AS "email" FROM "user" ORDER BY "createdAt" DESC LIMIT $1',
+      );
       expect(plan.params).toEqual([5]);
     });
 
@@ -230,10 +242,12 @@ describe('Result Shape Verification', () => {
       const query = sql(mockSchema)
         .from(t.post)
         .select({ id: t.post.id, title: t.post.title, published: t.post.published });
-      
+
       const plan = query.build();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "id", "title" AS "title", "published" AS "published" FROM "post"');
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "id", "title" AS "title", "published" AS "published" FROM "post"',
+      );
       expect(plan.meta.refs.tables).toContain('post');
       expect(plan.meta.refs.columns).toContain('post.id');
       expect(plan.meta.refs.columns).toContain('post.title');
@@ -243,7 +257,7 @@ describe('Result Shape Verification', () => {
     it('generates SELECT * when no select() is called', () => {
       const query = sql(mockSchema).from(t.user);
       const plan = query.build();
-      
+
       expect(plan.sql).toBe('SELECT * FROM "user"');
       expect(plan.params).toHaveLength(0);
       expect(plan.meta.refs.tables).toContain('user');
@@ -254,7 +268,7 @@ describe('Result Shape Verification', () => {
     it('preserves contract hash in plan metadata', () => {
       const query = sql(mockSchema).from(t.user).select({ id: t.user.id });
       const plan = query.build();
-      
+
       expect(plan.meta.contractHash).toBe('test-hash');
       expect(plan.meta.target).toBe('postgres');
     });
@@ -264,28 +278,28 @@ describe('Result Shape Verification', () => {
     it('handles empty select object', () => {
       const query = sql(mockSchema).from(t.user).select({});
       const plan = query.build();
-      
+
       // Empty select should still work but generate SELECT *
       expect(plan.sql).toBe('SELECT * FROM "user"');
-      
+
       // TypeScript should infer this as Plan<{}>
       const planType: Plan<{}> = plan;
       expect(planType).toBeDefined();
     });
 
     it('handles column aliasing correctly', () => {
-      const query = sql(mockSchema)
-        .from(t.user)
-        .select({ 
-          userId: t.user.id, 
-          userEmail: t.user.email,
-          isActive: t.user.active 
-        });
-      
+      const query = sql(mockSchema).from(t.user).select({
+        userId: t.user.id,
+        userEmail: t.user.email,
+        isActive: t.user.active,
+      });
+
       const plan = query.build();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "userId", "email" AS "userEmail", "active" AS "isActive" FROM "user"');
-      
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "userId", "email" AS "userEmail", "active" AS "isActive" FROM "user"',
+      );
+
       // TypeScript should infer this as Plan<{ userId: number; userEmail: string; isActive: boolean }>
       const planType: Plan<{ userId: number; userEmail: string; isActive: boolean }> = plan;
       expect(planType).toBeDefined();
@@ -299,12 +313,14 @@ describe('Result Shape Verification', () => {
         .orderBy('email', 'ASC')
         .orderBy('id', 'DESC')
         .limit(100);
-      
+
       const plan = query.build();
-      
-      expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email" FROM "user" WHERE "active" = $1 ORDER BY "email" ASC, "id" DESC LIMIT $2');
+
+      expect(plan.sql).toBe(
+        'SELECT "id" AS "id", "email" AS "email" FROM "user" WHERE "active" = $1 ORDER BY "email" ASC, "id" DESC LIMIT $2',
+      );
       expect(plan.params).toEqual([true, 100]);
-      
+
       // TypeScript should still infer correct result type
       const planType: Plan<{ id: number; email: string }> = plan;
       expect(planType).toBeDefined();
@@ -328,14 +344,16 @@ describe('Result Shape Verification', () => {
 
     it('verifies column expressions work correctly', () => {
       const eqExpr = t.user.id.eq(42);
-      expect(eqExpr).toHaveProperty('type', 'eq');
-      expect(eqExpr).toHaveProperty('field', 'id');
-      expect(eqExpr).toHaveProperty('value', 42);
-      
+      expect(eqExpr).toHaveProperty('kind', 'eq');
+      expect(eqExpr).toHaveProperty('left');
+      expect(eqExpr).toHaveProperty('right');
+      expect(eqExpr.right).toHaveProperty('value', 42);
+
       const inExpr = t.user.id.in([1, 2, 3]);
-      expect(inExpr).toHaveProperty('type', 'in');
-      expect(inExpr).toHaveProperty('field', 'id');
-      expect(inExpr).toHaveProperty('values', [1, 2, 3]);
+      expect(inExpr).toHaveProperty('kind', 'in');
+      expect(inExpr).toHaveProperty('left');
+      expect(inExpr).toHaveProperty('right');
+      expect(inExpr.right).toHaveLength(3);
     });
   });
 });

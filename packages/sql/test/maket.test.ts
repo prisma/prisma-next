@@ -93,30 +93,57 @@ describe('makeT Factory Function', () => {
     const t = makeT<TestTables>(mockSchema);
 
     const eqExpr = t.user.id.eq(1);
-    expect(eqExpr).toEqual({ __t: undefined, type: 'eq', field: 'id', value: 1 });
+    expect(eqExpr).toEqual({
+      kind: 'eq',
+      left: { kind: 'column', name: 'id' },
+      right: { kind: 'literal', value: 1 },
+    });
 
     const neExpr = t.user.email.ne('test@example.com');
     expect(neExpr).toEqual({
-      __t: undefined,
-      type: 'ne',
-      field: 'email',
-      value: 'test@example.com',
+      kind: 'ne',
+      left: { kind: 'column', name: 'email' },
+      right: { kind: 'literal', value: 'test@example.com' },
     });
 
     const gtExpr = t.user.id.gt(5);
-    expect(gtExpr).toEqual({ __t: undefined, type: 'gt', field: 'id', value: 5 });
+    expect(gtExpr).toEqual({
+      kind: 'gt',
+      left: { kind: 'column', name: 'id' },
+      right: { kind: 'literal', value: 5 },
+    });
 
     const ltExpr = t.user.id.lt(10);
-    expect(ltExpr).toEqual({ __t: undefined, type: 'lt', field: 'id', value: 10 });
+    expect(ltExpr).toEqual({
+      kind: 'lt',
+      left: { kind: 'column', name: 'id' },
+      right: { kind: 'literal', value: 10 },
+    });
 
     const gteExpr = t.user.id.gte(1);
-    expect(gteExpr).toEqual({ __t: undefined, type: 'gte', field: 'id', value: 1 });
+    expect(gteExpr).toEqual({
+      kind: 'gte',
+      left: { kind: 'column', name: 'id' },
+      right: { kind: 'literal', value: 1 },
+    });
 
     const lteExpr = t.user.id.lte(100);
-    expect(lteExpr).toEqual({ __t: undefined, type: 'lte', field: 'id', value: 100 });
+    expect(lteExpr).toEqual({
+      kind: 'lte',
+      left: { kind: 'column', name: 'id' },
+      right: { kind: 'literal', value: 100 },
+    });
 
     const inExpr = t.user.id.in([1, 2, 3]);
-    expect(inExpr).toEqual({ __t: undefined, type: 'in', field: 'id', values: [1, 2, 3] });
+    expect(inExpr).toEqual({
+      kind: 'in',
+      left: { kind: 'column', name: 'id' },
+      right: [
+        { kind: 'literal', value: 1 },
+        { kind: 'literal', value: 2 },
+        { kind: 'literal', value: 3 },
+      ],
+    });
   });
 
   it('handles table with no columns', () => {

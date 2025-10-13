@@ -13,6 +13,7 @@ export interface Expression<T> {
 }
 
 // Legacy types for backward compatibility during transition
+// @deprecated Use Expr instead
 export interface FieldExpression {
   type: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in';
   field: string;
@@ -29,13 +30,13 @@ export interface Column<TTable extends string, TName extends string, TType>
   readonly __contractHash?: string;
   readonly __tsType?: TType; // Brand for type inference
   readonly _type?: TType;
-  eq(value: TType): FieldExpression;
-  ne(value: TType): FieldExpression;
-  gt(value: TType): FieldExpression;
-  lt(value: TType): FieldExpression;
-  gte(value: TType): FieldExpression;
-  lte(value: TType): FieldExpression;
-  in(values: TType[]): FieldExpression;
+  eq(value: TType): Expr;
+  ne(value: TType): Expr;
+  gt(value: TType): Expr;
+  lt(value: TType): Expr;
+  gte(value: TType): Expr;
+  lte(value: TType): Expr;
+  in(values: TType[]): Expr;
 }
 
 export const TABLE_NAME = Symbol('tableName');
@@ -61,7 +62,7 @@ export interface SelectClause {
 
 export interface WhereClause {
   type: 'where';
-  condition: FieldExpression | Expr;
+  condition: Expr;
 }
 
 export interface OrderByClause {
@@ -170,6 +171,7 @@ export type Expr =
   | { kind: 'lt'; left: Expr; right: Expr } // less than comparison
   | { kind: 'gte'; left: Expr; right: Expr } // greater than or equal comparison
   | { kind: 'lte'; left: Expr; right: Expr } // less than or equal comparison
+  | { kind: 'in'; left: Expr; right: Expr[] } // IN operator
   | { kind: 'and'; left: Expr; right: Expr } // logical AND
   | { kind: 'or'; left: Expr; right: Expr } // logical OR
   | ExprRaw; // raw SQL expressions
@@ -185,7 +187,7 @@ export interface JoinClause {
   type: 'join' | 'leftJoin';
   table: string;
   alias?: string;
-  on: FieldExpression | { type: 'literal'; value: string } | Expr;
+  on: Expr;
 }
 
 // Forward declaration for FromBuilder
@@ -194,7 +196,7 @@ export interface FromBuilder<TTable extends Table<any>, TResult = never> {
     fields: TSelect,
   ): FromBuilder<TTable, InferSelectResult<TSelect>>;
   selectRaw(projections: ProjectionItem[]): any; // For raw expressions
-  where(condition: FieldExpression): FromBuilder<TTable, TResult>;
+  where(condition: Expr): FromBuilder<TTable, TResult>;
   orderBy(field: string, direction?: 'ASC' | 'DESC'): FromBuilder<TTable, TResult>;
   limit(count: number): FromBuilder<TTable, TResult>;
   build(): Plan<TResult>;

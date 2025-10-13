@@ -2,6 +2,7 @@ import {
   QueryAST,
   Column,
   FieldExpression,
+  Expr,
   InferSelectResult,
   InferTableShape,
   Table,
@@ -77,8 +78,8 @@ export class QueryBuilder<TTable extends Table<any>, TResult = never> {
     return this as any;
   }
 
-  where(condition: FieldExpression): QueryBuilder<TTable, TResult> {
-    // Note: FieldExpression doesn't carry contract hash, but the column that created it does
+  where(condition: Expr): QueryBuilder<TTable, TResult> {
+    // Note: Expr doesn't carry contract hash, but the column that created it does
     // This verification happens at build() time when we walk all references
     this.ast.where = { type: 'where', condition };
     return this;

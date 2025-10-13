@@ -3,6 +3,7 @@ import {
   Table,
   Column,
   FieldExpression,
+  Expr,
   Plan,
   ContractMismatchMode,
   TABLE_NAME,
@@ -69,7 +70,7 @@ export class OrmBuilder<Parent> {
     return this as any;
   }
 
-  where(condition: FieldExpression): OrmBuilder<Parent> {
+  where(condition: Expr): OrmBuilder<Parent> {
     this.ast.where = { type: 'where', condition };
     return this;
   }
@@ -132,7 +133,7 @@ export class OrmQueryBuilder<Child> {
     return this;
   }
 
-  where(condition: FieldExpression): OrmQueryBuilder<Child> {
+  where(condition: Expr): OrmQueryBuilder<Child> {
     this.ast.where = { type: 'where', condition };
     return this;
   }

@@ -1,5 +1,13 @@
 import { Schema, RelationGraph, Contract } from '@prisma/relational-ir';
-import { Table, Column, FieldExpression, Plan, TABLE_NAME, InferSelectResult } from '@prisma/sql';
+import {
+  Table,
+  Column,
+  FieldExpression,
+  Plan,
+  TABLE_NAME,
+  InferSelectResult,
+  Expr,
+} from '@prisma/sql';
 import { OrmQueryAST, IncludeNode, RelationHandle as RuntimeRelationHandle } from './ast/types';
 import { lowerRelations } from './lowering/lower-relations';
 import { compileToSQL } from '@prisma/sql';
@@ -47,14 +55,8 @@ export class TypedChildQB<
     return this as any;
   }
 
-  where(condition: FieldExpression): TypedChildQB<TContract, TChild, TChildRow> {
-    // Convert FieldExpression to Expr
-    const expr: any = {
-      kind: condition.type,
-      left: { kind: 'column', name: condition.field },
-      right: { kind: 'literal', value: condition.value },
-    };
-    this.ast.where = { type: 'where', condition: expr };
+  where(condition: Expr): TypedChildQB<TContract, TChild, TChildRow> {
+    this.ast.where = { type: 'where', condition };
     return this;
   }
 
@@ -119,14 +121,8 @@ export class TypedOrmBuilder<
     return this as any;
   }
 
-  where(condition: FieldExpression): TypedOrmBuilder<TContract, TParent, TRow> {
-    // Convert FieldExpression to Expr
-    const expr: any = {
-      kind: condition.type,
-      left: { kind: 'column', name: condition.field },
-      right: { kind: 'literal', value: condition.value },
-    };
-    this.ast.where = { type: 'where', condition: expr };
+  where(condition: Expr): TypedOrmBuilder<TContract, TParent, TRow> {
+    this.ast.where = { type: 'where', condition };
     return this;
   }
 

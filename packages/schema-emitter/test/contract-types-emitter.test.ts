@@ -73,7 +73,7 @@ describe('emitContractTypes', () => {
     expect(result).toContain('export namespace Contract {');
     expect(result).toContain('export interface UserShape {');
     expect(result).toContain('export interface PostShape {');
-    expect(result).toContain('export interface Tables {');
+    expect(result).toContain('export type Tables = {');
     expect(result).toContain('export type Relations = {');
     expect(result).toContain('export type Uniques = {');
   });
@@ -148,7 +148,7 @@ describe('emitContractTypes', () => {
     const result = emitContractTypes(emptySchema);
 
     expect(result).toContain('export namespace Contract {');
-    expect(result).toContain('export interface Tables {');
+    expect(result).toContain('export type Tables = {');
     expect(result).not.toContain('export interface UserShape');
     expect(result).not.toContain('export interface PostShape');
   });
@@ -182,7 +182,7 @@ describe('emitContractTypes', () => {
 
     expect(result).toContain('export namespace Contract {');
     expect(result).toContain('export interface UserShape {');
-    expect(result).toContain('export interface Tables {');
+    expect(result).toContain('export type Tables = {');
     // Should not contain Relations or Uniques if empty
     expect(result).not.toContain('export type Relations = {');
     expect(result).not.toContain('export type Uniques = {');
@@ -218,7 +218,7 @@ describe('emitContractTypes', () => {
 
     expect(result).toContain('export namespace Contract {');
     expect(result).toContain('export interface UserShape {');
-    expect(result).toContain('export interface Tables {');
+    expect(result).toContain('export type Tables = {');
     // Should not contain Relations if empty, but Uniques will contain primary key
     expect(result).not.toContain('export type Relations = {');
     expect(result).toContain('export type Uniques = {');
@@ -357,7 +357,7 @@ describe('emitContractTypes', () => {
     // Basic syntax checks
     expect(result).toMatch(/export namespace \w+ \{/);
     expect(result).toMatch(/export interface \w+Shape \{/);
-    expect(result).toMatch(/export interface Tables \{/);
+    expect(result).toMatch(/export type Tables = \{/);
     expect(result).toMatch(/export type Relations = \{/);
     expect(result).toMatch(/export type Uniques = \{/);
 

@@ -122,18 +122,29 @@ describe('Type Inference Tests', () => {
   });
 
   it('verifies Column expressions return correct structure', () => {
-    const eqExpr: FieldExpression = t.user.id.eq(1);
-    const neExpr: FieldExpression = t.user.email.ne('test@example.com');
-    const inExpr: FieldExpression = t.user.id.in([1, 2, 3]);
+    const eqExpr = t.user.id.eq(1);
+    const neExpr = t.user.email.ne('test@example.com');
+    const inExpr = t.user.id.in([1, 2, 3]);
 
-    expect(eqExpr).toEqual({ __t: undefined, type: 'eq', field: 'id', value: 1 });
-    expect(neExpr).toEqual({
-      __t: undefined,
-      type: 'ne',
-      field: 'email',
-      value: 'test@example.com',
+    expect(eqExpr).toEqual({
+      kind: 'eq',
+      left: { kind: 'column', name: 'id' },
+      right: { kind: 'literal', value: 1 },
     });
-    expect(inExpr).toEqual({ __t: undefined, type: 'in', field: 'id', values: [1, 2, 3] });
+    expect(neExpr).toEqual({
+      kind: 'ne',
+      left: { kind: 'column', name: 'email' },
+      right: { kind: 'literal', value: 'test@example.com' },
+    });
+    expect(inExpr).toEqual({
+      kind: 'in',
+      left: { kind: 'column', name: 'id' },
+      right: [
+        { kind: 'literal', value: 1 },
+        { kind: 'literal', value: 2 },
+        { kind: 'literal', value: 3 },
+      ],
+    });
   });
 
   it('verifies table structure with TABLE_NAME symbol', () => {
@@ -143,30 +154,30 @@ describe('Type Inference Tests', () => {
 
   it('verifies type safety for different column types', () => {
     // Number column
-    const idExpr: FieldExpression = t.user.id.eq(123);
-    expect(idExpr.value).toBe(123);
+    const idExpr = t.user.id.eq(123);
+    expect(idExpr.right.value).toBe(123);
 
     // String column
-    const emailExpr: FieldExpression = t.user.email.eq('test@example.com');
-    expect(emailExpr.value).toBe('test@example.com');
+    const emailExpr = t.user.email.eq('test@example.com');
+    expect(emailExpr.right.value).toBe('test@example.com');
 
     // Boolean column
-    const activeExpr: FieldExpression = t.user.active.eq(true);
-    expect(activeExpr.value).toBe(true);
+    const activeExpr = t.user.active.eq(true);
+    expect(activeExpr.right.value).toBe(true);
 
     // Date column
-    const dateExpr: FieldExpression = t.user.createdAt.eq(new Date('2023-01-01'));
-    expect(dateExpr.value).toBeInstanceOf(Date);
+    const dateExpr = t.user.createdAt.eq(new Date('2023-01-01'));
+    expect(dateExpr.right.value).toBeInstanceOf(Date);
   });
 
   it('verifies IN expressions work with arrays', () => {
-    const numberInExpr: FieldExpression = t.user.id.in([1, 2, 3]);
-    expect(numberInExpr.type).toBe('in');
-    expect(numberInExpr.values).toEqual([1, 2, 3]);
+    const numberInExpr = t.user.id.in([1, 2, 3]);
+    expect(numberInExpr.kind).toBe('in');
+    expect(numberInExpr.right).toHaveLength(3);
 
-    const stringInExpr: FieldExpression = t.user.email.in(['a@test.com', 'b@test.com']);
-    expect(stringInExpr.type).toBe('in');
-    expect(stringInExpr.values).toEqual(['a@test.com', 'b@test.com']);
+    const stringInExpr = t.user.email.in(['a@test.com', 'b@test.com']);
+    expect(stringInExpr.kind).toBe('in');
+    expect(stringInExpr.right).toHaveLength(2);
   });
 
   it('verifies all comparison operators are available', () => {
