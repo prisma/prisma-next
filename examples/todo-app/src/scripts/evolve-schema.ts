@@ -26,7 +26,7 @@ export async function evolveSchema() {
   id        Int        @id @default(autoincrement())
   email     String     @unique
   active    Boolean    @default(true)
-  bio       String?
+  bio       String   @default("")
   createdAt DateTime   @default(now())
 
   posts     Post[]

@@ -12,6 +12,7 @@ import { emitContractAndTypes } from '@prisma/schema-emitter';
 import { parse } from '@prisma/psl';
 import { join } from 'path';
 import { promises as fs } from 'fs';
+import { readdir } from 'fs/promises';
 
 export async function generateMigration(migrationId?: string) {
   console.log('🔧 Generating new migration...\n');
@@ -29,10 +30,49 @@ export async function generateMigration(migrationId?: string) {
       contractA = { kind: 'empty' as const };
       console.log('   Current state: empty database');
     } else {
-      // For MVP, we'll treat any existing state as empty to keep it simple
-      // In a real implementation, this would reconstruct the contract from the database
-      contractA = { kind: 'empty' as const };
-      console.log('   Current state: treating as empty for MVP demo');
+      // Find the latest migration that matches the current contract hash
+      const migrationsDir = join(process.cwd(), 'migrations');
+      const entries = await readdir(migrationsDir, { withFileTypes: true });
+      const migrationDirs = entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort();
+
+      let foundContract = null;
+      for (const dir of migrationDirs.reverse()) {
+        // Check newest first
+        try {
+          const metaPath = join(migrationsDir, dir, 'meta.json');
+          const metaContent = await fs.readFile(metaPath, 'utf-8');
+          const meta = JSON.parse(metaContent);
+
+          if (meta.to.kind === 'contract' && meta.to.hash === contractResult.hash) {
+            // Found the migration that created this state, use its target contract
+            const opsetPath = join(migrationsDir, dir, 'opset.json');
+            const opsetContent = await fs.readFile(opsetPath, 'utf-8');
+            const opset = JSON.parse(opsetContent);
+
+            // Reconstruct contract from opset (simplified - in real implementation would be more robust)
+            foundContract = reconstructContractFromOpset(opset);
+            break;
+          }
+        } catch (error) {
+          // Skip invalid migrations
+          continue;
+        }
+      }
+
+      if (foundContract) {
+        contractA = foundContract;
+        console.log(
+          `   Current state: contract ${contractResult.hash} (reconstructed from migration)`,
+        );
+      } else {
+        contractA = { kind: 'empty' as const };
+        console.log(
+          '   Current state: contract hash found but no matching migration, treating as empty',
+        );
+      }
     }
 
     // Step 2: Parse and emit desired PSL state
@@ -88,6 +128,70 @@ export async function generateMigration(migrationId?: string) {
   } finally {
     await admin.close();
   }
+}
+
+/**
+ * Reconstruct a contract from an opset (simplified implementation)
+ * In a real implementation, this would be more robust and handle all operation types
+ */
+function reconstructContractFromOpset(opset: any): any {
+  const tables: any = {};
+
+  for (const op of opset.operations) {
+    if (op.kind === 'addTable') {
+      const columns: any = {};
+      const primaryKey = { kind: 'primaryKey' as const, columns: [] as string[] };
+      const uniques: any[] = [];
+      const foreignKeys: any[] = [];
+
+      // Process columns
+      for (const col of op.columns) {
+        columns[col.name] = {
+          type: col.type,
+          nullable: col.nullable,
+          default: col.default,
+        };
+      }
+
+      // Process constraints
+      if (op.constraints) {
+        for (const constraint of op.constraints) {
+          switch (constraint.kind) {
+            case 'primaryKey':
+              primaryKey.columns = constraint.columns;
+              break;
+            case 'unique':
+              uniques.push({
+                kind: 'unique',
+                columns: constraint.columns,
+              });
+              break;
+            case 'foreignKey':
+              foreignKeys.push({
+                kind: 'foreignKey',
+                columns: constraint.columns,
+                references: constraint.ref,
+              });
+              break;
+          }
+        }
+      }
+
+      tables[op.name] = {
+        columns,
+        primaryKey: primaryKey.columns.length > 0 ? primaryKey : undefined,
+        uniques: uniques.length > 0 ? uniques : undefined,
+        foreignKeys: foreignKeys.length > 0 ? foreignKeys : undefined,
+        indexes: [], // Simplified - would need to track indexes separately
+      };
+    }
+  }
+
+  return {
+    target: 'postgres',
+    contractHash: 'reconstructed', // This would be the actual hash in a real implementation
+    tables,
+  };
 }
 
 // Run generation if this file is executed directly

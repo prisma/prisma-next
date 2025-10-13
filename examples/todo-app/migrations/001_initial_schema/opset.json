@@ -6,7 +6,7 @@
       "name": "user",
       "columns": [
         { "name": "id", "type": "int4", "nullable": false, "default": { "kind": "autoincrement" } },
-        { "name": "email", "type": "varchar", "nullable": false },
+        { "name": "email", "type": "text", "nullable": false },
         {
           "name": "active",
           "type": "bool",
@@ -15,7 +15,7 @@
         },
         {
           "name": "createdAt",
-          "type": "timestamp",
+          "type": "timestamptz",
           "nullable": false,
           "default": { "kind": "now" }
         }
@@ -39,7 +39,7 @@
         },
         {
           "name": "createdAt",
-          "type": "timestamp",
+          "type": "timestamptz",
           "nullable": false,
           "default": { "kind": "now" }
         },

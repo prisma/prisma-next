@@ -13,6 +13,7 @@ import { migrateDatabase } from './migrate';
 import { evolveSchema } from './evolve-schema';
 import { join } from 'path';
 import { promises as fs } from 'fs';
+import { readdir } from 'fs/promises';
 
 export async function runMigrationDemo() {
   console.log('🚀 Migration Planner Demo');
@@ -20,6 +21,26 @@ export async function runMigrationDemo() {
   console.log('This demo shows the complete migration workflow:\n');
 
   try {
+    // Step 0: Clean up any generated migrations (keep only initial)
+    console.log('Step 0: Clean up generated migrations');
+    console.log('-'.repeat(40));
+    const migrationsDir = join(process.cwd(), 'migrations');
+    const entries = await readdir(migrationsDir, { withFileTypes: true });
+    const migrationDirs = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((name) => name !== '001_initial_schema'); // Keep the initial migration
+
+    for (const dir of migrationDirs) {
+      await fs.rm(join(migrationsDir, dir), { recursive: true, force: true });
+      console.log(`   🗑️  Removed migration: ${dir}`);
+    }
+
+    if (migrationDirs.length === 0) {
+      console.log('   ✅ No generated migrations to clean up');
+    }
+    console.log('');
+
     // Step 1: Reset database
     console.log('Step 1: Reset database to empty state');
     console.log('-'.repeat(40));
@@ -58,6 +79,7 @@ export async function runMigrationDemo() {
 
     console.log('\n🎉 Migration Planner Demo Complete!');
     console.log('\nWhat happened:');
+    console.log('0. ✅ Cleaned up any previous generated migrations');
     console.log('1. ✅ Database was reset to empty state');
     console.log('2. ✅ PSL schema was modified (added bio column)');
     console.log('3. ✅ Migration planner generated a new migration program');
