@@ -3,7 +3,7 @@ import { planMigration } from '../src/planner';
 import { Contract } from '../src/planner/types';
 
 describe('Migration Planner Integration', () => {
-  it('generates complete migration package end-to-end', async () => {
+  it('generates complete migration program end-to-end', async () => {
     // Contract A: user table only
     const contractA: Contract = {
       target: 'postgres',

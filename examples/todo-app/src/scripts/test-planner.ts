@@ -51,7 +51,7 @@ export async function testPlanner() {
     if (summary.fksAdded > 0) console.log(`   • ${summary.fksAdded} foreign key(s) added`);
 
     // Step 4: Show generated files
-    console.log('\n📁 Step 4: Generated migration package');
+    console.log('\n📁 Step 4: Generated migration program');
     console.log('   Files created:');
     console.log('     • meta.json - Migration metadata');
     console.log('     • opset.json - Schema operations');
@@ -62,7 +62,7 @@ export async function testPlanner() {
     console.log('\n✨ Key Features Demonstrated:');
     console.log('   ✅ Deterministic migration generation');
     console.log('   ✅ Postgres-native constraint naming');
-    console.log('   ✅ Complete migration package creation');
+    console.log('   ✅ Complete migration program creation');
     console.log('   ✅ Stable operation ordering');
     console.log('   ✅ SHA256 hash for verification');
 

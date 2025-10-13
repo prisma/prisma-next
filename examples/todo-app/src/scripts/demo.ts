@@ -60,7 +60,7 @@ export async function runMigrationDemo() {
     console.log('\nWhat happened:');
     console.log('1. ✅ Database was reset to empty state');
     console.log('2. ✅ PSL schema was modified (added bio column)');
-    console.log('3. ✅ Migration planner generated a new migration package');
+    console.log('3. ✅ Migration planner generated a new migration program');
     console.log('4. ✅ Migration runner applied all applicable migrations');
     console.log('5. ✅ Database is now in sync with the desired schema');
   } catch (error) {

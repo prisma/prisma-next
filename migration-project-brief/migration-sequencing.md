@@ -54,10 +54,10 @@ The sequence of migration programs is still there, but it's enforced by from →
 ## A note on safety
 
 One of the nicest properties of the from → to contract model is:
-- A squashed "baseline" package has `from: { kind: "empty" }` (or "unknown").
+- A squashed "baseline" program has `from: { kind: "empty" }` (or "unknown").
 In production, the DB already stores `contract_hash = sha256:<X>`, so it cannot match that from. The apply step simply skips it.
-- Normal packages have `from: { kind: "contract", hash: "sha256:<A>" }`.
-If prod is at `sha256:<C>`, only a package whose from is `sha256:<C>` is applicable. Everything else is ignored.
+- Normal programs have `from: { kind: "contract", hash: "sha256:<A>" }`.
+If prod is at `sha256:<C>`, only a program whose from is `sha256:<C>` is applicable. Everything else is ignored.
 
 So you can't accidentally run "zero → latest" on prod—the applicability predicate won't match.
 
@@ -69,7 +69,7 @@ So you can't accidentally run "zero → latest" on prod—the applicability pred
 2. **Advisory lock + single session**
    Run migrations under an admin connection with a DB-wide advisory lock so you can't double-apply or overlap with another deploy.
 
-3. **Immutable package checks**
+3. **Immutable program checks**
    Verify opSetHash and a hash of the rendered SQL (sqlHash) before execute; record both in a small ledger table after success.
 
 4. **No marker, no run**
@@ -83,7 +83,7 @@ So you can't accidentally run "zero → latest" on prod—the applicability pred
 
 ## What happens when you squash
 
-- You generate a new package:
+- You generate a new program:
 
 ```json
 "from": { "kind": "contract", "hash": "sha256:<A>" },
@@ -96,7 +96,7 @@ or (for fresh dev installs)
 "from": { "kind": "empty" }, "to": { "hash": "sha256:<Z>" }
 ```
 
-- Production is already at `sha256:<Z>` (or beyond), so neither package applies there.
+- Production is already at `sha256:<Z>` (or beyond), so neither program applies there.
 - New developer machines (empty DB) will match the empty baseline, which is exactly what you want.
 
 Bottom line: the hash-keyed applicability makes misapplying migrations on production practically impossible, and "squash everything to zero → latest" is safe because from can never match prod's non-empty contract.

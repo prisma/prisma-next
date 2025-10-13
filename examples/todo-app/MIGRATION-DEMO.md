@@ -29,7 +29,7 @@ Clears the database and removes all tables.
 ```bash
 pnpm generate-migration [custom-id]
 ```
-Compares current database state with PSL schema and generates a migration package.
+Compares current database state with PSL schema and generates a migration program.
 
 ### Evolve Schema
 ```bash
@@ -51,7 +51,7 @@ Runs: reset → evolve schema → migrate (shows the full planner workflow)
 
 ## 🔍 What You'll See
 
-### Migration Package Structure
+### Migration Program Structure
 Each migration creates a folder with:
 - `meta.json` - Migration metadata (ID, from/to hashes, etc.)
 - `opset.json` - Schema operations (addTable, addColumn, etc.)
@@ -60,7 +60,7 @@ Each migration creates a folder with:
 
 ### Example Migration Output
 ```
-📦 Migration package created:
+📦 Migration program created:
    Directory: migrations/20250113T1430_add-columns
    Files: meta.json, opset.json, diff.json, notes.md
 
@@ -85,7 +85,7 @@ After migration, you'll have:
 2. **Change Detection**: Compares current database state with desired PSL state
 3. **Operation Planning**: Generates additive operations (addTable, addColumn, etc.)
 4. **Canonicalization**: Sorts operations deterministically for stable hashing
-5. **Artifact Generation**: Creates migration package with metadata and documentation
+5. **Artifact Generation**: Creates migration program with metadata and documentation
 6. **Migration Application**: Runner applies operations in correct order
 
 ## 🎯 Key Features Demonstrated
@@ -95,7 +95,7 @@ After migration, you'll have:
 - ✅ **Postgres-native naming**: Constraint names follow Postgres conventions
 - ✅ **FK supporting indexes**: Automatically adds indexes for foreign keys when needed
 - ✅ **Fail-fast**: Clear error messages for unsupported changes
-- ✅ **Complete artifacts**: Generates all migration package files
+- ✅ **Complete artifacts**: Generates all migration program files
 
 ## 🔧 Troubleshooting
 

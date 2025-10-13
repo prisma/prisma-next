@@ -8,7 +8,7 @@ import { generateArtifacts } from './artifacts';
  * Plan a migration between two contracts
  *
  * This is the main entry point for the migration planner. It takes two contract IRs
- * (A = current, B = desired) and produces a complete migration package with:
+ * (A = current, B = desired) and produces a complete migration program with:
  * - meta.json (metadata)
  * - opset.json (operations)
  * - diff.json (machine-readable diff)

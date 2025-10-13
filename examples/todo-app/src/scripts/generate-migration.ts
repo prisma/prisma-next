@@ -3,7 +3,7 @@
  *
  * Uses the migration planner to generate a new migration from PSL changes.
  * This script compares the current database state with the desired PSL state
- * and creates a migration package.
+ * and creates a migration program.
  */
 
 import { connectAdmin } from '@prisma/migrate';
@@ -53,7 +53,7 @@ export async function generateMigration(migrationId?: string) {
     console.log(`   Operations: ${plan.opset.operations.length}`);
     console.log(`   OpSet Hash: ${plan.opSetHash}`);
 
-    // Step 4: Write migration package to disk
+    // Step 4: Write migration program to disk
     const migrationDir = join(process.cwd(), 'migrations', plan.meta.id);
     await fs.mkdir(migrationDir, { recursive: true });
 
@@ -65,7 +65,7 @@ export async function generateMigration(migrationId?: string) {
 
     await fs.writeFile(join(migrationDir, 'notes.md'), plan.notesMd);
 
-    console.log(`\n📦 Migration package created:`);
+    console.log(`\n📦 Migration program created:`);
     console.log(`   Directory: ${migrationDir}`);
     console.log(`   Files: meta.json, opset.json, diff.json, notes.md`);
 

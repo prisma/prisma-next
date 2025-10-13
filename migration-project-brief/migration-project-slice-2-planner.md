@@ -224,7 +224,7 @@ export function planMigration(
 - Clear error wording with next steps
 - Tests for rejection paths
 
-### Phase 4 — Package emission & E2E
+### Phase 4 — Program emission & E2E
 - Write {meta.json, opset.json, notes.md} to a new migration folder
 - E2E with runner on a temp Postgres: A→B plan → apply → DB contract updated to B
 - CLI: migrate plan wiring
