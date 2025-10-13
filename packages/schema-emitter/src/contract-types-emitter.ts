@@ -14,7 +14,7 @@ export function emitContractTypes(schema: Schema, namespace: string = 'Contract'
       fields.push(`    ${colName}: ${tsType};`);
     }
 
-    interfaces.push(`  export interface ${shapeName} {\n${fields.join('\n')}\n  }`);
+    interfaces.push(`  export type ${shapeName} {\n${fields.join('\n')}\n  }`);
   }
 
   // Generate Tables interface
@@ -24,7 +24,7 @@ export function emitContractTypes(schema: Schema, namespace: string = 'Contract'
     tableEntries.push(`    ${tableName}: Table<${shapeName}>;`);
   }
 
-  interfaces.push(`  export interface Tables {\n${tableEntries.join('\n')}\n  }`);
+  interfaces.push(`  export type Tables = {\n${tableEntries.join('\n')}\n  };`);
 
   // Generate relations types
   const graph = buildRelationGraph(schema);
