@@ -2,6 +2,25 @@
 
 A TypeScript-based prototype demonstrating a **contract-first data layer** architecture that decomposes Prisma's ORM into modular, verifiable components.
 
+## What Is This?
+
+Prisma Next is a prototype of a new data access layer that replaces traditional ORMs with a "contract-first" approach. It follows a similar workflow to Prisma ORM but with key differences:
+
+- **Defines your database schema as a verifiable contract** (not just a schema)
+- **Generates lightweight types instead of heavy client code**
+- **Uses a composable DSL for queries instead of generated methods**
+- **Works seamlessly with AI coding assistants** (machine-readable, composable APIs)
+
+**Think of it as**: "What if Prisma ORM generated only lightweight types instead of heavy client code, and you wrote queries using a composable DSL instead of generated methods?"
+
+## Evaluation Guide
+
+**New to this project?** Check out our comprehensive [Evaluation Guide](EVALUATION-GUIDE.md) for:
+- Quick 5-minute demo
+- Structured evaluation process
+- Comparison with existing solutions
+- Success criteria and troubleshooting
+
 ## Motivation
 
 Prisma's current ORM architecture tightly couples three layers — the Prisma Schema Language (PSL), the generated client, and runtime execution. This coupling introduces rigidity, rebuild cost, and conceptual opacity.
@@ -13,7 +32,7 @@ The prototype rethinks Prisma's data layer around a **contract-first model**, wh
 Modern developer agents (Cursor, Windsurf, v0.dev) increasingly read, reason about, and modify codebases. For a data access layer to be truly idiomatic in this environment, it must be:
 
 - **Machine-navigable**: Understandable through static analysis without executing code
-- **Composable**: Usable as an API surface agents can call directly or generate code against  
+- **Composable**: Usable as an API surface agents can call directly or generate code against
 - **Predictable**: Deterministic output with no hidden side effects or black-box codegen
 
 The existing Prisma ORM is opaque to agents because schema → client codegen hides SQL semantics and many behaviors are runtime-generated.
@@ -34,14 +53,14 @@ Agents can read the schema (IR), generate valid queries (DSL), and verify them (
 - IR includes `contractHash` to cryptographically tie all artifacts to a specific schema version
 - Single source of truth for query validation, policy enforcement, and compatibility
 
-### 2. Composable Query Layer  
+### 2. Composable Query Layer
 - Replace monolithic generated client with runtime-compiled query DSL (`@prisma/sql`)
 - Queries written inline in TypeScript, compiled to SQL ASTs at runtime
 - Dialect-agnostic design supports multiple targets (Postgres, MySQL, SQLite) without regeneration
 
 ### 3. Modular Package Architecture
 - `@prisma/relational-ir`: Schema contract definition and validation
-- `@prisma/sql`: Query builder and SQL compiler  
+- `@prisma/sql`: Query builder and SQL compiler
 - `@prisma/runtime`: Execution engine with plugin hooks
 - Each package evolves independently and composes cleanly
 
@@ -82,6 +101,8 @@ The architecture decomposes Prisma's ORM into modular, contract-verified compone
 - **`@prisma/orm`** - Optional ORM layer with relations and higher-level abstractions
 
 ## Quick Start
+
+**First time here?** Start with our [Evaluation Guide](EVALUATION-GUIDE.md) for a guided walkthrough.
 
 ### Prerequisites
 - Node.js >= 20
