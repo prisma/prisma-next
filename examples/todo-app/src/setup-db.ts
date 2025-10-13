@@ -6,7 +6,7 @@
  */
 
 import { connect } from '@prisma/runtime';
-import ir from '../.prisma/schema.json' assert { type: 'json' };
+import ir from '../.prisma/contract.json' assert { type: 'json' };
 import { Schema } from '@prisma/relational-ir';
 
 export async function setupDatabase() {

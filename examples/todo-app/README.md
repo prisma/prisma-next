@@ -183,7 +183,7 @@ export async function getUserById(id: number) {
 ```typescript
 // src/db.ts
 import { connect } from '@prisma/runtime';
-import ir from '../.prisma/schema.json' assert { type: 'json' };
+import ir from '../.prisma/contract.json' assert { type: 'json' };
 
 export const db = connect({
   ir: ir as Schema,

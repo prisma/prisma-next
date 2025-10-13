@@ -15,7 +15,7 @@ The architecture strictly separates compile-time type information from runtime d
    - **Purpose**: This JSON file is the canonical runtime representation of the database schema, emitted by the `@prisma/cli` from a PSL file.
    - **Content**: It contains metadata about tables and their columns, including PostgreSQL-specific types, constraints, and attributes.
    - **Structure**: Uses `tables` object with `columns` as direct properties, flat column properties (`nullable`, `pk`, `unique`, `default`), and table-level metadata.
-   - **Usage**: It is loaded at runtime by the application (e.g., `import ir from '../.prisma/schema.json' assert { type: 'json' };`) and passed to the `makeT` factory function.
+   - **Usage**: It is loaded at runtime by the application (e.g., `import ir from '../.prisma/contract.json' assert { type: 'json' };`) and passed to the `makeT` factory function.
 
 2. **`schema.d.ts` (Compile-Time Type Definitions)**:
    - **Purpose**: This TypeScript declaration file provides static type information for the DSL, enabling autocompletion, type checking, and compile-time errors. It is also emitted by the `@prisma/cli`.
@@ -108,7 +108,7 @@ The new IR structure uses a `tables`/`columns` format with PostgreSQL-specific t
 
 ```typescript
 // schema.ts - Runtime object creation
-import ir from '../.prisma/schema.json' assert { type: 'json' };
+import ir from '../.prisma/contract.json' assert { type: 'json' };
 import { makeT } from '@prisma/sql';
 import type { Tables } from '../.prisma/schema.d.ts';
 
