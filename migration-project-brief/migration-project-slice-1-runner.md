@@ -2,18 +2,18 @@
 
 This is the overall breakdown of the migration system.
 - Planner (diff PSL A→B, produce deterministic opset.json)
-- Runner (apply packages to a DB safely)
-- Package definition library (read/write/validate meta.json + opset.json, hashing, applicability)
+- Runner (apply programs to a DB safely)
+- Program definition library (read/write/validate meta.json + opset.json, hashing, applicability)
 
-In this slice we will focus on the runner + package definition library and exclude the planner. Below is a tight architecture that you can implement independently of the planner.
+In this slice we will focus on the runner + program definition library and exclude the planner. Below is a tight architecture that you can implement independently of the planner.
 
 ---
 
 ## Scope for this slice
 
 ### What we will build now
-- Package format contracts (types, validators)
-- Reader/Writer for migration packages
+- Program format contracts (types, validators)
+- Reader/Writer for migration programs
 - Applicability logic (from matching, strict/tolerant modes)
 - Runner:
   - Select next applicable migration
@@ -29,7 +29,7 @@ In this slice we will focus on the runner + package definition library and exclu
 
 ---
 
-## Package definition library
+## Program definition library
 
 ### File layout (per migration)
 
@@ -93,13 +93,13 @@ type ColumnAlterSpec =
   | { setType: ColumnSpec['type'] }; // v1 simple
 ```
 
-Determinism: Operation order is already canonical (provided by planner). The package lib will hash the canonical JSON to validate opSetHash.
+Determinism: Operation order is already canonical (provided by planner). The program lib will hash the canonical JSON to validate opSetHash.
 
-### Package library API (TypeScript)
+### Program library API (TypeScript)
 
 ```typescript
 // packages/migrate-pkg
-export interface MigrationPackage {
+export interface MigrationProgram {
   dir: string;
   meta: Meta;
   ops: OpSet;
@@ -109,8 +109,8 @@ export interface ContractMarker {
   hash: `sha256:${string}` | null; // null = empty/unknown
 }
 
-// Read/validate a package
-export function loadPackage(dir: string): Promise<MigrationPackage>;
+// Read/validate a program
+export function loadProgram(dir: string): Promise<MigrationProgram>;
 
 // Compute canonical hash of opset
 export function hashOpSet(ops: OpSet): `sha256:${string}`;
@@ -118,8 +118,8 @@ export function hashOpSet(ops: OpSet): `sha256:${string}`;
 // Applicability
 export function matchesFrom(meta: Meta, current: ContractMarker): boolean;
 
-// Choose the next package from a list given current DB contract
-export function nextApplicable(pkgs: MigrationPackage[], current: ContractMarker): MigrationPackage | null;
+// Choose the next program from a list given current DB contract
+export function nextApplicable(programs: MigrationProgram[], current: ContractMarker): MigrationProgram | null;
 ```
 
 ### Rules for matchesFrom:
@@ -134,8 +134,8 @@ export function nextApplicable(pkgs: MigrationPackage[], current: ContractMarker
 
 ### Responsibilities
 - Resolve current DB contract (SELECT contract_hash FROM prisma_contract LIMIT 1, else null)
-- Select next applicable package (using package lib)
-- Validate package integrity (hashOpSet(ops) equals meta.opSetHash)
+- Select next applicable program (using program lib)
+- Validate program integrity (hashOpSet(ops) equals meta.opSetHash)
 - Lower ops → Script (ScriptAST) using injected dialect lowerer
 - Execute script on AdminConnection (advisory lock, tx segmentation)
 - Update prisma_contract with meta.to.hash
@@ -165,7 +165,7 @@ export interface ApplyOptions {
 }
 
 export interface ApplyReport {
-  packageId: string;
+  programId: string;
   from: Meta['from'];
   to: Meta['to'];
   applied: boolean;           // false if not applicable
@@ -179,29 +179,29 @@ export interface ApplyReport {
 
 ```typescript
 export async function applyNext(
-  pkgs: MigrationPackage[],
+  programs: MigrationProgram[],
   admin: AdminConnection,
   lowerer: DialectLowerer,
   opts: ApplyOptions = {}
 ): Promise<ApplyReport> {
   const current = await admin.readContract(); // {hash}|null
 
-  const pkg = nextApplicable(pkgs, current);
-  if (!pkg) return { packageId: '', from:{kind:'contract',hash:current.hash as any}, to:{kind:'contract',hash:current?.hash as any}, applied:false, reason:'not-applicable' };
+  const prog = nextApplicable(programs, current);
+  if (!prog) return { programId: '', from:{kind:'contract',hash:current.hash as any}, to:{kind:'contract',hash:current?.hash as any}, applied:false, reason:'not-applicable' };
 
   // integrity
-  if (hashOpSet(pkg.ops) !== pkg.meta.opSetHash) {
-    throw new Error(`opSetHash mismatch for ${pkg.meta.id}`);
+  if (hashOpSet(prog.ops) !== prog.meta.opSetHash) {
+    throw new Error(`opSetHash mismatch for ${prog.meta.id}`);
   }
 
   // strict/tolerant decision
-  const effectiveMode = opts.mode ?? pkg.meta.mode ?? 'strict';
-  if (effectiveMode === 'strict' && !matchesFrom(pkg.meta, current)) {
-    return { packageId: pkg.meta.id, from: pkg.meta.from, to: pkg.meta.to, applied:false, reason:'strict-mismatch' };
+  const effectiveMode = opts.mode ?? prog.meta.mode ?? 'strict';
+  if (effectiveMode === 'strict' && !matchesFrom(prog.meta, current)) {
+    return { programId: prog.meta.id, from: prog.meta.from, to: prog.meta.to, applied:false, reason:'strict-mismatch' };
   }
 
   // lower
-  const script = lowerer.lower(pkg.ops);
+  const script = lowerer.lower(prog.ops);
 
   // execute under advisory lock
   const { sql, params, sqlHash } = await admin.withAdvisoryLock('prisma:migrate', async () => {
@@ -209,11 +209,11 @@ export async function applyNext(
       return { sql: render(script), params: [], sqlHash: hash(render(script)) as any };
     }
     const res = await admin.executeScript(script);
-    await admin.writeContract(pkg.meta.to.hash);
+    await admin.writeContract(prog.meta.to.hash);
     return res;
   });
 
-  return { packageId: pkg.meta.id, from: pkg.meta.from, to: pkg.meta.to, applied:true, sql, sqlHash };
+  return { programId: prog.meta.id, from: prog.meta.from, to: prog.meta.to, applied:true, sql, sqlHash };
 }
 ```
 
@@ -236,9 +236,9 @@ Loop applyNext until it returns not-applicable.
 ## Usage from CLI layer (example)
 
 ```typescript
-// load all packages on disk
-const pkgs = (await glob('migrations/*'))
-  .map(loadPackage)
+// load all programs on disk
+const programs = (await glob('migrations/*'))
+  .map(loadProgram)
   .sort(byIdAsc); // order doesn't matter for correctness; sort for stable UX
 
 // connect
@@ -247,27 +247,27 @@ const lowerer = pgLowerer(); // inject
 
 // apply in a loop
 for (;;) {
-  const r = await applyNext(pkgs, admin, lowerer);
+  const r = await applyNext(programs, admin, lowerer);
   if (!r.applied && r.reason === 'not-applicable') break;
   if (!r.applied && r.reason === 'strict-mismatch') {
     console.error('Strict mismatch—aborting.');
     process.exit(1);
   }
-  console.log(`Applied ${r.packageId} → ${r.to.hash}`);
+  console.log(`Applied ${r.programId} → ${r.to.hash}`);
 }
 ```
 
 ---
 
 ## Tests to write (fast and focused)
-1. **Package validation**
+1. **Program validation**
    - malformed meta.json rejected
    - opSetHash mismatch throws
 2. **Applicability**
    - empty DB matches {kind:'empty'}, not {kind:'contract'}
    - strict vs tolerant behavior
 3. **Runner happy path**
-   - Given current=A and package A→B, apply updates marker to B
+   - Given current=A and program A→B, apply updates marker to B
 4. **Non-applicable**
    - Given current=C and only A→B exists, returns not-applicable
 5. **Advisory lock**
@@ -280,7 +280,7 @@ for (;;) {
 ## Why this slice stands alone
 - It gives you a runnable end-to-end apply loop with real safety guarantees.
 - It defines the file format and runtime contracts other teams can build against.
-- The planner can land later and simply drop opset.json into the package folders.
+- The planner can land later and simply drop opset.json into the program folders.
 - Dialects can be added by supplying new lowerers; the runner need not change.
 
 If you want, I can tighten any of these signatures into exact .ts stubs you can paste into packages/migrate-pkg and packages/migrate-runner.

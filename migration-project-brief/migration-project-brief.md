@@ -10,7 +10,23 @@ The resulting system must:
 - Allow portable replay across environments (dev, staging, prod)
 - Support squashing history without introducing a separate "baseline" concept
 
-The design uses a single migration package format with meta.json and opset.json, avoiding multiple parallel abstractions or heavy tooling.
+The design uses a single migration program format with meta.json and opset.json, avoiding multiple parallel abstractions or heavy tooling.
+
+---
+
+## Terminology
+
+This document uses specific terminology to avoid confusion in the JavaScript/TypeScript ecosystem:
+
+- **Migration Program**: A folder containing `meta.json` and `opset.json` files that represents a deterministic transformation from one contract state to another. We avoid "migration package" because "package" is overloaded in JavaScript contexts (NPM packages, monorepo packages, etc.).
+
+- **Contract**: The canonical, serialized representation of a database schema derived from PSL, stored as `contract.json` with a `contractHash` for verification.
+
+- **OpSet**: A deterministic set of operations (`opset.json`) that transforms a database from one contract state to another.
+
+- **Meta**: Metadata (`meta.json`) describing when and how a migration program applies, including source and target contract hashes.
+
+This terminology ensures clarity when discussing migration artifacts versus other types of packages in the ecosystem.
 
 ---
 
@@ -18,7 +34,7 @@ The design uses a single migration package format with meta.json and opset.json,
 
 1. **PSL as truth**: The current schema.prisma always defines desired state.
 2. **Deterministic ops**: PSL(A) + PSL(B) → reproducible op-set (opset.json).
-3. **Replayable**: The same migration package can be applied anywhere.
+3. **Replayable**: The same migration program can be applied anywhere.
 4. **Environment verification**: DB hash must match meta.from.
 5. **Minimal UX**: File-based workflow, no complex CLI arguments.
 6. **Extensible**: Future phases can introduce drift detection and re-planning.
@@ -61,7 +77,7 @@ CREATE TABLE prisma_contract (
 INSERT INTO prisma_contract (contract_hash) VALUES ('sha256:<hash>');
 ```
 
-### 2. Migration Package Format
+### 2. Migration Program Format
 
 Define the canonical shape of migration folders:
 
@@ -133,7 +149,7 @@ Implement deterministic composition:
 ### 2. Squashing
 
 `pn prisma-next migrate squash --range <from>..<to>`:
-- Generates a single migration package from composed ops
+- Generates a single migration program from composed ops
 - Example:
 
 ```json
@@ -208,7 +224,7 @@ Add migrate.config.json to handle environments and policies:
 - Deterministic PSL(A)→PSL(B) → identical opset.json across machines.
 - Replayable migrations applied consistently across environments.
 - `migrate status` clearly reports out-of-sync contracts.
-- Squash produces portable single-package installers.
+- Squash produces portable single-program installers.
 - No separate baseline concept required — only unified migration folders.
 
 ---

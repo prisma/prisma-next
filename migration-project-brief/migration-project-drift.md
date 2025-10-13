@@ -75,13 +75,13 @@ type DriftReport = {
   - Classifies drift and prints actions.
 
 - `migrate apply --env <name> [--mode strict|tolerant]`
-  - **strict** (default in prod): only apply a package when dbContract == meta.from.hash.
+  - **strict** (default in prod): only apply a program when dbContract == meta.from.hash.
     If not, fail with drift report.
   - **tolerant** (dev/staging): allow "trim" of an opset (skip already-satisfied ops) when dbContract is ahead OR catalog already satisfies some ops.
 
 - `migrate replan --from-live`
   - Reads live catalog as A_live.
-  - Plans A_live → B using the planner (same deterministic rules) → writes a repair package (from = dbCatalogHash or from = dbContract? see below).
+  - Plans A_live → B using the planner (same deterministic rules) → writes a repair program (from = dbCatalogHash or from = dbContract? see below).
   - You then review and migrate apply.
 
 - `migrate mark --hash sha256:<H>`
@@ -106,7 +106,7 @@ type DriftReport = {
      - Else → structural: differsFromContract (true structural drift).
 
 3. **Behind/ahead/fork (using migration graph)**:
-   - If there exists a path in migration packages from dbContract → desired: behind (fast-forward).
+   - If there exists a path in migration programs from dbContract → desired: behind (fast-forward).
    - If there exists a path from desired → dbContract: ahead (you're beyond desired; usually staging/dev).
    - Otherwise: fork (branch).
 
@@ -116,11 +116,11 @@ type DriftReport = {
 
 ### A) Fast-forward (best case)
 - **When**: dbContract exists and there's a from=dbContract → ... → to=desired path.
-- **Action**: apply packages in order using strict mode.
+- **Action**: apply programs in order using strict mode.
 - **Notes**: no structural catalog read necessary.
 
 ### B) Trim & apply (tolerant)
-- **When**: You have the correct next package A → A', but the live catalog already satisfies some subset of ops (e.g., a teammate ran part of it).
+- **When**: You have the correct next program A → A', but the live catalog already satisfies some subset of ops (e.g., a teammate ran part of it).
 - **Action**: at apply-time in tolerant mode, compile opset, skip satisfied operations, and still land at to = A'.
 - **This requires** a quick check function: isSatisfied(op, dbCatalog).
 - **Safety**: disallow in prod by default; allow only additive ops to be skipped (no destructive ops in MVP anyway).
@@ -131,7 +131,7 @@ type DriftReport = {
 - **Read** A_live = dbCatalog.
 - **Plan** A_live → B with our MVP planner (additive-only).
 - **If** B < A_live (drops/renames/casts), the MVP planner will fail with instructions (that's fine; you can later add hints).
-- **Write** repair package:
+- **Write** repair program:
 
 ```json
 // meta.json
@@ -143,7 +143,7 @@ type DriftReport = {
 ```
 
 - **Recommendation**: for MVP, keep from.kind = 'contract' using the declared dbContract (not catalogHash) to stay consistent with versioning, and rely on tolerant apply to skip satisfied ops if needed.
-- **Apply** the repair package (strict in prod, tolerant in dev).
+- **Apply** the repair program (strict in prod, tolerant in dev).
 
 ### D) Mark (adopt)
 - **When**: The live catalog already equals desired, but prisma_contract is missing/wrong.
@@ -162,10 +162,10 @@ type DriftReport = {
   - addColumn satisfied if column exists with compatible spec (MVP: exact type/nullable/default match).
   - addUnique/addIndex/addForeignKey satisfied if an equivalent exists.
   - Keep this strict in MVP to avoid masking subtle mismatches.
-- In tolerant mode, when applying a package:
+- In tolerant mode, when applying a program:
   - Load dbCatalog.
   - Filter ops by !isSatisfied(op, dbCatalog).
-  - If all ops satisfied → return {applied:false, reason:'noop'} but still update prisma_contract to the package to.hash (this is the "skip but version" behavior).
+  - If all ops satisfied → return {applied:false, reason:'noop'} but still update prisma_contract to the program to.hash (this is the "skip but version" behavior).
   - Else run as usual.
 
 ---
@@ -217,7 +217,7 @@ Options:
 - **Mark**: require structural equality in prod (no --force).
 - **Trim**: only skip additive ops (we only have additive ops in MVP planner anyway).
 - **Advisory lock** around everything.
-- **Ledger** (optional later): append { packageId, from, to, sqlHash, pre/post catalog hashes } to a prisma_migration_ledger.
+- **Ledger** (optional later): append { programId, from, to, sqlHash, pre/post catalog hashes } to a prisma_migration_ledger.
 
 ---
 

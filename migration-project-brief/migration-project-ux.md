@@ -7,7 +7,7 @@ This describes the end-to-end user experience for Prisma Next's deterministic, r
 ## Core Concepts (mental model)
 - **schema.prisma**: the desired state of your data model (source of truth).
 - **contract.json**: generated IR of the schema with a contractHash.
-- **Migration package**: a folder with:
+- **Migration program**: a folder with:
   - meta.json — when this migration applies and where it lands.
   - opset.json — how to get there (deterministic, idempotent ops).
   - notes.md — optional human context.
@@ -191,7 +191,7 @@ $ pn prisma-next migrate apply --url postgres://...
 
 ## Squashing (same structure, no "baseline" type)
 
-Squash multiple migrations into one new package:
+Squash multiple migrations into one new program:
 
 ```bash
 $ pn prisma-next migrate squash --range 2025-10-01..2025-10-13
@@ -200,7 +200,7 @@ $ pn prisma-next migrate squash --range 2025-10-01..2025-10-13
   - opset.json (composed)
 ```
 
-- The new package has the same { meta.json, opset.json } shape.
+- The new program has the same { meta.json, opset.json } shape.
 - Old folders listed in supersedes can be archived.
 - For brand-new dev DBs, you may also generate a "from empty" installer:
 
@@ -266,7 +266,7 @@ Attach migrations/*/{meta.json,opset.json} and optional plan.sql to build artifa
 ---
 
 ## IDE / Agent Experience
-- The whole state is on disk: schema.prisma, contract.json, migration packages.
+- The whole state is on disk: schema.prisma, contract.json, migration programs.
 - Agents can:
   - Read contract.json to understand tables & types.
   - Propose migrate plan, surface notes.md, and open PRs with the new migration folder.
@@ -279,7 +279,7 @@ Attach migrations/*/{meta.json,opset.json} and optional plan.sql to build artifa
 - **psl emit**
   Generate prisma/contract.json from schema.prisma.
 - **migrate plan [--message "…"] [--from <hash>] [--to <hash>]**
-  Diff contracts and write a new migration package; by default from "latest applied" (or previous package to) to contract.json.
+  Diff contracts and write a new migration program; by default from "latest applied" (or previous program to) to contract.json.
 - **migrate apply [--env <name> | --url <dsn>] [--noninteractive]**
   Apply the next applicable migration(s) to the target DB, updating prisma_contract.
 - **migrate status [--env <name>]**
@@ -287,7 +287,7 @@ Attach migrations/*/{meta.json,opset.json} and optional plan.sql to build artifa
 - **migrate preview**
   Print SQL for pending migration(s) without running.
 - **migrate squash --range <idStart>..(idEnd|HEAD)**
-  Compose a set into one new package with supersedes.
+  Compose a set into one new program with supersedes.
 - **migrate mark --hash <sha256:…>**
   (Advanced) Set the DB's prisma_contract hash manually (e.g., adopting an existing DB).
 
@@ -295,7 +295,7 @@ Attach migrations/*/{meta.json,opset.json} and optional plan.sql to build artifa
 
 ## Design Guarantees (what users can rely on)
 - **Deterministic**: same PSL A→B yields byte-identical opset.json.
-- **Portable**: packages replay anywhere; no dependence on a specific DB instance.
+- **Portable**: programs replay anywhere; no dependence on a specific DB instance.
 - **Safe by default**: strict mode protects prod; tolerant mode helps dev/staging.
 - **Minimal cognitive load**: one migration shape; baselines are just migrations with from:"empty"/"unknown".
 - **Auditable**: every apply updates the DB's contract_hash and can be recorded in a small ledger (optional future).
