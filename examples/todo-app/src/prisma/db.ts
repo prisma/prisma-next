@@ -1,10 +1,16 @@
 import { connect, createRuntime, lint, verification } from '@prisma/runtime';
-import ir from '../../.prisma/contract.json';
-import { validateContract, parseIR } from '@prisma/relational-ir';
+import _ir from '../../.prisma/contract.json';
+import { validateContract } from '@prisma/relational-ir';
+import contract from '../../.prisma/contract.json';
+import { makeT } from '@prisma/sql';
+import * as Contract from '../../.prisma/contract';
+import { orm } from '@prisma/orm';
 
-// Create the raw database connection
-const db = connect({
-  ir: validateContract(ir),
+export const dataContract = validateContract(_ir);
+
+// Export the raw connection for scripts that need it (like setup-db.ts)
+export const db = connect({
+  ir: dataContract,
   database: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
@@ -16,7 +22,7 @@ const db = connect({
 
 // Create a runtime with lint and verification plugins for enhanced query execution
 export const runtime = createRuntime({
-  ir: parseIR(ir),
+  ir: dataContract,
   driver: db,
   plugins: [
     verification({ mode: 'onFirstUse' }),
@@ -31,5 +37,11 @@ export const runtime = createRuntime({
   ],
 });
 
-// Export the raw connection for scripts that need it (like setup-db.ts)
-export { db };
+type ContractTypes = {
+  Tables: Contract.Contract.Tables;
+  Relations: Contract.Contract.Relations;
+  Uniques: Contract.Contract.Uniques;
+};
+
+export const t = makeT<Contract.Contract.Tables>(contract);
+export const r = orm<ContractTypes>(dataContract);

@@ -1,22 +1,7 @@
-import { sql, makeT } from '@prisma/sql';
-import { orm } from '@prisma/orm';
-import { runtime } from '../prisma/db';
+import { sql } from '@prisma/sql';
+import { runtime, t, r } from '../prisma/db';
 import contract from '../../.prisma/contract.json';
-import { parseIR, validateContract } from '@prisma/relational-ir';
-import * as Contract from '../../.prisma/contract';
-
-const ir = validateContract(contract);
-
-// Extract the contract types from the namespace
-type ContractTypes = {
-  Tables: Record<string, Record<string, any>>;
-  Relations: Contract.Contract.Relations;
-  Uniques: Contract.Contract.Uniques;
-};
-
-// Parameterized ORM factory (just like makeT) - using extracted contract types
-const r = orm<ContractTypes>(ir);
-const t = makeT<Contract.Contract.Tables>(ir);
+import { parseIR } from '@prisma/relational-ir';
 
 // ============================================================================
 // BASIC QUERIES (using base SQL DSL)
