@@ -29,7 +29,7 @@ export class OrmBuilder<Parent> {
     this.ast = {
       type: 'select',
       from: table[TABLE_NAME],
-      contractHash: table.__contractHash,
+      ...(table.__contractHash && { contractHash: table.__contractHash }),
       projectStar: true,
     };
   }

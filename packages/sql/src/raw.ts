@@ -166,7 +166,11 @@ export const qualified = (parts: string[]): Qualified => ({ kind: 'qualified', p
  * rawQuery`INSERT INTO users (email) VALUES (${value(email, 'text')})` // → INSERT INTO users (email) VALUES ($1)
  * ```
  */
-export const value = <T>(v: T, codec?: string): Value => ({ kind: 'value', v, codec });
+export const value = <T>(v: T, codec?: string): Value => ({
+  kind: 'value',
+  v,
+  ...(codec && { codec }),
+});
 
 /**
  * Creates an unsafe raw SQL atom that bypasses safety mechanisms.

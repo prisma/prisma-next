@@ -33,7 +33,10 @@ export function sql(
         }
       }
 
-      return createFromBuilder(tableName, { contractHash, onContractMismatch }) as any;
+      return createFromBuilder(tableName, {
+        ...(contractHash && { contractHash }),
+        onContractMismatch,
+      }) as any;
     },
   };
 }

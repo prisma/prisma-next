@@ -45,7 +45,7 @@ export class QueryBuilder<TTable extends Table<any>, TResult = never> {
     this.ast = {
       type: 'select',
       from,
-      contractHash: context.contractHash,
+      ...(context.contractHash && { contractHash: context.contractHash }),
       projectStar: true, // Default to true, will be set to false when select() is called
     };
   }

@@ -74,54 +74,58 @@ export interface DialectLowerer {
 export function pgLowerer(): DialectLowerer {
   return {
     target: 'postgres',
-    
+
     lower(opset: OpSet): ScriptAST {
       const statements: ScriptAST['statements'] = [];
-      
+
       // Wrap all operations in a single transaction block
-      const ddlStatements = opset.map(op => {
+      const ddlStatements = opset.map((op) => {
         switch (op.kind) {
           case 'addTable':
             return {
               type: 'createTable' as const,
               name: { name: op.name },
               columns: op.columns,
-              constraints: op.constraints,
-              ifNotExists: true
+              ...(op.constraints && { constraints: op.constraints }),
+              ifNotExists: true,
             };
-          
+
           case 'dropTable':
             return {
               type: 'dropTable' as const,
               name: { name: op.name },
-              ifExists: true
+              ifExists: true,
             };
-          
+
           case 'addColumn':
             return {
               type: 'alterTable' as const,
               name: { name: op.table },
-              alters: [{
-                kind: 'addColumn' as const,
-                column: op.column
-              }]
+              alters: [
+                {
+                  kind: 'addColumn' as const,
+                  column: op.column,
+                },
+              ],
             };
-          
+
           case 'alterColumn':
             return {
               type: 'alterTable' as const,
               name: { name: op.table },
-              alters: [{
-                kind: 'alterColumn' as const,
-                name: op.column,
-                setNotNull: op.setNotNull,
-                dropNotNull: op.dropNotNull,
-                setType: op.setType,
-                setDefault: op.setDefault,
-                dropDefault: op.dropDefault
-              }]
+              alters: [
+                {
+                  kind: 'alterColumn' as const,
+                  name: op.column,
+                  ...(op.setNotNull && { setNotNull: op.setNotNull }),
+                  ...(op.dropNotNull && { dropNotNull: op.dropNotNull }),
+                  ...(op.setType && { setType: op.setType }),
+                  ...(op.setDefault && { setDefault: op.setDefault }),
+                  ...(op.dropDefault && { dropDefault: op.dropDefault }),
+                },
+              ],
             };
-          
+
           case 'addUnique':
             return {
               type: 'addConstraint' as const,
@@ -129,10 +133,10 @@ export function pgLowerer(): DialectLowerer {
               spec: {
                 kind: 'unique' as const,
                 columns: op.columns,
-                name: op.name
-              }
+                ...(op.name && { name: op.name }),
+              },
             };
-          
+
           case 'addForeignKey':
             return {
               type: 'addConstraint' as const,
@@ -141,38 +145,40 @@ export function pgLowerer(): DialectLowerer {
                 kind: 'foreignKey' as const,
                 columns: op.columns,
                 ref: op.ref,
-                name: op.name,
-                onDelete: op.onDelete,
-                onUpdate: op.onUpdate
-              }
+                ...(op.name && { name: op.name }),
+                ...(op.onDelete && { onDelete: op.onDelete }),
+                ...(op.onUpdate && { onUpdate: op.onUpdate }),
+              },
             };
-          
+
           case 'addIndex':
             return {
               type: 'createIndex' as const,
-              name: { name: op.name || `${op.table}_${op.columns.map(c => c.name).join('_')}_idx` },
+              name: {
+                name: op.name || `${op.table}_${op.columns.map((c) => c.name).join('_')}_idx`,
+              },
               table: { name: op.table },
               columns: op.columns,
-              unique: op.unique
+              ...(op.unique !== undefined && { unique: op.unique }),
             };
-          
+
           default:
             throw new Error(`Unsupported operation: ${(op as any).kind}`);
         }
       });
-      
+
       // Wrap all DDL in a transaction block
       if (ddlStatements.length > 0) {
         statements.push({
           type: 'tx',
-          statements: ddlStatements
+          statements: ddlStatements,
         });
       }
-      
+
       return {
         type: 'script',
-        statements
+        statements,
       };
-    }
+    },
   };
 }

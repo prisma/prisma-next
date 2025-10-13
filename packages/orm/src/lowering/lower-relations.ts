@@ -9,11 +9,11 @@ export function lowerRelations(ormAst: OrmQueryAST, ir: Schema): QueryAST {
   let baseAst: QueryAST = {
     type: 'select',
     from: ormAst.from,
-    contractHash: ormAst.contractHash,
-    select: ormAst.select,
-    where: ormAst.where,
-    orderBy: ormAst.orderBy,
-    limit: ormAst.limit,
+    ...(ormAst.contractHash && { contractHash: ormAst.contractHash }),
+    ...(ormAst.select && { select: ormAst.select }),
+    ...(ormAst.where && { where: ormAst.where }),
+    ...(ormAst.orderBy && { orderBy: ormAst.orderBy }),
+    ...(ormAst.limit && { limit: ormAst.limit }),
   };
 
   for (const include of ormAst.includes ?? []) {
