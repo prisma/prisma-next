@@ -1,0 +1,35 @@
+{
+  "name": "@prisma/migrate",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run --pool=forks",
+    "lint": "eslint 'src/**/*.ts'",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@prisma/relational-ir": "workspace:*",
+    "@prisma/sql": "workspace:*",
+    "@prisma/schema-emitter": "workspace:*",
+    "typescript": "^5.6.2"
+  },
+  "devDependencies": {
+    "@prisma/dev": "^0.11.0",
+    "@types/pg": "^8.10.9",
+    "pg": "^8.11.3",
+    "tsup": "^8.2.4",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}
