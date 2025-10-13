@@ -49,7 +49,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('builds a query with WHERE clause using Column expressions', () => {
-    const query = sql().from(t.user).where(t.user.active.eq(true));
+    const query = sql().from(t.user).where(t.user.active.eq(true)).select({});
 
     const { sql: generatedSQL, params } = query.build();
 
@@ -58,7 +58,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('builds a query with ORDER BY and LIMIT', () => {
-    const query = sql().from(t.user).orderBy('createdAt', 'DESC').limit(10);
+    const query = sql().from(t.user).orderBy('createdAt', 'DESC').limit(10).select({});
 
     const { sql: generatedSQL, params } = query.build();
 
@@ -85,7 +85,8 @@ describe('SQL Query Builder', () => {
   it('handles IN expressions with Column objects', () => {
     const query = sql()
       .from(t.user)
-      .where(t.user.id.in([1, 2, 3]));
+      .where(t.user.id.in([1, 2, 3]))
+      .select({});
 
     const { sql: generatedSQL, params } = query.build();
 
@@ -95,11 +96,11 @@ describe('SQL Query Builder', () => {
 
   it('handles multiple comparison operators', () => {
     const queries = [
-      sql().from(t.user).where(t.user.id.gt(5)),
-      sql().from(t.user).where(t.user.id.lt(10)),
-      sql().from(t.user).where(t.user.id.gte(1)),
-      sql().from(t.user).where(t.user.id.lte(100)),
-      sql().from(t.user).where(t.user.email.ne('test@example.com')),
+      sql().from(t.user).where(t.user.id.gt(5)).select({}),
+      sql().from(t.user).where(t.user.id.lt(10)).select({}),
+      sql().from(t.user).where(t.user.id.gte(1)).select({}),
+      sql().from(t.user).where(t.user.id.lte(100)).select({}),
+      sql().from(t.user).where(t.user.email.ne('test@example.com')).select({}),
     ];
 
     const expectedSQLs = [
@@ -134,7 +135,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('handles boolean values in WHERE clauses', () => {
-    const query = sql().from(t.user).where(t.user.active.eq(false));
+    const query = sql().from(t.user).where(t.user.active.eq(false)).select({});
 
     const { sql: generatedSQL, params } = query.build();
 
@@ -143,7 +144,7 @@ describe('SQL Query Builder', () => {
   });
 
   it('handles string values with special characters', () => {
-    const query = sql().from(t.user).where(t.user.email.eq('test@example.com'));
+    const query = sql().from(t.user).where(t.user.email.eq('test@example.com')).select({});
 
     const { sql: generatedSQL, params } = query.build();
 

@@ -184,11 +184,12 @@ describe('Integration Tests', () => {
     await expect(db.execute(query.build())).rejects.toThrow();
   });
 
-  it('throws error for unknown column', async () => {
+  it('throws error for invalid ORDER BY field', async () => {
     const query = sql()
       .from(t.user)
       .where(t.user.active.eq(true))
-      .select({ id: t.user.id, nonexistent: t.user.id }); // Using wrong column
+      .select({ id: t.user.id, email: t.user.email })
+      .orderBy('nonexistent', 'ASC');
 
     await expect(db.execute(query.build())).rejects.toThrow();
   });
