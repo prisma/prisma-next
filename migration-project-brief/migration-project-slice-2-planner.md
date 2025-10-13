@@ -287,3 +287,94 @@ export function planMigration(
 - It's deterministic and tiny, so you can implement it quickly.
 - It sets a clean foundation to add hints later (renames, drops, casts, nullability tightening) without refactoring the core.
 
+
+---
+
+## Additional design decisions
+
+1) Constraint & index naming
+
+Decision: Match Postgres conventions
+	•	PK: {table}_pkey
+	•	Unique: {table}_{cols}_key
+	•	Foreign key: {table}_{cols}_fkey (cols = referencing columns, in order)
+	•	Index: {table}_{cols}_idx
+
+Why this option?
+	•	Familiar to most teams and tooling; easy to spot intent at a glance.
+	•	Deterministic across machines and planner versions.
+	•	Plays nicely with ecosystem defaults (introspection, psql, monitoring).
+
+Policy details:
+	•	Lowercase, columns joined by _, stable order.
+	•	Enforce the 63-byte identifier cap via a deterministic truncate + short hash suffix to avoid collisions while keeping readability.
+
+⸻
+
+2) FK supporting index
+
+Decision: Emit an index only when needed; ensure coverage before adding the FK.
+	•	Check if the referencing columns are already covered by:
+	•	a PK/Unique on exactly those columns, or
+	•	an existing btree index where those columns are the left-prefix in order.
+	•	If not covered, emit an addIndex before the addForeignKey.
+
+Why this option?
+	•	Postgres does not auto-create indexes for FKs.
+	•	Ensures predictable performance (updates/deletes on parent, lock behavior).
+	•	Avoids redundant indexes when a suitable composite/unique already exists.
+	•	Keeps the planner deterministic and minimal without guessing “maybe it’s fine.”
+
+⸻
+
+3) Migration ID format
+
+Decision: Timestamp + human slug, e.g. 2025-10-13T0912_add_user_active.
+	•	Default: UTC timestamp; slug derived from a short summary.
+	•	Allow explicit override (--id) if needed; validate uniqueness.
+
+Why this option?
+	•	Sortable, collision-resistant in day-to-day use.
+	•	No global counter to coordinate; easy to scan in git and CI logs.
+	•	Human-readable without sacrificing determinism.
+
+⸻
+
+4) Planner inputs (no emitting inside planner)
+
+Decision: Planner only accepts pre-emitted IR contracts.
+	•	Inputs: contractA (DB’s current contract hash → contract JSON) and contractB (latest emitted contract JSON).
+	•	The CLI or build step is responsible for running psl emit before planning.
+
+Why this option?
+	•	Keeps the planner pure, testable, and deterministic.
+	•	Avoids hidden side effects, version drift, or environment dependencies.
+	•	Makes CI flows explicit: “emit → plan → package → apply”.
+
+⸻
+
+5) Determinism & safety (cross-cutting policies)
+
+Canonicalization:
+	•	Stable key ordering and canonical op ordering everywhere; opSetHash is reproducible across machines and runs.
+
+Deterministic erroring:
+	•	For unsupported changes in the MVP (renames, drops, type changes, NOT NULL without default), fail with clear, actionable messages. No best-effort guessing.
+
+Identifier length:
+	•	Always enforce Postgres’s 63-byte cap using a truncate + stable short hash rule for any synthesized name (constraints, indexes). Prevents rare but painful edge cases.
+
+Index method default:
+	•	Default to btree for equality/coverage and FK support unless the target contract explicitly requires another method. Keeps behavior predictable.
+
+⸻
+
+6) Out-of-scope for MVP (and why)
+	•	Renames, drops, type casts, nullability tightening without default: excluded to keep the planner small, safe, and deterministic. These require explicit intent and will be addressed later (e.g., with PSL hints/pragmas).
+	•	Emitter invocation: excluded by design to keep boundaries clean.
+
+⸻
+
+Summary
+
+We’re choosing Postgres-native naming, on-demand FK index synthesis, timestamped migration IDs, and a pure, IR-only planner. These defaults maximize determinism, safety, and familiarity, while keeping the MVP tight and easy to evolve (and leaving clear seams for future features like renames/drops via PSL hints).
