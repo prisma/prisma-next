@@ -2,17 +2,29 @@
 export { orm } from '../relations/factory';
 export type { OrmFactory } from '../relations/factory';
 export type { OrmBuilder, OrmQueryBuilder, IncludeOptions } from '../relations/builder';
-export type { RelationHandle } from '../relations/handles';
 export type { OrmQueryAST, IncludeNode } from '../ast/types';
 
 // Type-safe exports
+export type { TypedOrmFactory, TypedOrmBuilder, TypedChildQB } from '../typed-builder';
+
+// Import Column from SQL package
+export type { Column } from '@prisma/sql';
+
+// New type-safe types
 export type {
-  TypedOrmFactory,
-  TypedOrmBuilder,
-  TypedRelationBuilder,
-  TypedRelationHandle,
-  TypedIncludeOptions,
-} from '../typed-builder';
+  TableHandle,
+  RelationHandle,
+  RelationHandles,
+  RowOfProjection,
+  Merge,
+  NonEmpty,
+  IncludeResult,
+  GateCardinality,
+  BaseQB,
+  ChildQB,
+  OrmQB,
+  OrmHandles,
+} from '../types';
 
 // Lowering exports
 export { lowerRelations } from '../lowering/lower-relations';

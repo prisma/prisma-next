@@ -80,11 +80,11 @@ describe('makeT Factory Function', () => {
   it('creates columns with correct metadata', () => {
     const t = makeT<TestTables>(mockSchema);
 
-    const userIdColumn: Column<number> = t.user.id;
+    const userIdColumn: Column<'user', 'id', number> = t.user.id;
     expect(userIdColumn.table).toBe('user');
     expect(userIdColumn.name).toBe('id');
 
-    const userEmailColumn: Column<string> = t.user.email;
+    const userEmailColumn: Column<'user', 'email', string> = t.user.email;
     expect(userEmailColumn.table).toBe('user');
     expect(userEmailColumn.name).toBe('email');
   });

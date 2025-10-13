@@ -1,94 +1,148 @@
-import { Column, Table } from '@prisma/sql';
+import { Column, Table, Plan } from '@prisma/sql';
 
-// Base table shape types
-export type TableShape<T extends string> = T extends keyof Contract.Tables ? Contract.Tables[T] : never;
+export type TableHandle<TName extends string, TCols extends Record<string, any>> = {
+  name: TName;
+} & {
+  [K in keyof TCols & string]: Column<TName, K, any>;
+};
 
-// Relation metadata types
-export type RelationMeta<T extends string, K extends string> = 
-  T extends keyof Contract.Relations 
-    ? K extends keyof Contract.Relations[T]
-      ? Contract.Relations[T][K]
-      : never
-    : never;
+// ============================================================================
+// Relation Handle Types from Contract.Relations
+// ============================================================================
 
-// Result type inference helpers
-export type InferSelect<T> = T extends Record<string, Column<infer U>> ? U : never;
+type Cardinality = '1:N' | 'N:1';
 
-export type InferInclude<T, R extends RelationMeta<any, any>> = 
-  R['cardinality'] extends '1:N' 
-    ? InferSelect<T>[]
-    : InferSelect<T>;
+// Forward declare the Contract types - these will be populated by the global namespace
+type Tables = any;
+type Relations = any;
 
-// Include options with proper typing
-export interface IncludeOptions<T, R extends RelationMeta<any, any>> {
-  asArray?: R['cardinality'] extends '1:N' ? boolean : never;
-  alias?: string;
-  required?: boolean;
+export type RelationHandle<
+  P extends keyof Relations & string,
+  K extends keyof Relations[P] & string,
+  C extends Relations[P][K]['cardinality'] = Relations[P][K]['cardinality'],
+  To extends Relations[P][K]['to'] = Relations[P][K]['to'],
+> = {
+  parent: P; // e.g., 'user'
+  child: To; // e.g., 'post'
+  cardinality: C; // '1:N' | 'N:1'
+  alias: K; // relation property name, e.g., 'post' or 'user'
+  on: Relations[P][K]['on']; // join keys
+};
+
+// Helper to shape the whole r object from Relations
+export type RelationHandles<R extends Relations> = {
+  [P in keyof R & string]: {
+    [K in keyof R[P] & string]: RelationHandle<P, K>;
+  };
+};
+
+// ============================================================================
+// Projection Typing (select columns → row type)
+// ============================================================================
+
+type Projection<TCols extends Record<string, Column<any, any, any>>> = TCols;
+
+export type RowOfProjection<P extends Projection<any>> = {
+  [K in keyof P & string]: P[K] extends Column<any, any, infer T> ? T : never;
+};
+
+// Merge helper
+export type Merge<A, B> = Omit<A, keyof B> & B;
+export type NonEmpty<T> = keyof T extends never ? never : T;
+
+// ============================================================================
+// Include Result Types
+// ============================================================================
+
+export type IncludeResult<C extends Cardinality, Alias extends string, ChildRow> = C extends '1:N'
+  ? { [A in Alias]: ChildRow[] }
+  : { [A in Alias]: ChildRow | null };
+
+// For N:1, hide limit/orderBy at type level
+export type GateCardinality<C extends Cardinality, QB extends ChildQB<any, any>> = C extends 'N:1'
+  ? Omit<QB, 'limit' | 'orderBy'>
+  : QB;
+
+// ============================================================================
+// Query Builder Types
+// ============================================================================
+
+export class BaseQB<TFrom extends keyof Tables & string, TRow extends Record<string, any> = {}> {
+  constructor(readonly from: TFrom) {}
+
+  select<P extends Projection<Record<string, Column<TFrom, any, any>>>>(
+    p: P,
+  ): BaseQB<TFrom, Merge<TRow, RowOfProjection<P>>> {
+    // record select for AST...
+    return this as any;
+  }
+
+  where(_pred: any): this {
+    return this;
+  } // can tighten later
+  orderBy(_spec: any): this {
+    return this;
+  }
+  limit(_n: number): this {
+    return this;
+  }
+
+  build(): Plan<NonEmpty<TRow>> {
+    /* ... */ return {} as any;
+  }
 }
 
-// Result type for queries with includes
-export type QueryResult<
-  TSelect extends Record<string, Column<any>>,
-  TIncludes extends Record<string, any> = {}
-> = InferSelect<TSelect> & TIncludes;
+export class ChildQB<
+  TChild extends keyof Tables & string,
+  TChildRow extends Record<string, any> = {},
+> {
+  constructor(readonly child: TChild) {}
 
-// Relation builder type - this should be the same as the main builder but scoped to the child table
-export type RelationBuilder<TChild extends string> = {
-  select<TSelect extends Record<string, Column<any>>>(
-    fields: TSelect
-  ): RelationBuilder<TChild> & { getAst(): any };
-  where(condition: any): RelationBuilder<TChild>;
-  orderBy(field: string, direction?: 'ASC' | 'DESC'): RelationBuilder<TChild>;
-  limit(count: number): RelationBuilder<TChild>;
-  getAst(): any;
-};
+  select<P extends Projection<Record<string, Column<TChild, any, any>>>>(
+    p: P,
+  ): ChildQB<TChild, Merge<TChildRow, RowOfProjection<P>>> {
+    return this as any;
+  }
 
-// Main ORM builder with proper typing
-export type OrmBuilderTyped<TParent extends string> = {
-  select<TSelect extends Record<string, Column<any>>>(
-    fields: TSelect
-  ): OrmBuilderTyped<TParent> & {
-    build(): { ast: any; sql: string; params: any[]; meta: any };
-  };
-  where(condition: any): OrmBuilderTyped<TParent>;
-  orderBy(field: string, direction?: 'ASC' | 'DESC'): OrmBuilderTyped<TParent>;
-  limit(count: number): OrmBuilderTyped<TParent>;
-  include<
-    TRelation extends string,
-    TChild extends RelationMeta<TParent, TRelation>['to'],
-    TChildSelect extends Record<string, Column<any>>
-  >(
-    relation: RelationHandle<TParent, TRelation>,
-    buildChild: (qb: RelationBuilder<TChild>) => RelationBuilder<TChild> & { getAst(): any },
-    opts?: IncludeOptions<TChildSelect, RelationMeta<TParent, TRelation>>
-  ): OrmBuilderTyped<TParent> & {
-    build(): { 
-      ast: any; 
-      sql: string; 
-      params: any[]; 
-      meta: any;
-      // This would ideally include the result type, but TypeScript limitations make this complex
-    };
-  };
-  build(): { ast: any; sql: string; params: any[]; meta: any };
-};
+  where(_pred: any): this {
+    return this;
+  }
+  orderBy(_spec: any): this {
+    return this;
+  }
+  limit(_n: number): this {
+    return this;
+  }
 
-// Relation handle with proper typing
-export interface RelationHandle<TParent extends string, TRelation extends string> {
-  parent: TParent;
-  child: RelationMeta<TParent, TRelation>['to'];
-  cardinality: RelationMeta<TParent, TRelation>['cardinality'];
-  on: RelationMeta<TParent, TRelation>['on'];
-  name: TRelation;
+  // type witness (no runtime)
+  _row(): TChildRow {
+    return {} as any;
+  }
 }
 
-// ORM factory with proper typing
-export type OrmFactoryTyped = {
-  from<T extends keyof Contract.Tables>(table: Table<Contract.Tables[T]>): OrmBuilderTyped<T>;
-  [K in keyof Contract.Relations]: {
-    [R in keyof Contract.Relations[K]]: RelationHandle<K, R>;
-  };
-};
+export class OrmQB<
+  TFrom extends keyof Tables & string,
+  TRow extends Record<string, any> = {},
+> extends BaseQB<TFrom, TRow> {
+  include(handle: any, build: (qb: any) => any): OrmQB<TFrom, any> {
+    // capture IncludeNode + child AST…
+    return this as any;
+  }
+}
+
+// ============================================================================
+// Factory Types
+// ============================================================================
+
+export type OrmHandles = RelationHandles<Relations>;
+
+export function orm(irJson: unknown): OrmHandles & {
+  from<T extends keyof Tables & string>(table: TableHandle<T, Tables[T]>): OrmQB<T, {}>;
+} {
+  // runtime: build handles from JSON IR (FKs → handles with alias/cardinality)
+  // return object satisfying the OrmHandles mapping + .from()
+  return {} as any;
+}
 
 // Import the generated contract types
 declare global {

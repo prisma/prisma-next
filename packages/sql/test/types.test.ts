@@ -115,7 +115,7 @@ describe('Type Inference Tests', () => {
   });
 
   it('verifies Column objects have correct structure', () => {
-    const userIdColumn: Column<number> = t.user.id;
+    const userIdColumn: Column<'user', 'id', number> = t.user.id;
     expect(userIdColumn.table).toBe('user');
     expect(userIdColumn.name).toBe('id');
     expect(typeof userIdColumn.eq).toBe('function');

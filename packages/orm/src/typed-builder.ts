@@ -3,33 +3,30 @@ import { Table, Column, FieldExpression, Plan, TABLE_NAME, InferSelectResult } f
 import { OrmQueryAST, IncludeNode, RelationHandle } from './ast/types';
 import { lowerRelations } from './lowering/lower-relations';
 import { compileToSQL } from '@prisma/sql';
+import {
+  RelationHandle as TypedRelationHandle,
+  RelationHandles,
+  ChildQB,
+  OrmQB,
+  GateCardinality,
+  IncludeResult,
+  Merge,
+  RowOfProjection,
+  NonEmpty,
+} from './types';
 
-// Type-safe relation handle
-export interface TypedRelationHandle<
-  TContract extends Contract,
-  TParent extends keyof TContract['Tables'],
-  TRelation extends keyof TContract['Relations'][TParent],
+// ============================================================================
+// Type-safe Child Query Builder
+// ============================================================================
+
+export class TypedChildQB<
+  TChild extends keyof Contract['Tables'] & string,
+  TChildRow extends Record<string, any> = {},
 > {
-  parent: TParent;
-  child: TContract['Relations'][TParent][TRelation]['to'];
-  cardinality: TContract['Relations'][TParent][TRelation]['cardinality'];
-  on: TContract['Relations'][TParent][TRelation]['on'];
-  name: TRelation;
-}
-
-// Type-safe include options
-export interface TypedIncludeOptions {
-  asArray?: boolean;
-  alias?: string;
-  required?: boolean;
-}
-
-// Type-safe relation builder
-export class TypedRelationBuilder<TChild extends string> {
   private ast: OrmQueryAST;
   private ir: Schema;
 
-  constructor(tableName: string, ir: Schema) {
+  constructor(tableName: TChild, ir: Schema) {
     this.ir = ir;
     this.ast = {
       type: 'select',
@@ -38,29 +35,29 @@ export class TypedRelationBuilder<TChild extends string> {
     };
   }
 
-  select<TSelect extends Record<string, Column<any>>>(
+  select<TSelect extends Record<string, Column<any, any, any>>>(
     fields: TSelect,
-  ): TypedRelationBuilder<TChild> {
+  ): TypedChildQB<TChild, Merge<TChildRow, InferSelectResult<TSelect>>> {
     this.ast.select = {
       type: 'select',
       fields,
     };
     this.ast.projectStar = false;
-    return this;
+    return this as any;
   }
 
-  where(condition: FieldExpression): TypedRelationBuilder<TChild> {
+  where(condition: FieldExpression): TypedChildQB<TChild, TChildRow> {
     this.ast.where = { type: 'where', condition };
     return this;
   }
 
-  orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): TypedRelationBuilder<TChild> {
+  orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): TypedChildQB<TChild, TChildRow> {
     this.ast.orderBy = this.ast.orderBy ?? [];
     this.ast.orderBy.push({ type: 'orderBy', field, direction });
     return this;
   }
 
-  limit(count: number): TypedRelationBuilder<TChild> {
+  limit(count: number): TypedChildQB<TChild, TChildRow> {
     this.ast.limit = { type: 'limit', count };
     return this;
   }
@@ -68,13 +65,21 @@ export class TypedRelationBuilder<TChild extends string> {
   getAst(): OrmQueryAST {
     return this.ast;
   }
+
+  // Type witness for extracting accumulated row type
+  _row(): TChildRow {
+    return {} as any;
+  }
 }
 
-// Type-safe ORM builder
+// ============================================================================
+// Type-safe ORM Builder
+// ============================================================================
+
 export class TypedOrmBuilder<
   TContract extends Contract,
-  TParent extends keyof TContract['Tables'],
-  TResult = never,
+  TParent extends keyof TContract['Tables'] & string,
+  TRow extends Record<string, any> = {},
 > {
   private ast: OrmQueryAST;
   private ir: Schema;
@@ -91,33 +96,10 @@ export class TypedOrmBuilder<
     };
   }
 
-  include(
-    relation: TypedRelationHandle<TContract, TParent, any>,
-    buildChild: (qb: TypedRelationBuilder<any>) => TypedRelationBuilder<any>,
-    opts?: TypedIncludeOptions,
-  ): TypedOrmBuilder<TContract, TParent, TResult> {
-    const childBuilder = new TypedRelationBuilder(relation.child, this.ir);
-    const childBuilt = buildChild(childBuilder);
-
-    const mode =
-      (opts?.asArray ?? (relation.cardinality === '1:N' ? true : false)) ? 'nested' : 'flat';
-
-    this.ast.includes = this.ast.includes ?? [];
-    this.ast.includes.push({
-      kind: 'Include',
-      relation: relation as RelationHandle,
-      alias: opts?.alias ?? String(relation.name),
-      mode,
-      child: childBuilt.getAst(),
-    });
-
-    return this;
-  }
-
-  select<TSelect extends Record<string, Column<any>>>(
+  select<TSelect extends Record<string, Column<any, any, any>>>(
     fields: TSelect,
-  ): TypedOrmBuilder<TContract, TParent, InferSelectResult<TSelect>> & {
-    build(): Plan<InferSelectResult<TSelect>>;
+  ): TypedOrmBuilder<TContract, TParent, Merge<TRow, InferSelectResult<TSelect>>> & {
+    build(): Plan<Merge<TRow, InferSelectResult<TSelect>>>;
   } {
     this.ast.select = {
       type: 'select',
@@ -127,7 +109,7 @@ export class TypedOrmBuilder<
     return this as any;
   }
 
-  where(condition: FieldExpression): TypedOrmBuilder<TContract, TParent, TResult> {
+  where(condition: FieldExpression): TypedOrmBuilder<TContract, TParent, TRow> {
     this.ast.where = { type: 'where', condition };
     return this;
   }
@@ -135,18 +117,41 @@ export class TypedOrmBuilder<
   orderBy(
     field: string,
     direction: 'ASC' | 'DESC' = 'ASC',
-  ): TypedOrmBuilder<TContract, TParent, TResult> {
+  ): TypedOrmBuilder<TContract, TParent, TRow> {
     this.ast.orderBy = this.ast.orderBy ?? [];
     this.ast.orderBy.push({ type: 'orderBy', field, direction });
     return this;
   }
 
-  limit(count: number): TypedOrmBuilder<TContract, TParent, TResult> {
+  limit(count: number): TypedOrmBuilder<TContract, TParent, TRow> {
     this.ast.limit = { type: 'limit', count };
     return this;
   }
 
-  build(): Plan<TResult> {
+  include(
+    handle: any,
+    build: (qb: any) => any,
+    opts?: { asArray?: boolean; alias?: string; required?: boolean },
+  ): TypedOrmBuilder<TContract, TParent, any> {
+    const childBuilder = new TypedChildQB(handle.child, this.ir);
+    const childBuilt = build(childBuilder as any);
+
+    const mode =
+      (opts?.asArray ?? (handle.cardinality === '1:N' ? true : false)) ? 'nested' : 'flat';
+
+    this.ast.includes = this.ast.includes ?? [];
+    this.ast.includes.push({
+      kind: 'Include',
+      relation: handle as any,
+      alias: opts?.alias ?? String(handle.alias),
+      mode,
+      child: childBuilt.getAst(),
+    });
+
+    return this as any;
+  }
+
+  build(): Plan<NonEmpty<TRow>> {
     // 1. ORM AST complete
     // 2. Lower to base QueryAST
     const baseAst = lowerRelations(this.ast, this.ir);
@@ -165,17 +170,16 @@ export class TypedOrmBuilder<
           columns: [],
         },
       },
-    };
+    } as Plan<NonEmpty<TRow>>;
   }
 }
 
-// Type-safe ORM factory
+// ============================================================================
+// Type-safe ORM Factory
+// ============================================================================
+
 export type TypedOrmFactory<TContract extends Contract> = {
-  from<TParent extends keyof TContract['Tables']>(
+  from<TParent extends keyof TContract['Tables'] & string>(
     table: Table<any>,
   ): TypedOrmBuilder<TContract, TParent>;
-} & {
-  [K in keyof TContract['Relations']]: {
-    [R in keyof TContract['Relations'][K]]: TypedRelationHandle<TContract, K, R>;
-  };
-};
+} & RelationHandles<TContract['Relations']>;

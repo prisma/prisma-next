@@ -12,6 +12,7 @@ export function makeT<TTables>(ir: any): TTables {
 
     for (const [colName, column] of Object.entries((table as any).columns)) {
       tableObj[colName] = {
+        __brand: 'Column' as const,
         __t: undefined as any,
         table: tableName,
         name: colName,
@@ -38,7 +39,7 @@ export function makeT<TTables>(ir: any): TTables {
           field: colName,
           values,
         }),
-      } as Column<any>;
+      } as Column<any, any, any>;
     }
 
     tables[tableName] = tableObj;

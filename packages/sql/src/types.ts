@@ -20,18 +20,22 @@ export interface FieldExpression {
   values?: any[];
 }
 
-export interface Column<T> extends Expression<T> {
-  readonly table: string;
-  readonly name: string;
+// Single Column type with full branding for table/name/type
+export interface Column<TTable extends string, TName extends string, TType>
+  extends Expression<TType> {
+  readonly __brand: 'Column';
+  readonly table: TTable;
+  readonly name: TName;
   readonly __contractHash?: string;
-  readonly __tsType?: T; // Brand for type inference
-  eq(value: T): FieldExpression;
-  ne(value: T): FieldExpression;
-  gt(value: T): FieldExpression;
-  lt(value: T): FieldExpression;
-  gte(value: T): FieldExpression;
-  lte(value: T): FieldExpression;
-  in(values: T[]): FieldExpression;
+  readonly __tsType?: TType; // Brand for type inference
+  readonly _type?: TType;
+  eq(value: TType): FieldExpression;
+  ne(value: TType): FieldExpression;
+  gt(value: TType): FieldExpression;
+  lt(value: TType): FieldExpression;
+  gte(value: TType): FieldExpression;
+  lte(value: TType): FieldExpression;
+  in(values: TType[]): FieldExpression;
 }
 
 export const TABLE_NAME = Symbol('tableName');
@@ -40,9 +44,9 @@ export type Table<TShape> = {
   readonly [TABLE_NAME]: string;
   readonly __contractHash?: string;
 } & {
-  readonly [K in keyof TShape]: Column<TShape[K]>;
+  readonly [K in keyof TShape]: Column<string, keyof TShape & string, TShape[K]>;
 } & {
-  readonly [x: string]: Column<any>;
+  readonly [x: string]: Column<any, any, any>;
 };
 
 export interface Tables {
@@ -52,7 +56,7 @@ export interface Tables {
 // Legacy types for backward compatibility during transition
 export interface SelectClause {
   type: 'select';
-  fields: Record<string, Column<any>>;
+  fields: Record<string, Column<any, any, any>>;
 }
 
 export interface WhereClause {
@@ -143,8 +147,8 @@ export function rawSql(sql: string): Plan<unknown> {
 }
 
 // Type inference helpers
-export type InferSelectResult<TSelect extends Record<string, Column<any>>> = {
-  [K in keyof TSelect]: TSelect[K] extends Column<infer U> ? U : never;
+export type InferSelectResult<TSelect extends Record<string, Column<any, any, any>>> = {
+  [K in keyof TSelect]: TSelect[K] extends Column<any, any, infer U> ? U : never;
 };
 
 export type InferTableShape<TTable extends Table<any>> =
@@ -178,7 +182,7 @@ export interface JoinClause {
 
 // Forward declaration for FromBuilder
 export interface FromBuilder<TTable extends Table<any>, TResult = never> {
-  select<TSelect extends Record<string, Column<any>>>(
+  select<TSelect extends Record<string, Column<any, any, any>>>(
     fields: TSelect,
   ): FromBuilder<TTable, InferSelectResult<TSelect>>;
   selectRaw(projections: ProjectionItem[]): any; // For raw expressions

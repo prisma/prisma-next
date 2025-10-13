@@ -49,7 +49,7 @@ export class QueryBuilder<TTable extends Table<any>, TResult = never> {
     };
   }
 
-  select<TSelect extends Record<string, Column<any>>>(
+  select<TSelect extends Record<string, Column<any, any, any>>>(
     fields: TSelect,
   ): QueryBuilder<TTable, InferSelectResult<TSelect>> & {
     build(): Plan<InferSelectResult<TSelect>>;
@@ -99,7 +99,7 @@ export class QueryBuilder<TTable extends Table<any>, TResult = never> {
 
   build(): Plan<TResult> {
     // Final verification: check all column references have matching contract hash
-    const references: Column<any>[] = [];
+    const references: Column<any, any, any>[] = [];
     const tables = new Set<string>();
     const columns = new Set<string>();
 
@@ -114,7 +114,7 @@ export class QueryBuilder<TTable extends Table<any>, TResult = never> {
               table: item.expr.table || this.ast.from,
               name: item.expr.name,
               __contractHash: this.context.contractHash,
-            } as Column<any>;
+            } as Column<any, any, any>;
             references.push(mockColumn);
           }
         }

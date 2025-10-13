@@ -1,5 +1,12 @@
 import { Schema, RelationGraph } from '@prisma/relational-ir';
-import { Table, Column, FieldExpression, Plan, ContractMismatchMode, TABLE_NAME } from '@prisma/sql';
+import {
+  Table,
+  Column,
+  FieldExpression,
+  Plan,
+  ContractMismatchMode,
+  TABLE_NAME,
+} from '@prisma/sql';
 import { OrmQueryAST, IncludeNode, RelationHandle } from '../ast/types';
 import { lowerRelations } from '../lowering/lower-relations';
 import { compileToSQL } from '@prisma/sql';
@@ -49,7 +56,7 @@ export class OrmBuilder<Parent> {
     return this;
   }
 
-  select<TSelect extends Record<string, Column<any>>>(
+  select<TSelect extends Record<string, Column<any, any, any>>>(
     fields: TSelect,
   ): OrmBuilder<Parent> & {
     build(): Plan;
@@ -114,7 +121,9 @@ export class OrmQueryBuilder<Child> {
     };
   }
 
-  select<TSelect extends Record<string, Column<any>>>(fields: TSelect): OrmQueryBuilder<Child> {
+  select<TSelect extends Record<string, Column<any, any, any>>>(
+    fields: TSelect,
+  ): OrmQueryBuilder<Child> {
     this.ast.select = {
       type: 'select',
       fields,

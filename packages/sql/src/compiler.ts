@@ -210,7 +210,7 @@ function getParamCount(expr: FieldExpression): number {
   return 1;
 }
 
-function isColumn(obj: any): obj is Column<any> {
+function isColumn(obj: any): obj is Column<any, any, any> {
   return obj && typeof obj === 'object' && 'table' in obj && 'name' in obj;
 }
 
