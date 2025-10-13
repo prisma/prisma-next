@@ -20,11 +20,12 @@ export function buildRelationGraph(ir: Schema): RelationGraph {
   const reverseEdges = new Map<string, RelationEdge[]>();
 
   for (const [tableName, table] of Object.entries(ir.tables)) {
-    if (!table.foreignKeys) continue;
+    const tableObj = table as any;
+    if (!tableObj.foreignKeys) continue;
 
-    for (const fk of table.foreignKeys) {
+    for (const fk of tableObj.foreignKeys) {
       // Validate FK references point to existing table
-      if (!ir.tables[fk.references.table]) {
+      if (!(ir.tables as any)[fk.references.table]) {
         throw new Error(`Foreign key references non-existent table: ${fk.references.table}`);
       }
 
@@ -79,7 +80,7 @@ export function resolveUnique(
   table: string,
   columns: string[],
 ): { kind: 'pk' | 'unique'; columns: string[] } | null {
-  const tableDef = ir.tables[table];
+  const tableDef = (ir.tables as any)[table];
   if (!tableDef) return null;
 
   // Check primary key
@@ -105,7 +106,7 @@ export function resolveUnique(
  * Checks if table has an index for equality queries on given column
  */
 export function hasIndexForEquality(ir: Schema, table: string, column: string): boolean {
-  const tableDef = ir.tables[table];
+  const tableDef = (ir.tables as any)[table];
   if (!tableDef) return false;
 
   // Check if column is part of primary key

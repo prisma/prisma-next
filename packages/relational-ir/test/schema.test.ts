@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { type } from 'arktype';
 import {
   validateContract,
   validateTable,
@@ -40,8 +41,9 @@ describe('Schema Validation', () => {
               default: { kind: 'now' },
             },
           },
+          uniques: [],
+          foreignKeys: [],
           indexes: [],
-          constraints: [],
           capabilities: [],
           meta: {
             source: 'model User',
@@ -67,8 +69,9 @@ describe('Schema Validation', () => {
           unique: true,
         },
       },
+      uniques: [],
+      foreignKeys: [],
       indexes: [],
-      constraints: [],
       capabilities: [],
     };
 
@@ -101,8 +104,9 @@ describe('Schema Validation', () => {
       'jsonb',
     ];
 
-    validTypes.forEach((type) => {
-      expect(() => ColumnTypeSchema.parse(type)).not.toThrow();
+    validTypes.forEach((typeValue) => {
+      const result = ColumnTypeSchema(typeValue);
+      expect(result).not.toBeInstanceOf(type.errors);
     });
   });
 
@@ -111,9 +115,9 @@ describe('Schema Validation', () => {
     const now = { kind: 'now' };
     const literal = { kind: 'literal', value: 'test' };
 
-    expect(() => DefaultValueSchema.parse(autoincrement)).not.toThrow();
-    expect(() => DefaultValueSchema.parse(now)).not.toThrow();
-    expect(() => DefaultValueSchema.parse(literal)).not.toThrow();
+    expect(() => DefaultValueSchema(autoincrement)).not.toThrow();
+    expect(() => DefaultValueSchema(now)).not.toThrow();
+    expect(() => DefaultValueSchema(literal)).not.toThrow();
   });
 
   it('rejects invalid schema without target', () => {
@@ -199,8 +203,8 @@ describe('Schema Validation', () => {
         relationTarget: 'Post',
       };
 
-      expect(() => ModelFieldSchema.parse(scalarField)).not.toThrow();
-      expect(() => ModelFieldSchema.parse(relationField)).not.toThrow();
+      expect(() => ModelFieldSchema(scalarField)).not.toThrow();
+      expect(() => ModelFieldSchema(relationField)).not.toThrow();
     });
 
     it('validates model storage schema', () => {
@@ -208,9 +212,9 @@ describe('Schema Validation', () => {
       const viewStorage = { kind: 'view', target: 'user_view' };
       const collectionStorage = { kind: 'collection', target: 'users' };
 
-      expect(() => ModelStorageSchema.parse(tableStorage)).not.toThrow();
-      expect(() => ModelStorageSchema.parse(viewStorage)).not.toThrow();
-      expect(() => ModelStorageSchema.parse(collectionStorage)).not.toThrow();
+      expect(() => ModelStorageSchema(tableStorage)).not.toThrow();
+      expect(() => ModelStorageSchema(viewStorage)).not.toThrow();
+      expect(() => ModelStorageSchema(collectionStorage)).not.toThrow();
     });
 
     it('validates model schema', () => {
@@ -224,7 +228,7 @@ describe('Schema Validation', () => {
         meta: { source: 'model User' },
       };
 
-      expect(() => ModelSchema.parse(model)).not.toThrow();
+      expect(() => ModelSchema(model)).not.toThrow();
     });
 
     it('validates model mappings against tables', () => {

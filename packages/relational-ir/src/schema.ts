@@ -1,159 +1,149 @@
-import { z } from 'zod';
+import { type } from 'arktype';
 
 // PostgreSQL-specific column types
-export const ColumnTypeSchema = z.enum([
-  'int4',
-  'int8',
-  'text',
-  'varchar',
-  'bool',
-  'timestamptz',
-  'timestamp',
-  'float8',
-  'float4',
-  'uuid',
-  'json',
-  'jsonb',
-]);
+export const ColumnTypeSchema = type(
+  "'int4' | 'int8' | 'text' | 'varchar' | 'bool' | 'timestamptz' | 'timestamp' | 'float8' | 'float4' | 'uuid' | 'json' | 'jsonb'",
+);
 
-export type ColumnType = z.infer<typeof ColumnTypeSchema>;
+export type ColumnType = typeof ColumnTypeSchema.infer;
 
 // Default value kinds
-export const DefaultValueSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('autoincrement') }),
-  z.object({ kind: z.literal('now') }),
-  z.object({ kind: z.literal('literal'), value: z.string() }),
-]);
+export const DefaultValueSchema = type({
+  kind: "'autoincrement'",
+})
+  .or({
+    kind: "'now'",
+  })
+  .or({
+    kind: "'literal'",
+    value: 'string',
+  });
 
-export type DefaultValue = z.infer<typeof DefaultValueSchema>;
+export type DefaultValue = typeof DefaultValueSchema.infer;
 
 // Primary key
-export const PrimaryKeySchema = z.object({
-  kind: z.literal('primaryKey'),
-  columns: z.array(z.string()).min(1),
-  name: z.string().optional(),
+export const PrimaryKeySchema = type({
+  kind: "'primaryKey'",
+  columns: 'string[]',
+  'name?': 'string',
 });
 
 // Unique constraint
-export const UniqueSchema = z.object({
-  kind: z.literal('unique'),
-  columns: z.array(z.string()).min(1),
-  name: z.string().optional(),
+export const UniqueSchema = type({
+  kind: "'unique'",
+  columns: 'string[]',
+  'name?': 'string',
 });
 
 // Foreign key
-export const ForeignKeySchema = z.object({
-  kind: z.literal('foreignKey'),
-  columns: z.array(z.string()).min(1),
-  references: z.object({
-    table: z.string(),
-    columns: z.array(z.string()).min(1),
-  }),
-  name: z.string().optional(),
-  onDelete: z.enum(['noAction', 'restrict', 'cascade', 'setNull', 'setDefault']).optional(),
-  onUpdate: z.enum(['noAction', 'restrict', 'cascade', 'setNull', 'setDefault']).optional(),
+export const ForeignKeySchema = type({
+  kind: "'foreignKey'",
+  columns: 'string[]',
+  references: {
+    table: 'string',
+    columns: 'string[]',
+  },
+  'name?': 'string',
+  'onDelete?': "'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'",
+  'onUpdate?': "'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'",
 });
 
 // Index
-export const IndexSchema = z.object({
-  name: z.string().optional(),
-  columns: z.array(z.string()).min(1),
-  unique: z.boolean().default(false),
-  method: z.enum(['btree', 'hash', 'gist', 'gin']).optional(),
+export const IndexSchema = type({
+  'name?': 'string',
+  columns: 'string[]',
+  unique: 'boolean',
+  'method?': "'btree' | 'hash' | 'gist' | 'gin'",
 });
 
-export const ConstraintSchema = z.discriminatedUnion('kind', [
-  PrimaryKeySchema,
-  UniqueSchema,
-  ForeignKeySchema,
-]);
+export const ConstraintSchema = PrimaryKeySchema.or(UniqueSchema).or(ForeignKeySchema);
 
-export type PrimaryKey = z.infer<typeof PrimaryKeySchema>;
-export type Unique = z.infer<typeof UniqueSchema>;
-export type ForeignKey = z.infer<typeof ForeignKeySchema>;
-export type Index = z.infer<typeof IndexSchema>;
-export type Constraint = z.infer<typeof ConstraintSchema>;
+export type PrimaryKey = typeof PrimaryKeySchema.infer;
+export type Unique = typeof UniqueSchema.infer;
+export type ForeignKey = typeof ForeignKeySchema.infer;
+export type Index = typeof IndexSchema.infer;
+export type Constraint = typeof ConstraintSchema.infer;
 
 // Column definition
-export const ColumnSchema = z.object({
+export const ColumnSchema = type({
   type: ColumnTypeSchema,
-  nullable: z.boolean(),
-  pk: z.boolean().optional(),
-  unique: z.boolean().optional(),
-  default: DefaultValueSchema.optional(),
+  nullable: 'boolean',
+  'pk?': 'boolean',
+  'unique?': 'boolean',
+  'default?': DefaultValueSchema,
 });
 
-export type Column = z.infer<typeof ColumnSchema>;
+export type Column = typeof ColumnSchema.infer;
 
-// Table definition
-export const TableSchema = z.object({
-  columns: z.record(z.string(), ColumnSchema),
-  primaryKey: PrimaryKeySchema.optional(),
-  uniques: z.array(UniqueSchema).default([]),
-  foreignKeys: z.array(ForeignKeySchema).default([]),
-  indexes: z.array(IndexSchema).default([]),
-  capabilities: z.array(z.string()).default([]),
-  meta: z
-    .object({
-      source: z.string().optional(),
-    })
-    .optional(),
+// Table definition with proper type specificity
+export const TableSchema = type({
+  columns: {
+    '[string]': ColumnSchema,
+  },
+  'primaryKey?': PrimaryKeySchema,
+  uniques: UniqueSchema.array(),
+  foreignKeys: ForeignKeySchema.array(),
+  indexes: IndexSchema.array(),
+  'capabilities?': 'string[]', // Optional, defaults to empty array
+  'meta?': {
+    'source?': 'string',
+  },
 });
 
-export type Table = z.infer<typeof TableSchema>;
+export type Table = typeof TableSchema.infer;
 
 // Model field definition
-export const ModelFieldSchema = z.object({
-  type: z.string(), // PSL type: 'Int', 'String', 'DateTime', etc.
-  isList: z.boolean().optional(),
-  isOptional: z.boolean().optional(),
-  mappedTo: z.string().optional(), // column name in storage
-  isRelation: z.boolean().optional(), // true for relation fields
-  relationTarget: z.string().optional(), // target model name for relations
+export const ModelFieldSchema = type({
+  type: 'string', // PSL type: 'Int', 'String', 'DateTime', etc.
+  'isList?': 'boolean',
+  'isOptional?': 'boolean',
+  'mappedTo?': 'string', // column name in storage
+  'isRelation?': 'boolean', // true for relation fields
+  'relationTarget?': 'string', // target model name for relations
 });
 
 // Model storage mapping
-export const ModelStorageSchema = z.object({
-  kind: z.enum(['table', 'view', 'collection']),
-  target: z.string(), // table/view/collection name
+export const ModelStorageSchema = type({
+  kind: "'table' | 'view' | 'collection'",
+  target: 'string', // table/view/collection name
 });
 
-// Model definition
-export const ModelSchema = z.object({
-  name: z.string(),
+// Model definition with proper type specificity
+export const ModelSchema = type({
+  name: 'string',
   storage: ModelStorageSchema,
-  fields: z.record(z.string(), ModelFieldSchema),
-  meta: z
-    .object({
-      source: z.string().optional(),
-      comments: z.string().optional(),
-    })
-    .optional(),
+  fields: {
+    '[string]': ModelFieldSchema,
+  },
+  'meta?': {
+    'source?': 'string',
+    'comments?': 'string',
+  },
 });
 
-export type ModelField = z.infer<typeof ModelFieldSchema>;
-export type ModelStorage = z.infer<typeof ModelStorageSchema>;
-export type Model = z.infer<typeof ModelSchema>;
+export type ModelField = typeof ModelFieldSchema.infer;
+export type ModelStorage = typeof ModelStorageSchema.infer;
+export type Model = typeof ModelSchema.infer;
 
-// Complete schema
-export const ContractSchema = z.object({
-  target: z.literal('postgres'),
-  contractHash: z.string().optional(),
-  tables: z.record(z.string(), TableSchema),
-  models: z.record(z.string(), ModelSchema).optional(), // additive
-  capabilities: z
-    .object({
-      postgres: z
-        .object({
-          jsonAgg: z.boolean().default(true),
-          lateral: z.boolean().default(true),
-        })
-        .optional(),
-    })
-    .optional(),
+// Complete schema with proper type specificity
+export const ContractSchema = type({
+  target: "'postgres'",
+  'contractHash?': 'string',
+  tables: {
+    '[string]': TableSchema,
+  },
+  'models?': {
+    '[string]': ModelSchema,
+  },
+  'capabilities?': {
+    'postgres?': {
+      jsonAgg: 'boolean',
+      lateral: 'boolean',
+    },
+  },
 });
 
-export type Schema = z.infer<typeof ContractSchema>;
+export type Schema = typeof ContractSchema.infer;
 
 // Contract type structure for generated relations.d.ts
 export interface Contract {
@@ -174,35 +164,62 @@ export interface Contract {
 
 // Validation functions
 export function validateContract(data: unknown): Schema {
-  return ContractSchema.parse(data);
+  const result = ContractSchema(data);
+  if (result instanceof type.errors) {
+    throw new Error(result.summary);
+  }
+
+  // ArkType now handles nested validation directly through index signatures
+  return result as Schema;
 }
 
 export function validateTable(data: unknown): Table {
-  return TableSchema.parse(data);
+  const result = TableSchema(data);
+  if (result instanceof type.errors) {
+    throw new Error(result.summary);
+  }
+
+  // ArkType now handles nested validation directly through index signatures
+  return result as Table;
 }
 
 export function validateColumn(data: unknown): Column {
-  return ColumnSchema.parse(data);
+  const result = ColumnSchema(data);
+  if (result instanceof type.errors) {
+    throw new Error(result.summary);
+  }
+  return result;
+}
+
+export function validateModel(data: unknown): Model {
+  const result = ModelSchema(data);
+  if (result instanceof type.errors) {
+    throw new Error(result.summary);
+  }
+
+  // ArkType now handles nested validation directly through index signatures
+  return result as Model;
 }
 
 export function validateModelMappings(schema: Schema): void {
   if (!schema.models) return;
 
   for (const [modelName, model] of Object.entries(schema.models)) {
-    const targetTable = schema.tables[model.storage.target];
+    const modelObj = model as any;
+    const targetTable = (schema.tables as any)[modelObj.storage.target];
 
     if (!targetTable) {
       throw new Error(
-        `Model '${modelName}' references non-existent table '${model.storage.target}'`,
+        `Model '${modelName}' references non-existent table '${modelObj.storage.target}'`,
       );
     }
 
-    for (const [fieldName, field] of Object.entries(model.fields)) {
-      if (field.isRelation) continue; // skip relation fields
+    for (const [fieldName, field] of Object.entries(modelObj.fields)) {
+      if ((field as any).isRelation) continue; // skip relation fields
 
-      if (field.mappedTo && !targetTable.columns[field.mappedTo]) {
+      if ((field as any).mappedTo && !(targetTable.columns as any)[(field as any).mappedTo]) {
         throw new Error(
-          `Model '${modelName}' field '${fieldName}' maps to non-existent column '${field.mappedTo}' in table '${model.storage.target}'`,
+          `Model '${modelName}' field '${fieldName}' maps to non-existent column '${(field as any).mappedTo}' in table '${modelObj.storage.target}'`,
         );
       }
     }

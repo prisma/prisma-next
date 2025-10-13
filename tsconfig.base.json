@@ -6,6 +6,7 @@
     "lib": ["ES2022"],
     "strict": true,
     "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
     "declaration": true,
     "sourceMap": true
   },
@@ -18,4 +19,3 @@
     { "path": "./packages/cli" }
   ]
 }
-
