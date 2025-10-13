@@ -24,34 +24,24 @@ function lower1NNested(parentAst: QueryAST, include: IncludeNode, ctx: LowerCont
     .map(([alias, col]) => `'${alias}', ${col.name}`)
     .join(', ');
 
-  // Create FK match condition
-  const fkMatch = include.relation.on.parentCols
+  // Create FK correlation condition
+  const fkCondition = include.relation.on.parentCols
     .map((parentCol, i) => {
       const childCol = include.relation.on.childCols[i];
-      return `${include.child.from}.${childCol} = ${parentAst.from}.${parentCol}`;
+      return {
+        type: 'eq' as const,
+        field: childCol,
+        value: { kind: 'column' as const, table: parentAst.from, name: parentCol },
+      };
     })
-    .join(' AND ');
-
-  // Build child WHERE clause
-  let childWhere = fkMatch;
-  if (include.child.where) {
-    childWhere += ` AND ${compileChildWhere(include.child.where)}`;
-  }
-
-  // Build ORDER BY clause
-  let orderByClause = '';
-  if (include.child.orderBy && include.child.orderBy.length > 0) {
-    const orderBy = include.child.orderBy
-      .map((order) => `${include.child.from}.${order.field} ${order.direction}`)
-      .join(', ');
-    orderByClause = ` ORDER BY ${orderBy}`;
-  }
-
-  // Build LIMIT clause
-  let limitClause = '';
-  if (include.child.limit) {
-    limitClause = ` LIMIT ${include.child.limit.count}`;
-  }
+    .reduce((acc, condition) => {
+      if (!acc) return condition;
+      return {
+        type: 'and' as const,
+        left: acc,
+        right: condition,
+      };
+    });
 
   // Create the scalar subquery expression
   const subqueryExpr: Expr = {
@@ -83,9 +73,7 @@ function lower1NNested(parentAst: QueryAST, include: IncludeNode, ctx: LowerCont
               },
             },
           ],
-          where: childWhere
-            ? { type: 'where', condition: { type: 'eq', field: '1', value: 1 } }
-            : undefined,
+          where: fkCondition ? { type: 'where', condition: fkCondition } : undefined,
           orderBy: include.child.orderBy,
           limit: include.child.limit,
         },
