@@ -4,12 +4,22 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./connection": {
+      "types": "./dist/connection.d.ts",
+      "import": "./dist/connection.js"
+    }
+  },
   "scripts": {
-    "build": "pnpm exec tsc",
-    "dev": "npx tsup src/index.ts --watch --format esm --dts",
+    "build": "tsup && tsc --emitDeclarationOnly",
+    "dev": "tsup --watch",
     "test": "vitest run",
     "lint": "eslint 'src/**/*.ts'",
-    "typecheck": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {

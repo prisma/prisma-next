@@ -7,14 +7,15 @@
     "strict": true,
     "skipLibCheck": true,
     "declaration": true,
-    "sourceMap": true,
-    "paths": {
-      "@prisma/relational-ir": ["packages/relational-ir/src/index.ts"],
-      "@prisma/psl": ["packages/psl/src/index.ts"],
-      "@prisma/schema-emitter": ["packages/schema-emitter/src/index.ts"],
-      "@prisma/sql": ["packages/sql/src/index.ts"],
-      "@prisma/runtime": ["packages/runtime/src/index.ts"]
-    }
-  }
+    "sourceMap": true
+  },
+  "references": [
+    { "path": "./packages/relational-ir" },
+    { "path": "./packages/psl" },
+    { "path": "./packages/sql" },
+    { "path": "./packages/schema-emitter" },
+    { "path": "./packages/runtime" },
+    { "path": "./packages/cli" }
+  ]
 }
 
