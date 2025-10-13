@@ -1,33 +1,97 @@
-# PSL → IR Prototype
+# Prisma Next Prototype
 
-A TypeScript-based prototype system demonstrating a **PSL → IR toolchain** and **type-safe query builder** for relational databases.
+A TypeScript-based prototype demonstrating a **contract-first data layer** architecture that decomposes Prisma's ORM into modular, verifiable components.
 
-## Overview
+## Primary Motivation
 
-This project implements a complete pipeline from Prisma Schema Language (PSL) parsing to type-safe SQL query execution:
+Prisma's current ORM architecture tightly couples three layers — the Prisma Schema Language (PSL), the generated client, and runtime execution. This coupling introduces rigidity, rebuild cost, and conceptual opacity.
 
-1. **PSL Parser** - Parses `.psl` files into an Abstract Syntax Tree (AST)
-2. **IR Emitter** - Transforms AST into a validated Intermediate Representation (IR) and generates TypeScript types
-3. **Query Builder** - Provides a fluent API for building type-safe SQL queries using Column objects
-4. **Runtime** - Executes queries against PostgreSQL with schema verification
+The prototype aims to rethink Prisma's data layer around a **contract-first model**, where the schema is a stable, versioned artifact describing the database structure — not fuel for codegen, but a data contract.
+
+## Core Goals
+
+### 1. PSL as Data Contract
+- Treat PSL output as a versioned, deterministic intermediate representation (IR) rather than as code-generation input
+- Include a `contractHash` inside the IR to cryptographically tie all downstream artifacts (queries, clients, etc.) to a specific schema version
+- The IR becomes the single source of truth for:
+  - Query validation
+  - Policy enforcement
+  - Linting/guardrails
+  - Compatibility and migration safety
+
+### 2. Composable, Dialect-Agnostic Query Layer
+- Replace the monolithic generated Prisma Client with a runtime-compiled query DSL (`@prisma/sql`)
+- Queries are written inline in TypeScript and compiled at runtime into SQL ASTs, then lowered to the specific dialect (Postgres initially)
+- This layer can be reused or extended for future targets (MySQL, SQLite, Mongo, etc.) without requiring full client regeneration
+
+### 3. Separation of Concerns
+- `@prisma/relational-ir`: defines the schema contract, validation, and serialization
+- `@prisma/sql`: builds and compiles query ASTs to dialect SQL
+- `@prisma/runtime`: executes query Plans, enforces contracts, and hosts plugin hooks (guardrails, budgets, telemetry, etc.)
+- Each package can evolve independently and compose cleanly
+
+### 4. No Extra Compile Step for Queries
+- Only the PSL → IR → Types emission happens as build-time codegen
+- Query compilation happens at runtime, allowing interactive and incremental development without regenerating a client binary
+
+### 5. Verifiable, Auditable Plans
+- Every query Plan includes metadata: referenced tables, columns, dialect, and `contractHash`
+- This enables contract verification, policy injection, and linting guardrails at runtime or in CI
+
+### 6. Extensible Runtime Plugin Framework
+- Instead of wrapping the DB client, a first-class hook system lets plugins intercept Plan lifecycle events:
+  - `beforeCompile`, `afterCompile`
+  - `beforeExecute`, `afterExecute`
+  - `onError`
+- Enables composable linting (e.g. "no SELECT *"), telemetry, query budgets, and policy enforcement without entangling the core runtime
+
+### 7. Type-Safe Query Shapes
+- Query result types are derived from the schema IR and the explicit `select()` projection
+- Left joins and other nullable relations correctly reflect nullability in result types
+- The type system ensures queries are both safe (no missing columns) and accurate (correct result shapes)
 
 ## Architecture
 
 ```
-PSL File → Parser → AST → IR Emitter → schema.json + schema.d.ts
+PSL File → Parser → AST → IR Emitter → contract.json + schema.d.ts
                                               ↓
 Query Builder ← Generated Types ← schema.d.ts
      ↓
-SQL Compiler → PostgreSQL Runtime
+SQL Compiler → Runtime (with Plugin Hooks) → PostgreSQL
 ```
+
+The architecture decomposes Prisma's ORM into modular, contract-verified components:
+- **PSL defines a verifiable schema contract** → **IR encodes it deterministically** → **the runtime consumes it to safely compile, execute, and audit queries without codegen friction**
+
+## Demonstration Goals
+
+The prototype demonstrates, not perfects, the following ideas:
+
+| Goal | Demonstrated By |
+|------|----------------|
+| PSL → IR pipeline with hash | `@prisma/relational-ir` generator |
+| Runtime-safe query DSL | `@prisma/sql` package |
+| Dialect lowering | Postgres compiler implementation |
+| Plan metadata & verification | `contractHash`, refs in Plan |
+| Guardrails as runtime plugins | `@prisma/runtime` plugin hooks |
+| Optional ORM layer built on DSL | `@prisma/orm` prototype (relations, includes) |
 
 ## Packages
 
-- **`@prisma/relational-ir`** - Shared IR types and Zod validators
+- **`@prisma/relational-ir`** - Schema contract definition, validation, and serialization
 - **`@prisma/psl`** - PSL lexer, recursive descent parser, and CLI
 - **`@prisma/schema-emitter`** - AST → IR transformation and TypeScript code generation
 - **`@prisma/sql`** - Type-safe query builder and PostgreSQL SQL compiler
-- **`@prisma/runtime`** - Database connection, query execution, and schema verification
+- **`@prisma/runtime`** - Database connection, query execution, contract verification, and plugin hooks
+- **`@prisma/orm`** - Optional ORM layer with relations and higher-level abstractions
+
+## What's Left to Explore
+
+- **Schema evolution**: how IR hashes change across versions and how to diff/verify in CI
+- **ORM extensions**: building higher abstractions (relations, findOne/findMany) on top of the DSL safely
+- **Multi-dialect support**: confirm the abstraction is portable beyond Postgres
+- **Dynamic guardrails**: budgets, query cost estimation, EXPLAIN-based profiling
+- **Recording & golden testing**: capture query shapes and SQL output for regression testing
 
 ## Quick Start
 
@@ -91,7 +155,7 @@ model User {
 }
 ```
 
-### 2. Generate IR and Types
+### 2. Generate Contract and Types
 
 ```bash
 # Using CLI
@@ -102,17 +166,22 @@ import { parse } from '@prisma/psl';
 import { emitSchemaAndTypes } from '@prisma/schema-emitter';
 
 const ast = parse(pslContent);
-const { schema, types } = emitSchemaAndTypes(ast);
+const { contract, types } = emitSchemaAndTypes(ast);
 ```
 
 ### 3. Build Type-Safe Queries
 
 ```typescript
 import { sql, t } from '@prisma/sql';
-import { connect } from '@prisma/runtime';
-import ir from './schema.json' assert { type: 'json' };
+import { createRuntime } from '@prisma/runtime';
+import contract from './contract.json' assert { type: 'json' };
 
-const db = connect({ ir, verify: 'onFirstUse' });
+// Create runtime with contract verification
+const runtime = createRuntime({
+  ir: contract,
+  driver: postgresDriver,
+  verify: 'onFirstUse'
+});
 
 // Type-safe query with Column objects
 const query = sql()
@@ -121,7 +190,28 @@ const query = sql()
   .select({ id: t.user.id, email: t.user.email });
 
 // Return type is inferred as Array<{ id: number; email: string }>
-const results = await db.execute(query.build());
+const results = await runtime.execute(query);
+```
+
+### 4. Runtime Plugin System
+
+```typescript
+import { lint } from '@prisma/runtime/plugins';
+
+// Add guardrails as composable plugins
+const runtime = createRuntime({
+  ir: contract,
+  driver: postgresDriver,
+  plugins: [
+    lint({
+      rules: {
+        'no-select-star': 'error',
+        'mutation-requires-where': 'error',
+        'no-missing-limit': 'warn'
+      }
+    })
+  ]
+});
 ```
 
 ## Type Safety Features
@@ -134,20 +224,13 @@ The query builder uses Column objects that provide:
 - **Type-safe expressions**: `t.user.active.eq(true)` returns `Expression<boolean>`
 - **Automatic type inference**: Select results are typed based on Column types
 
-### Generated Types
+### Generated Contract and Types
 
 The schema emitter generates:
 
 ```typescript
 // Generated schema.d.ts
 export interface User {
-  id: number;
-  email: string;
-  active?: boolean;
-  createdAt?: Date;
-}
-
-export interface UserShape {
   id: number;
   email: string;
   active?: boolean;
@@ -161,6 +244,25 @@ export const t: Tables = {
     // ... other fields
   }
 };
+```
+
+```json
+// Generated contract.json
+{
+  "version": 3,
+  "target": "postgres",
+  "contractHash": "sha256:abc123...",
+  "tables": {
+    "user": {
+      "columns": {
+        "id": { "type": "int4", "pk": true },
+        "email": { "type": "text", "unique": true },
+        "active": { "type": "bool", "default": true },
+        "createdAt": { "type": "timestamp", "default": "now()" }
+      }
+    }
+  }
+}
 ```
 
 ### Query Examples
@@ -294,32 +396,28 @@ t.user.id.in([1, 2, 3])
 ### Runtime Connection
 
 ```typescript
-import { connect } from '@prisma/runtime';
+import { createRuntime } from '@prisma/runtime';
+import { createPostgresDriver } from '@prisma/runtime/drivers';
 
-const db = connect({
-  ir: schemaIR,
-  verify: 'onFirstUse', // or 'never'
-  database: {
+const runtime = createRuntime({
+  ir: contractIR,
+  driver: createPostgresDriver({
     host: 'localhost',
     port: 5432,
     database: 'postgres',
     user: 'postgres',
     password: 'postgres',
-  },
+  }),
+  verify: 'onFirstUse', // or 'never'
+  plugins: [
+    // Optional: add linting, telemetry, budgets, etc.
+  ]
 });
 
 // Execute queries
-const results = await db.execute(query.build());
+const results = await runtime.execute(query);
 
 // Clean up
-await db.end();
+await runtime.end();
 ```
-
-## Contributing
-
-This is a prototype project for demonstrating PSL → IR toolchain concepts. The codebase prioritizes clarity and educational value over production readiness.
-
-## License
-
-MIT
 
