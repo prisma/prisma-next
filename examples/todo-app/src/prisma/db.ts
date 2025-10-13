@@ -37,5 +37,11 @@ export const runtime = createRuntime({
   ],
 });
 
+type ContractTypes = {
+  Tables: Contract.Contract.Tables;
+  Relations: Contract.Contract.Relations;
+  Uniques: Contract.Contract.Uniques;
+};
+
 export const t = makeT<Contract.Contract.Tables>(dataContract);
-export const r = orm<Contract.Contract>(dataContract);
+export const r = orm<ContractTypes>(dataContract);
