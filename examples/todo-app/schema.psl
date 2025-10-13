@@ -2,7 +2,6 @@ model User {
   id        Int        @id @default(autoincrement())
   email     String     @unique
   active    Boolean    @default(true)
-  bio       String?
   createdAt DateTime   @default(now())
 
   posts     Post[]
