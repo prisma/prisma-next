@@ -58,7 +58,7 @@ export async function getUsersWithPosts() {
       r.user.post,
       (posts) => {
         return posts
-          .select({ id: t.post.id, title: t.post.title })
+          .select({ id: t.post.id, title: t.post.title, createdAt: t.post.createdAt })
           .where(t.post.published.eq(true))
           .orderBy('createdAt', 'DESC')
           .limit(5);

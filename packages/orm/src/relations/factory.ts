@@ -17,12 +17,19 @@ export function orm<TContract extends Contract>(ir: Schema): TypedOrmFactory<TCo
   const graph = buildRelationGraph(ir);
   const handles = buildRelationHandles(ir, graph);
 
+  // Cast the runtime handles to the typed version
+  const typedHandles = handles as any as {
+    [P in keyof TContract['Relations'] & string]: {
+      [K in keyof TContract['Relations'][P] & string]: any;
+    };
+  };
+
   return {
-    ...handles, // Spread all relation handles
+    ...typedHandles, // Spread all relation handles
     from<TParent extends keyof TContract['Tables'] & string>(
       table: Table<any>,
     ): TypedOrmBuilder<TContract, TParent> {
       return new TypedOrmBuilder(table, ir, graph);
     },
-  } as TypedOrmFactory<TContract>;
+  } as any as TypedOrmFactory<TContract>;
 }

@@ -6,15 +6,15 @@ export interface RelationHandles {
   };
 }
 
-export interface RelationHandle<P extends string = string, K extends string = string> {
-  parent: P;
+export interface RelationHandle {
+  parent: string;
   child: string;
   cardinality: '1:N' | 'N:1';
   on: {
     parentCols: string[];
     childCols: string[];
   };
-  name: K;
+  alias: string;
 }
 
 export function buildRelationHandles(ir: Schema, graph: RelationGraph): RelationHandles {
@@ -31,8 +31,8 @@ export function buildRelationHandles(ir: Schema, graph: RelationGraph): Relation
         child: edge.from.table,
         cardinality: '1:N',
         on: { parentCols: edge.to.columns, childCols: edge.from.columns },
-        name: edge.name,
-      };
+        alias: edge.name,
+      } as RelationHandle;
     }
 
     // N:1 relations (incoming edges from edges)
@@ -43,8 +43,8 @@ export function buildRelationHandles(ir: Schema, graph: RelationGraph): Relation
         child: edge.to.table,
         cardinality: 'N:1',
         on: { parentCols: edge.from.columns, childCols: edge.to.columns },
-        name: edge.name,
-      };
+        alias: edge.name,
+      } as RelationHandle;
     }
   }
 

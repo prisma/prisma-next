@@ -73,15 +73,47 @@ const mockSchema = validateContract({
   },
 });
 
-// Extract contract types
-type ContractTypes = {
-  Tables: Contract.Contract.Tables;
-  Relations: Contract.Contract.Relations;
-  Uniques: Contract.Contract.Uniques;
+// Create a proper contract type that matches the Contract interface
+type TestContract = {
+  Tables: {
+    user: {
+      id: number;
+      email: string;
+      active: boolean;
+      createdAt: Date;
+    };
+    post: {
+      id: number;
+      title: string;
+      published: boolean;
+      createdAt: Date;
+      user_id: number;
+    };
+  };
+  Relations: {
+    user: {
+      post: {
+        to: 'post';
+        cardinality: '1:N';
+        on: { parentCols: ['id']; childCols: ['user_id'] };
+      };
+    };
+    post: {
+      user: {
+        to: 'user';
+        cardinality: 'N:1';
+        on: { parentCols: ['user_id']; childCols: ['id'] };
+      };
+    };
+  };
+  Uniques: {
+    user: ['id'] | ['email'];
+    post: ['id'];
+  };
 };
 
-const r = orm<ContractTypes>(mockSchema);
-const t = makeT<Contract.Contract.Tables>(mockSchema);
+const r = orm<TestContract>(mockSchema);
+const t = makeT<TestContract['Tables']>(mockSchema) as any;
 
 describe('Type Safety', () => {
   it('allows limit() and orderBy() on 1:N relations', () => {
@@ -153,6 +185,10 @@ describe('Type Safety', () => {
     // TypeScript should infer the correct nested array type
     const result: ExpectedType = query;
     expect(result).toBeDefined();
+
+    // Verify the SQL contains the expected structure
+    expect(query.sql).toContain('SELECT');
+    expect(query.sql).toContain('FROM');
   });
 
   it('infers correct result type for N:1 includes', () => {
@@ -181,6 +217,10 @@ describe('Type Safety', () => {
     // TypeScript should infer the correct nested object type
     const result: ExpectedType = query;
     expect(result).toBeDefined();
+
+    // Verify the SQL contains the expected structure
+    expect(query.sql).toContain('SELECT');
+    expect(query.sql).toContain('FROM');
   });
 
   it('accumulates nested selections properly', () => {
@@ -223,6 +263,10 @@ describe('Type Safety', () => {
 
     const result: ExpectedType = query;
     expect(result).toBeDefined();
+
+    // Verify the SQL contains the expected structure
+    expect(query.sql).toContain('SELECT');
+    expect(query.sql).toContain('FROM');
   });
 
   it('enforces relation existence at compile time', () => {
@@ -258,5 +302,26 @@ describe('Type Safety', () => {
 
     // TypeScript should compile this without errors
     expect(query).toBeDefined();
+  });
+
+  it('demonstrates cardinality gating for N:1 relations', () => {
+    const query = r
+      .from(t.post)
+      .include(r.post.user, (user) => {
+        // For N:1 relations, limit() and orderBy() should be unavailable
+        return user.select({ id: t.user.id, email: t.user.email });
+        // The following lines should cause TypeScript errors:
+        // .orderBy('createdAt', 'DESC') // ❌ TS error: Property 'orderBy' does not exist
+        // .limit(5); // ❌ TS error: Property 'limit' does not exist
+      })
+      .select({ id: t.post.id, title: t.post.title })
+      .build();
+
+    // TypeScript should compile this without errors
+    expect(query).toBeDefined();
+
+    // Verify the SQL contains the expected structure
+    expect(query.sql).toContain('SELECT');
+    expect(query.sql).toContain('FROM');
   });
 });

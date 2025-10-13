@@ -1,10 +1,10 @@
 import { Schema, RelationGraph, Contract } from '@prisma/relational-ir';
 import { Table, Column, FieldExpression, Plan, TABLE_NAME, InferSelectResult } from '@prisma/sql';
-import { OrmQueryAST, IncludeNode, RelationHandle } from './ast/types';
+import { OrmQueryAST, IncludeNode, RelationHandle as RuntimeRelationHandle } from './ast/types';
 import { lowerRelations } from './lowering/lower-relations';
 import { compileToSQL } from '@prisma/sql';
 import {
-  RelationHandle as TypedRelationHandle,
+  RelationHandle,
   RelationHandles,
   ChildQB,
   OrmQB,
@@ -20,7 +20,8 @@ import {
 // ============================================================================
 
 export class TypedChildQB<
-  TChild extends keyof Contract['Tables'] & string,
+  TContract extends Contract,
+  TChild extends keyof TContract['Tables'] & string,
   TChildRow extends Record<string, any> = {},
 > {
   private ast: OrmQueryAST;
@@ -37,7 +38,7 @@ export class TypedChildQB<
 
   select<TSelect extends Record<string, Column<any, any, any>>>(
     fields: TSelect,
-  ): TypedChildQB<TChild, Merge<TChildRow, InferSelectResult<TSelect>>> {
+  ): TypedChildQB<TContract, TChild, Merge<TChildRow, InferSelectResult<TSelect>>> {
     this.ast.select = {
       type: 'select',
       fields,
@@ -46,18 +47,27 @@ export class TypedChildQB<
     return this as any;
   }
 
-  where(condition: FieldExpression): TypedChildQB<TChild, TChildRow> {
-    this.ast.where = { type: 'where', condition };
+  where(condition: FieldExpression): TypedChildQB<TContract, TChild, TChildRow> {
+    // Convert FieldExpression to Expr
+    const expr: any = {
+      kind: condition.type,
+      left: { kind: 'column', name: condition.field },
+      right: { kind: 'literal', value: condition.value },
+    };
+    this.ast.where = { type: 'where', condition: expr };
     return this;
   }
 
-  orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): TypedChildQB<TChild, TChildRow> {
+  orderBy(
+    field: string,
+    direction: 'ASC' | 'DESC' = 'ASC',
+  ): TypedChildQB<TContract, TChild, TChildRow> {
     this.ast.orderBy = this.ast.orderBy ?? [];
     this.ast.orderBy.push({ type: 'orderBy', field, direction });
     return this;
   }
 
-  limit(count: number): TypedChildQB<TChild, TChildRow> {
+  limit(count: number): TypedChildQB<TContract, TChild, TChildRow> {
     this.ast.limit = { type: 'limit', count };
     return this;
   }
@@ -110,7 +120,13 @@ export class TypedOrmBuilder<
   }
 
   where(condition: FieldExpression): TypedOrmBuilder<TContract, TParent, TRow> {
-    this.ast.where = { type: 'where', condition };
+    // Convert FieldExpression to Expr
+    const expr: any = {
+      kind: condition.type,
+      left: { kind: 'column', name: condition.field },
+      right: { kind: 'literal', value: condition.value },
+    };
+    this.ast.where = { type: 'where', condition: expr };
     return this;
   }
 
@@ -128,12 +144,22 @@ export class TypedOrmBuilder<
     return this;
   }
 
-  include(
-    handle: any,
-    build: (qb: any) => any,
+  include<
+    K extends keyof TContract['Relations'][TParent] & string,
+    C extends TContract['Relations'][TParent][K]['cardinality'],
+    To extends TContract['Relations'][TParent][K]['to'],
+    Handle extends RelationHandle<TContract, TParent, K, C, To>,
+    CQ extends TypedChildQB<TContract, To, any>,
+  >(
+    handle: Handle,
+    build: (qb: GateCardinality<C, TypedChildQB<TContract, To, {}>>) => CQ,
     opts?: { asArray?: boolean; alias?: string; required?: boolean },
-  ): TypedOrmBuilder<TContract, TParent, any> {
-    const childBuilder = new TypedChildQB(handle.child, this.ir);
+  ): TypedOrmBuilder<
+    TContract,
+    TParent,
+    Merge<TRow, IncludeResult<C, Handle['alias'], ReturnType<CQ['_row']>>>
+  > {
+    const childBuilder = new TypedChildQB<TContract, To>(handle.child, this.ir);
     const childBuilt = build(childBuilder as any);
 
     const mode =
@@ -142,7 +168,7 @@ export class TypedOrmBuilder<
     this.ast.includes = this.ast.includes ?? [];
     this.ast.includes.push({
       kind: 'Include',
-      relation: handle as any,
+      relation: handle as any as RuntimeRelationHandle,
       alias: opts?.alias ?? String(handle.alias),
       mode,
       child: childBuilt.getAst(),
@@ -182,4 +208,4 @@ export type TypedOrmFactory<TContract extends Contract> = {
   from<TParent extends keyof TContract['Tables'] & string>(
     table: Table<any>,
   ): TypedOrmBuilder<TContract, TParent>;
-} & RelationHandles<TContract['Relations']>;
+} & RelationHandles<TContract>;

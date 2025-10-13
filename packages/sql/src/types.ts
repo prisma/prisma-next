@@ -61,7 +61,7 @@ export interface SelectClause {
 
 export interface WhereClause {
   type: 'where';
-  condition: FieldExpression;
+  condition: FieldExpression | Expr;
 }
 
 export interface OrderByClause {
@@ -164,6 +164,14 @@ export type Expr =
   | { kind: 'literal'; value: string | number | boolean | null }
   | { kind: 'subquery'; query: QueryAST } // correlated subqueries
   | { kind: 'jsonObject'; fields: Record<string, Expr> } // json_build_object helper
+  | { kind: 'eq'; left: Expr; right: Expr } // equality comparison
+  | { kind: 'ne'; left: Expr; right: Expr } // not equal comparison
+  | { kind: 'gt'; left: Expr; right: Expr } // greater than comparison
+  | { kind: 'lt'; left: Expr; right: Expr } // less than comparison
+  | { kind: 'gte'; left: Expr; right: Expr } // greater than or equal comparison
+  | { kind: 'lte'; left: Expr; right: Expr } // less than or equal comparison
+  | { kind: 'and'; left: Expr; right: Expr } // logical AND
+  | { kind: 'or'; left: Expr; right: Expr } // logical OR
   | ExprRaw; // raw SQL expressions
 
 // Projection item
@@ -177,7 +185,7 @@ export interface JoinClause {
   type: 'join' | 'leftJoin';
   table: string;
   alias?: string;
-  on: FieldExpression | { type: 'literal'; value: string };
+  on: FieldExpression | { type: 'literal'; value: string } | Expr;
 }
 
 // Forward declaration for FromBuilder

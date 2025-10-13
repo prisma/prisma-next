@@ -67,9 +67,14 @@ function compileSelect(query: QueryAST): { sql: string; params: any[] } {
         sql += ` LEFT JOIN ${quoteIdentifier(join.table)}`;
         if (join.alias) sql += ` ${quoteIdentifier(join.alias)}`;
         if (join.on) {
-          if (join.on.type === 'literal') {
+          if ('type' in join.on && join.on.type === 'literal') {
             sql += ` ON ${join.on.value}`;
+          } else if ('kind' in join.on) {
+            // New Expr system
+            sql += ` ON ${compileExpr(join.on, params, paramIndex)}`;
+            paramIndex += getExprParamCount(join.on);
           } else {
+            // Old FieldExpression system
             sql += ` ON ${compileExpression(join.on, params, paramIndex)}`;
             paramIndex += getParamCount(join.on);
           }
@@ -78,9 +83,14 @@ function compileSelect(query: QueryAST): { sql: string; params: any[] } {
         sql += ` JOIN ${quoteIdentifier(join.table)}`;
         if (join.alias) sql += ` ${quoteIdentifier(join.alias)}`;
         if (join.on) {
-          if (join.on.type === 'literal') {
+          if ('type' in join.on && join.on.type === 'literal') {
             sql += ` ON ${join.on.value}`;
+          } else if ('kind' in join.on) {
+            // New Expr system
+            sql += ` ON ${compileExpr(join.on, params, paramIndex)}`;
+            paramIndex += getExprParamCount(join.on);
           } else {
+            // Old FieldExpression system
             sql += ` ON ${compileExpression(join.on, params, paramIndex)}`;
             paramIndex += getParamCount(join.on);
           }
@@ -91,8 +101,14 @@ function compileSelect(query: QueryAST): { sql: string; params: any[] } {
 
   // Handle WHERE clause
   if (query.where) {
-    sql += ' WHERE ' + compileExpression(query.where.condition, params, paramIndex);
-    paramIndex += getParamCount(query.where.condition);
+    // Check if it's an Expr object (new system) or FieldExpression (old system)
+    if ('kind' in query.where.condition) {
+      sql += ' WHERE ' + compileExpr(query.where.condition, params, paramIndex);
+      paramIndex += getExprParamCount(query.where.condition);
+    } else {
+      sql += ' WHERE ' + compileExpression(query.where.condition, params, paramIndex);
+      paramIndex += getParamCount(query.where.condition);
+    }
   }
 
   // Handle ORDER BY clause
@@ -300,6 +316,11 @@ function quoteIdentifier(identifier: string): string {
 
 // New expression compilation functions
 function compileExpr(expr: Expr, params: any[], paramIndex: number): string {
+  if (!expr || typeof expr !== 'object' || !expr.kind) {
+    console.error('Invalid expression:', expr);
+    throw new Error(`Invalid expression: ${JSON.stringify(expr)}`);
+  }
+
   switch (expr.kind) {
     case 'column':
       const tablePrefix = expr.table ? `${quoteIdentifier(expr.table)}.` : '';
@@ -328,6 +349,23 @@ function compileExpr(expr: Expr, params: any[], paramIndex: number): string {
     case 'raw':
       return compileExprRaw(expr, params, paramIndex);
 
+    case 'eq':
+      return `${compileExpr(expr.left, params, paramIndex)} = ${compileExpr(expr.right, params, paramIndex)}`;
+    case 'ne':
+      return `${compileExpr(expr.left, params, paramIndex)} != ${compileExpr(expr.right, params, paramIndex)}`;
+    case 'gt':
+      return `${compileExpr(expr.left, params, paramIndex)} > ${compileExpr(expr.right, params, paramIndex)}`;
+    case 'lt':
+      return `${compileExpr(expr.left, params, paramIndex)} < ${compileExpr(expr.right, params, paramIndex)}`;
+    case 'gte':
+      return `${compileExpr(expr.left, params, paramIndex)} >= ${compileExpr(expr.right, params, paramIndex)}`;
+    case 'lte':
+      return `${compileExpr(expr.left, params, paramIndex)} <= ${compileExpr(expr.right, params, paramIndex)}`;
+    case 'and':
+      return `(${compileExpr(expr.left, params, paramIndex)} AND ${compileExpr(expr.right, params, paramIndex)})`;
+    case 'or':
+      return `(${compileExpr(expr.left, params, paramIndex)} OR ${compileExpr(expr.right, params, paramIndex)})`;
+
     default:
       throw new Error(`Unknown expression kind: ${(expr as any).kind}`);
   }
@@ -351,6 +389,16 @@ function getExprParamCount(expr: Expr): number {
 
     case 'raw':
       return getRawParamCount(expr.template);
+
+    case 'eq':
+    case 'ne':
+    case 'gt':
+    case 'lt':
+    case 'gte':
+    case 'lte':
+    case 'and':
+    case 'or':
+      return getExprParamCount(expr.left) + getExprParamCount(expr.right);
 
     default:
       return 0;
