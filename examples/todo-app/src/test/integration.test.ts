@@ -6,10 +6,12 @@ import { emitSchemaAndTypes } from '@prisma/schema-emitter';
 import { connect } from '@prisma/runtime';
 import { sql, TABLE_NAME } from '@prisma/sql';
 import { t } from '../schema';
+import { parseIR } from '@prisma/relational-ir';
 
 describe('Integration Tests', () => {
   let db: any;
   let postgresProcess: any;
+  let ir: ReturnType<typeof parseIR>;
 
   beforeAll(async () => {
     // Start PostgreSQL using @prisma/dev
@@ -38,9 +40,9 @@ describe('Integration Tests', () => {
     writeFileSync('.prisma/schema.d.ts', types);
 
     // Connect to database
-    const schemaIR = JSON.parse(schema);
+    ir = parseIR(schema);
     db = connect({
-      ir: schemaIR,
+      ir: ir,
       verify: 'onFirstUse',
       database: {
         host: 'localhost',
@@ -99,7 +101,7 @@ describe('Integration Tests', () => {
   });
 
   it('executes getActiveUsers query with correct type inference', async () => {
-    const query = sql()
+    const query = sql(ir)
       .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email });
@@ -126,7 +128,7 @@ describe('Integration Tests', () => {
   });
 
   it('executes getUserById query', async () => {
-    const query = sql().from(t.user).where(t.user.id.eq(1)).select({
+    const query = sql(ir).from(t.user).where(t.user.id.eq(1)).select({
       id: t.user.id,
       email: t.user.email,
       active: t.user.active,
@@ -143,7 +145,7 @@ describe('Integration Tests', () => {
   });
 
   it('executes getUsersByEmail query', async () => {
-    const query = sql()
+    const query = sql(ir)
       .from(t.user)
       .where(t.user.email.eq('test2@example.com'))
       .select({ id: t.user.id, email: t.user.email, active: t.user.active });
@@ -156,7 +158,7 @@ describe('Integration Tests', () => {
   });
 
   it('handles queries with LIMIT', async () => {
-    const query = sql().from(t.user).select({ id: t.user.id, email: t.user.email }).limit(2);
+    const query = sql(ir).from(t.user).select({ id: t.user.id, email: t.user.email }).limit(2);
 
     const results = await db.execute(query.build());
 
@@ -164,7 +166,7 @@ describe('Integration Tests', () => {
   });
 
   it('handles queries with ORDER BY', async () => {
-    const query = sql()
+    const query = sql(ir)
       .from(t.user)
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('id', 'ASC');
@@ -177,7 +179,7 @@ describe('Integration Tests', () => {
   });
 
   it('throws error for unknown table', async () => {
-    const query = sql()
+    const query = sql(ir)
       .from('nonexistent' as any)
       .select({ id: t.user.id });
 
@@ -185,7 +187,7 @@ describe('Integration Tests', () => {
   });
 
   it('throws error for invalid ORDER BY field', async () => {
-    const query = sql()
+    const query = sql(ir)
       .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email })

@@ -23,6 +23,7 @@ export interface FieldExpression {
 export interface Column<T> extends Expression<T> {
   readonly table: string;
   readonly name: string;
+  readonly __contractHash?: string;
   eq(value: T): FieldExpression;
   ne(value: T): FieldExpression;
   gt(value: T): FieldExpression;
@@ -36,6 +37,7 @@ export const TABLE_NAME = Symbol('tableName');
 
 export type Table<TShape> = {
   readonly [TABLE_NAME]: string;
+  readonly __contractHash?: string;
 } & {
   readonly [K in keyof TShape]: Column<TShape[K]>;
 };
@@ -69,6 +71,7 @@ export interface LimitClause {
 export interface QueryAST {
   type: 'select';
   from: string;
+  contractHash?: string;
   select?: SelectClause;
   where?: WhereClause;
   orderBy?: OrderByClause[];
@@ -81,4 +84,7 @@ export type InferSelectResult<TSelect extends Record<string, Column<any>>> = {
 };
 
 export type InferTableShape<TTable extends Table<any>> = TTable extends Table<infer TShape> ? TShape : never;
+
+// Contract hash verification configuration
+export type ContractMismatchMode = 'error' | 'warn';
 

@@ -5,7 +5,7 @@ import { getActiveUsers, getUserById, getUsersByEmail } from './queries';
 import { db } from './db';
 import { assertContract, verifyContract } from '@prisma/runtime';
 import ir from '../.prisma/schema.json' assert { type: 'json' };
-import { Schema } from '@prisma/relational-ir';
+import { parseIR } from '@prisma/relational-ir';
 
 async function main() {
   console.log('🚀 PSL → IR Prototype Demo\n');
@@ -30,8 +30,8 @@ async function main() {
 
   // Step 3: Contract verification (one line!)
   console.log('3. Verifying contract...');
-  const schemaIR = JSON.parse(schema) as Schema;
-  await assertContract({ expectedHash: schemaIR.contractHash!, client: db.pool });
+  const ir = parseIR(schema);
+  await assertContract({ expectedHash: ir.contractHash!, client: db.pool });
   console.log('✅ Contract verified\n');
 
   // Step 4: Execute type-safe queries
