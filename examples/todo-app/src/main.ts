@@ -8,8 +8,8 @@ import {
   getUsersWithPosts,
   getPostsWithAuthors,
   getPublishedPostsWithAuthors,
-} from './queries.js';
-import { db } from './db.js';
+} from './queries';
+import { db } from './db';
 import { assertContract } from '@prisma/runtime';
 import { parseIR } from '@prisma/relational-ir';
 
@@ -40,8 +40,8 @@ async function main() {
   await assertContract({ expectedHash: contractIR.contractHash!, client: db.pool });
   console.log('✅ Data contract verified\n');
 
-  // Step 4: Execute type-safe queries
-  console.log('4. Executing type-safe queries...');
+  // Step 4: Execute queries
+  console.log('4. Executing queries...');
 
   try {
     // Basic queries

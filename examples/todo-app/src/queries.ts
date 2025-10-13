@@ -4,20 +4,20 @@ import { db } from './db';
 import contract from '../.prisma/contract.json' assert { type: 'json' };
 import { parseIR, validateContract } from '@prisma/relational-ir';
 import { createRuntime, lint } from '@prisma/runtime';
-import { Contract } from '../.prisma/contract';
+import * as Contract from '../.prisma/contract';
 
 const ir = validateContract(contract);
 
 // Extract the contract types from the namespace
 type ContractTypes = {
   Tables: Record<string, Record<string, any>>;
-  Relations: Contract.Relations;
-  Uniques: Contract.Uniques;
+  Relations: Contract.Contract.Relations;
+  Uniques: Contract.Contract.Uniques;
 };
 
 // Parameterized ORM factory (just like makeT) - using extracted contract types
 const r = orm<ContractTypes>(ir);
-const t = makeT<Contract.Tables>(ir);
+const t = makeT<Contract.Contract.Tables>(ir);
 
 // Create a runtime with lint plugin for enhanced query execution
 const runtime = createRuntime({

@@ -3,14 +3,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build": "pnpm exec tsc",
+    "build": "tsup",
     "dev": "pnpm exec node dist/main.js",
     "generate": "pnpm exec prisma-next generate schema.psl",
-    "dev:contract": "pnpm exec prisma-next dev schema.psl",
     "setup-db": "pnpm exec node dist/setup-db.js",
     "test": "vitest run",
     "clean": "rm -rf dist .prisma",
-    "test:integration": "vitest run --config vitest.config.ts",
     "lint": "eslint 'src/**/*.ts'",
     "typecheck": "pnpm exec tsc --noEmit && pnpm exec tsc --noEmit --skipLibCheck $(find src -name '*.ts' 2>/dev/null || true)"
   },
@@ -26,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
+    "tsup": "^8.5.0",
     "typescript": "^5.6.2",
     "vitest": "^2.1.1"
   }

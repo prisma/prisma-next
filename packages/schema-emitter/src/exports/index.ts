@@ -3,7 +3,10 @@ import { SchemaAST } from '@prisma/psl';
 import { emitSchema } from '../ir-emitter';
 import { emitContractTypes } from '../contract-types-emitter';
 
-export async function emitSchemaAndTypes(ast: SchemaAST, namespace?: string): Promise<{ schema: string; types: string }> {
+export async function emitSchemaAndTypes(
+  ast: SchemaAST,
+  namespace?: string,
+): Promise<{ schema: string; types: string }> {
   const schema = await emitSchema(ast);
   const types = emitContractTypes(schema, namespace);
 
