@@ -3,13 +3,14 @@ import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { parse } from '@prisma/psl';
 import { emitContractAndTypes } from '@prisma/schema-emitter';
-import { connect } from '@prisma/runtime';
+import { connect, createRuntime, verification } from '@prisma/runtime';
 import { sql, TABLE_NAME } from '@prisma/sql';
 import { t } from '../app/schema';
 import { parseIR } from '@prisma/relational-ir';
 
 describe('Integration Tests', () => {
   let db: any;
+  let runtime: any;
   let postgresProcess: any;
   let contractIR: ReturnType<typeof parseIR>;
 
@@ -39,11 +40,10 @@ describe('Integration Tests', () => {
     writeFileSync('.prisma/contract.json', contract);
     writeFileSync('.prisma/contract.d.ts', contractTypes);
 
-    // Connect to database
+    // Connect to database without verification first
     contractIR = parseIR(contract);
     db = connect({
       ir: contractIR,
-      verify: 'onFirstUse',
       database: {
         host: 'localhost',
         port: 5432,
@@ -53,8 +53,8 @@ describe('Integration Tests', () => {
       },
     });
 
-    // Create table
-    console.log('Creating table...');
+    // Create tables
+    console.log('Creating tables...');
     await db.execute({
       type: 'raw',
       sql: `
@@ -67,16 +67,52 @@ describe('Integration Tests', () => {
       `,
     });
 
-    // Check if table was created
+    // Drop and recreate post table to ensure correct structure
+    await db.execute({
+      type: 'raw',
+      sql: 'DROP TABLE IF EXISTS "post";',
+    });
+
+    await db.execute({
+      type: 'raw',
+      sql: `
+        CREATE TABLE "post" (
+          id SERIAL PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          published BOOLEAN DEFAULT false,
+          "createdAt" TIMESTAMP DEFAULT NOW(),
+          user_id INTEGER NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES "user"(id)
+        );
+      `,
+    });
+
+    // Check if tables were created
     console.log('Checking table structure...');
-    const tableCheck = await db.execute({
+    const userTableCheck = await db.execute({
       type: 'raw',
       sql: "SELECT column_name FROM information_schema.columns WHERE table_name = 'user' ORDER BY ordinal_position;",
     });
     console.log(
-      'Table columns:',
-      tableCheck.map((r: any) => r.column_name),
+      'User table columns:',
+      userTableCheck.map((r: any) => r.column_name),
     );
+
+    const postTableCheck = await db.execute({
+      type: 'raw',
+      sql: "SELECT column_name FROM information_schema.columns WHERE table_name = 'post' ORDER BY ordinal_position;",
+    });
+    console.log(
+      'Post table columns:',
+      postTableCheck.map((r: any) => r.column_name),
+    );
+
+    // Now create runtime with verification enabled
+    runtime = createRuntime({
+      ir: contractIR,
+      driver: db,
+      plugins: [verification({ mode: 'onFirstUse' })],
+    });
 
     // Clear existing data and insert test data
     await db.execute({
@@ -121,7 +157,7 @@ describe('Integration Tests', () => {
     console.log('Debug - Generated SQL:', query.build().sql);
     console.log('Debug - Parameters:', query.build().params);
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
 
     // Type should be inferred as Array<{ id: number; email: string }>
     expect(results).toHaveLength(2);
@@ -145,7 +181,7 @@ describe('Integration Tests', () => {
       createdAt: t.user.createdAt,
     });
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
 
     expect(results).toHaveLength(1);
     expect(results[0].id).toBe(1);
@@ -160,7 +196,7 @@ describe('Integration Tests', () => {
       .where(t.user.email.eq('test2@example.com'))
       .select({ id: t.user.id, email: t.user.email, active: t.user.active });
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
 
     expect(results).toHaveLength(1);
     expect(results[0].email).toBe('test2@example.com');
@@ -173,7 +209,7 @@ describe('Integration Tests', () => {
       .select({ id: t.user.id, email: t.user.email })
       .limit(2);
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
 
     expect(results).toHaveLength(2);
   });
@@ -184,7 +220,7 @@ describe('Integration Tests', () => {
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('id', 'ASC');
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
 
     expect(results).toHaveLength(3);
     expect(results[0].id).toBeLessThan(results[1].id);
@@ -196,7 +232,7 @@ describe('Integration Tests', () => {
       .from('nonexistent' as any)
       .select({ id: t.user.id });
 
-    await expect(db.execute(query.build())).rejects.toThrow();
+    await expect(runtime.execute(query.build())).rejects.toThrow();
   });
 
   it('throws error for invalid ORDER BY field', async () => {
@@ -206,7 +242,7 @@ describe('Integration Tests', () => {
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('nonexistent', 'ASC');
 
-    await expect(db.execute(query.build())).rejects.toThrow();
+    await expect(runtime.execute(query.build())).rejects.toThrow();
   });
 
   it('demonstrates proper type inference with FromBuilder::select()', async () => {
@@ -216,7 +252,7 @@ describe('Integration Tests', () => {
       .where(t.user.id.eq(1))
       .select({ email: t.user.email });
 
-    const singleFieldResults = await db.execute(singleFieldQuery.build());
+    const singleFieldResults = await runtime.execute(singleFieldQuery.build());
 
     // TypeScript should infer this as Array<{ email: string }>
     expect(singleFieldResults).toHaveLength(1);
@@ -235,7 +271,7 @@ describe('Integration Tests', () => {
       active: t.user.active,
     });
 
-    const multiFieldResults = await db.execute(multiFieldQuery.build());
+    const multiFieldResults = await runtime.execute(multiFieldQuery.build());
 
     // TypeScript should infer this as Array<{ id: number; email: string; active: boolean }>
     expect(multiFieldResults).toHaveLength(2);
@@ -261,7 +297,7 @@ describe('Integration Tests', () => {
       .orderBy('id', 'ASC')
       .limit(1);
 
-    const chainedResults = await db.execute(chainedQuery.build());
+    const chainedResults = await runtime.execute(chainedQuery.build());
 
     // Type should still be Array<{ id: number; email: string }> after chaining
     expect(chainedResults).toHaveLength(1);
@@ -284,7 +320,7 @@ describe('Integration Tests', () => {
       .where(t.user.id.eq(2))
       .select({ id: t.user.id });
 
-    const idOnlyResults = await db.execute(idOnlyQuery.build());
+    const idOnlyResults = await runtime.execute(idOnlyQuery.build());
     expect(idOnlyResults).toHaveLength(1);
     expect(idOnlyResults[0]).toEqual({ id: 2 });
     expect(Object.keys(idOnlyResults[0])).toEqual(['id']);
@@ -295,7 +331,7 @@ describe('Integration Tests', () => {
       .where(t.user.id.eq(3))
       .select({ email: t.user.email });
 
-    const emailOnlyResults = await db.execute(emailOnlyQuery.build());
+    const emailOnlyResults = await runtime.execute(emailOnlyQuery.build());
     expect(emailOnlyResults).toHaveLength(1);
     expect(emailOnlyResults[0]).toEqual({ email: 'test3@example.com' });
     expect(Object.keys(emailOnlyResults[0])).toEqual(['email']);
@@ -308,7 +344,7 @@ describe('Integration Tests', () => {
       createdAt: t.user.createdAt,
     });
 
-    const allFieldsResults = await db.execute(allFieldsQuery.build());
+    const allFieldsResults = await runtime.execute(allFieldsQuery.build());
     expect(allFieldsResults).toHaveLength(1);
     expect(allFieldsResults[0]).toHaveProperty('id');
     expect(allFieldsResults[0]).toHaveProperty('email');
@@ -341,7 +377,7 @@ describe('Integration Tests', () => {
     expect(aliasedPlan.sql).toContain('"active" AS "isActive"');
     expect(aliasedPlan.sql).toContain('"createdAt" AS "createdAt"');
 
-    const aliasedResults = await db.execute(aliasedPlan);
+    const aliasedResults = await runtime.execute(aliasedPlan);
 
     // Verify results have aliased property names
     expect(aliasedResults).toHaveLength(1);
@@ -384,7 +420,7 @@ describe('Integration Tests', () => {
     expect(mixedPlan.sql).toContain('"active" AS "active"');
     expect(mixedPlan.sql).toContain('"createdAt" AS "createdAt"');
 
-    const mixedResults = await db.execute(mixedPlan);
+    const mixedResults = await runtime.execute(mixedPlan);
 
     // Verify results have correct property names
     expect(mixedResults).toHaveLength(1);

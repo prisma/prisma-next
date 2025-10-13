@@ -1,11 +1,10 @@
-import { connect, createRuntime, lint } from '@prisma/runtime';
+import { connect, createRuntime, lint, verification } from '@prisma/runtime';
 import ir from '../../.prisma/contract.json';
 import { validateContract, parseIR } from '@prisma/relational-ir';
 
 // Create the raw database connection
 const db = connect({
   ir: validateContract(ir),
-  verify: 'onFirstUse',
   database: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
@@ -15,11 +14,12 @@ const db = connect({
   },
 });
 
-// Create a runtime with lint plugin for enhanced query execution
+// Create a runtime with lint and verification plugins for enhanced query execution
 export const runtime = createRuntime({
   ir: parseIR(ir),
   driver: db,
   plugins: [
+    verification({ mode: 'onFirstUse' }),
     lint({
       rules: {
         'no-select-star': 'error',

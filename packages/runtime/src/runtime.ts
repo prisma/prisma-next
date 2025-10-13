@@ -32,7 +32,7 @@ export class Runtime {
     // beforeExecute hooks
     for (const plugin of this.plugins) {
       if (plugin.beforeExecute) {
-        await plugin.beforeExecute({ plan, ir: this.ir, config: this.config });
+        await plugin.beforeExecute({ plan, ir: this.ir, config: this.config, driver: this.driver });
       }
     }
 

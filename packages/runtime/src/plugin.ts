@@ -1,5 +1,6 @@
 import { Schema } from '@prisma/relational-ir';
 import { Plan } from '@prisma/sql';
+import { DatabaseConnection } from './connection';
 
 export interface QueryResult {
   rows: any[];
@@ -12,7 +13,6 @@ export interface QueryMetrics {
 }
 
 export interface RuntimeConfig {
-  verify?: 'onFirstUse' | 'never';
   [key: string]: any;
 }
 
@@ -20,6 +20,7 @@ export interface BeforeExecuteContext {
   plan: Plan;
   ir: Schema;
   config: RuntimeConfig;
+  driver: DatabaseConnection;
 }
 
 export interface AfterExecuteContext {

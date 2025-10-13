@@ -3,10 +3,11 @@ import { spawn } from 'child_process';
 import { sql } from '@prisma/sql';
 import { makeT } from '@prisma/sql';
 import type { Table } from '@prisma/sql';
-import { connect } from '../src/exports';
+import { connect, createRuntime, verification } from '../src/exports';
 
 describe('Runtime Integration Tests', () => {
   let db: any;
+  let runtime: any;
   let postgresProcess: any;
 
   // Define our test schema types
@@ -60,7 +61,6 @@ describe('Runtime Integration Tests', () => {
     // Connect to database
     db = connect({
       ir: mockSchema,
-      verify: 'onFirstUse',
       database: {
         host: 'localhost',
         port: 5432,
@@ -68,6 +68,12 @@ describe('Runtime Integration Tests', () => {
         user: 'postgres',
         password: 'postgres',
       },
+    });
+
+    runtime = createRuntime({
+      ir: mockSchema,
+      driver: db,
+      plugins: [verification({ mode: 'onFirstUse' })],
     });
 
     // Create test table
@@ -114,7 +120,7 @@ describe('Runtime Integration Tests', () => {
     console.log('Debug - Generated SQL:', query.build().sql);
     console.log('Debug - Parameters:', query.build().params);
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
 
     expect(results).toHaveLength(2);
     expect(results[0]).toHaveProperty('id');
@@ -138,7 +144,7 @@ describe('Runtime Integration Tests', () => {
       .where(t.user.email.eq('test1@example.com'))
       .select({ id: t.user.id, email: t.user.email });
 
-    const eqResults = await db.execute(eqQuery.build());
+    const eqResults = await runtime.execute(eqQuery.build());
     expect(eqResults).toHaveLength(1);
     expect(eqResults[0].email).toBe('test1@example.com');
 
@@ -148,7 +154,7 @@ describe('Runtime Integration Tests', () => {
       .where(t.user.email.ne('test1@example.com'))
       .select({ id: t.user.id, email: t.user.email });
 
-    const neResults = await db.execute(neQuery.build());
+    const neResults = await runtime.execute(neQuery.build());
     expect(neResults).toHaveLength(2);
     expect(neResults.every((r: any) => r.email !== 'test1@example.com')).toBe(true);
 
@@ -158,7 +164,7 @@ describe('Runtime Integration Tests', () => {
       .where(t.user.id.gt(1))
       .select({ id: t.user.id, email: t.user.email });
 
-    const gtResults = await db.execute(gtQuery.build());
+    const gtResults = await runtime.execute(gtQuery.build());
     expect(gtResults).toHaveLength(2);
     expect(gtResults.every((r: any) => r.id > 1)).toBe(true);
   });
@@ -171,7 +177,7 @@ describe('Runtime Integration Tests', () => {
       .select({ id: t.user.id, email: t.user.email })
       .limit(2);
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
     expect(results).toHaveLength(2);
   });
 
@@ -183,7 +189,7 @@ describe('Runtime Integration Tests', () => {
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('id', 'ASC');
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
     expect(results).toHaveLength(3);
 
     // Verify ordering
@@ -200,7 +206,7 @@ describe('Runtime Integration Tests', () => {
       .where(t.user.id.in([1, 3]))
       .select({ id: t.user.id, email: t.user.email });
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
     expect(results).toHaveLength(2);
 
     const ids = results.map((r: any) => r.id);
@@ -219,7 +225,7 @@ describe('Runtime Integration Tests', () => {
       .orderBy('id', 'ASC')
       .limit(1);
 
-    const results = await db.execute(query.build());
+    const results = await runtime.execute(query.build());
     expect(results).toHaveLength(1);
     expect(results[0].email).toBe('test1@example.com'); // Should be the first active user
   });

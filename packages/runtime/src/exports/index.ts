@@ -15,3 +15,6 @@ export type {
 export { lint } from '../plugins/lint';
 export type { LintRule, RuleConfig, RuleVerdict, RuleLevel } from '../plugins/lint';
 export { GuardrailError } from '../plugins/lint';
+
+export { verification } from '../plugins/verification';
+export type { VerificationPluginOptions } from '../plugins/verification';
