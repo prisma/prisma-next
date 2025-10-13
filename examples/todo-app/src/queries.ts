@@ -1,6 +1,6 @@
 import { sql } from '@prisma/sql';
-import { t } from './schema';
-import { db } from './db';
+import { t } from './schema.js';
+import { db } from './db.js';
 import contract from '../.prisma/contract.json' assert { type: 'json' };
 import { parseIR } from '@prisma/relational-ir';
 import { createRuntime, lint } from '@prisma/runtime';

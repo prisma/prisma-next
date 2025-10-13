@@ -4,8 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm exec tsc",
-    "dev": "pnpm exec tsc --watch",
-    "start": "pnpm exec node dist/main.js",
+    "dev": "pnpm exec node dist/main.js",
     "generate": "pnpm exec prisma-next generate schema.psl",
     "dev:contract": "pnpm exec prisma-next dev schema.psl",
     "setup-db": "pnpm exec node dist/setup-db.js",

@@ -1,10 +1,9 @@
 import { parse } from '@prisma/psl';
 import { emitContractAndTypes } from '@prisma/schema-emitter';
 import { readFileSync, writeFileSync } from 'fs';
-import { getActiveUsers, getUserById, getUsersByEmail } from './queries';
-import { db } from './db';
-import { assertContract, verifyContract } from '@prisma/runtime';
-import contract from '../.prisma/contract.json' assert { type: 'json' };
+import { getActiveUsers, getUserById, getUsersByEmail } from './queries.js';
+import { db } from './db.js';
+import { assertContract } from '@prisma/runtime';
 import { parseIR } from '@prisma/relational-ir';
 
 async function main() {

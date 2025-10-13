@@ -66,7 +66,6 @@ export async function setupDatabase() {
     }
 
     await db.execute({
-      type: 'raw',
       sql: `
         INSERT INTO prisma_contract.version (id, hash)
         VALUES (1, $1)
