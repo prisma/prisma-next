@@ -70,8 +70,8 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
     async readContract(): Promise<{ hash: `sha256:${string}` | null }> {
       try {
         const result = await client.query(`
-          SELECT contract_hash FROM prisma_contract
-          ORDER BY updated_at DESC
+          SELECT hash FROM prisma_contract.version
+          ORDER BY id DESC
           LIMIT 1
         `);
 
@@ -81,7 +81,7 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
         }
 
         hasContractTable = true;
-        return { hash: result.rows[0].contract_hash as `sha256:${string}` };
+        return { hash: result.rows[0].hash as `sha256:${string}` };
       } catch (error) {
         // Table doesn't exist yet
         hasContractTable = false;
@@ -90,12 +90,13 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
     },
 
     async writeContract(hash: `sha256:${string}`): Promise<void> {
-      // Create contract table if it doesn't exist
+      // Create contract schema and table if they don't exist
       if (!hasContractTable) {
         await client.query(`
-          CREATE TABLE IF NOT EXISTS prisma_contract (
+          CREATE SCHEMA IF NOT EXISTS prisma_contract;
+          CREATE TABLE IF NOT EXISTS prisma_contract.version (
             id SERIAL PRIMARY KEY,
-            contract_hash text NOT NULL,
+            hash text NOT NULL,
             updated_at timestamptz NOT NULL DEFAULT now()
           )
         `);
@@ -105,7 +106,7 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
       // Insert contract hash (simple INSERT for now)
       await client.query(
         `
-        INSERT INTO prisma_contract (contract_hash)
+        INSERT INTO prisma_contract.version (hash)
         VALUES ($1)
       `,
         [hash],

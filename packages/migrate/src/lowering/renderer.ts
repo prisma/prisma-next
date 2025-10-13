@@ -59,7 +59,7 @@ function renderDefault(defaultValue: ColumnSpec['default']): string {
     case 'now':
       return 'DEFAULT NOW()';
     case 'literal':
-      return `DEFAULT ${defaultValue.value}`;
+      return `DEFAULT '${defaultValue.value}'`;
     default:
       return '';
   }

@@ -53,7 +53,7 @@ export async function generateMigration(migrationId?: string) {
             const opset = JSON.parse(opsetContent);
 
             // Reconstruct contract from opset (simplified - in real implementation would be more robust)
-            foundContract = reconstructContractFromOpset(opset);
+            foundContract = reconstructContractFromOpset(opset, contractResult.hash);
             break;
           }
         } catch (error) {
@@ -63,14 +63,22 @@ export async function generateMigration(migrationId?: string) {
       }
 
       if (foundContract) {
-        contractA = foundContract;
+        // Use the actual contract hash from the database, not the reconstructed one
+        contractA = {
+          target: 'postgres',
+          contractHash: contractResult.hash,
+          tables: foundContract.tables,
+        };
         console.log(
           `   Current state: contract ${contractResult.hash} (reconstructed from migration)`,
         );
       } else {
-        contractA = { kind: 'empty' as const };
-        console.log(
-          '   Current state: contract hash found but no matching migration, treating as empty',
+        // If we can't find a matching migration, we need to treat this as a contract mismatch
+        // This means the database has a contract hash that doesn't match any known migration
+        throw new Error(
+          `Database contract hash ${contractResult.hash} does not match any known migration. ` +
+            `This suggests the database is in an inconsistent state. ` +
+            `Consider resetting the database or applying the correct migration.`,
         );
       }
     }
@@ -134,7 +142,7 @@ export async function generateMigration(migrationId?: string) {
  * Reconstruct a contract from an opset (simplified implementation)
  * In a real implementation, this would be more robust and handle all operation types
  */
-function reconstructContractFromOpset(opset: any): any {
+function reconstructContractFromOpset(opset: any, contractHash: string): any {
   const tables: any = {};
 
   for (const op of opset.operations) {
@@ -189,7 +197,7 @@ function reconstructContractFromOpset(opset: any): any {
 
   return {
     target: 'postgres',
-    contractHash: 'reconstructed', // This would be the actual hash in a real implementation
+    contractHash: contractHash, // Use the provided contract hash
     tables,
   };
 }

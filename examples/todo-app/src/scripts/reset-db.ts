@@ -16,7 +16,7 @@ export async function resetDatabase() {
 
   try {
     await admin.withAdvisoryLock('prisma:reset', async () => {
-      // Drop all tables in the public schema (this will also drop prisma_contract)
+      // Drop all tables and schemas
       await admin.executeScript({
         type: 'script',
         statements: [
@@ -26,7 +26,7 @@ export async function resetDatabase() {
               {
                 kind: 'text',
                 value:
-                  'DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;',
+                  'DROP SCHEMA IF EXISTS public CASCADE; DROP SCHEMA IF EXISTS prisma_contract CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;',
               },
             ],
             intent: 'ddl',
