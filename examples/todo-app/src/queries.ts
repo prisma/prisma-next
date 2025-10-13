@@ -1,11 +1,11 @@
 import { sql } from '@prisma/sql';
 import { t } from './schema';
 import { db } from './db';
-import ir from '../.prisma/schema.json' assert { type: 'json' };
+import contract from '../.prisma/contract.json' assert { type: 'json' };
 import { parseIR } from '@prisma/relational-ir';
 
 export async function getActiveUsers() {
-  const query = sql(parseIR(ir))
+  const query = sql(parseIR(contract))
     .from(t.user)
     .where(t.user.active.eq(true))
     .select({ id: t.user.id, email: t.user.email });
@@ -14,7 +14,7 @@ export async function getActiveUsers() {
 }
 
 export async function getUserById(id: number) {
-  const query = sql(parseIR(ir)).from(t.user).where(t.user.id.eq(id)).select({
+  const query = sql(parseIR(contract)).from(t.user).where(t.user.id.eq(id)).select({
     id: t.user.id,
     email: t.user.email,
     active: t.user.active,
@@ -26,7 +26,7 @@ export async function getUserById(id: number) {
 }
 
 export async function getUsersByEmail(email: string) {
-  const query = sql(parseIR(ir))
+  const query = sql(parseIR(contract))
     .from(t.user)
     .where(t.user.email.eq(email))
     .select({ id: t.user.id, email: t.user.email, active: t.user.active });

@@ -1,0 +1,208 @@
+---
+alwaysApply: true
+---
+
+# Data Contract Architecture
+
+## Overview
+
+The Prisma Next prototype uses a **data contract** model where the Intermediate Representation (IR) represents a canonical, serialized data contract rather than a traditional "schema". This architectural decision reflects the contract-first approach where the PSL defines the application's data contract.
+
+## Key Architectural Decisions
+
+### 1. Data Contract vs Schema
+
+**Data Contract**: A declarative specification of the application's domain model, relationships, invariants, and policies that serves as a binding agreement between the application and database.
+
+**Schema**: A traditional database structure definition focused on storage layout and constraints.
+
+**Why Data Contract?**
+- Emphasizes the **contractual nature** of the agreement between app and database
+- Includes **business logic constraints** beyond pure storage (policies, invariants, capabilities)
+- Supports **verification and drift detection** through contract hashing
+- Enables **composable primitives** rather than monolithic schema management
+
+### 2. Contract Serialization Format
+
+The data contract is serialized as `contract.json` (not `schema.json`) to reflect its purpose:
+
+```json
+{
+  "version": 3,
+  "target": "postgres",
+  "contractHash": "sha256:abc123...",
+  "tables": {
+    "user": {
+      "columns": {
+        "id": { "type": "int4", "pk": true },
+        "email": { "type": "text", "unique": true, "tags": { "pii": "identifier" } }
+      },
+      "policies": { "access": "authenticated" },
+      "capabilities": ["pgvector"],
+      "invariants": ["email_format"]
+    }
+  }
+}
+```
+
+### 3. Contract Lifecycle
+
+1. **PSL Definition**: Developer writes PSL defining the data contract
+2. **Contract Compilation**: PSL → IR (data contract representation)
+3. **Contract Serialization**: IR → `contract.json`
+4. **Contract Verification**: Runtime verifies contract hash matches database
+5. **Contract Enforcement**: DSL elements carry contract hash for verification
+
+### 4. Contract Verification Model
+
+Every DSL element (table, column) carries the contract hash:
+
+```typescript
+const t = makeT(contractIR);
+t.user.id.__contractHash; // "sha256:abc123..."
+```
+
+Query construction verifies all elements share the same contract:
+
+```typescript
+sql(contractIR)
+  .from(t.user)     // ← Verifies contract hash match
+  .select({ id: t.user.id }) // ← Verifies contract hash match
+```
+
+### 5. Benefits of Contract Model
+
+- **Explicit Agreements**: Clear contract between application and database
+- **Drift Detection**: Contract hash enables detection of schema drift
+- **Policy Enforcement**: Contracts can include access policies and data classifications
+- **Composable Verification**: Each component can verify contract compliance independently
+- **AI-Friendly**: Contracts are machine-readable and verifiable
+
+### 6. Contract vs Schema Terminology
+
+| Traditional Schema | Data Contract |
+|-------------------|---------------|
+| `schema.json` | `contract.json` |
+| Schema validation | Contract verification |
+| Schema migration | Contract evolution |
+| Schema drift | Contract violation |
+| Schema definition | Contract specification |
+
+### 7. Implementation Guidelines
+
+- Use `contract.json` for the serialized IR file
+- Use `contractHash` for verification identifiers
+- Use "contract" terminology in user-facing APIs
+- Use "IR" terminology for internal representations
+- Maintain backward compatibility during transition
+
+## Migration Strategy
+
+1. **Phase 1**: Update internal terminology and file names
+2. **Phase 2**: Update user-facing APIs and documentation
+3. **Phase 3**: Update CLI commands and tooling
+4. **Phase 4**: Deprecate old "schema" terminology
+
+This contract-first approach aligns with modern application architecture where data contracts serve as the foundation for type safety, verification, and composable primitives.
+# Data Contract Architecture
+
+## Overview
+
+The Prisma Next prototype uses a **data contract** model where the Intermediate Representation (IR) represents a canonical, serialized data contract rather than a traditional "schema". This architectural decision reflects the contract-first approach where the PSL defines the application's data contract.
+
+## Key Architectural Decisions
+
+### 1. Data Contract vs Schema
+
+**Data Contract**: A declarative specification of the application's domain model, relationships, invariants, and policies that serves as a binding agreement between the application and database.
+
+**Schema**: A traditional database structure definition focused on storage layout and constraints.
+
+**Why Data Contract?**
+- Emphasizes the **contractual nature** of the agreement between app and database
+- Includes **business logic constraints** beyond pure storage (policies, invariants, capabilities)
+- Supports **verification and drift detection** through contract hashing
+- Enables **composable primitives** rather than monolithic schema management
+
+### 2. Contract Serialization Format
+
+The data contract is serialized as `contract.json` (not `schema.json`) to reflect its purpose:
+
+```json
+{
+  "version": 3,
+  "target": "postgres",
+  "contractHash": "sha256:abc123...",
+  "tables": {
+    "user": {
+      "columns": {
+        "id": { "type": "int4", "pk": true },
+        "email": { "type": "text", "unique": true, "tags": { "pii": "identifier" } }
+      },
+      "policies": { "access": "authenticated" },
+      "capabilities": ["pgvector"],
+      "invariants": ["email_format"]
+    }
+  }
+}
+```
+
+### 3. Contract Lifecycle
+
+1. **PSL Definition**: Developer writes PSL defining the data contract
+2. **Contract Compilation**: PSL → IR (data contract representation)
+3. **Contract Serialization**: IR → `contract.json`
+4. **Contract Verification**: Runtime verifies contract hash matches database
+5. **Contract Enforcement**: DSL elements carry contract hash for verification
+
+### 4. Contract Verification Model
+
+Every DSL element (table, column) carries the contract hash:
+
+```typescript
+const t = makeT(contractIR);
+t.user.id.__contractHash; // "sha256:abc123..."
+```
+
+Query construction verifies all elements share the same contract:
+
+```typescript
+sql(contractIR)
+  .from(t.user)     // ← Verifies contract hash match
+  .select({ id: t.user.id }) // ← Verifies contract hash match
+```
+
+### 5. Benefits of Contract Model
+
+- **Explicit Agreements**: Clear contract between application and database
+- **Drift Detection**: Contract hash enables detection of schema drift
+- **Policy Enforcement**: Contracts can include access policies and data classifications
+- **Composable Verification**: Each component can verify contract compliance independently
+- **AI-Friendly**: Contracts are machine-readable and verifiable
+
+### 6. Contract vs Schema Terminology
+
+| Traditional Schema | Data Contract |
+|-------------------|---------------|
+| `schema.json` | `contract.json` |
+| Schema validation | Contract verification |
+| Schema migration | Contract evolution |
+| Schema drift | Contract violation |
+| Schema definition | Contract specification |
+
+### 7. Implementation Guidelines
+
+- Use `contract.json` for the serialized IR file
+- Use `contractHash` for verification identifiers
+- Use "contract" terminology in user-facing APIs
+- Use "IR" terminology for internal representations
+- Maintain backward compatibility during transition
+
+## Migration Strategy
+
+1. **Phase 1**: Update internal terminology and file names
+2. **Phase 2**: Update user-facing APIs and documentation
+3. **Phase 3**: Update CLI commands and tooling
+4. **Phase 4**: Deprecate old "schema" terminology
+
+This contract-first approach aligns with modern application architecture where data contracts serve as the foundation for type safety, verification, and composable primitives.

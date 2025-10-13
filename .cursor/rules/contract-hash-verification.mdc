@@ -98,15 +98,15 @@ const ir = parseIR(content);
 ## Example Usage
 
 ```typescript
-import ir from './schema.json';
+import contract from './contract.json';
 import { sql, makeT, parseIR } from '@prisma/sql';
 
-// Create DSL elements from IR
-const t = makeT(parseIR(ir));
+// Create DSL elements from data contract
+const t = makeT(parseIR(contract));
 
 // Construct query with verification
-const query = sql(parseIR(ir))
-  .from(t.user)           // ← Verifies t.user.__contractHash matches ir.contractHash
+const query = sql(parseIR(contract))
+  .from(t.user)           // ← Verifies t.user.__contractHash matches contract.contractHash
   .select({
     id: t.user.id,        // ← Verifies t.user.id.__contractHash matches
     email: t.user.email   // ← Verifies t.user.email.__contractHash matches

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { parse } from '@prisma/psl';
-import { emitSchemaAndTypes } from '@prisma/schema-emitter';
+import { emitContractAndTypes } from '@prisma/schema-emitter';
 
 const program = new Command();
 
@@ -12,36 +12,36 @@ program
 
 program
   .command('generate')
-  .description('Generate schema.json and schema.d.ts from PSL file')
-  .argument('<schema-file>', 'Path to the PSL schema file')
+  .description('Generate contract.json and types.d.ts from PSL file')
+  .argument('<psl-file>', 'Path to the PSL file')
   .option('-o, --output-dir <dir>', 'Output directory for generated files', '.prisma')
-  .action(async (schemaFile: string, options: { outputDir: string }) => {
+  .action(async (pslFile: string, options: { outputDir: string }) => {
     try {
-      console.log(`📖 Reading schema file: ${schemaFile}`);
-      const pslContent = readFileSync(schemaFile, 'utf-8');
+      console.log(`📖 Reading PSL file: ${pslFile}`);
+      const pslContent = readFileSync(pslFile, 'utf-8');
 
-      console.log('🔍 Parsing PSL schema...');
+      console.log('🔍 Parsing PSL...');
       const ast = parse(pslContent);
 
-      console.log('⚡ Generating schema and types...');
-      const { schema, types } = await emitSchemaAndTypes(ast);
+      console.log('⚡ Generating data contract and types...');
+      const { contract, types } = await emitContractAndTypes(ast);
 
       // Ensure output directory exists
       mkdirSync(options.outputDir, { recursive: true });
 
-      // Write schema.json
-      const schemaPath = `${options.outputDir}/schema.json`;
-      writeFileSync(schemaPath, schema);
-      console.log(`✅ Generated ${schemaPath}`);
+      // Write contract.json
+      const contractPath = `${options.outputDir}/contract.json`;
+      writeFileSync(contractPath, contract);
+      console.log(`✅ Generated ${contractPath}`);
 
-      // Write schema.d.ts
-      const typesPath = `${options.outputDir}/schema.d.ts`;
+      // Write types.d.ts
+      const typesPath = `${options.outputDir}/types.d.ts`;
       writeFileSync(typesPath, types);
       console.log(`✅ Generated ${typesPath}`);
 
-      console.log('🎉 Schema generation complete!');
+      console.log('🎉 Data contract generation complete!');
     } catch (error) {
-      console.error('❌ Error generating schema:', error);
+      console.error('❌ Error generating data contract:', error);
       process.exit(1);
     }
   });
@@ -49,26 +49,26 @@ program
 program
   .command('dev')
   .description('Start development mode with file watching')
-  .argument('<schema-file>', 'Path to the PSL schema file')
+  .argument('<psl-file>', 'Path to the PSL file')
   .option('-o, --output-dir <dir>', 'Output directory for generated files', '.prisma')
-  .action(async (schemaFile: string, options: { outputDir: string }) => {
+  .action(async (pslFile: string, options: { outputDir: string }) => {
     console.log('🚀 Starting development mode...');
-    console.log(`📁 Watching: ${schemaFile}`);
+    console.log(`📁 Watching: ${pslFile}`);
     console.log(`📁 Output: ${options.outputDir}`);
 
     // For now, just run generate once
     // In a real implementation, this would watch for file changes
     try {
-      const pslContent = readFileSync(schemaFile, 'utf-8');
+      const pslContent = readFileSync(pslFile, 'utf-8');
       const ast = parse(pslContent);
-      const { schema, types } = await emitSchemaAndTypes(ast);
+      const { contract, types } = await emitContractAndTypes(ast);
 
       mkdirSync(options.outputDir, { recursive: true });
-      writeFileSync(`${options.outputDir}/schema.json`, schema);
-      writeFileSync(`${options.outputDir}/schema.d.ts`, types);
+      writeFileSync(`${options.outputDir}/contract.json`, contract);
+      writeFileSync(`${options.outputDir}/types.d.ts`, types);
 
       console.log('✅ Initial generation complete!');
-      console.log('💡 Tip: Re-run this command when you modify your schema');
+      console.log('💡 Tip: Re-run this command when you modify your PSL');
     } catch (error) {
       console.error('❌ Error in development mode:', error);
       process.exit(1);

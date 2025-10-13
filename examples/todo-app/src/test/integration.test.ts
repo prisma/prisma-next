@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { parse } from '@prisma/psl';
-import { emitSchemaAndTypes } from '@prisma/schema-emitter';
+import { emitContractAndTypes } from '@prisma/schema-emitter';
 import { connect } from '@prisma/runtime';
 import { sql, TABLE_NAME } from '@prisma/sql';
 import { t } from '../schema';
@@ -11,7 +11,7 @@ import { parseIR } from '@prisma/relational-ir';
 describe('Integration Tests', () => {
   let db: any;
   let postgresProcess: any;
-  let ir: ReturnType<typeof parseIR>;
+  let contractIR: ReturnType<typeof parseIR>;
 
   beforeAll(async () => {
     // Start PostgreSQL using @prisma/dev
@@ -26,7 +26,7 @@ describe('Integration Tests', () => {
     // Generate schema files
     const pslContent = readFileSync('schema.psl', 'utf-8');
     const ast = parse(pslContent);
-    const { schema, types } = await emitSchemaAndTypes(ast);
+    const { contract, types } = await emitContractAndTypes(ast);
 
     // Ensure .prisma directory exists
     try {
@@ -35,14 +35,14 @@ describe('Integration Tests', () => {
       // Directory might already exist
     }
 
-    // Write schema files
-    writeFileSync('.prisma/schema.json', schema);
-    writeFileSync('.prisma/schema.d.ts', types);
+    // Write contract files
+    writeFileSync('.prisma/contract.json', contract);
+    writeFileSync('.prisma/types.d.ts', types);
 
     // Connect to database
-    ir = parseIR(schema);
+    contractIR = parseIR(contract);
     db = connect({
-      ir: ir,
+      ir: contractIR,
       verify: 'onFirstUse',
       database: {
         host: 'localhost',
@@ -101,7 +101,7 @@ describe('Integration Tests', () => {
   });
 
   it('executes getActiveUsers query with correct type inference', async () => {
-    const query = sql(ir)
+    const query = sql(contractIR)
       .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email });
@@ -128,7 +128,7 @@ describe('Integration Tests', () => {
   });
 
   it('executes getUserById query', async () => {
-    const query = sql(ir).from(t.user).where(t.user.id.eq(1)).select({
+    const query = sql(contractIR).from(t.user).where(t.user.id.eq(1)).select({
       id: t.user.id,
       email: t.user.email,
       active: t.user.active,
@@ -145,7 +145,7 @@ describe('Integration Tests', () => {
   });
 
   it('executes getUsersByEmail query', async () => {
-    const query = sql(ir)
+    const query = sql(contractIR)
       .from(t.user)
       .where(t.user.email.eq('test2@example.com'))
       .select({ id: t.user.id, email: t.user.email, active: t.user.active });
@@ -158,7 +158,10 @@ describe('Integration Tests', () => {
   });
 
   it('handles queries with LIMIT', async () => {
-    const query = sql(ir).from(t.user).select({ id: t.user.id, email: t.user.email }).limit(2);
+    const query = sql(contractIR)
+      .from(t.user)
+      .select({ id: t.user.id, email: t.user.email })
+      .limit(2);
 
     const results = await db.execute(query.build());
 
@@ -166,7 +169,7 @@ describe('Integration Tests', () => {
   });
 
   it('handles queries with ORDER BY', async () => {
-    const query = sql(ir)
+    const query = sql(contractIR)
       .from(t.user)
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('id', 'ASC');
@@ -179,7 +182,7 @@ describe('Integration Tests', () => {
   });
 
   it('throws error for unknown table', async () => {
-    const query = sql(ir)
+    const query = sql(contractIR)
       .from('nonexistent' as any)
       .select({ id: t.user.id });
 
@@ -187,7 +190,7 @@ describe('Integration Tests', () => {
   });
 
   it('throws error for invalid ORDER BY field', async () => {
-    const query = sql(ir)
+    const query = sql(contractIR)
       .from(t.user)
       .where(t.user.active.eq(true))
       .select({ id: t.user.id, email: t.user.email })
