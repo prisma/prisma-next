@@ -71,8 +71,7 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
       try {
         const result = await client.query(`
           SELECT hash FROM prisma_contract.version
-          ORDER BY id DESC
-          LIMIT 1
+          WHERE id = 1
         `);
 
         if (result.rows.length === 0) {
@@ -103,11 +102,14 @@ export async function connectAdmin(url: string): Promise<AdminConnection> {
         hasContractTable = true;
       }
 
-      // Insert contract hash (simple INSERT for now)
+      // Upsert contract hash (insert or update row with id=1)
       await client.query(
         `
-        INSERT INTO prisma_contract.version (hash)
-        VALUES ($1)
+        INSERT INTO prisma_contract.version (id, hash)
+        VALUES (1, $1)
+        ON CONFLICT (id) DO UPDATE SET
+          hash = EXCLUDED.hash,
+          updated_at = now()
       `,
         [hash],
       );
