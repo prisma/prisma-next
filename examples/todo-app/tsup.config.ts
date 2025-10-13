@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/main.ts', 'src/setup-db.ts'],
+  entry: ['src/scripts/main.ts', 'src/scripts/setup-db.ts'],
   outDir: 'dist',
   format: ['esm'],
   target: 'es2022',

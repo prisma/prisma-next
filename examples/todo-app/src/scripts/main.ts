@@ -8,8 +8,8 @@ import {
   getUsersWithPosts,
   getPostsWithAuthors,
   getPublishedPostsWithAuthors,
-} from './queries';
-import { db } from './db';
+} from '../app/queries';
+import { db } from '../prisma/db';
 import { assertContract } from '@prisma/runtime';
 import { parseIR } from '@prisma/relational-ir';
 

@@ -1,10 +1,9 @@
 import { sql, makeT } from '@prisma/sql';
 import { orm } from '@prisma/orm';
-import { db } from './db';
-import contract from '../.prisma/contract.json' assert { type: 'json' };
+import { runtime } from '../prisma/db';
+import contract from '../../.prisma/contract.json';
 import { parseIR, validateContract } from '@prisma/relational-ir';
-import { createRuntime, lint } from '@prisma/runtime';
-import * as Contract from '../.prisma/contract';
+import * as Contract from '../../.prisma/contract';
 
 const ir = validateContract(contract);
 
@@ -18,22 +17,6 @@ type ContractTypes = {
 // Parameterized ORM factory (just like makeT) - using extracted contract types
 const r = orm<ContractTypes>(ir);
 const t = makeT<Contract.Contract.Tables>(ir);
-
-// Create a runtime with lint plugin for enhanced query execution
-const runtime = createRuntime({
-  ir: parseIR(contract),
-  driver: db,
-  plugins: [
-    lint({
-      rules: {
-        'no-select-star': 'error',
-        'mutation-requires-where': 'error',
-        'no-missing-limit': 'warn',
-        'no-unindexed-column-in-where': 'warn',
-      },
-    }),
-  ],
-});
 
 // ============================================================================
 // BASIC QUERIES (using base SQL DSL)

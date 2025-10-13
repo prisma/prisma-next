@@ -5,7 +5,7 @@ import { parse } from '@prisma/psl';
 import { emitContractAndTypes } from '@prisma/schema-emitter';
 import { connect } from '@prisma/runtime';
 import { sql, TABLE_NAME } from '@prisma/sql';
-import { t } from '../schema';
+import { t } from '../app/schema';
 import { parseIR } from '@prisma/relational-ir';
 
 describe('Integration Tests', () => {
