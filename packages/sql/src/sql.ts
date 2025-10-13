@@ -1,5 +1,5 @@
 import { createFromBuilder } from './builder';
-import { Tables, Table, TABLE_NAME, TableName, ContractMismatchMode } from './types';
+import { Tables, Table, TABLE_NAME, TableName, ContractMismatchMode, FromBuilder } from './types';
 import { Schema } from '@prisma/relational-ir';
 
 export interface SqlOptions {
@@ -10,9 +10,7 @@ export function sql(
   ir: Schema,
   opts?: SqlOptions,
 ): {
-  from<TTables extends Tables>(
-    table: Table<any> | TableName<TTables>,
-  ): ReturnType<typeof createFromBuilder<any>>;
+  from<TTables extends Tables>(table: Table<any> | TableName<TTables>): FromBuilder<any, never>;
 } {
   const contractHash = ir.contractHash;
   const onContractMismatch = opts?.onContractMismatch ?? 'error';

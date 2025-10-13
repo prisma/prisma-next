@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabaseConnection } from '../src/connection';
 import { Schema } from '@prisma/relational-ir';
+import { sql, makeT, rawSql } from '@prisma/sql';
 
 describe('Runtime Verification Tests', () => {
   let db: DatabaseConnection;
@@ -92,13 +93,10 @@ describe('Runtime Verification Tests', () => {
   });
 
   it('handles raw SQL queries', async () => {
-    const query = {
-      type: 'raw' as const,
-      sql: 'SELECT 1 as test',
-    };
+    const query = rawSql('SELECT 1 as test');
 
-    // This will fail because we don't have a real database
-    // but it tests that raw queries are handled differently
-    await expect(db.execute(query)).rejects.toThrow();
+    // Raw SQL queries should work without verification
+    const result = await db.execute(query);
+    expect(result).toEqual([{ test: 1 }]);
   });
 });

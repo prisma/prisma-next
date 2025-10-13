@@ -1,5 +1,5 @@
 import { Schema, RelationGraph, Contract } from '@prisma/relational-ir';
-import { Table, Column, FieldExpression, Plan, TABLE_NAME } from '@prisma/sql';
+import { Table, Column, FieldExpression, Plan, TABLE_NAME, InferSelectResult } from '@prisma/sql';
 import { OrmQueryAST, IncludeNode, RelationHandle } from './ast/types';
 import { lowerRelations } from './lowering/lower-relations';
 import { compileToSQL } from '@prisma/sql';
@@ -74,6 +74,7 @@ export class TypedRelationBuilder<TChild extends string> {
 export class TypedOrmBuilder<
   TContract extends Contract,
   TParent extends keyof TContract['Tables'],
+  TResult = never,
 > {
   private ast: OrmQueryAST;
   private ir: Schema;
@@ -94,7 +95,7 @@ export class TypedOrmBuilder<
     relation: TypedRelationHandle<TContract, TParent, any>,
     buildChild: (qb: TypedRelationBuilder<any>) => TypedRelationBuilder<any>,
     opts?: TypedIncludeOptions,
-  ): TypedOrmBuilder<TContract, TParent> {
+  ): TypedOrmBuilder<TContract, TParent, TResult> {
     const childBuilder = new TypedRelationBuilder(relation.child, this.ir);
     const childBuilt = buildChild(childBuilder);
 
@@ -115,8 +116,8 @@ export class TypedOrmBuilder<
 
   select<TSelect extends Record<string, Column<any>>>(
     fields: TSelect,
-  ): TypedOrmBuilder<TContract, TParent> & {
-    build(): Plan;
+  ): TypedOrmBuilder<TContract, TParent, InferSelectResult<TSelect>> & {
+    build(): Plan<InferSelectResult<TSelect>>;
   } {
     this.ast.select = {
       type: 'select',
@@ -126,23 +127,26 @@ export class TypedOrmBuilder<
     return this as any;
   }
 
-  where(condition: FieldExpression): TypedOrmBuilder<TContract, TParent> {
+  where(condition: FieldExpression): TypedOrmBuilder<TContract, TParent, TResult> {
     this.ast.where = { type: 'where', condition };
     return this;
   }
 
-  orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): TypedOrmBuilder<TContract, TParent> {
+  orderBy(
+    field: string,
+    direction: 'ASC' | 'DESC' = 'ASC',
+  ): TypedOrmBuilder<TContract, TParent, TResult> {
     this.ast.orderBy = this.ast.orderBy ?? [];
     this.ast.orderBy.push({ type: 'orderBy', field, direction });
     return this;
   }
 
-  limit(count: number): TypedOrmBuilder<TContract, TParent> {
+  limit(count: number): TypedOrmBuilder<TContract, TParent, TResult> {
     this.ast.limit = { type: 'limit', count };
     return this;
   }
 
-  build(): Plan {
+  build(): Plan<TResult> {
     // 1. ORM AST complete
     // 2. Lower to base QueryAST
     const baseAst = lowerRelations(this.ast, this.ir);

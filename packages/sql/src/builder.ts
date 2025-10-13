@@ -8,6 +8,7 @@ import {
   ContractMismatchMode,
   Plan,
   ProjectionItem,
+  FromBuilder,
 } from './types';
 import { compileToSQL } from './compiler';
 
@@ -34,7 +35,7 @@ function handleMismatch(
   }
 }
 
-export class QueryBuilder<TTable extends Table<any>> {
+export class QueryBuilder<TTable extends Table<any>, TResult = never> {
   private ast: QueryAST;
   private context: BuilderContext;
 
@@ -50,8 +51,8 @@ export class QueryBuilder<TTable extends Table<any>> {
 
   select<TSelect extends Record<string, Column<any>>>(
     fields: TSelect,
-  ): QueryBuilder<TTable> & {
-    build(): Plan;
+  ): QueryBuilder<TTable, InferSelectResult<TSelect>> & {
+    build(): Plan<InferSelectResult<TSelect>>;
   } {
     // Verify all columns have matching contract hash
     for (const [alias, column] of Object.entries(fields)) {
@@ -70,14 +71,14 @@ export class QueryBuilder<TTable extends Table<any>> {
     return this as any;
   }
 
-  where(condition: FieldExpression): QueryBuilder<TTable> {
+  where(condition: FieldExpression): QueryBuilder<TTable, TResult> {
     // Note: FieldExpression doesn't carry contract hash, but the column that created it does
     // This verification happens at build() time when we walk all references
     this.ast.where = { type: 'where', condition };
     return this;
   }
 
-  orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): QueryBuilder<TTable> {
+  orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): QueryBuilder<TTable, TResult> {
     if (!this.ast.orderBy) {
       this.ast.orderBy = [];
     }
@@ -85,12 +86,12 @@ export class QueryBuilder<TTable extends Table<any>> {
     return this;
   }
 
-  limit(count: number): QueryBuilder<TTable> {
+  limit(count: number): QueryBuilder<TTable, TResult> {
     this.ast.limit = { type: 'limit', count };
     return this;
   }
 
-  build(): Plan {
+  build(): Plan<TResult> {
     // Final verification: check all column references have matching contract hash
     const references: Column<any>[] = [];
     const tables = new Set<string>();
@@ -151,23 +152,11 @@ export class QueryBuilder<TTable extends Table<any>> {
   }
 }
 
-export interface FromBuilder<TTable extends Table<any>> {
-  select<TSelect extends Record<string, Column<any>>>(
-    fields: TSelect,
-  ): QueryBuilder<TTable> & {
-    build(): Plan;
-  };
-  where(condition: FieldExpression): FromBuilder<TTable>;
-  orderBy(field: string, direction?: 'ASC' | 'DESC'): FromBuilder<TTable>;
-  limit(count: number): FromBuilder<TTable>;
-  build(): Plan;
-}
-
 export function createFromBuilder<TTable extends Table<any>>(
   tableName: string,
   context: BuilderContext,
-): FromBuilder<TTable> {
-  const builder = new QueryBuilder<TTable>(tableName, context);
+): FromBuilder<TTable, never> {
+  const builder = new QueryBuilder<TTable, never>(tableName, context);
 
   return {
     select: builder.select.bind(builder),

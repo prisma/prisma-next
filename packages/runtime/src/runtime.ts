@@ -28,7 +28,7 @@ export class Runtime {
     return this;
   }
 
-  async execute(plan: Plan): Promise<any[]> {
+  async execute<TResult>(plan: Plan<TResult>): Promise<TResult[]> {
     // beforeExecute hooks
     for (const plugin of this.plugins) {
       if (plugin.beforeExecute) {
@@ -38,7 +38,7 @@ export class Runtime {
 
     try {
       const start = performance.now();
-      const result = await this.driver.execute({ sql: plan.sql, params: plan.params });
+      const result = await this.driver.execute(plan);
       const durationMs = performance.now() - start;
 
       const queryResult: QueryResult = { rows: result, rowCount: result.length };
@@ -51,7 +51,7 @@ export class Runtime {
         }
       }
 
-      return result;
+      return result as TResult[];
     } catch (error) {
       // onError hooks
       for (const plugin of this.plugins) {

@@ -24,6 +24,7 @@ export interface Column<T> extends Expression<T> {
   readonly table: string;
   readonly name: string;
   readonly __contractHash?: string;
+  readonly __tsType?: T; // Brand for type inference
   eq(value: T): FieldExpression;
   ne(value: T): FieldExpression;
   gt(value: T): FieldExpression;
@@ -82,7 +83,7 @@ export interface QueryAST {
   limit?: LimitClause;
 }
 
-export interface Plan {
+export interface Plan<TResult = never> {
   ast: QueryAST;
   sql: string;
   params: unknown[];
@@ -92,6 +93,20 @@ export interface Plan {
     refs: { tables: string[]; columns: string[] };
     paramsShape?: Array<{ name?: string; type?: string }>;
     annotations?: Record<string, any>;
+  };
+}
+
+// Helper function to create raw SQL Plan
+export function rawSql(sql: string): Plan<unknown> {
+  return {
+    ast: { type: 'select', from: '', projectStar: true } as any, // Dummy AST for raw SQL
+    sql,
+    params: [],
+    meta: {
+      contractHash: '',
+      target: 'postgres',
+      refs: { tables: [], columns: [] },
+    },
   };
 }
 
@@ -126,4 +141,13 @@ export interface JoinClause {
   table: string;
   alias?: string;
   on: FieldExpression | { type: 'literal'; value: string };
+}
+
+// Forward declaration for FromBuilder
+export interface FromBuilder<TTable extends Table<any>, TResult = never> {
+  select<TSelect extends Record<string, Column<any>>>(fields: TSelect): any; // QueryBuilder will be imported from builder.ts
+  where(condition: FieldExpression): FromBuilder<TTable, TResult>;
+  orderBy(field: string, direction?: 'ASC' | 'DESC'): FromBuilder<TTable, TResult>;
+  limit(count: number): FromBuilder<TTable, TResult>;
+  build(): Plan<TResult>;
 }

@@ -1,6 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import { Schema } from '@prisma/relational-ir';
-import { QueryAST, compileToSQL } from '@prisma/sql';
+import { Plan } from '@prisma/sql';
 
 export interface ConnectionConfig {
   ir: Schema;
@@ -32,42 +32,11 @@ export class DatabaseConnection {
     });
   }
 
-  async execute(
-    query: QueryAST | { type: 'raw'; sql: string } | { sql: string; params: unknown[] },
-  ): Promise<any[]> {
-    if ('type' in query && query.type === 'raw') {
-      const client = await this.pool.connect();
-      try {
-        const result = await client.query(query.sql);
-        return result.rows;
-      } finally {
-        client.release();
-      }
-    }
-
-    if ('sql' in query && 'params' in query && !('type' in query)) {
-      // This is a compiled query object from query.build()
-      const client = await this.pool.connect();
-      try {
-        const result = await client.query(query.sql, query.params);
-        return result.rows;
-      } finally {
-        client.release();
-      }
-    }
-
-    // This is a QueryAST
-    if (!this.verified) {
-      await this.verifySchema();
-      this.verified = true;
-    }
-
-    const { sql, params } = compileToSQL(query as QueryAST);
+  async execute<TResult = any>(plan: Plan<TResult>): Promise<TResult[]> {
     const client = await this.pool.connect();
-
     try {
-      const result = await client.query(sql, params);
-      return result.rows;
+      const result = await client.query(plan.sql, plan.params);
+      return result.rows as TResult[];
     } finally {
       client.release();
     }
