@@ -208,4 +208,194 @@ describe('Integration Tests', () => {
 
     await expect(db.execute(query.build())).rejects.toThrow();
   });
+
+  it('demonstrates proper type inference with FromBuilder::select()', async () => {
+    // Test 1: Single field selection with proper type inference
+    const singleFieldQuery = sql(contractIR)
+      .from(t.user)
+      .where(t.user.id.eq(1))
+      .select({ email: t.user.email });
+
+    const singleFieldResults = await db.execute(singleFieldQuery.build());
+
+    // TypeScript should infer this as Array<{ email: string }>
+    expect(singleFieldResults).toHaveLength(1);
+    expect(singleFieldResults[0]).toHaveProperty('email');
+    expect(typeof singleFieldResults[0].email).toBe('string');
+    expect(singleFieldResults[0].email).toBe('test1@example.com');
+
+    // Should NOT have other properties
+    expect(singleFieldResults[0]).not.toHaveProperty('id');
+    expect(singleFieldResults[0]).not.toHaveProperty('active');
+
+    // Test 2: Multiple field selection with proper type inference
+    const multiFieldQuery = sql(contractIR).from(t.user).where(t.user.active.eq(true)).select({
+      id: t.user.id,
+      email: t.user.email,
+      active: t.user.active,
+    });
+
+    const multiFieldResults = await db.execute(multiFieldQuery.build());
+
+    // TypeScript should infer this as Array<{ id: number; email: string; active: boolean }>
+    expect(multiFieldResults).toHaveLength(2);
+
+    // Verify each result has the correct shape and types
+    multiFieldResults.forEach((result: any) => {
+      expect(result).toHaveProperty('id');
+      expect(result).toHaveProperty('email');
+      expect(result).toHaveProperty('active');
+
+      expect(typeof result.id).toBe('number');
+      expect(typeof result.email).toBe('string');
+      expect(typeof result.active).toBe('boolean');
+
+      expect(result.active).toBe(true);
+    });
+
+    // Test 3: Method chaining preserves type information
+    const chainedQuery = sql(contractIR)
+      .from(t.user)
+      .where(t.user.active.eq(true))
+      .select({ id: t.user.id, email: t.user.email })
+      .orderBy('id', 'ASC')
+      .limit(1);
+
+    const chainedResults = await db.execute(chainedQuery.build());
+
+    // Type should still be Array<{ id: number; email: string }> after chaining
+    expect(chainedResults).toHaveLength(1);
+    expect(chainedResults[0]).toHaveProperty('id');
+    expect(chainedResults[0]).toHaveProperty('email');
+    expect(typeof chainedResults[0].id).toBe('number');
+    expect(typeof chainedResults[0].email).toBe('string');
+
+    // Should be the first user (lowest ID)
+    expect(chainedResults[0].id).toBe(1);
+    expect(chainedResults[0].email).toBe('test1@example.com');
+  });
+
+  it('demonstrates type safety with different select shapes', async () => {
+    // Test different select shapes to ensure type inference works correctly
+
+    // Shape 1: Only ID
+    const idOnlyQuery = sql(contractIR)
+      .from(t.user)
+      .where(t.user.id.eq(2))
+      .select({ id: t.user.id });
+
+    const idOnlyResults = await db.execute(idOnlyQuery.build());
+    expect(idOnlyResults).toHaveLength(1);
+    expect(idOnlyResults[0]).toEqual({ id: 2 });
+    expect(Object.keys(idOnlyResults[0])).toEqual(['id']);
+
+    // Shape 2: Only email
+    const emailOnlyQuery = sql(contractIR)
+      .from(t.user)
+      .where(t.user.id.eq(3))
+      .select({ email: t.user.email });
+
+    const emailOnlyResults = await db.execute(emailOnlyQuery.build());
+    expect(emailOnlyResults).toHaveLength(1);
+    expect(emailOnlyResults[0]).toEqual({ email: 'test3@example.com' });
+    expect(Object.keys(emailOnlyResults[0])).toEqual(['email']);
+
+    // Shape 3: All fields
+    const allFieldsQuery = sql(contractIR).from(t.user).where(t.user.id.eq(1)).select({
+      id: t.user.id,
+      email: t.user.email,
+      active: t.user.active,
+      createdAt: t.user.createdAt,
+    });
+
+    const allFieldsResults = await db.execute(allFieldsQuery.build());
+    expect(allFieldsResults).toHaveLength(1);
+    expect(allFieldsResults[0]).toHaveProperty('id');
+    expect(allFieldsResults[0]).toHaveProperty('email');
+    expect(allFieldsResults[0]).toHaveProperty('active');
+    expect(allFieldsResults[0]).toHaveProperty('createdAt');
+
+    // Verify types
+    expect(typeof allFieldsResults[0].id).toBe('number');
+    expect(typeof allFieldsResults[0].email).toBe('string');
+    expect(typeof allFieldsResults[0].active).toBe('boolean');
+    expect(allFieldsResults[0].createdAt).toBeInstanceOf(Date);
+  });
+
+  it('demonstrates aliased select fields work correctly', async () => {
+    // Test aliased select fields to ensure they work with contract hash verification
+    // and produce the correct SQL with AS clauses
+
+    const aliasedQuery = sql(contractIR).from(t.user).where(t.user.id.eq(1)).select({
+      userId: t.user.id,
+      userEmail: t.user.email,
+      isActive: t.user.active,
+      createdAt: t.user.createdAt,
+    });
+
+    const aliasedPlan = aliasedQuery.build();
+
+    // Verify the SQL contains proper AS clauses
+    expect(aliasedPlan.sql).toContain('"id" AS "userId"');
+    expect(aliasedPlan.sql).toContain('"email" AS "userEmail"');
+    expect(aliasedPlan.sql).toContain('"active" AS "isActive"');
+    expect(aliasedPlan.sql).toContain('"createdAt" AS "createdAt"');
+
+    const aliasedResults = await db.execute(aliasedPlan);
+
+    // Verify results have aliased property names
+    expect(aliasedResults).toHaveLength(1);
+    expect(aliasedResults[0]).toHaveProperty('userId');
+    expect(aliasedResults[0]).toHaveProperty('userEmail');
+    expect(aliasedResults[0]).toHaveProperty('isActive');
+    expect(aliasedResults[0]).toHaveProperty('createdAt');
+
+    // Verify types are correct
+    expect(typeof aliasedResults[0].userId).toBe('number');
+    expect(typeof aliasedResults[0].userEmail).toBe('string');
+    expect(typeof aliasedResults[0].isActive).toBe('boolean');
+    expect(aliasedResults[0].createdAt).toBeInstanceOf(Date);
+
+    // Verify values are correct
+    expect(aliasedResults[0].userId).toBe(1);
+    expect(aliasedResults[0].userEmail).toBe('test1@example.com');
+    expect(aliasedResults[0].isActive).toBe(true);
+
+    // Should NOT have original property names
+    expect(aliasedResults[0]).not.toHaveProperty('id');
+    expect(aliasedResults[0]).not.toHaveProperty('email');
+    expect(aliasedResults[0]).not.toHaveProperty('active');
+  });
+
+  it('demonstrates mixed aliased and non-aliased select fields', async () => {
+    // Test mixing aliased and non-aliased fields
+    const mixedQuery = sql(contractIR).from(t.user).where(t.user.id.eq(2)).select({
+      id: t.user.id, // No alias
+      userEmail: t.user.email, // Aliased
+      active: t.user.active, // No alias
+      createdAt: t.user.createdAt, // No alias
+    });
+
+    const mixedPlan = mixedQuery.build();
+
+    // Verify SQL contains both aliased and non-aliased fields
+    expect(mixedPlan.sql).toContain('"id" AS "id"');
+    expect(mixedPlan.sql).toContain('"email" AS "userEmail"');
+    expect(mixedPlan.sql).toContain('"active" AS "active"');
+    expect(mixedPlan.sql).toContain('"createdAt" AS "createdAt"');
+
+    const mixedResults = await db.execute(mixedPlan);
+
+    // Verify results have correct property names
+    expect(mixedResults).toHaveLength(1);
+    expect(mixedResults[0]).toHaveProperty('id');
+    expect(mixedResults[0]).toHaveProperty('userEmail');
+    expect(mixedResults[0]).toHaveProperty('active');
+    expect(mixedResults[0]).toHaveProperty('createdAt');
+
+    // Verify values
+    expect(mixedResults[0].id).toBe(2);
+    expect(mixedResults[0].userEmail).toBe('test2@example.com');
+    expect(mixedResults[0].active).toBe(false);
+  });
 });

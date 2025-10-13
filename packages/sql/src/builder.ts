@@ -58,7 +58,7 @@ export class QueryBuilder<TTable extends Table<any>, TResult = never> {
     for (const [alias, column] of Object.entries(fields)) {
       if (column.__contractHash !== this.context.contractHash) {
         handleMismatch(
-          'select()',
+          `select() field '${alias}'`,
           this.context.contractHash || 'undefined',
           column.__contractHash || 'undefined',
           this.context.onContractMismatch,

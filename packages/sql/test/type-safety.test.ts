@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { sql, makeT, TABLE_NAME } from '../src/exports';
 import type { Column, FieldExpression, Tables, Table, Plan } from '../src/types';
+import { validateContract } from '@prisma/relational-ir';
 
 interface UserShape {
   id: number;
@@ -13,7 +14,7 @@ interface TestTables {
   user: Table<UserShape>;
 }
 
-const mockSchema = {
+const mockSchema = validateContract({
   target: 'postgres' as const,
   contractHash: 'test-hash',
   tables: {
@@ -42,7 +43,7 @@ const mockSchema = {
       capabilities: [],
     },
   },
-};
+});
 
 const t = makeT<TestTables>(mockSchema);
 
@@ -131,5 +132,59 @@ describe('Compile-time Type Safety', () => {
 
     const planType: Plan<{ id: number; email: string }> = plan;
     expect(planType).toBeDefined();
+  });
+
+  it('handles aliased select fields with proper type inference', () => {
+    const query = sql(mockSchema).from(t.user).select({
+      userId: t.user.id,
+      userEmail: t.user.email,
+      isActive: t.user.active,
+    });
+
+    const plan = query.build();
+
+    // TypeScript should infer this as Plan<{ userId: number; userEmail: string; isActive: boolean }>
+    const planType: Plan<{ userId: number; userEmail: string; isActive: boolean }> = plan;
+    expect(planType).toBeDefined();
+
+    // Verify the SQL contains proper AS clauses
+    expect(plan.sql).toContain('"id" AS "userId"');
+    expect(plan.sql).toContain('"email" AS "userEmail"');
+    expect(plan.sql).toContain('"active" AS "isActive"');
+  });
+
+  it('handles mixed aliased and non-aliased select fields', () => {
+    const query = sql(mockSchema).from(t.user).select({
+      id: t.user.id, // No alias
+      userEmail: t.user.email, // Aliased
+      active: t.user.active, // No alias
+    });
+
+    const plan = query.build();
+
+    // TypeScript should infer this as Plan<{ id: number; userEmail: string; active: boolean }>
+    const planType: Plan<{ id: number; userEmail: string; active: boolean }> = plan;
+    expect(planType).toBeDefined();
+
+    // Verify the SQL contains both aliased and non-aliased fields
+    expect(plan.sql).toContain('"id" AS "id"');
+    expect(plan.sql).toContain('"email" AS "userEmail"');
+    expect(plan.sql).toContain('"active" AS "active"');
+  });
+
+  it('verifies contract hash validation works with aliased selects', () => {
+    // Create a mock column with different contract hash
+    const mismatchedColumn = {
+      ...t.user.id,
+      __contractHash: 'different-hash',
+    };
+
+    // This should throw an error due to contract hash mismatch
+    expect(() => {
+      sql(mockSchema).from(t.user).select({
+        userId: mismatchedColumn,
+        userEmail: t.user.email,
+      });
+    }).toThrow('E_CONTRACT_MISMATCH');
   });
 });

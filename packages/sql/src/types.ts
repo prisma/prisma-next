@@ -178,7 +178,9 @@ export interface JoinClause {
 
 // Forward declaration for FromBuilder
 export interface FromBuilder<TTable extends Table<any>, TResult = never> {
-  select<TSelect extends Record<string, Column<any>>>(fields: TSelect): any; // QueryBuilder will be imported from builder.ts
+  select<TSelect extends Record<string, Column<any>>>(
+    fields: TSelect,
+  ): FromBuilder<TTable, InferSelectResult<TSelect>>;
   selectRaw(projections: ProjectionItem[]): any; // For raw expressions
   where(condition: FieldExpression): FromBuilder<TTable, TResult>;
   orderBy(field: string, direction?: 'ASC' | 'DESC'): FromBuilder<TTable, TResult>;
