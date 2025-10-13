@@ -3,13 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": [
-        "src/**",
-        "package.json",
-        "tsconfig.json",
-        "tsconfig.build.json",
-        "tsup.config.ts"
-      ],
+      "inputs": ["src/**", "package.json", "tsconfig.json", "tsup.config.ts"],
       "outputs": ["dist/**"]
     },
     "dev": {
@@ -22,7 +16,7 @@
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "tsconfig.json", "tsconfig.build.json"]
+      "inputs": ["src/**", "tsconfig.json"]
     },
     "lint": {
       "inputs": ["src/**", "test/**"]

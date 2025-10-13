@@ -1,4 +1,11 @@
-import { QueryAST, Column, FieldExpression, InferSelectResult, InferTableShape, Table } from './types';
+import {
+  QueryAST,
+  Column,
+  FieldExpression,
+  InferSelectResult,
+  InferTableShape,
+  Table,
+} from './types';
 import { compileToSQL } from './compiler';
 
 export class QueryBuilder<TTable extends Table<any>> {
@@ -12,8 +19,10 @@ export class QueryBuilder<TTable extends Table<any>> {
   }
 
   select<TSelect extends Record<string, Column<any>>>(
-    fields: TSelect
-  ): QueryBuilder<TTable> & { build(): { sql: string; params: unknown[]; rowType: InferSelectResult<TSelect> } } {
+    fields: TSelect,
+  ): QueryBuilder<TTable> & {
+    build(): { sql: string; params: unknown[]; rowType: InferSelectResult<TSelect> };
+  } {
     this.ast.select = { type: 'select', fields };
     return this as any;
   }
@@ -44,14 +53,18 @@ export class QueryBuilder<TTable extends Table<any>> {
 
 export interface FromBuilder<TTable extends Table<any>> {
   select<TSelect extends Record<string, Column<any>>>(
-    fields: TSelect
-  ): QueryBuilder<TTable> & { build(): { sql: string; params: unknown[]; rowType: InferSelectResult<TSelect> } };
+    fields: TSelect,
+  ): QueryBuilder<TTable> & {
+    build(): { sql: string; params: unknown[]; rowType: InferSelectResult<TSelect> };
+  };
   where(condition: FieldExpression): FromBuilder<TTable>;
   orderBy(field: string, direction?: 'ASC' | 'DESC'): FromBuilder<TTable>;
   limit(count: number): FromBuilder<TTable>;
 }
 
-export function createFromBuilder<TTable extends Table<any>>(tableName: string): FromBuilder<TTable> {
+export function createFromBuilder<TTable extends Table<any>>(
+  tableName: string,
+): FromBuilder<TTable> {
   const builder = new QueryBuilder<TTable>(tableName);
 
   return {
@@ -61,3 +74,16 @@ export function createFromBuilder<TTable extends Table<any>>(tableName: string):
     limit: builder.limit.bind(builder),
   };
 }
+
+// Re-export compileToSQL for convenience
+export { compileToSQL } from './compiler';
+
+// Re-export types that are needed by other packages
+export type { QueryAST } from './types';
+export { TABLE_NAME } from './types';
+
+// Re-export sql function
+export { sql } from './sql';
+
+// Re-export makeT function
+export { makeT } from './maket';

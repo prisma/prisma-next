@@ -2,12 +2,12 @@
   "name": "@prisma/sql",
   "version": "0.0.0",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/builder.js",
+  "types": "dist/builder.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/builder.d.ts",
+      "import": "./dist/builder.js"
     },
     "./builder": {
       "types": "./dist/builder.d.ts",
