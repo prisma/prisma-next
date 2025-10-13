@@ -27,6 +27,53 @@ export const DefaultValueSchema = z.discriminatedUnion('kind', [
 
 export type DefaultValue = z.infer<typeof DefaultValueSchema>;
 
+// Primary key
+export const PrimaryKeySchema = z.object({
+  kind: z.literal('primaryKey'),
+  columns: z.array(z.string()).min(1),
+  name: z.string().optional(),
+});
+
+// Unique constraint
+export const UniqueSchema = z.object({
+  kind: z.literal('unique'),
+  columns: z.array(z.string()).min(1),
+  name: z.string().optional(),
+});
+
+// Foreign key
+export const ForeignKeySchema = z.object({
+  kind: z.literal('foreignKey'),
+  columns: z.array(z.string()).min(1),
+  references: z.object({
+    table: z.string(),
+    columns: z.array(z.string()).min(1),
+  }),
+  name: z.string().optional(),
+  onDelete: z.enum(['noAction', 'restrict', 'cascade', 'setNull', 'setDefault']).optional(),
+  onUpdate: z.enum(['noAction', 'restrict', 'cascade', 'setNull', 'setDefault']).optional(),
+});
+
+// Index
+export const IndexSchema = z.object({
+  name: z.string().optional(),
+  columns: z.array(z.string()).min(1),
+  unique: z.boolean().default(false),
+  method: z.enum(['btree', 'hash', 'gist', 'gin']).optional(),
+});
+
+export const ConstraintSchema = z.discriminatedUnion('kind', [
+  PrimaryKeySchema,
+  UniqueSchema,
+  ForeignKeySchema,
+]);
+
+export type PrimaryKey = z.infer<typeof PrimaryKeySchema>;
+export type Unique = z.infer<typeof UniqueSchema>;
+export type ForeignKey = z.infer<typeof ForeignKeySchema>;
+export type Index = z.infer<typeof IndexSchema>;
+export type Constraint = z.infer<typeof ConstraintSchema>;
+
 // Column definition
 export const ColumnSchema = z.object({
   type: ColumnTypeSchema,
@@ -41,8 +88,10 @@ export type Column = z.infer<typeof ColumnSchema>;
 // Table definition
 export const TableSchema = z.object({
   columns: z.record(z.string(), ColumnSchema),
-  indexes: z.array(z.any()).default([]),
-  constraints: z.array(z.any()).default([]),
+  primaryKey: PrimaryKeySchema.optional(),
+  uniques: z.array(UniqueSchema).default([]),
+  foreignKeys: z.array(ForeignKeySchema).default([]),
+  indexes: z.array(IndexSchema).default([]),
   capabilities: z.array(z.string()).default([]),
   meta: z
     .object({
@@ -54,17 +103,27 @@ export const TableSchema = z.object({
 export type Table = z.infer<typeof TableSchema>;
 
 // Complete schema
-export const SchemaSchema = z.object({
+export const ContractSchema = z.object({
   target: z.literal('postgres'),
   contractHash: z.string().optional(),
   tables: z.record(z.string(), TableSchema),
+  capabilities: z
+    .object({
+      postgres: z
+        .object({
+          jsonAgg: z.boolean().default(true),
+          lateral: z.boolean().default(true),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
-export type Schema = z.infer<typeof SchemaSchema>;
+export type Schema = z.infer<typeof ContractSchema>;
 
 // Validation functions
-export function validateSchema(data: unknown): Schema {
-  return SchemaSchema.parse(data);
+export function validateContract(data: unknown): Schema {
+  return ContractSchema.parse(data);
 }
 
 export function validateTable(data: unknown): Table {

@@ -7,8 +7,14 @@ export interface ModelDeclaration {
 export interface FieldDeclaration {
   type: 'FieldDeclaration';
   name: string;
-  fieldType: string;
+  fieldType: string | RelationFieldType;
   attributes: AttributeDeclaration[];
+}
+
+export interface RelationFieldType {
+  type: 'RelationFieldType';
+  targetModel: string;
+  isArray: boolean;
 }
 
 export interface AttributeDeclaration {
@@ -26,4 +32,3 @@ export interface SchemaAST {
   type: 'Schema';
   models: ModelDeclaration[];
 }
-

@@ -1,9 +1,9 @@
 import { connect } from '@prisma/runtime';
 import ir from '../.prisma/contract.json' assert { type: 'json' };
-import { Schema } from '@prisma/relational-ir';
+import { validateContract } from '@prisma/relational-ir';
 
 export const db = connect({
-  ir: ir as Schema,
+  ir: validateContract(ir),
   verify: 'onFirstUse',
   database: {
     host: process.env.DB_HOST || 'localhost',

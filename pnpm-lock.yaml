@@ -50,6 +50,9 @@ importers:
       '@prisma/dev':
         specifier: ^0.11.0
         version: 0.11.1(typescript@5.9.3)
+      '@prisma/orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
       '@prisma/psl':
         specifier: workspace:*
         version: link:../../packages/psl
@@ -99,6 +102,31 @@ importers:
         version: 8.5.0(postcss@8.5.6)(typescript@5.9.3)
       typescript:
         specifier: ^5.6.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@24.7.2)
+
+  packages/orm:
+    dependencies:
+      '@prisma/relational-ir':
+        specifier: workspace:*
+        version: link:../relational-ir
+      '@prisma/sql':
+        specifier: workspace:*
+        version: link:../sql
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^24.7.2
+        version: 24.7.2
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.0(postcss@8.5.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
         version: 5.9.3
       vitest:
         specifier: ^2.1.1

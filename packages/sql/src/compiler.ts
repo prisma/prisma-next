@@ -1,4 +1,4 @@
-import { QueryAST, Column, FieldExpression } from './types';
+import { QueryAST, Column, FieldExpression, ProjectionItem, Expr, SelectClause } from './types';
 
 export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   const params: any[] = [];
@@ -6,25 +6,69 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
 
   let sql = 'SELECT ';
 
-  // Handle SELECT clause
-  if (query.select && query.select.fields && Object.keys(query.select.fields).length > 0) {
-    const fieldList = Object.entries(query.select.fields)
-      .map(([alias, column]) => {
-        if (isColumn(column)) {
-          const quotedName = quoteIdentifier(column.name);
-          const quotedAlias = quoteIdentifier(alias);
-          return `${quotedName} AS ${quotedAlias}`;
-        }
-        return `${quoteIdentifier(column)} AS ${quoteIdentifier(alias)}`;
-      })
-      .join(', ');
-    sql += fieldList;
+  // Handle SELECT clause - support both old and new formats
+  if (query.select) {
+    if (Array.isArray(query.select)) {
+      // New ProjectionItem[] format
+      const fieldList = query.select
+        .map((item) => {
+          const expr = compileExpr(item.expr, params, paramIndex);
+          paramIndex += getExprParamCount(item.expr);
+          return `${expr} AS ${quoteIdentifier(item.alias)}`;
+        })
+        .join(', ');
+      sql += fieldList;
+    } else if (query.select.fields && Object.keys(query.select.fields).length > 0) {
+      // Old SelectClause format
+      const fieldList = Object.entries(query.select.fields)
+        .map(([alias, column]) => {
+          if (isColumn(column)) {
+            const quotedName = quoteIdentifier(column.name);
+            const quotedAlias = quoteIdentifier(alias);
+            return `${quotedName} AS ${quotedAlias}`;
+          }
+          return `${quoteIdentifier(column)} AS ${quoteIdentifier(alias)}`;
+        })
+        .join(', ');
+      sql += fieldList;
+    } else {
+      sql += '*';
+    }
   } else {
     sql += '*';
   }
 
   // Handle FROM clause
   sql += ` FROM ${quoteIdentifier(query.from)}`;
+
+  // Handle JOINs
+  if (query.joins) {
+    for (const join of query.joins) {
+      if (join.type === 'leftJoin') {
+        sql += ` LEFT JOIN ${quoteIdentifier(join.table)}`;
+        if (join.alias) sql += ` ${quoteIdentifier(join.alias)}`;
+        if (join.on) {
+          if (join.on.type === 'literal') {
+            sql += ` ON ${join.on.value}`;
+          } else {
+            sql += ` ON ${compileExpression(join.on, params, paramIndex)}`;
+            paramIndex += getParamCount(join.on);
+          }
+        }
+      } else if (join.type === 'join') {
+        sql += ` JOIN ${quoteIdentifier(join.table)}`;
+        if (join.alias) sql += ` ${quoteIdentifier(join.alias)}`;
+        if (join.on) {
+          if (join.on.type === 'literal') {
+            sql += ` ON ${join.on.value}`;
+          } else {
+            sql += ` ON ${compileExpression(join.on, params, paramIndex)}`;
+            paramIndex += getParamCount(join.on);
+          }
+        }
+      }
+    }
+  }
 
   // Handle WHERE clause
   if (query.where) {
@@ -225,4 +269,57 @@ function quoteIdentifier(identifier: string): string {
     return `"${identifier}"`;
   }
   return identifier;
+}
+
+// New expression compilation functions
+function compileExpr(expr: Expr, params: any[], paramIndex: number): string {
+  switch (expr.kind) {
+    case 'column':
+      const tablePrefix = expr.table ? `${quoteIdentifier(expr.table)}.` : '';
+      return `${tablePrefix}${quoteIdentifier(expr.name)}`;
+
+    case 'call':
+      const args = expr.args.map((arg) => compileExpr(arg, params, paramIndex)).join(', ');
+      return `${expr.fn}(${args})`;
+
+    case 'literal':
+      if (expr.value === null) return 'NULL';
+      if (typeof expr.value === 'string') return `'${expr.value.replace(/'/g, "''")}'`;
+      return String(expr.value);
+
+    case 'subquery':
+      const { sql: subSql, params: subParams } = compileToSQL(expr.query);
+      params.push(...subParams);
+      return `(${subSql})`;
+
+    case 'jsonObject':
+      const fields = Object.entries(expr.fields)
+        .map(([key, value]) => `'${key}', ${compileExpr(value, params, paramIndex)}`)
+        .join(', ');
+      return `json_build_object(${fields})`;
+
+    default:
+      throw new Error(`Unknown expression kind: ${(expr as any).kind}`);
+  }
+}
+
+function getExprParamCount(expr: Expr): number {
+  switch (expr.kind) {
+    case 'column':
+    case 'literal':
+      return 0;
+
+    case 'call':
+      return expr.args.reduce((sum, arg) => sum + getExprParamCount(arg), 0);
+
+    case 'subquery':
+      // Subquery params are handled separately
+      return 0;
+
+    case 'jsonObject':
+      return Object.values(expr.fields).reduce((sum, field) => sum + getExprParamCount(field), 0);
+
+    default:
+      return 0;
+  }
 }

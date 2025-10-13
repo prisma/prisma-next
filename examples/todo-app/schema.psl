@@ -3,5 +3,16 @@ model User {
   email     String     @unique
   active    Boolean    @default(true)
   createdAt DateTime   @default(now())
+
+  posts     Post[]
+}
+
+model Post {
+  id        Int        @id @default(autoincrement())
+  title     String
+  published Boolean    @default(false)
+  createdAt DateTime   @default(now())
+
+  user      User
 }
 

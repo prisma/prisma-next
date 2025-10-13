@@ -16,6 +16,7 @@
   "dependencies": {
     "@prisma/cli": "workspace:*",
     "@prisma/dev": "^0.11.0",
+    "@prisma/orm": "workspace:*",
     "@prisma/psl": "workspace:*",
     "@prisma/relational-ir": "workspace:*",
     "@prisma/runtime": "workspace:*",

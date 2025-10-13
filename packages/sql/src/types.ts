@@ -75,8 +75,9 @@ export interface QueryAST {
   from: string;
   contractHash?: string;
   projectStar?: boolean;
-  select?: SelectClause;
+  select?: SelectClause | ProjectionItem[]; // Support both old and new format
   where?: WhereClause;
+  joins?: JoinClause[]; // NEW: for N:1 includes
   orderBy?: OrderByClause[];
   limit?: LimitClause;
 }
@@ -104,3 +105,25 @@ export type InferTableShape<TTable extends Table<any>> =
 
 // Contract hash verification configuration
 export type ContractMismatchMode = 'error' | 'warn';
+
+// Expression types for flexible projections
+export type Expr =
+  | { kind: 'column'; table?: string; name: string }
+  | { kind: 'call'; fn: string; args: Expr[] } // json_agg, coalesce, etc.
+  | { kind: 'literal'; value: string | number | boolean | null }
+  | { kind: 'subquery'; query: QueryAST } // correlated subqueries
+  | { kind: 'jsonObject'; fields: Record<string, Expr> }; // json_build_object helper
+
+// Projection item
+export interface ProjectionItem {
+  alias: string;
+  expr: Expr;
+}
+
+// JOIN support (for N:1 includes)
+export interface JoinClause {
+  type: 'join' | 'leftJoin';
+  table: string;
+  alias?: string;
+  on: FieldExpression | { type: 'literal'; value: string };
+}

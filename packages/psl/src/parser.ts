@@ -5,6 +5,7 @@ import {
   FieldDeclaration,
   AttributeDeclaration,
   AttributeArgument,
+  RelationFieldType,
 } from './ast';
 
 export class Parser {
@@ -93,15 +94,8 @@ export class Parser {
     const nameToken = this.expect(TokenType.IDENTIFIER);
     const name = nameToken.value;
 
-    // Parse field type - can be INT, STRING, BOOLEAN, or DATETIME
-    const currentToken = this.current();
-    if (!currentToken || !this.isFieldType(currentToken.type)) {
-      throw new Error(
-        `Expected field type (Int, String, Boolean, DateTime), got ${currentToken?.type || 'EOF'}`,
-      );
-    }
-    this.advance();
-    const fieldType = currentToken.value;
+    // Parse field type - can be INT, STRING, BOOLEAN, DATETIME, or relation type
+    const fieldType = this.parseFieldType();
 
     const attributes: AttributeDeclaration[] = [];
 
@@ -116,6 +110,48 @@ export class Parser {
       fieldType,
       attributes,
     };
+  }
+
+  private parseFieldType(): string | RelationFieldType {
+    const currentToken = this.current();
+    if (!currentToken) {
+      throw new Error('Unexpected end of input while parsing field type');
+    }
+
+    // Check if it's a basic type
+    if (this.isFieldType(currentToken.type)) {
+      this.advance();
+      return currentToken.value;
+    }
+
+    // Check if it's a relation type (identifier)
+    if (currentToken.type === TokenType.IDENTIFIER) {
+      const targetModel = currentToken.value;
+      this.advance();
+
+      // Check if it's an array type (User[])
+      if (this.current() && this.current()!.type === TokenType.LBRACKET) {
+        this.advance(); // Skip [
+        this.expect(TokenType.RBRACKET); // Expect ]
+
+        return {
+          type: 'RelationFieldType',
+          targetModel,
+          isArray: true,
+        };
+      }
+
+      // Single relation type (User)
+      return {
+        type: 'RelationFieldType',
+        targetModel,
+        isArray: false,
+      };
+    }
+
+    throw new Error(
+      `Expected field type (Int, String, Boolean, DateTime, or relation), got ${currentToken.type}`,
+    );
   }
 
   private isFieldType(tokenType: TokenType): boolean {

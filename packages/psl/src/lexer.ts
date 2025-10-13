@@ -20,6 +20,8 @@ export enum TokenType {
   // Symbols
   LBRACE = 'LBRACE',
   RBRACE = 'RBRACE',
+  LBRACKET = 'LBRACKET',
+  RBRACKET = 'RBRACKET',
   AT = 'AT',
   LPAREN = 'LPAREN',
   RPAREN = 'RPAREN',
@@ -146,6 +148,14 @@ export class Lexer {
           break;
         case '=':
           tokens.push({ type: TokenType.EQUALS, value: this.currentChar, position: startPos });
+          this.advance();
+          break;
+        case '[':
+          tokens.push({ type: TokenType.LBRACKET, value: this.currentChar, position: startPos });
+          this.advance();
+          break;
+        case ']':
+          tokens.push({ type: TokenType.RBRACKET, value: this.currentChar, position: startPos });
           this.advance();
           break;
         case '"':

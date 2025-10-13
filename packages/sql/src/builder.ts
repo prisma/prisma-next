@@ -7,6 +7,7 @@ import {
   Table,
   ContractMismatchMode,
   Plan,
+  ProjectionItem,
 } from './types';
 import { compileToSQL } from './compiler';
 
@@ -97,7 +98,23 @@ export class QueryBuilder<TTable extends Table<any>> {
 
     // Collect from select fields
     if (this.ast.select) {
-      references.push(...Object.values(this.ast.select.fields));
+      if (Array.isArray(this.ast.select)) {
+        // New ProjectionItem[] format - extract column references
+        for (const item of this.ast.select) {
+          if (item.expr.kind === 'column') {
+            // Create a mock column object for contract hash checking
+            const mockColumn = {
+              table: item.expr.table || this.ast.from,
+              name: item.expr.name,
+              __contractHash: this.context.contractHash,
+            } as Column<any>;
+            references.push(mockColumn);
+          }
+        }
+      } else if (this.ast.select.fields) {
+        // Old SelectClause format
+        references.push(...Object.values(this.ast.select.fields));
+      }
     }
 
     // Extract table and column references
