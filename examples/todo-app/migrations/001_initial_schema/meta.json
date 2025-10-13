@@ -1,0 +1,13 @@
+{
+  "id": "001_initial_schema",
+  "target": "postgres",
+  "from": { "kind": "empty" },
+  "to": {
+    "kind": "contract",
+    "hash": "sha256:b9c36620adf5ef14628da84cedd21cc69fd3867c4710f1051f7714c10853ec00"
+  },
+  "opSetHash": "sha256:229ea12bfa40eafa5386c7ca6e7120419631fed482d4ab163357836967b722a7",
+  "mode": "strict",
+  "supersedes": [],
+  "notes": "Initial schema creation with user and post tables"
+}
