@@ -18,10 +18,23 @@ const mockSchema = {
   tables: {
     user: {
       columns: {
-        id: { type: 'int4' as const, nullable: false, pk: true, default: { kind: 'autoincrement' as const } },
+        id: {
+          type: 'int4' as const,
+          nullable: false,
+          pk: true,
+          default: { kind: 'autoincrement' as const },
+        },
         email: { type: 'text' as const, nullable: false, unique: true },
-        active: { type: 'bool' as const, nullable: false, default: { kind: 'literal' as const, value: 'true' } },
-        createdAt: { type: 'timestamptz' as const, nullable: false, default: { kind: 'now' as const } },
+        active: {
+          type: 'bool' as const,
+          nullable: false,
+          default: { kind: 'literal' as const, value: 'true' },
+        },
+        createdAt: {
+          type: 'timestamptz' as const,
+          nullable: false,
+          default: { kind: 'now' as const },
+        },
       },
       indexes: [],
       constraints: [],
@@ -36,19 +49,19 @@ describe('SQL Query Builder', () => {
   it('builds a simple SELECT query with Column objects', () => {
     const query = sql(mockSchema).from(t.user).select({ id: t.user.id, email: t.user.email });
 
-    const { sql: generatedSQL, params } = query.build();
+    const plan = query.build();
 
-    expect(generatedSQL).toBe('SELECT id AS id, email AS email FROM user');
-    expect(params).toHaveLength(0);
+    expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email" FROM "user"');
+    expect(plan.params).toHaveLength(0);
   });
 
   it('builds a query with WHERE clause using Column expressions', () => {
     const query = sql(mockSchema).from(t.user).where(t.user.active.eq(true)).select({});
 
-    const { sql: generatedSQL, params } = query.build();
+    const plan = query.build();
 
-    expect(generatedSQL).toBe('SELECT * FROM user WHERE active = $1');
-    expect(params).toEqual([true]);
+    expect(plan.sql).toBe('SELECT * FROM "user" WHERE "active" = $1');
+    expect(plan.params).toEqual([true]);
   });
 
   it('builds a query with ORDER BY and LIMIT', () => {
@@ -56,7 +69,7 @@ describe('SQL Query Builder', () => {
 
     const { sql: generatedSQL, params } = query.build();
 
-    expect(generatedSQL).toBe('SELECT * FROM user ORDER BY createdAt DESC LIMIT $1');
+    expect(generatedSQL).toBe('SELECT * FROM "user" ORDER BY "createdAt" DESC LIMIT $1');
     expect(params).toEqual([10]);
   });
 
@@ -71,7 +84,7 @@ describe('SQL Query Builder', () => {
     const { sql: generatedSQL, params } = query.build();
 
     expect(generatedSQL).toBe(
-      'SELECT id AS id, email AS email FROM user WHERE active = $1 ORDER BY createdAt DESC LIMIT $2',
+      'SELECT "id" AS "id", "email" AS "email" FROM "user" WHERE "active" = $1 ORDER BY "createdAt" DESC LIMIT $2',
     );
     expect(params).toEqual([true, 5]);
   });
@@ -84,7 +97,7 @@ describe('SQL Query Builder', () => {
 
     const { sql: generatedSQL, params } = query.build();
 
-    expect(generatedSQL).toBe('SELECT * FROM user WHERE id IN ($1, $2, $3)');
+    expect(generatedSQL).toBe('SELECT * FROM "user" WHERE "id" IN ($1, $2, $3)');
     expect(params).toEqual([1, 2, 3]);
   });
 
@@ -98,11 +111,11 @@ describe('SQL Query Builder', () => {
     ];
 
     const expectedSQLs = [
-      'SELECT * FROM user WHERE id > $1',
-      'SELECT * FROM user WHERE id < $1',
-      'SELECT * FROM user WHERE id >= $1',
-      'SELECT * FROM user WHERE id <= $1',
-      'SELECT * FROM user WHERE email != $1',
+      'SELECT * FROM "user" WHERE "id" > $1',
+      'SELECT * FROM "user" WHERE "id" < $1',
+      'SELECT * FROM "user" WHERE "id" >= $1',
+      'SELECT * FROM "user" WHERE "id" <= $1',
+      'SELECT * FROM "user" WHERE "email" != $1',
     ];
 
     queries.forEach((query, index) => {
@@ -123,7 +136,7 @@ describe('SQL Query Builder', () => {
     const { sql: generatedSQL, params } = query.build();
 
     expect(generatedSQL).toBe(
-      'SELECT id AS id, email AS email, active AS active, "createdAt" AS "createdAt" FROM user',
+      'SELECT "id" AS "id", "email" AS "email", "active" AS "active", "createdAt" AS "createdAt" FROM "user"',
     );
     expect(params).toHaveLength(0);
   });
@@ -133,16 +146,19 @@ describe('SQL Query Builder', () => {
 
     const { sql: generatedSQL, params } = query.build();
 
-    expect(generatedSQL).toBe('SELECT * FROM user WHERE active = $1');
+    expect(generatedSQL).toBe('SELECT * FROM "user" WHERE "active" = $1');
     expect(params).toEqual([false]);
   });
 
   it('handles string values with special characters', () => {
-    const query = sql(mockSchema).from(t.user).where(t.user.email.eq('test@example.com')).select({});
+    const query = sql(mockSchema)
+      .from(t.user)
+      .where(t.user.email.eq('test@example.com'))
+      .select({});
 
     const { sql: generatedSQL, params } = query.build();
 
-    expect(generatedSQL).toBe('SELECT * FROM user WHERE email = $1');
+    expect(generatedSQL).toBe('SELECT * FROM "user" WHERE "email" = $1');
     expect(params).toEqual(['test@example.com']);
   });
 });

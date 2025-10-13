@@ -6,6 +6,7 @@ import {
   InferTableShape,
   Table,
   ContractMismatchMode,
+  Plan,
 } from './types';
 import { compileToSQL } from './compiler';
 
@@ -42,13 +43,14 @@ export class QueryBuilder<TTable extends Table<any>> {
       type: 'select',
       from,
       contractHash: context.contractHash,
+      projectStar: true, // Default to true, will be set to false when select() is called
     };
   }
 
   select<TSelect extends Record<string, Column<any>>>(
     fields: TSelect,
   ): QueryBuilder<TTable> & {
-    build(): { sql: string; params: unknown[]; rowType: InferSelectResult<TSelect> };
+    build(): Plan;
   } {
     // Verify all columns have matching contract hash
     for (const [alias, column] of Object.entries(fields)) {
@@ -63,6 +65,7 @@ export class QueryBuilder<TTable extends Table<any>> {
     }
 
     this.ast.select = { type: 'select', fields };
+    this.ast.projectStar = false; // Explicit select() means no SELECT *
     return this as any;
   }
 
@@ -86,19 +89,20 @@ export class QueryBuilder<TTable extends Table<any>> {
     return this;
   }
 
-  build(): { sql: string; params: unknown[]; rowType: InferSelectResult<any> } {
+  build(): Plan {
     // Final verification: check all column references have matching contract hash
     const references: Column<any>[] = [];
+    const tables = new Set<string>();
+    const columns = new Set<string>();
 
     // Collect from select fields
     if (this.ast.select) {
       references.push(...Object.values(this.ast.select.fields));
     }
 
-    // Note: FieldExpression doesn't carry contract hash directly, but we could
-    // add verification here if needed. For now, the select() verification is sufficient.
+    // Extract table and column references
+    tables.add(this.ast.from);
 
-    // Verify all collected references
     for (const ref of references) {
       if (ref.__contractHash !== this.context.contractHash) {
         handleMismatch(
@@ -108,10 +112,25 @@ export class QueryBuilder<TTable extends Table<any>> {
           this.context.onContractMismatch,
         );
       }
+      tables.add(ref.table);
+      columns.add(`${ref.table}.${ref.name}`);
     }
 
     const { sql, params } = compileToSQL(this.ast);
-    return { sql, params, rowType: {} as any };
+
+    return {
+      ast: { ...this.ast }, // Immutable snapshot
+      sql,
+      params,
+      meta: {
+        contractHash: this.context.contractHash || '',
+        target: 'postgres',
+        refs: {
+          tables: Array.from(tables),
+          columns: Array.from(columns),
+        },
+      },
+    };
   }
 }
 
@@ -119,11 +138,12 @@ export interface FromBuilder<TTable extends Table<any>> {
   select<TSelect extends Record<string, Column<any>>>(
     fields: TSelect,
   ): QueryBuilder<TTable> & {
-    build(): { sql: string; params: unknown[]; rowType: InferSelectResult<TSelect> };
+    build(): Plan;
   };
   where(condition: FieldExpression): FromBuilder<TTable>;
   orderBy(field: string, direction?: 'ASC' | 'DESC'): FromBuilder<TTable>;
   limit(count: number): FromBuilder<TTable>;
+  build(): Plan;
 }
 
 export function createFromBuilder<TTable extends Table<any>>(
@@ -137,6 +157,7 @@ export function createFromBuilder<TTable extends Table<any>>(
     where: builder.where.bind(builder),
     orderBy: builder.orderBy.bind(builder),
     limit: builder.limit.bind(builder),
+    build: builder.build.bind(builder),
   };
 }
 

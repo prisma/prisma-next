@@ -18,10 +18,23 @@ const mockSchema = {
   tables: {
     user: {
       columns: {
-        id: { type: 'int4' as const, nullable: false, pk: true, default: { kind: 'autoincrement' as const } },
+        id: {
+          type: 'int4' as const,
+          nullable: false,
+          pk: true,
+          default: { kind: 'autoincrement' as const },
+        },
         email: { type: 'text' as const, nullable: false, unique: true },
-        active: { type: 'bool' as const, nullable: false, default: { kind: 'literal' as const, value: 'true' } },
-        createdAt: { type: 'timestamptz' as const, nullable: false, default: { kind: 'now' as const } },
+        active: {
+          type: 'bool' as const,
+          nullable: false,
+          default: { kind: 'literal' as const, value: 'true' },
+        },
+        createdAt: {
+          type: 'timestamptz' as const,
+          nullable: false,
+          default: { kind: 'now' as const },
+        },
       },
       indexes: [],
       constraints: [],
@@ -34,14 +47,16 @@ const t = makeT<TestTables>(mockSchema);
 
 describe('Type Inference Tests', () => {
   it('infers correct return type for simple select', () => {
-    const query = sql(mockSchema).from(t.user as any).select({ id: t.user.id, email: t.user.email });
+    const query = sql(mockSchema)
+      .from(t.user as any)
+      .select({ id: t.user.id, email: t.user.email });
 
-    const { sql: generatedSQL, params, rowType } = query.build();
+    const plan = query.build();
 
-    expect(generatedSQL).toBe('SELECT id AS id, email AS email FROM user');
-    expect(params).toHaveLength(0);
+    expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email" FROM "user"');
+    expect(plan.params).toHaveLength(0);
     // Type checking happens at compile time, this is a runtime check for structure
-    expect(rowType).toEqual({}); // Placeholder for runtime type check
+    expect(plan.meta.refs.tables).toEqual(['user']);
   });
 
   it('infers correct return type for select with all fields', () => {
@@ -52,36 +67,38 @@ describe('Type Inference Tests', () => {
       createdAt: t.user.createdAt,
     });
 
-    const { sql: generatedSQL, params, rowType } = query.build();
+    const plan = query.build();
 
-    expect(generatedSQL).toBe(
-      'SELECT id AS id, email AS email, active AS active, "createdAt" AS "createdAt" FROM user',
+    expect(plan.sql).toBe(
+      'SELECT "id" AS "id", "email" AS "email", "active" AS "active", "createdAt" AS "createdAt" FROM "user"',
     );
-    expect(params).toHaveLength(0);
-    expect(rowType).toEqual({});
+    expect(plan.params).toHaveLength(0);
+    expect(plan.meta.refs.tables).toEqual(['user']);
   });
 
   it('infers correct return type for query with where clause', () => {
     const query = sql(mockSchema)
       .from(t.user)
-      .where((t.user).active.eq(true))
-      .select({ id: (t.user).id, email: (t.user).email });
+      .where(t.user.active.eq(true))
+      .select({ id: t.user.id, email: t.user.email });
 
-    const { sql: generatedSQL, params, rowType } = query.build();
+    const plan = query.build();
 
-    expect(generatedSQL).toBe('SELECT id AS id, email AS email FROM user WHERE active = $1');
-    expect(params).toEqual([true]);
-    expect(rowType).toEqual({});
+    expect(plan.sql).toBe(
+      'SELECT "id" AS "id", "email" AS "email" FROM "user" WHERE "active" = $1',
+    );
+    expect(plan.params).toEqual([true]);
+    expect(plan.meta.refs.tables).toEqual(['user']);
   });
 
   it('infers correct return type for query with limit', () => {
     const query = sql(mockSchema).from(t.user).select({ id: t.user.id }).limit(10);
 
-    const { sql: generatedSQL, params, rowType } = query.build();
+    const plan = query.build();
 
-    expect(generatedSQL).toBe('SELECT id AS id FROM user LIMIT $1');
-    expect(params).toEqual([10]);
-    expect(rowType).toEqual({});
+    expect(plan.sql).toBe('SELECT "id" AS "id" FROM "user" LIMIT $1');
+    expect(plan.params).toEqual([10]);
+    expect(plan.meta.refs.tables).toEqual(['user']);
   });
 
   it('infers correct return type for query with order by', () => {
@@ -90,11 +107,11 @@ describe('Type Inference Tests', () => {
       .select({ id: t.user.id, email: t.user.email })
       .orderBy('id', 'ASC');
 
-    const { sql: generatedSQL, params, rowType } = query.build();
+    const plan = query.build();
 
-    expect(generatedSQL).toBe('SELECT id AS id, email AS email FROM user ORDER BY id ASC');
-    expect(params).toHaveLength(0);
-    expect(rowType).toEqual({});
+    expect(plan.sql).toBe('SELECT "id" AS "id", "email" AS "email" FROM "user" ORDER BY "id" ASC');
+    expect(plan.params).toHaveLength(0);
+    expect(plan.meta.refs.tables).toEqual(['user']);
   });
 
   it('verifies Column objects have correct structure', () => {

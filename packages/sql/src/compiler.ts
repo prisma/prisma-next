@@ -7,7 +7,7 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   let sql = 'SELECT ';
 
   // Handle SELECT clause
-  if (query.select && query.select.fields) {
+  if (query.select && query.select.fields && Object.keys(query.select.fields).length > 0) {
     const fieldList = Object.entries(query.select.fields)
       .map(([alias, column]) => {
         if (isColumn(column)) {
@@ -15,7 +15,7 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
           const quotedAlias = quoteIdentifier(alias);
           return `${quotedName} AS ${quotedAlias}`;
         }
-        return `${column} AS ${alias}`;
+        return `${quoteIdentifier(column)} AS ${quoteIdentifier(alias)}`;
       })
       .join(', ');
     sql += fieldList;
@@ -35,7 +35,7 @@ export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
   // Handle ORDER BY clause
   if (query.orderBy && query.orderBy.length > 0) {
     const orderByClause = query.orderBy
-      .map((order) => `${order.field} ${order.direction}`)
+      .map((order) => `${quoteIdentifier(order.field)} ${order.direction}`)
       .join(', ');
     sql += ` ORDER BY ${orderByClause}`;
   }
@@ -162,6 +162,10 @@ function isFieldExpression(obj: any): boolean {
 function quoteIdentifier(identifier: string): string {
   // PostgreSQL reserved words that should always be quoted
   const reservedWords = new Set([
+    'id',
+    'email',
+    'active',
+    'createdAt',
     'user',
     'order',
     'group',

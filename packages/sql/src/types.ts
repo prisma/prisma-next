@@ -74,10 +74,24 @@ export interface QueryAST {
   type: 'select';
   from: string;
   contractHash?: string;
+  projectStar?: boolean;
   select?: SelectClause;
   where?: WhereClause;
   orderBy?: OrderByClause[];
   limit?: LimitClause;
+}
+
+export interface Plan {
+  ast: QueryAST;
+  sql: string;
+  params: unknown[];
+  meta: {
+    contractHash: string;
+    target: 'postgres';
+    refs: { tables: string[]; columns: string[] };
+    paramsShape?: Array<{ name?: string; type?: string }>;
+    annotations?: Record<string, any>;
+  };
 }
 
 // Type inference helpers
@@ -85,8 +99,8 @@ export type InferSelectResult<TSelect extends Record<string, Column<any>>> = {
   [K in keyof TSelect]: TSelect[K] extends Column<infer U> ? U : never;
 };
 
-export type InferTableShape<TTable extends Table<any>> = TTable extends Table<infer TShape> ? TShape : never;
+export type InferTableShape<TTable extends Table<any>> =
+  TTable extends Table<infer TShape> ? TShape : never;
 
 // Contract hash verification configuration
 export type ContractMismatchMode = 'error' | 'warn';
-
