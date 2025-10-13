@@ -8,6 +8,7 @@
     "start": "pnpm exec node dist/main.js",
     "generate": "pnpm exec prisma-next generate schema.psl",
     "dev:schema": "pnpm exec prisma-next dev schema.psl",
+    "setup-db": "pnpm exec node dist/setup-db.js",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.config.ts",
     "lint": "eslint 'src/**/*.ts'",

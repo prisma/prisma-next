@@ -3,6 +3,9 @@ import { emitSchemaAndTypes } from '@prisma/schema-emitter';
 import { readFileSync, writeFileSync } from 'fs';
 import { getActiveUsers, getUserById, getUsersByEmail } from './queries';
 import { db } from './db';
+import { assertContract, verifyContract } from '@prisma/runtime';
+import ir from '../.prisma/schema.json' assert { type: 'json' };
+import { Schema } from '@prisma/relational-ir';
 
 async function main() {
   console.log('🚀 PSL → IR Prototype Demo\n');
@@ -25,8 +28,14 @@ async function main() {
   writeFileSync('.prisma/schema.d.ts', types);
   console.log('✅ schema.d.ts generated\n');
 
-  // Step 3: Demonstrate type-safe queries
-  console.log('3. Executing type-safe queries...');
+  // Step 3: Contract verification (one line!)
+  console.log('3. Verifying contract...');
+  const schemaIR = JSON.parse(schema) as Schema;
+  await assertContract({ expectedHash: schemaIR.contractHash!, client: db.pool });
+  console.log('✅ Contract verified\n');
+
+  // Step 4: Execute type-safe queries
+  console.log('4. Executing type-safe queries...');
 
   try {
     // Get active users
@@ -38,7 +47,7 @@ async function main() {
     console.log('User by ID 1:', user);
 
     // Get users by email
-    const usersByEmail = await getUsersByEmail('test@example.com');
+    const usersByEmail = await getUsersByEmail('alice@example.com');
     console.log('Users by email:', usersByEmail);
 
     console.log('\n✅ All queries executed successfully!');

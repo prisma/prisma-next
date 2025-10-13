@@ -14,7 +14,9 @@ describe('Canonicalization', () => {
       post: { title: 'Hello', content: 'World' },
     };
     const result = canonicalJSONStringify(input);
-    expect(result).toBe('{"post":{"content":"World","title":"Hello"},"user":{"email":"test@example.com","id":1}}');
+    expect(result).toBe(
+      '{"post":{"content":"World","title":"Hello"},"user":{"email":"test@example.com","id":1}}',
+    );
   });
 
   it('preserves array order', () => {
@@ -61,11 +63,11 @@ describe('Canonicalization', () => {
       },
       target: 'postgres',
     };
-    
+
     const result1 = canonicalJSONStringify(input);
     const result2 = canonicalJSONStringify(input);
     expect(result1).toBe(result2);
-    
+
     // Verify the structure is properly sorted
     expect(result1).toContain('"target":"postgres"');
     expect(result1).toContain('"tables"');

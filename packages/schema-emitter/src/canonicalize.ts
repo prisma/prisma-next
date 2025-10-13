@@ -11,7 +11,7 @@ function sortKeysDeep(obj: any): any {
   if (Array.isArray(obj)) {
     return obj.map(sortKeysDeep);
   }
-  
+
   if (obj && typeof obj === 'object') {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(obj).sort()) {
@@ -19,6 +19,6 @@ function sortKeysDeep(obj: any): any {
     }
     return out;
   }
-  
+
   return obj;
 }

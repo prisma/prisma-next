@@ -1,12 +1,13 @@
 # Todo App Example
 
-This example demonstrates the complete TypeScript query DSL prototype with type-safe queries and integration testing.
+This example demonstrates the complete TypeScript query DSL prototype with type-safe queries, contract verification, and integration testing.
 
 ## Features Demonstrated
 
 - **PSL Schema Definition**: Define data models using Prisma Schema Language
 - **Type-Safe Query Building**: Use Column objects for type-safe SQL queries
 - **Automatic Type Inference**: Query results are automatically typed
+- **Contract Hash Verification**: Ensure application and database schema alignment
 - **Schema Verification**: Runtime verification of table/column existence
 - **Integration Testing**: Full database integration tests using `@prisma/dev`
 
@@ -41,15 +42,14 @@ This example demonstrates the complete TypeScript query DSL prototype with type-
    docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:15
    ```
 
-2. **Create the database table**:
-   ```sql
-   CREATE TABLE "user" (
-     id SERIAL PRIMARY KEY,
-     email VARCHAR(255) UNIQUE NOT NULL,
-     active BOOLEAN DEFAULT true,
-     "createdAt" TIMESTAMP DEFAULT NOW()
-   );
+2. **Set up the database with contract verification**:
+   ```bash
+   pnpm setup-db
    ```
+   This creates:
+   - `prisma_contract.version` table for contract hash storage
+   - `user` table from your schema
+   - Seeds the contract hash from your generated schema
 
 3. **Run the example**:
    ```bash
@@ -65,6 +65,71 @@ pnpm test
 # Integration tests (requires PostgreSQL)
 pnpm test:integration
 ```
+
+## Contract Hash Verification
+
+The contract verifier ensures your application's compiled schema matches the database's applied schema. This prevents runtime errors from schema mismatches.
+
+### Basic Usage
+
+```typescript
+import { connect, assertContract } from '@prisma/runtime';
+import schema from './schema.json';
+
+const db = connect({ ir: schema, database: { ... } });
+
+// Verify contract at startup - fails fast if mismatched
+await assertContract({ expectedHash: schema.contractHash, client: db.pool });
+```
+
+That's it! If the database schema doesn't match your application, it throws an actionable error.
+
+### Alternative: Non-Throwing Verification
+
+```typescript
+import { verifyContract } from '@prisma/runtime';
+
+// Non-throwing verification with custom handling
+const result = await verifyContract({
+  expectedHash: schema.contractHash,
+  client: db.pool,
+  mode: 'warn' // Log warnings instead of throwing
+});
+
+if (!result.ok) {
+  console.warn('Contract mismatch:', result);
+  // Custom handling logic here
+}
+```
+
+### Health Check Pattern
+
+```typescript
+// Health check endpoint
+const healthCheck = async () => {
+  const result = await verifyContract({
+    expectedHash: schema.contractHash,
+    client: db.pool,
+    mode: 'warn'
+  });
+
+  return {
+    status: result.ok ? 'healthy' : 'degraded',
+    contract: result.ok ? 'valid' : 'mismatch',
+    details: result,
+    timestamp: new Date().toISOString()
+  };
+};
+```
+
+### Error Scenarios
+
+The verifier handles two main error scenarios:
+
+1. **E_CONTRACT_MISSING**: No contract hash row found in database
+2. **E_CONTRACT_MISMATCH**: Database hash differs from application hash
+
+Both errors include actionable remediation hints.
 
 ## Code Examples
 
@@ -206,8 +271,9 @@ describe('Integration Tests', () => {
 
 - `pnpm build` - Build TypeScript files
 - `pnpm dev` - Watch mode for development
-- `pnpm start` - Run the example application
+- `pnpm start` - Run the example application with contract verification
 - `pnpm generate` - Generate schema files from PSL
+- `pnpm setup-db` - Set up database with contract version table
 - `pnpm test` - Run unit tests
 - `pnpm test:integration` - Run integration tests
 - `pnpm lint` - Lint TypeScript files
