@@ -26,21 +26,6 @@ export async function setupDatabase() {
   });
 
   try {
-    // Create prisma_contract schema
-    await db.execute(rawQuery`${unsafe('CREATE SCHEMA IF NOT EXISTS prisma_contract;')}`);
-    console.log('✅ Created prisma_contract schema');
-
-    // Create version table
-    await db.execute(rawQuery`
-      ${unsafe(`
-        CREATE TABLE IF NOT EXISTS prisma_contract.version (
-          id    int PRIMARY KEY,
-          hash  text NOT NULL
-        );
-      `)}
-    `);
-    console.log('✅ Created prisma_contract.version table');
-
     // Create user table (from our schema)
     await db.execute(rawQuery`
       ${unsafe(`
@@ -54,18 +39,30 @@ export async function setupDatabase() {
     `);
     console.log('✅ Created user table');
 
-    // Seed or update contract hash
-    const contractHash = ir.contractHash;
-    if (!contractHash) {
-      throw new Error('No contract hash found in schema.json');
-    }
-
+    // Create post table (from our schema)
     await db.execute(rawQuery`
-      INSERT INTO ${table('prisma_contract.version')} (id, hash)
-      VALUES (${value(1)}, ${value(contractHash, 'text')})
-      ON CONFLICT (id) DO UPDATE SET hash = EXCLUDED.hash;
+      ${unsafe(`
+        CREATE TABLE IF NOT EXISTS "post" (
+          id        SERIAL PRIMARY KEY,
+          title     TEXT NOT NULL,
+          published BOOLEAN DEFAULT false,
+          "createdAt" TIMESTAMP DEFAULT NOW(),
+          user_id   INTEGER NOT NULL REFERENCES "user"(id)
+        );
+      `)}
     `);
-    console.log(`✅ Seeded contract hash: ${contractHash}`);
+    console.log('✅ Created post table');
+
+    // Clear existing test data first
+    await db.execute(rawQuery`
+      ${unsafe(`
+        DELETE FROM "post";
+        DELETE FROM "user";
+        ALTER SEQUENCE "user_id_seq" RESTART WITH 1;
+        ALTER SEQUENCE "post_id_seq" RESTART WITH 1;
+      `)}
+    `);
+    console.log('✅ Cleared existing test data');
 
     // Insert some test data
     await db.execute(rawQuery`
@@ -75,7 +72,19 @@ export async function setupDatabase() {
       (${value('test3@example.com')}, ${value(true)}, NOW())
       ON CONFLICT (email) DO NOTHING;
     `);
-    console.log('✅ Inserted test data');
+    console.log('✅ Inserted test user data');
+
+    // Insert some test post data
+    await db.execute(rawQuery`
+      INSERT INTO ${table('post')} (title, published, "createdAt", user_id) VALUES
+      (${value('First Post')}, ${value(true)}, NOW(), 1),
+      (${value('Second Post')}, ${value(false)}, NOW(), 1),
+      (${value('Third Post')}, ${value(true)}, NOW(), 2),
+      (${value('Fourth Post')}, ${value(true)}, NOW(), 3),
+      (${value('Fifth Post')}, ${value(false)}, NOW(), 3)
+      ON CONFLICT DO NOTHING;
+    `);
+    console.log('✅ Inserted test post data');
 
     console.log('\n🎉 Database setup complete!');
     return db;
