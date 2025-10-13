@@ -8,8 +8,13 @@
     "generate": "pnpm exec prisma-next generate schema.psl",
     "migrate": "pnpm exec node dist/migrate.js",
     "reset-db": "pnpm exec node dist/reset-db.js",
+    "generate-migration": "pnpm exec node dist/generate-migration.js",
+    "evolve-schema": "pnpm exec node dist/evolve-schema.js",
+    "demo": "pnpm exec node dist/demo.js",
+    "test-planner": "pnpm exec node dist/test-planner.js",
     "test:migration": "pnpm reset-db && pnpm migrate",
     "test:migration-twice": "pnpm reset-db && pnpm migrate && pnpm migrate",
+    "test:planner": "pnpm reset-db && pnpm evolve-schema && pnpm migrate",
     "clean": "rm -rf dist .prisma",
     "lint": "eslint 'src/**/*.ts'",
     "typecheck": "pnpm exec tsc --noEmit && pnpm exec tsc --noEmit --skipLibCheck $(find src -name '*.ts' 2>/dev/null || true)"

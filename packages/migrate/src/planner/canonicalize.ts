@@ -32,7 +32,9 @@ function canonicalOpComparator(a: Op, b: Op): number {
   if (kindDiff !== 0) return kindDiff;
 
   // 2. Within each kind, sort by table name
-  const tableDiff = a.table.localeCompare(b.table);
+  const tableA = (a as any).table || (a as any).name || '';
+  const tableB = (b as any).table || (b as any).name || '';
+  const tableDiff = tableA.localeCompare(tableB);
   if (tableDiff !== 0) return tableDiff;
 
   // 3. For operations with columns, sort by columns

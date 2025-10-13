@@ -8,10 +8,12 @@
 
 import { connect } from '@prisma/runtime';
 import { rawQuery, value, table } from '@prisma/sql';
-import { loadProgram, applyNext, connectAdmin, pgLowerer } from '@prisma/migrate';
+import { loadProgram, applyNext, connectAdmin, pgLowerer, nextApplicable } from '@prisma/migrate';
 import ir from '../../.prisma/contract.json';
 import { Schema } from '@prisma/relational-ir';
 import { join } from 'path';
+import { promises as fs } from 'fs';
+import { readdir } from 'fs/promises';
 
 export async function migrateDatabase() {
   console.log('🔧 Running database migrations...\n');
@@ -33,27 +35,60 @@ export async function migrateDatabase() {
   const admin = await connectAdmin(connectionString);
 
   try {
-    // Load the initial schema migration program
-    const migrationDir = join(process.cwd(), 'migrations', '001_initial_schema');
-    const program = await loadProgram(migrationDir);
+    // Find all migration directories
+    const migrationsDir = join(process.cwd(), 'migrations');
+    const entries = await readdir(migrationsDir, { withFileTypes: true });
+    const migrationDirs = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name + '/')
+      .sort();
 
-    console.log(`📦 Loaded migration program: ${program.meta.id}`);
-    console.log(`   From: ${program.meta.from.kind}`);
-    console.log(`   To: ${program.meta.to.hash}`);
-    console.log(`   Operations: ${program.ops.operations.length}`);
+    console.log(`📁 Found ${migrationDirs.length} migration(s): ${migrationDirs.join(', ')}`);
 
-    // Apply the migration using the runner
-    const lowerer = pgLowerer();
-    const report = await applyNext([program], admin, lowerer);
-
-    if (report.applied) {
-      console.log('✅ Applied migration successfully');
-      console.log(`   Program ID: ${report.programId}`);
-      console.log(`   SQL Hash: ${report.sqlHash}`);
-    } else {
-      console.log('ℹ️  Migration not applicable');
-      console.log(`   Reason: ${report.reason}`);
+    // Load all migration programs
+    const programs = [];
+    for (const dir of migrationDirs.sort()) {
+      const program = await loadProgram(join(migrationsDir, dir));
+      programs.push(program);
+      console.log(`📦 Loaded: ${program.meta.id}`);
     }
+
+    // Apply migrations until none are applicable
+    const lowerer = pgLowerer();
+    let appliedCount = 0;
+
+    while (true) {
+      const contractResult = await admin.readContract();
+      const contractMarker = { hash: contractResult.hash };
+      const nextProgram = nextApplicable(programs, contractMarker);
+
+      if (!nextProgram) {
+        console.log('✅ No more applicable migrations');
+        break;
+      }
+
+      console.log(`\n🔄 Applying migration: ${nextProgram.meta.id}`);
+      console.log(
+        `   From: ${nextProgram.meta.from.kind === 'contract' ? nextProgram.meta.from.hash : nextProgram.meta.from.kind}`,
+      );
+      console.log(`   To: ${nextProgram.meta.to.hash}`);
+      console.log(`   Operations: ${nextProgram.ops.operations.length}`);
+
+      const report = await applyNext([nextProgram], admin, lowerer);
+
+      if (report.applied) {
+        console.log('✅ Applied migration successfully');
+        console.log(`   Program ID: ${report.programId}`);
+        console.log(`   SQL Hash: ${report.sqlHash}`);
+        appliedCount++;
+      } else {
+        console.log('ℹ️  Migration not applicable');
+        console.log(`   Reason: ${report.reason}`);
+        break;
+      }
+    }
+
+    console.log(`\n📊 Applied ${appliedCount} migration(s) total`);
 
     // Clear existing test data first (keep using rawQuery for DML)
     await db.execute(rawQuery`
