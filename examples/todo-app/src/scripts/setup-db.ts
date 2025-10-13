@@ -6,6 +6,7 @@
  */
 
 import { connect } from '@prisma/runtime';
+import { rawQuery, unsafe, value, table, column } from '@prisma/sql';
 import ir from '../../.prisma/contract.json';
 import { Schema } from '@prisma/relational-ir';
 
@@ -27,36 +28,31 @@ export async function setupDatabase() {
 
   try {
     // Create prisma_contract schema
-    await db.execute({
-      type: 'raw',
-      sql: 'CREATE SCHEMA IF NOT EXISTS prisma_contract;',
-    });
+    await db.execute(rawQuery`${unsafe('CREATE SCHEMA IF NOT EXISTS prisma_contract;')}`);
     console.log('✅ Created prisma_contract schema');
 
     // Create version table
-    await db.execute({
-      type: 'raw',
-      sql: `
+    await db.execute(rawQuery`
+      ${unsafe(`
         CREATE TABLE IF NOT EXISTS prisma_contract.version (
           id    int PRIMARY KEY,
           hash  text NOT NULL
         );
-      `,
-    });
+      `)}
+    `);
     console.log('✅ Created prisma_contract.version table');
 
     // Create user table (from our schema)
-    await db.execute({
-      type: 'raw',
-      sql: `
+    await db.execute(rawQuery`
+      ${unsafe(`
         CREATE TABLE IF NOT EXISTS "user" (
           id        SERIAL PRIMARY KEY,
           email     VARCHAR(255) UNIQUE NOT NULL,
           active    BOOLEAN DEFAULT true,
           "createdAt" TIMESTAMP DEFAULT NOW()
         );
-      `,
-    });
+      `)}
+    `);
     console.log('✅ Created user table');
 
     // Seed or update contract hash
@@ -65,27 +61,21 @@ export async function setupDatabase() {
       throw new Error('No contract hash found in schema.json');
     }
 
-    await db.execute({
-      sql: `
-        INSERT INTO prisma_contract.version (id, hash)
-        VALUES (1, $1)
-        ON CONFLICT (id) DO UPDATE SET hash = EXCLUDED.hash;
-      `,
-      params: [contractHash],
-    });
+    await db.execute(rawQuery`
+      INSERT INTO ${table('prisma_contract.version')} (id, hash)
+      VALUES (${value(1)}, ${value(contractHash, 'text')})
+      ON CONFLICT (id) DO UPDATE SET hash = EXCLUDED.hash;
+    `);
     console.log(`✅ Seeded contract hash: ${contractHash}`);
 
     // Insert some test data
-    await db.execute({
-      type: 'raw',
-      sql: `
-        INSERT INTO "user" (email, active, "createdAt") VALUES
-        ('alice@example.com', true, NOW()),
-        ('bob@example.com', false, NOW()),
-        ('charlie@example.com', true, NOW())
-        ON CONFLICT (email) DO NOTHING;
-      `,
-    });
+    await db.execute(rawQuery`
+      INSERT INTO ${table('user')} (email, active, "createdAt") VALUES
+      (${value('test1@example.com')}, ${value(true)}, NOW()),
+      (${value('test2@example.com')}, ${value(false)}, NOW()),
+      (${value('test3@example.com')}, ${value(true)}, NOW())
+      ON CONFLICT (email) DO NOTHING;
+    `);
     console.log('✅ Inserted test data');
 
     console.log('\n🎉 Database setup complete!');

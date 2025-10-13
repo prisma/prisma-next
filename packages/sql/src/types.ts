@@ -83,8 +83,37 @@ export interface QueryAST {
   limit?: LimitClause;
 }
 
+// Raw SQL AST types
+export type Dialect = 'postgres' | 'mysql' | 'sqlite' | '*';
+
+export type TemplatePiece =
+  | { kind: 'text'; value: string }
+  | { kind: 'value'; v: any; codec?: string }
+  | { kind: 'ident'; name: string }
+  | { kind: 'qualified'; parts: string[] }
+  | { kind: 'column'; table?: string; name: string }
+  | { kind: 'table'; name: string }
+  | { kind: 'rawUnsafe'; sql: string };
+
+export interface RawQueryAST {
+  type: 'raw';
+  template: TemplatePiece[];
+  dialect?: Dialect;
+  intent?: 'read' | 'write' | 'ddl' | 'unknown';
+  annotations?: Record<string, any>;
+}
+
+export interface ExprRaw {
+  kind: 'raw';
+  template: TemplatePiece[];
+  dialect?: Dialect;
+}
+
+// Union type for all query AST types
+export type QueryASTUnion = QueryAST | RawQueryAST;
+
 export interface Plan<TResult = never> {
-  ast: QueryAST;
+  ast: QueryASTUnion;
   sql: string;
   params: unknown[];
   meta: {
@@ -97,6 +126,9 @@ export interface Plan<TResult = never> {
 }
 
 // Helper function to create raw SQL Plan
+/**
+ * @deprecated Use raw() or rawQuery() from the new raw SQL API instead
+ */
 export function rawSql(sql: string): Plan<unknown> {
   return {
     ast: { type: 'select', from: '', projectStar: true } as any, // Dummy AST for raw SQL
@@ -127,7 +159,8 @@ export type Expr =
   | { kind: 'call'; fn: string; args: Expr[] } // json_agg, coalesce, etc.
   | { kind: 'literal'; value: string | number | boolean | null }
   | { kind: 'subquery'; query: QueryAST } // correlated subqueries
-  | { kind: 'jsonObject'; fields: Record<string, Expr> }; // json_build_object helper
+  | { kind: 'jsonObject'; fields: Record<string, Expr> } // json_build_object helper
+  | ExprRaw; // raw SQL expressions
 
 // Projection item
 export interface ProjectionItem {
@@ -146,6 +179,7 @@ export interface JoinClause {
 // Forward declaration for FromBuilder
 export interface FromBuilder<TTable extends Table<any>, TResult = never> {
   select<TSelect extends Record<string, Column<any>>>(fields: TSelect): any; // QueryBuilder will be imported from builder.ts
+  selectRaw(projections: ProjectionItem[]): any; // For raw expressions
   where(condition: FieldExpression): FromBuilder<TTable, TResult>;
   orderBy(field: string, direction?: 'ASC' | 'DESC'): FromBuilder<TTable, TResult>;
   limit(count: number): FromBuilder<TTable, TResult>;

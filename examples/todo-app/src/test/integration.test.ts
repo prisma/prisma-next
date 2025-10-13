@@ -78,15 +78,25 @@ describe('Integration Tests', () => {
       tableCheck.map((r: any) => r.column_name),
     );
 
-    // Insert test data
+    // Clear existing data and insert test data
+    await db.execute({
+      type: 'raw',
+      sql: `DELETE FROM "user";`,
+    });
+
+    // Reset the sequence to start from 1
+    await db.execute({
+      type: 'raw',
+      sql: `ALTER SEQUENCE "user_id_seq" RESTART WITH 1;`,
+    });
+
     await db.execute({
       type: 'raw',
       sql: `
         INSERT INTO "user" (email, active, "createdAt") VALUES
         ('test1@example.com', true, NOW()),
         ('test2@example.com', false, NOW()),
-        ('test3@example.com', true, NOW())
-        ON CONFLICT (email) DO NOTHING;
+        ('test3@example.com', true, NOW());
       `,
     });
   });

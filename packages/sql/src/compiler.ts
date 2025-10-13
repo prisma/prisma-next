@@ -1,6 +1,25 @@
-import { QueryAST, Column, FieldExpression, ProjectionItem, Expr, SelectClause } from './types';
+import {
+  QueryAST,
+  Column,
+  FieldExpression,
+  ProjectionItem,
+  Expr,
+  SelectClause,
+  RawQueryAST,
+  ExprRaw,
+  Dialect,
+  TemplatePiece,
+} from './types';
 
-export function compileToSQL(query: QueryAST): { sql: string; params: any[] } {
+export function compileToSQL(query: QueryAST | RawQueryAST): { sql: string; params: any[] } {
+  if (query.type === 'raw') {
+    return compileRaw(query);
+  }
+
+  return compileSelect(query);
+}
+
+function compileSelect(query: QueryAST): { sql: string; params: any[] } {
   const params: any[] = [];
   let paramIndex = 1;
 
@@ -211,7 +230,9 @@ function quoteIdentifier(identifier: string): string {
     'active',
     'createdAt',
     'user',
+    'users',
     'post',
+    'posts',
     'title',
     'published',
     'userId',
@@ -262,6 +283,8 @@ function quoteIdentifier(identifier: string): string {
     'true',
     'false',
     'unknown',
+    'public',
+    'tenant',
   ]);
 
   // Quote identifiers that contain mixed case, special characters, or are reserved words
@@ -302,6 +325,9 @@ function compileExpr(expr: Expr, params: any[], paramIndex: number): string {
         .join(', ');
       return `json_build_object(${fields})`;
 
+    case 'raw':
+      return compileExprRaw(expr, params, paramIndex);
+
     default:
       throw new Error(`Unknown expression kind: ${(expr as any).kind}`);
   }
@@ -323,7 +349,108 @@ function getExprParamCount(expr: Expr): number {
     case 'jsonObject':
       return Object.values(expr.fields).reduce((sum, field) => sum + getExprParamCount(field), 0);
 
+    case 'raw':
+      return getRawParamCount(expr.template);
+
     default:
       return 0;
   }
+}
+
+// Raw SQL compilation functions
+function compileRaw(ast: RawQueryAST): { sql: string; params: any[] } {
+  const parts: string[] = [];
+  const params: any[] = [];
+  let paramIndex = 1;
+
+  for (const piece of ast.template) {
+    switch (piece.kind) {
+      case 'text':
+        parts.push(piece.value);
+        break;
+      case 'ident':
+        parts.push(quoteIdentifier(piece.name));
+        break;
+      case 'table':
+        parts.push(quoteIdentifier(piece.name));
+        break;
+      case 'column':
+        const tablePrefix = piece.table ? `${quoteIdentifier(piece.table)}.` : '';
+        parts.push(`${tablePrefix}${quoteIdentifier(piece.name)}`);
+        break;
+      case 'qualified':
+        parts.push(piece.parts.map((part) => quoteIdentifier(part)).join('.'));
+        break;
+      case 'value':
+        parts.push(renderPlaceholder(paramIndex, ast.dialect || 'postgres'));
+        params.push(piece.v);
+        paramIndex++;
+        break;
+      case 'rawUnsafe':
+        parts.push(piece.sql);
+        break;
+      default:
+        throw new Error(`Unknown raw piece: ${(piece as any).kind}`);
+    }
+  }
+
+  const sql = parts.join('');
+
+  return { sql, params };
+}
+
+function compileExprRaw(expr: ExprRaw, params: any[], paramIndex: number): string {
+  const parts: string[] = [];
+  let currentParamIndex = paramIndex;
+
+  for (const piece of expr.template) {
+    switch (piece.kind) {
+      case 'text':
+        parts.push(piece.value);
+        break;
+      case 'ident':
+        parts.push(quoteIdentifier(piece.name));
+        break;
+      case 'table':
+        parts.push(quoteIdentifier(piece.name));
+        break;
+      case 'column':
+        const tablePrefix = piece.table ? `${quoteIdentifier(piece.table)}.` : '';
+        parts.push(`${tablePrefix}${quoteIdentifier(piece.name)}`);
+        break;
+      case 'qualified':
+        parts.push(piece.parts.map((part) => quoteIdentifier(part)).join('.'));
+        break;
+      case 'value':
+        parts.push(renderPlaceholder(currentParamIndex, expr.dialect || 'postgres'));
+        params.push(piece.v);
+        currentParamIndex++;
+        break;
+      case 'rawUnsafe':
+        parts.push(piece.sql);
+        break;
+      default:
+        throw new Error(`Unknown raw piece: ${(piece as any).kind}`);
+    }
+  }
+
+  return parts.join('');
+}
+
+function renderPlaceholder(paramIndex: number, dialect: Dialect): string {
+  switch (dialect) {
+    case 'postgres':
+      return `$${paramIndex}`;
+    case 'mysql':
+    case 'sqlite':
+      return '?';
+    case '*':
+      return `$${paramIndex}`; // Default to postgres style
+    default:
+      return `$${paramIndex}`;
+  }
+}
+
+function getRawParamCount(template: TemplatePiece[]): number {
+  return template.filter((piece) => piece.kind === 'value').length;
 }

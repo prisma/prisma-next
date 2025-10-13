@@ -71,6 +71,12 @@ export class QueryBuilder<TTable extends Table<any>, TResult = never> {
     return this as any;
   }
 
+  selectRaw(projections: ProjectionItem[]): QueryBuilder<TTable, any> {
+    this.ast.select = projections;
+    this.ast.projectStar = false;
+    return this as any;
+  }
+
   where(condition: FieldExpression): QueryBuilder<TTable, TResult> {
     // Note: FieldExpression doesn't carry contract hash, but the column that created it does
     // This verification happens at build() time when we walk all references
@@ -160,6 +166,7 @@ export function createFromBuilder<TTable extends Table<any>>(
 
   return {
     select: builder.select.bind(builder),
+    selectRaw: builder.selectRaw.bind(builder),
     where: builder.where.bind(builder),
     orderBy: builder.orderBy.bind(builder),
     limit: builder.limit.bind(builder),
