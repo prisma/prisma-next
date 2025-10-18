@@ -1,37 +1,41 @@
-ADR 101 — Advisors framework
+# ADR 101 — Advisors framework
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Data Layer Working Group
+- **Status**: Proposed
+- **Date**: 2025-10-18
+- **Owners**: Data Layer Working Group
 
-Context
+## Context
 
-We added a “squash advisor” concept to nudge teams toward keeping a small active migration DAG. The same pattern appears in other areas like graph hygiene, preflight effectiveness, and drift hygiene. Rather than hard-coding warnings in individual commands, we want a thin, reusable Advisors framework that evaluates project state and emits actionable, low-noise suggestions
+We added a "squash advisor" concept to nudge teams toward keeping a small active migration DAG. The same pattern appears in other areas like graph hygiene, preflight effectiveness, and drift hygiene. Rather than hard-coding warnings in individual commands, we want a thin, reusable Advisors framework that evaluates project state and emits actionable, low-noise suggestions
 
-Problem
-	•	Hygiene and safety guidance is scattered across commands and hard to tune
-	•	CI and PPg need consistent, machine-readable diagnostics with suggested actions
-	•	Teams have different appetites for advisory strictness and noise
-	•	We need a place for future hygiene checks without bloating lints or runtime hooks
+## Problem
 
-Goals
-	•	Provide a tiny, uniform API for computing advisories from project state
-	•	Make advisors configurable with consistent severity and on/off controls
-	•	Keep advisors non-blocking by default, with an enforce mode available
-	•	Reuse the same diagnostics payloads across CLI, CI, and PPg
-	•	Keep runtime perf impact negligible
+- Hygiene and safety guidance is scattered across commands and hard to tune
+- CI and PPg need consistent, machine-readable diagnostics with suggested actions
+- Teams have different appetites for advisory strictness and noise
+- We need a place for future hygiene checks without bloating lints or runtime hooks
 
-Non-goals
-	•	Per-Plan linting or policy enforcement (covered by ADR 022)
-	•	Heavy analyzers requiring full SQL parsing or deep DB introspection
-	•	Replacing human review with automated graph surgery
+## Goals
 
-Decision
+- Provide a tiny, uniform API for computing advisories from project state
+- Make advisors configurable with consistent severity and on/off controls
+- Keep advisors non-blocking by default, with an enforce mode available
+- Reuse the same diagnostics payloads across CLI, CI, and PPg
+- Keep runtime perf impact negligible
+
+## Non-goals
+
+- Per-Plan linting or policy enforcement (covered by ADR 022)
+- Heavy analyzers requiring full SQL parsing or deep DB introspection
+- Replacing human review with automated graph surgery
+
+## Decision
 
 Introduce a lane-neutral Advisors framework
 
-Advisory shape
+### Advisory shape
 
+```typescript
 type AdvisorySeverity = 'info' | 'warn' | 'error'
 
 interface Advisory {
@@ -46,9 +50,11 @@ interface Advisory {
   }>
   fingerprint: string                       // stable hash of inputs for dedupe in CI
 }
+```
 
-Advisor interface
+### Advisor interface
 
+```typescript
 interface AdvisorContext {
   contractHash?: string
   contract?: object                         // optional JSON contract
@@ -60,9 +66,11 @@ interface AdvisorContext {
 }
 
 type Advisor = (ctx: AdvisorContext) => Promise<Advisory[]>
+```
 
-Configuration
+### Configuration
 
+```json
 {
   "advisors": {
     "mode": "suggest",                        // off | suggest | enforce
@@ -74,62 +82,73 @@ Configuration
     }
   }
 }
+```
 
-	•	mode: off disables all advisors
-	•	mode: suggest prints hints and surfaces CI annotations
-	•	mode: enforce fails CI when any advisory at level error is emitted
+- **mode**: off disables all advisors
+- **mode**: suggest prints hints and surfaces CI annotations
+- **mode**: enforce fails CI when any advisory at level error is emitted
 
-Where advisors run
-	•	migrate graph status
-	•	migrate plan and migrate apply --dry-run
-	•	Preflight in CI and PPg
+## Where advisors run
 
-Surfacing and UX
-	•	CLI prints a compact advisors section with exact commands
-	•	CI and PPg emit annotations using the advisory payload, de-duplicated by fingerprint
-	•	A snooze mechanism may suppress repeats by advisory id and commit SHA
+- `migrate graph status`
+- `migrate plan` and `migrate apply --dry-run`
+- Preflight in CI and PPg
 
-Scope and performance guardrails
-	•	Advisors must run in O(V+E) over the active DAG and use summaries for preflight
-	•	No heavy SQL parsing, DB sampling, or network calls beyond local context
-	•	Advisors produce small JSON payloads and avoid logging raw params or PII
+## Surfacing and UX
 
-Consequences
+- CLI prints a compact advisors section with exact commands
+- CI and PPg emit annotations using the advisory payload, de-duplicated by fingerprint
+- A snooze mechanism may suppress repeats by advisory id and commit SHA
 
-Positive
-	•	Centralized, consistent hygiene guidance across CLI, CI, and PPg
-	•	Configurable noise level and strictness
-	•	Easy to add new checks without entangling core logic
+## Scope and performance guardrails
 
-Negative
-	•	Another configuration surface to document and support
-	•	Potential to drift into policy enforcement if not kept thin
+- Advisors must run in O(V+E) over the active DAG and use summaries for preflight
+- No heavy SQL parsing, DB sampling, or network calls beyond local context
+- Advisors produce small JSON payloads and avoid logging raw params or PII
 
-Mitigations
-	•	Keep default mode at suggest
-	•	Require a brief spec per advisor id and track usefulness via telemetry
-	•	De-duplication via fingerprint to avoid noisy PRs
+## Consequences
 
-Alternatives considered
-	•	Hard-coded warnings in each command
-	•	Folding checks into lints or budgets
-	•	Relying solely on documentation
+### Positive
 
-Implementation notes
-	•	Introduce @prisma/advisors with registry, types, and minimal runner
-	•	Wire into CLI status, plan, and apply flows
-	•	Emit advisories in diagnostics format per ADR 047
-	•	PPg surfaces advisories as PR annotations with optional server-side actions
+- Centralized, consistent hygiene guidance across CLI, CI, and PPg
+- Configurable noise level and strictness
+- Easy to add new checks without entangling core logic
 
-Testing
-	•	Unit tests per advisor with fixed fixtures
-	•	End-to-end tests verifying CLI and CI outputs and enforce mode behavior
-	•	Telemetry checks for advisory frequency and action uptake
+### Negative
 
-References
-	•	ADR 022 — Lint rule taxonomy & configuration model
-	•	ADR 047 — Diagnostics artifacts & formats
-	•	ADR 051 — PPg preflight-as-a-service contract
-	•	ADR 028 — Migration ledger & squash semantics
-	•	ADR 039 — DAG path resolution & integrity
+- Another configuration surface to document and support
+- Potential to drift into policy enforcement if not kept thin
+
+### Mitigations
+
+- Keep default mode at suggest
+- Require a brief spec per advisor id and track usefulness via telemetry
+- De-duplication via fingerprint to avoid noisy PRs
+
+## Alternatives considered
+
+- **Hard-coded warnings in each command**
+- **Folding checks into lints or budgets**
+- **Relying solely on documentation**
+
+## Implementation notes
+
+- Introduce @prisma/advisors with registry, types, and minimal runner
+- Wire into CLI status, plan, and apply flows
+- Emit advisories in diagnostics format per ADR 047
+- PPg surfaces advisories as PR annotations with optional server-side actions
+
+## Testing
+
+- Unit tests per advisor with fixed fixtures
+- End-to-end tests verifying CLI and CI outputs and enforce mode behavior
+- Telemetry checks for advisory frequency and action uptake
+
+## References
+
+- ADR 022 — Lint rule taxonomy & configuration model
+- ADR 047 — Diagnostics artifacts & formats
+- ADR 051 — PPg preflight-as-a-service contract
+- ADR 028 — Migration ledger & squash semantics
+- ADR 039 — DAG path resolution & integrity
 

@@ -1,39 +1,39 @@
-ADR 012 — Raw SQL escape hatch with required annotations
+# ADR 012 — Raw SQL escape hatch with required annotations
 
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 008 dev auto-emit vs CI explicit, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 013 plan identity and hashing, Query Lanes
+- **Status**: Accepted
+- **Date**: 2025-10-18
+- **Owners**: Prisma Next team
+- **Related**: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 008 dev auto-emit vs CI explicit, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 013 plan identity and hashing, Query Lanes
 
-Context
-	•	We intentionally keep the SQL DSL small and composable
-	•	Teams still need to run hand-authored SQL for advanced features, engine extensions, or when SQL is clearer than any builder
-	•	Safety and observability cannot be optional just because the query is raw
-	•	We need a defined way to create a Plan from raw SQL that keeps guardrails and verification intact without requiring the core to parse SQL
+## Context
 
-Decision
-	•	Introduce a Raw SQL escape hatch that constructs Plans without an AST but with required annotations for basic policy checks
-	•	Define a minimal annotation schema so guardrails can operate lane-agnostically
-	•	Allow optional structured refs, projection, and codecs to strengthen checks and DX when authors can supply them
-	•	Do not add core SQL parsing in the runtime or compiler
-	•	Adapters may optionally enrich raw Plans with refs or diagnostics via light parsing or EXPLAIN, but this is additive and off by default
+We intentionally keep the SQL DSL small and composable. Teams still need to run hand-authored SQL for advanced features, engine extensions, or when SQL is clearer than any builder. Safety and observability cannot be optional just because the query is raw. We need a defined way to create a Plan from raw SQL that keeps guardrails and verification intact without requiring the core to parse SQL.
 
-Plan construction
+## Decision
+
+Introduce a Raw SQL escape hatch that constructs Plans without an AST but with required annotations for basic policy checks:
+- Define a minimal annotation schema so guardrails can operate lane-agnostically
+- Allow optional structured refs, projection, and codecs to strengthen checks and DX when authors can supply them
+- Do not add core SQL parsing in the runtime or compiler
+- Adapters may optionally enrich raw Plans with refs or diagnostics via light parsing or EXPLAIN, but this is additive and off by default
+
+## Plan construction
 
 Raw Plans use the unified Plan shape from ADR 011 with ast omitted and meta.lane = 'raw-sql'
 
-Required fields
-	•	sql and params
-	•	meta.coreHash and meta.target
-	•	meta.annotations with the minimal set below
+### Required fields
+- `sql` and `params`
+- `meta.coreHash` and `meta.target`
+- `meta.annotations` with the minimal set below
 
-Optional fields
-	•	meta.refs and meta.projection for stronger linting and diagnostics
-	•	meta.codecs for boundary validation of params and rows
-	•	meta.annotations.ext for extension-specific claims
+### Optional fields
+- `meta.refs` and `meta.projection` for stronger linting and diagnostics
+- `meta.codecs` for boundary validation of params and rows
+- `meta.annotations.ext` for extension-specific claims
 
-Helper sketch
+## Helper sketch
 
+```typescript
 const plan = raw({
   sql: `select u.id, u.email from "user" u where u.active = $1 limit 100`,
   params: [true],
@@ -46,125 +46,115 @@ const plan = raw({
   refs: { tables: ['user'], columns: [{ table: 'user', column: 'id' }, { table: 'user', column: 'email' }] },
   projection: { id: 'user.id', email: 'user.email' }
 })
+```
 
-Minimal annotations (required)
+## Minimal annotations (required)
 
-These fields are mandatory for every raw Plan so baseline guardrails can run
-	•	intent: 'read' | 'write' | 'admin'
-communicates the operational intent for policy routing and logging
-	•	isMutation: boolean
-true for statements that can change data or schema
-	•	hasWhere: boolean
-whether a predicate is present in a DML statement
-	•	hasLimit: boolean
-whether a row-limiting construct is present for SELECT or DELETE where policy requires it
+These fields are mandatory for every raw Plan so baseline guardrails can run:
+- `intent: 'read' | 'write' | 'admin'` - communicates the operational intent for policy routing and logging
+- `isMutation: boolean` - true for statements that can change data or schema
+- `hasWhere: boolean` - whether a predicate is present in a DML statement
+- `hasLimit: boolean` - whether a row-limiting construct is present for SELECT or DELETE where policy requires it
 
 If a required annotation is omitted, the runtime fails fast in strict mode or warns in permissive mode
 
-Optional structure for stronger safety
-	•	refs
-list of tables and columns the query touches to power unindexed predicate lints, sensitivity policies, and audit
-	•	projection
-alias → fully qualified column mapping to validate result typing and enable plan change detection
-	•	codecs
-optional param and row validators to catch boundary errors early
+## Optional structure for stronger safety
+- `refs` - list of tables and columns the query touches to power unindexed predicate lints, sensitivity policies, and audit
+- `projection` - alias → fully qualified column mapping to validate result typing and enable plan change detection
+- `codecs` - optional param and row validators to catch boundary errors early
 
 When present, these unlock the same quality of guardrails available to AST-backed Plans
 
-Runtime behavior
-	•	Contract check
-verify meta.coreHash matches the active data contract marker
-	•	Policy and lints
-evaluate rules against annotations when ast is absent
-rules that depend on structure degrade gracefully if refs or projection are missing
-	•	Budgets
-enforce latency and row budgets based on runtime measurements
-	•	Telemetry
-record timing, row count, and violations using lane-agnostic plan identity from ADR 013
+## Runtime behavior
+- **Contract check**: verify meta.coreHash matches the active data contract marker
+- **Policy and lints**: evaluate rules against annotations when ast is absent; rules that depend on structure degrade gracefully if refs or projection are missing
+- **Budgets**: enforce latency and row budgets based on runtime measurements
+- **Telemetry**: record timing, row count, and violations using lane-agnostic plan identity from ADR 013
 
-Adapter enrichment (optional)
+## Adapter enrichment (optional)
 
-Adapters may offer an opt-in enrichment step
-	•	Light parsing to infer refs for common cases
-	•	EXPLAIN sampling in shadow DBs or preflight to derive shape hints
-	•	None of this is required by core and must not be on the hot path by default
+Adapters may offer an opt-in enrichment step:
+- Light parsing to infer refs for common cases
+- EXPLAIN sampling in shadow DBs or preflight to derive shape hints
+- None of this is required by core and must not be on the hot path by default
 
-Validation and modes
-	•	Strict mode (CI, staging, production hardened)
-required annotations must be present and consistent with policy
-missing or conflicting annotations fail the Plan before execution
-	•	Permissive mode (local dev, exploration)
-missing annotations produce warnings and reduced guardrails
+## Validation and modes
+- **Strict mode (CI, staging, production hardened)**: required annotations must be present and consistent with policy; missing or conflicting annotations fail the Plan before execution
+- **Permissive mode (local dev, exploration)**: missing annotations produce warnings and reduced guardrails
 
 Configuration is per runtime instance and can be set by environment
 
-Examples
+## Examples
 
-Read query
-
+### Read query
+```typescript
 raw({
   sql: `select * from "user" where email like $1 limit 50`,
   params: ['%@acme.com'],
   annotations: { intent: 'read', isMutation: false, hasWhere: true, hasLimit: true }
 })
+```
 
-Mutation requiring a predicate
-
+### Mutation requiring a predicate
+```typescript
 raw({
   sql: `update "user" set active = false`,
   params: [],
   annotations: { intent: 'write', isMutation: true, hasWhere: false, hasLimit: false }
 })
 // mutation-requires-where lint will block in strict mode
+```
 
-Admin DDL
-
+### Admin DDL
+```typescript
 raw({
   sql: `create index concurrently if not exists user_email_idx on "user"(email)`,
   params: [],
   annotations: { intent: 'admin', isMutation: true, hasWhere: false, hasLimit: false }
 })
+```
 
-Alternatives considered
-	•	Parse raw SQL into an AST in core
-heavy, dialect-fragile, and unnecessary for safety if authors provide minimal annotations
-	•	Allow raw SQL without annotations
-undermines guardrails and creates a bypass path that weakens the safety story
-	•	Require full refs and projection for all raw Plans
-too strict for many advanced queries and reduces escape-hatch usefulness
+## Alternatives considered
 
-Consequences
+### Parse raw SQL into an AST in core
+- Heavy, dialect-fragile, and unnecessary for safety if authors provide minimal annotations
 
-Positive
-	•	Keeps a first-class escape hatch without compromising safety guarantees
-	•	Works for agents and humans alike because the annotation contract is simple and explicit
-	•	Avoids a heavy SQL parser in core while allowing adapters to add value off the hot path
+### Allow raw SQL without annotations
+- Undermines guardrails and creates a bypass path that weakens the safety story
 
-Trade-offs
-	•	Some lints are weaker without refs or projection
-	•	Requires discipline from authors to supply truthful annotations or to enable adapter enrichment where needed
+### Require full refs and projection for all raw Plans
+- Too strict for many advanced queries and reduces escape-hatch usefulness
 
-Scope and non-goals
+## Consequences
 
-In scope for MVP
-	•	Annotation schema and validation
-	•	Raw Plan helper in @prisma/sql/raw
-	•	Runtime guardrails that operate on annotations
+### Positive
+- Keeps a first-class escape hatch without compromising safety guarantees
+- Works for agents and humans alike because the annotation contract is simple and explicit
+- Avoids a heavy SQL parser in core while allowing adapters to add value off the hot path
 
-Out of scope for MVP
-	•	SQL parsing in core
-	•	Automatic extraction of refs and projection for raw Plans
+### Trade-offs
+- Some lints are weaker without refs or projection
+- Requires discipline from authors to supply truthful annotations or to enable adapter enrichment where needed
 
-Testing
-	•	Unit tests validating annotation requirements and error modes
-	•	Integration tests ensuring guardrails behave identically for equivalent DSL and raw Plans when refs/projection are supplied
-	•	Golden tests confirming plan identity hashing ignores lane and depends on sql, params, and normalized metadata
+## Scope and non-goals
 
-Backwards compatibility
-	•	Existing DSL Plans unaffected
-	•	TypedSQL will later produce raw-style Plans with annotations and optional structure
+### In scope for MVP
+- Annotation schema and validation
+- Raw Plan helper in @prisma/sql/raw
+- Runtime guardrails that operate on annotations
 
-Decision record
-	•	Adopt a Raw SQL escape hatch with a minimal required annotation set
-	•	Strengthen safety via optional structured refs, projection, and codecs
-	•	Keep core free of SQL parsing and allow optional adapter enrichment behind an explicit flag
+### Out of scope for MVP
+- SQL parsing in core
+- Automatic extraction of refs and projection for raw Plans
+
+## Testing
+- Unit tests validating annotation requirements and error modes
+- Integration tests ensuring guardrails behave identically for equivalent DSL and raw Plans when refs/projection are supplied
+- Golden tests confirming plan identity hashing ignores lane and depends on sql, params, and normalized metadata
+
+## Backwards compatibility
+- Existing DSL Plans unaffected
+- TypedSQL will later produce raw-style Plans with annotations and optional structure
+
+## Decision record
+Adopt a Raw SQL escape hatch with a minimal required annotation set. Strengthen safety via optional structured refs, projection, and codecs. Keep core free of SQL parsing and allow optional adapter enrichment behind an explicit flag.

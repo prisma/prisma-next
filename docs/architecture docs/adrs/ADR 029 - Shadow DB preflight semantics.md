@@ -1,26 +1,13 @@
 # ADR 029 — Shadow DB preflight semantics
 
-## Status
-
-**Proposed**
+- **Status**: Proposed
+- **Date**: 2025-10-18
+- **Owners**: Prisma Next team
+- **Related**: ADR 021 contract marker storage, ADR 023 budget evaluation, ADR 024 telemetry schema, ADR 028 migration ledger, ADR 037 transactional DDL fallback, ADR 039 DAG path resolution, ADR 044 pre/post checks, ADR 079 identifier masking, ADR 086 webhook signing
 
 ## Context
 
-- We want a safe way to validate migrations and Plans before production apply
-- Teams run preflight in CI and we will also offer PPg preflight-as-a-service
-- Preflight must be deterministic, isolated, resource-bounded, and leave no residue
-- Some checks require a real database state, others can run in EXPLAIN-only mode
-- Preflight artifacts feed developer UIs, agents, and compliance tooling
-
-## Related
-
-- ADR 021 Contract marker storage & verification modes
-- ADR 023 Budget evaluation & EXPLAIN policy
-- ADR 024 Telemetry schema & privacy
-- ADR 028 Migration ledger & squash semantics
-- ADR 037 Transactional DDL fallback & compensation
-- ADR 039 DAG path resolution & integrity
-- ADR 044 Pre/post check vocabulary v1
+We want a safe way to validate migrations and Plans before production apply. Teams run preflight in CI and we will also offer PPg preflight-as-a-service. Preflight must be deterministic, isolated, resource-bounded, and leave no residue. Some checks require a real database state, others can run in EXPLAIN-only mode. Preflight artifacts feed developer UIs, agents, and compliance tooling.
 
 ## Decision
 
@@ -70,7 +57,6 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 ```
 
 ### Notes
-
 - `toHash` is the desired contract for the branch
 - `toContract` provides complete context for preflight analysis and diagnostics
 - `fromHashHint` is optional and used for diagnostics if the runner can't derive it from a remote marker
@@ -79,57 +65,49 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 ## Lifecycle
 
 ### States
-
-- **QUEUED** job admitted within concurrency limits
-- **PROVISIONING** allocate shadow environment
-- **MIGRATING** apply path from fromHash to toHash
-- **CHECKING** run pre/post checks, budgets, EXPLAINs, optional sample Plans
-- **ARCHIVING** persist diagnostics and minimal logs
-- **TEARDOWN** drop shadow resources and revoke creds
-- **DONE** success or failure
+- **QUEUED**: job admitted within concurrency limits
+- **PROVISIONING**: allocate shadow environment
+- **MIGRATING**: apply path from fromHash to toHash
+- **CHECKING**: run pre/post checks, budgets, EXPLAINs, optional sample Plans
+- **ARCHIVING**: persist diagnostics and minimal logs
+- **TEARDOWN**: drop shadow resources and revoke creds
+- **DONE**: success or failure
 
 ### Exit codes
-
-- **0** success with no blocking violations
-- **2** blocking violation (lint error, budget exceed, migration failure)
-- **3** infrastructure failure (provisioning, teardown) treated as retryable
-- **4** policy denied (e.g., shadow disabled) caller must switch to EXPLAIN-only
+- **0**: success with no blocking violations
+- **2**: blocking violation (lint error, budget exceed, migration failure)
+- **3**: infrastructure failure (provisioning, teardown) treated as retryable
+- **4**: policy denied (e.g., shadow disabled) caller must switch to EXPLAIN-only
 
 ## Shadow DB semantics
 
 ### Creation
-
 - Use per-job unique database name or tenant namespace
 - Credentials are per-job and least-privilege for migration and diagnostics roles
 - Enforce hard caps on size, duration, and concurrent sessions
 
 ### Seeding
-
-- **none** creates empty DB at fromHash path head
-- **fixtures** executes a deterministic ordered set of fixture files
-- **snapshot** clones from a pre-approved sanitized snapshot reference
+- **none**: creates empty DB at fromHash path head
+- **fixtures**: executes a deterministic ordered set of fixture files
+- **snapshot**: clones from a pre-approved sanitized snapshot reference
 
 ### Isolation guarantees
-
 - No cross-job visibility of data or metadata
 - No shared prepared statements, extensions, or schemas unless explicitly declared as read-only base images
 - Advisory locks are job-scoped and released on teardown per ADR 043
 
 ### Teardown
-
 - Drop database or namespace, revoke credentials, and clear PS caches
 - Retry with exponential backoff on drop failure, then mark as LEAKED with cleanup ticket
 - Emit a signed deletion receipt for audit when PPg manages the environment
 
 ### Path computation and apply
-
 - Resolve path using ledger.json per ADR 028 and ADR 039
 - If fromHash cannot be derived, emit CONTRACT.MARKER_MISSING and refuse shadow mode unless policy allows reset to zero
 - Apply edges with advisory locks, respecting per-op transactional boundaries and compensation plans per ADR 037
 - Idempotency classification per ADR 038 determines whether a repeated edge is safe no-op or a conflict
 
 ### Canonical JSON consumption
-
 - Preflight jobs must consume canonical JSON; if TS is provided, a trusted emitter step produces JSON inside the job sandbox
 - Record the exact canonical blob used for the job for auditability
 - Contract canonicalVersion and schemaVersion must be validated before processing
@@ -139,7 +117,6 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 ## Checks and diagnostics
 
 ### What runs in CHECKING
-
 - Pre and post checks defined on edges per ADR 044
 - Lint rules at the configured policy level per ADR 022
 - Budgets evaluation including EXPLAIN policies per ADR 023
@@ -147,7 +124,6 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 - Drift detection between applied state and toHash
 
 ### Diagnostics schema
-
 - Summary status and exit code
 - Contract context: fromHash, toHash, adapter profile
 - Path summary: edgeIds, counts, non-transactional steps, compensation steps
@@ -157,7 +133,6 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 - Links to logs and seed provenance
 
 ## EXPLAIN-only mode
-
 - Skips PROVISIONING and MIGRATING
 - Compiles Plans and runs static lints and EXPLAIN policies
 - Uses adapter capability discovery per ADR 031 to decide EXPLAIN variant and normalization
@@ -166,26 +141,21 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 ## Limits and budgets
 
 ### Time
-
 - Global job time budget limits.maxRuntimeMs
 - Per-statement timeouts for migration steps and Plan checks
 - Budget overages produce BUDGET.TIME_EXCEEDED
 
 ### Space
-
 - Hard cap limits.maxDbSizeBytes enforced via database quotas or runner monitoring
 - Space overage produces BUDGET.SIZE_EXCEEDED and initiates teardown
 
 ### Rows
-
 - Row budget applies to Plan checks and is estimated via EXPLAIN or bounded sampling
 
 ### Concurrency
-
 - limits.maxConcurrentJobs enforced per project and per organization to prevent noisy neighbor effects
 
 ## PPg preflight-as-a-service specifics
-
 - Ephemeral DBs provisioned in the same region and major version as target environments
 - Optional sanitized snapshot catalog maintained per customer for realistic statistics
 - Webhook signing and replay protection per ADR 086
@@ -193,32 +163,27 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 - Automatic teardown on webhook delivery success or after retention window
 
 ## CI integration
-
 - Official GitHub/GitLab app posts status checks with exit code mapping
 - CLI returns exit codes described above and prints a concise summary with a link to full diagnostics
 - `--explain-only` flag supported as a fallback when shadow is unavailable
 
 ## Privacy and redaction
-
 - No raw parameter values or row data persisted in diagnostics unless explicitly enabled
 - EXPLAIN artifacts are normalized and may mask identifiers by sensitivity tags per ADR 079
 - Seed snapshots must be sanitized and tagged; PPg enforces policy on snapshot usage
 
 ## Observability
-
 - Emit telemetry per ADR 024 with plan and migration fingerprints, durations, and outcomes
 - Surface percent of jobs blocked by budgets vs lints, median path length, average edge apply time
 - Track leaked resources and time-to-cleanup SLOs for PPg
 
 ## Failure handling
-
 - Provisioning failure → PREFLIGHT.SHADOW_FAILED with retry advice
 - Migration failure → MIGRATION.* error with op context and logs
 - Budget or lint failure → BUDGET.* or LINT.* with configured severity
 - Infrastructure disruption → RUNTIME.BACKPRESSURE or CONFIG.INCOMPATIBLE_VERSION as appropriate
 
 ## Acceptance criteria
-
 - Same job envelope works for CI and PPg with identical exit codes
 - Shadow jobs are isolated, bounded, and leave no residue under normal operation
 - Deterministic path computation and apply semantics match ADR 028 and ADR 039
@@ -226,14 +191,10 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 - EXPLAIN-only mode provides meaningful signal when shadow is unavailable
 
 ## Alternatives considered
-
-- **Always-shadow approach**
-  More signal but infeasible for restricted environments and higher cost
-- **Simulated planner without DB or EXPLAIN**
-  Too little signal to catch performance regressions and risky plans
+- **Always-shadow approach**: More signal but infeasible for restricted environments and higher cost
+- **Simulated planner without DB or EXPLAIN**: Too little signal to catch performance regressions and risky plans
 
 ## Open questions
-
 - Do we allow limited data sampling from production for statistics only with strict redaction
 - Should we support multi-DB preflight for sharded or federated deployments
 - Do we expose a plugin hook for custom checks during CHECKING while preserving isolation guarantees

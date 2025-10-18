@@ -1,15 +1,13 @@
 # ADR 030 — Result decoding & codecs registry
 
-## Status
-
-**Proposed**
+- **Status**: Proposed
+- **Date**: 2025-10-18
+- **Owners**: Prisma Next team
+- **Related**: ADR 011 unified Plan model, ADR 013 lane-agnostic plan identity, ADR 014 runtime hook API, ADR 021 contract marker storage, ADR 022 lint taxonomy, ADR 023 budget evaluation, ADR 024 telemetry schema, ADR 025 plan caching, ADR 026 conformance kit, ADR 027 error envelope, ADR 028 migration ledger, ADR 029 shadow preflight, ADR 031 capability discovery, ADR 037 transactional DDL, ADR 038 operation idempotency, ADR 043 advisory locks, ADR 044 pre/post checks, ADR 065 capability schema, ADR 068 driver execution, ADR 072 adapter manifest, ADR 076 EXPLAIN normalization, ADR 079 identifier masking, ADR 084 prepared statements, ADR 085 privacy redaction, ADR 086 webhook signing, ADR 089 performance budgets, ADR 094 performance scaling, ADR 095 prepared statement management
 
 ## Context
 
-- Plans execute against heterogeneous targets and drivers that surface wire types not directly usable in JS/TS
-- Users expect stable, predictable JS values that respect the data contract's types and nullability
-- Lanes may request explicit casts or richer shapes (JSON aggregates, arrays), and PPg preflight must decode consistently for diagnostics
-- We need a single composition model for where decoding logic lives, how it is selected, and what happens on conflicts or failures
+Plans execute against heterogeneous targets and drivers that surface wire types not directly usable in JS/TS. Users expect stable, predictable JS values that respect the data contract's types and nullability. Lanes may request explicit casts or richer shapes (JSON aggregates, arrays), and PPg preflight must decode consistently for diagnostics. We need a single composition model for where decoding logic lives, how it is selected, and what happens on conflicts or failures.
 
 ## Decision
 
@@ -20,25 +18,21 @@ Introduce a Codecs Registry and a deterministic decoding pipeline that composes 
 3. **Adapter codecs** for target-specific wire types
 4. **Driver native mapping** as the final fallback
 
-Decoding is pure, deterministic, and side-effect free
-Failures produce RuntimeError envelopes with stable codes and redacted messages per ADR 027
+Decoding is pure, deterministic, and side-effect free. Failures produce RuntimeError envelopes with stable codes and redacted messages per ADR 027
 
 ## Terminology
-
 - **Codec**: pure function pair `{ decode: (wire) => value, encode?: (value) => wire }` plus metadata
 - **Wire type**: value as returned by the driver before transformation
 - **Contract type**: logical scalar declared in the data contract (e.g., integer, decimal, datetime, json, bytes, enum)
 - **Lane hint**: per-Plan annotation that requests a specific codec for a projected field
 
 ## Goals
-
 - Deterministic decoding across environments
 - Clear conflict resolution and visibility into which codec produced a value
 - Extensible registry for community and first-party codecs
 - Safe defaults that prioritize correctness and observability over silent coercion
 
 ## Non-goals
-
 - SQL parsing in core for type inference from raw text
 - Auto-magical timezone conversion beyond declared codec policy
 
@@ -65,7 +59,6 @@ For each projected field in a result row:
 If decoding fails at any stage, emit RUNTIME.DECODE_FAILED with `cause.origin = 'adapter' | 'lane'` depending on where the selected codec came from
 
 ## Registry model
-
 - Global, versioned registry keyed by name = `'namespace/codec@version'`
 - Namespaces required to avoid collisions, e.g., `core/decimal@1`, `pg/numeric@1`, `vendorX/uuid@2`
 - Each codec publishes:
@@ -76,7 +69,6 @@ If decoding fails at any stage, emit RUNTIME.DECODE_FAILED with `cause.origin = 
   - `deterministic`: true assertion and precisionNotes if applicable
 
 ## Built-in starter set
-
 - `core/int` for int2|int4|int8 → number | bigint
 - `core/float` for float4|float8 → number
 - `core/decimal` for numeric → Decimal with pluggable backend (decimal.js)

@@ -1,26 +1,23 @@
-ADR 014 — Runtime hook API v1 (lane-neutral)
+# ADR 014 — Runtime hook API v1 (lane-neutral)
 
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 012 raw SQL escape hatch, ADR 013 lane-agnostic plan identity and hashing, Query Lanes
+- **Status**: Accepted
+- **Date**: 2025-10-18
+- **Owners**: Prisma Next team
+- **Related**: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 012 raw SQL escape hatch, ADR 013 lane-agnostic plan identity and hashing, Query Lanes
 
-Context
-	•	We support multiple authoring lanes that all emit a Plan
-SQL DSL, ORM over DSL, Raw SQL, future TypedSQL
-	•	Guardrails, budgets, telemetry, and vendor features must attach at runtime without lane coupling
-	•	We need a stable, minimal hook API that plugins can implement once and have it work for every lane
+## Context
 
-Decision
-	•	Ship a lane-neutral hook API v1 with four lifecycle hooks
-beforeCompile, beforeExecute, afterExecute, onError
-	•	Hooks operate on immutable inputs and return derived outputs
-plugins must not mutate provided objects
-	•	Policy outcomes are expressed via consistent lint levels and budget decisions
-the runtime decides whether to allow, warn, or block based on configuration
+We support multiple authoring lanes that all emit a Plan: SQL DSL, ORM over DSL, Raw SQL, future TypedSQL. Guardrails, budgets, telemetry, and vendor features must attach at runtime without lane coupling. We need a stable, minimal hook API that plugins can implement once and have it work for every lane.
 
-Data shapes
+## Decision
 
+Ship a lane-neutral hook API v1 with four lifecycle hooks: `beforeCompile`, `beforeExecute`, `afterExecute`, `onError`:
+- Hooks operate on immutable inputs and return derived outputs; plugins must not mutate provided objects
+- Policy outcomes are expressed via consistent lint levels and budget decisions; the runtime decides whether to allow, warn, or block based on configuration
+
+## Data shapes
+
+```typescript
 // From ADR 011
 export interface Plan<Row = unknown> {
   ast?: QueryAST
@@ -59,9 +56,11 @@ export interface DraftPlan {
   params?: unknown[]
   meta: Plan['meta']
 }
+```
 
-Diagnostics
+## Diagnostics
 
+```typescript
 export type Level = 'off' | 'warn' | 'error'
 
 export interface Violation {
@@ -78,9 +77,11 @@ export interface BudgetDecision {
   observed: number
   level: Level
 }
+```
 
-Hook result
+## Hook result
 
+```typescript
 export interface HookResult<T = unknown> {
   // A derived DraftPlan or Plan if the plugin rewrites or annotates
   plan?: DraftPlan | Plan<T>
@@ -93,117 +94,90 @@ export interface HookResult<T = unknown> {
   // Freeform diagnostics for logs and tooling
   notes?: Array<{ message: string; data?: unknown }>
 }
+```
 
-Hook signatures and guarantees
+## Hook signatures and guarantees
 
 Order of execution matches registration order for all plugins
 
-beforeCompile(ctx, draft): Promise<HookResult | void>
-	•	Runs before lowering AST to SQL
-always runs, even if the lane already provided SQL
-raw-SQL lanes will typically no-op
-	•	Input: frozen DraftPlan
-	•	Allowed
-return a new DraftPlan with added annotations, refs, projection
-add violations for structural issues detectable pre-compile
-	•	Not allowed
-change meta.target or meta.coreHash
-	•	Runtime behavior
-merges results from all plugins, then compiles to a concrete Plan
+### beforeCompile(ctx, draft): Promise<HookResult | void>
+- Runs before lowering AST to SQL
+- Always runs, even if the lane already provided SQL
+- Raw-SQL lanes will typically no-op
+- **Input**: frozen DraftPlan
+- **Allowed**: return a new DraftPlan with added annotations, refs, projection; add violations for structural issues detectable pre-compile
+- **Not allowed**: change meta.target or meta.coreHash
+- **Runtime behavior**: merges results from all plugins, then compiles to a concrete Plan
 
-beforeExecute(ctx, plan): Promise<HookResult | void>
-	•	Runs after compile and before sending SQL to the driver
-	•	Input: frozen Plan with sql, params, meta.planId
-	•	Allowed
-return a derived Plan with additional annotations or redactions
-report violations and budget prechecks
-	•	Runtime behavior
-contract verification runs here
-lints and preflight budgets are evaluated here
-if any plugin requests block or a violation at error level maps to block, execution is skipped and onError is invoked with a policy error
+### beforeExecute(ctx, plan): Promise<HookResult | void>
+- Runs after compile and before sending SQL to the driver
+- **Input**: frozen Plan with sql, params, meta.planId
+- **Allowed**: return a derived Plan with additional annotations or redactions; report violations and budget prechecks
+- **Runtime behavior**: contract verification runs here; lints and preflight budgets are evaluated here; if any plugin requests block or a violation at error level maps to block, execution is skipped and onError is invoked with a policy error
 
-afterExecute(ctx, plan, result): Promise<HookResult | void>
-	•	Runs after the driver returns
-	•	Input: frozen Plan and a result envelope { durationMs, rowCount, sampleRow?, error? }
-	•	Allowed
-record telemetry, emit budgets based on observed metrics, attach notes
-	•	Runtime behavior
-if observed budgets exceed error thresholds, the runtime surfaces violations and may promote to failure based on config
+### afterExecute(ctx, plan, result): Promise<HookResult | void>
+- Runs after the driver returns
+- **Input**: frozen Plan and a result envelope { durationMs, rowCount, sampleRow?, error? }
+- **Allowed**: record telemetry, emit budgets based on observed metrics, attach notes
+- **Runtime behavior**: if observed budgets exceed error thresholds, the runtime surfaces violations and may promote to failure based on config
 
-onError(ctx, phase, planOrDraft, err): Promise<void>
-	•	Runs when a compile, execute, or plugin failure occurs
-	•	Input
-phase: ‘compile’ | ‘execute’ | ‘plugin’
-planOrDraft: the latest DraftPlan or Plan if available
-err: error with a structured kind field when possible
-	•	Contract
-must not throw
-should log and attach diagnostics
+### onError(ctx, phase, planOrDraft, err): Promise<void>
+- Runs when a compile, execute, or plugin failure occurs
+- **Input**: phase: 'compile' | 'execute' | 'plugin'; planOrDraft: the latest DraftPlan or Plan if available; err: error with a structured kind field when possible
+- **Contract**: must not throw; should log and attach diagnostics
 
-Error semantics
-	•	Policy violation
-produced by plugins via violations or by runtime checks
-mapped by level: error blocks, warn logs and continues, off ignored
-	•	Budget breach
-treated like a violation with ruleIds budget.maxRows, budget.maxLatency, budget.maxSqlLength
-	•	Plugin error
-treated as phase = 'plugin' error, triggers onError, does not crash the process
-runtime may disable the offending plugin instance for the request
-	•	Execution error
-driver or adapter thrown errors with phase = 'execute', bubbled to caller after onError
+## Error semantics
+- **Policy violation**: produced by plugins via violations or by runtime checks; mapped by level: error blocks, warn logs and continues, off ignored
+- **Budget breach**: treated like a violation with ruleIds budget.maxRows, budget.maxLatency, budget.maxSqlLength
+- **Plugin error**: treated as phase = 'plugin' error, triggers onError, does not crash the process; runtime may disable the offending plugin instance for the request
+- **Execution error**: driver or adapter thrown errors with phase = 'execute', bubbled to caller after onError
 
-Lint levels and configuration
-	•	Each rule has a level off | warn | error
-configured at runtime creation and overridable per request
-	•	Recommended defaults
-no-select-star: error
-mutation-requires-where: error
-limit-required: warn
-unindexed-predicate: warn
-	•	Budgets configured globally or per request
-maxRows, maxLatencyMs, maxSqlLength
+## Lint levels and configuration
+- Each rule has a level off | warn | error; configured at runtime creation and overridable per request
+- **Recommended defaults**: no-select-star: error, mutation-requires-where: error, limit-required: warn, unindexed-predicate: warn
+- **Budgets configured globally or per request**: maxRows, maxLatencyMs, maxSqlLength
 
-Allowed Plan modifications by plugins
-	•	Add or refine meta.annotations, meta.refs, meta.projection
-	•	Redact literals in sql when producing diagnostics only
-	•	Replace Plan with an equivalent Plan that keeps plan.meta.target and plan.meta.coreHash unchanged
+## Allowed Plan modifications by plugins
+- Add or refine meta.annotations, meta.refs, meta.projection
+- Redact literals in sql when producing diagnostics only
+- Replace Plan with an equivalent Plan that keeps plan.meta.target and plan.meta.coreHash unchanged
 
-Not allowed
-	•	Changing meta.target or meta.coreHash
-	•	Mutating the input object in place
+## Not allowed
+- Changing meta.target or meta.coreHash
+- Mutating the input object in place
 
-Why this ADR
-	•	Locks a lane-independent extension surface so guardrails and telemetry do not depend on how queries were authored
-	•	Prevents API drift as new lanes are added
-	•	Ensures plugin authors have clear guarantees about when their code runs and what they may change
+## Why this ADR
+- Locks a lane-independent extension surface so guardrails and telemetry do not depend on how queries were authored
+- Prevents API drift as new lanes are added
+- Ensures plugin authors have clear guarantees about when their code runs and what they may change
 
-Alternatives considered
-	•	Lane-specific hook sets
-fragments the ecosystem and doubles work for plugin authors
-	•	Single monolithic aroundExecute hook
-harder to separate compile-time and run-time concerns and budgets
+## Alternatives considered
 
-Consequences
+### Lane-specific hook sets
+- Fragments the ecosystem and doubles work for plugin authors
 
-Positive
-	•	One plugin works across DSL, ORM, raw, and future TypedSQL
-	•	Clear blocking semantics and consistent diagnostics
-	•	Compatibility with PPg preflight where the same hooks run in a service
+### Single monolithic aroundExecute hook
+- Harder to separate compile-time and run-time concerns and budgets
 
-Trade-offs
-	•	Plugins that need deep AST access may be less effective on raw Plans without annotations
-acceptable given the escape-hatch intent
+## Consequences
 
-Versioning and compatibility
-	•	This is v1 of the hook API
-backward compatible changes add optional fields or hooks
-breaking changes require a new major hook API version negotiated at runtime
+### Positive
+- One plugin works across DSL, ORM, raw, and future TypedSQL
+- Clear blocking semantics and consistent diagnostics
+- Compatibility with PPg preflight where the same hooks run in a service
 
-Testing
-	•	Contract tests with a sample plugin exercising all hooks
-	•	Golden tests asserting consistent blocking behavior for equivalent Plans across lanes
-	•	Fault-injection tests for plugin throws routed to onError without process crash
+### Trade-offs
+- Plugins that need deep AST access may be less effective on raw Plans without annotations; acceptable given the escape-hatch intent
 
-Open questions
-	•	Whether to expose an opt-in enrichment stage for adapters to add refs to raw Plans behind a feature flag
-	•	Standard naming for ruleIds to avoid collisions across plugins
+## Versioning and compatibility
+- This is v1 of the hook API; backward compatible changes add optional fields or hooks
+- Breaking changes require a new major hook API version negotiated at runtime
+
+## Testing
+- Contract tests with a sample plugin exercising all hooks
+- Golden tests asserting consistent blocking behavior for equivalent Plans across lanes
+- Fault-injection tests for plugin throws routed to onError without process crash
+
+## Open questions
+- Whether to expose an opt-in enrichment stage for adapters to add refs to raw Plans behind a feature flag
+- Standard naming for ruleIds to avoid collisions across plugins

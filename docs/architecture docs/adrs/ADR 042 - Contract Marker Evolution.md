@@ -1,24 +1,27 @@
-ADR 042 — Contract marker evolution
+# ADR 042 — Contract marker evolution
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 021 contract marker storage, ADR 010 canonicalization rules, ADR 004 core vs profile hash
+- **Status**: Proposed
+- **Date**: 2025-10-18
+- **Owners**: Prisma Next team
+- **Related**: ADR 021 contract marker storage, ADR 010 canonicalization rules, ADR 004 core vs profile hash
 
-Context
-	•	The contract marker schema needs to evolve to support contract snapshots and canonicalization versioning
-	•	Existing deployments must be able to upgrade their marker schema without breaking existing functionality
-	•	New fields must be forward-compatible and optional to maintain backward compatibility
-	•	Migration of existing markers must be safe and atomic
+## Context
 
-Decision
-	•	Add canonical_version and optional contract_json fields to the forward-compatible marker schema
-	•	Define migration from markers without these columns
-	•	Ensure backward compatibility with existing deployments
+- The contract marker schema needs to evolve to support contract snapshots and canonicalization versioning
+- Existing deployments must be able to upgrade their marker schema without breaking existing functionality
+- New fields must be forward-compatible and optional to maintain backward compatibility
+- Migration of existing markers must be safe and atomic
 
-Marker schema evolution
+## Decision
 
-Current schema (v1)
+- Add canonical_version and optional contract_json fields to the forward-compatible marker schema
+- Define migration from markers without these columns
+- Ensure backward compatibility with existing deployments
+
+## Marker schema evolution
+
+### Current schema (v1)
+
 ```sql
 create table if not exists prisma_contract.marker (
   id smallint primary key default 1,
@@ -30,7 +33,8 @@ create table if not exists prisma_contract.marker (
 );
 ```
 
-Enhanced schema (v2)
+### Enhanced schema (v2)
+
 ```sql
 create table if not exists prisma_contract.marker (
   id smallint primary key default 1,
@@ -44,67 +48,76 @@ create table if not exists prisma_contract.marker (
 );
 ```
 
-Migration strategy
+## Migration strategy
 
-Automatic migration
-	•	The migration runner detects marker schema version and upgrades automatically
-	•	Migration is performed atomically within the same transaction as edge application
-	•	New columns are added as nullable to maintain backward compatibility
-	•	Existing data is preserved unchanged
+### Automatic migration
 
-Migration steps
-	1.	Check marker schema version in meta field
-	2.	If version < 2, add new columns:
-		•	ALTER TABLE prisma_contract.marker ADD COLUMN canonical_version int;
-		•	ALTER TABLE prisma_contract.marker ADD COLUMN contract_json jsonb;
-	3.	Update meta field to record schema version: 2
-	4.	Continue with normal edge application
+- The migration runner detects marker schema version and upgrades automatically
+- Migration is performed atomically within the same transaction as edge application
+- New columns are added as nullable to maintain backward compatibility
+- Existing data is preserved unchanged
 
-Backward compatibility
+### Migration steps
 
-Existing deployments
-	•	Older runtimes continue to work with v1 marker schema
-	•	New columns are ignored by older clients
-	•	No breaking changes to existing functionality
-	•	Gradual adoption of new features as deployments upgrade
+1. Check marker schema version in meta field
+2. If version < 2, add new columns:
+   - `ALTER TABLE prisma_contract.marker ADD COLUMN canonical_version int;`
+   - `ALTER TABLE prisma_contract.marker ADD COLUMN contract_json jsonb;`
+3. Update meta field to record schema version: 2
+4. Continue with normal edge application
 
-Field semantics
+## Backward compatibility
 
-canonical_version
-	•	Records the canonicalization version used for contract_json
-	•	Defaults to 1 for existing contracts without this field
-	•	Used for contract validation and drift detection
-	•	Must match the canonicalVersion in contract.json when present
+### Existing deployments
 
-contract_json
-	•	Optional complete contract JSON for drift analysis and PPg features
-	•	Can be null (off), compressed, or full based on contractStorage setting
-	•	Must be canonical JSON when present
-	•	Used for contract reconstruction and visualization
+- Older runtimes continue to work with v1 marker schema
+- New columns are ignored by older clients
+- No breaking changes to existing functionality
+- Gradual adoption of new features as deployments upgrade
 
-Validation rules
+## Field semantics
 
-Contract consistency
-	•	If contract_json is present, its coreHash must match core_hash
-	•	If contract_json is present, its canonicalVersion must match canonical_version
-	•	Runtime validates consistency on marker reads
-	•	Inconsistencies are reported as contract/marker-inconsistent errors
+### canonical_version
 
-Upgrade safety
+- Records the canonicalization version used for contract_json
+- Defaults to 1 for existing contracts without this field
+- Used for contract validation and drift detection
+- Must match the canonicalVersion in contract.json when present
 
-Atomic operations
-	•	Schema migration and edge application happen in the same transaction
-	•	If migration fails, edge application is rolled back
-	•	No partial state where schema is upgraded but edge fails
+### contract_json
 
-Rollback support
-	•	Schema downgrade is not supported (breaking change)
-	•	New columns can be set to null to disable new features
-	•	Existing functionality remains unaffected
+- Optional complete contract JSON for drift analysis and PPg features
+- Can be null (off), compressed, or full based on contractStorage setting
+- Must be canonical JSON when present
+- Used for contract reconstruction and visualization
 
-Configuration
+## Validation rules
 
-Runtime configuration
+### Contract consistency
+
+- If contract_json is present, its coreHash must match core_hash
+- If contract_json is present, its canonicalVersion must match canonical_version
+- Runtime validates consistency on marker reads
+- Inconsistencies are reported as contract/marker-inconsistent errors
+
+## Upgrade safety
+
+### Atomic operations
+
+- Schema migration and edge application happen in the same transaction
+- If migration fails, edge application is rolled back
+- No partial state where schema is upgraded but edge fails
+
+### Rollback support
+
+- Schema downgrade is not supported (breaking change)
+- New columns can be set to null to disable new features
+- Existing functionality remains unaffected
+
+## Configuration
+
+### Runtime configuration
+
 ```typescript
 createRuntime({
   contract,
@@ -116,7 +129,8 @@ createRuntime({
 })
 ```
 
-Migration runner configuration
+### Migration runner configuration
+
 ```typescript
 createRunner({
   adapter,
@@ -129,41 +143,47 @@ createRunner({
 })
 ```
 
-Testing
+## Testing
 
-Migration tests
-	•	Test migration from v1 to v2 marker schema
-	•	Test backward compatibility with older runtimes
-	•	Test contract consistency validation
-	•	Test rollback scenarios
+### Migration tests
 
-Integration tests
-	•	Test marker upgrade during edge application
-	•	Test contract storage modes (off/compressed/full)
-	•	Test validation with inconsistent marker data
+- Test migration from v1 to v2 marker schema
+- Test backward compatibility with older runtimes
+- Test contract consistency validation
+- Test rollback scenarios
 
-Performance impact
+### Integration tests
 
-Minimal overhead
-	•	New columns are nullable and don't affect existing queries
-	•	Contract JSON storage is optional and configurable
-	•	No performance impact on existing deployments
-	•	Gradual adoption allows teams to evaluate storage requirements
+- Test marker upgrade during edge application
+- Test contract storage modes (off/compressed/full)
+- Test validation with inconsistent marker data
 
-Security considerations
+## Performance impact
 
-No secrets in marker
-	•	Contract JSON contains only structure, no sensitive data
-	•	Marker remains safe for replication and backup
-	•	Access controls unchanged from existing schema
+### Minimal overhead
 
-Open questions
-	•	Whether to support schema downgrade for emergency rollbacks
-	•	Policy for handling inconsistent marker data in production
-	•	Integration with PPg contract storage features
+- New columns are nullable and don't affect existing queries
+- Contract JSON storage is optional and configurable
+- No performance impact on existing deployments
+- Gradual adoption allows teams to evaluate storage requirements
 
-Decision record
-	•	Add canonical_version and contract_json fields to marker schema v2
-	•	Provide automatic migration path from v1 to v2
-	•	Maintain backward compatibility with existing deployments
-	•	Enable contract snapshots and enhanced drift analysis
+## Security considerations
+
+### No secrets in marker
+
+- Contract JSON contains only structure, no sensitive data
+- Marker remains safe for replication and backup
+- Access controls unchanged from existing schema
+
+## Open questions
+
+- Whether to support schema downgrade for emergency rollbacks
+- Policy for handling inconsistent marker data in production
+- Integration with PPg contract storage features
+
+## Decision record
+
+- Add canonical_version and contract_json fields to marker schema v2
+- Provide automatic migration path from v1 to v2
+- Maintain backward compatibility with existing deployments
+- Enable contract snapshots and enhanced drift analysis
