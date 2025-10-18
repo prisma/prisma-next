@@ -1,10 +1,10 @@
-## Executive summary
+# Executive Summary
 
-Software development has entered the agent era. Agents can write code and SQL, but they lack structure, verification, and safe deployment paths. The **market is shifting from APIs for humans to systems with guardrails for automation** — and no one has yet defined what that looks like for data.
+Software development has entered the agent era. Agents can write code and SQL, but they lack structure, verification, and safe deployment paths. The **market is shifting from APIs for humans to systems with guardrails for automation** — and no one has yet defined what that looks like for data.
 
-**Prisma Next** is a contract-first successor to the Prisma ORM, purpose-built for this new workflow reality. It centers on a verifiable data contract that unifies code and database, enabling safe, predictable change for both humans and agents.
+**Prisma Next** is a contract-first successor to the Prisma ORM, purpose-built for this new workflow reality. It centers on a verifiable data contract that unifies code and database, enabling safe, predictable change for both humans and agents.
 
-**When paired with PPg, Prisma Next delivers a unique “better together” advantage**: preflight per PR, safe migrations, and contract-aware advisors.
+**When paired with PPg, Prisma Next delivers a unique "better together" advantage**: preflight per PR, safe migrations, and contract-aware advisors.
 
 |  |  | Audience | Strengths | Gaps |
 | --- | --- | --- | --- | --- |
