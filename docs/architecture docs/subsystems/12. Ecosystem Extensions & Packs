@@ -1,0 +1,158 @@
+Ecosystem Extensions & Packs
+
+Purpose & scope
+
+Describe how third parties extend Prisma Next with domain features such as vector search or geospatial, across the full lifecycle
+Covers the shape of a pack, how packs participate in authoring, planning, lowering, execution, and preflight, and how they are distributed to local and hosted contexts without embedding code into the data contract
+
+Non-goals
+
+Define every possible extension capability
+Ship a global registry service
+Allow arbitrary network access or repo cloning in hosted environments
+
+External contracts
+
+Consumes
+	•	contract.json with extensions.<namespace> payloads and capabilities declared by packs
+	•	Plan objects produced by any lane that may reference pack-provided types, operators, or annotations
+	•	Migration edges that may reference pack-provided operations
+
+Produces
+	•	Lane functions and lowerers bound to capability IDs
+	•	Codecs for parameters and results
+	•	Migration operations with pre/post checks
+	•	Manifests declaring capability support and security policies for bundling and hosted preflight
+
+Model
+
+A pack is a TS/JS package that may provide any subset of four slices
+	1.	PSL/contract slice (compile-time)
+	•	PSL attributes, blocks, and validators that contribute deterministic data to contract.extensions.<ns>
+	•	Canonicalization rules so the emitted JSON is stable
+	•	Purely data producing, no runtime code required to read the resulting JSON
+	2.	Query-lane slice (build-time)
+	•	Relational DSL builders or helpers and deterministic lowerers for their AST nodes
+	•	Capability IDs used to gate features at build time
+	•	No side effects or environment dependence
+	3.	Runtime slice (execute-time)
+	•	Codecs for parameters/results and optional guardrails or lints
+	•	Registered by the application or by the runtime host
+	4.	Migration slice (plan/apply-time)
+	•	Custom operations and their pre/post checks
+	•	Deterministic JSON op schema plus implementation code
+
+The data contract travels code-free
+Any context that needs to build, lower, or execute features provided by a pack must have the relevant pack code present
+
+Distribution modes
+
+Two supported ways to make pack code available outside the local dev environment
+	1.	Certified catalog mode
+	•	Hosted platforms like PPg preinstall vetted pack versions (e.g. @prisma/pack-pgvector@1.2.0)
+	•	Your artifacts refer to packs by ID and version in a manifest
+	•	The host resolves from its catalog and verifies integrity
+	2.	Bring-your-own bundle mode
+	•	CLI produces a deterministic preflight bundle containing:
+	•	contract.json, migration edges, and Plan diagnostics if needed
+	•	Pack code for the slices you used as ESM files
+	•	Pack manifests with capability IDs, versions, integrity digests, and security declarations
+	•	Hosted runner executes in a sandbox with no network, no dynamic imports, no shell, no WASM, and resource caps
+
+Both modes yield the same outcomes and error taxonomy
+
+Capability negotiation
+	•	Packs declare canonical capability keys in their manifest and at registration time
+	•	Adapters and runtimes expose supports(capabilityId) and surface capability sets during connect
+	•	Lanes and plugins branch on capabilities rather than target strings
+	•	If a required capability is missing:
+	•	At build time, DSL compilation fails with a precise capability error
+	•	At run time, execution is blocked with a ERR_CAPABILITY_MISSING error
+	•	See ADR 065 for schema and negotiation flow
+
+Key flows
+
+Local authoring and execution
+	1.	Developer installs a pack via npm or vendors it
+	2.	Emitter reads PSL and invokes pack contract slice to produce deterministic JSON under extensions.<ns>
+	3.	DSL uses pack lane slice to build AST nodes and lower to SQL when needed
+	4.	Runtime registers pack codecs and optional lints
+	5.	Plans execute with guardrails and decoding in place
+
+Hosted preflight on PPg
+	1.	CI invokes CLI to create a preflight bundle
+	2.	Bundle includes contract.json, migration edges, and either:
+	•	Catalog references for packs, or
+	•	Embedded pack code and manifests
+	3.	PPg validates signatures, integrity, and policy
+	4.	PPg runs preflight in a sandbox with no network and enforced limits
+	5.	Results are returned with the same diagnostics schema used locally
+
+Public API
+
+Registration
+	•	registerPack({ id, version, capabilities, codecs, lowerers, ops })
+	•	registerCodec(typeId, codec)
+	•	registerLowerer(nodeKind, lowerer)
+	•	registerOp(name, impl, { pre, post, idempotent, requiresTx })
+
+Manifests
+	•	pack.manifest.json
+	•	id, version, capabilities[]
+	•	slices: { contract?: true, lane?: true, runtime?: true, migrate?: true }
+	•	integrity: { file: sha256 }
+	•	policy: { noNetwork: true, noDynamicImport: true, noWasm: true }
+	•	targets: { postgres?: { minVersion: "14" } }
+
+Errors
+	•	ERR_CAPABILITY_MISSING, ERR_LOWERING_UNSUPPORTED, ERR_CODEC_MISSING, ERR_PACK_POLICY_VIOLATION
+	•	Stable codes per ADR 027 and mapping per ADR 068
+
+Stability level
+	•	Registration APIs stable once published
+	•	Contract JSON remains code-free per ADR 010
+
+Extensibility points
+	•	Contract extensions namespace reserved per pack ID
+	•	Codec registry per ADR 030
+	•	Lowering SPI per ADR 016
+	•	Custom operations loaded per ADR 041 with the same sandbox rules
+	•	Advisors can be delivered as packs that implement the advisor SPI and hook into preflight or PPg per ADR 101
+
+Performance & limits
+	•	Contract emission must remain O(n) on schema size, independent of pack code size
+	•	Lowering must be deterministic and linear in AST size
+	•	Runtime codec and lint overhead must keep p95 impact under the runtime overhead budget
+	•	Hosted sandboxes enforce CPU, memory, and wall clock limits per op
+
+Security and privacy
+	•	Data contract contains no code and no secrets
+	•	Hosted preflight forbids network, dynamic imports, shells, and WASM in pack code
+	•	Artifacts and logs follow redaction policy per ADR 024 and ADR 050
+	•	Manifests enumerate integrity hashes for all shipped files
+
+Failure modes
+	•	Missing pack code at build or run time → explicit capability error with remediation hint
+	•	Version mismatch in hosted catalog mode → fail with ERR_PACK_VERSION_UNAVAILABLE
+	•	Policy violation in bundle mode → reject with ERR_PACK_POLICY_VIOLATION
+	•	Codec not found for a pack type at execution → block with ERR_CODEC_MISSING
+
+Open questions & risks
+	•	Catalog governance for PPg scale and update cadence
+	•	Compatibility matrix as packs evolve capabilities
+	•	Testing strategy for cross-version lowering determinism and golden SQL
+
+Test strategy
+	•	Golden tests for contract emission with pack extensions
+	•	Golden SQL for lowering with capability flags toggled
+	•	Conformance suite for codecs and operations per ADR 026
+	•	Bundle parity tests to assert local vs hosted outcomes match on the same artifacts
+
+References
+	•	ADR 010 Canonicalization rules for contract.json
+	•	ADR 016 Adapter SPI for lowering relational AST
+	•	ADR 030 Result decoding & codecs registry
+	•	ADR 041 Custom operation loading via local packages + preflight bundles
+	•	ADR 051 PPg preflight-as-a-service contract
+	•	ADR 065 Adapter capability schema & negotiation v1
+	•	ADR 101 Advisor framework and squash advisor as a pack
