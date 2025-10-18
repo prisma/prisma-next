@@ -44,6 +44,7 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
   },
   "contract": {
     "toHash": "sha256:to...",
+    "toContract": { /* complete destination contract JSON */ },
     "ledgerPath": "migrations/ledger.json",
     "fromHashHint": "sha256:from..."
   },
@@ -71,6 +72,7 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 ### Notes
 
 - `toHash` is the desired contract for the branch
+- `toContract` provides complete context for preflight analysis and diagnostics
 - `fromHashHint` is optional and used for diagnostics if the runner can't derive it from a remote marker
 - Plans are optional for a migrations-only preflight
 

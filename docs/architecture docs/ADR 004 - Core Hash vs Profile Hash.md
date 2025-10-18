@@ -38,7 +38,8 @@ What contributes to profileHash
 Emission and storage
 	•	Emitter produces contract.json and computes both hashes via canonicalization
 	•	Database marker stores coreHash, profileHash, marker version, and a ledger of applied edges
-	•	Runtime embeds coreHash into each Plan’s meta and verifies on execute
+	•	Migration edges store complete fromContract and toContract JSON alongside hashes
+	•	Runtime embeds coreHash into each Plan's meta and verifies on execute
 	•	Preflight surfaces differences in both hashes with actionable guidance
 
 Behavior on mismatch

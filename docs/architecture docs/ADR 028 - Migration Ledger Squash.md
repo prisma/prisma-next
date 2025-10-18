@@ -32,6 +32,8 @@ coreHash string identifying a canonical data contract
 	•	Edge
 Directed transition fromCoreHash -> toCoreHash with
 	•	edgeId deterministic id derived from the edge header and its operations
+	•	fromContract, toContract complete contract JSON for state reconstruction
+	•	hints planner hints and strategies used during planning
 	•	ops list in JSON IR or typed program reference
 	•	pre and post check sets
 	•	labels optional metadata like branch or tag
@@ -120,13 +122,21 @@ edge.json header schema (v1)
   "to": "sha256:abc...123",
   "edgeId": "sha256:edgexxx",
   "kind": "regular",
+  "fromContract": { /* complete source contract JSON */ },
+  "toContract": { /* complete destination contract JSON */ },
+  "hints": {
+    "used": [],
+    "applied": ["additive_only"],
+    "plannerVersion": "1.0.0",
+    "planningStrategy": "additive"
+  },
   "pre": [{ "check": "tableNotExists", "args": { "table": "user" } }],
   "post": [{ "check": "tableExists", "args": { "table": "user" } }],
   "labels": ["main"],
   "authorship": { "author": "wmadden", "email": "madden@prisma.io" }
 }
 
-edgeId = sha256(canonicalize(edge.json without edgeId) + canonicalize(ops.json))
+edgeId = sha256(canonicalize(edge.json without edgeId) + canonicalize(ops.json) + canonicalize(fromContract) + canonicalize(toContract))
 
 Operations on the ledger
 
@@ -183,6 +193,14 @@ Squash semantics and safety
 	•	Production avoids baselines unless the DB’s current coreHash exactly equals the baseline from
 	•	Applying a baseline when the DB marker does not match from is a hard error
 	•	Baselines can be regenerated at any time from the same contiguous path, yielding the same edgeId due to deterministic canonicalization
+
+Contract reconstruction and splitting
+
+- Stored contracts enable reconstruction of any historical state
+- Migration splitting tools can infer intermediate contract states between any two stored contracts
+- Planner can generate new edges between any two historical states using stored contract context
+- Tooling can visualize contract evolution and migration impact analysis
+- Agents get complete context for migration analysis and debugging
 
 Drift detection
 	•	If the DB marker hash is unknown or differs from any ledger node, runner reports drift and refuses to choose a path

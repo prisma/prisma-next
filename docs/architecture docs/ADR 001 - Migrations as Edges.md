@@ -51,9 +51,22 @@ Preflight is mandatory in CI:
 ### Edge artifact shape
 - `id` stable identifier for human reference
 - `fromHash`, `toHash` contract IDs
+- `fromContract`, `toContract` complete contract JSON for state reconstruction
+- `hints` planner hints and strategies used during planning
 - `ops[]` ordered schema operations with pre and post checks
 - `tasks[]` optional data operations with verifications and retry guidance
 - metadata author, createdAt, planner version, target capabilities used
+
+### Contract storage rationale
+
+Storing complete contracts alongside migrations provides:
+- **Complete state reconstruction**: Any migration point can be reconstructed from stored contracts
+- **Migration splitting**: Planner can infer intermediate states and generate new edges between any two historical states
+- **Enhanced tooling**: Dev CLI and PPg can visualize contract evolution and provide migration impact analysis
+- **Agent support**: Complete context for migration analysis and better error messages
+- **Audit capabilities**: Full contract context for debugging and compliance
+
+The storage overhead is minimal (contracts are small JSON files) while providing substantial debugging and tooling benefits.
 
 ### Operation semantics
 - each op declares what it requires to be true before running and what must be true after
