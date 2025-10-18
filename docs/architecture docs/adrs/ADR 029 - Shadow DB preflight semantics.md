@@ -134,6 +134,7 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 - Record the exact canonical blob used for the job for auditability
 - Contract canonicalVersion and schemaVersion must be validated before processing
 - TS contracts are not evaluated directly in preflight for security; only canonical JSON is accepted
+- **Migration Bundle Consumption**: For hosted preflight, consumes pre-built migration bundles containing compiled ops and manifests, never resolves user repositories or package managers
 
 ## Checks and diagnostics
 
