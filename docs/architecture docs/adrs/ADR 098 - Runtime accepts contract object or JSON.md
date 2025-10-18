@@ -1,4 +1,4 @@
-ADR 048 — Runtime accepts contract object or JSON
+ADR 098 — Runtime accepts contract object or JSON
 
 Status: Proposed
 Date: 2025-10-18
@@ -38,7 +38,7 @@ Exactly one of contract or contractJson must be provided
 
 Canonicalization and validation
 	•	If contract is provided the runtime will
-	•	Validate purity and shape per ADR 046
+	•	Validate purity and shape per ADR 096
 	•	Canonicalize to a canonical JSON string and compute coreHash per ADR 010
 	•	Cache {canonicalJson, coreHash, canonicalVersion} for the process lifetime
 	•	If contractJson is provided the runtime will
@@ -134,5 +134,5 @@ References
 	•	ADR 021 — Contract marker storage & verification modes
 	•	ADR 025 — Plan caching & memoization in runtime
 	•	ADR 027 — Error envelope & stable codes
-	•	ADR 046 — TS-authored contract parity & purity rules
-	•	ADR 047 — Tooling runs on canonical JSON only
+	•	ADR 096 — TS-authored contract parity & purity rules
+	•	ADR 097 — Tooling runs on canonical JSON only

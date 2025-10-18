@@ -1,4 +1,4 @@
-ADR 046 — TS-authored contract parity & purity rules
+ADR 096 — TS-authored contract parity & purity rules
 
 Status: Proposed
 Date: 2025-10-18

@@ -1,4 +1,4 @@
-ADR 049 — Contract authoring lint rules
+ADR 099 — Contract authoring lint rules
 
 Status: Proposed
 Date: 2025-10-18
@@ -66,7 +66,7 @@ Teams can wire this into Husky or lefthook
 DX integration
 	•	ESLint inline diagnostics in IDEs for fast feedback
 	•	Vite/Next plugin surfaces canonicalization errors as overlay when auto-emit is enabled
-	•	Rule docs link to ADR 046 and ADR 010
+	•	Rule docs link to ADR 096 and ADR 010
 
 Rationale
 	•	Linting catches issues early where developers work
@@ -112,6 +112,6 @@ Open questions
 
 References
 	•	ADR 010 — Canonicalization rules for contract.json
-	•	ADR 046 — TS-authored contract parity & purity rules
-	•	ADR 047 — Tooling runs on canonical JSON only
-	•	ADR 048 — Runtime accepts contract object or JSON
+	•	ADR 096 — TS-authored contract parity & purity rules
+	•	ADR 097 — Tooling runs on canonical JSON only
+	•	ADR 098 — Runtime accepts contract object or JSON

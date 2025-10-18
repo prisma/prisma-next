@@ -1,4 +1,4 @@
-ADR 047 — Tooling runs on canonical JSON only
+ADR 097 — Tooling runs on canonical JSON only
 
 Status: Proposed
 Date: 2025-10-18
@@ -102,4 +102,4 @@ References
 	•	ADR 021 — Contract marker storage & verification modes
 	•	ADR 032 — Dev auto-emit integration
 	•	ADR 035 — Dual authoring conflict resolution
-	•	ADR 046 — TS-authored contract parity & purity rules
+	•	ADR 096 — TS-authored contract parity & purity rules
