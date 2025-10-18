@@ -74,6 +74,8 @@ ledger.json schema (v1)
       "edgeId": "sha256:edgexxx",
       "from": "sha256:000...zero",
       "to": "sha256:abc...123",
+      "toContractRef": "sha256:contractabc123",
+      "fromContractRef": "sha256:contract000zero",
       "path": "migrations/2025-01-15T1022_add_users",
       "kind": "regular",
       "labels": ["main"],
@@ -89,6 +91,8 @@ ledger.json schema (v1)
       "edgeId": "sha256:edgeyyy",
       "from": "sha256:abc...123",
       "to": "sha256:def...456",
+      "toContractRef": "sha256:contractdef456",
+      "fromContractRef": "sha256:contractabc123",
       "path": "migrations/2025-02-03T0905_add_posts",
       "kind": "regular",
       "labels": ["main"]
@@ -201,6 +205,15 @@ Contract reconstruction and splitting
 - Planner can generate new edges between any two historical states using stored contract context
 - Tooling can visualize contract evolution and migration impact analysis
 - Agents get complete context for migration analysis and debugging
+
+Contract blob management and GC rules
+
+- Contract blobs are referenced by toContractRef and optionally fromContractRef in edges
+- Edges persist plannerHints as structured JSON for reproducible planning decisions
+- GC rules for unreferenced contracts: contracts referenced by active edges, baselines, or DB markers are retained
+- Squash behavior: when squashing edges, contract references are preserved for audit and visualization
+- Contract blob storage is separate from edge storage to enable sharing across multiple edges
+- Tools can identify orphaned contract blobs and provide cleanup recommendations
 
 Drift detection
 	•	If the DB marker hash is unknown or differs from any ledger node, runner reports drift and refuses to choose a path

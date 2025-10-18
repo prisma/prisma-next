@@ -12,8 +12,10 @@ Context
 
 Decision
 	•	Ship first-party dev plugins for Vite, Next.js, and esbuild that auto-emit the contract artifacts whenever inputs change
-	•	Define a clear “no explicit generate” contract: importing the generated types or contract file guarantees they exist and are fresh
+	•	Define a clear "no explicit generate" contract: importing the generated types or contract file guarantees they exist and are fresh
 	•	Standardize invalidation triggers, debounce/backoff, error surfacing, caching, and concurrency policy across all plugins
+	•	Explicitly support TS-first projects: watch the contract module and auto-emit canonical JSON on import/change
+	•	Surface canonicalization errors in overlay and console with debounced rebuilds
 
 Scope
 	•	Dev time hot emit for PSL-first and TS-first authoring modes
@@ -98,6 +100,7 @@ import { defineConfig } from 'prisma-next/config'
 export default defineConfig({
   authoring: 'psl' | 'ts',
   roots: ['./prisma', './contracts/app'],
+  tsContract: './contract/contract.ts',  // NEW: TS contract path for TS-first projects
   emit: {
     outDir: './.prisma-next/artifacts',
     virtualModules: true

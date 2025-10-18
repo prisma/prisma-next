@@ -16,6 +16,9 @@ Decision
 	•	Apply canonicalization in the emitter after validation and normalization and before hashing
 	•	Compute coreHash and profileHash over the canonical bytes
 	•	Treat any divergence from these rules as an emitter bug
+	•	Define a canonicalVersion field and require it to be embedded in every stored contract blob and DB marker
+	•	State that TS-first and PSL-first must canonicalize to the identical JSON and coreHash
+	•	Require a recanonicalize tool and policy: emitter changes bump canonicalVersion, not coreHash, and repos can bulk-upgrade blobs
 
 Canonical JSON profile
 
@@ -42,15 +45,16 @@ Object key ordering
 	•	Sort applied recursively to all objects
 	•	For top-level sections we enforce an explicit order before lexicographic sort to stabilize human diffs
 	1.	schemaVersion
-	2.	targetFamily
-	3.	target
-	4.	coreHash
-	5.	profileHash
-	6.	models
-	7.	storage
-	8.	capabilities
-	9.	codecs
-	10.	meta
+	2.	canonicalVersion
+	3.	targetFamily
+	4.	target
+	5.	coreHash
+	6.	profileHash
+	7.	models
+	8.	storage
+	9.	capabilities
+	10.	codecs
+	11.	meta
 
 Within each of these sections, standard lexicographic sort applies, except where domain-specific ordering rules are defined below
 
@@ -99,6 +103,8 @@ Emitter responsibilities
 	•	Normalize then canonicalize, then compute hashes, then write artifacts
 	•	Provide --verify mode that re-parses and re-emits to assert byte-identical output
 	•	Provide a prisma-next verify contract.json command to check adherence outside of emit
+	•	Provide a prisma-next recanonicalize command to bulk-upgrade contract blobs when canonicalVersion changes
+	•	Ensure TS-first and PSL-first projects produce identical canonical JSON and coreHash for the same logical schema
 
 Consumer responsibilities
 	•	Treat contract.json as immutable content-addressed data
@@ -145,6 +151,8 @@ Testing and compliance
 Backwards compatibility
 	•	Older contracts without canonicalization are re-emitted on first emit and pick up hashes accordingly
 	•	Schema version bump if canonicalization rules change in a breaking way
+	•	canonicalVersion defaults to 1 for existing contracts; older contracts without this field are accepted
+	•	Emitter changes that only affect canonicalization bump canonicalVersion, not coreHash, ensuring stable hashing
 
 Open questions
 	•	Whether to expose a --pretty view for humans without altering the on-disk artifact

@@ -197,19 +197,19 @@ sequenceDiagram
 
 ## Links to Subsystem Specs
 
-- **Data Contract:** `/docs/subsystems/contract.md`
-- **Contract Emitter & Types:** `/docs/subsystems/emitter.md`
-- **Query — Relational DSL:** `/docs/subsystems/query-dsl.md`
-- **Query — TypedSQL:** `/docs/subsystems/typedsql.md`
-- **Runtime & Plugins:** `/docs/subsystems/runtime.md`
-- **Migration System:** `/docs/subsystems/migrations.md`
-- **Preflight & CI:** `/docs/subsystems/preflight.md`
-- **PPg Integration:** `/docs/subsystems/ppg.md`
-- **Adapters & Targets:** `/docs/subsystems/adapters.md`
-- **Security & Privacy:** `/docs/subsystems/security.md`
-- **Performance & Capacity:** `/docs/subsystems/perf.md`
+- **Data Contract:** `architecture docs/1. Data Contract — Subsystem Design.md`
+- **Contract Emitter & Types:** `architecture docs/2. Contract Emitter & Types.md`
+- **Query Lanes:** `architecture docs/3. Query Lanes.md`
+- **Runtime & Plugin Framework:** `architecture docs/4. Runtime & Plugin Framework.md`
+- **Migration System:** `architecture docs/5. Migration System.md`
+- **Preflight & CI Integration:** `architecture docs/6. Preflight & CI Integration.md`
+- **PPg Integration:** `architecture docs/7. PPg Integration.md`
+- **Adapters & Targets:** `architecture docs/8. Adapters & Targets.md`
+- **Security, Privacy, Compliance:** `architecture docs/9. Security, Privacy, Compliance.md`
+- **Performance & Capacity:** `architecture docs/10. Performance & Capacity.md`
+- **No-Emit Workflow — Technical Design:** `architecture docs/11. No-Emit Workflow — Technical Design.md`
 
-**ADR Index:** `/docs/adr/` (e.g., `migrations‑as‑edges.md`, `plans‑are‑immutable.md`, `one‑query‑one‑statement.md`, `no‑parity‑pursuit.md`)
+**ADR Index:** `architecture docs/` (e.g., `ADR 001 - Migrations as Edges.md`, `ADR 002 - Plans are Immutable.md`, `ADR 003 - One Query One Statement.md`, etc.)
 
 ## Roadmap (At a Glance)
 

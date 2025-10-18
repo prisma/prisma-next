@@ -28,6 +28,7 @@ Must
 	•	For raw SQL lanes, include the required annotations per ADR 012
 	•	Avoid embedding ephemeral data in SQL or meta that would break hashing stability per ADR 013
 	•	Document the adapter capability expectations and minimum versions they rely on
+	•	Accept either contractJson or a TS contract object, but must canonicalize the latter to compute coreHash
 
 Should
 	•	Populate meta.refs and meta.projection when available to strengthen guardrails
@@ -36,6 +37,14 @@ Should
 
 Must not
 	•	Depend on private runtime internals or mutate Plans in place
+
+Requirements for hosted runtimes
+
+Hosted runtimes (e.g., PPg services) have additional security constraints
+	•	Must not evaluate TS contracts; JSON-only allowed for security
+	•	Must accept only canonical contract JSON from trusted sources
+	•	Must validate contract canonicalVersion and schemaVersion before processing
+	•	Must not execute untrusted codecs or custom extensions without explicit policy
 
 Requirements for alternate runtimes
 

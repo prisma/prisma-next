@@ -26,6 +26,8 @@ create table if not exists prisma_contract.marker (
   id smallint primary key default 1,
   core_hash text not null,
   profile_hash text not null,
+  contract_json jsonb,
+  canonical_version int,
   updated_at timestamptz not null default now(),
   app_tag text,
   meta jsonb not null default '{}'
@@ -35,6 +37,8 @@ Notes
 	•	Single row keyed by id = 1 keeps reads cheap and avoids accidental fan-out
 	•	core_hash is the canonical hash of contract.json after canonicalization
 	•	profile_hash identifies the adapter profile and capability set used to lower Plans
+	•	contract_json is optional complete contract JSON for drift analysis and PPg features
+	•	canonical_version tracks the canonicalization version used for the contract_json
 	•	app_tag is optional human context (service or deployment name)
 	•	meta is reserved for forward-compatible fields the platform may add later
 
@@ -51,6 +55,12 @@ Ownership and lifecycle
 	•	The runtime reads but never mutates the marker
 	•	Reads are cheap, cached per process, and invalidated by configurable TTLs or explicit cache busting
 	•	If the marker is missing, the runtime reports contract/marker-missing and refuses to execute in strict mode
+
+Contract storage modes
+	•	off: contract_json is null, only hashes are stored (default for backward compatibility)
+	•	compressed: contract_json contains gzipped canonical JSON for space efficiency
+	•	full: contract_json contains complete canonical JSON for drift analysis and PPg features
+	•	Verification: hash equality is authoritative; JSON equality is diagnostic only
 
 Namespacing and multi-tenant
 	•	Default behavior is per schema for Postgres
@@ -118,7 +128,8 @@ createRuntime({
   driver,
   verify: 'startup' | 'onFirstUse' | 'always',
   verifyCacheTtlMs?: number,
-  markerLocator?: { schema?: string, centralized?: { schema: string, key: string } }
+  markerLocator?: { schema?: string, centralized?: { schema: string, key: string } },
+  contractStorage?: 'off' | 'compressed' | 'full'
 })
 
 Runner

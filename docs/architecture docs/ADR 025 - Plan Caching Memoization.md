@@ -51,6 +51,8 @@ Normalized text that removes literal values, canonicalizes whitespace, stable al
 	•	profileHash (adapter profile and capability set)
 	•	adapterVersion
 	•	laneVersion optional, used only if the lane affects lowering shape
+	•	Note that cache keys remain (sqlFingerprint, profileHash, coreHash) regardless of authoring mode
+	•	Clarify invalidation when canonicalVersion changes without coreHash change (no invalidation required)
 
 Keys per tier
 	•	Shape cache key

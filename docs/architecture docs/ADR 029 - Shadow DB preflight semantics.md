@@ -128,6 +128,13 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 - Apply edges with advisory locks, respecting per-op transactional boundaries and compensation plans per ADR 037
 - Idempotency classification per ADR 038 determines whether a repeated edge is safe no-op or a conflict
 
+### Canonical JSON consumption
+
+- Preflight jobs must consume canonical JSON; if TS is provided, a trusted emitter step produces JSON inside the job sandbox
+- Record the exact canonical blob used for the job for auditability
+- Contract canonicalVersion and schemaVersion must be validated before processing
+- TS contracts are not evaluated directly in preflight for security; only canonical JSON is accepted
+
 ## Checks and diagnostics
 
 ### What runs in CHECKING

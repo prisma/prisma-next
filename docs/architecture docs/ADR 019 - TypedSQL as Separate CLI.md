@@ -14,9 +14,11 @@ Context
 Decision
 	•	Ship TypedSQL as an out-of-tree CLI, not a core lane
 	•	The CLI reads .sql files and emits Plan factories: tiny TS/JS functions that, when called with params, return a Plan conforming to ADR 011
-	•	The CLI stamps meta.coreHash from the project’s data contract and meta.target from the selected adapter profile
+	•	The CLI stamps meta.coreHash from the project's data contract and meta.target from the selected adapter profile
 	•	The CLI validates parameter and result types using either a live DB or the contract when possible
 	•	Generated artifacts are minimal and lane-neutral, avoiding client codegen and runtime coupling
+	•	TypedSQL generation must stamp coreHash from canonical JSON, not by evaluating TS
+	•	If a repo is TS-first, the CLI calls canonicalize(contract) in a sandboxed step to obtain JSON
 
 Goals
 	•	Preserve the clarity and power of hand-authored SQL while keeping safety guarantees
