@@ -19,12 +19,16 @@ Introduce a versioned migration ledger stored alongside migration packages that 
 	•	Squash produces a new baseline edge that subsumes a contiguous path
 	•	Tooling validates reachability, detects orphans and cycles, and enforces integrity
 
+**Note**: ADR 102 defines the default squash-first policy and advisor system. ADR 101 provides the Advisors framework. This ADR defines the ledger mechanics that support squashing.
+
 This ADR complements
 	•	ADR 021 Contract marker storage & verification modes
 	•	ADR 039 DAG path resolution & integrity
 	•	ADR 037 Transactional DDL fallback & compensation
 	•	ADR 038 Operation idempotency classification & enforcement
 	•	ADR 044 Pre/post check vocabulary v1
+	•	ADR 101 — Advisors framework
+	•	ADR 102 — Squash-first policy & squash advisor
 
 Ledger model
 	•	Node
@@ -39,6 +43,10 @@ Directed transition fromCoreHash -> toCoreHash with
 	•	labels optional metadata like branch or tag
 	•	verified proofs such as shadow apply result, planner version, adapter profile
 	•	authorship info for accountability
+	•	createdAt timestamp for deterministic ordering (recorded in edge manifest)
+	•	archived boolean flag marking edges superseded by baseline (kept for audit, ignored for pathfinding)
+
+These fields in each edge's `edge.json` enable graph reconstruction without a separate index. See ADR 039 for details on index-optional operation.
 
 No runtime environment state is embedded in the ledger
 
@@ -150,12 +158,15 @@ Append edge
 	•	Ensure no duplicate edgeId and no conflicting edge with same from/to but different content
 	•	Update ledger.json and write files atomically
 
-Squash to baseline
+Squash to baseline (primary hygiene mechanism)
+	•	Squashing is the recommended approach to DAG hygiene (see ADR 102 for policy)
 	•	Input is an ordered path of edgeIds from A to B
-	•	Produce a new baseline edge A→B whose ops.json is the concatenation of the path’s ops with compensation boundaries preserved
-	•	Set kind = baseline, fill supersedes with edgeIds, and place under migrations/baselines/<name>
-	•	Keep superseded edges on disk by default but mark them as superseded in the ledger to preserve provenance and allow audits
-	•	Baseline edges are eligible only when all included edges are verified or policy allows soft baselines
+	•	Produce a new baseline edge A→B embedding destination contract JSON
+	•	Set kind = baseline, fill supersedes with edgeIds, place under migrations/baselines/<name>
+	•	Mark superseded edges as archived: true in their edge.json
+	•	Archived edges preserved for provenance/audit but ignored during pathfinding
+	•	Baseline edges eligible only when all included edges verified or policy allows soft baselines
+	•	Branches should rebase onto latest baseline before merge to avoid parallel edges
 
 Rebase and prune
 	•	If a branch diverges, recompute an edge from current main to to branch to
@@ -170,6 +181,8 @@ Tooling for path checks
 
 All path operations are pure and read only from ledger.json
 
+Path operations reconstruct the graph from edge files by default. The committed index (ADR 039) is optional for performance. PPg can accept `{ edges/, graph-manifest.json (optional), desiredHash }` and reconstruct server-side if no index provided.
+
 Integrity and validation
 	•	Canonicalization rules per ADR 010 applied before hashing
 	•	Edge ids are deterministic and content-addressed
@@ -179,6 +192,12 @@ Integrity and validation
 	•	no cycles
 	•	supersedes lists reference existing edges
 	•	baselines cover contiguous paths only
+
+Parallel edges policy
+	•	Default: parallel edges (same from/to, different opsHash) rejected
+	•	Rationale: encourages rebase workflow, keeps graph simple
+	•	Override: require explicit parallel-ok label with justification
+	•	Most teams avoid parallel edges via squash-first + rebase (ADR 102)
 
 Concurrency and locking
 	•	Local dev uses file-level atomic writes with temp files and rename
@@ -242,7 +261,7 @@ Bloats artifacts and complicates edits, single ledger is simpler and auditable
 
 Open questions
 	•	Do we support multiple ledgers per repo for multi-service monorepos or enforce one ledger per contract root
-	•	Should superseded edges be auto-archived outside the repo to shrink history or remain for audit
+	•	**Resolved in ADR 102**: Retention windows via squash-first policy handle this. Superseded edges remain on disk with `archived: true` flag and are ignored during pathfinding.
 	•	Do we allow partial squashes that keep certain edges for audit reasons while collapsing others
 
 Acceptance criteria
