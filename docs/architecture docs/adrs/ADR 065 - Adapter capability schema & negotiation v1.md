@@ -1,25 +1,27 @@
-ADR 065 — Adapter capability schema & negotiation v1
+# ADR 065 — Adapter capability schema & negotiation v1
 
-Decision
+## Decision
 
-Define a versioned capability schema and a negotiation flow where
-	•	Adapters expose a capability map and a profileHash at connect()
-	•	Compile profiles (target-specific lowerers, e.g. sql/pg) consume capabilities to choose deterministic lowering strategies
-	•	Lanes and plugins branch on capabilities, never on target strings
-	•	Plans compiled under capability profile X are recompiled when the active profileHash changes
+Define a versioned capability schema and a negotiation flow where:
+- Adapters expose a capability map and a `profileHash` at `connect()`
+- Compile profiles (target-specific lowerers, e.g. `sql/pg`) consume capabilities to choose deterministic lowering strategies
+- Lanes and plugins branch on capabilities, never on target strings
+- Plans compiled under capability profile X are recompiled when the active `profileHash` changes
 
-Adapters do not lower Plans to SQL. Lowering is the responsibility of compile profiles
+**Adapters do not lower Plans to SQL. Lowering is the responsibility of compile profiles.**
 
-Why
-	•	Keep dialect logic deterministic and testable with golden SQL in compile profiles
-	•	Allow one runtime to execute across heterogeneous deployments by branching on declared capabilities rather than hardcoding "postgres" or "mysql"
-	•	Make fallbacks explicit when a feature is unavailable and avoid silent differences across environments
-	•	Enable reproducible builds by hashing the negotiated capability set per ADR 004
+## Why
 
-Capability schema
+- Keep dialect logic deterministic and testable with golden SQL in compile profiles
+- Allow one runtime to execute across heterogeneous deployments by branching on declared capabilities rather than hardcoding "postgres" or "mysql"
+- Make fallbacks explicit when a feature is unavailable and avoid silent differences across environments
+- Enable reproducible builds by hashing the negotiated capability set per ADR 004
 
-Capabilities are a JSON-serializable object with stable key ordering
+## Capability schema
 
+Capabilities are a JSON-serializable object with stable key ordering:
+
+```json
 {
   "schemaVersion": "1",
   "target": { "family": "sql", "profile": "pg", "version": "15" },
@@ -60,58 +62,65 @@ Capabilities are a JSON-serializable object with stable key ordering
     "pg": { "extensions": { "postgis": false, "vector": false } }
   }
 }
+```
 
-Rules
-	•	Reserved top-level segments: target, sql, ddl, types, limits, explain, tx, vendor, schemaVersion
-	•	vendor.* is freeform for adapter-specific data
-	•	Values are booleans, enums, strings, numbers, or small structured objects
-	•	No functions or code references
+### Rules
 
-profileHash
-	•	profileHash = sha256(canonicalize(capabilities) + compileProfileId)
-	•	Used for reproducibility, caching, and change detection per ADR 004
-	•	Changes whenever capabilities or the compile profile implementation changes in a way that affects lowering
+- Reserved top-level segments: `target`, `sql`, `ddl`, `types`, `limits`, `explain`, `tx`, `vendor`, `schemaVersion`
+- `vendor.*` is freeform for adapter-specific data
+- Values are booleans, enums, strings, numbers, or small structured objects
+- No functions or code references
 
-Negotiation flow
-	1.	Compile-time defaults
-	•	Lanes and tools may compile offline using a reference profile shipped with the compile profile (e.g. pg15-baseline)
-	•	This produces SQL tentatively and caches by (planId, referenceProfileHash)
-	2.	Connect
-	•	adapter.connect() returns { capabilities, profileHash }
-	•	Runtime stores active capabilities and emits onCapabilitiesNegotiated for plugins
-	3.	Before compile
-	•	If a Plan was compiled under a different profileHash, recompile with the active capabilities
-	•	Compile profiles choose the lowest common strategy that satisfies the Plan and capabilities
-	•	If a required feature is missing and no fallback exists, fail with a stable error
-	4.	Execute
-	•	Adapter executes { sql, params } and maps errors to runtime codes
-	•	Optional lightweight probes may validate a small subset of sensitive capabilities but are not required
+### profileHash
 
-Lane and plugin usage
-	•	Lanes must not branch on target strings
-	•	They may query runtime.getCapabilities() and guard behavior with explicit keys
-	•	Plugins can attach rule context using capability checks, e.g. if (!capabilities.sql.jsonAgg) rule('no-nested-array-projection').warn(...)
+- `profileHash = sha256(canonicalize(capabilities) + compileProfileId)`
+- Used for reproducibility, caching, and change detection per ADR 004
+- Changes whenever capabilities or the compile profile implementation changes in a way that affects lowering
 
-Failure modes and defaults
-	•	Unknown schema version
-	•	Warn and treat unknown keys as opaque, but do not assume capabilities exist
-	•	Missing critical key
-	•	Assume the most conservative default, e.g. ddl.transactional: false, and allow compile profile to reject if it cannot provide a safe lowering
-	•	Runtime mismatch
-	•	If the connection rotates to a different profileHash mid-process, the runtime must invalidate compiled outputs and recompile
-	•	Degraded capabilities
-	•	Compile profile may choose a fallback lowering or return a deterministic error with a suggested capability requirement
+## Negotiation flow
 
-Versioning
-	•	schemaVersion is semver-like but single integer for v1
-	•	New optional keys may be added without bumping the major version
-	•	Changing meaning of existing keys requires a major bump
-	•	Compile profiles declare supported schemaVersion ranges
+1. **Compile-time defaults**
+   - Lanes and tools may compile offline using a reference profile shipped with the compile profile (e.g. `pg15-baseline`)
+   - This produces SQL tentatively and caches by `(planId, referenceProfileHash)`
 
-Examples
+2. **Connect**
+   - `adapter.connect()` returns `{ capabilities, profileHash }`
+   - Runtime stores active capabilities and emits `onCapabilitiesNegotiated` for plugins
 
-Postgres 15 example
+3. **Before compile**
+   - If a Plan was compiled under a different `profileHash`, recompile with the active capabilities
+   - Compile profiles choose the lowest common strategy that satisfies the Plan and capabilities
+   - If a required feature is missing and no fallback exists, fail with a stable error
 
+4. **Execute**
+   - Adapter executes `{ sql, params }` and maps errors to runtime codes
+   - Optional lightweight probes may validate a small subset of sensitive capabilities but are not required
+
+## Lane and plugin usage
+
+- Lanes must not branch on target strings
+- They may query `runtime.getCapabilities()` and guard behavior with explicit keys
+- Plugins can attach rule context using capability checks, e.g. `if (!capabilities.sql.jsonAgg) rule('no-nested-array-projection').warn(...)`
+
+## Failure modes and defaults
+
+- **Unknown schema version**: Warn and treat unknown keys as opaque, but do not assume capabilities exist
+- **Missing critical key**: Assume the most conservative default, e.g. `ddl.transactional: false`, and allow compile profile to reject if it cannot provide a safe lowering
+- **Runtime mismatch**: If the connection rotates to a different `profileHash` mid-process, the runtime must invalidate compiled outputs and recompile
+- **Degraded capabilities**: Compile profile may choose a fallback lowering or return a deterministic error with a suggested capability requirement
+
+## Versioning
+
+- `schemaVersion` is semver-like but single integer for v1
+- New optional keys may be added without bumping the major version
+- Changing meaning of existing keys requires a major bump
+- Compile profiles declare supported `schemaVersion` ranges
+
+## Examples
+
+### Postgres 15 example
+
+```json
 {
   "schemaVersion": "1",
   "target": { "family": "sql", "profile": "pg", "version": "15" },
@@ -123,9 +132,11 @@ Postgres 15 example
   "tx": { "savepoints": true, "advisoryLocks": "session" },
   "vendor": { "pg": { "extensions": { "postgis": false, "vector": false } } }
 }
+```
 
-SQLite baseline
+### SQLite baseline
 
+```json
 {
   "schemaVersion": "1",
   "target": { "family": "sql", "profile": "sqlite", "version": "3.45" },
@@ -136,41 +147,45 @@ SQLite baseline
   "explain": { "format": "text", "costs": true, "buffers": false },
   "tx": { "savepoints": true, "advisoryLocks": "none" }
 }
+```
 
-Adapter responsibilities
-	•	Provide accurate capabilities at connect() and a stable profileHash
-	•	Update capabilities if the effective environment changes and notify runtime
-	•	Map database errors to stable runtime error codes per ADR 027
-	•	Do not embed lowering logic or transform ASTs
+## Adapter responsibilities
 
-Compile profile responsibilities
-	•	Deterministically lower (AST, capabilities) to { sql, params }
-	•	Prefer conservative fallbacks when possible
-	•	Emit stable diagnostics when a Plan cannot be lowered under the active capabilities
-	•	Ship reference capability profiles for offline compilation and testing
-	•	Participate in profileHash creation per ADR 004
+- Provide accurate capabilities at `connect()` and a stable `profileHash`
+- Update capabilities if the effective environment changes and notify runtime
+- Map database errors to stable runtime error codes per ADR 027
+- Do not embed lowering logic or transform ASTs
 
-Security and privacy
-	•	Capability maps must not leak sensitive configuration like passwords or hostnames
-	•	Vendor sections should avoid revealing internal infrastructure details and stick to feature availability or extension flags
+## Compile profile responsibilities
 
-Open questions
-	•	Should we allow a small set of runtime probes behind a feature flag to verify high-risk claims like ddl.transactional
-	•	Do we need a standardized way to express performance characteristics in capabilities, e.g. limits.maxExplainCost, or should that remain policy in budgets
+- Deterministically lower `(AST, capabilities)` to `{ sql, params }`
+- Prefer conservative fallbacks when possible
+- Emit stable diagnostics when a Plan cannot be lowered under the active capabilities
+- Ship reference capability profiles for offline compilation and testing
+- Participate in `profileHash` creation per ADR 004
 
-Consequences
+## Security and privacy
 
-Positive
-	•	Deterministic compilation tied to explicit features
-	•	Better portability and fewer target-string branches in code
-	•	Clear error paths when a feature is unavailable
+- Capability maps must not leak sensitive configuration like passwords or hostnames
+- Vendor sections should avoid revealing internal infrastructure details and stick to feature availability or extension flags
 
-Negative
-	•	More upfront work to define and maintain the capability map
-	•	Adapters must keep capability reporting accurate across server versions and configuration
+## Open questions
 
-Alternatives considered
-	•	Hardcode target strings and scatter conditionals
-	•	Rejected as brittle and untestable across environments
-	•	Let adapters perform lowering
-	•	Rejected because it breaks determinism, complicates testing, and conflates execution with compilation
+- Should we allow a small set of runtime probes behind a feature flag to verify high-risk claims like `ddl.transactional`?
+- Do we need a standardized way to express performance characteristics in capabilities, e.g. `limits.maxExplainCost`, or should that remain policy in budgets?
+
+## Consequences
+
+### Positive
+- Deterministic compilation tied to explicit features
+- Better portability and fewer target-string branches in code
+- Clear error paths when a feature is unavailable
+
+### Negative
+- More upfront work to define and maintain the capability map
+- Adapters must keep capability reporting accurate across server versions and configuration
+
+## Alternatives considered
+
+- **Hardcode target strings and scatter conditionals**: Rejected as brittle and untestable across environments
+- **Let adapters perform lowering**: Rejected because it breaks determinism, complicates testing, and conflates execution with compilation

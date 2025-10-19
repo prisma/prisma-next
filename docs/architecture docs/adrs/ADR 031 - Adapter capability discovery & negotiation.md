@@ -1,52 +1,58 @@
-ADR 031 — Adapter capability discovery & negotiation
+# ADR 031 — Adapter Capability Discovery & Negotiation
 
-Context
+## Context
 
-Prisma Next supports multiple SQL dialects via adapters. Lanes (DSL, ORM, TypedSQL, Raw) lower abstract Plans to dialect SQL. Some SQL features are optional or versioned (e.g., LATERAL, json_agg, transactional DDL, concurrent index creation). We need a consistent way for adapters to surface capabilities and for lanes to react when features are missing or discouraged
+Prisma Next supports multiple SQL dialects via adapters. Lanes (DSL, ORM, TypedSQL, Raw) lower abstract Plans to dialect SQL. Some SQL features are optional or versioned (e.g., LATERAL, json_agg, transactional DDL, concurrent index creation). We need a consistent way for adapters to surface capabilities and for lanes to react when features are missing or discouraged.
 
-Problem
-	•	Lanes must not emit SQL that the target cannot execute
-	•	Capability presence can be static (dialect design) or runtime-dependent (server version, extensions, config)
-	•	We need deterministic lowering and stable failure modes across environments
-	•	Plans and caches must vary when capabilities change to avoid stale or unsafe SQL
+## Problem
 
-Goals
-	•	Define a capability model covering static and runtime-discovered features
-	•	Provide a negotiation flow that yields a stable profileHash used in plan caches and diagnostics
-	•	Let lanes declare required vs optional capabilities and degrade or fail deterministically
-	•	Allow feature flags to pin or disable capabilities for safety or perf reasons
-	•	Keep the lowering responsibility in adapters, preserving lane portability
+- Lanes must not emit SQL that the target cannot execute
+- Capability presence can be static (dialect design) or runtime-dependent (server version, extensions, config)
+- We need deterministic lowering and stable failure modes across environments
+- Plans and caches must vary when capabilities change to avoid stale or unsafe SQL
 
-Non-goals
-	•	Implement automatic multi-statement fallbacks that violate the one-call → one-statement rule
-	•	Auto-enable database extensions or mutate server config during discovery
-	•	Encode business policies in the capability layer
+## Goals
 
-Decision
+- Define a capability model covering static and runtime-discovered features
+- Provide a negotiation flow that yields a stable profileHash used in plan caches and diagnostics
+- Let lanes declare required vs optional capabilities and degrade or fail deterministically
+- Allow feature flags to pin or disable capabilities for safety or perf reasons
+- Keep the lowering responsibility in adapters, preserving lane portability
 
-Capability taxonomy
+## Non-goals
 
-Capabilities are simple string identifiers, versioned when needed, grouped by domain
-	•	SQL core: cte, recursiveCte, lateral, windowFunctions, generatedColumns
-	•	JSON/arrays: json, jsonb, jsonAgg, arrayAgg, unnest
-	•	DDL: transactionalDdl, concurrentIndex, ifExists, ifNotExists, columnIdentity
-	•	Indexes: btree, hash, gist, gin, partialIndex, expressionIndex
-	•	Extensions: postgis@>=3.1, vector@>=0.5, pgcrypto, citext
-	•	Behavioral: readCommitted, serializable, planHints, explainAnalyze
-	•	Limits: maxParams@N, maxIdentifierLen@N (numeric payloads modeled via profile metadata)
+- Implement automatic multi-statement fallbacks that violate the one-call → one-statement rule
+- Auto-enable database extensions or mutate server config during discovery
+- Encode business policies in the capability layer
 
-Each capability is documented with a short description, references, and conformance tests
+## Decision
 
-Surfacing capabilities
+### Capability taxonomy
 
-Adapters expose two layers
-	•	Static: baked into the adapter for the dialect or profile family
-Example: MySQL lacks lateral, Postgres has lateral
-	•	Runtime: discovered per connection profile by probing the server
-Example: server version, loaded extensions, config flags, SHOW values
+Capabilities are simple string identifiers, versioned when needed, grouped by domain:
 
-Discovery API
+- **SQL core**: `cte`, `recursiveCte`, `lateral`, `windowFunctions`, `generatedColumns`
+- **JSON/arrays**: `json`, `jsonb`, `jsonAgg`, `arrayAgg`, `unnest`
+- **DDL**: `transactionalDdl`, `concurrentIndex`, `ifExists`, `ifNotExists`, `columnIdentity`
+- **Indexes**: `btree`, `hash`, `gist`, `gin`, `partialIndex`, `expressionIndex`
+- **Extensions**: `postgis@>=3.1`, `vector@>=0.5`, `pgcrypto`, `citext`
+- **Behavioral**: `readCommitted`, `serializable`, `planHints`, `explainAnalyze`
+- **Limits**: `maxParams@N`, `maxIdentifierLen@N` (numeric payloads modeled via profile metadata)
 
+Each capability is documented with a short description, references, and conformance tests.
+
+### Surfacing capabilities
+
+Adapters expose two layers:
+
+- **Static**: baked into the adapter for the dialect or profile family
+  - Example: MySQL lacks lateral, Postgres has lateral
+- **Runtime**: discovered per connection profile by probing the server
+  - Example: server version, loaded extensions, config flags, SHOW values
+
+### Discovery API
+
+```typescript
 type AdapterProfile = {
   adapterName: 'postgres' | 'mysql' | 'sqlite' | string
   adapterVersion: string
@@ -59,110 +65,125 @@ type AdapterProfile = {
   }
   profileHash: string // see below
 }
+```
 
-Negotiation
+### Negotiation
 
-At runtime initialization
-	1.	Adapter reports staticCaps
-	2.	Adapter runs lightweight probes to compute runtimeCaps and serverMeta
-	3.	Runtime merges caps, applies feature flags, then computes profileHash
+At runtime initialization:
+1. Adapter reports `staticCaps`
+2. Adapter runs lightweight probes to compute `runtimeCaps` and `serverMeta`
+3. Runtime merges caps, applies feature flags, then computes `profileHash`
 
-Feature flags
+### Feature flags
 
+```typescript
 type CapabilityPolicy = {
   forceEnable?: CapabilityId[]   // pin on, useful in tests
   forceDisable?: CapabilityId[]  // pin off for safety or perf
   prefer?: CapabilityId[]        // tie-break hints for adapters
 }
+```
 
-The effective capability set is
+The effective capability set is:
 
+```
 effective = (static ∪ runtime ∪ forceEnable) \ forceDisable
+```
 
-The adapter may use prefer to choose among multiple legal lowerings
+The adapter may use `prefer` to choose among multiple legal lowerings.
 
-Profile hash
+### Profile hash
 
+```
 profileHash = sha256(adapterName, adapterVersion, sorted(effectiveCaps), serverVersion, selected profile options)
-	•	Included in Plan meta.profileHash
-	•	Used in cache keys (sqlFingerprint, profileHash, coreHash) per ADR 025
-	•	Changes when capabilities or server version change, invalidating caches predictably
+```
 
-Lane behavior on missing capabilities
+- Included in `Plan.meta.profileHash`
+- Used in cache keys (`sqlFingerprint`, `profileHash`, `coreHash`) per ADR 025
+- Changes when capabilities or server version change, invalidating caches predictably
 
-Lanes declare capability intent on a per-lowering basis
-	•	required: lowering fails with ERR_CAPABILITY_MISSING and a precise hint
-Example: ORM nested 1:N requires lateral + jsonAgg for the chosen strategy
-	•	optional: adapter attempts a deterministic fallback strategy, else fails with a clear message
-Example: if jsonAgg absent, flatten projection and document shape change
-	•	discouraged: allowed but gated by lint or budget policy
+## Lane behavior on missing capabilities
 
-Lanes do not implement dialect fallbacks themselves. They call adapter lowerers with a declarative intent, adapter decides the SQL or fails
+Lanes declare capability intent on a per-lowering basis:
 
-Error semantics
+- **required**: lowering fails with `ERR_CAPABILITY_MISSING` and a precise hint
+  - Example: ORM nested 1:N requires `lateral` + `jsonAgg` for the chosen strategy
+- **optional**: adapter attempts a deterministic fallback strategy, else fails with a clear message
+  - Example: if `jsonAgg` absent, flatten projection and document shape change
+- **discouraged**: allowed but gated by lint or budget policy
 
-Stable error codes per ADR 027
-	•	ERR_CAPABILITY_MISSING when a required cap is absent
-	•	ERR_CAPABILITY_UNCERTAIN when discovery is inconclusive
-	•	ERR_CAPABILITY_DISABLED_BY_POLICY when forceDisable blocks it
-	•	Errors carry { capability, lane, reason, suggestions }
+Lanes do not implement dialect fallbacks themselves. They call adapter lowerers with a declarative intent, adapter decides the SQL or fails.
 
-Discovery cadence and caching
-	•	Discovery runs at startup and is memoized per connection profile
-	•	Revalidation occurs on reconnect or when the adapter detects serverVersion change
-	•	A short TTL can be configured for environments with dynamic extension toggles
-	•	Lanes receive a read-only view of the effective capabilities
+## Error semantics
 
-Feature flags use cases
-	•	Pin off jsonAgg in environments where it regresses perf to force flattened lowerings
-	•	Disable transactionalDdl when running against engines without full support
-	•	Prefer cte over subqueries for readability in training or testing contexts
+Stable error codes per ADR 027:
+- `ERR_CAPABILITY_MISSING` when a required cap is absent
+- `ERR_CAPABILITY_UNCERTAIN` when discovery is inconclusive
+- `ERR_CAPABILITY_DISABLED_BY_POLICY` when `forceDisable` blocks it
+- Errors carry `{ capability, lane, reason, suggestions }`
 
-Deterministic lowering requirement
+### Discovery cadence and caching
 
-Adapters must produce the same SQL for the same Plan + effective capabilities set
-	•	Golden SQL tests validate each lowering combination
-	•	If no valid lowering exists, adapters must fail rather than silently change semantics
+- Discovery runs at startup and is memoized per connection profile
+- Revalidation occurs on reconnect or when the adapter detects `serverVersion` change
+- A short TTL can be configured for environments with dynamic extension toggles
+- Lanes receive a read-only view of the effective capabilities
 
-Consequences
+### Feature flags use cases
 
-Positive
-	•	Deterministic, testable behavior across dialects and versions
-	•	Clear separation of concerns: lanes are portable, adapters own dialect logic
-	•	Stable caches keyed by profileHash and predictable invalidation
-	•	Safer rollouts by feature-flagging risky capabilities
+- Pin off `jsonAgg` in environments where it regresses perf to force flattened lowerings
+- Disable `transactionalDdl` when running against engines without full support
+- Prefer `cte` over subqueries for readability in training or testing contexts
 
-Negative
-	•	Slight startup cost for discovery probes
-	•	Adapter authors must maintain capability matrices and conformance tests
-	•	Some desirable fallbacks are not possible under the one-statement rule
+## Deterministic lowering requirement
 
-Alternatives considered
-	•	Centralize all capability handling in lanes
-Rejected to keep lanes portable and avoid dialect leakage
-	•	Omit runtime discovery and rely on static matrices
-Rejected because extensions and server versions materially affect feature sets
-	•	Auto multi-statement fallback when caps are missing
-Rejected due to ADR 015 one-call → one-statement rule and policy guardrails
+Adapters must produce the same SQL for the same Plan + effective capabilities set:
+- Golden SQL tests validate each lowering combination
+- If no valid lowering exists, adapters must fail rather than silently change semantics
 
-Implementation notes
-	•	Add adapter.discover() and adapter.lower(plan, caps, hints) to the SPI
-	•	Provide a shared CapabilityRegistry with docs and conformance hooks
-	•	Expose profileHash and effectiveCaps in runtime diagnostics and telemetry
-	•	Include capability context in lint rule messages for actionable guidance
+## Consequences
 
-Testing and conformance
-	•	Conformance Kit defines fixtures for capability permutations and expected SQL or errors
-	•	Adapters must pass golden tests for all declared caps and fallbacks
-	•	Fuzz tests check that profileHash changes when caps or version flip
+### Positive
 
-Migration
-	•	Existing Postgres adapter seeds static caps and a minimal discovery probe for serverVersion and common extensions
-	•	Lanes begin passing capability intents to lowerers
-	•	Gradually gate advanced features behind required caps with clear errors
+- Deterministic, testable behavior across dialects and versions
+- Clear separation of concerns: lanes are portable, adapters own dialect logic
+- Stable caches keyed by profileHash and predictable invalidation
+- Safer rollouts by feature-flagging risky capabilities
 
-References
-	•	ADR 016 — Adapter SPI for lowering relational AST
-	•	ADR 025 — Plan caching & memoization in runtime
-	•	ADR 027 — Error envelope & stable codes
-	•	ADR 015 — ORM as an optional extension over the DSL
+### Negative
+
+- Slight startup cost for discovery probes
+- Adapter authors must maintain capability matrices and conformance tests
+- Some desirable fallbacks are not possible under the one-statement rule
+
+## Alternatives considered
+
+- **Centralize all capability handling in lanes**: Rejected to keep lanes portable and avoid dialect leakage
+- **Omit runtime discovery and rely on static matrices**: Rejected because extensions and server versions materially affect feature sets
+- **Auto multi-statement fallback when caps are missing**: Rejected due to ADR 015 one-call → one-statement rule and policy guardrails
+
+## Implementation notes
+
+- Add `adapter.discover()` and `adapter.lower(plan, caps, hints)` to the SPI
+- Provide a shared `CapabilityRegistry` with docs and conformance hooks
+- Expose `profileHash` and `effectiveCaps` in runtime diagnostics and telemetry
+- Include capability context in lint rule messages for actionable guidance
+
+## Testing and conformance
+
+- Conformance Kit defines fixtures for capability permutations and expected SQL or errors
+- Adapters must pass golden tests for all declared caps and fallbacks
+- Fuzz tests check that `profileHash` changes when caps or version flip
+
+## Migration
+
+- Existing Postgres adapter seeds static caps and a minimal discovery probe for `serverVersion` and common extensions
+- Lanes begin passing capability intents to lowerers
+- Gradually gate advanced features behind required caps with clear errors
+
+## References
+
+- ADR 016 — Adapter SPI for lowering relational AST
+- ADR 025 — Plan caching & memoization in runtime
+- ADR 027 — Error envelope & stable codes
+- ADR 015 — ORM as an optional extension over the DSL

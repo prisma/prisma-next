@@ -1,8 +1,5 @@
 # Prisma Next — Architecture Overview
 
-> **Audience:** Engineering, PM, DX, leadership <br>
-> **Goal:** A single entry point to the Prisma Next design: what it is, why it exists, how the pieces fit, and the contracts that bind them.
-
 ## Problem & Goals
 
 **Context.** Developer tooling is shifting to agent‑assisted workflows. Agents can write SQL; what they lack is **structure, verification, and safe deployment**. Meanwhile, modern toolchains expect **TypeScript‑native** libs that “just work” without native binaries or heavy client codegen.
@@ -12,7 +9,7 @@
 - Generated clients add friction (native binaries, explicit “generate” steps, bundling issues).
 - Safety is **after the fact** (runtime errors, post‑hoc reviews), not **by construction**.
 
-**Prisma Next goals.**
+**Prisma Next goals:**
 1. **Data Contract as the system boundary.** A single, verifiable artifact that ties schema, code, queries, and the database together.
 2. **Safety‑first by design.** Guardrails, verification, and preflight checks before changes hit production.
 3. **TS‑native developer experience.** No heavy client; minimal, composable runtime; zero‑touch dev integrations (Vite/Next).
