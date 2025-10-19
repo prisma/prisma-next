@@ -175,4 +175,4 @@ References
 	•	ADR 043 — Advisory lock domain & key strategy
 	•	ADR 044 — Pre/post check vocabulary v1
 	•	ADR 024 — Telemetry schema & privacy
-	•	ADR 028 — Migration ledger & squash semantics
+	•	ADR 028 — Migration squashing & DAG hygiene

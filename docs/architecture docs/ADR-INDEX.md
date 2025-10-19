@@ -50,7 +50,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 
 | ADR | Title | Description | Link |
 |-----|-------|-------------|------|
-| 028 | Migration Ledger Squash | Defines migration ledger structure and squash operations for baseline creation | [ADR 028 - Migration Ledger Squash.md](adrs/ADR%20028%20-%20Migration%20Ledger%20Squash.md) |
+| 028 | Migration Squashing & DAG Hygiene | Defines migration squashing and DAG hygiene without on-disk ledger | [ADR 028 - Migration Squashing & DAG Hygiene.md](adrs/ADR%20028%20-%20Migration%20Squashing%20%26%20DAG%20Hygiene.md) |
 | 037 | Transactional DDL Fallback | Specifies fallback behavior when adapters lack full transactional DDL support | [ADR 037 - Transactional DDL Fallback.md](adrs/ADR%20037%20-%20Transactional%20DDL%20Fallback.md) |
 | 038 | Operation idempotency classification & enforcement | Defines idempotency classification and enforcement for migration operations | [ADR 038 - Operation idempotency classification & enforcement.md](adrs/ADR%20038%20-%20Operation%20idempotency%20classification%20&%20enforcement.md) |
 | 039 | DAG path resolution & integrity | Specifies DAG path computation, cycle detection, and deterministic tie-breaking | [ADR 039 - DAG path resolution & integrity.md](adrs/ADR%20039%20-%20DAG%20path%20resolution%20&%20integrity.md) |

@@ -26,14 +26,19 @@ Non-goals
 Decision
 
 Graph model and index
-	•	Each edge is { edgeId, from, to, opsHash, createdAt, labels?, archived? }
-	•	Migration files carry their own manifest with this metadata
-	•	**Default mode**: reconstruct graph on demand from edge files
-	•	**Optional**: maintain graph index JSON in repo: migrations/graph.index.json
-	•	edgeId = sha256(from + to + opsHash) unless tooling assigns it
-	•	Loader builds adjacency maps out[from] and in[to] from edge manifests
 
-Under the squash-first policy (ADR 102), most teams maintain small DAGs (10-20 active edges) where reconstruction is fast and the index is unnecessary.
+**Default mode: Reconstruct from migration files**
+- Each migration file (migration.json) carries its own manifest with metadata: { edgeId, from, to, opsHash, createdAt, labels?, archived? }
+- Graph is reconstructed on demand from migration file headers
+- This is the source of truth - no separate ledger required
+- edgeId = sha256(from + to + opsHash) unless tooling assigns it
+- Loader builds adjacency maps out[from] and in[to] from migration.json manifests
+
+**Optional: Performance cache with graph.index.json**
+- maintain graph index JSON in repo: migrations/graph.index.json
+- Pre-materialized adjacency lists for faster pathfinding on large DAGs
+- Purely a performance optimization - can be regenerated anytime from migration files
+- Under the squash-first policy (ADR 102), most teams maintain small DAGs (10-20 active edges) where reconstruction is fast and the index is unnecessary
 
 When to use a committed index (optional)
 

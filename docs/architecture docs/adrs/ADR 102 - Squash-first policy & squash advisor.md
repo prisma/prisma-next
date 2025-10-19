@@ -38,19 +38,19 @@ Teams can tune or disable these defaults
 
 ### Advisor rules
 
-- **squash.age-window** evaluates newest edge age since last baseline and emits a warn advisory with evidence `{ lastBaselineAt, newestEdgeAt, days }`
-- **squash.edges-since-baseline** evaluates edge count since last baseline and emits a warn advisory with evidence `{ count }`
-- **squash.baseline-missing** warns when the repo has no baseline and more than minEdgesBeforeSuggest edges exist
+- **squash.age-window** evaluates newest migration age since last baseline and emits a warn advisory with evidence `{ lastBaselineAt, newestMigrationAt, days }`
+- **squash.edges-since-baseline** evaluates migration count since last baseline and emits a warn advisory with evidence `{ count }`
+- **squash.baseline-missing** warns when the repo has no baseline and more than minEdgesBeforeSuggest migrations exist
 
 ### Suggested actions
 
-- `migrate baseline create` generates a baseline edge ∅ → H_latest, embedding the destination contract.json, and marks prior edges as archived: true
-- In PPg, a "Generate baseline PR" action opens a PR with the baseline edge and a summary of collapsed edges
+- `migrate baseline create` generates a baseline migration ∅ → H_latest, embedding the destination contract.json, and marks prior migrations as archived: true
+- In PPg, a "Generate baseline PR" action opens a PR with the baseline migration and a summary of collapsed migrations
 
 ### Safety rules
 
 - Baselines are for new environments only
-- The runner treats a baseline edge as a no-op on databases that already have a contract marker
+- The runner treats a baseline migration as a no-op on databases that already have a contract marker
 - CI in enforce mode can block merges when thresholds are exceeded without an accompanying baseline PR
 
 ## Configuration
@@ -103,14 +103,14 @@ Teams can tune or disable these defaults
 
 ## Implementation notes
 
-- Implement `migrate graph status` to compute edgesSinceBaseline and lastBaselineAt
+- Implement `migrate graph status` to compute migrationsSinceBaseline and lastBaselineAt
 - Implement `migrate baseline create` to produce ∅ → H_latest with embedded destination contract
-- Mark previous edges as archived: true and exclude from pathfinding
+- Mark previous migrations as archived: true and exclude from pathfinding
 - PPg adds a PR annotation with a button to generate a baseline PR
 
 ## Testing
 
-- Fixtures with and without baselines, varying edge counts and ages
+- Fixtures with and without baselines, varying migration counts and ages
 - Preflight gating tests to ensure we only suggest when safe
 - PPg PR flow tests creating a baseline PR from advisories
 

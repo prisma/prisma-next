@@ -27,7 +27,7 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
   "contract": {
     "toHash": "sha256:to...",
     "toContract": { /* complete destination contract JSON */ },
-    "ledgerPath": "migrations/ledger.json",
+    "migrationsPath": "migrations/",
     "fromHashHint": "sha256:from..."
   },
   "plans": [
@@ -97,10 +97,10 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 - Emit a signed deletion receipt for audit when PPg manages the environment
 
 ### Path computation and apply
-- Resolve path using ledger.json per ADR 028 and ADR 039
+- Resolve path by reconstructing graph from migration files per ADR 028 and optional graph.index.json per ADR 039
 - If fromHash cannot be derived, emit CONTRACT.MARKER_MISSING and refuse shadow mode unless policy allows reset to zero
-- Apply edges with advisory locks, respecting per-op transactional boundaries and compensation plans per ADR 037
-- Idempotency classification per ADR 038 determines whether a repeated edge is safe no-op or a conflict
+- Apply migrations with advisory locks, respecting per-op transactional boundaries and compensation plans per ADR 037
+- Idempotency classification per ADR 038 determines whether a repeated migration is safe no-op or a conflict
 
 ### Canonical JSON consumption
 - Preflight jobs must consume canonical JSON; if TS is provided, a trusted emitter step produces JSON inside the job sandbox

@@ -146,6 +146,6 @@ type Advisor = (ctx: AdvisorContext) => Promise<Advisory[]>
 - ADR 022 — Lint rule taxonomy & configuration model
 - ADR 047 — Diagnostics artifacts & formats
 - ADR 051 — PPg preflight-as-a-service contract
-- ADR 028 — Migration ledger & squash semantics
+- ADR 028 — Migration squashing & DAG hygiene
 - ADR 039 — DAG path resolution & integrity
 
