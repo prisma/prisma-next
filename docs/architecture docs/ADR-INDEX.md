@@ -101,7 +101,6 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 032 | Dev Auto Emit Integration | Specifies development tool integration for automatic contract emission | [ADR 032 - Dev Auto Emit Integration.md](adrs/ADR%20032%20-%20Dev%20Auto%20Emit%20Integration.md) |
 | 034 | Raw Plan factory manifest | Defines optional manifest for raw Plan factories with metadata | [ADR 034 - Raw Plan factory manifest.md](adrs/ADR%20034%20-%20Raw%20Plan%20factory%20manifest.md) |
 | 035 | Dual authoring conflict resolution | Specifies conflict resolution when both PSL and TS authoring exist | [ADR 035 - Dual authoring conflict resolution.md](adrs/ADR%20035%20-%20Dual%20authoring%20conflict%20resolution.md) |
-| 036 | Operation idempotency classification & enforcement | Defines idempotency classification for migration operations (duplicate of ADR 038) | [ADR 036 - Operation idempotency classification & enforcement.md](adrs/ADR%20036%20-%20Operation%20idempotency%20classification%20&%20enforcement.md) |
 
 ## No-Emit Workflow
 
@@ -122,7 +121,6 @@ This document provides a comprehensive index of all Architectural Decision Recor
 
 ## Notes
 
-- **ADR 036** and **ADR 038** appear to be duplicates covering the same topic (Operation idempotency classification & enforcement)
 - **ADR 051** covers PPg preflight-as-a-service contract
 - **ADRs 104-118** form the core extension system architecture
 - **ADRs 096-100** cover the no-emit workflow for TypeScript-authored contracts
