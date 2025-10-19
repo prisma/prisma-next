@@ -60,7 +60,7 @@ If decoding fails at any stage, emit RUNTIME.DECODE_FAILED with `cause.origin = 
   - `decode`, optional `encode`
   - `accepts`: predicate on wire value shape and optional driver OIDs/typeIds
   - `targetTypes`: set of contract scalar kinds it satisfies
-  - `configSchema`: zod-like schema for per-codec config
+  - `configSchema`: arktype schema for per-codec config
   - `deterministic`: true assertion and precisionNotes if applicable
 
 ## Built-in starter set
