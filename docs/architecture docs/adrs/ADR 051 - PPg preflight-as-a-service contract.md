@@ -30,8 +30,8 @@ Parity with local tools is guaranteed via shared schemas, hashing, capability ne
   Index with bundleSchemaVersion, coreHash, profileHash, target profile, edge list, Node target, creation metadata
 - **contract.json**
   Canonical data contract
-- **migrations/*.json**
-  Edges pinned by fromHash → toHash with op refs and arguments
+- **migrations/*/migration.json**
+  Migration definitions pinned by fromHash → toHash with op refs and arguments
 - **ops/*.js**
   Self-contained ESM files for each op used by edges, deps inlined
 - **ops/*.manifest.json**

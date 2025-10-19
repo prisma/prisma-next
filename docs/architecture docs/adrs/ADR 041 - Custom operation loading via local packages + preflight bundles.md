@@ -59,7 +59,7 @@ Produced by prisma-next migrate bundle in the user's CI or dev machine
 
 - bundle.json index with coreHash, profile, and edge list
 - contract.json canonical data contract
-- migrations/*.json edges with pinned op refs and arguments
+- migrations/*/migration.json migration definitions with pinned op refs and arguments
 - ops/*.js self-contained ESM files for each op used by edges
 - ops/*.manifest.json corresponding manifests
 - fixtures/* optional seed or fixtures for shadow DB

@@ -77,7 +77,7 @@ Path computation
 
 Deterministic tie-breaking
 
-Neighbor ordering is deterministic whether using reconstruction or index. Metadata comes from edge file headers (edge.json), not the index. The index merely caches this for faster access.
+Neighbor ordering is deterministic whether using reconstruction or index. Metadata comes from migration file headers (migration.json), not the index. The index merely caches this for faster access.
 
 Neighbor processing order is stable by a sort key tuple
 	1.	Label priority: main < default < feature

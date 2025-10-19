@@ -38,7 +38,7 @@ This ADR complements:
   - createdAt timestamp for deterministic ordering (recorded in edge manifest)
   - archived boolean flag marking edges superseded by baseline (kept for audit, ignored for pathfinding)
 
-These fields in each edge's `edge.json` enable graph reconstruction without a separate index. See ADR 039 for details on index-optional operation.
+These fields in each migration's `migration.json` enable graph reconstruction without a separate index. See ADR 039 for details on index-optional operation.
 
 No runtime environment state is embedded in the ledger
 
@@ -48,16 +48,16 @@ No runtime environment state is embedded in the ledger
 ```
 migrations/
   ledger.json                 # the DAG index
-  2025-01-15T1022_add_users/  # edge package directory
-    edge.json                 # edge header
+  2025-01-15T1022_add_users/  # migration package directory
+    migration.json            # migration header
     ops.json                  # machine ops IR
     notes.md                  # optional human notes
   2025-02-03T0905_add_posts/
-    edge.json
+    migration.json
     ops.json
   baselines/
     baseline_zero_to_2025-03-01/
-      edge.json
+      migration.json
       ops.json
 ```
 
@@ -121,7 +121,7 @@ migrations/
 }
 ```
 
-### edge.json header schema (v1)
+### migration.json header schema (v1)
 ```json
 {
   "from": "sha256:000...zero",
@@ -143,13 +143,13 @@ migrations/
 }
 ```
 
-edgeId = sha256(canonicalize(edge.json without edgeId) + canonicalize(ops.json) + canonicalize(fromContract) + canonicalize(toContract))
+edgeId = sha256(canonicalize(migration.json without edgeId) + canonicalize(ops.json) + canonicalize(fromContract) + canonicalize(toContract))
 
 ## Operations on the ledger
 
 ### Append edge
 - Validate from and to nodes exist or add them
-- Check that ops.json and edge.json canonicalize and hash to edgeId
+- Check that ops.json and migration.json canonicalize and hash to edgeId
 - Ensure no duplicate edgeId and no conflicting edge with same from/to but different content
 - Update ledger.json and write files atomically
 
@@ -158,7 +158,7 @@ edgeId = sha256(canonicalize(edge.json without edgeId) + canonicalize(ops.json) 
 - Input is an ordered path of edgeIds from A to B
 - Produce a new baseline edge A→B embedding destination contract JSON
 - Set kind = baseline, fill supersedes with edgeIds, place under migrations/baselines/<name>
-- Mark superseded edges as archived: true in their edge.json
+- Mark superseded edges as archived: true in their migration.json
 - Archived edges preserved for provenance/audit but ignored during pathfinding
 - Baseline edges eligible only when all included edges verified or policy allows soft baselines
 - Branches should rebase onto latest baseline before merge to avoid parallel edges
@@ -176,7 +176,7 @@ edgeId = sha256(canonicalize(edge.json without edgeId) + canonicalize(ops.json) 
 
 All path operations are pure and read only from ledger.json
 
-Path operations reconstruct the graph from edge files by default. The committed index (ADR 039) is optional for performance. PPg can accept `{ edges/, graph-manifest.json (optional), desiredHash }` and reconstruct server-side if no index provided.
+Path operations reconstruct the graph from migration files by default. The committed index (ADR 039) is optional for performance. PPg can accept `{ migrations/, graph-manifest.json (optional), desiredHash }` and reconstruct server-side if no index provided.
 
 ## Integrity and validation
 - Canonicalization rules per ADR 010 applied before hashing

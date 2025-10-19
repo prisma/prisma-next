@@ -21,7 +21,7 @@ A preflight bundle must include the following pack artifacts
 	•	bundle.json index with coreHash, profileTarget (e.g. postgres@XX), list of edges and plan manifests
 	•	packs/manifest.json pack declarations and resolved requirements
 	•	plans/**/*.json or ndjson for recorded Plans, each with annotations per ADR 018
-	•	migrations/*.json edges and node tasks with op IDs and args
+	•	migrations/*/migration.json migration definitions and node tasks with op IDs and args
 	•	ops/*.js custom operation implementations when present, plus ops/*.manifest.json per ADR 041
 	•	fixtures/** optional seed for shadow runs
 
