@@ -84,6 +84,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 116 | Extension-aware migration ops | Specifies extension-aware migration operations and capability gating | [ADR 116 - Extension-aware migration ops.md](adrs/ADR%20116%20-%20Extension-aware%20migration%20ops.md) |
 | 117 | Extension capability keys | Defines canonical capability keys and reserved namespaces | [ADR 117 - Extension capability keys.md](adrs/ADR%20117%20-%20Extension%20capability%20keys.md) |
 | 118 | Bundle inclusion policy for packs | Establishes bundle inclusion policy and security constraints for packs | [ADR 118 - Bundle inclusion policy for packs.md](adrs/ADR%20118%20-%20Bundle%20inclusion%20policy%20for%20packs.md) |
+| 121 | Contract.d.ts structure and relation typing | Complete specification for Tables, Models, and Relations namespaces with proper relation field typing | [ADR 121 - Contract.d.ts structure and relation typing.md](adrs/ADR%20121%20-%20Contract.d.ts%20structure%20and%20relation%20typing.md) |
 
 ## Adapters & Targets
 
