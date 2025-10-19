@@ -143,12 +143,15 @@ sequenceDiagram
 
 ## Glossary & Invariants
 
-- **Data Contract.** Canonical JSON describing storage (tables/indexes/FKs) and the models they support. Authored in PSL or a TS builder; emits the same artifact
-- **Contract Hash.** A unique identifier for a contract; persisted in artifacts and the database marker
-- **Plan.** An immutable object describing a query or a migration opset. Plans carry the contract hash and references
-- **Guardrails.** Configurable checks (lints, budgets, policies) applied before execution
-- **Preflight.** A dry‑run/EXPLAIN of plans and migrations in CI or a preview DB; returns structured diagnostics
+- **Data Contract.** Canonical JSON describing storage (tables/indexes/FKs), models, capabilities, and extensions. Authored in PSL or a TS builder; emits the same artifact
+- **Contract Hash.** A unique identifier for a contract; persisted in artifacts and the database marker. Includes `coreHash` (logical schema) and optional `profileHash` (physical capabilities)
+- **Plan.** An immutable object describing a query or a migration opset. Plans carry the contract hash, references, and annotations for policy enforcement
+- **Guardrails.** Configurable checks (lints, budgets, policies) applied before execution, including extension-specific rules
+- **Preflight.** A dry‑run/EXPLAIN of plans and migrations in CI or a preview DB; returns structured diagnostics including capability verification
 - **Node Task.** A verifiable data operation attached to a contract state (e.g., backfill), separate from schema edges
+- **Extension Pack.** A versioned npm package providing domain-specific capabilities (e.g., pgvector, PostGIS) through standardized SPIs
+- **Capability Key.** A canonical identifier for database or extension features used in adapter negotiation and feature gating
+- **Bundle.** A self-contained artifact for hosted preflight containing contracts, migrations, and pack code with security constraints
 
 **Invariants:**
 
@@ -195,6 +198,23 @@ sequenceDiagram
 - **Preflight reliability.** Shadow DB and EXPLAIN‑only modes; reproducibility checks
 - **Performance budgets.** CI gates for compile/execute overhead; p95 CRUD targets
 
+## Artifacts
+
+Prisma Next produces several key artifacts that serve as the foundation for type safety, verification, and tooling:
+
+### Core Artifacts
+- **`contract.json`** — Canonical data contract describing models, storage, capabilities, and extensions
+- **`contract.d.ts`** — TypeScript declaration file exposing table and model types for the DSL
+- **`packs/manifest.json`** — Extension pack manifests declaring capabilities and integration points
+
+### Migration Artifacts
+- **Migration DAG files** — Edge definitions and node tasks for contract-to-contract transitions
+- **Bundle archives** — Self-contained artifacts for preflight containing contracts, migrations, and pack code
+
+### Development Artifacts
+- **`.d.ts` types** — Generated TypeScript types for tables, columns, and extension values
+- **Plan factories** — TypedSQL-generated query factories with contract verification
+
 ## Links to Subsystem Specs
 
 - **Data Contract:** `architecture docs/1. Data Contract — Subsystem Design.md`
@@ -208,6 +228,14 @@ sequenceDiagram
 - **Security, Privacy, Compliance:** `architecture docs/9. Security, Privacy, Compliance.md`
 - **Performance & Capacity:** `architecture docs/10. Performance & Capacity.md`
 - **No-Emit Workflow — Technical Design:** `architecture docs/11. No-Emit Workflow — Technical Design.md`
+- **Ecosystem Extensions & Packs:** `architecture docs/12. Ecosystem Extensions & Packs.md`
+
+## Extensions
+
+Prisma Next's extension system enables domain-specific capabilities through installable packs:
+
+- **ADR 104–106:** Extension namespacing, encoding, and canonicalization
+- **ADR 112–118:** Extension packs, function registry, codecs, guardrails, migration ops, capability keys, and bundle policies
 
 **ADR Index:** `architecture docs/` (e.g., `ADR 001 - Migrations as Edges.md`, `ADR 002 - Plans are Immutable.md`, `ADR 003 - One Query One Statement.md`, etc.)
 
