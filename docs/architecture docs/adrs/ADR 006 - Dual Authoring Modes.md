@@ -1,9 +1,4 @@
-ADR 006 — Dual authoring modes (PSL-first and TS-first) with a single canonical artifact
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: Data contract, Emitter & Types, ADR 004 core vs profile hash, ADR 005 thin core fat targets
+# ADR 006 — Dual authoring modes (PSL-first and TS-first) with a single canonical artifact
 
 Context
 	•	Teams want flexibility to author schemas in PSL or in TypeScript for agent and tool ergonomics

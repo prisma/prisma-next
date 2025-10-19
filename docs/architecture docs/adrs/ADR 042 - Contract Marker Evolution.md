@@ -1,9 +1,5 @@
 # ADR 042 — Contract marker evolution
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 021 contract marker storage, ADR 010 canonicalization rules, ADR 004 core vs profile hash
 
 ## Context
 

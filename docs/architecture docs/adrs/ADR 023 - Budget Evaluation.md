@@ -1,10 +1,5 @@
 # ADR 023 — Budget evaluation & EXPLAIN policy
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 014 runtime hook API v1, ADR 018 plan annotations schema, ADR 020 result typing rules, ADR 021 contract marker verification, ADR 022 lint taxonomy
-
 ## Context
 
 Prisma Next provides guardrails via budgets to prevent accidental expensive queries. We need a clear policy for when to run EXPLAIN, how to cache results, and how to fall back safely when EXPLAIN is unavailable or too costly. Budgets must be predictable, low overhead by default, and configurable per environment.

@@ -1,9 +1,4 @@
-ADR 018 — Plan annotations schema and validation
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 011 unified Plan model, ADR 012 raw SQL escape hatch, ADR 013 lane-agnostic plan identity and hashing, ADR 014 runtime hook API, ADR 016 adapter SPI
+# ADR 018 — Plan annotations schema and validation
 
 Context
 	•	Raw SQL Plans intentionally do not carry an AST, so guardrails must rely on explicit annotations

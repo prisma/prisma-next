@@ -1,10 +1,5 @@
 # ADR 027 — Error Envelope & Stable Codes
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 011 unified Plan model, ADR 013 lane-agnostic plan identity, ADR 014 runtime hook API, ADR 021 contract marker storage, ADR 022 lint taxonomy, ADR 023 budget evaluation, ADR 024 telemetry schema, ADR 025 plan caching, ADR 026 conformance kit, ADR 028 migration ledger, ADR 029 shadow preflight, ADR 030 result decoding, ADR 031 capability discovery, ADR 037 transactional DDL, ADR 038 operation idempotency, ADR 043 advisory locks, ADR 044 pre/post checks, ADR 065 capability schema, ADR 068 driver execution, ADR 072 adapter manifest, ADR 076 EXPLAIN normalization, ADR 079 identifier masking, ADR 084 prepared statements, ADR 085 privacy redaction, ADR 086 webhook signing, ADR 089 performance budgets, ADR 094 performance scaling, ADR 095 prepared statement management
-
 ## Context
 
 Prisma Next spans lanes (DSL, ORM, raw), runtimes, adapters, migrations, and PPg preflight. Users and agents need machine-parsable, stable errors with actionable detail. Today, SQLSTATEs, driver exceptions, lint violations, and budget overages surface inconsistently. We need a single envelope and a stable code registry so policies, dashboards, and retries work uniformly.

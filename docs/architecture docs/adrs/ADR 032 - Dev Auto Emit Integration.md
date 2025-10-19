@@ -1,10 +1,5 @@
 ADR 032 — Dev auto-emit integration (Vite/Next/esbuild)
 
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 006 dual authoring modes, ADR 010 contract canonicalization, ADR 021 contract marker, ADR 011 unified Plan model
-
 Context
 	•	Prisma Next produces two canonical artifacts from the data contract: contract.json and contract.d.ts
 	•	Requiring developers to run an explicit generate step regresses DX, breaks agent flows, and complicates hot-reload loops

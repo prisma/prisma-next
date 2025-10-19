@@ -1,9 +1,4 @@
-ADR 005 — Thin core, fat targets
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: Data contract, Emitter, Runtime, Adapters, Migrations, Preflight, PPg integration
+# ADR 005 — Thin core, fat targets
 
 Context
 	•	The legacy ORM intertwined cross-cutting logic with dialect details, making changes risky and contributions difficult

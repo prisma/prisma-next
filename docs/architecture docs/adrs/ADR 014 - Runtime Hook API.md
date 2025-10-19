@@ -1,10 +1,5 @@
 # ADR 014 — Runtime hook API v1 (lane-neutral)
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 012 raw SQL escape hatch, ADR 013 lane-agnostic plan identity and hashing, Query Lanes
-
 ## Context
 
 We support multiple authoring lanes that all emit a Plan: SQL DSL, ORM over DSL, Raw SQL, future TypedSQL. Guardrails, budgets, telemetry, and vendor features must attach at runtime without lane coupling. We need a stable, minimal hook API that plugins can implement once and have it work for every lane.

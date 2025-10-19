@@ -1,8 +1,5 @@
 ADR 040 — Node task execution environment & sandboxing
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Migrate Working Group
 
 Context
 

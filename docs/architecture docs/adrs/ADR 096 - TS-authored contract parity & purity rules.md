@@ -1,8 +1,5 @@
 # ADR 096 — TS-authored contract parity & purity rules
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Data Layer Working Group
 
 ## Context
 

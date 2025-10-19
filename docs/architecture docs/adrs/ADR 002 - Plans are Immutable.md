@@ -1,10 +1,5 @@
 # ADR 002 — Plans are Immutable
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: Data contract, Query DSL, TypedSQL, Runtime, Plugins, Migrations
-
 ## Context
 
 We compile both queries and migrations into Plans. Plans are consumed by the runtime, verified against the data contract, linted, budgeted, and then executed. To enable verification, caching, auditing, and agent interoperability, a Plan must be a stable, hashable value. Mutable plans make audit trails unreliable, complicate plugin behavior, and break deterministic CI checks.

@@ -1,9 +1,5 @@
 # ADR 041 — Custom operation loading via local packages + preflight bundles
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Migrate Working Group
-- **Supersedes**: earlier registry-based proposal for ADR 041
 
 ## Context
 

@@ -1,10 +1,5 @@
 # ADR 025 — Plan caching & memoization in runtime
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 002 plans are immutable, ADR 013 lane-agnostic plan identity and hashing, ADR 014 runtime hook API v1, ADR 023 budget & EXPLAIN policy
-
 ## Context
 
 Plans are immutable units of execution produced by lanes and consumed by the runtime. Lowering and compilation are deterministic but non-zero cost, especially under bursty load. Some runtime guardrails (lints, EXPLAIN budgets) and adapter work benefit from reuse across identical or structurally equivalent Plans. We must avoid caching anything that leaks secrets or ties cache entries to a specific environment, contract, or adapter version.

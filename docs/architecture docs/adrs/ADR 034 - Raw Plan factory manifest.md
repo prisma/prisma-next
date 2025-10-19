@@ -1,8 +1,5 @@
 ADR 034 — Raw Plan factory manifest
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Data Layer Working Group
 
 Context
 

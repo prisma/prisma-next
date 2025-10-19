@@ -1,10 +1,5 @@
 ADR 115 — Extension guardrails & EXPLAIN policies
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Runtime, Preflight, Adapters
-Related: ADR 010 Canonicalization rules for contract.json, ADR 018 Plan annotations schema and validation, ADR 021 Contract marker storage & verification modes, ADR 022 Lint rule taxonomy & configuration model, ADR 023 Budget evaluation & EXPLAIN policy, ADR 029 Shadow DB preflight semantics, ADR 030 Result decoding & codecs registry, ADR 031 Adapter capability discovery & negotiation, ADR 065 Adapter capability schema & negotiation v1, ADR 112 Target Extension Packs, ADR 113 Extension function & operator registry
-
 Context
 
 Target extensions like pgvector and PostGIS unlock powerful queries but can be easy to misuse, leading to slow sequential scans, incorrect distance computations, or unstable plans. Because agents and humans will both author queries, we need guardrails that are:

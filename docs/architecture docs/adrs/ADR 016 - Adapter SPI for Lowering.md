@@ -1,10 +1,5 @@
 # ADR 016 — Adapter SPI for lowering relational AST
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 005 thin core fat targets, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 013 lane-agnostic plan identity and hashing, ADR 014 runtime hook API, ADR 015 ORM as optional extension
-
 ## Context
 
 The SQL DSL and optional ORM produce a dialect-agnostic relational AST. We need a clear, stable SPI where dialect logic lives so lanes stay portable and the core remains thin. Lowering must be deterministic to support plan hashing, golden tests, and agent predictability.

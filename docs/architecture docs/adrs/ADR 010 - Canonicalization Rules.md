@@ -1,9 +1,4 @@
-ADR 010 — Canonicalization rules for contract.json
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 006 dual authoring modes, ADR 008 dev auto-emit vs CI explicit, ADR 009 deterministic naming, Contract Emitter & Types
+# ADR 010 — Canonicalization rules for contract.json
 
 Context
 	•	contract.json is the canonical artifact consumed by the runtime, planner, preflight, and PPg

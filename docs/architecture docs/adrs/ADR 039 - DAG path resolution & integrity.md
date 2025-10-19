@@ -1,9 +1,5 @@
 ADR 039 — DAG path resolution & integrity
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Data Layer Working Group
-
 Context
 
 Migrations are modeled as directed edges from fromHash to toHash. At apply time, the runner must compute a path from the database’s current contract hash to the desired hash using the set of on-disk edges. The graph must remain acyclic and well-formed so path computation is deterministic, fast, and safe

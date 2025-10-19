@@ -1,10 +1,5 @@
 # ADR 012 — Raw SQL escape hatch with required annotations
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 008 dev auto-emit vs CI explicit, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 013 plan identity and hashing, Query Lanes
-
 ## Context
 
 We intentionally keep the SQL DSL small and composable. Teams still need to run hand-authored SQL for advanced features, engine extensions, or when SQL is clearer than any builder. Safety and observability cannot be optional just because the query is raw. We need a defined way to create a Plan from raw SQL that keeps guardrails and verification intact without requiring the core to parse SQL.

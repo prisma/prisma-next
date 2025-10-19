@@ -1,9 +1,4 @@
-ADR 003 — One query → one statement
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: Data contract, Query DSL, TypedSQL, Runtime, Plugins, Migrations, Preflight
+# ADR 003 — One query → one statement
 
 Context
 	•	The legacy ORM often mapped a single high-level call to multiple database round-trips

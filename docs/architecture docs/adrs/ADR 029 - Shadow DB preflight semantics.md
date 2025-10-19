@@ -1,10 +1,5 @@
 # ADR 029 — Shadow DB preflight semantics
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 021 contract marker storage, ADR 023 budget evaluation, ADR 024 telemetry schema, ADR 028 migration ledger, ADR 037 transactional DDL fallback, ADR 039 DAG path resolution, ADR 044 pre/post checks, ADR 079 identifier masking, ADR 086 webhook signing
-
 ## Context
 
 We want a safe way to validate migrations and Plans before production apply. Teams run preflight in CI and we will also offer PPg preflight-as-a-service. Preflight must be deterministic, isolated, resource-bounded, and leave no residue. Some checks require a real database state, others can run in EXPLAIN-only mode. Preflight artifacts feed developer UIs, agents, and compliance tooling.

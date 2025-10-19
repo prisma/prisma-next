@@ -1,10 +1,5 @@
 # ADR 011 — Unified Plan model across lanes
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 006 dual authoring modes, ADR 007 types-only emission, ADR 008 dev auto-emit vs CI explicit, ADR 010 canonicalization rules, Query Lanes doc
-
 ## Context
 
 We support multiple query authoring lanes: SQL DSL, ORM extension over the DSL, Raw SQL escape hatch, future TypedSQL CLI. To keep the runtime simple and safe, every lane must converge on a single execution contract: a Plan that the runtime can verify, lint, budget, and execute. Prior designs leaked lane-specific behavior into execution or required generated clients; we want one immutable object that captures everything needed for safety and observability.

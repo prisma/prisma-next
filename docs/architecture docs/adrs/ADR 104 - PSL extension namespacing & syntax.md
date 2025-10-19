@@ -1,11 +1,5 @@
 ADR 104 — PSL extension namespacing & syntax
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Data Contract WG
-Supersedes: None
-Related: ADR 010 Canonicalization rules for contract.json, ADR 016 Adapter SPI for lowering, ADR 030 Codecs registry, ADR 041 Custom operation loading, ADR 065 Capability schema & negotiation v1, Doc 11 Extensions & Packs
-
 Context
 
 We need a stable way for database and domain feature packs to extend PSL while keeping the emitted data contract deterministic and code-free

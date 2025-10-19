@@ -1,9 +1,4 @@
-ADR 019 — TypedSQL as a separate CLI that emits Plan factories
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 006 dual authoring modes, ADR 007 types-only emission, ADR 011 unified Plan model, ADR 012 raw SQL escape hatch, ADR 013 lane-agnostic plan identity and hashing, ADR 014 runtime hook API, ADR 017 extension and alternate runtime compatibility
+# ADR 019 — TypedSQL as a separate CLI that emits Plan factories
 
 Context
 	•	Some queries are clearer or only possible in hand-authored SQL

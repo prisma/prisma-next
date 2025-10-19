@@ -1,10 +1,5 @@
 # ADR 021 — Contract marker storage & verification modes
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 004 core vs profile hash, ADR 011 unified Plan model, ADR 014 runtime hook API v1, ADR 028 migration ledger & squash, ADR 029 shadow preflight
-
 ## Context
 
 The runtime and the migration runner must know which data contract a database currently satisfies. Plans carry meta.coreHash and meta.target and must be verified against the database before execution. We need a durable, unambiguous marker in the database plus clear verification modes suited to dev, CI, and production.

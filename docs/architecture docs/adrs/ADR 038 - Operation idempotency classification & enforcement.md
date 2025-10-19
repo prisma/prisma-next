@@ -1,9 +1,5 @@
 # ADR 038 — Operation idempotency classification & enforcement
 
-**Status:** Proposed
-**Date:** 2025-10-18
-**Owners:** Data Layer Working Group
-
 ## Context
 
 The migration runner applies a sequence of operations defined on an edge from `fromHash` to `toHash`. Real databases can be retried, interrupted, or concurrently modified. To remain safe and resumable, each operation must declare whether replays are acceptable and how the runner distinguishes between an operation that is already applied, a true conflict, or a fresh apply.

@@ -1,10 +1,5 @@
 ADR 106 — Canonicalization for extensions
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Data Contract WG
-Related: ADR 010 Canonicalization rules for contract.json, ADR 104 PSL extension namespacing & syntax, ADR 105 Contract extension encoding, ADR 065 Adapter capability schema & negotiation v1
-
 Context
 
 Extensions let targets and community packs attach structured metadata to the data contract without changing core storage nodes. ADR 105 defined where extension data lives and how it references core nodes. To keep hashes stable, diffs readable, and tool behavior deterministic, we need explicit canonicalization rules for the extensions section that build on ADR 010

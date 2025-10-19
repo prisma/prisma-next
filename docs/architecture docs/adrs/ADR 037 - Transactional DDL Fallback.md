@@ -1,9 +1,5 @@
 ADR 037 — Transactional DDL fallback & compensation
 
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 016 adapter SPI, ADR 021 contract marker, ADR 028 migration ledger & squash, ADR 029 shadow preflight, ADR 038 idempotency, ADR 043 advisory locks
 
 Context
 	•	Some targets support fully transactional DDL, others do not or only partially

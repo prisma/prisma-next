@@ -1,10 +1,5 @@
 ADR 112 — Target Extension Packs
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Extensions Working Group
-Related: ADR 010 Canonicalization rules for contract.json, ADR 065 Adapter capability schema & negotiation v1, ADR 104 PSL extension namespacing & syntax, ADR 105 Contract extension encoding, ADR 106 Canonicalization for extensions, ADR 026 Conformance Kit & Certification Levels, ADR 068 Error mapping to RuntimeError
-
 Context
 
 We want a first-class way to add target-specific capabilities like PostGIS, pgvector, Trigram, or future vendor features without changing the core. These capabilities must be expressible in the data contract, validated deterministically, participate in type and lowering pipelines where applicable, and remain safe and auditable. Community contributions should be possible with minimal friction while preserving our guarantees

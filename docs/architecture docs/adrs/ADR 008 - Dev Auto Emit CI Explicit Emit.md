@@ -1,9 +1,4 @@
-ADR 008 — Dev auto-emit, CI explicit emit
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 006 dual authoring modes, Contract Emitter & Types
+# ADR 008 — Dev auto-emit, CI explicit emit
 
 Context
 	•	The legacy ORM forces an explicit generate step and ships native binaries, slowing inner loops

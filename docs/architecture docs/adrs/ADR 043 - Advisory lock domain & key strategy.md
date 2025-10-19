@@ -1,11 +1,5 @@
 # ADR 043 — Advisory lock domain & key strategy
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Migrate WG, Runtime WG, PPg WG
-- **Depends on**: ADR 021, ADR 028, ADR 037, ADR 039
-- **Related**: ADR 040, ADR 041, ADR 044
-
 ## Context
 
 Multiple actors can operate on the same database: local migrate runners, CI preflight, background jobs, and PPg orchestration. We need a deterministic, cross-runner way to prevent concurrent schema changes and other exclusive operations without relying on vendor-specific implicit locks. PostgreSQL exposes advisory locks, some targets do not. We also support multi-tenant apps where certain operations must serialize per tenant rather than globally

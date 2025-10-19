@@ -1,10 +1,5 @@
 ADR 117 — Extension capability keys
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Adapters & Targets, Extensions, Runtime
-Related: ADR 004 Core vs profile hash, ADR 065 Adapter capability schema & negotiation v1, ADR 112 Target Extension Packs, ADR 115 Extension guardrails & EXPLAIN policies, ADR 116 Extension-aware migration ops, ADR 021 Contract marker storage
-
 Context
 
 Targets like Postgres can be extended with packs such as pgvector and PostGIS. These introduce new types, operators, indexes, and DDL features that must be surfaced to

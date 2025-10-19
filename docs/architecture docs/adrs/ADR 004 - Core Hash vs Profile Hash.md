@@ -1,9 +1,4 @@
-ADR 004 — Core hash vs profile hash
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: Data contract, Emitter, Migrations, Runtime, Preflight, PPg integration
+# ADR 004 — Core hash vs profile hash
 
 Context
 	•	We hash the emitted data contract to tie code, database state, and artifacts together

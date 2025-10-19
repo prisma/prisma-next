@@ -1,10 +1,5 @@
 ADR 118 — Bundle inclusion policy for packs
 
-Status: Proposed
-Date: 2025-10-18
-Owners: PPg Integration, Preflight, Adapters & Targets
-Related: ADR 112 Target Extension Packs, ADR 115 Extension guardrails & EXPLAIN policies, ADR 116 Extension-aware migration ops, ADR 117 Extension capability keys, ADR 029 Shadow DB preflight semantics, ADR 021 Contract marker storage
-
 Context
 
 Preflight-as-a-service (PPg) validates migrations and query Plans using a hosted Postgres cluster. Many apps depend on server extensions like pgvector or PostGIS. These capabilities live on the database, not in the application bundle. The preflight service must know which packs are required, ensure matching capabilities are present, and execute deterministically without cloning user repos or fetching packages

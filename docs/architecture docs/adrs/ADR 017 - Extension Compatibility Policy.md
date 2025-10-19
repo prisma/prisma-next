@@ -1,9 +1,4 @@
-ADR 017 — Extension and alternate runtime compatibility policy
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 012 raw SQL escape hatch, ADR 013 lane-agnostic plan identity and hashing, ADR 014 runtime hook API, ADR 016 adapter SPI
+# ADR 017 — Extension and alternate runtime compatibility policy
 
 Context
 	•	Prisma Next intentionally supports multiple query authoring lanes and invites third parties to add new lanes or even alternate runtimes

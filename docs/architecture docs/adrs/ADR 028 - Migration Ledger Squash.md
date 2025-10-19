@@ -1,10 +1,5 @@
 # ADR 028 — Migration ledger & squash semantics
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 021 contract marker storage, ADR 037 transactional DDL fallback, ADR 038 operation idempotency, ADR 039 DAG path resolution, ADR 044 pre/post checks, ADR 101 advisors framework, ADR 102 squash-first policy
-
 ## Context
 
 Prisma Next models migrations as edges between data contract hashes rather than ordered files on disk. We need a durable on-disk index that represents this DAG so tools can reason about reachability, safety, and provenance without hitting a live database. Teams want to squash old edges into a baseline to speed fresh environment bootstrap while guaranteeing production safety. CI and PPg features need fast answers to questions like path existence, orphans, cycles, and what would run to reach a target hash.

@@ -1,10 +1,5 @@
 # ADR 013 — Lane-agnostic Plan identity and hashing
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 002 plans are immutable, ADR 004 core vs profile hash, ADR 005 thin core fat targets, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 012 raw SQL escape hatch
-
 ## Context
 
 Multiple query lanes exist (DSL, ORM, raw SQL, future TypedSQL). The runtime, CI, and PPg need a consistent way to identify a query Plan, detect meaningful changes, and de-duplicate telemetry. If identity depends on the authoring lane or incidental metadata, teams get noisy diffs and unstable dashboards. We need a lane-agnostic hashing and identity scheme focused on the executable surface.

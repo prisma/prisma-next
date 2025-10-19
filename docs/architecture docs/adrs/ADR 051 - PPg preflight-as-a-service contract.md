@@ -1,11 +1,5 @@
 # ADR 051 — PPg preflight-as-a-service contract
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: PPg Platform WG, Runtime WG
-- **Supersedes**: None
-- **Complements**: ADR 029, ADR 041, ADR 022, ADR 023, ADR 027, ADR 031, ADR 013, ADR 024, ADR 039
-
 ## Context
 
 Prisma Postgres (PPg) will offer a hosted preflight that validates schema changes and query Plans before they reach production. The service must be deterministic, secure, and yield the same outcomes as local preflight while never accessing user repositories or package managers. Custom migration operations must run in a tightly sandboxed environment with no network access

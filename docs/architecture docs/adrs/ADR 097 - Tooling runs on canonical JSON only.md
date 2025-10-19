@@ -1,8 +1,5 @@
 # ADR 097 — Tooling runs on canonical JSON only
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Data Layer Working Group
 
 ## Context
 

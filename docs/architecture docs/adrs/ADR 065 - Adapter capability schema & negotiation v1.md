@@ -1,11 +1,5 @@
 ADR 065 — Adapter capability schema & negotiation v1
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Adapters Working Group
-Supersedes: None
-Relates to: ADR 004 (Core vs profile hash), ADR 016 (Adapter SPI for lowering), ADR 031 (Capability discovery), ADR 014 (Runtime hook API)
-
 Decision
 
 Define a versioned capability schema and a negotiation flow where

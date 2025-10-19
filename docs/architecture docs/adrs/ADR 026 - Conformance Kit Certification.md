@@ -1,10 +1,5 @@
 # ADR 026 — Conformance Kit & Certification Levels
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 011 unified Plan model, ADR 013 lane-agnostic plan identity, ADR 016 adapter SPI, ADR 021 contract marker storage, ADR 023 budget evaluation, ADR 024 telemetry schema, ADR 027 error envelope, ADR 031 capability discovery, ADR 037 transactional DDL, ADR 038 operation idempotency, ADR 041 custom operations, ADR 044 pre/post checks, ADR 065 capability schema, ADR 067 golden rendering, ADR 068 driver execution, ADR 072 adapter manifest, ADR 076 EXPLAIN normalization, ADR 084 prepared statements, ADR 085 privacy redaction, ADR 089 performance budgets, ADR 094 performance scaling, ADR 095 prepared statement management
-
 ## Context
 
 We want a healthy adapter ecosystem while preserving Prisma Next guarantees of determinism, safety, and portability across targets. Community adapters need a clear, objective way to prove compatibility without patching core. PPg features and runtime guardrails depend on predictable Plan formation, error semantics, and migration behavior. A standardized conformance kit and tiered certification levels let us gate features, publish badges, and build trust with users.

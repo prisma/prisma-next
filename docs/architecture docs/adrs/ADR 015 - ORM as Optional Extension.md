@@ -1,10 +1,5 @@
 # ADR 015 — ORM as an optional extension over the DSL
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 005 thin core fat targets, ADR 006 dual authoring modes, ADR 007 types-only emission, ADR 010 canonicalization rules, ADR 011 unified Plan model, ADR 012 raw SQL escape hatch, ADR 013 lane-agnostic plan identity and hashing, ADR 014 runtime hook API, ADR 016 adapter SPI for lowering
-
 ## Context
 
 The base system provides a small SQL DSL that compiles to a relational AST and a Plan. Many users want higher-level ergonomics for traversing relations and shaping results. Historically, ORM concerns have leaked into core query builders, increasing complexity and limiting portability. We want an optional ORM layer that improves ergonomics without changing core semantics, safety, or portability.

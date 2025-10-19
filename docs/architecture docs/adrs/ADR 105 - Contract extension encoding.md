@@ -1,10 +1,5 @@
 ADR 105 — Contract extension encoding
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Data Contract WG
-Related: ADR 010 Canonicalization rules for contract.json, ADR 016 Adapter SPI for lowering, ADR 030 Codecs registry, ADR 041 Custom operation loading, ADR 065 Adapter capability schema & negotiation v1, ADR 104 PSL extension namespacing & syntax, Doc 11 Extensions & Packs
-
 Context
 
 We need a precise, deterministic way to encode third-party and target-specific features in the canonical data contract JSON

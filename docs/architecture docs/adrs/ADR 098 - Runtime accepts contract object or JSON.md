@@ -1,8 +1,5 @@
 # ADR 098 — Runtime accepts contract object or JSON
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Data Layer Working Group
 
 ## Context
 

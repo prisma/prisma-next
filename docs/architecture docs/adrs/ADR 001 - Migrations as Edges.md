@@ -1,10 +1,5 @@
 # ADR 001 — Migrations as Edges
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: Data contract, Planner, Runner, Preflight, PPg integration
-
 ## Context
 
 Traditional migration systems rely on the order of files on disk to decide what to run next. That creates coupling to file sequencing, makes squashing brittle, and complicates collaboration when branches diverge. Agents and CI need deterministic, machine-verifiable answers to basic questions like “is it safe to apply this change” and “how do I get from here to there.”

@@ -1,10 +1,5 @@
 ADR 114 — Extension codecs & branded types
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Runtime & Types Working Groups
-Related: ADR 010 Canonicalization rules for contract.json, ADR 016 Adapter SPI for lowering relational AST, ADR 020 Result typing and projection inference rules, ADR 030 Result decoding & codecs registry, ADR 065 Adapter capability schema & negotiation v1, ADR 104 PSL extension namespacing & syntax, ADR 105 Contract extension encoding, ADR 106 Canonicalization for extensions, ADR 112 Target Extension Packs, ADR 113 Extension function & operator registry, ADR 021 Contract marker storage & verification modes
-
 Context
 
 Targets like PostGIS and pgvector introduce storage types that lack lossless or unambiguous mappings to plain JavaScript primitives. We need a way to:

@@ -1,10 +1,5 @@
 # ADR 022 — Lint rule taxonomy & configuration model
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 014 runtime hook API v1, ADR 018 plan annotations schema, ADR 020 result typing and projection, ADR 021 contract marker storage
-
 ## Context
 
 Guardrails are first-class in Prisma Next and must be consistent, configurable, and machine readable. Multiple query lanes can produce Plans, and violations must reference rule IDs in a stable taxonomy. Different environments need different defaults and override behavior without code changes.

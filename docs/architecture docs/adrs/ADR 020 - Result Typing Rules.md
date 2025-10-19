@@ -1,9 +1,4 @@
-ADR 020 — Result typing and projection inference rules
-
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: ADR 005 thin core fat targets, ADR 007 types-only emission, ADR 011 unified Plan model, ADR 015 ORM optional extension, ADR 016 adapter SPI
+# ADR 020 — Result typing and projection inference rules
 
 Context
 	•	Users and agents rely on predictable TypeScript result types from the SQL DSL and the optional ORM layer

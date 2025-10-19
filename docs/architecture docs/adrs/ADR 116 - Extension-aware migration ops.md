@@ -1,10 +1,5 @@
 ADR 116 — Extension-aware migration ops
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Migration System, Adapters, Extensions
-Related: ADR 001 Migrations as edges, ADR 009 Deterministic naming, ADR 010 Canonicalization, ADR 018 Plan annotations schema, ADR 037 Transactional DDL fallback, ADR 038 Op idempotency, ADR 039 DAG path integrity, ADR 041 Custom op loading via local packages + preflight bundles, ADR 044 Pre/post check vocabulary v1, ADR 065 Adapter capability schema & negotiation v1, ADR 112 Target Extension Packs, ADR 115 Extension guardrails & EXPLAIN policies, ADR 021 Contract marker storage
-
 Context
 
 Prisma Next supports target extensions like pgvector and PostGIS. Schema evolution for these features requires migration operations that understand extension types, indexes, operator families, and catalog state. We need a first-class way to plan and run extension-aware migrations with safety guarantees, deterministic names, and parity between local and hosted preflight

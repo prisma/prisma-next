@@ -1,11 +1,5 @@
 # ADR 044 — Pre/post check vocabulary v1
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Migrate WG, Runtime WG
-- **Depends on**: ADR 037, ADR 038, ADR 040
-- **Related**: ADR 041, ADR 051
-
 ## Context
 
 Migration edges in Prisma Next carry pre and post checks to prove applicability and success. Other ADRs define how we execute and recover (transactions, idempotency, sandboxing), but we lack a shared, versioned vocabulary for checks. Without a canonical set of check IDs, parameter schemas, and evaluation rules, op authors cannot interoperate and PPg or the local runner cannot provide consistent diagnostics

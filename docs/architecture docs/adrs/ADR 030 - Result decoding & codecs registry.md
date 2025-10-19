@@ -1,10 +1,5 @@
 # ADR 030 — Result decoding & codecs registry
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 011 unified Plan model, ADR 013 lane-agnostic plan identity, ADR 014 runtime hook API, ADR 021 contract marker storage, ADR 022 lint taxonomy, ADR 023 budget evaluation, ADR 024 telemetry schema, ADR 025 plan caching, ADR 026 conformance kit, ADR 027 error envelope, ADR 028 migration ledger, ADR 029 shadow preflight, ADR 031 capability discovery, ADR 037 transactional DDL, ADR 038 operation idempotency, ADR 043 advisory locks, ADR 044 pre/post checks, ADR 065 capability schema, ADR 068 driver execution, ADR 072 adapter manifest, ADR 076 EXPLAIN normalization, ADR 079 identifier masking, ADR 084 prepared statements, ADR 085 privacy redaction, ADR 086 webhook signing, ADR 089 performance budgets, ADR 094 performance scaling, ADR 095 prepared statement management
-
 ## Context
 
 Plans execute against heterogeneous targets and drivers that surface wire types not directly usable in JS/TS. Users expect stable, predictable JS values that respect the data contract's types and nullability. Lanes may request explicit casts or richer shapes (JSON aggregates, arrays), and PPg preflight must decode consistently for diagnostics. We need a single composition model for where decoding logic lives, how it is selected, and what happens on conflicts or failures.

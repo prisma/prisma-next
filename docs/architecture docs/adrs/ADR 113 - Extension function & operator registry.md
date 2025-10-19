@@ -1,10 +1,5 @@
 ADR 113 — Extension function & operator registry
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Extensions Working Group
-Related: ADR 010 Canonicalization rules for contract.json, ADR 016 Adapter SPI for lowering relational AST, ADR 020 Result typing and projection inference rules, ADR 065 Adapter capability schema & negotiation v1, ADR 104 PSL extension namespacing & syntax, ADR 105 Contract extension encoding, ADR 106 Canonicalization for extensions, ADR 112 Target Extension Packs, ADR 018 Plan annotations schema and validation, ADR 013 Lane-agnostic Plan identity and hashing, ADR 022 Lint rule taxonomy & configuration model
-
 Context
 
 Target extensions like PostGIS and pgvector introduce functions (e.g., ST_DWithin) and operators (e.g., <->, @@) that developers need to call from the relational DSL. We must provide a way to:

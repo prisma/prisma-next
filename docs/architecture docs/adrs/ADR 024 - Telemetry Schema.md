@@ -1,10 +1,5 @@
 # ADR 024 — Telemetry schema & privacy
 
-- **Status**: Accepted
-- **Date**: 2025-10-18
-- **Owners**: Prisma Next team
-- **Related**: ADR 014 runtime hook API v1, ADR 018 plan annotations schema, ADR 021 contract marker verification, ADR 022 lint taxonomy, ADR 023 budget & EXPLAIN policy
-
 ## Context
 
 We need consistent, low-overhead telemetry to understand performance, safety, and usage across lanes and adapters. Telemetry must be privacy-preserving by default and configurable to meet stricter org policies. Agents and PPg benefit from structured signals like sqlFingerprint, budgets, and lint outcomes without exposing SQL text or PII.

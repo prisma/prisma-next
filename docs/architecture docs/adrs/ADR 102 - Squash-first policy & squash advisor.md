@@ -1,9 +1,5 @@
 # ADR 102 — Squash-first policy & squash advisor
 
-- **Status**: Proposed
-- **Date**: 2025-10-18
-- **Owners**: Data Layer Working Group
-
 ## Context
 
 Migration histories tend to accumulate branches and long chains, increasing pathfinding complexity and review burden. Our model supports baselines that collapse a set of edges into a single ∅ → H_latest edge embedding the destination contract. We want a default squash-first posture that nudges teams toward a small active chain while keeping history auditable

@@ -1,9 +1,5 @@
 ADR 031 — Adapter capability discovery & negotiation
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Data Layer Working Group
-
 Context
 
 Prisma Next supports multiple SQL dialects via adapters. Lanes (DSL, ORM, TypedSQL, Raw) lower abstract Plans to dialect SQL. Some SQL features are optional or versioned (e.g., LATERAL, json_agg, transactional DDL, concurrent index creation). We need a consistent way for adapters to surface capabilities and for lanes to react when features are missing or discouraged

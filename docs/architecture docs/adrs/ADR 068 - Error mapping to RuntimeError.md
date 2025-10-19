@@ -1,10 +1,5 @@
 ADR 068 — Error mapping to RuntimeError
 
-Status: Proposed
-Date: 2025-10-18
-Owners: Runtime & Adapters WG
-Relates to: ADR 027 Error envelope & stable codes, ADR 014 Runtime hook API, ADR 024 Telemetry schema & privacy, ADR 065 Adapter capability negotiation, ADR 016 Adapter SPI for lowering
-
 Decision
 
 Introduce a deterministic translation layer that maps source-specific failures (database, driver, adapter, compile profile, lane) into the canonical RuntimeError envelope and stable codes defined in ADR 027. This mapping is target-aware but lane-neutral and must be reproducible across environments
