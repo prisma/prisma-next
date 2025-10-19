@@ -6,7 +6,10 @@ We support multiple authoring lanes that all emit a Plan: SQL DSL, ORM over DSL,
 
 ## Decision
 
-Ship a lane-neutral hook API v1 with four lifecycle hooks: `beforeCompile`, `beforeExecute`, `afterExecute`, `onError`:
+Ship a lane-neutral hook API v1 with execution mode selection (per ADR 125):
+- Execution returns `AsyncIterable<Row>` immediately with runtime-managed buffering/streaming
+- Five main hooks: `beforeCompile`, `beforeExecute`, `afterExecute`, `onError`, plus optional streaming lifecycle hooks
+- Optional streaming lifecycle hooks fire at **batch granularity** (not per-row): `onStreamOpen`, `onStreamChunk`, `onStreamClose`, `onStreamError`
 - Hooks operate on immutable inputs and return derived outputs; plugins must not mutate provided objects
 - Policy outcomes are expressed via consistent lint levels and budget decisions; the runtime decides whether to allow, warn, or block based on configuration
 
@@ -105,16 +108,22 @@ Order of execution matches registration order for all plugins
 - **Runtime behavior**: merges results from all plugins, then compiles to a concrete Plan
 
 ### beforeExecute(ctx, plan): Promise<HookResult | void>
-- Runs after compile and before sending SQL to the driver
+- Runs after compile and before initiating streaming
 - **Input**: frozen Plan with sql, params, meta.planId
 - **Allowed**: return a derived Plan with additional annotations or redactions; report violations and budget prechecks
-- **Runtime behavior**: contract verification runs here; lints and preflight budgets are evaluated here; if any plugin requests block or a violation at error level maps to block, execution is skipped and onError is invoked with a policy error
+- **Runtime behavior**: contract verification runs here; lints and preflight budgets are evaluated here; if any plugin requests block or a violation at error level maps to block, streaming is skipped and onError is invoked with a policy error
+
+### onRow(ctx, plan, row): Promise<HookResult | void> (optional)
+- Runs for each row as it streams from the driver
+- **Input**: frozen Plan and the current row value
+- **Allowed**: record per-row telemetry, sampling, or early termination signals
+- **Runtime behavior**: if a plugin returns a termination signal, the stream is closed
 
 ### afterExecute(ctx, plan, result): Promise<HookResult | void>
-- Runs after the driver returns
-- **Input**: frozen Plan and a result envelope { durationMs, rowCount, sampleRow?, error? }
-- **Allowed**: record telemetry, emit budgets based on observed metrics, attach notes
-- **Runtime behavior**: if observed budgets exceed error thresholds, the runtime surfaces violations and may promote to failure based on config
+- Runs after the stream completes or is closed
+- **Input**: frozen Plan and a result envelope { rowCount, latencyMs, completed: boolean }
+- **Allowed**: record aggregated telemetry, emit budget violations based on observed totals, attach notes
+- **Runtime behavior**: if observed budgets exceeded error thresholds and streaming completed, violations are surfaced post-hoc
 
 ### onError(ctx, phase, planOrDraft, err): Promise<void>
 - Runs when a compile, execute, or plugin failure occurs

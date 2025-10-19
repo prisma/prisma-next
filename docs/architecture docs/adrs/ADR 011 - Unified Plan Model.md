@@ -73,9 +73,11 @@ export interface Plan<Row = unknown> {
 ### Runtime expectations
 - Verify meta.coreHash against the active contract marker before execution
 - Apply lint rules and budgets against ast when present, otherwise against annotations and refs
-- Execute sql with params using the selected adapter and driver
+- Execute sql with params using the selected adapter and driver, returning immediately as `AsyncIterable<Row>`
+- Stream rows incrementally, allowing plugins to observe per-row or aggregated results
+- Enforce budgets dynamically during iteration and can terminate streaming early on violation
 - Record timing, row count, and violations in a standard envelope keyed by Plan identity
-- Never rely on lane to determine safety behavior
+- Never rely on lane to determine safety behavior; all lanes execute with identical streaming semantics
 
 ### Hashing and identity
 - Plan identity and change detection are defined in ADR 013

@@ -29,6 +29,7 @@
 - **Contract‑first.** The **data contract** is the source of truth for structure and capabilities
 - **One query → one statement.** No hidden client‑side joins or multi‑roundtrips
 - **Plans are data.** Queries and migrations compile to **immutable Plan** objects
+- **Streaming execution by default.** All query lanes return async iterables; consumers choose between incremental streaming for large datasets or collecting all results for typical CRUD
 - **Thin core, fat targets.** A small, stable core with target‑specific adapters (SQL today; Mongo later)
 - **Measured safety.** Guardrails, budgets, and preflight are first‑class, not afterthoughts
 
@@ -125,10 +126,10 @@ sequenceDiagram
   RT->>RT: lint/budgets + extension guardrails
   alt verified
     RT->>DB: run sql with params
-    DB-->>RT: rows
-    RT->>Ext: decode extension values (branded types)
-    Ext-->>RT: typed extension values
-    RT-->>Dev: typed rows + extension values
+    DB-->>RT: async iterable (streaming rows)
+    RT->>Ext: decode extension values per row (branded types)
+    Ext-->>RT: typed rows + extension values
+    RT-->>Dev: AsyncIterable<Row> with optional .toArray() helper
   else violation
     RT-->>Dev: diagnostics (actionable + capability info)
   end
@@ -163,11 +164,11 @@ sequenceDiagram
 ## Core Concepts
 
 - **Plan.** An immutable object describing a query or a migration opset. Plans carry the contract hash, references, and annotations for policy enforcement
-- **Guardrails.** Configurable checks (lints, budgets, policies) applied before execution, including extension-specific rules
+- **Async Iterable Results.** All queries execute as async iterables by default, enabling incremental streaming of results. Optional `.toArray()` helper collects all rows for simpler consumption patterns
+- **Guardrails.** Configurable checks (lints, budgets, policies) applied before execution and enforced incrementally during streaming, including extension-specific rules
 - **Preflight.** A dry‑run/EXPLAIN of plans and migrations in CI or a preview DB; returns structured diagnostics including capability verification
 - **Data Contract.** Canonical JSON describing storage, models, capabilities, and extensions. Authored in PSL or TS; emits identical artifacts
 - **Contract Hash.** Unique identifier with `coreHash` (logical schema) and `profileHash` (physical capabilities)
-- **Plan.** Immutable query or migration object with contract hash and policy annotations
 - **Extension Pack.** Versioned npm package providing domain capabilities (pgvector, PostGIS) through standardized SPIs
 
 **Key Invariants:**

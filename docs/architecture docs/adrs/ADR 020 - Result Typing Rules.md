@@ -6,7 +6,8 @@ Context
 	•	Ambiguity usually stems from joins, aggregates, and adapter-specific lowerings for nested results
 
 Decision
-	•	Standardize how the SQL DSL and ORM compute result types from projections and joins
+	•	All result types are `AsyncIterable<T>` where `T` is inferred from the query projection (per ADR 037)
+	•	Standardize how the SQL DSL and ORM compute element type `T` from projections and joins
 	•	Define nullability propagation rules for LEFT JOIN, RIGHT JOIN, FULL OUTER JOIN, and common aggregates
 	•	Push dialect-specific edge cases behind adapter capabilities so the type rules remain stable while allowing adapters to refine details
 

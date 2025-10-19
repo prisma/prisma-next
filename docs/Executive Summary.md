@@ -48,14 +48,14 @@ Because the contract is explicit and verifiable, Prisma Next eliminates ambiguit
 
 Two simple ways to express queries, whichever teams prefer:
 
-- A minimal **query builder** (TypeScript) that knows your data contract
-- An **ORM-style builder** on top of that for familiar model-oriented queries
+- A minimal **query builder** (TypeScript) that knows your data contract
+- An **ORM-style builder** on top of that for familiar model-oriented queries
 
-Both paths produce the same structured query plan carrying the contract ID, verified before execution. This enables runtime guardrails—no unbounded queries, sensible limits, and time or resource budget caps—so agents can iterate safely with clear, actionable feedback.
+Both paths produce async iterable results that support incremental streaming for large datasets or collection for typical CRUD operations. Each query is a structured plan carrying the contract ID, verified before execution. This enables runtime guardrails—no unbounded queries, sensible limits, and time or resource budget caps—so agents can iterate safely with clear, actionable feedback.
 
-For advanced or vendor-specific operations, Prisma Next provides a **raw SQL escape hatch** with optional plan annotation for policy checks and auditing. We will evaluate a TypedSQL surface in a later phase only if private preview usage demonstrates clear need.
+For advanced or vendor-specific operations, Prisma Next provides a **raw SQL escape hatch** with optional plan annotation for policy checks and auditing. We will evaluate a TypedSQL surface in a later phase only if private preview usage demonstrates clear need.
 
-These query guarantees combine with deterministic migrations to form the foundation of Prisma Next’s safety model — one that both humans and agents can rely on.
+These query guarantees combine with deterministic migrations to form the foundation of Prisma Next's safety model — one that both humans and agents can rely on.
 
 ### **Deterministic migrations**
 
