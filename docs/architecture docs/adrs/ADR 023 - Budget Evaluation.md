@@ -133,10 +133,25 @@ budgets({
 - budget/latency-exceeded
 - budget/explain-unavailable for diagnostics when falling back
 
-## Telemetry
-- Record whether budgets were enforced, explain source type, and outcomes per planId
-- Emit sqlFingerprint, estimatedRows, observedRows, latencyMs, and rule levels
-- Sampling configurable to control volume
+## Reporting & telemetry (plugins)
+- **Runtime outcome**: blocking violations raise structured errors (e.g., `budget/row-count-exceeded`, `budget/sql-size-exceeded`) in `beforeExecute`. Non-blocking violations are surfaced as warnings to plugins and may be logged.
+- **Lints & budgets**: violations are produced by the lints/budgets plugins in `beforeExecute` (prechecks) and `afterExecute` (postchecks). The runtime maps violation level to allow/warn/block using standard policy.
+- **Telemetry (optional)**: telemetry plugins may emit events per ADR 024 (e.g., `sqlFingerprint`, `estimatedRows`, `observedRows`, `latencyMs`, and budget outcomes). Emission, sampling, and sinks are plugin-owned and strictly opt-in.
+
+### Emission mechanics (brief)
+- **No core logging**: the runtime core never writes to stdout/stderr or remote sinks.
+- **Shared hub**: a telemetry plugin exposes a shared `ctx.telemetry?.emit(event)` to other plugins; if no telemetry plugin is registered, nothing is emitted.
+- **Sinks** (configured by the telemetry plugin):
+  - `console()` → NDJSON to stdout (dev)
+  - `file({ path })` → append-only NDJSON (CI/local)
+  - `http({ url, headers })` → POST NDJSON lines (self-hosted)
+  - `otlp({ endpoint, headers })` → OpenTelemetry exporter (prod)
+  - `custom({ write(event) })` → integrate with app loggers (e.g., pino/winston)
+- **Defaults by environment** (recommendation):
+  - Dev: `console()`; EXPLAIN sampled; warn on non-blocking
+  - CI/Preflight: `file(.ndjson)` artifacts; EXPLAIN on; strict policy
+  - Prod: `otlp()` with low sampling; EXPLAIN off by default; block on configured errors
+- **Volume & privacy**: per-row emission is discouraged by default; aggregate events only. Redaction happens in the telemetry plugin before any sink.
 
 ## Testing
 - Fixture queries with known cardinalities validate EXPLAIN normalization across adapters
