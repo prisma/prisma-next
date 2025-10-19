@@ -2,7 +2,7 @@
 
 ## Problem & Goals
 
-**Context.** Developer tooling is shifting to agent‑assisted workflows. Agents can write SQL; what they lack is **structure, verification, and safe deployment**. Meanwhile, modern toolchains expect **TypeScript‑native** libs that “just work” without native binaries or heavy client codegen.
+Developer tooling is shifting to agent‑assisted workflows. Agents can write SQL; what they lack is **structure, verification, and safe deployment**. Meanwhile, modern toolchains expect **TypeScript‑native** libs that “just work” without native binaries or heavy client codegen.
 
 **Pain points today:**
 - Schema changes are risky; migration order and ad‑hoc scripts cause incidents.
