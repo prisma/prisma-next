@@ -176,3 +176,23 @@ Contracts declare required capabilities in `contract.capabilities`:
 - [ADR 065: Adapter capability schema & negotiation v1](../architecture%20docs/adrs/ADR%20065%20-%20Adapter%20capability%20schema%20&%20negotiation%20v1.md)
 - [ADR 117: Extension capability keys](../architecture%20docs/adrs/ADR%20117%20-%20Extension%20capability%20keys.md)
 - [Extensions Glossary](./extensions-glossary.md)
+
+## Capability Matrix
+
+Canonical capability keys with descriptions, typical implementers, and ADR references.
+
+| Capability key | Description | Implemented by | ADRs |
+|---|---|---|---|
+| join.lateral | LATERAL join lowering | postgres adapter | ADR 065 |
+| join.semi | SEMI join lowering | adapters that support SEMI semantics | ADR 065 |
+| join.anti | ANTI join lowering | adapters that support ANTI semantics | ADR 065 |
+| projection.distinct | DISTINCT projection | most SQL adapters | ADR 065 |
+| projection.distinctOn | DISTINCT ON projection | postgres adapter | ADR 065 |
+| index.partial | Partial/filtered index support | postgres adapter, packs | ADR 065, 116 |
+| distribution.shardKey | Distribution/shard key support | citus pack | ADR 065, 116 |
+| pgvector.vector | Vector type support | pgvector pack | ADR 112–115 |
+| postgis.geometry | Geometry type support | postgis pack | ADR 112–115 |
+
+Notes
+- Capability keys are versioned and namespaced; see ADR 117 for stability rules.
+- Keep this matrix updated with adapter and pack changes.
