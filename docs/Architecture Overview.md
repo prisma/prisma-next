@@ -32,6 +32,7 @@
 - **Streaming execution by default.** All query lanes return async iterables; consumers choose between incremental streaming for large datasets or collecting all results for typical CRUD
 - **Thin core, fat targets.** A small, stable core with target‑specific adapters (SQL today; Mongo later)
 - **Measured safety.** Guardrails, budgets, and preflight are first‑class, not afterthoughts
+ - **No core feature flags.** Unstable features ship via extension packs with explicit capability gating and stability metadata
 
 ## High‑Level Architecture
 

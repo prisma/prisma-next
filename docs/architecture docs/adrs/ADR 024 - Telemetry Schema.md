@@ -11,13 +11,21 @@ Define a canonical, lane-agnostic event schema centered on planId and sqlFingerp
 - Support configurable sampling, sinks, and retention with safe defaults
 - Provide first-class PII controls, including sensitive column masking guided by the data contract
 
+## Scope and ownership
+
+- Implementation is plugin-based. The runtime core does not emit telemetry or write to sinks.
+- This ADR defines the event schema, privacy policy, and configuration surface that telemetry plugins conform to.
+- Emission is done by optional runtime plugins that observe hooks (beforeExecute, afterExecute, onError) and publish events to configured sinks.
+- Zero-overhead guarantee: when no telemetry plugin is registered, there are no telemetry allocations, timers, or I/O in the core path.
+
 ## Event envelope
 
 Common fields across all runtime telemetry events:
 - **ts**: ISO timestamp in UTC
 - **env**: enum dev|ci|prod
 - **service**: logical application name
-- **planId**: stable UUID v5 per Plan instance within a process
+- **planId**: UUID v7 assigned when a Plan is executed (time-ordered, per-process unique)
+- **planHash?**: optional stable hash per ADR 013 for correlating identical Plans across processes
 - **lane**: dsl|orm|typed-sql|raw
 - **target**: adapter target postgres|mysql|sqlite|mongo|...
 - **coreHash**: core contract hash
@@ -29,6 +37,7 @@ Common fields across all runtime telemetry events:
 ### Notes
 - sqlFingerprint is derived from normalized SQL and a per-deployment salt so it groups similar queries without leaking text
 - planId is not globally unique across processes but is stable for the lifetime of a Plan in a single runtime
+- Consistency: error envelopes per ADR 027; sqlFingerprint normalization per ADR 092; capability/profile semantics per ADR 065
 
 ## Event types
 
@@ -64,11 +73,22 @@ Emitted on any failure path:
 - **details**: minimal structured payload safe to log
 - **phase**: beforeCompile|beforeExecute|afterExecute|onError
 
+## Runtime integration (plugins)
+
+- Telemetry plugins subscribe to runtime hooks:
+  - beforeExecute: capture plan metadata (sqlFingerprint, annotations), budgets-in-effect
+  - afterExecute: record latency, row counts, budget outcomes
+  - onError: record normalized error envelope (ADR 027)
+- Per-row events via onRow are discouraged by default due to volume and privacy; plugins should prefer aggregate events unless explicitly configured.
+- Plugins must respect privacy modes and redaction before emitting any event.
+
 ## Parameter handling and redaction
 - Default is no parameter values in telemetry
 - Emit parameter type shapes only, e.g. [{ type: int4 }, { type: text, length: 12 }]
 - Emit array lengths and blob sizes but never contents
 - Optional opt-in paramSampling can include sampled values only when annotations.intent is introspect and policy allows, with per-key allowlist
+
+Plugins must enforce redaction prior to emission; sinks must not rely on downstream filtering for privacy guarantees.
 
 ## PII and sensitive data controls
 
@@ -105,6 +125,7 @@ Emitted on any failure path:
 - Cap per-minute event volume per process to avoid storms
 
 ## Sinks
+Telemetry emission is provided by optional plugins. Sinks are configured by those plugins; the runtime core provides no default sink and never emits by itself.
 
 ### Supported sinks
 - **console** for dev
@@ -161,6 +182,8 @@ telemetry({
   }
 })
 ```
+
+Note: If no telemetry() plugin is registered, the runtime emits no events. Sampling, sinks, and any data movement are strictly opt-in.
 
 ## Testing
 - Golden tests for event shapes by type and lane with stable field names
