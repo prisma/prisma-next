@@ -226,7 +226,9 @@ Prisma Next produces several key artifacts that serve as the foundation for type
 - **`packs/manifest.json`** — Extension pack manifests declaring capabilities and integration points
 
 ### Migration Artifacts
-- **Migration DAG files** — Edge definitions and node tasks for contract-to-contract transitions
+- **Migration files** — Migration packages containing from/to contract hashes, operations, and edge metadata for contract-to-contract transitions
+- **Optional graph index** — Performance cache for pathfinding on large DAG (optional, regeneratable from migration files)
+- **Database migration ledger** — Audit trail in database for tooling, UI, and historical visualization (not used for operations)
 - **Bundle archives** — Self-contained artifacts for preflight containing contracts, migrations, and pack code
 
 ### Development Artifacts
@@ -247,13 +249,6 @@ Prisma Next produces several key artifacts that serve as the foundation for type
 - **[Performance & Capacity](architecture%20docs/subsystems/10.%20Performance%20&%20Capacity.md)** — Performance budgets, extension overhead
 - **[No-Emit Workflow](architecture%20docs/subsystems/11.%20No-Emit%20Workflow.md)** — TS authoring, extension serialization, CI trust model
 - **[Ecosystem Extensions & Packs](architecture%20docs/subsystems/12.%20Ecosystem%20Extensions%20&%20Packs.md)** — Extension pack architecture, publishing, registry
-
-## Extensions
-
-Prisma Next's extension system enables domain-specific capabilities through installable packs:
-
-- **ADR 104–106:** Extension namespacing, encoding, and canonicalization
-- **ADR 112–118:** Extension packs, function registry, codecs, guardrails, migration ops, capability keys, and bundle policies
 
 **ADR Index:** [architecture docs/ADR-INDEX.md](architecture%20docs/ADR-INDEX.md) — Complete index of all ADRs with descriptions and links
 

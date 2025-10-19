@@ -151,7 +151,7 @@ Testing
 	•	CI tests that fail on stale index and pass after graph update
 
 References
-	•	ADR 028 — Migration ledger & squash semantics
+	•	ADR 028 — Migration structure & operations
 	•	ADR 037 — Transactional DDL fallback & compensation
 	•	ADR 038 — Operation idempotency classification & enforcement
 	•	ADR 021 — Contract marker storage & verification modes

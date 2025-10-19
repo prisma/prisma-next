@@ -215,7 +215,7 @@ This enables audit, replay decisions, and safe resumption.
 
 ## References
 
-- ADR 028 — Migration squashing & DAG hygiene
+- ADR 028 — Migration structure & operations
 - ADR 037 — Transactional DDL fallback & compensation
 - ADR 039 — DAG path resolution & integrity
 - ADR 044 — Pre/post check vocabulary v1

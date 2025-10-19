@@ -1,19 +1,28 @@
-# ADR 028 — Migration squashing & DAG hygiene
+# ADR 028 — Migration structure & operations
 
 ## Context
 
-Prisma Next models migrations as edges between data contract hashes rather than ordered files on disk. Teams want to squash old edges into a baseline to speed fresh environment bootstrap while guaranteeing production safety. CI and PPg features need fast answers to questions like path existence, orphans, cycles, and what would run to reach a target hash.
+Prisma Next models migrations as edges between data contract hashes rather than ordered files on disk. The system needs a well-defined migration structure that supports graph reconstruction, deterministic pathfinding, and operational transformations like squashing. Teams want to squash old edges into a baseline to speed fresh environment bootstrap while guaranteeing production safety.
 
 ## Decision
 
-Migration squashing operates directly on migration files without requiring an on-disk ledger. The system reconstructs the DAG from `migration.json` headers in each migration package, with optional `graph.index.json` for performance optimization on large DAGs:
-- Nodes are data contract hashes
-- Edges are migration packages with identity derived from content
-- Graph reconstruction happens from migration file headers by default
-- Squash produces a new baseline migration package that subsumes a contiguous path
+Migrations are defined as directed edges in a DAG, with rich metadata supporting graph reconstruction and squashing operations:
+
+**Structure (Primary):**
+- Migrations are directed edges from `fromCoreHash` → `toCoreHash` with complete contract context
+- Each migration file carries metadata enabling graph reconstruction without a separate ledger
+- Baseline migrations can subsume a contiguous path of regular migrations
+
+**Operations (Secondary):**
+- Migration operations enable DAG management: squash to baseline, rebase, prune
+- All operations work directly on migration files without requiring an on-disk ledger
 - Tooling validates reachability, detects orphans and cycles, and enforces integrity
 
-**Note**: ADR 102 defines the default squash-first policy and advisor system. ADR 101 provides the Advisors framework. This ADR defines the squashing mechanics that operate on migration files.
+**Scope and Relationship:**
+- This ADR defines the migration structure (model, on-disk formats, schemas) and the operations that work with that structure
+- See ADR 102 for the policy framework that guides when teams should use these operations and how to maintain healthy DAGs
+
+**Note**: ADR 102 defines the squash-first policy and DAG hygiene strategy. ADR 101 provides the Advisors framework. ADR 039 defines DAG path resolution. This ADR focuses on defining what migrations are and what operations can be performed on them.
 
 This ADR complements:
 - ADR 021 Contract marker storage & verification modes
@@ -23,6 +32,20 @@ This ADR complements:
 - ADR 044 Pre/post check vocabulary v1
 - ADR 101 — Advisors framework
 - ADR 102 — Squash-first policy & squash advisor
+
+## Scope and Relationship to ADR 102
+
+This ADR defines the **structure** of migrations and the **operations** that work with that structure:
+
+- **Structure**: Migration file model, on-disk formats, schemas, integrity rules
+- **Operations**: Squash to baseline, rebase, prune, path checking, graph reconstruction
+
+ADR 102 (Squash-first policy & squash advisor) defines the **policy layer** that guides when and how to use these operations:
+
+- **Policy**: When to squash, thresholds, advisor rules, DAG hygiene strategies
+- **Composition**: How to recommend and automate the use of these operations
+
+Together, they form composable primitives: ADR 028 provides the mechanisms, ADR 102 provides the policy for using those mechanisms.
 
 ## Migration file model
 - **Node**: coreHash string identifying a canonical data contract
@@ -130,15 +153,15 @@ edgeId = sha256(canonicalize(migration.json without edgeId) + canonicalize(ops.j
 - Write ops.json with machine operations
 - Optional: Update graph.index.json for performance
 
-### Squash to baseline (primary hygiene mechanism)
-- Squashing is the recommended approach to DAG hygiene (see ADR 102 for policy)
+### Squash to baseline (primary operation for baseline creation)
 - Input is an ordered path of migration packages from A to B
 - Produce a new baseline migration package A→B embedding destination contract JSON
 - Set kind = baseline, place under migrations/baselines/<name>
 - Mark superseded migration packages as archived: true in their migration.json
 - Archived migrations preserved for provenance/audit but ignored during pathfinding
 - Baseline migrations eligible only when all included edges verified or policy allows soft baselines
-- Branches should rebase onto latest baseline before merge to avoid parallel edges
+
+See ADR 102 for policy decisions on when to squash and DAG hygiene strategies. Line 170 explicitly references ADR 102 for guidance on when parallel edges matter for DAG hygiene.
 
 ### Rebase and prune
 - If a branch diverges, recompute a migration from current main to branch target
@@ -164,10 +187,15 @@ All path operations reconstruct the graph from migration files by default. The o
   - baselines cover contiguous paths only
 
 ## Parallel edges policy
-- Default: parallel edges (same from/to, different opsHash) rejected
-- Rationale: encourages rebase workflow, keeps graph simple
+
+**Mechanical constraint:**
+- Default: parallel edges (same from/to, different opsHash) are rejected
 - Override: require explicit parallel-ok label with justification
-- Most teams avoid parallel edges via squash-first + rebase (ADR 102)
+
+**Rationale:**
+This is an integrity rule, not a hygiene policy. It encourages simpler DAG structures and rebase workflows.
+
+See ADR 102 for how parallel edges matter in the context of DAG hygiene policy.
 
 ## Concurrency and locking
 - Local dev uses file-level atomic writes with temp files and rename
@@ -181,10 +209,17 @@ All path operations reconstruct the graph from migration files by default. The o
 - The DB's coreHash is sufficient to select a path and detect drift; no on-disk ledger required
 
 ## Squash semantics and safety
-- Baselines are intended for cold-start environments like dev or ephemeral previews
-- Production avoids baselines unless the DB's current coreHash exactly equals the baseline from
-- Applying a baseline when the DB marker does not match from is a hard error
+
+**Technical invariants:**
+- Applying a baseline when the DB marker does not match its `from` hash is a hard error
 - Baselines can be regenerated at any time from the same contiguous path, yielding the same edgeId due to deterministic canonicalization
+- Archived migrations are preserved for audit/visualization but ignored during pathfinding
+
+**Policy guidance:**
+See ADR 102 for policy decisions on:
+- When to create baselines (development vs. production)
+- When baselines should be applied
+- DAG hygiene strategies
 
 ## Contract reconstruction and splitting
 - Stored contracts in migration.json files enable reconstruction of any historical state

@@ -139,7 +139,7 @@ For each executed op, record:
 
 ## References
 
-- ADR 028 — Migration squashing & DAG hygiene
+- ADR 028 — Migration structure & operations
 - ADR 037 — Transactional DDL fallback & compensation
 - ADR 038 — Operation idempotency classification & enforcement
 - ADR 040 — Node task execution environment & sandboxing

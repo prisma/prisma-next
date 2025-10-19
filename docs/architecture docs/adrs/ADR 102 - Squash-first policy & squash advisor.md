@@ -27,6 +27,11 @@ Migration histories tend to accumulate branches and long chains, increasing path
 
 Adopt a squash-first default posture with a Squash Advisor implemented on the Advisors framework (ADR 101)
 
+**Relationship to ADR 028:**
+- ADR 028 defines the migration structure (file model, schemas, on-disk formats) and available operations (squash, rebase, prune)
+- This ADR defines the policy layer: when, why, and how teams should use those operations
+- Together, these ADRs implement DAG hygiene as composable primitives (structure + policy)
+
 ### Policy defaults
 
 - Suggest squashing when the newest edge since the last baseline is older than 14 days
@@ -44,14 +49,16 @@ Teams can tune or disable these defaults
 
 ### Suggested actions
 
-- `migrate baseline create` generates a baseline migration ∅ → H_latest, embedding the destination contract.json, and marks prior migrations as archived: true
-- In PPg, a "Generate baseline PR" action opens a PR with the baseline migration and a summary of collapsed migrations
+- `migrate baseline create` invokes the baseline creation mechanics defined in ADR 028. The advisor recommends when to run this command based on policy thresholds (age, edge count, etc.)
+- In PPg, a "Generate baseline PR" action opens a PR with the proposed baseline and a summary of migrations to be collapsed
 
 ### Safety rules
 
 - Baselines are for new environments only
 - The runner treats a baseline migration as a no-op on databases that already have a contract marker
 - CI in enforce mode can block merges when thresholds are exceeded without an accompanying baseline PR
+
+Technical enforcement of these rules is handled in ADR 028 (contract marker checks, baseline application logic).
 
 ## Configuration
 
@@ -75,6 +82,12 @@ Teams can tune or disable these defaults
 
 - Teams that prefer long histories can set `advisors.mode: "off"` and optionally adopt a committed graph index
 - Exempt labels may suppress suggestions for specific branches or edges
+
+## Relationship to ADR 028
+
+- **ADR 028** defines: migration structure, file formats, and available operations (squash, rebase, prune)
+- **This ADR** defines: the policy layer that recommends when and how to use those operations
+- **Together**: they form a complete DAG hygiene system where 028 provides mechanisms and 102 provides policy
 
 ## Consequences
 
