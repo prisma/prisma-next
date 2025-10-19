@@ -1,108 +1,130 @@
-ADR 006 — Dual authoring modes (PSL-first and TS-first) with a single canonical artifact
+# ADR 007 — Types-Only Emission and No Runtime Client Codegen
 
-Status: Accepted
-Date: 2025-10-18
-Owners: Prisma Next team
-Related: Data contract, Emitter & Types, ADR 004 core vs profile hash, ADR 005 thin core fat targets
+## Context
 
-Context
-	•	Teams want flexibility to author schemas in PSL or in TypeScript for agent and tool ergonomics
-	•	Having multiple sources of truth creates drift and unclear build boundaries
-	•	Our safety model depends on a deterministic, hashable contract artifact consumed by queries, runtime, migrations, and PPg
-	•	We need great DX in dev (auto emit) and strong determinism in CI
+Prisma ORM historically generates a large JavaScript client from PSL. In Prisma Next, TypeScript serves as the primary safety layer for application code that consumes the data layer, rather than relying on generated runtime objects. The schema becomes a verifiable data contract consumed by multiple lanes. We want type safety without shipping generated JS, and a runtime that can adapt to contract changes without a regenerate step.
 
-Decision
-	•	Support two authoring modes per project: PSL-first or TS-first
-	•	A project declares one authoritative mode in config
-	•	Both modes must emit the same canonical artifact: contract.json plus .d.ts types
-	•	Only contract.json is the system of record for downstream tools and hashing
-	•	Back-generation of the non-authoritative form is optional and clearly marked as derived
+## Problem
 
-Details
+- Runtime consumption of JSON data contracts makes TypeScript type inference difficult without additional type information
+- Generated JS clients hide the underlying data contract semantics that agents and tools need to inspect
+- Requiring generate for each schema change is at odds with modern TS-first flows and contract-driven architectures
 
-Authoring modes
-	•	PSL-first
-Source of truth is schema.prisma
-Emitter parses PSL and produces contract.json and contract.d.ts
-	•	TS-first
-Source of truth is contract/contract.ts using defineContract()
-Emitter executes the builder in a constrained environment and produces contract.json and contract.d.ts
+## Decision
 
-Canonical artifact
-	•	contract.json is canonical, deterministic, and cross-platform stable
-	•	Hashing follows ADR 004 with coreHash and profileHash
-	•	.d.ts provides types only, no generated runtime objects
+- Emit only two artifacts from the contract emitter: `contract.json` and `contract.d.ts`
+- Construct runtime tables/columns via `makeT(contractJson)` at application startup
+- Never ship generated JS client code
+- All lanes (DSL, ORM, Raw SQL, TypedSQL factories) produce Plans against the runtime-built `t` and stamped coreHash
 
-Configuration
+## Design
 
-prisma-next.config.ts declares:
-	•	authoring: 'psl' | 'ts'
-	•	schema path for PSL mode or builder entry for TS mode
-	•	outDir for emitted artifacts
-	•	target info and naming scheme used for deterministic names
+### Artifacts
 
-Dev and CI behavior
-	•	Dev
-Vite/Next/esbuild plugins auto-emit on import and on file change
-Errors surface inline in terminal and editor
-	•	CI
-Explicit prisma-next emit step required
-Pipeline verifies determinism by re-emitting and checking hashes
+#### contract.json
+- Canonical JSON per ADR 010 with coreHash and profileHash
+- Input to runtime, preflight, planner, and PPg
 
-Back-generation
-	•	Optional renderers can derive PSL from a TS contract or a TS scaffold from PSL
-	•	Back-generated files are annotated as derived and should not be committed as sources
+#### contract.d.ts
+- Declares `Contract.Tables`, `Contract.Relations`, codecs, branded types
+- Includes extension-branded types and function/operator typings registered by packs (ADR 113, ADR 114)
+- Exposes read-only sources projected from pack-owned blocks alongside tables (ADR 127)
+- Drives editor types and inference without shipping JS
 
-Meta and provenance
-	•	contract.json.meta.source records the authoring mode and source path
-	•	Tooling warns if both PSL and TS sources are present but the config declares a different authoritative mode
+### Runtime construction
 
-Failure modes
-	•	If both sources change in the same branch, the emitter fails with a clear error
-	•	If the derived file exists and differs from a fresh render, emitter warns and offers a fix strategy
-	•	If the hashing changes across platforms, CI fails determinism checks
+```typescript
+import contractJson from './contract.json' assert { type: 'json' }
+import { makeT, sql } from '@prisma/sql'
+import { createRuntime } from '@prisma/runtime'
 
-Alternatives considered
-	•	Single authoring mode only
-simpler docs but constrains teams and agents that prefer TS builders
-	•	Multiple sources of truth with last-write wins
-easy to corrupt artifacts and defeats deterministic hashing
-	•	TS-only with PSL deprecated
-excludes a large part of the existing ecosystem and increases migration cost
+const t = makeT(contractJson)           // builds typed table/column objects at runtime
+const db = createRuntime({ ir: contractJson, verify: 'onFirstUse' })
 
-Consequences
+const plan = sql()
+  .from('user')
+  .where(t.user.active.eq(true))
+  .select({ id: t.user.id, email: t.user.email })
+  .build()
 
-Positive
-	•	Teams choose the mode that fits their workflow and tools
-	•	Deterministic contract.json keeps safety, hashing, and PPg features intact
-	•	Agents can operate in either mode and rely on the same downstream artifact
+const rows = await db.execute(plan)
+```
 
-Trade-offs
-	•	Slightly more complexity in config and docs
-	•	Need clear guardrails to avoid dual-source drift
+#### makeT
+- Accepts the canonical JSON, validates minimally, memoizes by coreHash
+- Returns a stable object graph of tables, columns, and typed expression builders
+- No dynamic code generation or new Function
+- Zero JS emitted from the emitter
 
-Scope and non-goals
+### Tooling
 
-In scope for MVP
-	•	PSL-first and TS-first emission producing identical contract.json for equivalent intent
-	•	Dev plugins for auto-emit and CI command for explicit emit
-	•	Provenance metadata in artifacts
+- Dev-time integration (Vite/Next/esbuild) auto-emits `contract.json` + `.d.ts` on PSL/TS contract change per ADR 008 and ADR 032
+- CI treats emission as explicit and reproducible
+- Agents and CLIs consume `contract.json` directly
+ - When JSON import isn’t available, a `contract.ts` file may be emitted that `export default` the canonical JSON (identical content to `contract.json`, no code). This preserves determinism and avoids embedding logic in artifacts.
 
-Out of scope for MVP
-	•	Full fidelity PSL↔TS round-trip for advanced target extensions
-	•	Integrated migration of large codebases between modes
+### Plans and verification
 
-Backwards compatibility and migration
-	•	Existing PSL projects can switch to PSL-first with minimal changes
-	•	TS-first projects can be bootstrapped from an emitted PSL by generating a TS scaffold
-	•	A one-time helper can render PSL from an existing contract to ease audits
+- Plans embed `meta.coreHash`
+- Runtime verifier compares with DB marker per ADR 021
+- Plan hashing and caching ignore lane details per ADR 013 and ADR 025
 
-Open questions
-	•	Degree of back-generation we want to support beyond basic scaffolds
-	•	How to represent complex target extensions in PSL rendering without leaking adapter details
-	•	Whether to allow mixed mode within a mono-repo with clear package boundaries
+### Lanes and code generation
 
-Decision record
-	•	Adopt dual authoring modes with a single canonical artifact
-	•	Require projects to declare one authoritative mode, enforce determinism, and surface provenance
-	•	Keep .d.ts emission types-only and rely on makeT(contractJson) for runtime construction
+- DSL and ORM lanes do not require generated clients or runtime JS codegen. They compose functions at runtime over the `t` object and emit Plans directly.
+- TypedSQL is an optional, out-of-tree CLI that emits small per-query Plan factory modules (TS/JS) for `.sql` files. These factories stamp `coreHash` and return Plans; they are not a monolithic generated client and can be adopted selectively.
+
+## Alternatives considered
+
+- **Generated JS client**: Provides runtime objects but hides contract semantics and complicates bundling
+- **Hybrid small JS stubs plus types**: Still adds codegen complexity without solving the type inference problem
+- **Reflection only (no .d.ts)**: Loses editor-time types and makes agent generation less precise
+
+## Consequences
+
+### Positive
+
+- TypeScript type safety through `.d.ts` emission without runtime JS overhead
+- Clear, inspectable data contract for agents and tooling
+- Works in serverless/edge without native client artifacts
+- One runtime surface for all lanes
+
+### Negative
+
+- Small runtime cost to build `t` from JSON
+- Requires JSON import support or packaging step in some environments
+- Types derive from `.d.ts`, so purely dynamic contract edits at runtime won't update editor types
+
+### Mitigations
+
+- Memoize `t` by contractHash and keep construction O(schema)
+- Provide a simple bundler transform for JSON import if needed
+- Encourage TS-first authoring with explicit emit of canonical JSON for tools per ADR 097–098
+
+## Migration impact
+
+- Existing Prisma ORM users migrating to Prisma Next remove `prisma generate` as a runtime dependency and adopt contract emission
+- Queries are written against `t` from `makeT(contractJson)` instead of a generated client
+- TypedSQL continues as a separate CLI that emits Plan factories, not a client
+
+## Open questions
+
+- Should `makeT` perform deep runtime validation or trust the emitter's canonical JSON
+- How to surface best-effort deprecation warnings in `.d.ts` without shipping JS
+
+## Test strategy
+
+- Golden tests for emitted `.d.ts` shapes from known PSL inputs
+- Runtime snapshot tests for `makeT` object graph stability across versions
+- Performance budgets for `makeT` construction and first query
+
+## References
+
+- ADR 006 — Dual authoring modes
+- ADR 008 — Dev auto-emit, CI explicit emit
+- ADR 010 — Canonicalization rules for contract.json
+- ADR 011 — Unified Plan model across lanes
+- ADR 021 — Contract marker storage & verification modes
+- ADR 025 — Plan caching & memoization
+- ADR 097 — Tooling runs on canonical JSON only
+- ADR 098 — Runtime accepts contract object or JSON
