@@ -36,7 +36,7 @@ Both caches are strictly in-process, non-persistent, and evicted by LRU with siz
 ### Fingerprints and guards
 - **sqlFingerprint**: Normalized text that removes literal values, canonicalizes whitespace, stable aliasing, and placeholder forms
 - **Guards for environment and determinism**:
-  - contractHash
+  - coreHash
   - profileHash (adapter profile and capability set)
   - adapterVersion
   - laneVersion optional, used only if the lane affects lowering shape
@@ -44,7 +44,7 @@ Both caches are strictly in-process, non-persistent, and evicted by LRU with siz
 - Clarify invalidation when canonicalVersion changes without coreHash change (no invalidation required)
 
 ### Keys per tier
-- **Shape cache key**: key = hash(sqlFingerprint, contractHash, profileHash, adapterVersion)
+- **Shape cache key**: key = hash(sqlFingerprint, coreHash, profileHash, adapterVersion)
 - **Exact Plan cache key**: key = planHash as defined in ADR 013
 
 ## Invalidation
@@ -72,7 +72,7 @@ Both caches are strictly in-process, non-persistent, and evicted by LRU with siz
 ## What we do not cache
 - Concrete parameter values or rows
 - Raw SQL text in artifacts unless explicitly enabled for debug
-- EXPLAIN results in the Plan caches (EXPLAIN uses a separate cache keyed by sqlFingerprint + contractHash + profileHash + adapterVersion with its own TTL policy per ADR 088 and ADR 023)
+- EXPLAIN results in the Plan caches (EXPLAIN uses a separate cache keyed by sqlFingerprint + coreHash + profileHash + adapterVersion with its own TTL policy per ADR 088 and ADR 023)
 
 ## Observability
 - **Expose counters and gauges**:

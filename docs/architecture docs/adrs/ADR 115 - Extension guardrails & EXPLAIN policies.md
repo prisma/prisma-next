@@ -73,7 +73,7 @@ Guardrail categories
 EXPLAIN policy
 	•	Where: preflight only by default, using shadow DB or EXPLAIN-only mode per ADR 029
 	•	What: EXPLAIN (FORMAT JSON, COSTS, BUFFERS, TIMING) by default, no ANALYZE on production databases
-	•	Caching: keyed by sqlFingerprint + contractHash + adapterProfile + extVersionSet with TTL and size limits per ADR 023
+	•	Caching: keyed by sqlFingerprint + coreHash + adapterProfile + extVersionSet with TTL and size limits per ADR 023
 	•	Budget evaluation: extension packs can add interpretation hooks to derive meaningful signals from EXPLAIN JSON
 	•	pgvector: index used, rows, actual_rows in shadow, scan method, recheck ratio
 	•	PostGIS: spatial index used, filter selectivity, recheck ratio

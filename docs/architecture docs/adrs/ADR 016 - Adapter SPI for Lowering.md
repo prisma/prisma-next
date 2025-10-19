@@ -77,7 +77,7 @@ Adapters must:
 - Order projections, predicates, joins, and CTEs deterministically
 
 ## Stability guarantees
-- Given (adapter.version, capabilities, contractHash, AST), the output (sql, params) is stable
+- Given (adapter.version, capabilities, coreHash, AST), the output (sql, params) is stable
 - Any change to emitted SQL formatting that affects sqlFingerprint is considered a breaking change unless guarded behind an explicit adapter version bump
 - Minor adapter updates may add capabilities or diagnostics but must not change SQL for existing constructs
 

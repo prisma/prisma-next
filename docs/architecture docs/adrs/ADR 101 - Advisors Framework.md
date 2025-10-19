@@ -53,7 +53,7 @@ interface Advisory {
 
 ```typescript
 interface AdvisorContext {
-  contractHash?: string
+  coreHash?: string
   contract?: object                         // optional JSON contract
   graph?: MigrationGraphSummary             // reconstructed or from index
   ledger?: MigrationLedgerSummary

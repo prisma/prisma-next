@@ -62,7 +62,7 @@ Emitted shape example
 
 {
   "target": "postgres",
-  "contractHash": "sha256:…",
+  "coreHash": "sha256:…",
   "tables": {
     "document": {
       "columns": {

@@ -20,7 +20,7 @@ Common fields across all runtime telemetry events:
 - **planId**: stable UUID v5 per Plan instance within a process
 - **lane**: dsl|orm|typed-sql|raw
 - **target**: adapter target postgres|mysql|sqlite|mongo|...
-- **contractHash**: core contract hash
+- **coreHash**: core contract hash
 - **profileHash**: adapter profile hash
 - **sqlFingerprint**: normalized SQL with placeholders, hashed with algorithm and salt id
 - **annotations**: subset of Plan annotations deemed safe to emit

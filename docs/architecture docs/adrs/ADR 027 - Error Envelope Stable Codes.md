@@ -40,7 +40,7 @@ export interface RuntimeError {
   planId?: string
   planHash?: string
   sqlFingerprint?: string
-  contractHash?: string
+  coreHash?: string
   profileHash?: string
   lane?: string                // 'dsl' | 'orm' | 'raw' | external
   ruleId?: string              // For LINT.* codes
@@ -176,7 +176,7 @@ throw err('ADAPTER.TIMEOUT', {
   severity: 'error',
   details: { elapsedMs: 10023 },
   cause: { origin: 'driver', message: 'socket timeout', sqlState: '57014' },
-  planId, planHash, sqlFingerprint, contractHash, profileHash
+  planId, planHash, sqlFingerprint, coreHash, profileHash
 })
 ```
 

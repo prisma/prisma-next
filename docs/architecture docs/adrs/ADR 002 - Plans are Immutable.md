@@ -7,7 +7,7 @@ We compile both queries and migrations into Plans. Plans are consumed by the run
 ## Decision
 
 Plans are immutable value objects once constructed:
-- A Plan carries ast, sql, params, and meta including contractHash and stable references
+- A Plan carries ast, sql, params, and meta including coreHash and stable references
 - `build()` returns a frozen Plan
 - Any transformation produces a new Plan rather than mutating the existing one
 - Plugin hooks cannot mutate Plans in place
@@ -24,7 +24,7 @@ Plan hashing is canonical and excludes non-semantic fields:
 - `ast`: typed AST for the lane (relational, typed SQL, migration ops)
 - `sql|ops`: compiled statement or ordered operations for migrations
 - `params`: positional or named parameters
-- `meta`: { contractHash, target, refs { tables, columns }, compilerVersion, planVersion }
+- `meta`: { coreHash, target, refs { tables, columns }, compilerVersion, planVersion }
 - `id`: stable UUIDv7 assigned at creation for join keys in logs and telemetry
 
 ### Immutability enforcement
@@ -38,7 +38,7 @@ Plan hashing is canonical and excludes non-semantic fields:
 - Migrations re-plan by producing a new edge Plan rather than editing an existing one
 
 ### Caching and reproducibility
-- Execution caches keyed by { planHash, contractHash, role, env }
+- Execution caches keyed by { planHash, coreHash, role, env }
 - Golden tests snapshot AST → SQL and plan hashes to detect unintended compiler changes
 - CI change detection flags unexpected planHash drift in the same code revision
 

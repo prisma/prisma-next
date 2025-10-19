@@ -8,8 +8,8 @@ We support multiple authoring lanes that all emit a Plan: SQL DSL, ORM over DSL,
 
 Ship a lane-neutral hook API v1 with execution mode selection (per ADR 125):
 - Execution returns `AsyncIterable<Row>` immediately with runtime-managed buffering/streaming
-- Five main hooks: `beforeCompile`, `beforeExecute`, `afterExecute`, `onError`, plus optional streaming lifecycle hooks
-- Optional streaming lifecycle hooks fire at **batch granularity** (not per-row): `onStreamOpen`, `onStreamChunk`, `onStreamClose`, `onStreamError`
+- Four main hooks: `beforeCompile`, `beforeExecute`, `afterExecute`, `onError`, plus optional per-row `onRow`
+- Per-row `onRow` enables light, incremental observation without buffering the entire result
 - Hooks operate on immutable inputs and return derived outputs; plugins must not mutate provided objects
 - Policy outcomes are expressed via consistent lint levels and budget decisions; the runtime decides whether to allow, warn, or block based on configuration
 

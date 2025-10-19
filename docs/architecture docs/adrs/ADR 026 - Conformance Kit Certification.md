@@ -23,7 +23,7 @@ Ship an official Conformance Kit and define Certification Levels L0, L1, L2 for 
 
 ## Definitions
 - **Profile**: adapter identity and capability set for a target, versioned and hashed as profileHash
-- **Contract**: canonical data contract artifact, hashed as contractHash
+- **Contract**: canonical data contract artifact, hashed as coreHash
 - **Plan**: immutable execution unit with lane-agnostic identity and annotations
 - **Lowering**: transformation from AST to wire payload for the target
 

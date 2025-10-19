@@ -120,9 +120,9 @@ sequenceDiagram
   participant DB as PPg / Postgres
 
   Dev->>Plan: build Plan (DSL + extension functions)
-  Plan-->>Dev: Immutable Plan{sql, params, contractHash, meta, extensionRefs}
+  Plan-->>Dev: Immutable Plan{sql, params, coreHash, meta, extensionRefs}
   Dev->>RT: execute(Plan)
-  RT->>RT: verify contractHash & capability negotiation
+  RT->>RT: verify coreHash & capability negotiation
   RT->>RT: lint/budgets + extension guardrails
   alt verified
     RT->>DB: run sql with params
@@ -150,7 +150,7 @@ sequenceDiagram
   Plan->>Plan: capability negotiation & extension validation
   Plan-->>Repo: Opset (schema edges + node tasks + extension ops)
   Repo->>Run: apply(Opset)
-  Run->>DB: assert current contractHash == fromHash
+  Run->>DB: assert current coreHash == fromHash
   alt ok
     Run->>Ext: execute extension operations (if any)
     Ext-->>Run: extension operation results
@@ -168,7 +168,7 @@ sequenceDiagram
 - **Guardrails.** Configurable checks (lints, budgets, policies) applied before execution and enforced incrementally during streaming, including extension-specific rules
 - **Preflight.** A dry‑run/EXPLAIN of plans and migrations in CI or a preview DB; returns structured diagnostics including capability verification
 - **Data Contract.** Canonical JSON describing storage, models, capabilities, and extensions. Authored in PSL or TS; emits identical artifacts
-- **Contract Hash.** Unique identifier with `coreHash` (logical schema) and `profileHash` (physical capabilities)
+- **Contract Hash.** Unique identifier with `coreHash` (logical schema) and `profileHash` (physical capabilities). In prose, “contract ID” refers to `coreHash`.
 - **Extension Pack.** Versioned npm package providing domain capabilities (pgvector, PostGIS) through standardized SPIs
 
 **Key Invariants:**
