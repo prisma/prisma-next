@@ -235,6 +235,75 @@ Prisma Next produces several key artifacts that serve as the foundation for type
 - **`.d.ts` types** — Generated TypeScript types for tables, columns, and extension values
 - **Plan factories** — TypedSQL-generated query factories with contract verification
 
+## Initialization & Adoption
+
+Prisma Next supports three adoption paths for bringing databases under contract management:
+
+### Greenfield
+Start with an empty database. Define contract, create baseline migration, deploy application. Fastest and cleanest path.
+
+### Brownfield-Conservative
+Existing project with established database. Introspect schema, generate initial contract, create baseline. Adopt all tables at once.
+
+### Brownfield-Incremental
+Existing project with legacy schema. Introspect existing tables, create initial contract, then gradually expand contract over time by adding new tables and features incrementally. Applications deployed for the new contract can safely run against older database states during rollout.
+
+**Key insight:** Version skew (application knows about tables the database doesn't have yet) is not a problem. The DSL raises clear errors when referencing unavailable tables. This is different from hidden schema changes, which would be dangerous.
+
+### Multi-Service Namespacing
+Multiple services in the same database can maintain independent contracts using database-level namespacing (Postgres schemas, separate databases for MySQL/SQLite). Each service has its own marker, ledger, and migration DAG.
+
+For complete details on adoption strategies, introspection, baseline creation, and multi-service configuration, see **ADR 122 — Database Initialization & Adoption**.
+
+## Drift Handling & Recovery
+
+A database can diverge from the state expected by its contract in multiple ways:
+- Manual DDL changes not via migrations
+- Partial migration failures
+- Replica lag and caching issues
+- Marker table corruption or loss
+- Concurrent deployments
+
+### Detection
+Drift is detected at:
+- Application startup (verify marker and contract hash match)
+- Before query execution (verify query against current contract)
+- Before migration apply (validate marker matches edge `from` hash)
+- After migration apply (verify postconditions)
+- On error conditions (detect schema-related errors)
+
+### Recovery Strategies
+Recovery strategies differ by drift type and environment:
+
+**Marker-level drifts** (missing, corrupt, stale): Initialization or manual reconciliation
+
+**Schema-level drifts** (manual DDL, partial-apply):
+- If migration is idempotent: safe to re-run
+- If not idempotent: manual remediation or reset
+- Introspection can detect and plan corrections
+
+**DAG-level drifts** (orphaned database, no path): Create adoption baseline or new migration edge
+
+**Capability drifts** (missing extensions, version mismatches): Install extensions or update contract
+
+### Idempotency-Based Recovery
+**Idempotent operations** (per ADR 038) are critical to drift recovery. They enable safe re-execution of partially-applied migrations:
+- `CREATE TABLE IF NOT EXISTS` — No-op if table exists, creates if missing
+- `ALTER TABLE ADD COLUMN IF NOT EXISTS` — Idempotent column additions
+- Operations that already completed: no-op
+- Failed operations can now succeed
+
+This bridges schema-level drift and recovery: partial migration failures can be recovered by re-running without manual intervention.
+
+### Environment-Based Policies
+**Development:** Permissive — auto-initialize marker if missing, allow manual DDL with reconciliation, automatic retry on idempotent operations
+
+**Staging:** Strict — require marker, detailed diagnostics, preflight required before migrations
+
+**Production:** Very strict — refuse all execution on drift, no auto-recovery, require explicit human action
+
+For comprehensive drift taxonomy and recovery procedures, see **ADR 123 — Drift Detection, Recovery & Reconciliation**.
+
 ## Links to Subsystem Specs
 
 - **[Data Contract](architecture%20docs/subsystems/1.%20Data%20Contract.md)** — Core contract model, PSL/TS authoring, extensions

@@ -119,6 +119,8 @@ This document provides a comprehensive index of all Architectural Decision Recor
 |-----|-------|-------------|------|
 | 101 | Advisors Framework | Establishes uniform API for computing and surfacing migration advisories | [ADR 101 - Advisors Framework.md](adrs/ADR%20101%20-%20Advisors%20Framework.md) |
 | 102 | Squash-first policy & squash advisor | Defines policy for keeping migration DAGs small through regular baselines | [ADR 102 - Squash-first policy & squash advisor.md](adrs/ADR%20102%20-%20Squash-first%20policy%20&%20squash%20advisor.md) |
+| 122 | Database Initialization & Adoption | Covers greenfield, brownfield-conservative, and brownfield-incremental adoption strategies including introspection, multi-service namespacing, and incremental contract expansion | [ADR 122 - Database Initialization & Adoption.md](adrs/ADR%20122%20-%20Database%20Initialization%20%26%20Adoption.md) |
+| 123 | Drift Detection, Recovery & Reconciliation | Comprehensive drift taxonomy (marker, schema, DAG, capability, transactional, cache, canonicalization), detection mechanisms, and recovery strategies with idempotency patterns | [ADR 123 - Drift Detection, Recovery & Reconciliation.md](adrs/ADR%20123%20-%20Drift%20Detection%2C%20Recovery%20%26%20Reconciliation.md) |
 
 ## Notes
 
