@@ -19,7 +19,7 @@
 
 - SELECT results for SQL DSL and ORM-lowered single-statement queries
 - Projections, joins, simple expressions, and common aggregates
-- Nested results produced by ORM lowerers using single-statement strategies
+- Nested results produced by core traversal nodes (`nestArray`, `joinFlat`) lowered by adapters using single-statement strategies
 
 ### Out of scope
 
@@ -44,6 +44,11 @@ If multiple sources disagree, the more specific one wins and the less specific i
 - Duplicate aliases are a compile-time error in strict mode and produce a warning in permissive mode
 - `SELECT *` is allowed by the core but strongly discouraged and typically linted as error
   - When used, the result is the intersection of all visible table fields with join-based nullability applied, breaking ties by last-projected table in deterministic order
+
+### Nested projection metadata
+
+- `meta.projection` may include nested descriptors to reflect structured outputs from `nestArray` and dotted paths for `joinFlat` aliases
+- `meta.refs` remains a flat list of referenced tables/columns and includes nested/junction references for guardrails
 
 ## Join nullability rules
 
@@ -103,20 +108,18 @@ Assume no FILTER and no DISTINCT unless specified:
 - Result nullability from aggregates ignores join preservation because aggregates collapse the group
 - Join-induced nullability only matters for inputs to aggregates, not the aggregate's own nullability except as defined above
 
-## ORM nesting rules
+## Relationship traversal typing rules
 
-When ORM lowers 1:N includes using single-statement strategies:
+For core traversal nodes lowered by adapters:
 
-- **Lateral subquery with json_agg**:
-  - Child collection type is `ChildRow[] | null` by default
-  - If the adapter declares `jsonAggCoalescesEmpty`, the type is `ChildRow[]`
-- **Flat LEFT JOIN with prefixed columns**:
-  - Child fields become `Nullable<ChildCol>` on the projection
-  - ORM may provide a post-projection combiner to produce `{ parent: ParentRow, child: ChildRow[] }` at the typing layer only if the adapter declares the combining strategy and it stays single-statement
+- **nestArray (1:N and M:N)**
+  - Yields `{ alias: ChildRow[] | null }` by default
+  - If the adapter declares `jsonAggCoalescesEmpty` (or equivalent), and the node sets `coalesceEmpty`, yields `{ alias: ChildRow[] }`
+  - Child `where`, `orderBy`, and `limit` do not affect parent row nullability
 
-For N:1 includes lowered via LEFT JOIN:
-- Child fields are `Nullable<ChildCol>`
-- If the include is marked as required and lowered with an INNER JOIN, child fields retain original nullability
+- **joinFlat (N:1)**
+  - With `required: false` (LEFT JOIN semantics), projected child fields are `T | null`
+  - With `required: true` (INNER JOIN semantics), projected child fields are `T`
 
 ## Aliasing and collisions
 

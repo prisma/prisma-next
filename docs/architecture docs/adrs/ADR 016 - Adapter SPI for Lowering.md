@@ -2,7 +2,7 @@
 
 ## Context
 
-The SQL DSL and optional ORM produce a dialect-agnostic relational AST. We need a clear, stable SPI where dialect logic lives so lanes stay portable and the core remains thin. Lowering must be deterministic to support plan hashing, golden tests, and agent predictability.
+The SQL DSL and optional ORM produce a dialect-agnostic relational AST. Relationship traversal is represented by first-class, projection-scoped nodes (`nestArray`, `joinFlat`, including M:N via junction). We need a clear, stable SPI where dialect logic lowers these nodes so lanes stay portable and the core remains thin. Lowering must be deterministic to support plan hashing, golden tests, and agent predictability.
 
 ## Decision
 
@@ -62,7 +62,8 @@ export interface LoweringResult {
 ```
 
 ## Capability flags
-- Capabilities are boolean feature switches describing what the adapter can guarantee (examples: lateral, jsonAgg, onConflict, returning, cte, distinctOn)
+- Capabilities are boolean feature switches describing what the adapter can guarantee (examples: `lateral`, `jsonAgg`, `arrayAgg`, `jsonBuildObject`, `onConflict`, `returning`, `cte`, `distinctOn`)
+- Optional typing refinements may be advertised, e.g., `jsonAggCoalescesEmpty` when adapters guarantee `COALESCE(json_agg(...), '[]')`
 - Lanes and higher layers must branch on capabilities rather than probing the dialect at runtime
 - Missing capabilities should produce compile-time diagnostics with remediation guidance
 
@@ -75,6 +76,14 @@ Adapters must:
 - Render placeholders consistently for the target driver
 - Avoid embedding non-deterministic literals like timestamps or random IDs in SQL text
 - Order projections, predicates, joins, and CTEs deterministically
+
+### Relationship traversal lowering
+
+Adapters must lower:
+- `nestArray` to a single-statement correlated subquery that aggregates typed child rows (e.g., `json_agg(json_build_object(...))` in Postgres), optionally coalesced to `[]` when capability allows; M:N is expressed by joining a junction inside the subquery
+- `joinFlat` to a single `LEFT JOIN` or `INNER JOIN` depending on `required`, projecting aliased child columns deterministically
+
+When capabilities are missing and no safe, single-statement equivalent exists, adapters return a structured error.
 
 ## Stability guarantees
 - Given (adapter.version, capabilities, coreHash, AST), the output (sql, params) is stable

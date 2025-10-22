@@ -6,11 +6,12 @@ The base system provides a small SQL DSL that compiles to a relational AST and a
 
 ## Decision
 
-Ship the ORM as an optional package layered on top of the SQL DSL and the data contract:
+Ship the ORM as an optional package layered on top of the SQL DSL and the data contract. The ORM is purely ergonomic: it emits the same core `QueryAST` as the SQL DSL, including first-class relationship traversal nodes, and performs no dialect-specific lowering itself.
+
 - `@prisma/orm` depends on `@prisma/sql` and `@prisma/relational-ir` but not vice versa
-- Enforce the one call → one statement rule for ORM operations; each ORM invocation must compile to exactly one SQL statement and one Plan
-- Place dialect-specific lowering strategy for ORM constructs in adapter profiles, not in the DSL core (e.g., the Postgres profile implements include lowering via LEFT JOIN LATERAL, json_agg, or LEFT JOIN patterns)
-- Keep the SQL DSL free of ORM concepts such as relation handles or nested include syntax; the ORM compiles its higher-level AST into the same relational AST nodes the DSL already uses
+- Enforce the one call → one statement rule for ORM operations; each ORM invocation compiles to exactly one SQL statement and one Plan
+- Dialect-specific lowering for relationship traversal lives in adapter profiles (per ADR 016); ORM does not lower
+- Keep the SQL DSL free of ORM-only surface; both DSL and ORM can author the same core nodes (`nestArray`, `joinFlat`)
 
 ## Rationale
 - One call → one statement keeps performance characteristics predictable, makes budgets and guardrails straightforward, and avoids N+1 class pitfalls
@@ -32,14 +33,14 @@ Ship the ORM as an optional package layered on top of the SQL DSL and the data c
 - Caching, identity map, or change tracking
 
 ## Adapter responsibilities
-- Declare capabilities needed by ORM lowering such as lateral, jsonAgg, arrayAgg, jsonBuildObject
-- Provide lowering routines that transform ORM AST nodes into relational AST nodes supported by the base SQL compiler
+- Declare capabilities needed to lower relationship traversal nodes such as `lateral`, `jsonAgg`, `arrayAgg`, `jsonBuildObject`, and optional `jsonAggCoalescesEmpty`
+- Provide lowering routines for the core `QueryAST` nodes (`nestArray`, `joinFlat`, including M:N via junction)
 - Guarantee deterministic SQL emission from the same inputs and capabilities
-- Emit helpful diagnostics if a requested ORM feature is unsupported by the target
+- Emit helpful diagnostics if a requested traversal is unsupported or lacks required capabilities
 
 ## Behavior when capabilities are missing
-- If the adapter cannot lower an ORM construct while preserving one call → one statement, compilation fails with a clear error and remediation guidance
-- Where safe and unambiguous, adapters may fall back to alternative single-statement strategies such as flattening with prefixed columns and grouping in the client, but only if result types and guardrails remain correct
+- If the adapter cannot lower a traversal node while preserving one call → one statement, compilation fails with a clear, structured error and remediation guidance
+- Where safe and unambiguous, adapters may fall back to alternative single-statement strategies (e.g., `array_agg(row_to_json(...))`) when equivalent semantics are preserved and covered by golden tests
 
 ## Error semantics and safety
 - ORM-generated Plans participate in the same verification pipeline as DSL and raw Plans
