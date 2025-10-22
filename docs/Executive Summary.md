@@ -12,6 +12,28 @@ Software development has entered the agent era. Agents can write code and SQL, b
 | Present | **Drizzle, Kysely** | Modern toolchains and frameworks | Pure TypeScript, no generate step <br> Runs anywhere JS runs | No verification <br> No guardrails for unsafe queries or schema drift <br> Query builder, not a system |
 | Future | **Prisma Next** | Humans *and* agents | Verified data contracts <br> Deterministic, safe migrations <br> Actionable feedback for agents <br> PPg integration: preflight and hosted safety checks | — |
 
+### Before vs After: how building with data feels
+
+#### Before (today)
+Teams write code that “looks” correct because TypeScript checks the shape of their queries. But once those queries hit the database, it’s hard to know if they are efficient, safe, or future‑proof. Problems like hidden N+1 patterns, unbounded reads, or missing indexes often show up late—in staging or production—when they are expensive to fix. When schemas change, drift is discovered through failures, not early warnings. Agents (and junior developers) don’t get much help beyond generic errors and blog‑post advice.
+
+#### After (with Prisma Next)
+Every app has a clear data contract that both the app and the database agree on. Each query is checked against that contract before it runs, and the system explains what’s risky and exactly how to improve it. Results and behavior are consistent and traceable, because each request maps to one well‑defined statement, making cause and effect obvious. When the schema changes, Prisma Next and PPg can verify those changes in an isolated environment before they reach production.
+
+#### What this means for everyday development
+Developers keep the ergonomics they love—familiar includes and selections—but now the system acts like a coach and a safety net. If a query could return far more data than expected or is missing a filter, Prisma Next flags it and tells the developer how to fix it. If the database doesn’t support a feature, the system says so up front and suggests a supported alternative. The goal isn’t to force a new style, but to make the existing style safer and more predictable.
+
+#### What this means for teams running at scale
+Leaders get fewer surprises. Because each request is a single, predictable statement, it’s easier to manage performance, costs, and reliability. We can set sensible budgets (for example, how many rows or how long a query may run) and enforce them consistently. When something regresses, we can point to the exact query and the exact reason, rather than guessing across multiple moving parts.
+
+#### What this means for agents and automation
+Agents can read the same contract that humans do and propose changes with confidence. When an agent’s query isn’t ideal, Prisma Next provides specific, actionable feedback—what to change and why—so the agent learns and improves. For schema changes, agents can run a pre‑flight in a safe, isolated environment and get a clear yes/no answer with reasons before anything is merged. This makes automated work both faster and safer.
+
+#### How we bring our users along
+We keep the ergonomics people love. A compatibility layer lets most teams switch without large rewrites, preserving familiar patterns while adding the new safety checks behind the scenes. Adoption can be incremental: start by running Prisma Next side‑by‑side, turn on guidance in “warn” mode, and tighten to “enforce” once teams are comfortable. This is an upgrade in experience, not a reset.
+
+> Before, teams had typed queries and hoped they behaved well. After, teams have verified plans with a guide. Prisma Next turns data access into something you can trust: the application and the database agree on a contract, every query is checked and explained, and changes are verified before they ship.
+
 ### Proposal
 
 Approve a focused pivot to Prisma Next as the successor to the current ORM, which will move into LTS (security and critical fixes only). Fund a **two-week MVP** and a **stage-gated private preview** to validate value, de-risk adoption, and establish Prisma Next + PPg as the definitive data platform for the agent era.
