@@ -14,8 +14,8 @@ Prisma Next supports multiple SQL dialects via adapters. Lanes (DSL, ORM, TypedS
 ## Goals
 
 - Define a capability model covering static and runtime-discovered features
-- Provide a negotiation flow that yields a stable profileHash used in plan caches and diagnostics
-- Let lanes declare required vs optional capabilities and degrade or fail deterministically
+- Provide a verification flow that checks database capabilities satisfy the contract-declared requirements
+- Let lanes declare required vs optional capabilities and degrade or fail deterministically (based on contract-declared caps)
 - Allow feature flags to pin or disable capabilities for safety or perf reasons
 - Keep the lowering responsibility in adapters, preserving lane portability
 
@@ -67,12 +67,13 @@ type AdapterProfile = {
 }
 ```
 
-### Negotiation
+### Verification (pinned profile)
 
-At runtime initialization:
+During verification (`prisma-next verify` or runner apply):
 1. Adapter reports `staticCaps`
 2. Adapter runs lightweight probes to compute `runtimeCaps` and `serverMeta`
-3. Runtime merges caps, applies feature flags, then computes `profileHash`
+3. Tooling checks that `(static ∪ runtime)` satisfies the contract-declared capability requirements
+4. On success, the runner writes the contract's `coreHash` and `profileHash` to the marker
 
 ### Feature flags
 
@@ -94,13 +95,9 @@ The adapter may use `prefer` to choose among multiple legal lowerings.
 
 ### Profile hash
 
-```
-profileHash = sha256(adapterName, adapterVersion, sorted(effectiveCaps), serverVersion, selected profile options)
-```
-
-- Included in `Plan.meta.profileHash`
-- Used in cache keys (`sqlFingerprint`, `profileHash`, `coreHash`) per ADR 025
-- Changes when capabilities or server version change, invalidating caches predictably
+- `profileHash` is contract-derived from declared capability keys/variants and optional adapter pins.
+- Included in artifacts and in the database marker; Plans may carry it in `meta` for diagnostics.
+- Used to enforce equality with the marker at runtime; caches may key on `(sqlFingerprint, coreHash, profileHash)` for clarity.
 
 ## Lane behavior on missing capabilities
 
@@ -124,10 +121,9 @@ Stable error codes per ADR 027:
 
 ### Discovery cadence and caching
 
-- Discovery runs at startup and is memoized per connection profile
-- Revalidation occurs on reconnect or when the adapter detects `serverVersion` change
-- A short TTL can be configured for environments with dynamic extension toggles
-- Lanes receive a read-only view of the effective capabilities
+- Discovery runs during verification and runner apply to confirm contract satisfaction
+- Revalidation occurs when verification is re-run; runtime does not renegotiate a new profile in pinned mode
+- Lanes receive a read-only view of declared capabilities from the contract
 
 ### Feature flags use cases
 
@@ -147,7 +143,7 @@ Adapters must produce the same SQL for the same Plan + effective capabilities se
 
 - Deterministic, testable behavior across dialects and versions
 - Clear separation of concerns: lanes are portable, adapters own dialect logic
-- Stable caches keyed by profileHash and predictable invalidation
+- Stable caches keyed by profileHash and predictable invalidation (when the contract changes)
 - Safer rollouts by feature-flagging risky capabilities
 
 ### Negative
@@ -159,14 +155,18 @@ Adapters must produce the same SQL for the same Plan + effective capabilities se
 ## Alternatives considered
 
 - **Centralize all capability handling in lanes**: Rejected to keep lanes portable and avoid dialect leakage
-- **Omit runtime discovery and rely on static matrices**: Rejected because extensions and server versions materially affect feature sets
+- **Omit discovery entirely**: Rejected because extensions and server versions materially affect available features; we still probe to verify satisfaction, but we do not compute a new profile hash at runtime in pinned mode
 - **Auto multi-statement fallback when caps are missing**: Rejected due to ADR 015 one-call → one-statement rule and policy guardrails
 
 ## Implementation notes
 
 - Add `adapter.discover()` and `adapter.lower(plan, caps, hints)` to the SPI
 - Provide a shared `CapabilityRegistry` with docs and conformance hooks
-- Expose `profileHash` and `effectiveCaps` in runtime diagnostics and telemetry
+- Expose `profileHash` and declared capabilities in runtime diagnostics and telemetry
+
+## Future extension
+
+- A "floating mode" could compute a runtime profile from discovered capabilities, use it for cache scoping, and require only that the runtime profile satisfies the contract. This would be additive and opt-in; the default remains pinned and contract-derived.
 - Include capability context in lint rule messages for actionable guidance
 
 ## Testing and conformance

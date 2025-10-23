@@ -7,7 +7,7 @@ The runtime and the migration runner must know which data contract a database cu
 ## Decision
 
 Store the current contract identity in a small, reserved table called prisma_contract.marker in each target schema or database:
-- The marker records the core hash of the data contract and the profile hash of the adapter capabilities in use
+- The marker records the core hash of the data contract and the profile hash pinned by the contract (declared capability profile)
 - The runtime implements three verification modes: startup, onFirstUse, and always
 - Cross-environment drift is reported with structured errors and remediation guidance, never auto-patched
 
@@ -33,7 +33,7 @@ create table if not exists prisma_contract.marker (
 ### Notes
 - Single row keyed by id = 1 keeps reads cheap and avoids accidental fan-out
 - core_hash is the canonical hash of contract.json after canonicalization
-- profile_hash identifies the adapter profile and capability set used to lower Plans
+- profile_hash mirrors the contract-pinned capability profile and is used to enforce equality at verification time
 - contract_json is optional complete contract JSON for drift analysis and PPg features
 - canonical_version tracks the canonicalization version used for the contract_json
 - app_tag is optional human context (service or deployment name)
@@ -72,7 +72,7 @@ create table if not exists prisma_contract.marker (
 
 ### startup
 - Verify once when the runtime starts
-- Read the marker, compare coreHash and profileHash, cache the result
+- Read the marker, compare contract coreHash/profileHash to marker values, cache the result
 - On mismatch, throw contract/hash-mismatch or contract/target-mismatch and refuse to start in strict mode
 - Intended for stable production processes and long-lived workers
 
@@ -92,7 +92,7 @@ create table if not exists prisma_contract.marker (
 ### Error taxonomy
 - contract/marker-missing when the marker table or row is absent
 - contract/hash-mismatch when DB core_hash and Plan coreHash differ
-- contract/target-mismatch when DB profile_hash and Plan adapter profile differ
+- contract/target-mismatch when DB profile_hash and contract profileHash differ
 
 ### Behavior
 - In strict mode these are blocking errors

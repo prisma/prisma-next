@@ -11,7 +11,7 @@ A canonical, verifiable JSON artifact that describes an application's data model
 A SHA-256 hash of the meaningful schema components (models, fields, relations, storage layout) that represents the logical data contract. Changes to business logic, constraints, or data model affect the `coreHash`. Used for contract verification and migration planning.
 
 ### ProfileHash
-A SHA-256 hash of the physical profile (dialect-specific features, capabilities, adapter configuration) that does not change the logical meaning of the data contract. Changes to index methods, storage parameters, or capability flags affect the `profileHash` but not the `coreHash`.
+A SHA-256 hash of the contract-pinned capability profile (declared capability keys/variants and optional adapter pins). It does not change the logical meaning of the data contract. The migration runner verifies that the database satisfies these requirements and writes the same `profileHash` to the marker. At runtime, equality with the marker is enforced. Note: a future "floating mode" could compute a runtime profile from discovery; today, `profileHash` is contract-derived.
 
 ### Capability Key
 A canonical identifier for a database or extension feature (e.g., `lateral`, `jsonAgg`, `ivfflat`). Capability keys are namespaced and follow a stability contract where core capabilities are reserved and extension capabilities are prefixed by pack namespace. Used for adapter negotiation and feature gating.

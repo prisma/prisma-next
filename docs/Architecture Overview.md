@@ -21,7 +21,7 @@ The contract is the center of gravity. A single canonical `contract.json` define
 We don’t execute intent directly; we compile it into immutable Plans. Every query plan lowers to one statement for predictability and guardrails, and every migration is a contract→contract edge with verifiable pre and post conditions. Plans are hashable, auditable, and portable across environments (ADR 002, ADR 003, ADR 001, ADR 011)
 
 ### Thin core, fat targets
-Keep the core small and stable—contracts, plan model, runtime lifecycle, and policy surfaces—while adapters and extension packs carry dialect and capability logic. Capabilities are negotiated and versioned so behavior is explicit and swappable without touching core (ADR 005, ADR 112, ADR 117)
+Keep the core small and stable—contracts, plan model, runtime lifecycle, and policy surfaces—while adapters and extension packs carry dialect and capability logic. Capabilities are declared in the contract and verified against the database so behavior is explicit and swappable without touching core (ADR 005, ADR 112, ADR 117)
 
 ### Explicit over implicit
 No hidden multi round-trips, fallbacks, or adapter heuristics. Strategies are chosen explicitly via hints, annotations, and capability checks; raw SQL carries annotations so guardrails still apply. Multi-step behavior is expressed as explicit pipelines or transactions, not implicit client behavior (ADR 003, ADR 012, ADR 018, ADR 022)
@@ -34,7 +34,7 @@ Fast, targeted feedback at authoring, planning, and execution time. Lints and bu
 
 ## Architecture at a Glance
 
-Prisma Next is organized around two planes that share the contract and a negotiated capability profile
+Prisma Next is organized around two planes that share the contract and a pinned capability profile
 
 - **Migration Plane** (build time): authoring, planning, verifying, and applying contract changes
 - **Query Plane** (runtime): authoring, validating, and executing query plans against live data
@@ -42,7 +42,7 @@ Prisma Next is organized around two planes that share the contract and a negotia
 Both planes operate on the same shared artifacts:
 
 - **Data Contract:** Generated from PSL + TypeScript builders + extension manifests and distributed as JSON alongside TypeScript definitions
-- **Capability negotiation:** Adapters report capabilities, packs declare requirements, and the runtime computes a negotiated profile that contributes to `profileHash` (ADR 117, ADR 021)
+- **Capability profile (pinned):** The contract declares required capabilities (and optional adapter pins) and emits a pinned `profileHash`. The runner verifies the database satisfies the contract and writes the same `profileHash` to the marker (ADR 117, ADR 021)
 - **Plan Factories:** Compile declarative inputs into deterministic plans with hash-stamped metadata
 - **Guardrail Plugins:** Applied during plan creation, PPg preflight, and runtime execution
 - **Marker and ledger:** Database marker storing `coreHash` and `profileHash` plus an append-only ledger of applied edges for verification and audit (ADR 021, ADR 001)
@@ -53,22 +53,31 @@ Both planes operate on the same shared artifacts:
 flowchart LR
   subgraph Shared
     C[contract.json]
-    Prof[Capability profile\nprofileHash]
+    Prof[Pinned capability profile
+    profileHash]
     Mk[(Marker + Ledger)]
   end
 
   subgraph "Migration Plane"
-    Auth[Authoring\nPSL/TS + Packs]
-    Plan[Planner\ncontract diff → edges]
-    Pf[Preflight\nshadow or explain]
-    Run[Runner\nidempotent ops + checks]
+    Auth[Authoring
+    PSL/TS + Packs]
+    Plan[Planner
+    contract diff → edges]
+    Pf[Preflight
+    shadow or explain]
+    Run[Runner
+    idempotent ops + checks]
   end
 
   subgraph "Query Plane"
-    QF[Plan Factories\nDSL | TypedSQL | Raw]
-    RT[Runtime\nhooks + lints + budgets]
-    Adp[Adapter\nlower/execute]
-    Cd[Codecs\nbranded types]
+    QF["Plan Factories
+    DSL | TypedSQL | Raw"]
+    RT[Runtime
+    hooks + lints + budgets]
+    Adp[Adapter
+    lower/execute]
+    Cd[Codecs
+    branded types]
   end
 
   subgraph PPg
@@ -161,7 +170,7 @@ sequenceDiagram
 
 **Verification**
 
-- Runtime verifies the contract hash, negotiates capabilities, and applies lint rules and budgets configured by policy
+- Runtime verifies marker `coreHash` and `profileHash` equality with the contract and applies lint rules and budgets configured by policy
 - Extensible linting highlights potential issues before execution
 
 **Execution**
@@ -191,7 +200,6 @@ sequenceDiagram
   App->>Factory: Build plan (DSL/TypedSQL/Raw)
   Factory-->>App: Plan{sql,params,meta{coreHash,lane,annotations,refs}}
   App->>Runtime: execute(plan)
-  Runtime->>Caps: Negotiate capabilities
   Runtime->>Runtime: Verify marker coreHash/profileHash
   Runtime->>Plugins: Lints and budgets (policy)
   alt auto mode selection
@@ -208,8 +216,8 @@ sequenceDiagram
 | Stage            | Migration Plane                                                  | Query Plane                                                     |
 |------------------|------------------------------------------------------------------|-----------------------------------------------------------------|
 | Authoring        | Contract builders validate schema intent and capability usage.   | DSL annotations and TypedSQL expose capabilities and policies. |
-| Planning         | Planner simulates edges; hash-stamps preconditions and outcomes. | Plan factories negotiate adapter capabilities and attach lint/budget annotations. |
-| Preflight/Verify | PPg answers “Will this migration do what I expect?” and enforces policy gates. | Runtime negotiates capabilities and applies guardrail plugins.  |
+| Planning         | Planner simulates edges; hash-stamps preconditions and outcomes. | Plan factories attach lint/budget annotations. |
+| Preflight/Verify | PPg answers “Will this migration do what I expect?” and enforces policy gates. | Runtime verifies marker equality and applies guardrail plugins. |
 | Execution        | Runner enforces idempotency, markers, and extension requirements. | Streaming execution monitored by guardrail plugins and budgets. |
 | Post-feedback    | PPg ledger, drift detectors, and diagnostics inform authors.     | Policy outcomes and drift indicators feed back to authoring tools. |
 ## Modularity and Extensibility
