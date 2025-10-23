@@ -49,6 +49,7 @@ create table if not exists prisma_contract.marker (
 - The migration runner is the only component that updates the marker
 - It writes core_hash and profile_hash at the end of a successful edge apply, in the same transaction when transactional DDL is available
 - It also writes an entry to the migration ledger for audit
+- For profile-only updates (no DDL), the runner updates `profile_hash` after a successful verification that the database satisfies the contract-declared capabilities (core_hash remains unchanged)
 - The runtime reads but never mutates the marker
 - Reads are cheap, cached per process, and invalidated by configurable TTLs or explicit cache busting
 - If the marker is missing, the runtime reports contract/marker-missing and refuses to execute in strict mode
@@ -92,7 +93,7 @@ create table if not exists prisma_contract.marker (
 ### Error taxonomy
 - contract/marker-missing when the marker table or row is absent
 - contract/hash-mismatch when DB core_hash and Plan coreHash differ
-- contract/target-mismatch when DB profile_hash and contract profileHash differ
+- contract/target-mismatch when DB profile_hash and contract profileHash differ (run a profile-only verify if the contract intentionally changed capability profile)
 
 ### Behavior
 - In strict mode these are blocking errors
