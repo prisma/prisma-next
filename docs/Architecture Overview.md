@@ -47,6 +47,51 @@ Both planes operate on the same shared artifacts:
 - **Guardrail Plugins:** Applied during plan creation, PPg preflight, and runtime execution
 - **Marker and ledger:** Database marker storing `coreHash` and `profileHash` plus an append-only ledger of applied edges for verification and audit (ADR 021, ADR 001)
 
+### Diagram — System map
+
+```mermaid
+flowchart LR
+  subgraph Shared
+    C[contract.json]
+    Prof[Capability profile\nprofileHash]
+    Mk[(Marker + Ledger)]
+  end
+
+  subgraph "Migration Plane"
+    Auth[Authoring\nPSL/TS + Packs]
+    Plan[Planner\ncontract diff → edges]
+    Pf[Preflight\nshadow or explain]
+    Run[Runner\nidempotent ops + checks]
+  end
+
+  subgraph "Query Plane"
+    QF[Plan Factories\nDSL | TypedSQL | Raw]
+    RT[Runtime\nhooks + lints + budgets]
+    Adp[Adapter\nlower/execute]
+    Cd[Codecs\nbranded types]
+  end
+
+  subgraph PPg
+    Svc[Preflight-as-a-service]
+    Cat[Pack catalog]
+  end
+
+  C --> Plan
+  C --> QF
+  Plan --> Pf
+  Pf --> Run
+  Run --> Mk
+  QF --> RT
+  RT --> Adp
+  Adp --> RT
+  RT --> Cd
+  Prof --> RT
+  Prof --> Plan
+  Mk --> RT
+  Svc --> Pf
+  Cat --> C
+```
+
 ## Migration Plane — Self-Verifying Change
 
 **Authoring**
@@ -73,6 +118,35 @@ Both planes operate on the same shared artifacts:
 
 - Postconditions verify effects; PPg ledger records contract hashes and applied migrations
 - Failures emit diagnostics tied back to contract statements or extension hooks
+
+### Diagram — Migration preflight and apply
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Author as Author
+  participant Planner as Planner
+  participant PPg as PPg Preflight
+  participant Runner as Runner
+  participant DB as Database
+  participant Marker as Marker + Ledger
+
+  Author->>Planner: Edit contract H0→H1
+  Planner-->>Author: Edge{fromHash,toHash,ops,pre,post}
+  Author->>PPg: Preflight(edge, bundle)
+  alt shadow
+    PPg->>DB: Apply edge in shadow
+    DB-->>PPg: Diagnostics
+  else explain
+    PPg->>DB: EXPLAIN plans
+    DB-->>PPg: Normalized EXPLAIN
+  end
+  Author->>Runner: Apply(edge)
+  Runner->>DB: Acquire advisory lock
+  Runner->>DB: Run ops with pre/post checks
+  DB-->>Runner: Success
+  Runner->>Marker: Update coreHash/profileHash, write ledger
+```
 ## Query Plane — Runtime Assertions
 
 **Authoring**
@@ -100,6 +174,35 @@ Both planes operate on the same shared artifacts:
 
 - Immediate feedback on query success or failure, capability mismatches, or contract drift
 - Plans and results are logged in machine-readable formats for agents and observability tooling
+
+### Diagram — Query execution
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App as App
+  participant Factory as Plan Factory
+  participant Runtime as Runtime
+  participant Caps as Adapter Caps
+  participant DB as Database
+  participant Plugins as Plugins
+  participant Codecs as Codecs
+
+  App->>Factory: Build plan (DSL/TypedSQL/Raw)
+  Factory-->>App: Plan{sql,params,meta{coreHash,lane,annotations,refs}}
+  App->>Runtime: execute(plan)
+  Runtime->>Caps: Negotiate capabilities
+  Runtime->>Runtime: Verify marker coreHash/profileHash
+  Runtime->>Plugins: Lints and budgets (policy)
+  alt auto mode selection
+    Runtime->>DB: EXPLAIN or probe fetch
+  end
+  Runtime->>DB: Parse/Bind/Execute
+  DB-->>Runtime: Rows (buffer or cursor)
+  Runtime->>Codecs: Decode rows to branded types
+  Runtime->>Plugins: onRow / afterExecute
+  Runtime-->>App: AsyncIterable<Row>
+```
 ## Guardrails and Feedback Matrix
 
 | Stage            | Migration Plane                                                  | Query Plane                                                     |
@@ -119,6 +222,52 @@ Legacy Prisma required touching multiple layers of a monolithic Rust/TypeScript 
 - **Capability negotiation** ensures new behavior is discoverable and opt-in through explicit contract declarations
 
 Contributors extend behavior by publishing packs or adapters. Core recompilation is not required.
+
+### Diagram — Thin core, fat targets
+
+```mermaid
+flowchart LR
+  subgraph Core[Core]
+    C1["Contracts
+      canonicalization & hashing"]
+    C2[Plan model
+      immutable plans]
+    C3[Runtime hooks
+    plugins: lints & budgets]
+    C4[Policy surfaces
+    error taxonomy]
+  end
+
+  subgraph Adapters[Targets — Adapters]
+    A1[Postgres adapter
+    lowering, execute, cursors]
+    A2[MySQL adapter]
+    A3[Mongo adapter]
+  end
+
+  subgraph Packs[Extension Packs]
+    P1[pgvector
+    codecs, ops, rules]
+    P2[PostGIS
+    codecs, ops, rules]
+  end
+
+  Contract[contract.json]
+  Profile[Capability negotiation
+  profileHash]
+
+  Contract --> C1
+  C1 --> C2
+  C2 --> C3
+  C3 --> Profile
+  Profile --> A1
+  Profile --> A2
+  Profile --> A3
+  P1 --> A1
+  P2 --> A1
+  P1 --> C3
+  P2 --> C3
+```
 ## Role of Prisma Postgres (PPg)
 
 PPg is a contract-aware Postgres service that amplifies determinism and feedback.
@@ -139,10 +288,3 @@ PPg is optional, but using it delivers zero-touch guardrails for teams and agent
 1. **MVP:** Postgres support, contract emit, plan factories, runtime guardrails, PPg preflight previews
 2. **Pilot:** Rename/drop with policy hints, richer diagnostics, pack catalog, PPg-managed advisors and orchestration
 3. **GA:** Hardened runtime, policy packs, additional database adapters, contributor-friendly extension tooling
-## Open Questions
-
-- How should guardrail severity default per environment (warn vs block)?
-- What capability surface is required for a non-Postgres adapter?
-- How much DSL sugar can we offer without losing explicitness?
-- Which telemetry signals best help agents self-correct (latency, guardrail hits, plan variance)?
-**Bottom line:** Prisma Next gives agents and teams a deterministic, explicit, and feedback-rich ORM. Migrations and queries operate as verifiable plans grounded in a single contract. Guardrails fire before surprises reach production, and modular boundaries let contributors extend behavior without rewriting the core.
