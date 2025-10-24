@@ -42,7 +42,7 @@ Prisma Next is organized around two planes that share the contract and a pinned 
 Both planes operate on the same shared artifacts:
 
 - **Data Contract:** Generated from PSL + TypeScript builders + extension manifests and distributed as JSON alongside TypeScript definitions
-- **Capability profile (pinned):** The contract declares required capabilities (and optional adapter pins) and emits a pinned `profileHash`. The runner verifies the database satisfies the contract and writes the same `profileHash` to the marker (ADR 117, ADR 021)
+- **Capability profile:** The contract declares required capabilities (and optional adapter pins) and emits a pinned `profileHash`. The runner verifies the database satisfies the contract and writes the same `profileHash` to the marker (ADR 117, ADR 021)
 - **Plan Factories:** Compile declarative inputs into deterministic plans with hash-stamped metadata
 - **Guardrail Plugins:** Applied during plan creation, PPg preflight, and runtime execution
 - **Marker and ledger:** Database marker storing `coreHash` and `profileHash` plus an append-only ledger of applied edges for verification and audit (ADR 021, ADR 001)
@@ -82,7 +82,6 @@ flowchart LR
 
   subgraph PPg
     Svc[Preflight-as-a-service]
-    Cat[Pack catalog]
   end
 
   C --> Plan
@@ -98,8 +97,24 @@ flowchart LR
   Prof --> Plan
   Mk --> RT
   Svc --> Pf
-  Cat --> C
 ```
+
+## Subsystems Index
+
+Quick links to detailed subsystem specifications:
+
+- [Data Contract](architecture%20docs/subsystems/1.%20Data%20Contract.md) — Canonical contract (`contract.json`) and types; hashing, capabilities, and marker verification
+- [Contract Emitter & Types](architecture%20docs/subsystems/2.%20Contract%20Emitter%20&%20Types.md) — PSL/TS parsing, canonicalization, hashing, and `.d.ts` surface
+- [Query Lanes](architecture%20docs/subsystems/3.%20Query%20Lanes.md) — Authoring surfaces (SQL DSL, raw SQL, ORM, TypedSQL) compiling to unified Plans
+- [Runtime & Plugin Framework](architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md) — Execution pipeline, hooks, lints, budgets, and plugins
+- [Migration System](architecture%20docs/subsystems/5.%20Migration%20System.md) — Contract→contract edges, planner/runner, checks, and idempotency
+- [Preflight & CI Integration](architecture%20docs/subsystems/6.%20Preflight%20&%20CI%20Integration.md) — Shadow/EXPLAIN, policy gates, and CI flows
+- [PPg Integration](architecture%20docs/subsystems/7.%20PPg%20Integration.md) — Preflight-as-a-service, ledger, advisors, and pack catalog
+- [Adapters & Targets](architecture%20docs/subsystems/8.%20Adapters%20&%20Targets.md) — Adapter SPI for lowering and capability negotiation
+- [Security, Privacy, Compliance](architecture%20docs/subsystems/9.%20Security,%20Privacy,%20Compliance.md) — Error taxonomy, redaction, and policy surfaces
+- [Performance & Capacity](architecture%20docs/subsystems/10.%20Performance%20&%20Capacity.md) — Budgets, streaming behavior, and performance targets
+- [No-Emit Workflow](architecture%20docs/subsystems/11.%20No-Emit%20Workflow.md) — TS-first authoring, watch plugins, and CI trust model
+- [Ecosystem Extensions & Packs](architecture%20docs/subsystems/12.%20Ecosystem%20Extensions%20&%20Packs.md) — Pack model, function/operator registry, and branded codecs
 
 ## Migration Plane — Self-Verifying Change
 
@@ -286,11 +301,13 @@ PPg is a contract-aware Postgres service that amplifies determinism and feedback
 - **Pack catalog:** distributes approved extension packs with capability metadata
 
 PPg is optional, but using it delivers zero-touch guardrails for teams and agents.
+
 ## Operating the System
 
 - **Drift handling:** Marker checks, plan hashes, and contract verification detect drift at startup, before queries, and throughout migration workflows
 - **Environment policies:** Development environments allow automatic reconciliation while staging and production enforce strict guardrails and human approval
 - **Observability:** Plans, guardrail outcomes, and contract changes are logged in machine-readable formats for agents and dashboards
+
 ## Roadmap Snapshot
 
 1. **MVP:** Postgres support, contract emit, plan factories, runtime guardrails, PPg preflight previews
