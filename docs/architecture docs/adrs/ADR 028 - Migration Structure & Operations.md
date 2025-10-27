@@ -50,7 +50,7 @@ Together, they form composable primitives: ADR 028 provides the mechanisms, ADR 
 ## Migration file model
 - **Node**: coreHash string identifying a canonical data contract
 - **Edge**: Directed transition fromCoreHash -> toCoreHash with:
-  - edgeId deterministic id derived from the edge header and its operations
+  - edgeId deterministic id derived from content-addressed hashing (see Edge attestation)
   - fromContract, toContract complete contract JSON for state reconstruction
   - hints planner hints and strategies used during planning
   - ops list in JSON IR or typed program reference
@@ -59,6 +59,7 @@ Together, they form composable primitives: ADR 028 provides the mechanisms, ADR 
   - verified proofs such as shadow apply result, planner version, adapter profile
   - authorship info for accountability
   - createdAt timestamp for deterministic ordering (recorded in edge manifest)
+  - signature optional provenance signature for hosted preflight/promotion
   - archived boolean flag marking edges superseded by baseline (kept for audit, ignored for pathfinding)
 
 These fields in each migration's `migration.json` enable graph reconstruction without a separate index. See ADR 039 for details on index-optional operation.
@@ -143,7 +144,13 @@ migrations/
 }
 ```
 
-edgeId = sha256(canonicalize(migration.json without edgeId) + canonicalize(ops.json) + canonicalize(fromContract) + canonicalize(toContract))
+edgeId = sha256(canonicalize(migration.json without edgeId/signature) + canonicalize(ops.json) + canonicalize(fromContract) + canonicalize(toContract))
+
+### Edge attestation (hash and optional signature)
+
+- The edgeId is the canonical, content-addressed digest of the edge header, ops, and referenced contracts. Editing ops or header fields changes the digest.
+- A `signature` field may be included in `migration.json` as `{ keyId, value }`, where `value = sign(edgeId, keyId)`. Signatures are optional locally and required by hosted preflight/promotion policies.
+- Tools provide commands to compute, sign, and verify edges. Verification recomputes `edgeId`, validates the signature when present, and checks `{from,to}` hashes against referenced contracts.
 
 ## Operations on migration files
 
@@ -175,6 +182,13 @@ See ADR 102 for policy decisions on when to squash and DAG hygiene strategies. L
 - **explain-path(from, to)**: summarizes ops count, risk flags, and whether compensation or non-transactional steps are present
 
 All path operations reconstruct the graph from migration files by default. The optional graph.index.json (ADR 039) is purely for performance optimization. PPg can accept `{ migrations/, graph.index.json (optional), desiredHash }` and reconstruct server-side if no index provided.
+
+## Operation resolution (adapter and packs)
+
+Ops in `ops.json` resolve to executors at apply time:
+- Core ops are executed by the target adapter and honor transactional semantics and idempotency (ADR 037, ADR 038).
+- Extension ops carry `kind: "ext.op"` and `extId`; they are validated and executed by the corresponding extension pack, with capability gates enforced (ADR 116).
+- Pre/post checks use the shared vocabulary (ADR 044). Canonicalization and deterministic naming make ops hash-stable (ADR 010, ADR 009, ADR 106).
 
 ## Integrity and validation
 - Canonicalization rules per ADR 010 applied before hashing
