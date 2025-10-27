@@ -190,6 +190,50 @@ Ops in `ops.json` resolve to executors at apply time:
 - Extension ops carry `kind: "ext.op"` and `extId`; they are validated and executed by the corresponding extension pack, with capability gates enforced (ADR 116).
 - Pre/post checks use the shared vocabulary (ADR 044). Canonicalization and deterministic naming make ops hash-stable (ADR 010, ADR 009, ADR 106).
 
+## Lifecycle, attestation, and commands (spec overview)
+
+This section aligns lifecycle terminology and commands with the Migration System subsystem.
+
+### States
+
+- Draft: `edgeId` missing/stale
+- Attested: `edgeId` computed, optional `signature` present
+- Preflighted: proofs recorded after shadow/hosted run
+- Applied: DB marker updated; ledger entry written
+
+### Commands (normative surface)
+
+- Plan: `prisma-next migration plan [--from <hash> --to <hash>]` — produce attested edge from contracts
+- New: `prisma-next migration new [--from <hash> --to <hash>]` — scaffold empty edge (Draft)
+- Verify: `prisma-next migration verify <dir> [--sign --key <keyId>]` — compute `edgeId`, validate signature (if present), optionally sign (Attested)
+- Sign: `prisma-next migration sign <dir> --key <keyId>` — attach provenance signature only
+- Preflight (shadow): `prisma-next preflight --mode=shadow --verify-edge` — verify then sandbox
+- Preflight (PPg): `prisma-next preflight bundle && prisma-next preflight submit` — hosted preflight with attested+signed edge
+
+Hosted preflight MUST reject unsigned edges; local policy MAY allow unsigned but SHOULD require `--verify-edge`.
+
+### Helpful commands (synopsis)
+
+- `prisma-next migration plan [--from <hash> --to <hash>]` — diff contracts and write an attested edge
+- `prisma-next migration new [--from <hash> --to <hash>]` — scaffold empty edge (Draft)
+- `prisma-next migration verify <dir> [--sign --key <keyId>]` — compute `edgeId`, validate signature (if present), optionally sign
+- `prisma-next migration sign <dir> --key <keyId>` — attach provenance signature without changing content
+- `prisma-next preflight --mode=shadow --verify-edge` — verify then sandbox apply
+- `prisma-next preflight bundle` / `submit` — hosted preflight with bundle signing
+
+### Policy knobs (CI/org)
+
+- Require `--verify-edge` in all preflight runs; optionally require a valid signature
+- Require PPg hosted preflight before promotion to staging/production
+- Reject parallel edges (same `from`/`to`, different `edgeId`) unless a policy label is present
+- Enforce advisory locks and idempotency class constraints per adapter
+
+### Notes and guardrails
+
+- Any edit to `ops`, checks, or referenced contracts changes `edgeId`; run `migration verify` to update deterministically
+- Preflight proofs should persist adapter profile, check outcomes, and timings; hosted runs enforce no-network/no-WASM constraints
+- Runner always halts if DB marker != `from`; after apply, it writes `{ core_hash = to, profile_hash }` atomically
+
 ## Integrity and validation
 - Canonicalization rules per ADR 010 applied before hashing
 - Edge ids are deterministic and content-addressed
