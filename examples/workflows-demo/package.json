@@ -6,7 +6,7 @@
     "stamp-marker": "node ./dist/prisma/scripts/stamp-marker.js"
   },
   "dependencies": {
-    "@prisma/marker": "workspace:*",
+    "@prisma/runtime": "workspace:*",
     "pg": "^8.11.5"
   },
   "devDependencies": {

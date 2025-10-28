@@ -1,4 +1,4 @@
-import { readMarker } from '@prisma/marker';
+import { mapContractMarkerRow, readContractMarker } from './marker';
 import type {
   Adapter,
   PostgresContract,
@@ -22,7 +22,7 @@ export interface RuntimeOptions {
 }
 
 export interface Runtime {
-  execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row>;
+  execute(plan: Plan): AsyncIterable<Record<string, any>>;
   close(): Promise<void>;
 }
 
@@ -47,9 +47,10 @@ export function createRuntime(options: RuntimeOptions): Runtime {
       return;
     }
 
-    const marker = await readMarker(driver);
+    const readStatement = readContractMarker();
+    const result = await driver.query(readStatement.sql, readStatement.params);
 
-    if (!marker) {
+    if (result.rows.length === 0) {
       if (options.verify.requireMarker) {
         throw runtimeError('CONTRACT.MARKER_MISSING', 'Contract marker not found in database');
       }
@@ -57,6 +58,8 @@ export function createRuntime(options: RuntimeOptions): Runtime {
       verified = true;
       return;
     }
+
+    const marker = mapContractMarkerRow(result.rows[0] as any);
 
     if (marker.coreHash !== contract.coreHash) {
       throw runtimeError('CONTRACT.MARKER_MISMATCH', 'Database core hash does not match contract', {
@@ -98,7 +101,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
   }
 
   const runtime: Runtime = {
-    execute<Row>(plan: Plan<Row>): AsyncIterable<Row> {
+    execute(plan: Plan): AsyncIterable<Record<string, any>> {
       validatePlan(plan);
 
       const iterator = async function* () {
@@ -110,7 +113,10 @@ export function createRuntime(options: RuntimeOptions): Runtime {
           await verifyPlanIfNeeded(plan);
         }
 
-        for await (const row of driver.execute<Row>({ sql: plan.sql, params: plan.params })) {
+        for await (const row of driver.execute<Record<string, any>>({
+          sql: plan.sql,
+          params: plan.params,
+        })) {
           yield row;
         }
       };
@@ -145,3 +151,5 @@ function runtimeError(
     details,
   });
 }
+
+export * from './marker';

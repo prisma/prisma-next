@@ -1,6 +1,11 @@
 import { Client } from 'pg';
 
-import { upsertMarker } from '@prisma/marker';
+import {
+  ensureSchemaStatement,
+  ensureTableStatement,
+  readContractMarker,
+  writeContractMarker,
+} from '@prisma/runtime';
 
 export interface StampMarkerOptions {
   readonly connectionString: string;
@@ -8,6 +13,8 @@ export interface StampMarkerOptions {
   readonly profileHash: string;
   readonly contractJson?: unknown;
   readonly canonicalVersion?: number;
+  readonly appTag?: string;
+  readonly meta?: Record<string, unknown>;
 }
 
 export async function stampMarker(options: StampMarkerOptions) {
@@ -15,12 +22,25 @@ export async function stampMarker(options: StampMarkerOptions) {
   await client.connect();
 
   try {
-    await upsertMarker(client, {
+    await client.query(ensureSchemaStatement.sql);
+    await client.query(ensureTableStatement.sql);
+
+    const read = readContractMarker();
+    const result = await client.query(read.sql, [...read.params]);
+    const write = writeContractMarker({
       coreHash: options.coreHash,
       profileHash: options.profileHash,
       contractJson: options.contractJson,
       canonicalVersion: options.canonicalVersion ?? 1,
+      appTag: options.appTag,
+      meta: options.meta,
     });
+
+    if (result.rows.length === 0) {
+      await client.query(write.insert.sql, [...write.insert.params]);
+    } else {
+      await client.query(write.update.sql, [...write.update.params]);
+    }
   } finally {
     await client.end();
   }
