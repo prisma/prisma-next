@@ -25,9 +25,9 @@ Out of scope (future slices): runtime execution, lints/budgets, joins, ORM resha
 
 ## Deliverables
 - Package updates/new:
-  - `@prisma/sql` (extend): minimal SQL builder and AST types
-  - `@prisma/adapter-spi` (new): types-only SPI (AdapterProfile, Lowerer, Driver signatures)
-  - `@prisma/adapter-postgres` (new): Postgres lowerer (factory + class), golden-tested rendering
+  - `@prisma-next/sql` (extend): minimal SQL builder and AST types
+  - `@prisma-next/adapter-spi` (new): types-only SPI (AdapterProfile, Lowerer, Driver signatures)
+  - `@prisma-next/adapter-postgres` (new): Postgres lowerer (factory + class), golden-tested rendering
 - Tests:
   - Offline unit tests for DSL → AST → Postgres SQL (goldens)
   - Build-time validation against contract (unknown refs → PLAN.INVALID)
@@ -73,13 +73,13 @@ Out of scope (future slices): runtime execution, lints/budgets, joins, ORM resha
   - `PLAN.INVALID` (e.g., unknown table/column in `from`/`select`/`where`)
 
 ## Adapter SPI (slice A)
-- Package: `@prisma/adapter-spi` (types-only)
+- Package: `@prisma-next/adapter-spi` (types-only)
   - `AdapterProfile = { id: string; target: 'postgres'; capabilities: Record<string,unknown> }`
   - `Lowerer = (queryAst, contract) => { sql: string; params: unknown[]; annotations?: Record<string,unknown> }`
   - `Driver` present in SPI but not implemented in this slice (execution out of scope)
 
 ## Postgres Adapter (slice A)
-- Package: `@prisma/adapter-postgres`
+- Package: `@prisma-next/adapter-postgres`
 - Export both:
   - `createPostgresAdapter(options?)` factory returning a frozen object
   - `class PostgresAdapter` for subclassing/overrides (e.g., DDL-enabled variants)

@@ -4,8 +4,8 @@ Objective: Execute a real SELECT against Postgres with contract verification and
 
 ## Scope
 - Runtime `execute(plan)` with `onFirstUse` contract verification (no lints/budgets yet)
-- Marker helper package `@prisma/marker` (production-ready upsert/read per ADR 021)
-- Postgres driver package `@prisma/driver-postgres` (AsyncIterable API, cursor when available)
+- Marker helper package `@prisma-next/marker` (production-ready upsert/read per ADR 021)
+- Postgres driver package `@prisma-next/driver-postgres` (AsyncIterable API, cursor when available)
 - Scaffolding script to stamp marker (for dev/CI only), not shipped as a public product feature
 - Integration tests using `prisma dev` that stamp → execute → stream rows
 
@@ -23,11 +23,11 @@ Out of scope (future slices): plugins (lints/budgets/telemetry), joins, ORM resh
 - [ADR 065 — Adapter capability schema & negotiation v1](../architecture%20docs/adrs/ADR%20065%20-%20Adapter%20capability%20schema%20%26%20negotiation%20v1.md)
 
 ## Deliverables
-- New package: `@prisma/marker`
+- New package: `@prisma-next/marker`
   - `upsertMarker(client, { coreHash, profileHash, contractJson? })`
   - `readMarker(client)`
   - Creates schema/table if missing; UPSERT id=1 per ADR 021
-- New package: `@prisma/driver-postgres`
+- New package: `@prisma-next/driver-postgres`
   - `createPostgresDriver({ connectionString })`
   - Methods: `connect()`, `execute({ sql, params }) -> AsyncIterable<Row>`, `explain?({ sql, params })`, `close()`
   - Use cursors when available; otherwise buffer → expose AsyncIterable
@@ -36,7 +36,7 @@ Out of scope (future slices): plugins (lints/budgets/telemetry), joins, ORM resh
   - `execute(plan)` → verify marker on first use → lower via adapter → stream via driver
   - Structured errors per ADR 027, e.g. `CONTRACT.MARKER_MISSING`, `CONTRACT.MARKER_MISMATCH`
 - Example app scaffolding script
-  - `examples/workflows-demo/src/prisma/scripts/stamp-marker.ts` (esr) calls `@prisma/marker.upsertMarker`
+  - `examples/workflows-demo/src/prisma/scripts/stamp-marker.ts` (esr) calls `@prisma-next/marker.upsertMarker`
 
 ## Test Plan
 ### Integration (Vitest, prisma dev per test)
@@ -53,8 +53,8 @@ Out of scope (future slices): plugins (lints/budgets/telemetry), joins, ORM resh
 - Runtime: onFirstUse verify gate; error mapping to ADR 027 envelope
 
 ## Milestones & Timeline
-- M1 `@prisma/marker` helper and tests (2d)
-- M2 `@prisma/driver-postgres` AsyncIterable execute (3d)
+- M1 `@prisma-next/marker` helper and tests (2d)
+- M2 `@prisma-next/driver-postgres` AsyncIterable execute (3d)
 - M3 Runtime glue (verify on first use; lower+execute) (2d)
 - M4 Integration tests + stamp script (2d)
 
