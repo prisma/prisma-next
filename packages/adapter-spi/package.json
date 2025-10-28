@@ -6,7 +6,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "devDependencies": {

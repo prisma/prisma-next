@@ -1,5 +1,15 @@
-import type { Adapter, AdapterProfile } from '@prisma/adapter-spi';
-import type { PostgresContract, PostgresLoweredStatement, SelectAst } from '@prisma/sql/types';
+import type {
+  Adapter,
+  AdapterProfile,
+  BinaryExpr,
+  ColumnRef,
+  LowererContext,
+  ParamRef,
+  PostgresAdapterOptions,
+  PostgresContract,
+  PostgresLoweredStatement,
+  SelectAst,
+} from './types';
 
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -7,10 +17,6 @@ const defaultCapabilities = Object.freeze({
     limit: true,
   },
 });
-
-export interface PostgresAdapterOptions {
-  readonly profileId?: string;
-}
 
 class PostgresAdapterImpl
   implements Adapter<SelectAst, PostgresContract, PostgresLoweredStatement>
@@ -25,7 +31,7 @@ class PostgresAdapterImpl
     });
   }
 
-  lower(ast: SelectAst, context: { contract: PostgresContract; params?: readonly unknown[] }) {
+  lower(ast: SelectAst, context: LowererContext<PostgresContract>) {
     const sql = renderSelect(ast);
     const params = context.params ? [...context.params] : [];
 
@@ -61,17 +67,17 @@ function renderProjection(ast: SelectAst): string {
     .join(', ');
 }
 
-function renderBinary(expr: NonNullable<SelectAst['where']>): string {
+function renderBinary(expr: BinaryExpr): string {
   const left = renderColumn(expr.left);
   const right = renderParam(expr.right);
   return `${left} = ${right}`;
 }
 
-function renderColumn(ref: { table: string; column: string }): string {
+function renderColumn(ref: ColumnRef): string {
   return `${quoteIdentifier(ref.table)}.${quoteIdentifier(ref.column)}`;
 }
 
-function renderParam(ref: { index: number }): string {
+function renderParam(ref: ParamRef): string {
   return `$${ref.index}`;
 }
 

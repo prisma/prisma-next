@@ -3,8 +3,11 @@ import type {
   BinaryBuilder,
   BuildOptions,
   ColumnBuilder,
+  ColumnRef,
+  Direction,
   ParamDescriptor,
   Plan,
+  PlanMeta,
   PostgresContract,
   PostgresLoweredStatement,
   SelectAst,
@@ -88,6 +91,19 @@ class SelectBuilderImpl {
       ? buildWhereExpr(this.state.where, paramsMap, paramDescriptors, paramValues)
       : undefined;
 
+    const orderByClause = this.state.orderBy
+      ? ([
+          {
+            expr: {
+              kind: 'col',
+              table: this.state.orderBy.expr.table,
+              column: this.state.orderBy.expr.column,
+            },
+            dir: this.state.orderBy.dir,
+          },
+        ] as ReadonlyArray<{ expr: ColumnRef; dir: Direction }>)
+      : undefined;
+
     const ast: SelectAst = {
       kind: 'select',
       from: { kind: 'table', name: table.name },
@@ -99,28 +115,10 @@ class SelectBuilderImpl {
           column: projection.columns[idx].column,
         },
       })),
+      ...(whereExpr ? { where: whereExpr } : {}),
+      ...(orderByClause ? { orderBy: orderByClause } : {}),
+      ...(typeof this.state.limit === 'number' ? { limit: this.state.limit } : {}),
     };
-
-    if (whereExpr) {
-      ast.where = whereExpr;
-    }
-
-    if (this.state.orderBy) {
-      ast.orderBy = [
-        {
-          expr: {
-            kind: 'col',
-            table: this.state.orderBy.expr.table,
-            column: this.state.orderBy.expr.column,
-          },
-          dir: this.state.orderBy.dir,
-        },
-      ];
-    }
-
-    if (typeof this.state.limit === 'number') {
-      ast.limit = this.state.limit;
-    }
 
     const lowered = this.adapter.lower(ast, {
       contract: this.contract,
@@ -128,18 +126,20 @@ class SelectBuilderImpl {
     });
     const loweredBody = lowered.body as PostgresLoweredStatement;
 
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table,
+      projection,
+      paramDescriptors,
+      ...(this.state.where ? { where: this.state.where } : {}),
+      ...(this.state.orderBy ? { orderBy: this.state.orderBy } : {}),
+    });
+
     const plan: Plan = Object.freeze({
       ast,
       sql: loweredBody.sql,
       params: loweredBody.params ?? paramValues,
-      meta: buildMeta({
-        contract: this.contract,
-        table,
-        projection,
-        where: this.state.where,
-        orderBy: this.state.orderBy,
-        paramDescriptors,
-      }),
+      meta: planMeta,
     });
 
     return plan;
@@ -222,10 +222,10 @@ function buildWhereExpr(
 
   descriptors.push({
     name: paramName,
-    type: meta.type,
-    nullable: meta.nullable,
     source: 'dsl',
     refs: { table: where.left.table, column: where.left.column },
+    ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+    ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
   });
 
   return {
@@ -287,7 +287,6 @@ function buildMeta(args: MetaBuildArgs): Plan['meta'] {
   return Object.freeze({
     target: args.contract.target,
     coreHash: args.contract.coreHash,
-    profileHash: args.contract.profileHash,
     lane: 'dsl' as const,
     refs: {
       tables: [args.table.name],
@@ -295,8 +294,8 @@ function buildMeta(args: MetaBuildArgs): Plan['meta'] {
     },
     projection: projectionMap,
     paramDescriptors: args.paramDescriptors,
-    annotations: undefined,
-  });
+    ...(args.contract.profileHash !== undefined ? { profileHash: args.contract.profileHash } : {}),
+  } satisfies PlanMeta);
 }
 
 export function sql(options: SqlBuilderOptions) {

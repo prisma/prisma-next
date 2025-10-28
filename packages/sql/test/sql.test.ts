@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { Adapter } from '@prisma/adapter-spi';
 import { describe, expect, it } from 'vitest';
 
 import { param } from '../src/param';
@@ -10,6 +9,7 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type {
   ParamDescriptor,
+  Adapter,
   PostgresContract,
   PostgresLoweredStatement,
   SelectAst,
@@ -30,7 +30,7 @@ function createStubAdapter(): Adapter<SelectAst, PostgresContract, PostgresLower
       target: 'postgres',
       capabilities: {},
     },
-    lower(ast, ctx) {
+    lower(ast: SelectAst, ctx: { contract: PostgresContract; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
       return {
         profileId: this.profile.id,
@@ -46,11 +46,13 @@ describe('sql DSL builder', () => {
   const adapter = createStubAdapter();
 
   it('builds a select plan with projection, where, order, and limit', () => {
+    const userColumns = tables.user.columns;
+
     const plan = sql({ contract, adapter })
       .from(tables.user)
       .select('id', 'email')
-      .where(tables.user.id.eq(param('userId')))
-      .orderBy(tables.user.createdAt.desc())
+      .where(userColumns.id.eq(param('userId')))
+      .orderBy(userColumns.createdAt.desc())
       .limit(5)
       .build({ params: { userId: 42 } });
 
@@ -111,10 +113,12 @@ describe('sql DSL builder', () => {
   });
 
   it('throws PLAN.INVALID when parameter value is missing', () => {
+    const userColumns = tables.user.columns;
+
     const builder = sql({ contract, adapter })
       .from(tables.user)
       .select('id')
-      .where(tables.user.id.eq(param('userId')));
+      .where(userColumns.id.eq(param('userId')));
 
     expect(() => builder.build()).toThrowError(/Missing value for parameter userId/);
   });

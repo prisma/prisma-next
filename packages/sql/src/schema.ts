@@ -1,5 +1,6 @@
 import { planInvalid } from './errors';
 import type {
+  BinaryBuilder,
   ColumnBuilder,
   ContractStorage,
   OrderBuilder,
@@ -22,7 +23,7 @@ class ColumnBuilderImpl implements ColumnBuilder {
     return this.storageColumn;
   }
 
-  eq(value: ParamPlaceholder) {
+  eq(this: ColumnBuilderImpl, value: ParamPlaceholder): BinaryBuilder {
     if (value.kind !== 'param-placeholder') {
       throw planInvalid('Parameter placeholder required for column comparison');
     }
@@ -35,7 +36,7 @@ class ColumnBuilderImpl implements ColumnBuilder {
     });
   }
 
-  asc(): OrderBuilder {
+  asc(this: ColumnBuilderImpl): OrderBuilder {
     return Object.freeze({
       kind: 'order' as const,
       expr: this,
@@ -43,7 +44,7 @@ class ColumnBuilderImpl implements ColumnBuilder {
     });
   }
 
-  desc(): OrderBuilder {
+  desc(this: ColumnBuilderImpl): OrderBuilder {
     return Object.freeze({
       kind: 'order' as const,
       expr: this,

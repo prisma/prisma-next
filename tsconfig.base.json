@@ -8,7 +8,19 @@
     "skipLibCheck": true,
     "exactOptionalPropertyTypes": true,
     "declaration": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@prisma/adapter-spi": ["packages/adapter-spi/src/index.ts"],
+      "@prisma/adapter-postgres/adapter": ["packages/adapter-postgres/src/adapter.ts"],
+      "@prisma/adapter-postgres/types": ["packages/adapter-postgres/src/types.ts"],
+      "@prisma/sql/sql": ["packages/sql/src/sql.ts"],
+      "@prisma/sql/schema": ["packages/sql/src/schema.ts"],
+      "@prisma/sql/param": ["packages/sql/src/param.ts"],
+      "@prisma/sql/types": ["packages/sql/src/types.ts"],
+      "@prisma/sql/errors": ["packages/sql/src/errors.ts"],
+      "@prisma/sql/*": ["packages/sql/src/*.ts"]
+    }
   },
   "references": [
     { "path": "./packages/relational-ir" },
