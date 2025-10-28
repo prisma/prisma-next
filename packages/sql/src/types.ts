@@ -1,5 +1,3 @@
-export type Direction = 'asc' | 'desc';
-
 import type {
   Adapter,
   AdapterProfile,
@@ -12,6 +10,8 @@ import type {
   SqlExplainResult,
   SqlQueryResult,
 } from '@prisma-next/sql-target';
+
+export type Direction = 'asc' | 'desc';
 
 export type {
   Adapter,
@@ -39,8 +39,9 @@ export interface ContractStorage {
   readonly tables: Record<string, StorageTable>;
 }
 
-export interface PostgresContract {
-  readonly target: 'postgres';
+export interface DataContract {
+  readonly target: string;
+  readonly targetFamily?: string;
   readonly coreHash: string;
   readonly profileHash?: string;
   readonly storage: ContractStorage;
@@ -96,8 +97,8 @@ export type Expr = ColumnRef | ParamRef;
 export interface BinaryExpr {
   readonly kind: 'bin';
   readonly op: 'eq';
-  readonly left: Expr;
-  readonly right: Expr;
+  readonly left: ColumnRef;
+  readonly right: ParamRef;
 }
 
 export interface SelectAst {
@@ -118,7 +119,8 @@ export interface ParamDescriptor {
 }
 
 export interface PlanMeta {
-  readonly target: 'postgres';
+  readonly target: string;
+  readonly targetFamily?: string;
   readonly coreHash: string;
   readonly profileHash?: string;
   readonly lane: 'dsl';
@@ -138,7 +140,7 @@ export interface Plan {
   readonly meta: PlanMeta;
 }
 
-export interface PostgresLoweredStatement {
+export interface LoweredStatement {
   readonly sql: string;
   readonly params: readonly unknown[];
   readonly annotations?: Record<string, unknown>;
@@ -163,6 +165,6 @@ export interface BuildOptions {
 }
 
 export interface SqlBuilderOptions {
-  readonly contract: PostgresContract;
-  readonly adapter: Adapter<SelectAst, PostgresContract, PostgresLoweredStatement>;
+  readonly contract: DataContract;
+  readonly adapter: Adapter<SelectAst, DataContract, LoweredStatement>;
 }

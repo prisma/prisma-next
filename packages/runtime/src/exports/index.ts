@@ -1,3 +1,8 @@
-export { createRuntime } from '../runtime';
+export {
+  createRuntime,
+  ensureSchemaStatement,
+  ensureTableStatement,
+  readContractMarker,
+  writeContractMarker,
+} from '../runtime';
 export type { Runtime, RuntimeOptions, RuntimeVerifyOptions } from '../runtime';
-

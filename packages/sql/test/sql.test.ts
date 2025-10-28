@@ -10,27 +10,27 @@ import { sql } from '../src/sql';
 import type {
   ParamDescriptor,
   Adapter,
-  PostgresContract,
-  PostgresLoweredStatement,
+  DataContract,
+  LoweredStatement,
   SelectAst,
 } from '../src/types';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
-function loadContract(name: string): PostgresContract {
+function loadContract(name: string): DataContract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
   return JSON.parse(contents);
 }
 
-function createStubAdapter(): Adapter<SelectAst, PostgresContract, PostgresLoweredStatement> {
+function createStubAdapter(): Adapter<SelectAst, DataContract, LoweredStatement> {
   return {
     profile: {
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
     },
-    lower(ast: SelectAst, ctx: { contract: PostgresContract; params?: readonly unknown[] }) {
+    lower(ast: SelectAst, ctx: { contract: DataContract; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
       return {
         profileId: this.profile.id,

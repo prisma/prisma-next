@@ -1,8 +1,8 @@
 import { mapContractMarkerRow, readContractMarker } from './marker';
 import type {
   Adapter,
-  PostgresContract,
-  PostgresLoweredStatement,
+  DataContract,
+  LoweredStatement,
   SelectAst,
   Plan,
 } from '@prisma-next/sql/types';
@@ -15,8 +15,8 @@ export interface RuntimeVerifyOptions {
 }
 
 export interface RuntimeOptions {
-  readonly contract: PostgresContract;
-  readonly adapter: Adapter<SelectAst, PostgresContract, PostgresLoweredStatement>;
+  readonly contract: DataContract;
+  readonly adapter: Adapter<SelectAst, DataContract, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
 }

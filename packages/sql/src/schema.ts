@@ -3,9 +3,9 @@ import type {
   BinaryBuilder,
   ColumnBuilder,
   ContractStorage,
+  DataContract,
   OrderBuilder,
   ParamPlaceholder,
-  PostgresContract,
   StorageColumn,
   TableRef,
 } from './types';
@@ -88,7 +88,7 @@ export interface SchemaHandle {
   readonly tables: SchemaTables;
 }
 
-export function schema(contract: PostgresContract): SchemaHandle {
+export function schema(contract: DataContract): SchemaHandle {
   const storage = contract.storage;
 
   const tables = Object.fromEntries(

@@ -4,12 +4,12 @@ import type {
   BuildOptions,
   ColumnBuilder,
   ColumnRef,
+  DataContract,
   Direction,
+  LoweredStatement,
   ParamDescriptor,
   Plan,
   PlanMeta,
-  PostgresContract,
-  PostgresLoweredStatement,
   SelectAst,
   SqlBuilderOptions,
   TableRef,
@@ -29,7 +29,7 @@ interface ProjectionState {
 }
 
 class SelectBuilderImpl {
-  private readonly contract: PostgresContract;
+  private readonly contract: DataContract;
   private readonly adapter: SqlBuilderOptions['adapter'];
   private readonly state: BuilderState = {};
 
@@ -124,7 +124,7 @@ class SelectBuilderImpl {
       contract: this.contract,
       params: paramValues,
     });
-    const loweredBody = lowered.body as PostgresLoweredStatement;
+    const loweredBody = lowered.body as LoweredStatement;
 
     const planMeta = buildMeta({
       contract: this.contract,
@@ -245,7 +245,7 @@ function buildWhereExpr(
 }
 
 interface MetaBuildArgs {
-  readonly contract: PostgresContract;
+  readonly contract: DataContract;
   readonly table: TableRef;
   readonly projection: ProjectionState;
   readonly where?: BinaryBuilder;
@@ -286,6 +286,7 @@ function buildMeta(args: MetaBuildArgs): Plan['meta'] {
 
   return Object.freeze({
     target: args.contract.target,
+    ...(args.contract.targetFamily ? { targetFamily: args.contract.targetFamily } : {}),
     coreHash: args.contract.coreHash,
     lane: 'dsl' as const,
     refs: {

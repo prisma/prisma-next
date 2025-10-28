@@ -7,7 +7,7 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
 
-import type { PostgresContract } from '@prisma-next/sql/types';
+import type { DataContract } from '@prisma-next/sql/types';
 
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
@@ -102,7 +102,7 @@ describe('runtime execute integration', () => {
     });
     await driver.connect();
 
-    const mismatchedContract: PostgresContract = {
+    const mismatchedContract: DataContract = {
       ...fixtureContract,
       coreHash: 'sha256:mismatch',
     };
@@ -124,9 +124,9 @@ describe('runtime execute integration', () => {
   }, 15000);
 });
 
-function loadContractFixture(): PostgresContract {
+function loadContractFixture(): DataContract {
   const fixtureDir = dirname(fileURLToPath(import.meta.url));
   const contractPath = join(fixtureDir, '../../sql/test/fixtures/contract.json');
   const json = readFileSync(contractPath, 'utf8');
-  return JSON.parse(json) as PostgresContract;
+  return JSON.parse(json) as DataContract;
 }
