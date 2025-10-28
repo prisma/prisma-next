@@ -1,0 +1,16 @@
+{
+  "target": "postgres",
+  "coreHash": "sha256:test-core",
+  "profileHash": "sha256:test-profile",
+  "storage": {
+    "tables": {
+      "user": {
+        "columns": {
+          "id": { "type": "int4", "nullable": false },
+          "email": { "type": "text", "nullable": false },
+          "createdAt": { "type": "timestamptz", "nullable": false }
+        }
+      }
+    }
+  }
+}
