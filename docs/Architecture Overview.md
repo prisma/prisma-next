@@ -109,9 +109,7 @@ Quick links to detailed subsystem specifications:
 - [Runtime & Plugin Framework](architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md) — Execution pipeline, hooks, lints, budgets, and plugins
 - [Migration System](architecture%20docs/subsystems/5.%20Migration%20System.md) — Contract→contract edges, planner/runner, checks, and idempotency
 - [Preflight & CI Integration](architecture%20docs/subsystems/6.%20Preflight%20&%20CI%20Integration.md) — Shadow/EXPLAIN, policy gates, and CI flows
-- [PPg Integration](architecture%20docs/subsystems/7.%20PPg%20Integration.md) — Preflight-as-a-service, ledger, advisors, and pack catalog
 - [Adapters & Targets](architecture%20docs/subsystems/8.%20Adapters%20&%20Targets.md) — Adapter SPI for lowering and capability negotiation
-- [Security, Privacy, Compliance](architecture%20docs/subsystems/9.%20Security,%20Privacy,%20Compliance.md) — Error taxonomy, redaction, and policy surfaces
 - [Performance & Capacity](architecture%20docs/subsystems/10.%20Performance%20&%20Capacity.md) — Budgets, streaming behavior, and performance targets
 - [No-Emit Workflow](architecture%20docs/subsystems/11.%20No-Emit%20Workflow.md) — TS-first authoring, watch plugins, and CI trust model
 - [Ecosystem Extensions & Packs](architecture%20docs/subsystems/12.%20Ecosystem%20Extensions%20&%20Packs.md) — Pack model, function/operator registry, and branded codecs

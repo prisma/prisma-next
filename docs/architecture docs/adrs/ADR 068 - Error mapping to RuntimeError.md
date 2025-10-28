@@ -169,7 +169,7 @@ registerProfileMapper('sql/pg', pgLoweringMapper)
 
 ### Positive
 - Stable, analyzable errors across targets
-- Cleaner CI and PPg integration with consistent outcomes
+- Cleaner CI with consistent outcomes
 - Safer telemetry with structured, redacted details
 
 ### Negative

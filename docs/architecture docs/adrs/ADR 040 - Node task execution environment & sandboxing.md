@@ -9,7 +9,7 @@ Migration edges can attach node tasks for data moves, backfills, or one-off admi
 - Arbitrary scripts risk privilege escalation, non-determinism, and accidental data exposure
 - Task retries and partial application can corrupt state without idempotency guarantees
 - Long-running backfills can starve resources or break CI without clear limits
-- Lack of structured logs and results hinders auditability and PPg integration
+- Lack of structured logs and results hinders auditability
 
 ## Decision
 
