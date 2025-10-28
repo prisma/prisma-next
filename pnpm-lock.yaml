@@ -48,6 +48,9 @@ importers:
         specifier: ^8.11.5
         version: 8.16.3
     devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.15.6
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(postcss@8.5.6)(typescript@5.9.3)

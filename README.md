@@ -364,7 +364,7 @@ Integration tests spin up PostgreSQL, create tables, execute type-safe queries, 
 ### Project Structure
 
 ```
-prisma-next-proto/
+prisma-next/
 ├── packages/
 │   ├── relational-ir/     # IR types and validators
 │   ├── psl/               # PSL parser and CLI

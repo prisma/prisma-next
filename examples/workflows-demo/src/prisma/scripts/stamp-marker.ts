@@ -32,8 +32,8 @@ export async function stampMarker(options: StampMarkerOptions) {
       profileHash: options.profileHash,
       contractJson: options.contractJson,
       canonicalVersion: options.canonicalVersion ?? 1,
-      appTag: options.appTag,
-      meta: options.meta,
+      ...(options.appTag !== undefined ? { appTag: options.appTag } : {}),
+      ...(options.meta !== undefined ? { meta: options.meta } : {}),
     });
 
     if (result.rows.length === 0) {
