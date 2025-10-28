@@ -10,7 +10,7 @@ Introduce a two-tier memoization strategy inside the runtime:
 - **Shape cache (primary)**: Reuses results for structurally equivalent Plans that differ only by parameter values. Keyed by a stable SQL fingerprint and environment guards, it stores lowered templates, parameter order, normalized annotations, and optional prepared statement handles
 - **Exact Plan cache (opportunistic)**: Reuses work for byte-identical Plans produced repeatedly within a process. Keyed by planHash, it is smaller and mostly useful for factories that emit the same Plan object across calls
 
-Both caches are strictly in-process, non-persistent, and evicted by LRU with size and TTL caps. Cache entries are invalidated on contract change, adapter profile change, or adapter version change
+Both caches are strictly in-process, non-persistent, and evicted by LRU with size and TTL caps. Cache entries are invalidated on contract change or capability profile change (discovery results), or on adapter version change that affects lowering shape
 
 ## What we cache
 
@@ -37,7 +37,7 @@ Both caches are strictly in-process, non-persistent, and evicted by LRU with siz
 - **sqlFingerprint**: Normalized text that removes literal values, canonicalizes whitespace, stable aliasing, and placeholder forms
 - **Guards for environment and determinism**:
   - coreHash
-  - profileHash (adapter profile and capability set)
+  - profileHash (declared capability set)
   - adapterVersion
   - laneVersion optional, used only if the lane affects lowering shape
 - Note that cache keys remain (sqlFingerprint, profileHash, coreHash) regardless of authoring mode
@@ -49,7 +49,8 @@ Both caches are strictly in-process, non-persistent, and evicted by LRU with siz
 
 ## Invalidation
 - **Contract change**: When the runtime's active contract changes, invalidate both caches
-- **Adapter profile or version change**: On profile negotiation change or adapter upgrade, invalidate both caches
+- **Capability profile change**: On capability discovery change (profileHash differs), invalidate both caches
+- **Adapter version change**: On adapter upgrade that affects lowering shape, invalidate both caches
 - **Lane upgrade that affects shape**: If a lane release changes lowering shape, bump laneVersion so fingerprints diverge naturally
 - **Adapter signaled invalidation**: Adapters may signal a shape family is invalid (e.g., DDL that changes identifier quoting) to flush matching entries
 - **Time-based TTL**: Default TTL 10–30 minutes for shape entries, 1–5 minutes for exact Plan entries

@@ -50,7 +50,7 @@ CI must follow a sandboxed emit protocol when a canonical contract blob is requi
 - **Determinism guards**
   - Lint or runtime checks reject use of Date.now(), Math.random(), process.env
   - Object key ordering and number formatting handled by the canonicalizer, not user code
-  - Enforce ADR 046 purity rules at load time
+- Enforce ADR 096 purity rules at load time
 - **No-network policy**
   - Disable outbound network during emission
   - If a team opts in to network access for specific modules, that decision must be explicit and audited
@@ -146,6 +146,6 @@ CI must follow a sandboxed emit protocol when a canonical contract blob is requi
 - ADR 021 — Contract marker storage & verification modes
 - ADR 032 — Dev auto-emit integration
 - ADR 035 — Dual authoring conflict resolution
-- ADR 046 — TS-authored contract parity & purity rules
-- ADR 047 — Tooling runs on canonical JSON only
-- ADR 048 — Runtime accepts contract object or JSON
+- ADR 096 — TS-authored contract parity & purity rules
+- ADR 097 — Tooling runs on canonical JSON only
+- ADR 098 — Runtime accepts contract object or JSON

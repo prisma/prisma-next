@@ -102,7 +102,7 @@ Quick links to detailed subsystem specifications:
 - [Contract Emitter & Types](architecture%20docs/subsystems/2.%20Contract%20Emitter%20&%20Types.md) — PSL/TS parsing, canonicalization, hashing, and `.d.ts` surface
 - [Query Lanes](architecture%20docs/subsystems/3.%20Query%20Lanes.md) — Authoring surfaces (SQL DSL, raw SQL, ORM, TypedSQL) compiling to unified Plans
 - [Runtime & Plugin Framework](architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md) — Execution pipeline, hooks, lints, budgets, and plugins
-- [Adapters & Targets](architecture%20docs/subsystems/5.%20Adapters%20&%20Targets.md) — Adapter SPI for lowering and capability negotiation
+- [Adapters & Targets](architecture%20docs/subsystems/5.%20Adapters%20&%20Targets.md) — Adapter SPI for lowering and capability discovery
 - [Ecosystem Extensions & Packs](architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20&%20Packs.md) — Pack model, function/operator registry, and branded codecs
 - [Migration System](architecture%20docs/subsystems/7.%20Migration%20System.md) — Contract→contract edges, planner/runner, checks, and idempotency
 - [Preflight & CI Integration](architecture%20docs/subsystems/8.%20Preflight%20&%20CI%20Integration.md) — Shadow/EXPLAIN, policy gates, and CI flows
@@ -234,7 +234,7 @@ Legacy Prisma required touching multiple layers of a monolithic Rust/TypeScript 
 - **Extension packs** supply capabilities, migration operations, codecs, and policies in manifest-driven bundles
 - **Adapters** implement database-specific behavior behind capability interfaces
 - **Plugins** compose runtime guardrails (budgets, telemetry, policy enforcement) without altering the executor
-- **Capability negotiation** ensures new behavior is discoverable and opt-in through explicit contract declarations
+- **Capability discovery** ensures new behavior is discoverable and opt-in through explicit contract declarations
 
 Contributors extend behavior by publishing packs or adapters. Core recompilation is not required.
 
@@ -268,7 +268,7 @@ flowchart LR
   end
 
   Contract[contract.json]
-  Profile[Capability negotiation
+  Profile[Pinned capability profile
   profileHash]
 
   Contract --> C1

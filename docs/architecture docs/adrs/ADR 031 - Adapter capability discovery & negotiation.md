@@ -1,4 +1,4 @@
-# ADR 031 — Adapter Capability Discovery & Negotiation
+# ADR 031 — Adapter capability discovery
 
 ## Context
 

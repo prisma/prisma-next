@@ -1,8 +1,8 @@
-# ADR 065 — Adapter capability schema & negotiation v1
+# ADR 065 — Adapter capability schema & discovery
 
 ## Decision
 
-Define a versioned capability schema and a negotiation flow where:
+Define a versioned capability schema and a discovery flow where:
 - Adapters expose a capability map and a `profileHash` at `connect()`
 - Compile profiles (target-specific lowerers, e.g. `sql/pg`) consume capabilities to choose deterministic lowering strategies
 - Lanes and plugins branch on capabilities, never on target strings
@@ -77,7 +77,7 @@ Capabilities are a JSON-serializable object with stable key ordering:
 - Used for reproducibility, caching, and change detection per ADR 004
 - Changes whenever capabilities or the compile profile implementation changes in a way that affects lowering
 
-## Negotiation flow
+## Discovery flow
 
 1. **Compile-time defaults**
    - Lanes and tools may compile offline using a reference profile shipped with the compile profile (e.g. `pg15-baseline`)

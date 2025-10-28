@@ -20,7 +20,7 @@ PPg accepts only a deterministic migration bundle artifact, optionally signed, a
 - **Shadow apply**
   Apply the migration path in an isolated branch database with pre and post checks, then tear down
 
-Parity with local tools is guaranteed via shared schemas, hashing, capability negotiation, and stable error envelopes
+Parity with local tools is guaranteed via shared schemas, hashing, capability discovery, and stable error envelopes
 
 ## Inputs: Bundle format and signature
 
@@ -147,7 +147,7 @@ ACCEPTED → QUEUED → PROVISIONING (shadow only) → EXECUTING → COMPLETED |
 - **Errors**
   Same error envelope and codes per ADR 027
 - **Capabilities**
-  Same adapter capability negotiation per ADR 031 and ADR 065
+  Same adapter capability discovery per ADR 031 and ADR 065
 - **Hashing**
   Same contract hashing and lane-agnostic Plan hashing per ADR 004 and ADR 013
 - **Determinism**
@@ -202,7 +202,7 @@ ACCEPTED → QUEUED → PROVISIONING (shadow only) → EXECUTING → COMPLETED |
 ## Compatibility and versioning
 
 - bundleSchemaVersion declared in the bundle and validated by PPg
-- Node target negotiation pinned in the bundle with a published compatibility window
+- Node target declared and pinned in the bundle with a published compatibility window
 - Backward-compat policy documented, with clear rejection for unsupported versions
 
 ## Alternatives considered
@@ -241,7 +241,7 @@ ACCEPTED → QUEUED → PROVISIONING (shadow only) → EXECUTING → COMPLETED |
 - ADR 022 — Lint rule taxonomy & configuration model
 - ADR 023 — Budget evaluation & EXPLAIN policy
 - ADR 027 — Error envelope & stable codes
-- ADR 031 — Adapter capability discovery & negotiation
+- ADR 031 — Adapter capability discovery
 - ADR 013 — Lane-agnostic Plan identity and hashing
 - ADR 039 — DAG path resolution & integrity
 - ADR 024 — Telemetry schema & privacy
