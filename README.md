@@ -9,17 +9,46 @@ Prisma Next is a prototype of a new data access layer that replaces traditional 
 - **Defines your database schema as a verifiable contract** (not just a schema)
 - **Generates lightweight types instead of heavy client code**
 - **Uses a composable DSL for queries instead of generated methods**
+- **Supports extension packs for domain-specific capabilities** (vector search, geospatial, etc.)
 - **Works seamlessly with AI coding assistants** (machine-readable, composable APIs)
 
-**Think of it as**: "What if Prisma ORM generated only lightweight types instead of heavy client code, and you wrote queries using a composable DSL instead of generated methods?"
+**Think of it as**: "An ORM designed for agentic workflows: with guardrails and verifications, tight feedback loops and simple, deterministic operations."
 
-## Evaluation Guide
+## Quick Demo
 
-**New to this project?** Check out our comprehensive [Evaluation Guide](EVALUATION-GUIDE.md) for:
-- Quick 5-minute demo
-- Structured evaluation process
-- Comparison with existing solutions
-- Success criteria and troubleshooting
+```bash
+# 1. Clone and install
+git clone <repo>
+cd prisma-next
+pnpm install && pnpm build
+
+# 2. Start database (or however you start a local postgres DB)
+docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:15
+
+# 3. Run the complete demo
+cd examples/todo-app
+pnpm demo  # This does everything: generate, migrate, test
+```
+
+What you'll see: Type-safe queries, contract verification, and the migration system in action.
+
+## Why This Matters
+
+### 1. IR + Types Replace the Client as Source of Truth
+- Deterministic JSON contract plus TypeScript types replace heavy runtime codegen
+- Open, inspectable artifacts; no opaque generated methods
+
+### 2. Machine‑Readable by Design
+- Contract JSON is consumable by tools/agents
+- Hashes enable verification and drift detection
+
+### 3. Composable DSL Instead of Generated Client
+- Write queries inline with a minimal DSL (`sql().from(...).select(...)`)
+- Plans are verifiable and transparent; no hidden multi‑query behaviors
+
+### 4. Future‑Oriented Architecture
+- Extension packs, capability gating, and plugin guardrails
+- Safer migrations and runtime checks built on the contract
 
 ## Motivation
 
@@ -79,17 +108,45 @@ Agents can read the schema (IR), generate valid queries (DSL), and verify them (
 - Correct nullability handling for left joins and nullable relations
 - Type system ensures queries are both safe and accurate
 
-## Architecture
 
-```
-PSL File → Parser → AST → IR Emitter → contract.json + schema.d.ts
-                                              ↓
-Query Builder ← Generated Types ← schema.d.ts
-     ↓
-SQL Compiler → Runtime (with Plugin Hooks) → PostgreSQL
-```
+## Architectural Design in docs/
 
-The architecture decomposes Prisma's ORM into modular, contract-verified components where PSL defines a verifiable schema contract → IR encodes it deterministically → the runtime consumes it to safely compile, execute, and audit queries without codegen friction.
+The `docs/` directory contains the complete architectural design for Prisma Next. Use it to understand the long‑term model (data contract, plan model, runtime plugin framework, adapters, packs, migration plane).
+
+This repository implements a proof‑of‑concept; some details differ from the full design:
+
+- Hashing: the prototype uses a single `contractHash`. In the design, this corresponds to `coreHash`; `profileHash` (capability pinning) is not implemented here.
+- CLI: use `pnpm exec prisma-next generate schema.psl -o .prisma`. Some design docs reference different CLI verbs.
+- Scope: migrations and ORM features are minimal in the prototype; the design includes richer planner/runner and extension packs.
+
+Start with the [Architecture Overview](./docs/Architecture%20Overview.md) for a description of the design's goals and subsystems involved.
+
+## Side‑by‑Side Comparison
+
+| Feature | Prisma ORM | Prisma Next | Why It Matters |
+|----------|-------------|------------|----------------|
+| Schema Model | Codegen for runtime client | Contract IR + TypeScript types | Verifiable, inspectable schema |
+| Code Generation | Heavy, runtime-bound | Minimal, build-time only | Faster iterations |
+| Query Interface | Generated methods | Composable DSL | Transparent, flexible |
+| Machine Readability | Opaque client code | Structured IR JSON | Tool/agent-friendly |
+| Verification | None | Contract hash + runtime checks | Drift detection |
+| Extensibility | Monolithic client | Plugin and hook system | Guardrails and budgets |
+| Migration Logic | Sequential scripts | Contract-based, deterministic | Reproducible |
+
+## Workflow Comparison
+
+**Prisma ORM Workflow:**
+1. Write `schema.prisma`
+2. Run `prisma generate` → generates executable client code
+3. Write application code using generated methods: `prisma.user.findMany()`
+
+**Prisma Next Workflow:**
+1. Write `schema.psl`
+2. Run `prisma-next emit` → generates lightweight types + contract
+  - Not prototyped here but this will be replaced by a Vite plugin or equivalent
+3. Write application code using composable DSL: `sql().from(t.user).select(...)`
+
+Key difference: Prisma Next emits types and a contract rather than generating an executable client.
 
 ## Packages
 
@@ -102,7 +159,7 @@ The architecture decomposes Prisma's ORM into modular, contract-verified compone
 
 ## Quick Start
 
-**First time here?** Start with our [Evaluation Guide](EVALUATION-GUIDE.md) for a guided walkthrough.
+**First time here?** Start with the Quick Demo above, then explore the example app.
 
 ### Prerequisites
 - Node.js >= 20
@@ -142,23 +199,23 @@ model User {
 ### 2. Generate Contract and Types
 
 ```bash
-# Using CLI
-psl emit schema.psl
+# Using CLI (prototype)
+pnpm exec prisma-next generate schema.psl -o .prisma
 
-# Or programmatically
+# Or programmatically (prototype)
 import { parse } from '@prisma/psl';
-import { emitSchemaAndTypes } from '@prisma/schema-emitter';
+import { emitContractAndTypes } from '@prisma/schema-emitter';
 
 const ast = parse(pslContent);
-const { contract, types } = emitSchemaAndTypes(ast);
+const { contract, contractTypes } = await emitContractAndTypes(ast);
 ```
 
 ### 3. Build Type-Safe Queries
 
 ```typescript
-import { sql, t } from '@prisma/sql';
+import { sql, makeT } from '@prisma/sql';
 import { createRuntime } from '@prisma/runtime';
-import contract from './contract.json' assert { type: 'json' };
+import contract from './.prisma/contract.json' assert { type: 'json' };
 
 // Create runtime with contract verification
 const runtime = createRuntime({
@@ -168,6 +225,8 @@ const runtime = createRuntime({
 });
 
 // Type-safe query with Column objects
+const t = makeT(contract);
+
 const query = sql()
   .from('user')
   .where(t.user.active.eq(true))
@@ -221,7 +280,7 @@ const activeUsers = sql()
 The schema emitter generates:
 
 ```typescript
-// Generated schema.d.ts
+// Generated contract.d.ts
 export interface User {
   id: number;
   email: string;
@@ -266,8 +325,36 @@ pnpm test
 # Test specific package
 cd packages/sql && pnpm test
 
-# Integration tests with PostgreSQL
-cd examples/todo-app && pnpm test:integration
+# Example app utilities
+cd examples/todo-app && pnpm test-planner
+# Or run the end-to-end demo
+cd examples/todo-app && pnpm demo
+```
+
+## Troubleshooting
+
+### Build Errors
+```bash
+# Clean and rebuild
+rm -rf node_modules packages/*/node_modules
+pnpm install
+pnpm build
+```
+
+### Migration Issues
+```bash
+# Reset everything and start fresh
+cd examples/todo-app
+pnpm reset-db
+pnpm migrate
+```
+
+### Type Errors
+```bash
+# Regenerate types
+cd examples/todo-app
+pnpm generate
+pnpm typecheck
 ```
 
 Integration tests spin up PostgreSQL, create tables, execute type-safe queries, and verify return types and error handling.
