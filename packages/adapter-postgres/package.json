@@ -20,12 +20,12 @@
   },
   "exports": {
     "./adapter": {
-      "types": "./dist/adapter.d.ts",
-      "import": "./dist/adapter.js"
+      "types": "./dist/exports/adapter.d.ts",
+      "import": "./dist/exports/adapter.js"
     },
     "./types": {
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js"
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
     }
   }
 }

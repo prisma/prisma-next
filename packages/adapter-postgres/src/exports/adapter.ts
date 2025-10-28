@@ -1,0 +1,2 @@
+export { createPostgresAdapter } from '../adapter';
+

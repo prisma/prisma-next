@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newDb } from 'pg-mem';
 
-import { createPostgresDriver } from '../src/index';
+import { createPostgresDriver } from '../src/postgres-driver';
 
 describe('@prisma/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;

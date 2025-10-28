@@ -3,15 +3,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/adapter';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { schema } from '@prisma/sql/schema';
 import { sql } from '@prisma/sql/sql';
 
 import type { PostgresContract } from '@prisma/sql/types';
 
-import { createRuntime } from '../src/index';
+import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
-import { createPostgresDriver } from '../../driver-postgres/src/index';
+import { createPostgresDriver } from '../../driver-postgres/src/postgres-driver';
 import { createDevDatabase, drainAsyncIterable, executeStatement, withClient } from './utils';
 
 const fixtureContract = loadContractFixture();

@@ -2,11 +2,11 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    sql: 'src/sql.ts',
-    schema: 'src/schema.ts',
-    param: 'src/param.ts',
-    types: 'src/types.ts',
-    errors: 'src/errors.ts',
+    sql: 'src/exports/sql.ts',
+    schema: 'src/exports/schema.ts',
+    param: 'src/exports/param.ts',
+    types: 'src/exports/types.ts',
+    errors: 'src/exports/errors.ts',
   },
   format: ['esm'],
   sourcemap: true,

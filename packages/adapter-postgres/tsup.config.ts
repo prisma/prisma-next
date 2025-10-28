@@ -2,8 +2,8 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    adapter: 'src/adapter.ts',
-    types: 'src/types.ts',
+    adapter: 'src/exports/adapter.ts',
+    types: 'src/exports/types.ts',
   },
   format: ['esm'],
   sourcemap: true,

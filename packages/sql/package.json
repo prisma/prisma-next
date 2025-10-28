@@ -19,24 +19,24 @@
   },
   "exports": {
     "./sql": {
-      "types": "./dist/sql.d.ts",
-      "import": "./dist/sql.js"
+      "types": "./dist/exports/sql.d.ts",
+      "import": "./dist/exports/sql.js"
     },
     "./schema": {
-      "types": "./dist/schema.d.ts",
-      "import": "./dist/schema.js"
+      "types": "./dist/exports/schema.d.ts",
+      "import": "./dist/exports/schema.js"
     },
     "./param": {
-      "types": "./dist/param.d.ts",
-      "import": "./dist/param.js"
+      "types": "./dist/exports/param.d.ts",
+      "import": "./dist/exports/param.js"
     },
     "./types": {
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js"
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
     },
     "./errors": {
-      "types": "./dist/errors.d.ts",
-      "import": "./dist/errors.js"
+      "types": "./dist/exports/errors.d.ts",
+      "import": "./dist/exports/errors.js"
     }
   }
 }
