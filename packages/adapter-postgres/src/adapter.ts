@@ -1,9 +1,7 @@
+import type { Adapter, AdapterProfile, LowererContext } from '@prisma/sql-target';
 import type {
-  Adapter,
-  AdapterProfile,
   BinaryExpr,
   ColumnRef,
-  LowererContext,
   ParamRef,
   PostgresAdapterOptions,
   PostgresContract,

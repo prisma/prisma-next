@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@prisma/driver-postgres": "workspace:*",
-    "@prisma/sql": "workspace:*"
+    "@prisma/sql": "workspace:*",
+    "@prisma/sql-target": "workspace:*"
   },
   "devDependencies": {
     "@prisma/dev": "^0.1.1",

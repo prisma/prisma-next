@@ -10,7 +10,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma/adapter-spi": "workspace:*",
+    "@prisma/sql-target": "workspace:*",
     "@prisma/sql": "workspace:*"
   },
   "devDependencies": {

@@ -7,7 +7,7 @@ import type {
   Plan,
 } from '@prisma/sql/types';
 
-import type { PostgresDriver } from '@prisma/driver-postgres';
+import type { SqlDriver } from '@prisma/sql-target';
 
 export interface RuntimeVerifyOptions {
   readonly mode: 'onFirstUse' | 'startup' | 'always';
@@ -17,7 +17,7 @@ export interface RuntimeVerifyOptions {
 export interface RuntimeOptions {
   readonly contract: PostgresContract;
   readonly adapter: Adapter<SelectAst, PostgresContract, PostgresLoweredStatement>;
-  readonly driver: PostgresDriver;
+  readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
 }
 

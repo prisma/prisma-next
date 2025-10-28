@@ -57,24 +57,12 @@ importers:
 
   packages/adapter-postgres:
     dependencies:
-      '@prisma/adapter-spi':
-        specifier: workspace:*
-        version: link:../adapter-spi
       '@prisma/sql':
         specifier: workspace:*
         version: link:../sql
-    devDependencies:
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.0(postcss@8.5.6)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.1
-        version: 2.1.9(@types/node@24.7.2)
-
-  packages/adapter-spi:
+      '@prisma/sql-target':
+        specifier: workspace:*
+        version: link:../sql-target
     devDependencies:
       tsup:
         specifier: ^8.3.0
@@ -88,6 +76,9 @@ importers:
 
   packages/driver-postgres:
     dependencies:
+      '@prisma/sql-target':
+        specifier: workspace:*
+        version: link:../sql-target
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -122,6 +113,9 @@ importers:
       '@prisma/sql':
         specifier: workspace:*
         version: link:../sql
+      '@prisma/sql-target':
+        specifier: workspace:*
+        version: link:../sql-target
     devDependencies:
       '@prisma/dev':
         specifier: ^0.1.1
@@ -144,9 +138,21 @@ importers:
 
   packages/sql:
     dependencies:
-      '@prisma/adapter-spi':
+      '@prisma/sql-target':
         specifier: workspace:*
-        version: link:../adapter-spi
+        version: link:../sql-target
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(postcss@8.5.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@24.7.2)
+
+  packages/sql-target:
     devDependencies:
       tsup:
         specifier: ^8.3.0

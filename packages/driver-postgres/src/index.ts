@@ -2,27 +2,14 @@ import { Pool } from 'pg';
 import type { PoolClient, QueryResult as PgQueryResult, QueryResultRow } from 'pg';
 import Cursor from 'pg-cursor';
 
+import type {
+  SqlDriver,
+  SqlExecuteRequest,
+  SqlQueryResult,
+  SqlExplainResult,
+} from '@prisma/sql-target';
+
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
-
-export interface ExecuteRequest {
-  readonly sql: string;
-  readonly params?: readonly unknown[];
-}
-
-export interface ExplainResult {
-  readonly rows: ReadonlyArray<Record<string, unknown>>;
-}
-
-export interface PostgresDriver {
-  connect(): Promise<void>;
-  execute<Row extends QueryResultRow = QueryResultRow>(request: ExecuteRequest): AsyncIterable<Row>;
-  explain?(request: ExecuteRequest): Promise<ExplainResult>;
-  query<T extends QueryResultRow = QueryResultRow>(
-    sql: string,
-    params?: readonly unknown[],
-  ): Promise<QueryResult<T>>;
-  close(): Promise<void>;
-}
 
 export interface PostgresDriverOptions {
   readonly connectionString: string;
@@ -35,13 +22,13 @@ export interface PostgresDriverOptions {
 
 const DEFAULT_BATCH_SIZE = 100;
 
-class PostgresDriverImpl implements PostgresDriver {
+export class PostgresDriver implements SqlDriver {
   private readonly pool: Pool;
   private readonly cursorBatchSize: number;
   private readonly cursorDisabled: boolean;
   private connected = false;
 
-  constructor(private readonly options: PostgresDriverOptions) {
+  constructor(options: PostgresDriverOptions) {
     const PoolImpl: typeof Pool = options.poolFactory ?? Pool;
     this.pool = new PoolImpl({ connectionString: options.connectionString });
     this.cursorBatchSize = options.cursor?.batchSize ?? DEFAULT_BATCH_SIZE;
@@ -52,16 +39,16 @@ class PostgresDriverImpl implements PostgresDriver {
     await this.ensureConnected();
   }
 
-  async *execute<Row extends QueryResultRow = QueryResultRow>(
-    request: ExecuteRequest,
-  ): AsyncIterable<Row> {
+  async *execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
     await this.ensureConnected();
 
     const client = await this.pool.connect();
     try {
       if (!this.cursorDisabled) {
         try {
-          yield* this.executeWithCursor<Row>(client, request.sql, request.params);
+          for await (const row of this.executeWithCursor(client, request.sql, request.params)) {
+            yield row as Row;
+          }
           return;
         } catch (cursorError) {
           if (!(cursorError instanceof Error)) {
@@ -70,25 +57,27 @@ class PostgresDriverImpl implements PostgresDriver {
         }
       }
 
-      yield* this.executeBuffered<Row>(client, request.sql, request.params);
+      for await (const row of this.executeBuffered(client, request.sql, request.params)) {
+        yield row as Row;
+      }
     } finally {
       client.release();
     }
   }
 
-  async explain(request: ExecuteRequest): Promise<ExplainResult> {
+  async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
     const text = `EXPLAIN (FORMAT JSON) ${request.sql}`;
     const result = await this.pool.query(text, request.params as unknown[] | undefined);
     return { rows: result.rows as ReadonlyArray<Record<string, unknown>> };
   }
 
-  async query<T extends QueryResultRow = QueryResultRow>(
+  async query<Row = Record<string, unknown>>(
     sql: string,
     params?: readonly unknown[],
-  ): Promise<QueryResult<T>> {
+  ): Promise<SqlQueryResult<Row>> {
     await this.ensureConnected();
-    const result = await this.pool.query<T>(sql, params as unknown[] | undefined);
-    return result;
+    const result = await this.pool.query(sql, params as unknown[] | undefined);
+    return result as unknown as SqlQueryResult<Row>;
   }
 
   async close(): Promise<void> {
@@ -105,16 +94,16 @@ class PostgresDriverImpl implements PostgresDriver {
     this.connected = true;
   }
 
-  private async *executeWithCursor<Row extends QueryResultRow>(
+  private async *executeWithCursor(
     client: PoolClient,
     sql: string,
     params: readonly unknown[] | undefined,
-  ): AsyncIterable<Row> {
+  ): AsyncIterable<Record<string, unknown>> {
     const cursor = client.query(new Cursor(sql, params as unknown[] | undefined));
 
     try {
       while (true) {
-        const rows: Row[] = await readCursor<Row>(cursor, this.cursorBatchSize);
+        const rows = await readCursor(cursor, this.cursorBatchSize);
         if (rows.length === 0) {
           break;
         }
@@ -128,20 +117,20 @@ class PostgresDriverImpl implements PostgresDriver {
     }
   }
 
-  private async *executeBuffered<Row extends QueryResultRow>(
+  private async *executeBuffered(
     client: PoolClient,
     sql: string,
     params: readonly unknown[] | undefined,
-  ): AsyncIterable<Row> {
-    const result = await client.query<Row>(sql, params as unknown[] | undefined);
-    for (const row of result.rows) {
+  ): AsyncIterable<Record<string, unknown>> {
+    const result = await client.query(sql, params as unknown[] | undefined);
+    for (const row of result.rows as Record<string, unknown>[]) {
       yield row;
     }
   }
 }
 
-export function createPostgresDriver(options: PostgresDriverOptions): PostgresDriver {
-  return new PostgresDriverImpl(options);
+export function createPostgresDriver(options: PostgresDriverOptions): SqlDriver {
+  return new PostgresDriver(options);
 }
 
 function readCursor<Row>(cursor: Cursor<Row>, size: number): Promise<Row[]> {

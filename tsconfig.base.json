@@ -11,7 +11,7 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@prisma/adapter-spi": ["packages/adapter-spi/src/index.ts"],
+      "@prisma/sql-target": ["packages/sql-target/src/index.ts"],
       "@prisma/adapter-postgres/adapter": ["packages/adapter-postgres/src/adapter.ts"],
       "@prisma/adapter-postgres/types": ["packages/adapter-postgres/src/types.ts"],
       "@prisma/driver-postgres": ["packages/driver-postgres/src/index.ts"],
@@ -27,6 +27,7 @@
   "references": [
     { "path": "./packages/relational-ir" },
     { "path": "./packages/psl" },
+    { "path": "./packages/sql-target" },
     { "path": "./packages/driver-postgres" },
     { "path": "./packages/sql" },
     { "path": "./packages/schema-emitter" },

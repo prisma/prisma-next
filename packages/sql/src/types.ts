@@ -1,28 +1,30 @@
 export type Direction = 'asc' | 'desc';
 
-export type AdapterTarget = string;
+import type {
+  Adapter,
+  AdapterProfile,
+  AdapterTarget,
+  LoweredPayload,
+  Lowerer,
+  LowererContext,
+  SqlDriver,
+  SqlExecuteRequest,
+  SqlExplainResult,
+  SqlQueryResult,
+} from '@prisma/sql-target';
 
-export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
-  readonly id: string;
-  readonly target: TTarget;
-  readonly capabilities: Record<string, unknown>;
-}
-
-export interface LowererContext<TContract = unknown> {
-  readonly contract: TContract;
-  readonly params?: readonly unknown[];
-}
-
-export interface LoweredPayload<TBody = unknown> {
-  readonly profileId?: string;
-  readonly body: TBody;
-  readonly annotations?: Record<string, unknown>;
-}
-
-export interface Adapter<Ast = unknown, TContract = unknown, TBody = unknown> {
-  readonly profile: AdapterProfile;
-  lower(ast: Ast, context: LowererContext<TContract>): LoweredPayload<TBody>;
-}
+export type {
+  Adapter,
+  AdapterProfile,
+  AdapterTarget,
+  LoweredPayload,
+  Lowerer,
+  LowererContext,
+  SqlDriver,
+  SqlExecuteRequest,
+  SqlExplainResult,
+  SqlQueryResult,
+} from '@prisma/sql-target';
 
 export interface StorageColumn {
   readonly type?: string;

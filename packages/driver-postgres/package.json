@@ -10,6 +10,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@prisma/sql-target": "workspace:*",
     "pg": "^8.11.5",
     "pg-cursor": "^2.10.5"
   },
