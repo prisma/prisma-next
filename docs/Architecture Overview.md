@@ -29,6 +29,9 @@ No hidden multi round-trips, fallbacks, or adapter heuristics. Strategies are ch
 ### Compose, don’t configure
 Behavior comes from adapters, extension packs, and runtime plugins, not global flags or magic modes. The ORM is optional and built on the relational DSL; packs contribute codecs, functions, and ops without changing core implementation (ADR 014, ADR 015, ADR 112)
 
+### Modular, composable packages
+All packages are modular and composable with strict tree‑shakability: only imported components end up in the bundle. Exports are curated and side‑effect free with named, per‑module entry points. We ship ESM‑compatible packages and TypeScript source to maximize modern bundler support and DX.
+
 ### Feedback before execution
 Fast, targeted feedback at authoring, planning, and execution time. Lints and budgets, preflight in CI, and marker checks catch risks early and explain what to fix, with stricter defaults in staging and production (ADR 022, ADR 029, ADR 051, ADR 021, ADR 115)
 
