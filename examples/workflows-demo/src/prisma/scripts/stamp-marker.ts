@@ -5,7 +5,7 @@ import {
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
-} from '@prisma/runtime';
+} from '@prisma-next/runtime';
 
 export interface StampMarkerOptions {
   readonly connectionString: string;

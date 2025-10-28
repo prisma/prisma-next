@@ -1,5 +1,5 @@
 {
-  "name": "@prisma/adapter-postgres",
+  "name": "@prisma-next/adapter-postgres",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma/sql-target": "workspace:*",
-    "@prisma/sql": "workspace:*"
+    "@prisma-next/sql-target": "workspace:*",
+    "@prisma-next/sql": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.3.0",

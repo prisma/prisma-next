@@ -5,9 +5,9 @@ import type {
   PostgresLoweredStatement,
   SelectAst,
   Plan,
-} from '@prisma/sql/types';
+} from '@prisma-next/sql/types';
 
-import type { SqlDriver } from '@prisma/sql-target';
+import type { SqlDriver } from '@prisma-next/sql-target';
 
 export interface RuntimeVerifyOptions {
   readonly mode: 'onFirstUse' | 'startup' | 'always';

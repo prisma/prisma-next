@@ -1,5 +1,5 @@
 {
-  "name": "@prisma/driver-postgres",
+  "name": "@prisma-next/driver-postgres",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma/sql-target": "workspace:*",
+    "@prisma-next/sql-target": "workspace:*",
     "pg": "^8.11.5",
     "pg-cursor": "^2.10.5"
   },

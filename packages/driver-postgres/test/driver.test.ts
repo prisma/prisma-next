@@ -4,7 +4,7 @@ import { newDb } from 'pg-mem';
 
 import { createPostgresDriver } from '../src/postgres-driver';
 
-describe('@prisma/driver-postgres', () => {
+describe('@prisma-next/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;
 
   afterEach(async () => {

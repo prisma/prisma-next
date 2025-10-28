@@ -11,7 +11,7 @@ import type {
   SqlExecuteRequest,
   SqlExplainResult,
   SqlQueryResult,
-} from '@prisma/sql-target';
+} from '@prisma-next/sql-target';
 
 export type {
   Adapter,
@@ -24,7 +24,7 @@ export type {
   SqlExecuteRequest,
   SqlExplainResult,
   SqlQueryResult,
-} from '@prisma/sql-target';
+} from '@prisma-next/sql-target';
 
 export interface StorageColumn {
   readonly type?: string;

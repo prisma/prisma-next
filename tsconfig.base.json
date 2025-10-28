@@ -11,14 +11,14 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@prisma/adapter-postgres/*": ["packages/adapter-postgres/src/exports/*.ts"],
-      "@prisma/driver-postgres": ["packages/driver-postgres/src/exports/index.ts"],
-      "@prisma/driver-postgres/*": ["packages/driver-postgres/src/exports/*.ts"],
-      "@prisma/runtime": ["packages/runtime/src/exports/index.ts"],
-      "@prisma/runtime/*": ["packages/runtime/src/exports/*.ts"],
-      "@prisma/sql-target": ["packages/sql-target/src/exports/index.ts"],
-      "@prisma/sql-target/*": ["packages/sql-target/src/exports/*.ts"],
-      "@prisma/sql/*": ["packages/sql/src/exports/*.ts"]
+      "@prisma-next/adapter-postgres/*": ["packages/adapter-postgres/src/exports/*.ts"],
+      "@prisma-next/driver-postgres": ["packages/driver-postgres/src/exports/index.ts"],
+      "@prisma-next/driver-postgres/*": ["packages/driver-postgres/src/exports/*.ts"],
+      "@prisma-next/runtime": ["packages/runtime/src/exports/index.ts"],
+      "@prisma-next/runtime/*": ["packages/runtime/src/exports/*.ts"],
+      "@prisma-next/sql-target": ["packages/sql-target/src/exports/index.ts"],
+      "@prisma-next/sql-target/*": ["packages/sql-target/src/exports/*.ts"],
+      "@prisma-next/sql/*": ["packages/sql/src/exports/*.ts"]
     }
   },
   "references": [

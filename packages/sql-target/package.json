@@ -1,5 +1,5 @@
 {
-  "name": "@prisma/sql-target",
+  "name": "@prisma-next/sql-target",
   "version": "0.0.1",
   "private": true,
   "type": "module",

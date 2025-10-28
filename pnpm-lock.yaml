@@ -41,7 +41,7 @@ importers:
 
   examples/workflows-demo:
     dependencies:
-      '@prisma/runtime':
+      '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
       pg:
@@ -57,10 +57,10 @@ importers:
 
   packages/adapter-postgres:
     dependencies:
-      '@prisma/sql':
+      '@prisma-next/sql':
         specifier: workspace:*
         version: link:../sql
-      '@prisma/sql-target':
+      '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
     devDependencies:
@@ -76,7 +76,7 @@ importers:
 
   packages/driver-postgres:
     dependencies:
-      '@prisma/sql-target':
+      '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
       pg:
@@ -107,13 +107,13 @@ importers:
 
   packages/runtime:
     dependencies:
-      '@prisma/driver-postgres':
+      '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../driver-postgres
-      '@prisma/sql':
+      '@prisma-next/sql':
         specifier: workspace:*
         version: link:../sql
-      '@prisma/sql-target':
+      '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
     devDependencies:
@@ -138,7 +138,7 @@ importers:
 
   packages/sql:
     dependencies:
-      '@prisma/sql-target':
+      '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
     devDependencies:

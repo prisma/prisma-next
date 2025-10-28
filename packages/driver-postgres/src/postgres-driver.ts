@@ -7,7 +7,7 @@ import type {
   SqlExecuteRequest,
   SqlQueryResult,
   SqlExplainResult,
-} from '@prisma/sql-target';
+} from '@prisma-next/sql-target';
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
 

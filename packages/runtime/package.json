@@ -1,5 +1,5 @@
 {
-  "name": "@prisma/runtime",
+  "name": "@prisma-next/runtime",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma/driver-postgres": "workspace:*",
-    "@prisma/sql": "workspace:*",
-    "@prisma/sql-target": "workspace:*"
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/sql": "workspace:*",
+    "@prisma-next/sql-target": "workspace:*"
   },
   "devDependencies": {
     "@prisma/dev": "^0.1.1",

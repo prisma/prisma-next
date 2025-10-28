@@ -1,4 +1,4 @@
-import type { Adapter, AdapterProfile, LowererContext } from '@prisma/sql-target';
+import type { Adapter, AdapterProfile, LowererContext } from '@prisma-next/sql-target';
 import type {
   BinaryExpr,
   ColumnRef,

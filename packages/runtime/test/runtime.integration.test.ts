@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { schema } from '@prisma/sql/schema';
-import { sql } from '@prisma/sql/sql';
+import { schema } from '@prisma-next/sql/schema';
+import { sql } from '@prisma-next/sql/sql';
 
-import type { PostgresContract } from '@prisma/sql/types';
+import type { PostgresContract } from '@prisma-next/sql/types';
 
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
