@@ -30,7 +30,7 @@ No hidden multi round-trips, fallbacks, or adapter heuristics. Strategies are ch
 Behavior comes from adapters, extension packs, and runtime plugins, not global flags or magic modes. The ORM is optional and built on the relational DSL; packs contribute codecs, functions, and ops without changing core implementation (ADR 014, ADR 015, ADR 112)
 
 ### Feedback before execution
-Fast, targeted feedback at authoring, planning, and execution time. Lints and budgets, preflight in CI and PPg, and marker checks catch risks early and explain what to fix, with stricter defaults in staging and production (ADR 022, ADR 029, ADR 051, ADR 021, ADR 115)
+Fast, targeted feedback at authoring, planning, and execution time. Lints and budgets, preflight in CI, and marker checks catch risks early and explain what to fix, with stricter defaults in staging and production (ADR 022, ADR 029, ADR 051, ADR 021, ADR 115)
 
 ## Architecture at a Glance
 
@@ -44,7 +44,7 @@ Both planes operate on the same shared artifacts:
 - **Data Contract:** Generated from PSL + TypeScript builders + extension manifests and distributed as JSON alongside TypeScript definitions
 - **Capability profile:** The contract declares required capabilities (and optional adapter pins) and emits a pinned `profileHash`. The runner verifies the database satisfies the contract and writes the same `profileHash` to the marker (ADR 117, ADR 021)
 - **Plan Factories:** Compile declarative inputs into deterministic plans with hash-stamped metadata
-- **Guardrail Plugins:** Applied during plan creation, PPg preflight, and runtime execution
+- **Guardrail Plugins:** Applied during plan creation, preflight, and runtime execution
 - **Marker and ledger:** Database marker storing `coreHash` and `profileHash` plus an append-only ledger of applied edges for verification and audit (ADR 021, ADR 001)
 
 ### Diagram — System map
@@ -80,10 +80,6 @@ flowchart LR
     branded types]
   end
 
-  subgraph PPg
-    Svc[Preflight-as-a-service]
-  end
-
   C --> Plan
   C --> QF
   Plan --> Pf
@@ -96,7 +92,6 @@ flowchart LR
   Prof --> RT
   Prof --> Plan
   Mk --> RT
-  Svc --> Pf
 ```
 
 ## Subsystems Index
@@ -107,12 +102,11 @@ Quick links to detailed subsystem specifications:
 - [Contract Emitter & Types](architecture%20docs/subsystems/2.%20Contract%20Emitter%20&%20Types.md) — PSL/TS parsing, canonicalization, hashing, and `.d.ts` surface
 - [Query Lanes](architecture%20docs/subsystems/3.%20Query%20Lanes.md) — Authoring surfaces (SQL DSL, raw SQL, ORM, TypedSQL) compiling to unified Plans
 - [Runtime & Plugin Framework](architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md) — Execution pipeline, hooks, lints, budgets, and plugins
-- [Migration System](architecture%20docs/subsystems/5.%20Migration%20System.md) — Contract→contract edges, planner/runner, checks, and idempotency
-- [Preflight & CI Integration](architecture%20docs/subsystems/6.%20Preflight%20&%20CI%20Integration.md) — Shadow/EXPLAIN, policy gates, and CI flows
-- [Adapters & Targets](architecture%20docs/subsystems/8.%20Adapters%20&%20Targets.md) — Adapter SPI for lowering and capability negotiation
-- [Performance & Capacity](architecture%20docs/subsystems/10.%20Performance%20&%20Capacity.md) — Budgets, streaming behavior, and performance targets
-- [No-Emit Workflow](architecture%20docs/subsystems/11.%20No-Emit%20Workflow.md) — TS-first authoring, watch plugins, and CI trust model
-- [Ecosystem Extensions & Packs](architecture%20docs/subsystems/12.%20Ecosystem%20Extensions%20&%20Packs.md) — Pack model, function/operator registry, and branded codecs
+- [Adapters & Targets](architecture%20docs/subsystems/5.%20Adapters%20&%20Targets.md) — Adapter SPI for lowering and capability negotiation
+- [Ecosystem Extensions & Packs](architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20&%20Packs.md) — Pack model, function/operator registry, and branded codecs
+- [Migration System](architecture%20docs/subsystems/7.%20Migration%20System.md) — Contract→contract edges, planner/runner, checks, and idempotency
+- [Preflight & CI Integration](architecture%20docs/subsystems/8.%20Preflight%20&%20CI%20Integration.md) — Shadow/EXPLAIN, policy gates, and CI flows
+- [No-Emit Workflow](architecture%20docs/subsystems/9.%20No-Emit%20Workflow.md) — TS-first authoring, watch plugins, and CI trust model
 
 ## Migration Plane — Self-Verifying Change
 
@@ -128,7 +122,7 @@ Quick links to detailed subsystem specifications:
 
 **Verification**
 
-- Plans simulate locally; PPg can answer “Will this migration do what I expect?” via preflight
+- Plans simulate locally via preflight to answer "Will this migration do what I expect?"
 - Pre and post checks, capability gates, and policy checks run before apply
 
 **Execution**
@@ -293,10 +287,8 @@ flowchart LR
 
 PPg is a contract-aware Postgres service that amplifies determinism and feedback.
 
-- **Preflight service:** answers “Will this migration do what I expect?” by simulating plans against staged data
+- **Preflight service:** answers "Will this migration do what I expect?" by simulating plans against staged data
 - **Contract ledger:** records contract hashes and applied edges to detect drift instantly
-- **Advisor and guardrail enforcement:** applies capability policies, extension requirements, and advisor recommendations server-side
-- **Pack catalog:** distributes approved extension packs with capability metadata
 
 PPg is optional, but using it delivers zero-touch guardrails for teams and agents.
 
@@ -309,5 +301,5 @@ PPg is optional, but using it delivers zero-touch guardrails for teams and agent
 ## Roadmap Snapshot
 
 1. **MVP:** Postgres support, contract emit, plan factories, runtime guardrails, PPg preflight previews
-2. **Pilot:** Rename/drop with policy hints, richer diagnostics, pack catalog, PPg-managed advisors and orchestration
+2. **Pilot:** Rename/drop with policy hints, richer diagnostics, pack catalog
 3. **GA:** Hardened runtime, policy packs, additional database adapters, contributor-friendly extension tooling
