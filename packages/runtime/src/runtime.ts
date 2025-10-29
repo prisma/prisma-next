@@ -113,6 +113,10 @@ export function createRuntime(options: RuntimeOptions): Runtime {
           await verifyPlanIfNeeded(plan);
         }
 
+        if (options.verify.mode === 'always') {
+          await verifyPlanIfNeeded(plan);
+        }
+
         for await (const row of driver.execute<Record<string, any>>({
           sql: plan.sql,
           params: plan.params,

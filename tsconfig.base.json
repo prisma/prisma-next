@@ -16,6 +16,7 @@
       "@prisma-next/driver-postgres/*": ["packages/driver-postgres/src/exports/*.ts"],
       "@prisma-next/runtime": ["packages/runtime/src/exports/index.ts"],
       "@prisma-next/runtime/*": ["packages/runtime/src/exports/*.ts"],
+      "@prisma-next/runtime/test/*": ["packages/runtime/test/*"],
       "@prisma-next/sql-target": ["packages/sql-target/src/exports/index.ts"],
       "@prisma-next/sql-target/*": ["packages/sql-target/src/exports/*.ts"],
       "@prisma-next/sql/*": ["packages/sql/src/exports/*.ts"]

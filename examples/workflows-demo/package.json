@@ -4,15 +4,20 @@
   "type": "module",
   "scripts": {
     "stamp-marker": "pnpm esr src/prisma/scripts/stamp-marker.ts",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
     "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/sql": "workspace:*",
     "pg": "^8.11.5"
   },
   "devDependencies": {
     "@prisma/dev": "^0.1.1",
     "esbuild-runner": "^2.2.2",
+    "vite-tsconfig-paths": "^5.1.4",
     "@types/node": "^20.16.5",
     "@types/pg": "^8.11.10",
     "tsup": "^8.3.0",

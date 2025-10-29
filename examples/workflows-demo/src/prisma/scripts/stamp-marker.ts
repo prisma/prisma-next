@@ -1,5 +1,4 @@
 import { Client } from 'pg';
-
 import {
   ensureSchemaStatement,
   ensureTableStatement,
