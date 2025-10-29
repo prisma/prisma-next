@@ -8,6 +8,7 @@ export default defineConfig({
     types: 'src/exports/types.ts',
     errors: 'src/exports/errors.ts',
   },
+  outDir: 'dist/exports',
   format: ['esm'],
   sourcemap: true,
   dts: true,

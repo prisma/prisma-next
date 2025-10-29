@@ -5,6 +5,7 @@ export default defineConfig({
     adapter: 'src/exports/adapter.ts',
     types: 'src/exports/types.ts',
   },
+  outDir: 'dist/exports',
   format: ['esm'],
   sourcemap: true,
   dts: true,
