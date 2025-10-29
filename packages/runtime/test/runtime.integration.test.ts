@@ -122,6 +122,289 @@ describe('runtime execute integration', () => {
       await runtime.close();
     }
   }, 15000);
+
+  it('blocks raw select star with lint error', async () => {
+    const driver = createPostgresDriver({
+      connectionString: database.connectionString,
+      cursor: { disabled: true },
+    });
+    await driver.connect();
+
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: true },
+    });
+
+    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+      select * from "user"
+    `;
+
+    try {
+      await expect(async () => {
+        await drainAsyncIterable(runtime.execute(rawPlan));
+      }).rejects.toMatchObject({ code: 'LINT.SELECT_STAR' });
+
+      const diagnostics = runtime.diagnostics();
+      expect(diagnostics.lints).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'LINT.SELECT_STAR', severity: 'error' }),
+        ]),
+      );
+
+      const telemetry = runtime.telemetry();
+      expect(telemetry).toMatchObject({
+        outcome: 'lint-error',
+        lane: 'raw',
+        target: 'postgres',
+      });
+      expect(telemetry?.fingerprint).toBeTypeOf('string');
+    } finally {
+      await runtime.close();
+    }
+  }, 15000);
+
+  it('warns on missing limit and blocks via budget heuristic', async () => {
+    const driver = createPostgresDriver({
+      connectionString: database.connectionString,
+      cursor: { disabled: true },
+    });
+    await driver.connect();
+
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: true },
+    });
+
+    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+      select id from "user"
+    `;
+
+    try {
+      await expect(async () => {
+        await drainAsyncIterable(runtime.execute(rawPlan));
+      }).rejects.toMatchObject({ code: 'BUDGET.ROWS_EXCEEDED' });
+
+      const diagnostics = runtime.diagnostics();
+      expect(diagnostics.lints).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'LINT.NO_LIMIT', severity: 'warn' }),
+        ]),
+      );
+      expect(diagnostics.budgets).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED', severity: 'error' }),
+        ]),
+      );
+
+      const telemetry = runtime.telemetry();
+      expect(telemetry).toMatchObject({ outcome: 'budget-error', lane: 'raw' });
+    } finally {
+      await runtime.close();
+    }
+  }, 15000);
+
+  it('records unindexed predicate warning when refs lack indexes', async () => {
+    const driver = createPostgresDriver({
+      connectionString: database.connectionString,
+      cursor: { disabled: true },
+    });
+    await driver.connect();
+
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: true },
+    });
+
+    const rawPlan = sql({ contract: fixtureContract, adapter }).raw(
+      'select id from "user" where email = $1 limit $2',
+      {
+        params: ['ada@example.com', 1],
+        refs: {
+          tables: ['user'],
+          columns: [{ table: 'user', column: 'email' }],
+          indexes: [],
+        },
+      },
+    );
+
+    try {
+      const rows: Array<{ id: number }> = [];
+      for await (const row of runtime.execute(rawPlan)) {
+        rows.push(row as { id: number });
+      }
+
+      expect(rows.length).toBeGreaterThan(0);
+
+      const diagnostics = runtime.diagnostics();
+      expect(diagnostics.lints).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'LINT.UNINDEXED_PREDICATE', severity: 'warn' }),
+        ]),
+      );
+
+      const telemetry = runtime.telemetry();
+      expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
+    } finally {
+      await runtime.close();
+    }
+  }, 15000);
+
+  it('prevents read-only mutation when annotations intent is report', async () => {
+    const driver = createPostgresDriver({
+      connectionString: database.connectionString,
+      cursor: { disabled: true },
+    });
+    await driver.connect();
+
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: true },
+    });
+
+    const rawPlan = sql({ contract: fixtureContract, adapter }).raw(
+      'insert into "user" (email) values ($1)',
+      {
+        params: ['read-only@example.com'],
+        annotations: { intent: 'report' },
+      },
+    );
+
+    try {
+      await expect(async () => {
+        await drainAsyncIterable(runtime.execute(rawPlan));
+      }).rejects.toMatchObject({ code: 'LINT.READ_ONLY_MUTATION' });
+
+      const diagnostics = runtime.diagnostics();
+      expect(diagnostics.lints).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'LINT.READ_ONLY_MUTATION', severity: 'error' }),
+        ]),
+      );
+
+      const telemetry = runtime.telemetry();
+      expect(telemetry).toMatchObject({ outcome: 'lint-error', lane: 'raw' });
+    } finally {
+      await runtime.close();
+    }
+  }, 15000);
+
+  it('respects unbounded select severity override', async () => {
+    const driver = createPostgresDriver({
+      connectionString: database.connectionString,
+      cursor: { disabled: true },
+    });
+    await driver.connect();
+
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: true },
+      guardrails: { budgets: { unboundedSelectSeverity: 'warn' } },
+    });
+
+    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+      select id from "user"
+    `;
+
+    try {
+      await drainAsyncIterable(runtime.execute(rawPlan));
+
+      const diagnostics = runtime.diagnostics();
+      expect(diagnostics.budgets).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED', severity: 'warn' }),
+        ]),
+      );
+
+      const telemetry = runtime.telemetry();
+      expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
+    } finally {
+      await runtime.close();
+    }
+  }, 15000);
+
+  it('attaches explain estimates when enabled', async () => {
+    const driver = createPostgresDriver({
+      connectionString: database.connectionString,
+      cursor: { disabled: true },
+    });
+    await driver.connect();
+
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: true },
+      guardrails: { budgets: { unboundedSelectSeverity: 'warn', explain: { enabled: true } } },
+    });
+
+    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+      select id from "user"
+    `;
+
+    try {
+      await drainAsyncIterable(runtime.execute(rawPlan));
+
+      const diagnostics = runtime.diagnostics();
+      const budgetFinding = diagnostics.budgets.find((finding) => finding.code === 'BUDGET.ROWS_EXCEEDED');
+      expect(budgetFinding).toBeDefined();
+      expect(budgetFinding?.details?.estimatedRows).toBeTypeOf('number');
+
+      const telemetry = runtime.telemetry();
+      expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
+      expect(telemetry?.fingerprint).toBeTypeOf('string');
+    } finally {
+      await runtime.close();
+    }
+  }, 15000);
+
+  it('emits stable fingerprint for literal-only differences', async () => {
+    const driver = createPostgresDriver({
+      connectionString: database.connectionString,
+      cursor: { disabled: true },
+    });
+    await driver.connect();
+
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: true },
+      guardrails: { budgets: { unboundedSelectSeverity: 'warn' } },
+    });
+
+    try {
+      const planOne = sql({ contract: fixtureContract, adapter }).raw(
+        "select id from \"user\" where email = 'ada@example.com' limit 1",
+        { params: [] },
+      );
+
+      await drainAsyncIterable(runtime.execute(planOne));
+      const fingerprintOne = runtime.telemetry()?.fingerprint;
+
+      const planTwo = sql({ contract: fixtureContract, adapter }).raw(
+        "select id from \"user\" where email = 'tess@example.com' limit 1",
+        { params: [] },
+      );
+
+      await drainAsyncIterable(runtime.execute(planTwo));
+      const fingerprintTwo = runtime.telemetry()?.fingerprint;
+
+      expect(fingerprintOne).toBeTypeOf('string');
+      expect(fingerprintTwo).toBe(fingerprintOne);
+    } finally {
+      await runtime.close();
+    }
+  }, 15000);
 });
 
 function loadContractFixture(): DataContract {

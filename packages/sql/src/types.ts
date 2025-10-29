@@ -111,6 +111,7 @@ export interface SelectAst {
 }
 
 export interface ParamDescriptor {
+  readonly index?: number;
   readonly name?: string;
   readonly type?: string;
   readonly nullable?: boolean;
@@ -118,26 +119,75 @@ export interface ParamDescriptor {
   readonly refs?: { table: string; column: string };
 }
 
-export interface PlanMeta {
+export interface PlanRefs {
+  readonly tables: readonly string[];
+  readonly columns: ReadonlyArray<{ table: string; column: string }>;
+}
+
+export interface PlanMetaBase {
   readonly target: string;
   readonly targetFamily?: string;
   readonly coreHash: string;
   readonly profileHash?: string;
-  readonly lane: 'dsl';
-  readonly refs: {
-    readonly tables: string[];
-    readonly columns: Array<{ table: string; column: string }>;
-  };
-  readonly projection: Record<string, string>;
+  readonly lane: 'dsl' | 'raw';
   readonly annotations?: Record<string, unknown>;
-  readonly paramDescriptors: ParamDescriptor[];
+  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
 }
 
-export interface Plan {
-  readonly ast: SelectAst;
+export interface DslPlanMeta extends PlanMetaBase {
+  readonly lane: 'dsl';
+  readonly refs: PlanRefs;
+  readonly projection: Record<string, string>;
+}
+
+export interface RawPlanRefs {
+  readonly tables?: readonly string[];
+  readonly columns?: ReadonlyArray<{ table: string; column: string }>;
+  readonly indexes?: ReadonlyArray<{
+    readonly table: string;
+    readonly columns: ReadonlyArray<string>;
+    readonly name?: string;
+  }>;
+}
+
+export interface RawPlanMeta extends PlanMetaBase {
+  readonly lane: 'raw';
+  readonly target: 'postgres';
+  readonly refs?: RawPlanRefs;
+  readonly projection?: ReadonlyArray<string>;
+}
+
+export interface PlanBase<M extends PlanMetaBase = PlanMetaBase> {
   readonly sql: string;
   readonly params: readonly unknown[];
-  readonly meta: PlanMeta;
+  readonly meta: M;
+}
+
+export interface DslPlan extends PlanBase<DslPlanMeta> {
+  readonly ast: SelectAst;
+}
+
+export interface RawPlan extends PlanBase<RawPlanMeta> {}
+
+export type Plan = DslPlan | RawPlan;
+
+export interface RawTemplateOptions {
+  readonly refs?: RawPlanRefs;
+  readonly annotations?: Record<string, unknown>;
+  readonly projection?: ReadonlyArray<string>;
+}
+
+export interface RawFunctionOptions extends RawTemplateOptions {
+  readonly params: ReadonlyArray<unknown>;
+}
+
+export interface RawTemplateFactory {
+  (strings: TemplateStringsArray, ...values: readonly unknown[]): RawPlan;
+}
+
+export interface RawFactory extends RawTemplateFactory {
+  (text: string, options: RawFunctionOptions): RawPlan;
+  with(options: RawTemplateOptions): RawTemplateFactory;
 }
 
 export interface LoweredStatement {

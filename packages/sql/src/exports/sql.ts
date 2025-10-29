@@ -1,3 +1,4 @@
 export { sql } from '../sql';
-export type { SqlBuilderOptions } from '../types';
+export { rawOptions } from '../raw';
+export type { SqlBuilderOptions, RawFactory, RawFunctionOptions, RawTemplateOptions } from '../types';
 

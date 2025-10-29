@@ -1,15 +1,17 @@
 import { planInvalid } from './errors';
+import { createRawFactory } from './raw';
 import type {
   BinaryBuilder,
   BuildOptions,
   ColumnBuilder,
   ColumnRef,
+  DslPlan,
+  DslPlanMeta,
   DataContract,
   Direction,
   LoweredStatement,
   ParamDescriptor,
-  Plan,
-  PlanMeta,
+  RawFactory,
   SelectAst,
   SqlBuilderOptions,
   TableRef,
@@ -73,7 +75,7 @@ class SelectBuilderImpl {
     return this;
   }
 
-  build(options?: BuildOptions): Plan {
+  build(options?: BuildOptions): DslPlan {
     const table = this.ensureFrom();
     const projection = this.ensureProjection();
 
@@ -135,7 +137,7 @@ class SelectBuilderImpl {
       ...(this.state.orderBy ? { orderBy: this.state.orderBy } : {}),
     });
 
-    const plan: Plan = Object.freeze({
+    const plan: DslPlan = Object.freeze({
       ast,
       sql: loweredBody.sql,
       params: loweredBody.params ?? paramValues,
@@ -253,7 +255,7 @@ interface MetaBuildArgs {
   readonly paramDescriptors: ParamDescriptor[];
 }
 
-function buildMeta(args: MetaBuildArgs): Plan['meta'] {
+function buildMeta(args: MetaBuildArgs): DslPlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();
 
   args.projection.columns.forEach((column, index) => {
@@ -296,9 +298,20 @@ function buildMeta(args: MetaBuildArgs): Plan['meta'] {
     projection: projectionMap,
     paramDescriptors: args.paramDescriptors,
     ...(args.contract.profileHash !== undefined ? { profileHash: args.contract.profileHash } : {}),
-  } satisfies PlanMeta);
+  } satisfies DslPlanMeta);
 }
 
-export function sql(options: SqlBuilderOptions) {
-  return new SelectBuilderImpl(options);
+type SelectBuilder = InstanceType<typeof SelectBuilderImpl>;
+
+export function sql(options: SqlBuilderOptions): SelectBuilder & { readonly raw: RawFactory } {
+  const builder = new SelectBuilderImpl(options) as SelectBuilder & { readonly raw: RawFactory };
+  const rawFactory = createRawFactory(options.contract);
+
+  Object.defineProperty(builder, 'raw', {
+    value: rawFactory,
+    enumerable: true,
+    configurable: false,
+  });
+
+  return builder;
 }

@@ -72,6 +72,33 @@ describe('runtime execute integration', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ email: 'alice@example.com' });
 
+      const root = sql({ contract, adapter });
+      const templatePlan = root.raw`
+        select id, email from "user"
+        where email = ${'alice@example.com'}
+        limit ${1}
+      `;
+
+      const templateRows: Array<{ id: number; email: string }> = [];
+      for await (const row of runtime.execute(templatePlan)) {
+        templateRows.push(row as { id: number; email: string });
+      }
+
+      expect(templateRows).toHaveLength(1);
+
+      const functionPlan = root.raw('select id from "user" where email = $1 limit $2', {
+        params: ['alice@example.com', 1],
+        refs: { tables: ['user'], columns: [{ table: 'user', column: 'email' }] },
+        annotations: { intent: 'report' },
+      });
+
+      const functionRows: Array<{ id: number }> = [];
+      for await (const row of runtime.execute(functionPlan)) {
+        functionRows.push(row as { id: number });
+      }
+
+      expect(functionRows).toHaveLength(1);
+
       await stampMarker({
         connectionString,
         coreHash: 'sha256:mismatched-core',
