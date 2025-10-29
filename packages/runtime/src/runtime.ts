@@ -218,6 +218,10 @@ export function createRuntime(options: RuntimeOptions): Runtime {
         }
 
         try {
+          if (options.verify.mode === 'always') {
+            await verifyPlanIfNeeded(plan);
+          }
+
           await applyGuardrails(plan);
 
           for await (const row of driver.execute<Record<string, any>>({
@@ -339,8 +343,4 @@ function findPlanRows(node: unknown): number | undefined {
 }
 
 export * from './marker';
-export type {
-  LintFinding,
-  BudgetFinding,
-  RuntimeDiagnostics,
-} from './diagnostics';
+export type { LintFinding, BudgetFinding, RuntimeDiagnostics } from './diagnostics';
