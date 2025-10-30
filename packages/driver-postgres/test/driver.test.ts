@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { newDb } from 'pg-mem';
 
-import { createPostgresDriver } from '../src/postgres-driver';
+import { PostgresDriver } from '../src/postgres-driver';
 
 describe('@prisma-next/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -17,11 +17,11 @@ describe('@prisma-next/driver-postgres', () => {
   it('streams rows using buffered fallback when cursor disabled', async () => {
     const db = newDb();
     const { Pool } = db.adapters.createPg();
+    const pool = new Pool();
 
-    const driver = createPostgresDriver({
-      connectionString: 'postgres://user:pass@localhost:5432/db',
+    const driver = new PostgresDriver({
+      connect: { pool: pool as unknown as typeof Pool },
       cursor: { disabled: true },
-      poolFactory: Pool as any,
     });
 
     cleanup = async () => {

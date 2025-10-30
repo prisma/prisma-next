@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriver } from '@prisma-next/driver-postgres';
+import { PostgresDriver } from '@prisma-next/driver-postgres';
+import { Pool } from 'pg';
 import { createRuntime } from '@prisma-next/runtime';
 import { withClient, withDevDatabase } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql/schema';
@@ -23,7 +24,8 @@ describe('runtime execute integration', () => {
   it('streams rows and enforces marker verification', async () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
-      const driver = createPostgresDriver({ connectionString, cursor: { disabled: true } });
+      const pool = new Pool({ connectionString });
+      const driver = new PostgresDriver({ connect: { pool }, cursor: { disabled: true } });
       const runtime = createRuntime({
         contract,
         adapter,
