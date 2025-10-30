@@ -13,10 +13,9 @@ Deliver a lane‑agnostic budgets plugin integrated via the runtime plugin frame
 - Keep diagnostics/telemetry out of runtime core; provide `log` in plugin context
 
 ### Out of Scope (MVP)
-- Latency budget enforcement (wire later in the same plugin)
 - SQL size budget
-- EXPLAIN integration and caching (ADR 023)
-- Non‑DSL LIMIT inference or SQL parsing
+- EXPLAIN integration and caching (ADR 023) beyond a disabled config stub
+- SQL parsing
 - Lints plugin; broader guardrail taxonomy
 
 ### API Surface
@@ -29,36 +28,36 @@ Deliver a lane‑agnostic budgets plugin integrated via the runtime plugin frame
   - `Log = { info(x): void; warn(x): void; error(x): void }`
 - Budgets plugin factory:
   - `budgets(options?: BudgetsOptions): Plugin`
-  - `BudgetsOptions = { maxRows?: number; defaultTableRows?: number; tableRows?: Record<string, number>; severities?: { rowCount?: 'warn' | 'error'; latency?: 'warn' | 'error' } }`
+  - `BudgetsOptions = { maxRows?: number; defaultTableRows?: number; tableRows?: Record<string, number>; maxLatencyMs?: number; severities?: { rowCount?: 'warn' | 'error'; latency?: 'warn' | 'error' }; explain?: { enabled?: boolean } }`
 
 ### Behavior and Semantics
-- Pre‑exec (DSL only):
-  - If `plan.meta.lane !== 'dsl'` or `plan.ast` absent → skip pre‑exec estimation (treat as unknown)
-  - Determine table name from `plan.meta.refs.tables[0]`
-  - Lookup `tableRows[table]` with fallback `defaultTableRows`
-  - If no LIMIT → treat as unbounded; compute estimate = table estimate
-  - If LIMIT `N` → `estimatedRows = min(N, tableEstimate)`
-  - If `estimatedRows > maxRows` → emit `BUDGET.ROWS_EXCEEDED`
-    - Severity resolves to blocking error if `rowCount` severity is `error` OR runtime `mode` is `strict`
-    - Otherwise, log a warn via `ctx.log` and continue
+- Pre‑exec (lane‑agnostic):
+  - Any SELECT without a detectable LIMIT is treated as over the row budget by default (heuristic), per MVP‑Spec.
+  - DSL refinement (single‑table): determine table name from `plan.meta.refs.tables[0]`; lookup `tableRows[table]` with fallback `defaultTableRows`.
+  - If DSL LIMIT `N` is present → `estimatedRows = min(N, tableEstimate)`; else treat as unbounded with `estimatedRows = tableEstimate`.
+  - If `estimatedRows > maxRows` → emit `BUDGET.ROWS_EXCEEDED`.
+    - Severity resolves to blocking if `rowCount` severity is `error` or runtime `mode` is `strict`; otherwise warn via `ctx.log`.
+  - Detectable LIMIT definition: derived from lane‑provided structure only (e.g., DSL AST or explicit `plan.meta` hints). The plugin does not parse SQL text. If no lane‑level limit signal exists, treat as no LIMIT.
 - Streaming (all lanes):
   - Track observed rows; when `observed > maxRows` → throw `BUDGET.ROWS_EXCEEDED` and terminate iteration
 - After‑execute (all lanes):
-  - For MVP, only log `{ rowCount, latencyMs }`; latency budget wiring deferred
+  - Enforce latency budget: if `latencyMs > maxLatencyMs` → emit `BUDGET.TIME_EXCEEDED` (warn by default).
 
 ### Stable Codes (ADR 027)
 - Errors thrown/logged use:
   - `BUDGET.ROWS_EXCEEDED` with `details = { source: 'heuristic' | 'observed', estimatedRows?, observedRows?, maxRows }`
+  - `BUDGET.TIME_EXCEEDED` with `details = { latencyMs, maxLatencyMs }`
 - Severity mapping:
   - Row‑count: default `error` (blocking); overridable via `severities.rowCount`
-  - Latency: default `warn` (advisory); wired later
+  - Latency: default `warn` (advisory)
 
 ### Defaults (MVP‑Spec)
 - `maxRows: 10_000`
 - `defaultTableRows: 10_000`
 - `tableRows: { user: 10_000, post: 50_000, purchase: 25_000 }` (example app)
+- `maxLatencyMs: 1_000`
 - `severities: { rowCount: 'error', latency: 'warn' }`
-- EXPLAIN disabled
+- `explain.enabled: false` (optional stub)
 
 ### Runtime Integration
 - The runtime invokes plugin hooks in order:
@@ -90,17 +89,18 @@ const runtime = createRuntime({
 ```
 
 ### Acceptance Criteria (Locked)
-- Unbounded DSL SELECT without LIMIT blocks pre‑exec with `BUDGET.ROWS_EXCEEDED`.
+- Any SELECT without a detectable LIMIT is treated as over the row budget pre‑exec per policy, lane‑agnostic.
 - DSL SELECT with LIMIT `N` passes if `min(N, tableRows[table]) ≤ maxRows`; otherwise blocks pre‑exec.
 - Any lane: streaming stops with `BUDGET.ROWS_EXCEEDED` when observed row count exceeds `maxRows`.
-- Non‑DSL plans are treated as unbounded pre‑exec (no LIMIT inference), relying only on the post‑check.
+- Latency budget emits `BUDGET.TIME_EXCEEDED` (warn) when `latencyMs > 1_000`.
 
 ### Test Plan
 Integration (Vitest):
 - Start ephemeral Postgres via `@prisma/dev`; stamp marker; create `user` table; insert a few rows
-- Case A: Unbounded DSL SELECT (no LIMIT) → expect `BUDGET.ROWS_EXCEEDED` pre‑exec
+- Case A: Unbounded SELECT (no LIMIT, any lane available) → expect `BUDGET.ROWS_EXCEEDED` pre‑exec
 - Case B: Bounded DSL SELECT with small LIMIT → rows stream; no budget error
 - Case C: Any lane, large stream (simulate with cursor disabled fallback) → expect `BUDGET.ROWS_EXCEEDED` during iteration
+- Case D: Latency — `select pg_sleep(1.5)` in raw lane (or equivalent) → `BUDGET.TIME_EXCEEDED` (warn)
 
 Unit (offline):
 - Heuristic estimator picks `refs.tables[0]` and applies `min(LIMIT, tableEstimate)`
