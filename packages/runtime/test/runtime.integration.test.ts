@@ -24,47 +24,39 @@ const plan = builder.from(tables.user).select('id', 'email').limit(5).build();
 describe('runtime execute integration', { timeout: 100 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let sharedDriver: PostgresDriver;
-  let adminClient: Client;
+  /** Raw Postgres client for direct interaction with the database */
+  let client: Client;
 
   beforeAll(async () => {
     database = await createDevDatabase({});
-    adminClient = new Client({ connectionString: database.connectionString });
-    await adminClient.connect();
+    client = new Client({ connectionString: database.connectionString });
+    await client.connect();
     sharedDriver = new PostgresDriver({
-      connect: { client: adminClient },
+      connect: { client: client },
       cursor: { disabled: true },
     });
-  }, 15000);
+  }, 3000);
 
   afterAll(async () => {
-    if (sharedDriver) {
-      await sharedDriver.close();
-    }
-    if (adminClient) {
-      try {
-        await adminClient.end();
-      } catch (error) {
-        // Don't care if the client is already closed
-      }
-    }
-    if (database) {
+    try {
+      await client.end();
       await database.close();
-    }
+    } catch (error) {}
   });
 
   beforeEach(async () => {
-    await adminClient.query('drop schema if exists prisma_contract cascade');
-    await adminClient.query('create schema if not exists public');
-    await adminClient.query('drop table if exists "user"');
-    await adminClient.query('create table "user" (id serial primary key, email text not null)');
-    await adminClient.query('insert into "user" (email) values ($1), ($2), ($3)', [
+    await client.query('drop schema if exists prisma_contract cascade');
+    await client.query('create schema if not exists public');
+    await client.query('drop table if exists "user"');
+    await client.query('create table "user" (id serial primary key, email text not null)');
+    await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
       'ada@example.com',
       'tess@example.com',
       'mike@example.com',
     ]);
 
-    await executeStatement(adminClient, ensureSchemaStatement);
-    await executeStatement(adminClient, ensureTableStatement);
+    await executeStatement(client, ensureSchemaStatement);
+    await executeStatement(client, ensureTableStatement);
 
     const write = writeContractMarker({
       coreHash: fixtureContract.coreHash,
@@ -72,12 +64,12 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       contractJson: fixtureContract,
       canonicalVersion: 1,
     });
-    await executeStatement(adminClient, write.insert);
+    await executeStatement(client, write.insert);
   });
 
   afterEach(async () => {
-    await adminClient.query('drop schema if exists prisma_contract cascade');
-    await adminClient.query('drop table if exists "user"');
+    await client.query('drop schema if exists prisma_contract cascade');
+    await client.query('drop table if exists "user"');
   });
 
   it('executes a plan after onFirstUse verification', async () => {
