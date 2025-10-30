@@ -194,6 +194,10 @@ sequenceDiagram
 - Immediate feedback on query success or failure, capability mismatches, or contract drift
 - Plans and results are logged in machine-readable formats for agents and observability tooling
 
+### Raw lane parity
+
+- Raw SQL authoring uses `root.raw\`...\`` or `root.raw(text, options)` to build the same immutable Plans as the DSL. Plans are normalized to a stable fingerprint (ADR 024) so telemetry, caching, and guardrails apply uniformly across lanes.
+
 ### Diagram — Query execution
 
 ```mermaid
