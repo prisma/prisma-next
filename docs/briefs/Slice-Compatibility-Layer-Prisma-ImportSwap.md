@@ -10,7 +10,7 @@ Enable the example app to run unchanged by swapping Prisma Client imports for a 
 
 ### Contract Artifact Strategy (MVP)
 - No emitter in this slice. Use a static, hand‑authored `contract.json` committed to the repo.
-- Location: `examples/workflows-demo/src/prisma/contract.json` (loaded by the example runtime and compatibility layer).
+- Location: `examples/prisma-next-demo/src/prisma/contract.json` (loaded by the example runtime and compatibility layer).
 - Content: minimum `DataContract` fields needed by the runtime and DSL/ORM builders:
   - `target` (e.g., `"postgres"`), optional `targetFamily`
   - `coreHash` (fixed placeholder for demo; updated manually when schema changes)

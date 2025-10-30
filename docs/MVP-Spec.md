@@ -19,7 +19,7 @@ Supporting goals for developer experience and verification:
 Supporting acceptance
 - Vite plugin auto‑emits contract and blocks on contract errors
 
-## Example App (ESM) — `examples/workflows-demo/`
+## Example App (ESM) — `examples/prisma-next-demo/`
 - `src/prisma/schema.psl` ([Data Contract](./architecture%20docs/subsystems/1.%20Data%20Contract.md)).
 - `src/prisma/contract.json`, `src/prisma/contract.d.ts` ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 007 — Types Only Emission](./architecture%20docs/adrs/ADR%20007%20-%20Types%20Only%20Emission.md); [ADR 010 — Canonicalization Rules](./architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)).
 - `src/prisma/runtime.ts` (lazy singleton, onFirstUse verify; explicit `runtime.verify()` per [ADR 021 — Contract Marker Storage](./architecture%20docs/adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md)).
@@ -101,7 +101,7 @@ Supporting acceptance
 ## Migrations & Preflight
 - Scope for the two‑week spike: additive local migrations only; rename/drop, SQL escape hatch within migrations, and PPg preflight as a service are out of scope for the spike
 - [Migration System](./architecture%20docs/subsystems/7.%20Migration%20System.md) with ADRs: [001](./architecture%20docs/adrs/ADR%20001%20-%20Migrations%20as%20Edges.md), [021](./architecture%20docs/adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md), [028](./architecture%20docs/adrs/ADR%20028%20-%20Migration%20Structure%20%26%20Operations.md), [029](./architecture%20docs/adrs/ADR%20029%20-%20Shadow%20DB%20preflight%20semantics.md), [037](./architecture%20docs/adrs/ADR%20037%20-%20Transactional%20DDL%20Fallback.md), [038](./architecture%20docs/adrs/ADR%20038%20-%20Operation%20idempotency%20classification%20%26%20enforcement.md), [039](./architecture%20docs/adrs/ADR%20039%20-%20DAG%20path%20resolution%20%26%20integrity.md), [044](./architecture%20docs/adrs/ADR%20044%20-%20Pre%20%26%20post%20check%20vocabulary%20v1.md), [051](./architecture%20docs/adrs/ADR%20051%20-%20PPg%20preflight-as-a-service%20contract.md), [102](./architecture%20docs/adrs/ADR%20102%20-%20Squash-first%20policy%20%26%20squash%20advisor.md).
-- Directory: `examples/workflows-demo/migrations/`; name pattern `YYYYMMDDThhmm_snake_case` ([ADR 009](./architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md)).
+- Directory: `examples/prisma-next-demo/migrations/`; name pattern `YYYYMMDDThhmm_snake_case` ([ADR 009](./architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md)).
 - CLI (default config from `prisma-next.config.ts`):
   - `emit`, `verify contract`, `verify db`, `diff` ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [Data Contract](./architecture%20docs/subsystems/1.%20Data%20Contract.md))
   - `migration plan`, `migration verify`, `migration apply` ([ADR 001](./architecture%20docs/adrs/ADR%20001%20-%20Migrations%20as%20Edges.md)/[ADR 028](./architecture%20docs/adrs/ADR%20028%20-%20Migration%20Structure%20%26%20Operations.md)/[ADR 044](./architecture%20docs/adrs/ADR%20044%20-%20Pre%20%26%20post%20check%20vocabulary%20v1.md))

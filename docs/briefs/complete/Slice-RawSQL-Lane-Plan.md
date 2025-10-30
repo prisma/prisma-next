@@ -53,7 +53,7 @@ Key references:
   - Integration tests in `packages/runtime` for lints/budgets with raw lane.
 - Exports & docs:
   - Export via `@prisma-next/sql` entrypoints.
-  - Examples in `examples/workflows-demo`.
+  - Examples in `examples/prisma-next-demo`.
 
 
 ## Iterative chunks (milestones)
@@ -118,7 +118,7 @@ Key references:
 ### Docs + examples
 
 1. Update `Slice-RawSQL-Lane.md` Acceptance with links to tests.
-2. Add examples in `examples/workflows-demo` using both `root.raw` forms.
+2. Add examples in `examples/prisma-next-demo` using both `root.raw` forms.
 3. Verify `pnpm build` and run demo scripts locally.
 
 
@@ -405,7 +405,7 @@ References:
 Finalize examples and docs for the raw lane.
 
 Tasks:
-- Add example usage to examples/workflows-demo:
+- Add example usage to examples/prisma-next-demo:
   - Template form and function form samples with params.
   - A case with refs and annotations.
 - Update docs:

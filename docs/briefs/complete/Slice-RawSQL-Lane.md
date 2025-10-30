@@ -85,4 +85,4 @@ Out of scope (this brief): adapter lowering (raw uses provided SQL directly), OR
 - Raw lane emits Plans with positional params and stable metadata via both forms
 - Best‑effort lints fire without refs; additional lints fire when refs are provided
 - Budgets enforce pre/post (heuristic + optional EXPLAIN) consistently with other lanes
-- Coverage lives in `packages/sql/test/raw.test.ts`, `packages/runtime/test/runtime.integration.test.ts`, and `examples/workflows-demo/test/runtime.integration.test.ts` for template, function, and runtime flows.
+- Coverage lives in `packages/sql/test/raw.test.ts`, `packages/runtime/test/runtime.integration.test.ts`, and `examples/prisma-next-demo/test/runtime.integration.test.ts` for template, function, and runtime flows.

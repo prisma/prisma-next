@@ -64,7 +64,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  examples/workflows-demo:
+  examples/prisma-next-demo:
     dependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
@@ -141,6 +141,9 @@ importers:
         specifier: workspace:*
         version: link:../sql
     devDependencies:
+      '@prisma/dev':
+        specifier: ^0.1.1
+        version: 0.1.1(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6

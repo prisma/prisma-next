@@ -35,7 +35,7 @@ Out of scope (future slices): plugins (lints/budgets/telemetry), joins, ORM resh
   - `execute(plan)` → verify marker on first use → lower via adapter → stream via driver
   - Structured errors per ADR 027, e.g. `CONTRACT.MARKER_MISSING`, `CONTRACT.MARKER_MISMATCH`
 - Example app scaffolding script (exists)
-  - `examples/workflows-demo/src/prisma/scripts/stamp-marker.ts` uses runtime marker helpers: ensure schema/table → read → insert or update accordingly
+  - `examples/prisma-next-demo/src/prisma/scripts/stamp-marker.ts` uses runtime marker helpers: ensure schema/table → read → insert or update accordingly
 
 ## Test Plan
 ### Integration (Vitest, prisma dev per test)
