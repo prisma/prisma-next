@@ -6,6 +6,9 @@ const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
 
 (async () => {
+  // Initialize Prisma client (checks USE_COMPAT env var internally)
+  const prisma = await getPrisma();
+
   if (cmd === 'read') {
     const [id] = args;
     if (!id) {
@@ -26,6 +29,15 @@ const [cmd, ...args] = argv;
     console.log('Usage: pnpm start -- [read <id> | create <email> <name>]');
     process.exit(1);
   }
-})().finally(async () => {
-  await getPrisma().$disconnect();
+
+  // Cleanup
+  await prisma.$disconnect();
+  // Close Prisma Next runtime if using compat layer
+  // Note: runtime.close() is only available when using Prisma Next compat layer
+  if ('runtime' in prisma && prisma.runtime && typeof (prisma.runtime as { close?: () => Promise<void> }).close === 'function') {
+    await (prisma.runtime as { close: () => Promise<void> }).close();
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
 });

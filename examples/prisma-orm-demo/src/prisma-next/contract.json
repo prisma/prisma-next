@@ -1,0 +1,43 @@
+{
+  "target": "postgres",
+  "targetFamily": "sql",
+  "coreHash": "sha256:prisma-orm-demo-user-model",
+  "profileHash": "sha256:prisma-orm-demo-profile",
+  "storage": {
+    "tables": {
+      "User": {
+        "columns": {
+          "id": {
+            "type": "text",
+            "nullable": false
+          },
+          "email": {
+            "type": "text",
+            "nullable": false
+          },
+          "name": {
+            "type": "text",
+            "nullable": false
+          },
+          "createdAt": {
+            "type": "timestamptz",
+            "nullable": false
+          }
+        },
+        "primaryKey": {
+          "columns": ["id"],
+          "name": "User_pkey"
+        },
+        "uniques": [
+          {
+            "columns": ["email"],
+            "name": "User_email_key"
+          }
+        ],
+        "indexes": [],
+        "foreignKeys": []
+      }
+    }
+  }
+}
+

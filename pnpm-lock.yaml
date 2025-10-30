@@ -39,31 +39,6 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@24.7.2)
 
-  examples/prisma-orm-demo:
-    dependencies:
-      '@prisma/client':
-        specifier: ^6.0.0
-        version: 6.18.0(prisma@6.18.0(typescript@5.9.3))(typescript@5.9.3)
-    devDependencies:
-      '@types/node':
-        specifier: ^20.16.5
-        version: 20.19.24
-      dotenv:
-        specifier: ^16.4.5
-        version: 16.6.1
-      prisma:
-        specifier: ^6.0.0
-        version: 6.18.0(typescript@5.9.3)
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
-      tsx:
-        specifier: ^4.19.2
-        version: 4.20.6
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
   examples/prisma-next-demo:
     dependencies:
       '@prisma-next/adapter-postgres':
@@ -106,6 +81,49 @@ importers:
       vitest:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.24)
+
+  examples/prisma-orm-demo:
+    dependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../packages/adapter-postgres
+      '@prisma-next/compat-prisma':
+        specifier: workspace:*
+        version: link:../../packages/compat-prisma
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../packages/driver-postgres
+      '@prisma-next/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.18.0(prisma@6.18.0(typescript@5.9.3))(typescript@5.9.3)
+      pg:
+        specifier: ^8.11.5
+        version: 8.16.3
+    devDependencies:
+      '@types/node':
+        specifier: ^20.16.5
+        version: 20.19.24
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.15.6
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
+      prisma:
+        specifier: ^6.0.0
+        version: 6.18.0(typescript@5.9.3)
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.20.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/adapter-postgres:
     dependencies:

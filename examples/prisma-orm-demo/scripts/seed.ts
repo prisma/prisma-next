@@ -1,19 +1,18 @@
 import { getPrisma } from '../src/prisma/client';
 
 async function main() {
-  const prisma = getPrisma();
-  await prisma.user.createMany({
-    data: [
-      { email: 'a@example.com', name: 'Alice' },
-      { email: 'b@example.com', name: 'Bob' },
-    ],
-    skipDuplicates: true,
-  });
+  // Seed script uses Prisma Client based on USE_COMPAT env var (defaults to legacy)
+  const prisma = await getPrisma();
+
+  // Use individual creates since createMany is not implemented in compat layer MVP
+  await prisma.user.create({ data: { email: 'a@example.com', name: 'Alice' } });
+  await prisma.user.create({ data: { email: 'b@example.com', name: 'Bob' } });
 }
 
 main()
   .finally(async () => {
-    await getPrisma().$disconnect();
+    const prisma = await getPrisma();
+    await prisma.$disconnect();
   })
   .catch((e) => {
     console.error(e);

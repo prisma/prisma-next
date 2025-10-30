@@ -5,15 +5,22 @@
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev --name init",
+    "prisma-next:stamp": "tsx src/prisma-next/stamp-marker.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0"
+    "@prisma/client": "^6.0.0",
+    "@prisma-next/compat-prisma": "workspace:*",
+    "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "pg": "^8.11.5"
   },
   "devDependencies": {
     "@types/node": "^20.16.5",
+    "@types/pg": "^8.11.10",
     "dotenv": "^16.4.5",
     "prisma": "^6.0.0",
     "tsup": "^8.3.0",
