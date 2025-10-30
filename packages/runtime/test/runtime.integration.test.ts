@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { Client } from 'pg';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
@@ -11,8 +12,8 @@ import type { DataContract } from '@prisma-next/sql/types';
 
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
-import { createPostgresDriver } from '../../driver-postgres/src/postgres-driver';
-import { createDevDatabase, drainAsyncIterable, executeStatement, withClient } from './utils';
+import { PostgresDriver } from '../../driver-postgres/src/postgres-driver';
+import { createDevDatabase, drainAsyncIterable, executeStatement, collectAsync } from './utils';
 
 const fixtureContract = loadContractFixture();
 const tables = schema(fixtureContract).tables;
@@ -20,88 +21,80 @@ const adapter = createPostgresAdapter();
 const builder = sql({ contract: fixtureContract, adapter });
 const plan = builder.from(tables.user).select('id', 'email').limit(5).build();
 
-describe('runtime execute integration', () => {
+describe('runtime execute integration', { timeout: 100 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
+  let sharedDriver: PostgresDriver;
+  let adminClient: Client;
 
   beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 53213,
-      databasePort: 53214,
-      shadowDatabasePort: 53215,
+    database = await createDevDatabase({});
+    adminClient = new Client({ connectionString: database.connectionString });
+    await adminClient.connect();
+    sharedDriver = new PostgresDriver({
+      connect: { client: adminClient },
+      cursor: { disabled: true },
     });
-  });
+  }, 15000);
 
   afterAll(async () => {
-    await database.close();
+    if (sharedDriver) {
+      await sharedDriver.close();
+    }
+    if (adminClient) {
+      try {
+        await adminClient.end();
+      } catch (error) {
+        // Don't care if the client is already closed
+      }
+    }
+    if (database) {
+      await database.close();
+    }
   });
 
   beforeEach(async () => {
-    await withClient(database.connectionString, async (client) => {
-      await client.query('drop schema if exists prisma_contract cascade');
-      await client.query('create schema if not exists public');
-      await client.query('drop table if exists "user"');
-      await client.query('create table "user" (id serial primary key, email text not null)');
-      await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
-        'ada@example.com',
-        'tess@example.com',
-        'mike@example.com',
-      ]);
+    await adminClient.query('drop schema if exists prisma_contract cascade');
+    await adminClient.query('create schema if not exists public');
+    await adminClient.query('drop table if exists "user"');
+    await adminClient.query('create table "user" (id serial primary key, email text not null)');
+    await adminClient.query('insert into "user" (email) values ($1), ($2), ($3)', [
+      'ada@example.com',
+      'tess@example.com',
+      'mike@example.com',
+    ]);
 
-      await executeStatement(client, ensureSchemaStatement);
-      await executeStatement(client, ensureTableStatement);
+    await executeStatement(adminClient, ensureSchemaStatement);
+    await executeStatement(adminClient, ensureTableStatement);
 
-      const write = writeContractMarker({
-        coreHash: fixtureContract.coreHash,
-        profileHash: fixtureContract.profileHash ?? 'sha256:test-profile',
-        contractJson: fixtureContract,
-        canonicalVersion: 1,
-      });
-      await executeStatement(client, write.insert);
+    const write = writeContractMarker({
+      coreHash: fixtureContract.coreHash,
+      profileHash: fixtureContract.profileHash ?? 'sha256:test-profile',
+      contractJson: fixtureContract,
+      canonicalVersion: 1,
     });
+    await executeStatement(adminClient, write.insert);
   });
 
   afterEach(async () => {
-    await withClient(database.connectionString, async (client) => {
-      await client.query('drop schema if exists prisma_contract cascade');
-      await client.query('drop table if exists "user"');
-    });
+    await adminClient.query('drop schema if exists prisma_contract cascade');
+    await adminClient.query('drop table if exists "user"');
   });
 
   it('executes a plan after onFirstUse verification', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const runtime = createRuntime({
       contract: fixtureContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    try {
-      const rows: Array<{ id: number; email: string }> = [];
-      for await (const row of runtime.execute(plan)) {
-        const typed = row as { id: number; email: string };
-        rows.push(typed);
-      }
+    const rows = await collectAsync(runtime.execute(plan));
 
-      expect(rows.length).toBeGreaterThan(0);
-      expect(rows.map((r) => r.email)).toContain('ada@example.com');
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.map((r) => r.email)).toContain('ada@example.com');
+  });
 
   it('throws when marker hash mismatches contract', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const mismatchedContract: DataContract = {
       ...fixtureContract,
       coreHash: 'sha256:mismatch',
@@ -110,30 +103,20 @@ describe('runtime execute integration', () => {
     const runtime = createRuntime({
       contract: mismatchedContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    try {
-      await expect(async () => {
-        await drainAsyncIterable(runtime.execute(plan));
-      }).rejects.toMatchObject({ code: 'PLAN.HASH_MISMATCH' });
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    await expect(async () => {
+      await drainAsyncIterable(runtime.execute(plan));
+    }).rejects.toMatchObject({ code: 'PLAN.HASH_MISMATCH' });
+  });
 
   it('blocks raw select star with lint error', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const runtime = createRuntime({
       contract: fixtureContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
@@ -141,41 +124,31 @@ describe('runtime execute integration', () => {
       select * from "user"
     `;
 
-    try {
-      await expect(async () => {
-        await drainAsyncIterable(runtime.execute(rawPlan));
-      }).rejects.toMatchObject({ code: 'LINT.SELECT_STAR' });
+    await expect(async () => {
+      await drainAsyncIterable(runtime.execute(rawPlan));
+    }).rejects.toMatchObject({ code: 'LINT.SELECT_STAR' });
 
-      const diagnostics = runtime.diagnostics();
-      expect(diagnostics.lints).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: 'LINT.SELECT_STAR', severity: 'error' }),
-        ]),
-      );
+    const diagnostics = runtime.diagnostics();
+    expect(diagnostics.lints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'LINT.SELECT_STAR', severity: 'error' }),
+      ]),
+    );
 
-      const telemetry = runtime.telemetry();
-      expect(telemetry).toMatchObject({
-        outcome: 'lint-error',
-        lane: 'raw',
-        target: 'postgres',
-      });
-      expect(telemetry?.fingerprint).toBeTypeOf('string');
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    const telemetry = runtime.telemetry();
+    expect(telemetry).toMatchObject({
+      outcome: 'lint-error',
+      lane: 'raw',
+      target: 'postgres',
+    });
+    expect(telemetry?.fingerprint).toBeTypeOf('string');
+  });
 
   it('warns on missing limit and blocks via budget heuristic', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const runtime = createRuntime({
       contract: fixtureContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
@@ -183,41 +156,31 @@ describe('runtime execute integration', () => {
       select id from "user"
     `;
 
-    try {
-      await expect(async () => {
-        await drainAsyncIterable(runtime.execute(rawPlan));
-      }).rejects.toMatchObject({ code: 'BUDGET.ROWS_EXCEEDED' });
+    await expect(async () => {
+      await drainAsyncIterable(runtime.execute(rawPlan));
+    }).rejects.toMatchObject({ code: 'BUDGET.ROWS_EXCEEDED' });
 
-      const diagnostics = runtime.diagnostics();
-      expect(diagnostics.lints).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: 'LINT.NO_LIMIT', severity: 'warn' }),
-        ]),
-      );
-      expect(diagnostics.budgets).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED', severity: 'error' }),
-        ]),
-      );
+    const diagnostics = runtime.diagnostics();
+    expect(diagnostics.lints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'LINT.NO_LIMIT', severity: 'warn' }),
+      ]),
+    );
+    expect(diagnostics.budgets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED', severity: 'error' }),
+      ]),
+    );
 
-      const telemetry = runtime.telemetry();
-      expect(telemetry).toMatchObject({ outcome: 'budget-error', lane: 'raw' });
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    const telemetry = runtime.telemetry();
+    expect(telemetry).toMatchObject({ outcome: 'budget-error', lane: 'raw' });
+  });
 
   it('records unindexed predicate warning when refs lack indexes', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const runtime = createRuntime({
       contract: fixtureContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
@@ -233,39 +196,28 @@ describe('runtime execute integration', () => {
       },
     );
 
-    try {
-      const rows: Array<{ id: number }> = [];
-      for await (const row of runtime.execute(rawPlan)) {
-        rows.push(row as { id: number });
-      }
+    const rows = await collectAsync<{ id: number }>(
+      runtime.execute(rawPlan) as AsyncIterable<{ id: number }>,
+    );
 
-      expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeGreaterThan(0);
 
-      const diagnostics = runtime.diagnostics();
-      expect(diagnostics.lints).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: 'LINT.UNINDEXED_PREDICATE', severity: 'warn' }),
-        ]),
-      );
+    const diagnostics = runtime.diagnostics();
+    expect(diagnostics.lints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'LINT.UNINDEXED_PREDICATE', severity: 'warn' }),
+      ]),
+    );
 
-      const telemetry = runtime.telemetry();
-      expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    const telemetry = runtime.telemetry();
+    expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
+  });
 
   it('prevents read-only mutation when annotations intent is report', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const runtime = createRuntime({
       contract: fixtureContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
@@ -277,36 +229,26 @@ describe('runtime execute integration', () => {
       },
     );
 
-    try {
-      await expect(async () => {
-        await drainAsyncIterable(runtime.execute(rawPlan));
-      }).rejects.toMatchObject({ code: 'LINT.READ_ONLY_MUTATION' });
+    await expect(async () => {
+      await drainAsyncIterable(runtime.execute(rawPlan));
+    }).rejects.toMatchObject({ code: 'LINT.READ_ONLY_MUTATION' });
 
-      const diagnostics = runtime.diagnostics();
-      expect(diagnostics.lints).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: 'LINT.READ_ONLY_MUTATION', severity: 'error' }),
-        ]),
-      );
+    const diagnostics = runtime.diagnostics();
+    expect(diagnostics.lints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'LINT.READ_ONLY_MUTATION', severity: 'error' }),
+      ]),
+    );
 
-      const telemetry = runtime.telemetry();
-      expect(telemetry).toMatchObject({ outcome: 'lint-error', lane: 'raw' });
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    const telemetry = runtime.telemetry();
+    expect(telemetry).toMatchObject({ outcome: 'lint-error', lane: 'raw' });
+  });
 
   it('respects unbounded select severity override', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const runtime = createRuntime({
       contract: fixtureContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
       guardrails: { budgets: { unboundedSelectSeverity: 'warn' } },
     });
@@ -315,34 +257,24 @@ describe('runtime execute integration', () => {
       select id from "user"
     `;
 
-    try {
-      await drainAsyncIterable(runtime.execute(rawPlan));
+    await drainAsyncIterable(runtime.execute(rawPlan));
 
-      const diagnostics = runtime.diagnostics();
-      expect(diagnostics.budgets).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED', severity: 'warn' }),
-        ]),
-      );
+    const diagnostics = runtime.diagnostics();
+    expect(diagnostics.budgets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED', severity: 'warn' }),
+      ]),
+    );
 
-      const telemetry = runtime.telemetry();
-      expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    const telemetry = runtime.telemetry();
+    expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
+  });
 
   it('attaches explain estimates when enabled', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const runtime = createRuntime({
       contract: fixtureContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
       guardrails: { budgets: { unboundedSelectSeverity: 'warn', explain: { enabled: true } } },
     });
@@ -351,60 +283,48 @@ describe('runtime execute integration', () => {
       select id from "user"
     `;
 
-    try {
-      await drainAsyncIterable(runtime.execute(rawPlan));
+    await drainAsyncIterable(runtime.execute(rawPlan));
 
-      const diagnostics = runtime.diagnostics();
-      const budgetFinding = diagnostics.budgets.find((finding) => finding.code === 'BUDGET.ROWS_EXCEEDED');
-      expect(budgetFinding).toBeDefined();
-      expect(budgetFinding?.details?.estimatedRows).toBeTypeOf('number');
+    const diagnostics = runtime.diagnostics();
+    const budgetFinding = diagnostics.budgets.find(
+      (finding) => finding.code === 'BUDGET.ROWS_EXCEEDED',
+    );
+    expect(budgetFinding).toBeDefined();
+    expect(budgetFinding?.details?.estimatedRows).toBeTypeOf('number');
 
-      const telemetry = runtime.telemetry();
-      expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
-      expect(telemetry?.fingerprint).toBeTypeOf('string');
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    const telemetry = runtime.telemetry();
+    expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
+    expect(telemetry?.fingerprint).toBeTypeOf('string');
+  });
 
   it('emits stable fingerprint for literal-only differences', async () => {
-    const driver = createPostgresDriver({
-      connectionString: database.connectionString,
-      cursor: { disabled: true },
-    });
-    await driver.connect();
-
     const runtime = createRuntime({
       contract: fixtureContract,
       adapter,
-      driver,
+      driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
       guardrails: { budgets: { unboundedSelectSeverity: 'warn' } },
     });
 
-    try {
-      const planOne = sql({ contract: fixtureContract, adapter }).raw(
-        "select id from \"user\" where email = 'ada@example.com' limit 1",
-        { params: [] },
-      );
+    const planOne = sql({ contract: fixtureContract, adapter }).raw(
+      'select id from "user" where email = \'ada@example.com\' limit 1',
+      { params: [] },
+    );
 
-      await drainAsyncIterable(runtime.execute(planOne));
-      const fingerprintOne = runtime.telemetry()?.fingerprint;
+    await drainAsyncIterable(runtime.execute(planOne));
+    const fingerprintOne = runtime.telemetry()?.fingerprint;
 
-      const planTwo = sql({ contract: fixtureContract, adapter }).raw(
-        "select id from \"user\" where email = 'tess@example.com' limit 1",
-        { params: [] },
-      );
+    const planTwo = sql({ contract: fixtureContract, adapter }).raw(
+      'select id from "user" where email = \'tess@example.com\' limit 1',
+      { params: [] },
+    );
 
-      await drainAsyncIterable(runtime.execute(planTwo));
-      const fingerprintTwo = runtime.telemetry()?.fingerprint;
+    await drainAsyncIterable(runtime.execute(planTwo));
+    const fingerprintTwo = runtime.telemetry()?.fingerprint;
 
-      expect(fingerprintOne).toBeTypeOf('string');
-      expect(fingerprintTwo).toBe(fingerprintOne);
-    } finally {
-      await runtime.close();
-    }
-  }, 15000);
+    expect(fingerprintOne).toBeTypeOf('string');
+    expect(fingerprintTwo).toBe(fingerprintOne);
+  });
 });
 
 function loadContractFixture(): DataContract {

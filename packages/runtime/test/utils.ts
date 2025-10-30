@@ -2,6 +2,14 @@ import { unstable_startServer } from '@prisma/dev';
 import type { StartServerOptions } from '@prisma/dev';
 import { Client } from 'pg';
 
+function normalizeConnectionString(raw: string): string {
+  const url = new URL(raw);
+  if (url.hostname === 'localhost' || url.hostname === '::1') {
+    url.hostname = '127.0.0.1';
+  }
+  return url.toString();
+}
+
 import type { SqlStatement } from '../src/marker';
 
 export interface DevDatabase {
@@ -13,7 +21,7 @@ export async function createDevDatabase(options?: StartServerOptions): Promise<D
   const server = await unstable_startServer(options);
 
   return {
-    connectionString: server.database.connectionString,
+    connectionString: normalizeConnectionString(server.database.connectionString),
     async close() {
       await server.close();
     },
@@ -60,4 +68,12 @@ export async function drainAsyncIterable<T>(iterable: AsyncIterable<T>): Promise
   for await (const _ of iterable) {
     // exhaust iterator
   }
+}
+
+export async function collectAsync<T>(iterable: AsyncIterable<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const item of iterable) {
+    out.push(item);
+  }
+  return out;
 }
