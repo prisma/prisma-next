@@ -28,12 +28,26 @@ interface FindManyArgs {
 interface FindFirstArgs extends FindManyArgs {}
 
 class ModelDelegate {
+  private readonly tableName: string;
+  private readonly tableRef: TableRef;
+
   constructor(
     private readonly runtime: Runtime,
     private readonly contract: DataContract,
-    private readonly table: TableRef,
+    private readonly table: TableRef & Record<string, ColumnBuilder>,
     private readonly schemaTables: ReturnType<typeof schema>['tables'],
-  ) {}
+    tableName: string,
+  ) {
+    // Store table name explicitly (from schema key)
+    this.tableName = tableName;
+    // Create a clean TableRef that preserves the name property
+    // Object.assign in TableBuilderImpl may have overwritten name if there's a column named 'name'
+    // We preserve the original table for column access but create a clean ref for from() calls
+    this.tableRef = Object.freeze({
+      kind: 'table' as const,
+      name: tableName,
+    }) as TableRef;
+  }
 
   async findUnique(args: FindUniqueArgs): Promise<Record<string, unknown> | null> {
     const result = await this.findMany({
@@ -54,11 +68,11 @@ class ModelDelegate {
   }
 
   async findMany(args: FindManyArgs = {}): Promise<Record<string, unknown>[]> {
-    const tableName = this.table.name;
+    const tableName = this.tableName;
     const adapter = createPostgresAdapter();
     const query = sql({ contract: this.contract, adapter });
 
-    query.from(this.table);
+    query.from(this.tableRef);
 
     // Handle where clause (equality only for MVP)
     if (args.where) {
@@ -66,9 +80,20 @@ class ModelDelegate {
       const whereConditions: Array<{ column: ColumnBuilder; value: unknown }> = [];
 
       for (const [field, value] of Object.entries(args.where)) {
-        const column = (this.table as unknown as Record<string, ColumnBuilder>)[field];
-        if (!column) {
+        // Check contract first to validate field exists
+        const tableDef = this.contract.storage.tables[this.tableName];
+        if (!tableDef || !tableDef.columns[field]) {
           throw this.unsupportedError(`Unknown field '${field}' in where clause`);
+        }
+        // Access column from table object (columns are assigned as properties)
+        const column = this.table[field];
+        if (
+          !column ||
+          typeof column !== 'object' ||
+          !('kind' in column) ||
+          column.kind !== 'column'
+        ) {
+          throw this.unsupportedError(`Invalid column '${field}' in where clause`);
         }
         whereConditions.push({ column, value });
       }
@@ -87,28 +112,57 @@ class ModelDelegate {
     if (args.select) {
       for (const [field, include] of Object.entries(args.select)) {
         if (include) {
-          const column = (this.table as unknown as Record<string, ColumnBuilder>)[field];
-          if (!column) {
+          // Check contract first, then access column
+          const tableDef = this.contract.storage.tables[this.tableName];
+          if (!tableDef || !tableDef.columns[field]) {
             throw this.unsupportedError(`Unknown field '${field}' in select clause`);
+          }
+          const column = this.table[field];
+          if (
+            !column ||
+            typeof column !== 'object' ||
+            !('kind' in column) ||
+            column.kind !== 'column'
+          ) {
+            throw this.unsupportedError(`Invalid column '${field}' in select clause`);
           }
           projection[field] = column;
         }
       }
     } else {
-      // Default: select all columns
+      // Default: select all columns from contract definition
       const tableDef = this.contract.storage.tables[tableName];
       if (tableDef) {
         for (const columnName of Object.keys(tableDef.columns)) {
-          const column = (this.table as unknown as Record<string, ColumnBuilder>)[columnName];
-          if (column) {
+          // Access column from original table object (columns are assigned as properties)
+          const column = this.table[columnName];
+          if (
+            column &&
+            typeof column === 'object' &&
+            'kind' in column &&
+            column.kind === 'column'
+          ) {
             projection[columnName] = column;
           }
         }
       }
-    }
 
-    if (Object.keys(projection).length === 0) {
-      throw this.unsupportedError('Select projection cannot be empty');
+      // Fallback: iterate table properties to find columns
+      if (Object.keys(projection).length === 0) {
+        for (const key in this.table) {
+          if (key === 'name' || key === 'kind') {
+            continue; // Skip name/kind properties
+          }
+          const value = this.table[key];
+          if (value && typeof value === 'object' && 'kind' in value && value.kind === 'column') {
+            projection[key] = value;
+          }
+        }
+      }
+
+      if (Object.keys(projection).length === 0) {
+        throw this.unsupportedError('Select projection cannot be empty');
+      }
     }
 
     query.select(projection);
@@ -121,9 +175,18 @@ class ModelDelegate {
       }
 
       const [field, direction] = orderByEntries[0];
-      const column = (this.table as unknown as Record<string, ColumnBuilder>)[field];
-      if (!column) {
+      const tableDef = this.contract.storage.tables[this.tableName];
+      if (!tableDef || !tableDef.columns[field]) {
         throw this.unsupportedError(`Unknown field '${field}' in orderBy clause`);
+      }
+      const column = this.table[field];
+      if (
+        !column ||
+        typeof column !== 'object' ||
+        !('kind' in column) ||
+        column.kind !== 'column'
+      ) {
+        throw this.unsupportedError(`Invalid column '${field}' in orderBy clause`);
       }
 
       query.orderBy(direction === 'asc' ? column.asc() : column.desc());
@@ -158,7 +221,7 @@ class ModelDelegate {
   }
 
   async create(args: { data: Record<string, unknown> }): Promise<Record<string, unknown>> {
-    const tableName = this.table.name;
+    const tableName = this.tableName;
     const tableDef = this.contract.storage.tables[tableName];
 
     if (!tableDef) {
@@ -217,7 +280,10 @@ class ModelDelegate {
     return results[0];
   }
 
-  async update(args: { where: Record<string, unknown>; data: Record<string, unknown> }): Promise<Record<string, unknown>> {
+  async update(args: {
+    where: Record<string, unknown>;
+    data: Record<string, unknown>;
+  }): Promise<Record<string, unknown>> {
     throw this.unsupportedError('update() mutations are not supported in MVP compatibility layer');
   }
 
@@ -232,7 +298,9 @@ class ModelDelegate {
         throw this.unsupportedError(`Null/undefined values in where clause not supported in MVP`);
       }
       if (typeof value === 'object' && !Array.isArray(value)) {
-        throw this.unsupportedError(`Complex where predicates (e.g., {${field}: {gt: ...}}) not supported in MVP`);
+        throw this.unsupportedError(
+          `Complex where predicates (e.g., {${field}: {gt: ...}}) not supported in MVP`,
+        );
       }
       if (Array.isArray(value)) {
         throw this.unsupportedError(`IN/NOT IN predicates not supported in MVP`);
@@ -296,8 +364,14 @@ class PrismaClientImpl {
     for (const [tableName, table] of Object.entries(this.schemaHandle.tables)) {
       // Convert table name to camelCase model name (e.g., "user" -> "user", "User" -> "user")
       const modelName = tableName.charAt(0).toLowerCase() + tableName.slice(1);
-      const tableRef = table as TableRef;
-      this.models[modelName] = new ModelDelegate(this.runtime, this.contract, tableRef, this.schemaHandle.tables);
+      // Pass tableName explicitly since Object.assign in TableBuilderImpl may interfere with name property
+      this.models[modelName] = new ModelDelegate(
+        this.runtime,
+        this.contract,
+        table as unknown as TableRef & Record<string, ColumnBuilder>,
+        this.schemaHandle.tables,
+        tableName,
+      );
     }
   }
 
@@ -336,4 +410,3 @@ export class PrismaClient extends PrismaClientImpl {
     return proxy;
   }
 }
-

@@ -2,9 +2,40 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';
 import type { DataContract } from '@prisma-next/sql/types';
 import { Client } from 'pg';
-import { createPostgresDriver } from '@prisma-next/driver-postgres';
-import { createRuntime } from '@prisma-next/runtime';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import { PostgresDriver } from '@prisma-next/driver-postgres';
+import {
+  createRuntime,
+  ensureSchemaStatement,
+  ensureTableStatement,
+  writeContractMarker,
+} from '@prisma-next/runtime';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { unstable_startServer } from '@prisma/dev';
+import type { StartServerOptions } from '@prisma/dev';
+
+function normalizeConnectionString(raw: string): string {
+  const url = new URL(raw);
+  if (url.hostname === 'localhost' || url.hostname === '::1') {
+    url.hostname = '127.0.0.1';
+  }
+  return url.toString();
+}
+
+export interface DevDatabase {
+  readonly connectionString: string;
+  close(): Promise<void>;
+}
+
+async function createDevDatabase(options?: StartServerOptions): Promise<DevDatabase> {
+  const server = await unstable_startServer(options);
+
+  return {
+    connectionString: normalizeConnectionString(server.database.connectionString),
+    async close() {
+      await server.close();
+    },
+  };
+}
 
 const testContract: DataContract = {
   target: 'postgres',
@@ -28,7 +59,9 @@ const testContract: DataContract = {
 interface CompatClient {
   user: {
     findUnique(args: { where: { id: string } }): Promise<Record<string, unknown> | null>;
-    create(args: { data: { id: string; email: string; name: string } }): Promise<Record<string, unknown>>;
+    create(args: {
+      data: { id: string; email: string; name: string };
+    }): Promise<Record<string, unknown>>;
   };
   $disconnect(): Promise<void>;
 }
@@ -44,160 +77,195 @@ async function createUser(
   return client.user.create({ data: input });
 }
 
-describe('PrismaClient compatibility layer - dual implementation harness', () => {
-  let client: Client;
-  let prismaPN: PrismaClient;
+describe(
+  'PrismaClient compatibility layer - dual implementation harness',
+  { timeout: 15000 },
+  () => {
+    let database: Awaited<ReturnType<typeof createDevDatabase>>;
+    let client: Client;
+    let prismaPN: PrismaClient;
 
-  beforeAll(async () => {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL environment variable is required');
-    }
+    beforeAll(async () => {
+      database = await createDevDatabase({
+        acceleratePort: 54000,
+        databasePort: 54001,
+        shadowDatabasePort: 54002,
+      });
+      client = new Client({ connectionString: database.connectionString });
+      await client.connect();
 
-    client = new Client({ connectionString });
-    await client.connect();
+      // Create test table (shared for both implementations)
+      await client.query(`
+        DROP TABLE IF EXISTS "user";
+        CREATE TABLE "user" (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          name TEXT NOT NULL,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
 
-    // Create test table (shared for both implementations)
-    await client.query(`
-      DROP TABLE IF EXISTS "user";
-      CREATE TABLE "user" (
+      // Use the same client connection to avoid multiple connections to dev database
+      const driver = new PostgresDriver({
+        connect: { client },
+        cursor: { disabled: true },
+      });
+
+      const runtime = createRuntime({
+        contract: testContract,
+        adapter: createPostgresAdapter(),
+        driver,
+        verify: {
+          mode: 'onFirstUse',
+          requireMarker: false,
+        },
+      });
+
+      prismaPN = new PrismaClient({
+        contract: testContract,
+        runtime,
+      });
+    });
+
+    afterAll(async () => {
+      try {
+        await prismaPN.$disconnect();
+        await client.query('DROP TABLE IF EXISTS "user"');
+        await client.end();
+        await database.close();
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    });
+
+    beforeEach(async () => {
+      // Reset schema between tests
+      await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
+      await client.query('DROP TABLE IF EXISTS "user"');
+      await client.query(`CREATE TABLE "user" (
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         name TEXT NOT NULL,
         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
+      )`);
 
-    const driver = createPostgresDriver(connectionString);
-    const runtime = createRuntime({
-      contract: testContract,
-      adapter: createPostgresAdapter(),
-      driver,
-      verify: {
-        mode: 'onFirstUse',
-        requireMarker: false,
-      },
-    });
+      // Create marker schema and table
+      await client.query(ensureSchemaStatement.sql);
+      await client.query(ensureTableStatement.sql);
 
-    prismaPN = new PrismaClient({
-      contract: testContract,
-      runtime,
-    });
-  });
-
-  afterAll(async () => {
-    await prismaPN.$disconnect();
-    await client.query('DROP TABLE IF EXISTS "user"');
-    await client.end();
-  });
-
-  beforeEach(async () => {
-    // Reset schema between tests
-    await client.query('TRUNCATE TABLE "user" CASCADE');
-  });
-
-  describe('PN + compatibility layer', () => {
-    it('creates a user and returns the created record', async () => {
-      const result = await createUser(prismaPN, {
-        id: 'test-1',
-        email: 'test@example.com',
-        name: 'Test User',
+      // Write contract marker
+      const write = writeContractMarker({
+        coreHash: testContract.coreHash,
+        profileHash: testContract.profileHash ?? 'sha256:test-profile',
+        contractJson: testContract,
+        canonicalVersion: 1,
       });
-
-      expect(result).toBeDefined();
-      expect(result.id).toBe('test-1');
-      expect(result.email).toBe('test@example.com');
-      expect(result.name).toBe('Test User');
-      expect(result.createdAt).toBeDefined();
+      await client.query(write.insert.sql, [...write.insert.params]);
     });
 
-    it('finds a unique user by id', async () => {
-      // Seed data
-      await createUser(prismaPN, {
-        id: 'test-1',
-        email: 'test@example.com',
-        name: 'Test User',
-      });
-
-      const result = await readUserById(prismaPN, 'test-1');
-
-      expect(result).toBeDefined();
-      expect(result?.id).toBe('test-1');
-      expect(result?.email).toBe('test@example.com');
-      expect(result?.name).toBe('Test User');
-    });
-
-    it('returns null for findUnique when not found', async () => {
-      const result = await readUserById(prismaPN, 'non-existent');
-
-      expect(result).toBeNull();
-    });
-
-    it('finds many users', async () => {
-      // Create multiple users
-      await createUser(prismaPN, {
-        id: 'test-1',
-        email: 'test1@example.com',
-        name: 'Test User 1',
-      });
-      await createUser(prismaPN, {
-        id: 'test-2',
-        email: 'test2@example.com',
-        name: 'Test User 2',
-      });
-
-      const results = await prismaPN.user.findMany();
-
-      expect(results.length).toBe(2);
-      expect(results.some((u: Record<string, unknown>) => u.id === 'test-1')).toBe(true);
-      expect(results.some((u: Record<string, unknown>) => u.id === 'test-2')).toBe(true);
-    });
-
-    it('finds first user with where clause', async () => {
-      await createUser(prismaPN, {
-        id: 'test-1',
-        email: 'test@example.com',
-        name: 'Test User',
-      });
-
-      const result = await prismaPN.user.findFirst({
-        where: { email: 'test@example.com' },
-      });
-
-      expect(result).toBeDefined();
-      expect(result?.email).toBe('test@example.com');
-    });
-  });
-
-  describe('Guardrail: unbounded findMany should trigger budget error', () => {
-    it('throws BUDGET.ROWS_EXCEEDED for unbounded select without limit', async () => {
-      // Create many users to exceed budget
-      for (let i = 0; i < 20; i++) {
-        await createUser(prismaPN, {
-          id: `test-${i}`,
-          email: `test${i}@example.com`,
-          name: `Test User ${i}`,
+    describe('PN + compatibility layer', () => {
+      it('creates a user and returns the created record', async () => {
+        const result = await createUser(prismaPN, {
+          id: 'test-1',
+          email: 'test@example.com',
+          name: 'Test User',
         });
-      }
 
-      // Runtime should have budgets enabled by default
-      // For MVP, we'll test that findMany without take throws when budgets are enabled
-      // Note: This test may need adjustment based on actual budget configuration
-      await expect(prismaPN.user.findMany()).resolves.toBeDefined();
-      
-      // With take, it should work
-      const results = await prismaPN.user.findMany({ take: 10 });
-      expect(results.length).toBeLessThanOrEqual(10);
-    });
-  });
+        expect(result).toBeDefined();
+        expect(result.id).toBe('test-1');
+        expect(result.email).toBe('test@example.com');
+        expect(result.name).toBe('Test User');
+        expect(result.createdAt).toBeDefined();
+      });
 
-  describe('Contract drift handling', () => {
-    it('verifies contract marker on first use', async () => {
-      // Runtime is configured with verify.mode: 'onFirstUse'
-      // This should verify the contract on first query execution
-      const result = await readUserById(prismaPN, 'non-existent');
-      expect(result).toBeNull();
-      // If contract mismatch occurred, we would have thrown CONTRACT.MARKER_MISMATCH
+      it('finds a unique user by id', async () => {
+        // Seed data
+        await createUser(prismaPN, {
+          id: 'test-1',
+          email: 'test@example.com',
+          name: 'Test User',
+        });
+
+        const result = await readUserById(prismaPN, 'test-1');
+
+        expect(result).toBeDefined();
+        expect(result?.id).toBe('test-1');
+        expect(result?.email).toBe('test@example.com');
+        expect(result?.name).toBe('Test User');
+      });
+
+      it('returns null for findUnique when not found', async () => {
+        const result = await readUserById(prismaPN, 'non-existent');
+
+        expect(result).toBeNull();
+      });
+
+      it('finds many users', async () => {
+        // Create multiple users
+        await createUser(prismaPN, {
+          id: 'test-1',
+          email: 'test1@example.com',
+          name: 'Test User 1',
+        });
+        await createUser(prismaPN, {
+          id: 'test-2',
+          email: 'test2@example.com',
+          name: 'Test User 2',
+        });
+
+        const results = await prismaPN.user.findMany();
+
+        expect(results.length).toBe(2);
+        expect(results.some((u: Record<string, unknown>) => u.id === 'test-1')).toBe(true);
+        expect(results.some((u: Record<string, unknown>) => u.id === 'test-2')).toBe(true);
+      });
+
+      it('finds first user with where clause', async () => {
+        await createUser(prismaPN, {
+          id: 'test-1',
+          email: 'test@example.com',
+          name: 'Test User',
+        });
+
+        const result = await prismaPN.user.findFirst({
+          where: { email: 'test@example.com' },
+        });
+
+        expect(result).toBeDefined();
+        expect(result?.email).toBe('test@example.com');
+      });
     });
-  });
-});
+
+    describe('Guardrail: unbounded findMany should trigger budget error', () => {
+      it('throws BUDGET.ROWS_EXCEEDED for unbounded select without limit', async () => {
+        // Create many users to exceed budget
+        for (let i = 0; i < 20; i++) {
+          await createUser(prismaPN, {
+            id: `test-${i}`,
+            email: `test${i}@example.com`,
+            name: `Test User ${i}`,
+          });
+        }
+
+        // Runtime should have budgets enabled by default
+        // For MVP, we'll test that findMany without take throws when budgets are enabled
+        // Note: This test may need adjustment based on actual budget configuration
+        await expect(prismaPN.user.findMany()).resolves.toBeDefined();
+
+        // With take, it should work
+        const results = await prismaPN.user.findMany({ take: 10 });
+        expect(results.length).toBeLessThanOrEqual(10);
+      });
+    });
+
+    describe('Contract drift handling', () => {
+      it('verifies contract marker on first use', async () => {
+        // Runtime is configured with verify.mode: 'onFirstUse'
+        // This should verify the contract on first query execution
+        const result = await readUserById(prismaPN, 'non-existent');
+        expect(result).toBeNull();
+        // If contract mismatch occurred, we would have thrown CONTRACT.MARKER_MISMATCH
+      });
+    });
+  },
+);
