@@ -1,19 +1,23 @@
 # Prisma Next — Two‑Week MVP Spec (Workflow‑Oriented)
 
-This spec captures the MVP we agreed on and maps each area to the source design docs for traceability.
+This spec defines a single, coherent MVP for the two‑week spike. It reflects the leadership proposal’s goals and exit criteria and serves as the source of truth for what we will build and demonstrate.
 
-## Goals (de‑risk pivot)
-- Prove tighter, earlier feedback loops vs Drizzle and P0 (see [Architecture Overview](./Architecture%20Overview.md) — Guiding Principles and Guardrails and Feedback Matrix).
-- No manual generate: PSL → contract artifacts on save ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 008 — Dev Auto Emit CI Explicit Emit](./architecture%20docs/adrs/ADR%20008%20-%20Dev%20Auto%20Emit%20CI%20Explicit%20Emit.md)).
-- Guardrails/budgets enforced pre‑ and post‑execution ([Runtime & Plugin Framework](./architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md); [ADR 022 — Lint Rule Taxonomy](./architecture%20docs/adrs/ADR%20022%20-%20Lint%20Rule%20Taxonomy.md); [ADR 023 — Budget Evaluation](./architecture%20docs/adrs/ADR%20023%20-%20Budget%20Evaluation.md)).
-- Deterministic, self‑verifying migrations (plan/verify/preflight/apply) ([Migration System](./architecture%20docs/subsystems/7.%20Migration%20System.md); [ADR 001 — Migrations as Edges](./architecture%20docs/adrs/ADR%20001%20-%20Migrations%20as%20Edges.md); [ADR 044 — Pre & post check vocabulary v1](./architecture%20docs/adrs/ADR%20044%20-%20Pre%20%26%20post%20check%20vocabulary%20v1.md); [ADR 029 — Shadow DB preflight semantics](./architecture%20docs/adrs/ADR%20029%20-%20Shadow%20DB%20preflight%20semantics.md)).
-- CI required check with clear, machine‑readable diagnostics ([ADR 027 — Error Envelope & Stable Codes](./architecture%20docs/adrs/ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md); [ADR 024 — Telemetry Schema & Privacy](./architecture%20docs/adrs/ADR%20024%20-%20Telemetry%20Schema.md)).
+## Goals (two‑week spike)
+- Compatibility import‑swap for a minimal Prisma ORM example app with zero query edits via a compatibility layer
+- Safety and coaching value via the budgets plugin blocking an unbounded read and surfacing a clear fix
+- Extensibility demonstrated by installing and using a `pgvector` pack without core changes
+
+Supporting goals for developer experience and verification:
+- No manual generate: PSL → contract artifacts on save
+- Guardrails and budgets enforced pre‑ and post‑execution with stable error envelopes
 
 ## Acceptance Criteria
-- All workflows pass (below) using isolated prisma dev instances per test ([ADR 124 — Unified Async Iterable Execution Surface](./architecture%20docs/adrs/ADR%20124%20-%20Unified%20Async%20Iterable%20Execution%20Surface.md); [ADR 122 — Database Initialization & Adoption](./architecture%20docs/adrs/ADR%20122%20-%20Database%20Initialization%20%26%20Adoption.md)).
-- Vite plugin auto‑emits contract and blocks on contract errors ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 032 — Dev Auto Emit Integration](./architecture%20docs/adrs/ADR%20032%20-%20Dev%20Auto%20Emit%20Integration.md)).
-- CI required check fails on any error‑severity envelope; Drizzle comparison non‑gating ([ADR 027](./architecture%20docs/adrs/ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md); [ADR 024](./architecture%20docs/adrs/ADR%20024%20-%20Telemetry%20Schema.md)).
-- Seed is idempotent top‑up to targets (users 10k, posts 50k, purchases 25k).
+- Example app runs unchanged on PN via a compatibility layer (import‑swap, zero query edits)
+- Budgets plugin blocks an unbounded read with an actionable fix
+- `pgvector` pack installed and used in the demo without core changes
+
+Supporting acceptance
+- Vite plugin auto‑emits contract and blocks on contract errors
 
 ## Example App (ESM) — `examples/workflows-demo/`
 - `src/prisma/schema.psl` ([Data Contract](./architecture%20docs/subsystems/1.%20Data%20Contract.md)).
@@ -54,18 +58,18 @@ This spec captures the MVP we agreed on and maps each area to the source design 
 - Results: `AsyncIterable<Row>` by default ([ADR 124](./architecture%20docs/adrs/ADR%20124%20-%20Unified%20Async%20Iterable%20Execution%20Surface.md)/[ADR 125](./architecture%20docs/adrs/ADR%20125%20-%20Execution%20Mode%20Selection%20%26%20Streaming%20Semantics.md)).
 
 ### SQL Lane
-- Core relational builder (select, where eq/and/or, joins, orderBy, limit, aggregates).
-- Relation traversal across named tables (Query Lanes; [Adapters & Targets](./architecture%20docs/subsystems/5.%20Adapters%20%26%20Targets.md) for lowering decisions).
+- Core relational builder (select, where eq/and/or, joins, orderBy, limit, aggregates)
+- Relation traversal across named tables (Query Lanes; [Adapters & Targets](./architecture%20docs/subsystems/5.%20Adapters%20%26%20Targets.md) for lowering decisions)
 
 ### ORM Lane (thin reshape layer)
-- Same relational capabilities as SQL lane.
-- Traversal 1:N, N:1, N:M; multi‑level includes.
-- Default per‑relation limit 100 and order `createdAt desc` (fallback PK desc); overridable via chained options on relation selection.
-- Runtime reshapes joined rows to nested objects according to Plan projection ([Runtime & Plugin Framework](./architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md) — Execution Pipeline).
+- Same relational capabilities as SQL lane
+- Traversal 1:N, N:1
+- Default per‑relation limit 100 and order `createdAt desc` (fallback PK desc); overridable via chained options on relation selection
+- Runtime reshapes joined rows to nested objects according to Plan projection ([Runtime & Plugin Framework](./architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md) — Execution Pipeline)
 
 ### Raw SQL Lane
-- Tagged literal: `root.raw\`select * from "user" where id = ${id}\`` ([ADR 012 — Raw SQL Escape Hatch](./architecture%20docs/adrs/ADR%20012%20-%20Raw%20SQL%20Escape%20Hatch.md)).
-- Function form: `root.raw(text, { params, refs?, annotations? })` ([ADR 018 — Plan Annotations Schema](./architecture%20docs/adrs/ADR%20018%20-%20Plan%20Annotations%20Schema.md)).
+- Tagged literal: `root.raw\`select * from "user" where id = ${id}\`` ([ADR 012 — Raw SQL Escape Hatch](./architecture%20docs/adrs/ADR%20012%20-%20Raw%20SQL%20Escape%20Hatch.md))
+- Function form: `root.raw(text, { params, refs?, annotations? })` ([ADR 018 — Plan Annotations Schema](./architecture%20docs/adrs/ADR%20018%20-%20Plan%20Annotations%20Schema.md))
 - Lints/budgets apply consistently across lanes ([ADR 022](./architecture%20docs/adrs/ADR%20022%20-%20Lint%20Rule%20Taxonomy.md)/[ADR 023](./architecture%20docs/adrs/ADR%20023%20-%20Budget%20Evaluation.md)):
   - Built‑in best‑effort: `no-select-star`, `no-missing-limit`
   - Require `refs` to enable: `no-unindexed-predicate`, `read-only-mutation`
@@ -76,7 +80,6 @@ This spec captures the MVP we agreed on and maps each area to the source design 
 - Plugins enabled in example runtime ([Runtime & Plugin Framework](./architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md)):
   - `lints` (mode strict; [ADR 022](./architecture%20docs/adrs/ADR%20022%20-%20Lint%20Rule%20Taxonomy.md))
   - `budgets` (rows 10_000 error; latency 1_000 ms warn; [ADR 023](./architecture%20docs/adrs/ADR%20023%20-%20Budget%20Evaluation.md))
-  - `telemetry` console ([ADR 024](./architecture%20docs/adrs/ADR%20024%20-%20Telemetry%20Schema.md))
 - Pre‑exec heuristics (before execution):
   - Any SELECT without LIMIT is treated as over row budget (policy decides error/warn) ([ADR 023](./architecture%20docs/adrs/ADR%20023%20-%20Budget%20Evaluation.md))
   - Optional EXPLAIN (no ANALYZE) can refine estimates when enabled ([ADR 115 — Extension guardrails & EXPLAIN policies](./architecture%20docs/adrs/ADR%20115%20-%20Extension%20guardrails%20%26%20EXPLAIN%20policies.md))
@@ -96,6 +99,7 @@ This spec captures the MVP we agreed on and maps each area to the source design 
 - Error envelope ([ADR 027](./architecture%20docs/adrs/ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md)): `RuntimeError` with stable codes/categories (PLAN/RUNTIME/ADAPTER/BUDGET/LINT/MIGRATION/PREFLIGHT/CONTRACT/CONFIG).
 
 ## Migrations & Preflight
+- Scope for the two‑week spike: additive local migrations only; rename/drop, SQL escape hatch within migrations, and PPg preflight as a service are out of scope for the spike
 - [Migration System](./architecture%20docs/subsystems/7.%20Migration%20System.md) with ADRs: [001](./architecture%20docs/adrs/ADR%20001%20-%20Migrations%20as%20Edges.md), [021](./architecture%20docs/adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md), [028](./architecture%20docs/adrs/ADR%20028%20-%20Migration%20Structure%20%26%20Operations.md), [029](./architecture%20docs/adrs/ADR%20029%20-%20Shadow%20DB%20preflight%20semantics.md), [037](./architecture%20docs/adrs/ADR%20037%20-%20Transactional%20DDL%20Fallback.md), [038](./architecture%20docs/adrs/ADR%20038%20-%20Operation%20idempotency%20classification%20%26%20enforcement.md), [039](./architecture%20docs/adrs/ADR%20039%20-%20DAG%20path%20resolution%20%26%20integrity.md), [044](./architecture%20docs/adrs/ADR%20044%20-%20Pre%20%26%20post%20check%20vocabulary%20v1.md), [051](./architecture%20docs/adrs/ADR%20051%20-%20PPg%20preflight-as-a-service%20contract.md), [102](./architecture%20docs/adrs/ADR%20102%20-%20Squash-first%20policy%20%26%20squash%20advisor.md).
 - Directory: `examples/workflows-demo/migrations/`; name pattern `YYYYMMDDThhmm_snake_case` ([ADR 009](./architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md)).
 - CLI (default config from `prisma-next.config.ts`):
@@ -114,9 +118,10 @@ This spec captures the MVP we agreed on and maps each area to the source design 
   - Global `testTimeout: 1000`; suites that start prisma dev/seed override to ~15s.
 - Typecheck tests: `tsd` (Type helpers largely tested in packages; example app includes minimal tests).
 - Local DB orchestration: `@prisma/dev` programmatic API to start/stop prisma dev per workflow test; set `process.env.DATABASE_URL`; run seed via `esr`.
-- Drizzle harness: drizzle‑orm + pg (no drizzle‑kit), inline schema; run equivalent queries; record lack of diagnostics (non‑gating).
+- Drizzle harness: drizzle‑orm + pg (no drizzle‑kit), inline schema; run equivalent queries; record lack of diagnostics (non‑gating). Use harness side‑by‑side in the safety demo to contrast PN’s budgets‑based unbounded read block
 
 ## CI — GitHub Actions
+- Optional supportive infra for the spike: a CI required check is a GitHub status check that must pass for merges and can fail on error‑severity envelopes from PN’s error taxonomy. It is supportive evidence for quality but not a spike exit criterion
 - Trigger: `pull_request` → main.
 - Required check name: `Prisma Next Workflows`.
 - Node: 20.x.
@@ -141,3 +146,13 @@ This spec captures the MVP we agreed on and maps each area to the source design 
 - Raw SQL lane: deeper parse for refs without caller hints ([ADR 019 — TypedSQL as Separate CLI](./architecture%20docs/adrs/ADR%20019%20-%20TypedSQL%20as%20Separate%20CLI.md) is out of scope for MVP).
 - Additional lints (cartesian joins, PII policies), TypedSQL lane, richer telemetry sinks ([ADR 024](./architecture%20docs/adrs/ADR%20024%20-%20Telemetry%20Schema.md)).
 - Multi‑adapter support; rename/drop planning hints ([ADR 028](./architecture%20docs/adrs/ADR%20028%20-%20Migration%20Structure%20%26%20Operations.md) extensions; [ADR 116 — Extension‑aware migration ops](./architecture%20docs/adrs/ADR%20116%20-%20Extension-aware%20migration%20ops.md)).
+
+## Two‑axis plan (brief)
+- Compatibility + Functionality: start with a minimal P0 example app and prove import‑swap to PN; expand the app’s feature set and prove porting at each step so functionality and compatibility advance together
+- Exposure: widen the audience as capability grows — insiders conversations → insider demos → new‑app scaffolding → Prisma 8 prerelease → Prisma 8
+
+## Value delivery checkpoints (brief)
+- Can port an example app (import‑swap, zero query edits), with guardrails and `pgvector` in demo
+- Can scaffold a new PN + PPg app (CRUD + vector) with guardrails and CI checks
+- Cohort A can port via import‑swap across common read paths; additive migrations locally
+- External adapters begin to land (new SQL target; Mongo initiated externally)
