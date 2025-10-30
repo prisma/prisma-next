@@ -19,7 +19,7 @@ export async function getPrisma() {
   if (useCompat) {
     // Use Prisma Next compatibility layer
     if (!compatPrisma) {
-      const runtime = await getPrismaNextRuntime();
+      const runtime = getPrismaNextRuntime();
       compatPrisma = new CompatPrismaClient({
         contract: contract as DataContract,
         runtime,

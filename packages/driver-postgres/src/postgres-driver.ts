@@ -111,6 +111,23 @@ export class PostgresDriver implements SqlDriver {
       return this.pool.connect();
     }
     if (this.directClient) {
+      // Lazy connection: connect if not already connected
+      // This allows tests to manage their own connections while still supporting lazy connection
+      // pg's Client.connect() will throw if already connected, so we catch and ignore that case
+      try {
+        await this.directClient.connect();
+      } catch (error: unknown) {
+        // If already connected, pg throws an error - ignore it and proceed
+        // Re-throw other errors (actual connection failures)
+        if (error instanceof Error) {
+          const message = error.message.toLowerCase();
+          if (!message.includes('already') && !message.includes('connected')) {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
       return this.directClient;
     }
     throw new Error('PostgresDriver requires a pool or client');

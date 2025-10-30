@@ -27,6 +27,3 @@ export interface Plugin {
   onRow?(row: unknown, plan: unknown, ctx: PluginContext): Promise<void>;
   afterExecute?(plan: unknown, result: AfterExecuteResult, ctx: PluginContext): Promise<void>;
 }
-
-
-

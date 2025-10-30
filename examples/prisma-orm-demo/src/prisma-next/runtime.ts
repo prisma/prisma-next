@@ -8,17 +8,15 @@ import type { DataContract } from '@prisma-next/sql/types';
 let runtime: ReturnType<typeof createRuntime> | undefined;
 let client: Client | undefined;
 
-export async function getPrismaNextRuntime() {
+export function getPrismaNextRuntime() {
   if (!runtime) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
       throw new Error('DATABASE_URL environment variable is required');
     }
 
-    // Use a single client connection for the dev database (supports only one connection)
+    // Create client but don't connect yet - PostgresDriver will connect lazily on first use
     client = new Client({ connectionString });
-    // Connect the client before creating the driver
-    await client.connect();
 
     const driver = new PostgresDriver({
       connect: { client },
@@ -40,6 +38,8 @@ export async function getPrismaNextRuntime() {
 
 export async function closePrismaNextRuntime() {
   if (runtime) {
+    // Note: runtime.close() doesn't disconnect direct clients, only pools
+    // This allows tests to manage their own client connections
     await runtime.close();
     runtime = undefined;
   }
@@ -48,4 +48,3 @@ export async function closePrismaNextRuntime() {
     client = undefined;
   }
 }
-
