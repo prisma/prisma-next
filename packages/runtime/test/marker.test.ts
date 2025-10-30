@@ -17,9 +17,9 @@ describe('marker helpers', { timeout: 100 }, () => {
 
   beforeAll(async () => {
     database = await createDevDatabase({
-      acceleratePort: 54213,
-      databasePort: 54214,
-      shadowDatabasePort: 54215,
+      acceleratePort: 54216,
+      databasePort: 54217,
+      shadowDatabasePort: 54218,
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();

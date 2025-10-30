@@ -49,11 +49,10 @@ export class PostgresDriver implements SqlDriver {
   }
 
   async connect(): Promise<void> {
-    await this.ensureConnected();
+    // No-op: caller controls connecting the underlying client or pool
   }
 
   async *execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
-    await this.ensureConnected();
     const client = await this.acquireClient();
     try {
       if (!this.cursorDisabled) {
@@ -92,7 +91,6 @@ export class PostgresDriver implements SqlDriver {
     sql: string,
     params?: readonly unknown[],
   ): Promise<SqlQueryResult<Row>> {
-    await this.ensureConnected();
     const client = await this.acquireClient();
     try {
       const result = await client.query(sql, params as unknown[] | undefined);
@@ -106,11 +104,6 @@ export class PostgresDriver implements SqlDriver {
     if (this.pool) {
       await this.pool.end();
     }
-    this.connected = false;
-  }
-
-  private async ensureConnected(): Promise<void> {
-    this.connected = true;
   }
 
   private async acquireClient(): Promise<PoolClient | Client> {
