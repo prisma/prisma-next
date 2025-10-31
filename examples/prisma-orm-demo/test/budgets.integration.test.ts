@@ -12,7 +12,7 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { unstable_startServer } from '@prisma/dev';
 import type { StartServerOptions } from '@prisma/dev';
 import contract from '../src/prisma-next/contract.json' assert { type: 'json' };
-import type { DataContract } from '@prisma-next/sql/types';
+import type { DataContract } from '@prisma-next/contract/types';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 import type { TableRef, ColumnBuilder } from '@prisma-next/sql/types';

@@ -4,7 +4,7 @@ import { PostgresDriver } from '@prisma-next/driver-postgres';
 import { createRuntime, ensureSchemaStatement, ensureTableStatement, writeContractMarker, budgets } from '../src/runtime';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createDevDatabase } from './utils';
-import type { DataContract } from '@prisma-next/sql/types';
+import type { DataContract } from '@prisma-next/contract/types';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 

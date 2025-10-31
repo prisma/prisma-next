@@ -187,6 +187,15 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@24.7.2)
 
+  packages/contract:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/driver-postgres:
     dependencies:
       '@prisma-next/sql-target':
@@ -251,6 +260,9 @@ importers:
 
   packages/sql:
     dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target

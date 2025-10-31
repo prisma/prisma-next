@@ -1,0 +1,28 @@
+{
+  "name": "@prisma-next/contract",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Data contract type definitions and JSON schema for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "dist",
+    "schemas"
+  ],
+  "exports": {
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
+    },
+    "./schema": "./schemas/data-contract-v1.json"
+  }
+}
+

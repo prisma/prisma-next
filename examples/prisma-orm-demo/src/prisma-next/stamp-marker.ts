@@ -6,7 +6,7 @@ import {
   writeContractMarker,
 } from '@prisma-next/runtime';
 import contract from './contract.json' assert { type: 'json' };
-import type { DataContract } from '@prisma-next/sql/types';
+import type { DataContract } from '@prisma-next/contract/types';
 
 const contractData = contract as DataContract;
 

@@ -10,6 +10,10 @@ import type {
   SqlExplainResult,
   SqlQueryResult,
 } from '@prisma-next/sql-target';
+import type { DataContract, StorageColumn } from '@prisma-next/contract/types';
+
+// Re-export contract types for backward compatibility
+export type { DataContract, StorageColumn } from '@prisma-next/contract/types';
 
 export type Direction = 'asc' | 'desc';
 
@@ -25,27 +29,6 @@ export type {
   SqlExplainResult,
   SqlQueryResult,
 } from '@prisma-next/sql-target';
-
-export interface StorageColumn {
-  readonly type?: string;
-  readonly nullable?: boolean;
-}
-
-export interface StorageTable {
-  readonly columns: Record<string, StorageColumn>;
-}
-
-export interface ContractStorage {
-  readonly tables: Record<string, StorageTable>;
-}
-
-export interface DataContract {
-  readonly target: string;
-  readonly targetFamily?: string;
-  readonly coreHash: string;
-  readonly profileHash?: string;
-  readonly storage: ContractStorage;
-}
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';

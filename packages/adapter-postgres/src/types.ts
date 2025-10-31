@@ -1,14 +1,16 @@
 import type {
-  BinaryExpr,
-  ColumnRef,
   ContractStorage,
   DataContract,
+  StorageColumn,
+  StorageTable,
+} from '@prisma-next/contract/types';
+import type {
+  BinaryExpr,
+  ColumnRef,
   Direction,
   LoweredStatement,
   ParamRef,
   SelectAst,
-  StorageColumn,
-  StorageTable,
 } from '@prisma-next/sql/types';
 
 export interface PostgresAdapterOptions {

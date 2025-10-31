@@ -1,0 +1,192 @@
+{
+  "$id": "https://prisma.dev/schemas/data-contract-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Prisma Next Data Contract v1",
+  "description": "Schema for Prisma Next contract.json files defining data models and storage layout",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "target": {
+      "type": "string",
+      "description": "Database target identifier (e.g., 'postgres', 'mysql', 'sqlite')"
+    },
+    "targetFamily": {
+      "type": "string",
+      "enum": ["sql"],
+      "description": "Target family classification"
+    },
+    "coreHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the core schema structure (models, fields, relations, storage layout)"
+    },
+    "profileHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the pinned capability profile (capability keys/variants and adapter pins)"
+    },
+    "storage": {
+      "type": "object",
+      "description": "Storage layout definition",
+      "properties": {
+        "tables": {
+          "type": "object",
+          "description": "Table definitions keyed by table name",
+          "additionalProperties": {
+            "$ref": "#/$defs/StorageTable"
+          }
+        }
+      },
+      "required": ["tables"]
+    }
+  },
+  "required": ["target", "coreHash", "storage"],
+  "$defs": {
+    "StorageTable": {
+      "type": "object",
+      "description": "Table definition with columns, constraints, and indexes",
+      "properties": {
+        "columns": {
+          "type": "object",
+          "description": "Column definitions keyed by column name",
+          "additionalProperties": {
+            "$ref": "#/$defs/StorageColumn"
+          }
+        },
+        "primaryKey": {
+          "$ref": "#/$defs/PrimaryKey",
+          "description": "Primary key constraint definition"
+        },
+        "uniques": {
+          "type": "array",
+          "description": "Unique constraint definitions",
+          "items": {
+            "$ref": "#/$defs/UniqueConstraint"
+          }
+        },
+        "indexes": {
+          "type": "array",
+          "description": "Index definitions",
+          "items": {
+            "$ref": "#/$defs/Index"
+          }
+        },
+        "foreignKeys": {
+          "type": "array",
+          "description": "Foreign key constraint definitions",
+          "items": {
+            "$ref": "#/$defs/ForeignKey"
+          }
+        }
+      },
+      "required": ["columns"]
+    },
+    "StorageColumn": {
+      "type": "object",
+      "description": "Column definition with type and nullability",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Column type (e.g., 'text', 'int4', 'timestamptz', 'bool')"
+        },
+        "nullable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the column allows NULL values"
+        }
+      }
+    },
+    "PrimaryKey": {
+      "type": "object",
+      "description": "Primary key constraint",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "description": "Column names comprising the primary key",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Constraint name (e.g., 'user_pkey')"
+        }
+      },
+      "required": ["columns"]
+    },
+    "UniqueConstraint": {
+      "type": "object",
+      "description": "Unique constraint",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "description": "Column names comprising the unique constraint",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Constraint name (e.g., 'user_email_key')"
+        }
+      },
+      "required": ["columns"]
+    },
+    "Index": {
+      "type": "object",
+      "description": "Index definition (structure may vary by target)",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "description": "Column names indexed",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string",
+          "description": "Index name"
+        }
+      }
+    },
+    "ForeignKey": {
+      "type": "object",
+      "description": "Foreign key constraint definition",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "description": "Column names in the referencing table",
+          "items": {
+            "type": "string"
+          }
+        },
+        "references": {
+          "type": "object",
+          "description": "Referenced table and columns",
+          "properties": {
+            "table": {
+              "type": "string",
+              "description": "Referenced table name"
+            },
+            "columns": {
+              "type": "array",
+              "description": "Referenced column names",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["table", "columns"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Foreign key constraint name"
+        }
+      },
+      "required": ["columns", "references"]
+    }
+  }
+}
+

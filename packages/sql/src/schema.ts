@@ -1,12 +1,14 @@
 import { planInvalid } from './errors';
 import type {
-  BinaryBuilder,
-  ColumnBuilder,
   ContractStorage,
   DataContract,
+  StorageColumn,
+} from '@prisma-next/contract/types';
+import type {
+  BinaryBuilder,
+  ColumnBuilder,
   OrderBuilder,
   ParamPlaceholder,
-  StorageColumn,
   TableRef,
 } from './types';
 

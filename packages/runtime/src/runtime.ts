@@ -2,14 +2,8 @@ import { mapContractMarkerRow, readContractMarker } from './marker';
 import { evaluateRawGuardrails } from './guardrails/raw';
 import { emptyDiagnostics, freezeDiagnostics } from './diagnostics';
 import { computeSqlFingerprint } from './fingerprint';
-import type {
-  Adapter,
-  DataContract,
-  LoweredStatement,
-  SelectAst,
-  Plan,
-  RawPlan,
-} from '@prisma-next/sql/types';
+import type { DataContract } from '@prisma-next/contract/types';
+import type { Adapter, LoweredStatement, SelectAst, Plan, RawPlan } from '@prisma-next/sql/types';
 
 import type { SqlDriver } from '@prisma-next/sql-target';
 import type { BudgetSeverity, RuntimeDiagnostics } from './diagnostics';

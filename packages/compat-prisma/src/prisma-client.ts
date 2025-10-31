@@ -2,7 +2,8 @@ import { createRuntime, type Runtime } from '@prisma-next/runtime';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 import { param } from '@prisma-next/sql/param';
-import type { DataContract, TableRef, ColumnBuilder } from '@prisma-next/sql/types';
+import type { DataContract } from '@prisma-next/contract/types';
+import type { TableRef, ColumnBuilder } from '@prisma-next/sql/types';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
 

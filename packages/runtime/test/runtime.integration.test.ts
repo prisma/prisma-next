@@ -8,7 +8,7 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
 
-import type { DataContract } from '@prisma-next/sql/types';
+import type { DataContract } from '@prisma-next/contract/types';
 
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
