@@ -4,12 +4,13 @@ import { PostgresDriver } from '@prisma-next/driver-postgres';
 import { createRuntime, ensureSchemaStatement, ensureTableStatement, writeContractMarker, budgets } from '../src/runtime';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createDevDatabase } from './utils';
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/contract/types';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 
-const fixtureContract: DataContract = {
+const fixtureContract: SqlContract = {
   target: 'postgres',
+  targetFamily: 'sql',
   coreHash: 'sha256:test-core',
   profileHash: 'sha256:test-profile',
   storage: {

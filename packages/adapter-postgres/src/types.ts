@@ -1,6 +1,6 @@
 import type {
   ContractStorage,
-  DataContract,
+  SqlContract,
   StorageColumn,
   StorageTable,
 } from '@prisma-next/contract/types';
@@ -17,7 +17,7 @@ export interface PostgresAdapterOptions {
   readonly profileId?: string;
 }
 
-export type PostgresContract = DataContract & { readonly target: 'postgres' };
+export type PostgresContract = SqlContract & { readonly target: 'postgres' };
 
 export type Expr = ColumnRef | ParamRef;
 

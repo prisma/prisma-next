@@ -1,3 +1,3 @@
 export { PrismaClient } from '../prisma-client';
-export type { DataContract } from '@prisma-next/contract/types';
+export type { SqlContract as DataContract } from '@prisma-next/contract/types';
 

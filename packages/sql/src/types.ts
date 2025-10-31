@@ -10,7 +10,7 @@ import type {
   SqlExplainResult,
   SqlQueryResult,
 } from '@prisma-next/sql-target';
-import type { DataContract, StorageColumn } from '@prisma-next/contract/types';
+import type { SqlContract, StorageColumn } from '@prisma-next/contract/types';
 
 export type Direction = 'asc' | 'desc';
 
@@ -195,6 +195,6 @@ export interface BuildOptions {
 }
 
 export interface SqlBuilderOptions {
-  readonly contract: DataContract;
-  readonly adapter: Adapter<SelectAst, DataContract, LoweredStatement>;
+  readonly contract: SqlContract;
+  readonly adapter: Adapter<SelectAst, SqlContract, LoweredStatement>;
 }

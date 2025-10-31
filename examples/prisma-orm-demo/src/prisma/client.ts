@@ -2,7 +2,7 @@ import { PrismaClient as LegacyPrismaClient } from '@prisma/client';
 import { PrismaClient as CompatPrismaClient } from '@prisma-next/compat-prisma';
 import { getPrismaNextRuntime } from '../prisma-next/runtime';
 import contract from '../prisma-next/contract.json' assert { type: 'json' };
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/contract/types';
 
 let legacyPrisma: LegacyPrismaClient | undefined;
 let compatPrisma: CompatPrismaClient | undefined;
@@ -21,7 +21,7 @@ export async function getPrisma() {
     if (!compatPrisma) {
       const runtime = getPrismaNextRuntime();
       compatPrisma = new CompatPrismaClient({
-        contract: contract as DataContract,
+        contract: contract as SqlContract,
         runtime,
       });
     }

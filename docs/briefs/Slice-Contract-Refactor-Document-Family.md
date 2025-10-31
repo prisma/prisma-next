@@ -148,3 +148,4 @@ Notes:
 - Should we include a minimal `id` strategy in core for documents, or rely entirely on `FieldType` with `type: 'id'`?
 
 
+

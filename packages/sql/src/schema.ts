@@ -1,7 +1,7 @@
 import { planInvalid } from './errors';
 import type {
   ContractStorage,
-  DataContract,
+  SqlContract,
   StorageColumn,
 } from '@prisma-next/contract/types';
 import type {
@@ -90,7 +90,7 @@ export interface SchemaHandle {
   readonly tables: SchemaTables;
 }
 
-export function schema(contract: DataContract): SchemaHandle {
+export function schema(contract: SqlContract): SchemaHandle {
   const storage = contract.storage;
 
   const tables = Object.fromEntries(

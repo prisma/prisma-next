@@ -1,6 +1,8 @@
 {
-  "$schema": "../../../contract/schemas/data-contract-v1.json",
+  "$schema": "../../../contract/schemas/data-contract-sql-v1.json",
+  "schemaVersion": "1",
   "target": "postgres",
+  "targetFamily": "sql",
   "coreHash": "sha256:test-core",
   "profileHash": "sha256:test-profile",
   "storage": {

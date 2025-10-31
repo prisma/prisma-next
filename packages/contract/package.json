@@ -22,7 +22,8 @@
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
     },
-    "./schema": "./schemas/data-contract-v1.json"
+    "./schema-sql": "./schemas/data-contract-sql-v1.json",
+    "./schema-document": "./schemas/data-contract-document-v1.json"
   }
 }
 

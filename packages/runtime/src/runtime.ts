@@ -2,7 +2,7 @@ import { mapContractMarkerRow, readContractMarker } from './marker';
 import { evaluateRawGuardrails } from './guardrails/raw';
 import { emptyDiagnostics, freezeDiagnostics } from './diagnostics';
 import { computeSqlFingerprint } from './fingerprint';
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/contract/types';
 import type { Adapter, LoweredStatement, SelectAst, Plan, RawPlan } from '@prisma-next/sql/types';
 
 import type { SqlDriver } from '@prisma-next/sql-target';
@@ -36,8 +36,8 @@ export interface RuntimeGuardrailOptions {
 import type { Plugin } from './plugins/types';
 
 export interface RuntimeOptions {
-  readonly contract: DataContract;
-  readonly adapter: Adapter<SelectAst, DataContract, LoweredStatement>;
+  readonly contract: SqlContract;
+  readonly adapter: Adapter<SelectAst, SqlContract, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
   readonly guardrails?: RuntimeGuardrailOptions;

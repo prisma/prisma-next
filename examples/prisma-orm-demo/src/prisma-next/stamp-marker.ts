@@ -6,9 +6,9 @@ import {
   writeContractMarker,
 } from '@prisma-next/runtime';
 import contract from './contract.json' assert { type: 'json' };
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/contract/types';
 
-const contractData = contract as DataContract;
+const contractData = contract as SqlContract;
 
 export async function stampMarker() {
   const connectionString = process.env.DATABASE_URL;

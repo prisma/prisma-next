@@ -1,4 +1,4 @@
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/contract/types';
 import type { Plan, Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql/types';
 import type { SqlDriver } from '@prisma-next/sql-target';
 
@@ -11,8 +11,8 @@ export interface Log {
 }
 
 export interface PluginContext {
-  readonly contract: DataContract;
-  readonly adapter: Adapter<SelectAst, DataContract, LoweredStatement>;
+  readonly contract: SqlContract;
+  readonly adapter: Adapter<SelectAst, SqlContract, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly mode: 'strict' | 'permissive';
   readonly now: () => number;

@@ -2,7 +2,8 @@ import { createRuntime, type Runtime } from '@prisma-next/runtime';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 import { param } from '@prisma-next/sql/param';
-import type { DataContract } from '@prisma-next/contract/types';
+import type { DataContract, SqlContract, DocumentContract } from '@prisma-next/contract/types';
+import { isSqlContract } from '@prisma-next/contract/types';
 import type { TableRef, ColumnBuilder } from '@prisma-next/sql/types';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
@@ -35,7 +36,7 @@ class ModelDelegate {
 
   constructor(
     private readonly runtime: Runtime,
-    private readonly contract: DataContract,
+    private readonly contract: SqlContract, // Narrowed from DataContract in PrismaClientImpl
     private readonly table: TableRef & Record<string, ColumnBuilder>,
     private readonly schemaTables: ReturnType<typeof schema>['tables'],
     tableName: string,
@@ -325,7 +326,7 @@ class ModelDelegate {
 
 class PrismaClientImpl {
   readonly runtime: Runtime;
-  readonly contract: DataContract;
+  readonly contract: SqlContract;
   readonly schemaHandle: ReturnType<typeof schema>;
   readonly models: Record<string, ModelDelegate> = {};
 
@@ -333,6 +334,13 @@ class PrismaClientImpl {
   [key: string]: unknown;
 
   constructor(options: PrismaClientOptions) {
+    // Support both SQL and Document contracts (currently only SQL is implemented)
+    if (!isSqlContract(options.contract)) {
+      throw new Error(
+        `Document contracts are not yet supported in PrismaClient compatibility layer. ` +
+          `Only SQL contracts (targetFamily: 'sql') are currently supported.`,
+      );
+    }
     this.contract = options.contract;
 
     // Initialize runtime if not provided

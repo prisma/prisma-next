@@ -1,6 +1,6 @@
 import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/contract/types';
 import type {
   BinaryBuilder,
   BuildOptions,
@@ -31,7 +31,7 @@ interface ProjectionState {
 }
 
 class SelectBuilderImpl {
-  private readonly contract: DataContract;
+  private readonly contract: SqlContract;
   private readonly adapter: SqlBuilderOptions['adapter'];
   private readonly state: BuilderState = {};
 
@@ -247,7 +247,7 @@ function buildWhereExpr(
 }
 
 interface MetaBuildArgs {
-  readonly contract: DataContract;
+  readonly contract: SqlContract;
   readonly table: TableRef;
   readonly projection: ProjectionState;
   readonly where?: BinaryBuilder;

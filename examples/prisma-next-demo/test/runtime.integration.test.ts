@@ -12,13 +12,13 @@ import { withClient, withDevDatabase } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
 
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/contract/types';
 
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const contractPath = join(__dirname, 'fixtures', 'basic-contract.json');
-const contract: DataContract = JSON.parse(readFileSync(contractPath, 'utf8'));
+const contract: SqlContract = JSON.parse(readFileSync(contractPath, 'utf8')) as SqlContract;
 
 describe('runtime execute integration', () => {
   it('streams rows and enforces marker verification', async () => {

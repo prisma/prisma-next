@@ -39,6 +39,7 @@ async function createDevDatabase(options?: StartServerOptions): Promise<DevDatab
 
 const testContract: DataContract = {
   target: 'postgres',
+  targetFamily: 'sql',
   coreHash: 'sha256:test-core',
   profileHash: 'sha256:test-profile',
   storage: {

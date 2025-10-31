@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { rawOptions } from '../src/raw';
 import { sql } from '../src/sql';
 import { sql as exportedSql, rawOptions as exportedRawOptions } from '../src/exports/sql';
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/contract/types';
 import type {
   Adapter,
   LoweredStatement,
@@ -18,20 +18,20 @@ import type {
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
-function loadContract(name: string): DataContract {
+function loadContract(name: string): SqlContract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
-  return JSON.parse(contents) as DataContract;
+  return JSON.parse(contents) as SqlContract;
 }
 
-function createStubAdapter(): Adapter<SelectAst, DataContract, LoweredStatement> {
+function createStubAdapter(): Adapter<SelectAst, SqlContract, LoweredStatement> {
   return {
     profile: {
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
     },
-    lower(ast: SelectAst, ctx: { contract: DataContract; params?: readonly unknown[] }) {
+    lower(ast: SelectAst, ctx: { contract: SqlContract; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
       return {
         profileId: this.profile.id,

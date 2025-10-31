@@ -4,6 +4,7 @@ import { createPostgresAdapter } from '../src/adapter';
 
 const contract = Object.freeze({
   target: 'postgres',
+  targetFamily: 'sql' as const,
   coreHash: 'sha256:test-core',
   profileHash: 'sha256:test-profile',
   storage: {
