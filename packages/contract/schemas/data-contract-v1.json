@@ -32,6 +32,7 @@
     "storage": {
       "type": "object",
       "description": "Storage layout definition",
+      "additionalProperties": false,
       "properties": {
         "tables": {
           "type": "object",
@@ -49,6 +50,7 @@
     "StorageTable": {
       "type": "object",
       "description": "Table definition with columns, constraints, and indexes",
+      "additionalProperties": false,
       "properties": {
         "columns": {
           "type": "object",
@@ -88,6 +90,7 @@
     "StorageColumn": {
       "type": "object",
       "description": "Column definition with type and nullability",
+      "additionalProperties": false,
       "properties": {
         "type": {
           "type": "string",
@@ -103,6 +106,7 @@
     "PrimaryKey": {
       "type": "object",
       "description": "Primary key constraint",
+      "additionalProperties": false,
       "properties": {
         "columns": {
           "type": "array",
@@ -122,6 +126,7 @@
     "UniqueConstraint": {
       "type": "object",
       "description": "Unique constraint",
+      "additionalProperties": false,
       "properties": {
         "columns": {
           "type": "array",
@@ -141,6 +146,7 @@
     "Index": {
       "type": "object",
       "description": "Index definition (structure may vary by target)",
+      "additionalProperties": false,
       "properties": {
         "columns": {
           "type": "array",
@@ -158,6 +164,7 @@
     "ForeignKey": {
       "type": "object",
       "description": "Foreign key constraint definition",
+      "additionalProperties": false,
       "properties": {
         "columns": {
           "type": "array",
@@ -169,6 +176,7 @@
         "references": {
           "type": "object",
           "description": "Referenced table and columns",
+          "additionalProperties": false,
           "properties": {
             "table": {
               "type": "string",
@@ -193,4 +201,3 @@
     }
   }
 }
-
