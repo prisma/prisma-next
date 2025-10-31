@@ -1,9 +1,17 @@
+import type { CodecRegistry } from '@prisma-next/runtime';
+
 export type AdapterTarget = string;
 
 export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
   readonly id: string;
   readonly target: TTarget;
   readonly capabilities: Record<string, unknown>;
+  /**
+   * Returns the adapter's default codec registry.
+   * The registry contains codecs provided by the adapter for converting
+   * between wire types and JavaScript types.
+   */
+  codecs(): CodecRegistry;
 }
 
 export interface LoweredPayload<TBody = unknown> {

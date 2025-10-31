@@ -110,7 +110,10 @@ export interface PlanMetaBase {
   readonly coreHash: string;
   readonly profileHash?: string;
   readonly lane: 'dsl' | 'raw';
-  readonly annotations?: Record<string, unknown>;
+  readonly annotations?: {
+    codecs?: Record<string, string>; // alias/param → codec id ('ns/name@v')
+    [key: string]: unknown;
+  };
   readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
 }
 
@@ -118,6 +121,11 @@ export interface DslPlanMeta extends PlanMetaBase {
   readonly lane: 'dsl';
   readonly refs: PlanRefs;
   readonly projection: Record<string, string>;
+  /**
+   * Optional mapping of projection alias → contract scalar type ID.
+   * Used for codec resolution when AST+refs don't provide enough type info.
+   */
+  readonly projectionTypes?: Record<string, string>;
 }
 
 export interface RawPlanRefs {
@@ -137,19 +145,25 @@ export interface RawPlanMeta extends PlanMetaBase {
   readonly projection?: ReadonlyArray<string>;
 }
 
-export interface PlanBase<M extends PlanMetaBase = PlanMetaBase> {
+export interface PlanBase<Row = unknown, M extends PlanMetaBase = PlanMetaBase> {
   readonly sql: string;
   readonly params: readonly unknown[];
   readonly meta: M;
 }
 
-export interface DslPlan extends PlanBase<DslPlanMeta> {
+/**
+ * Utility type to extract the Row type from a Plan.
+ * Example: `type Row = ResultType<typeof plan>`
+ */
+export type ResultType<P> = P extends PlanBase<infer R> ? R : never;
+
+export interface DslPlan<Row = unknown> extends PlanBase<Row, DslPlanMeta> {
   readonly ast: SelectAst;
 }
 
-export interface RawPlan extends PlanBase<RawPlanMeta> {}
+export interface RawPlan<Row = unknown> extends PlanBase<Row, RawPlanMeta> {}
 
-export type Plan = DslPlan | RawPlan;
+export type Plan<Row = unknown> = DslPlan<Row> | RawPlan<Row>;
 
 export interface RawTemplateOptions {
   readonly refs?: RawPlanRefs;

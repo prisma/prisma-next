@@ -8,6 +8,7 @@ import type {
   PostgresLoweredStatement,
   SelectAst,
 } from './types';
+import { createPostgresCodecRegistry } from './codecs';
 
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -20,12 +21,14 @@ class PostgresAdapterImpl
   implements Adapter<SelectAst, PostgresContract, PostgresLoweredStatement>
 {
   readonly profile: AdapterProfile<'postgres'>;
+  private readonly codecRegistry = createPostgresCodecRegistry();
 
   constructor(options?: PostgresAdapterOptions) {
     this.profile = Object.freeze({
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
       capabilities: defaultCapabilities,
+      codecs: () => this.codecRegistry,
     });
   }
 

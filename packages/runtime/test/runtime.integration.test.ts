@@ -84,7 +84,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    const rows = await collectAsync(runtime.execute(plan));
+    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(plan));
 
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.map((r) => r.email)).toContain('ada@example.com');

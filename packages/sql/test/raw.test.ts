@@ -30,6 +30,12 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract, LoweredStatement> 
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
+      codecs() {
+        return Object.freeze({
+          byId: Object.freeze(new Map()),
+          byScalar: Object.freeze(new Map()),
+        });
+      },
     },
     lower(ast: SelectAst, ctx: { contract: SqlContract; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);

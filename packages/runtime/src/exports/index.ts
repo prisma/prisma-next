@@ -19,3 +19,4 @@ export type {
 export { budgets } from '../plugins/budgets';
 export type { BudgetsOptions } from '../plugins/budgets';
 export type { Plugin, PluginContext, Log, AfterExecuteResult } from '../plugins/types';
+export type { Codec, CodecRegistry } from '../codecs/types';

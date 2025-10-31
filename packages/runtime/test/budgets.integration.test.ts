@@ -102,7 +102,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
     // Unbounded SELECT should be blocked pre-exec (estimated 10_000 > maxRows 50)
     await expect(async () => {
-      for await (const _row of runtime.execute(plan)) {
+      for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
         // Should not reach here
       }
     }).rejects.toMatchObject({
@@ -132,7 +132,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
     // Bounded SELECT with LIMIT 5 should pass
     const results: Record<string, unknown>[] = [];
-    for await (const row of runtime.execute(plan)) {
+    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
       results.push(row);
     }
     expect(results.length).toBe(5);
@@ -161,7 +161,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     // Should throw during streaming when observed rows > maxRows
     await expect(async () => {
       let count = 0;
-      for await (const _row of runtime.execute(plan)) {
+      for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
         count++;
         if (count > 20) {
           // Should have thrown by now
@@ -192,7 +192,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
     // Unbounded raw SELECT should be blocked pre-exec
     await expect(async () => {
-      for await (const _row of runtime.execute(plan)) {
+      for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
         // Should not reach here
       }
     }).rejects.toMatchObject({
@@ -219,7 +219,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
     // Raw SELECT with limit annotation should pass
     const results: Record<string, unknown>[] = [];
-    for await (const row of runtime.execute(plan)) {
+    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
       results.push(row);
     }
     expect(results.length).toBeLessThanOrEqual(5);

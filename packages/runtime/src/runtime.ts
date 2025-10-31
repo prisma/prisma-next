@@ -34,6 +34,18 @@ export interface RuntimeGuardrailOptions {
 }
 
 import type { Plugin } from './plugins/types';
+import type { CodecRegistry } from './codecs/types';
+import { composeCodecRegistry } from './codecs/registry';
+import { encodeParams } from './codecs/encoding';
+import { decodeRow } from './codecs/decoding';
+
+export interface RuntimeCodecOptions {
+  /**
+   * Per-alias or fully-qualified column override → namespaced codec id.
+   * Example: { 'user.createdAt': 'core/iso-datetime@1', 'createdAt': 'core/iso-datetime@1' }
+   */
+  readonly overrides?: Record<string, string>;
+}
 
 export interface RuntimeOptions {
   readonly contract: SqlContract;
@@ -43,10 +55,15 @@ export interface RuntimeOptions {
   readonly guardrails?: RuntimeGuardrailOptions;
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
+  /**
+   * Codec configuration for runtime.
+   * Allows overriding codec selection per column/alias.
+   */
+  readonly codecs?: RuntimeCodecOptions;
 }
 
 export interface Runtime {
-  execute(plan: Plan): AsyncIterable<Record<string, any>>;
+  execute<Row = Record<string, any>>(plan: Plan<Row>): AsyncIterable<Row>;
   diagnostics(): RuntimeDiagnostics;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
@@ -67,6 +84,12 @@ export function createRuntime(options: RuntimeOptions): Runtime {
   let startupVerified = false;
   let diagnostics: RuntimeDiagnostics = emptyDiagnostics;
   let telemetry: RuntimeTelemetryEvent | null = null;
+
+  // Compose codec registry from adapter and runtime overrides
+  const codecRegistry: CodecRegistry = composeCodecRegistry(
+    adapter.profile.codecs(),
+    options.codecs?.overrides,
+  );
 
   // Create plugin context (reused across executions)
   const pluginContext: import('./plugins/types').PluginContext = {
@@ -222,11 +245,11 @@ export function createRuntime(options: RuntimeOptions): Runtime {
   }
 
   const runtime: Runtime = {
-    execute(plan: Plan): AsyncIterable<Record<string, any>> {
+    execute<Row = Record<string, any>>(plan: Plan<Row>): AsyncIterable<Row> {
       validatePlan(plan);
       telemetry = null;
 
-      const iterator = async function* () {
+      const iterator = async function* (): AsyncGenerator<Row, void, unknown> {
         const startedAt = Date.now();
         let rowCount = 0;
         let completed = false;
@@ -253,19 +276,25 @@ export function createRuntime(options: RuntimeOptions): Runtime {
             }
           }
 
+          // Encode parameters before execution
+          const encodedParams = encodeParams(plan, codecRegistry, options.codecs?.overrides);
+
           // Execute query with streaming row-by-row plugin hooks
           for await (const row of driver.execute<Record<string, any>>({
             sql: plan.sql,
-            params: plan.params,
+            params: encodedParams,
           })) {
-            // Invoke plugin onRow hooks
+            // Decode row using codec registry
+            const decodedRow = decodeRow(row, plan, codecRegistry, options.codecs?.overrides);
+
+            // Invoke plugin onRow hooks with decoded row
             for (const plugin of plugins) {
               if (plugin.onRow) {
-                await plugin.onRow(row, plan, pluginContext);
+                await plugin.onRow(decodedRow, plan, pluginContext);
               }
             }
             rowCount++;
-            yield row;
+            yield decodedRow as Row;
           }
 
           completed = true;

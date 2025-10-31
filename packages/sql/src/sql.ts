@@ -286,6 +286,17 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
     ]),
   );
 
+  // Build projectionTypes mapping: alias → contract scalar type
+  const projectionTypes: Record<string, string> = {};
+  for (let i = 0; i < args.projection.aliases.length; i++) {
+    const alias = args.projection.aliases[i];
+    const column = args.projection.columns[i];
+    const columnMeta = column.columnMeta;
+    if (columnMeta?.type) {
+      projectionTypes[alias] = columnMeta.type;
+    }
+  }
+
   return Object.freeze({
     target: args.contract.target,
     ...(args.contract.targetFamily ? { targetFamily: args.contract.targetFamily } : {}),
@@ -296,6 +307,7 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
       columns: Array.from(refsColumns.values()),
     },
     projection: projectionMap,
+    ...(Object.keys(projectionTypes).length > 0 ? { projectionTypes } : {}),
     paramDescriptors: args.paramDescriptors,
     ...(args.contract.profileHash !== undefined ? { profileHash: args.contract.profileHash } : {}),
   } satisfies DslPlanMeta);
