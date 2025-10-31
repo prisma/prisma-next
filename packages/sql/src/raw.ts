@@ -1,6 +1,6 @@
 import { planInvalid } from './errors';
+import type { DataContract } from '@prisma-next/contract/types';
 import type {
-  DataContract,
   ParamDescriptor,
   RawFactory,
   RawFunctionOptions,

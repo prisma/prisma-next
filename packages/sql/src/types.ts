@@ -12,9 +12,6 @@ import type {
 } from '@prisma-next/sql-target';
 import type { DataContract, StorageColumn } from '@prisma-next/contract/types';
 
-// Re-export contract types for backward compatibility
-export type { DataContract, StorageColumn } from '@prisma-next/contract/types';
-
 export type Direction = 'asc' | 'desc';
 
 export type {

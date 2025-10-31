@@ -7,10 +7,10 @@ import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
+import type { DataContract } from '@prisma-next/contract/types';
 import type {
   ParamDescriptor,
   Adapter,
-  DataContract,
   LoweredStatement,
   SelectAst,
 } from '../src/types';

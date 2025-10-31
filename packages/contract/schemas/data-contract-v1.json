@@ -6,6 +6,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this JSON schema for IDE validation"
+    },
     "target": {
       "type": "string",
       "description": "Database target identifier (e.g., 'postgres', 'mysql', 'sqlite')"

@@ -1,5 +1,6 @@
 import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
+import type { DataContract } from '@prisma-next/contract/types';
 import type {
   BinaryBuilder,
   BuildOptions,
@@ -7,7 +8,6 @@ import type {
   ColumnRef,
   DslPlan,
   DslPlanMeta,
-  DataContract,
   Direction,
   LoweredStatement,
   ParamDescriptor,

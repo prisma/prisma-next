@@ -7,9 +7,9 @@ import { describe, expect, it } from 'vitest';
 import { rawOptions } from '../src/raw';
 import { sql } from '../src/sql';
 import { sql as exportedSql, rawOptions as exportedRawOptions } from '../src/exports/sql';
+import type { DataContract } from '@prisma-next/contract/types';
 import type {
   Adapter,
-  DataContract,
   LoweredStatement,
   ParamDescriptor,
   RawPlanMeta,

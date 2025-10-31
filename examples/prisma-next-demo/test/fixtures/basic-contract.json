@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../../packages/contract/schemas/data-contract-v1.json",
   "target": "postgres",
   "coreHash": "sha256:test-core",
   "profileHash": "sha256:test-profile",
