@@ -28,6 +28,7 @@ interface FindManyArgs {
 
 interface FindFirstArgs extends FindManyArgs {}
 
+// NOTE: we can rely on the Prisma ORM's complex type definitions for the method return values, we only need to ensure the compatibility layer behaves correctly at runtime
 class ModelDelegate {
   private readonly tableName: string;
   private readonly tableRef: TableRef;
