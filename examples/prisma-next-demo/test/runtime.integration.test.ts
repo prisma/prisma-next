@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { PostgresDriver } from '@prisma-next/driver-postgres';
 import { Pool } from 'pg';
-import { createRuntime } from '@prisma-next/runtime';
+import { createRuntime, budgets } from '@prisma-next/runtime';
 import { withClient, withDevDatabase } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
@@ -31,6 +31,13 @@ describe('runtime execute integration', () => {
         adapter,
         driver,
         verify: { mode: 'always', requireMarker: true },
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000 },
+          }),
+        ],
       });
 
       try {
@@ -72,7 +79,7 @@ describe('runtime execute integration', () => {
         expect(rows[0]).toMatchObject({ email: 'alice@example.com' });
 
         const root = sql({ contract, adapter });
-        const templatePlan = root.raw`
+        const templatePlan = root.raw.with({ annotations: { limit: 1 } })`
           select id, email from "user"
           where email = ${'alice@example.com'}
           limit ${1}
@@ -87,7 +94,7 @@ describe('runtime execute integration', () => {
         const functionPlan = root.raw('select id from "user" where email = $1 limit $2', {
           params: ['alice@example.com', 1],
           refs: { tables: ['user'], columns: [{ table: 'user', column: 'email' }] },
-          annotations: { intent: 'report' },
+          annotations: { intent: 'report', limit: 1 },
         });
 
         const functionRows: Array<{ id: number }> = [];
@@ -106,6 +113,140 @@ describe('runtime execute integration', () => {
           const iterator = runtime.execute(plan)[Symbol.asyncIterator]();
           await iterator.next();
         }).rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISMATCH' });
+      } finally {
+        await runtime.close();
+      }
+    });
+  });
+
+  it('enforces row budget on unbounded queries', async () => {
+    await withDevDatabase(async ({ connectionString }) => {
+      const adapter = createPostgresAdapter();
+      const pool = new Pool({ connectionString });
+      const driver = new PostgresDriver({ connect: { pool }, cursor: { disabled: true } });
+      const runtime = createRuntime({
+        contract,
+        adapter,
+        driver,
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 50,
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000 },
+          }),
+        ],
+      });
+
+      try {
+        await stampMarker({
+          connectionString,
+          coreHash: contract.coreHash,
+          profileHash: contract.profileHash ?? contract.coreHash,
+        });
+
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity');
+          // Insert enough rows to exceed budget
+          for (let i = 0; i < 100; i++) {
+            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+              `user${i}@example.com`,
+            ]);
+          }
+        });
+
+        const tables = schema(contract).tables;
+        // Unbounded SELECT should be blocked
+        const unboundedPlan = sql({ contract, adapter })
+          .from(tables.user)
+          .select('id', 'email')
+          .build();
+
+        await expect(async () => {
+          for await (const _row of runtime.execute(unboundedPlan)) {
+            // Should not reach here
+          }
+        }).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+          category: 'BUDGET',
+        });
+
+        // Bounded SELECT should pass
+        const boundedPlan = sql({ contract, adapter })
+          .from(tables.user)
+          .select('id', 'email')
+          .limit(10)
+          .build();
+
+        const rows: Array<{ id: number; email: string }> = [];
+        for await (const row of runtime.execute(boundedPlan)) {
+          rows.push(row as { id: number; email: string });
+        }
+        expect(rows.length).toBeLessThanOrEqual(10);
+      } finally {
+        await runtime.close();
+      }
+    });
+  });
+
+  it('enforces streaming row budget', async () => {
+    await withDevDatabase(async ({ connectionString }) => {
+      const adapter = createPostgresAdapter();
+      const pool = new Pool({ connectionString });
+      const driver = new PostgresDriver({ connect: { pool }, cursor: { disabled: true } });
+      const runtime = createRuntime({
+        contract,
+        adapter,
+        driver,
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10,
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000 },
+          }),
+        ],
+      });
+
+      try {
+        await stampMarker({
+          connectionString,
+          coreHash: contract.coreHash,
+          profileHash: contract.profileHash ?? contract.coreHash,
+        });
+
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity');
+          // Insert rows
+          for (let i = 0; i < 50; i++) {
+            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+              `user${i}@example.com`,
+            ]);
+          }
+        });
+
+        const tables = schema(contract).tables;
+        // Query with LIMIT > maxRows should throw during streaming
+        const plan = sql({ contract, adapter })
+          .from(tables.user)
+          .select('id', 'email')
+          .limit(50)
+          .build();
+
+        await expect(async () => {
+          for await (const _row of runtime.execute(plan)) {
+            // Will throw on 11th row
+          }
+        }).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+          category: 'BUDGET',
+        });
       } finally {
         await runtime.close();
       }

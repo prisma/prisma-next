@@ -1,3 +1,7 @@
+import type { DataContract, Plan } from '@prisma-next/sql/types';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql/types';
+import type { SqlDriver } from '@prisma-next/sql-target';
+
 export type Severity = 'error' | 'warn' | 'info';
 
 export interface Log {
@@ -7,9 +11,9 @@ export interface Log {
 }
 
 export interface PluginContext {
-  readonly contract: unknown;
-  readonly adapter: unknown;
-  readonly driver: unknown;
+  readonly contract: DataContract;
+  readonly adapter: Adapter<SelectAst, DataContract, LoweredStatement>;
+  readonly driver: SqlDriver;
   readonly mode: 'strict' | 'permissive';
   readonly now: () => number;
   readonly log: Log;
@@ -23,7 +27,7 @@ export interface AfterExecuteResult {
 
 export interface Plugin {
   readonly name: string;
-  beforeExecute?(plan: unknown, ctx: PluginContext): Promise<void>;
-  onRow?(row: unknown, plan: unknown, ctx: PluginContext): Promise<void>;
-  afterExecute?(plan: unknown, result: AfterExecuteResult, ctx: PluginContext): Promise<void>;
+  beforeExecute?(plan: Plan, ctx: PluginContext): Promise<void>;
+  onRow?(row: Record<string, any>, plan: Plan, ctx: PluginContext): Promise<void>;
+  afterExecute?(plan: Plan, result: AfterExecuteResult, ctx: PluginContext): Promise<void>;
 }

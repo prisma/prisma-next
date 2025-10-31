@@ -26,6 +26,10 @@
     ".": {
       "types": "./dist/exports/index.d.ts",
       "import": "./dist/exports/index.js"
+    },
+    "./test/utils": {
+      "types": "./test/utils.ts",
+      "import": "./test/utils.ts"
     }
   }
 }

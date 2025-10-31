@@ -1,113 +1,194 @@
 import type { Plugin, PluginContext } from './types';
+import type { DslPlan, Plan, RawPlan } from '@prisma-next/sql/types';
 
 export interface BudgetsOptions {
   readonly maxRows?: number;
   readonly defaultTableRows?: number;
   readonly tableRows?: Record<string, number>;
+  readonly maxLatencyMs?: number;
   readonly severities?: {
     readonly rowCount?: 'warn' | 'error';
     readonly latency?: 'warn' | 'error';
   };
-}
-
-interface PlanMetaLike {
-  readonly lane?: string;
-  readonly refs?: { tables?: string[] };
-}
-
-interface DslAstLike {
-  readonly kind: 'select';
-  readonly limit?: number;
+  readonly explain?: {
+    readonly enabled?: boolean;
+  };
 }
 
 function budgetError(code: string, message: string, details?: Record<string, unknown>) {
   const error = new Error(message) as Error & {
     code: string;
     category: 'BUDGET';
-    severity: 'error' | 'warn' | 'info';
+    severity: 'error';
     details?: Record<string, unknown>;
   };
-  (error as any).code = code;
-  (error as any).category = 'BUDGET';
-  (error as any).severity = 'error';
-  if (details) (error as any).details = details;
-  return error;
+  Object.defineProperty(error, 'name', {
+    value: 'RuntimeError',
+    configurable: true,
+  });
+  return Object.assign(error, {
+    code,
+    category: 'BUDGET' as const,
+    severity: 'error' as const,
+    details,
+  });
 }
 
 export function budgets(options?: BudgetsOptions): Plugin {
   const maxRows = options?.maxRows ?? 10_000;
   const defaultTableRows = options?.defaultTableRows ?? 10_000;
   const tableRows = options?.tableRows ?? {};
+  const maxLatencyMs = options?.maxLatencyMs ?? 1_000;
   const rowSeverity = options?.severities?.rowCount ?? 'error';
+  const latencySeverity = options?.severities?.latency ?? 'warn';
 
+  // Per-execution state (reset on each beforeExecute)
   let observedRows = 0;
-  let start = 0;
+  let startTime = 0;
 
-  function estimateRows(plan: any): number | null {
-    const meta = (plan?.meta ?? {}) as PlanMetaLike;
-    const lane = meta.lane ?? undefined;
-
+  /**
+   * Estimate rows for DSL lane SELECT queries
+   * Returns null for non-DSL lanes or if unable to estimate
+   */
+  function estimateRows(plan: Plan): number | null {
     // Only DSL lane has AST we can trust for LIMIT in MVP
-    if (lane !== 'dsl') return null;
+    if (plan.meta.lane !== 'dsl') {
+      return null;
+    }
 
-    const ast = plan?.ast as DslAstLike | undefined;
-    const table = meta.refs?.tables?.[0];
-    if (!table) return null;
+    const dslPlan = plan as DslPlan;
+    const table = dslPlan.meta.refs?.tables?.[0];
+    if (!table) {
+      return null;
+    }
 
     const tableEstimate = tableRows[table] ?? defaultTableRows;
 
-    if (typeof ast?.limit !== 'number') {
-      // Unbounded read
-      return tableEstimate;
+    // Check if there's a LIMIT in the AST
+    if (typeof dslPlan.ast.limit === 'number') {
+      // Bounded: use min of LIMIT and table estimate
+      return Math.min(dslPlan.ast.limit, tableEstimate);
     }
 
-    return Math.min(ast.limit, tableEstimate);
+    // Unbounded SELECT - treat as full table estimate
+    return tableEstimate;
+  }
+
+  /**
+   * Check if a SELECT plan has a detectable LIMIT
+   * For DSL lane: check AST limit property
+   * For raw lane: check meta.annotations or refs hints (if provided)
+   */
+  function hasDetectableLimit(plan: Plan): boolean {
+    if (plan.meta.lane === 'dsl') {
+      const dslPlan = plan as DslPlan;
+      return typeof dslPlan.ast.limit === 'number';
+    }
+
+    // For raw lane, check if annotations provide limit hint
+    // MVP: no SQL parsing, so rely on lane-provided hints only
+    const rawPlan = plan as RawPlan;
+    return (
+      typeof rawPlan.meta.annotations?.limit === 'number' ||
+      typeof rawPlan.meta.annotations?.LIMIT === 'number'
+    );
   }
 
   return Object.freeze({
     name: 'budgets',
 
-    async beforeExecute(plan: any, ctx: PluginContext) {
+    async beforeExecute(plan: Plan, ctx: PluginContext) {
+      // Reset per-execution state
       observedRows = 0;
-      start = ctx.now();
+      startTime = ctx.now();
 
+      // Pre-exec heuristic: check estimated rows for DSL lane
       const estimated = estimateRows(plan);
-      if (estimated === null) {
-        // Unknown lane: rely on post-check during streaming
+      if (estimated !== null) {
+        // DSL lane with estimable rows
+        if (estimated > maxRows) {
+          const error = budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+            source: 'heuristic',
+            estimatedRows: estimated,
+            maxRows,
+          });
+
+          // Block if severity is error or mode is strict
+          const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
+          if (shouldBlock) {
+            throw error;
+          }
+          // Otherwise warn
+          ctx.log.warn({
+            code: error.code,
+            message: error.message,
+            details: error.details,
+          });
+        }
         return;
       }
 
-      if (typeof estimated === 'number' && estimated > maxRows) {
-        const err = budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
-          estimatedRows: estimated,
-          maxRows,
-          source: 'heuristic',
-        });
-        if (rowSeverity === 'error' || ctx.mode === 'strict') {
-          throw err;
+      // For non-DSL lanes or unestimable plans, check if SELECT without detectable LIMIT
+      // Per spec: "Any SELECT without a detectable LIMIT is treated as over the row budget"
+      const sqlUpper = plan.sql.trimStart().toUpperCase();
+      if (sqlUpper.startsWith('SELECT')) {
+        if (!hasDetectableLimit(plan)) {
+          const error = budgetError(
+            'BUDGET.ROWS_EXCEEDED',
+            'Unbounded SELECT query exceeds budget',
+            {
+              source: 'heuristic',
+              maxRows,
+            },
+          );
+
+          const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
+          if (shouldBlock) {
+            throw error;
+          }
+          ctx.log.warn({
+            code: error.code,
+            message: error.message,
+            details: error.details,
+          });
         }
-        ctx.log.warn({ code: err.code, message: err.message, details: (err as any).details });
       }
     },
 
-    async onRow(_row: unknown, _plan: any, _ctx: PluginContext) {
+    async onRow(row: Record<string, any>, plan: Plan, ctx: PluginContext) {
       observedRows += 1;
       if (observedRows > maxRows) {
         throw budgetError('BUDGET.ROWS_EXCEEDED', 'Observed row count exceeds budget', {
+          source: 'observed',
           observedRows,
           maxRows,
-          source: 'observed',
         });
       }
     },
 
-    async afterExecute(_plan: any, result, ctx) {
-      const latencyMs = ctx.now() - start;
-      // Latency budget wiring deferred; emit advisory if configured later.
-      ctx.log.info({ event: 'afterExecute', latencyMs, rowCount: result.rowCount });
+    async afterExecute(
+      plan: Plan,
+      result: import('./types').AfterExecuteResult,
+      ctx: PluginContext,
+    ) {
+      const latencyMs = result.latencyMs;
+      if (latencyMs > maxLatencyMs) {
+        const error = budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
+          latencyMs,
+          maxLatencyMs,
+        });
+
+        // Latency defaults to warn (advisory)
+        const shouldBlock = latencySeverity === 'error' && ctx.mode === 'strict';
+        if (shouldBlock) {
+          throw error;
+        }
+        ctx.log.warn({
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        });
+      }
     },
   });
 }
-
-
-

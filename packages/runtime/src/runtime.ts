@@ -39,12 +39,16 @@ export interface RuntimeGuardrailOptions {
   };
 }
 
+import type { Plugin } from './plugins/types';
+
 export interface RuntimeOptions {
   readonly contract: DataContract;
   readonly adapter: Adapter<SelectAst, DataContract, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
   readonly guardrails?: RuntimeGuardrailOptions;
+  readonly plugins?: readonly Plugin[];
+  readonly mode?: 'strict' | 'permissive';
 }
 
 export interface Runtime {
@@ -62,11 +66,33 @@ interface RuntimeErrorEnvelope extends Error {
 }
 
 export function createRuntime(options: RuntimeOptions): Runtime {
-  const { driver, contract } = options;
+  const { driver, contract, adapter } = options;
+  const plugins = options.plugins ?? [];
+  const mode = options.mode ?? 'strict';
   let verified = options.verify.mode === 'startup' ? false : options.verify.mode === 'always';
   let startupVerified = false;
   let diagnostics: RuntimeDiagnostics = emptyDiagnostics;
   let telemetry: RuntimeTelemetryEvent | null = null;
+
+  // Create plugin context (reused across executions)
+  const pluginContext: import('./plugins/types').PluginContext = {
+    contract,
+    adapter,
+    driver,
+    mode,
+    now: () => Date.now(),
+    log: {
+      info: (_event) => {
+        // No-op in MVP - diagnostics stay out of runtime core
+      },
+      warn: (_event) => {
+        // No-op in MVP - diagnostics stay out of runtime core
+      },
+      error: (_event) => {
+        // No-op in MVP - diagnostics stay out of runtime core
+      },
+    },
+  };
 
   async function verifyPlanIfNeeded(plan: Plan) {
     if (options.verify.mode === 'always') {
@@ -208,6 +234,8 @@ export function createRuntime(options: RuntimeOptions): Runtime {
 
       const iterator = async function* () {
         const startedAt = Date.now();
+        let rowCount = 0;
+        let completed = false;
 
         if (!startupVerified && options.verify.mode === 'startup') {
           await verifyPlanIfNeeded(plan);
@@ -224,20 +252,56 @@ export function createRuntime(options: RuntimeOptions): Runtime {
 
           await applyGuardrails(plan);
 
+          // Invoke plugin beforeExecute hooks
+          for (const plugin of plugins) {
+            if (plugin.beforeExecute) {
+              await plugin.beforeExecute(plan, pluginContext);
+            }
+          }
+
+          // Execute query with streaming row-by-row plugin hooks
           for await (const row of driver.execute<Record<string, any>>({
             sql: plan.sql,
             params: plan.params,
           })) {
+            // Invoke plugin onRow hooks
+            for (const plugin of plugins) {
+              if (plugin.onRow) {
+                await plugin.onRow(row, plan, pluginContext);
+              }
+            }
+            rowCount++;
             yield row;
           }
 
+          completed = true;
           recordTelemetry(plan, 'success', Date.now() - startedAt);
         } catch (error) {
           if (telemetry === null) {
             recordTelemetry(plan, 'runtime-error', Date.now() - startedAt);
           }
 
+          // Invoke plugin afterExecute hooks even on error
+          const latencyMs = Date.now() - startedAt;
+          for (const plugin of plugins) {
+            if (plugin.afterExecute) {
+              try {
+                await plugin.afterExecute(plan, { rowCount, latencyMs, completed }, pluginContext);
+              } catch {
+                // Ignore errors from afterExecute hooks
+              }
+            }
+          }
+
           throw error;
+        }
+
+        // Invoke plugin afterExecute hooks on success
+        const latencyMs = Date.now() - startedAt;
+        for (const plugin of plugins) {
+          if (plugin.afterExecute) {
+            await plugin.afterExecute(plan, { rowCount, latencyMs, completed }, pluginContext);
+          }
         }
       };
 
@@ -344,3 +408,6 @@ function findPlanRows(node: unknown): number | undefined {
 
 export * from './marker';
 export type { LintFinding, BudgetFinding, RuntimeDiagnostics } from './diagnostics';
+export { budgets } from './plugins/budgets';
+export type { BudgetsOptions } from './plugins/budgets';
+export type { Plugin, PluginContext, Log, AfterExecuteResult } from './plugins/types';

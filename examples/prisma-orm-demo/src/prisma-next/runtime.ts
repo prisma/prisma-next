@@ -1,5 +1,5 @@
 import { Client } from 'pg';
-import { createRuntime } from '@prisma-next/runtime';
+import { createRuntime, budgets } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { PostgresDriver } from '@prisma-next/driver-postgres';
 import contract from './contract.json' assert { type: 'json' };
@@ -31,6 +31,14 @@ export function getPrismaNextRuntime() {
         mode: 'onFirstUse',
         requireMarker: false,
       },
+      plugins: [
+        budgets({
+          maxRows: 10_000,
+          defaultTableRows: 10_000,
+          tableRows: { user: 10_000 },
+          maxLatencyMs: 1_000,
+        }),
+      ],
     });
   }
   return runtime;

@@ -16,3 +16,6 @@ export type {
   RuntimeTelemetryEvent,
   TelemetryOutcome,
 } from '../runtime';
+export { budgets } from '../plugins/budgets';
+export type { BudgetsOptions } from '../plugins/budgets';
+export type { Plugin, PluginContext, Log, AfterExecuteResult } from '../plugins/types';
