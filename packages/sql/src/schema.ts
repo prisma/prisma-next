@@ -57,12 +57,33 @@ class ColumnBuilderImpl implements ColumnBuilder {
 
 class TableBuilderImpl implements TableRef {
   readonly kind = 'table';
+  readonly columns: Record<string, ColumnBuilderImpl>;
+  private readonly _name: string;
 
   constructor(
-    readonly name: string,
-    readonly columns: Record<string, ColumnBuilderImpl>,
+    name: string,
+    columns: Record<string, ColumnBuilderImpl>,
   ) {
-    Object.assign(this, columns);
+    // Store name in private property to prevent overwriting
+    this._name = name;
+    this.columns = columns;
+
+    // Assign columns as properties for convenient access (e.g., tables.user.id)
+    // Skip properties that would conflict with TableRef interface properties
+    for (const [key, value] of Object.entries(columns)) {
+      if (key !== 'name' && key !== 'kind' && key !== 'columns') {
+        Object.defineProperty(this, key, {
+          value,
+          enumerable: true,
+          configurable: true,
+          writable: false,
+        });
+      }
+    }
+  }
+
+  get name(): string {
+    return this._name;
   }
 }
 

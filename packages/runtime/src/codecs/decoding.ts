@@ -1,4 +1,4 @@
-import type { Codec, CodecRegistry } from './types';
+import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
 import type { Plan, DslPlan } from '@prisma-next/sql/types';
 
 /**

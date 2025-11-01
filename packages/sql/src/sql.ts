@@ -173,9 +173,13 @@ function buildProjectionState(
 
   if (typeof args[0] === 'string') {
     const columnNames = args as string[];
+    // Cast table to access columns property (TableBuilderImpl has columns)
+    const tableWithColumns = table as TableRef & { columns: Record<string, ColumnBuilder> };
     for (const columnName of columnNames) {
-      const column = (table as unknown as Record<string, ColumnBuilder>)[columnName];
-      if (!column) {
+      // Always use table.columns to access columns, as direct property access
+      // can conflict with table properties (e.g., when a column is named 'name')
+      const column = tableWithColumns.columns[columnName];
+      if (!column || column.kind !== 'column') {
         throw planInvalid(`Unknown column ${columnName} on table ${table.name}`);
       }
       aliases.push(columnName);

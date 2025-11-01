@@ -1,4 +1,4 @@
-import type { Codec, CodecRegistry } from './types';
+import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
 
 /**
  * Composes a codec registry from adapter defaults and runtime overrides.

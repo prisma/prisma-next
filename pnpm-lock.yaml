@@ -158,6 +158,9 @@ importers:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../adapter-postgres
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../driver-postgres

@@ -10,6 +10,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@prisma-next/contract": "workspace:*",
     "@prisma-next/runtime": "workspace:*",
     "@prisma-next/sql": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",

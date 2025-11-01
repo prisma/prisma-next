@@ -34,7 +34,7 @@ export interface RuntimeGuardrailOptions {
 }
 
 import type { Plugin } from './plugins/types';
-import type { CodecRegistry } from './codecs/types';
+import type { CodecRegistry } from '@prisma-next/sql-target';
 import { composeCodecRegistry } from './codecs/registry';
 import { encodeParams } from './codecs/encoding';
 import { decodeRow } from './codecs/decoding';

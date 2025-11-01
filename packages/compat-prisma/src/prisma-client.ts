@@ -216,7 +216,7 @@ class ModelDelegate {
 
     // Execute via runtime
     const results: Record<string, unknown>[] = [];
-    for await (const row of this.runtime.execute(plan)) {
+    for await (const row of this.runtime.execute<Record<string, unknown>>(plan)) {
       results.push(row);
     }
 
@@ -272,7 +272,7 @@ class ModelDelegate {
 
     // Execute and return the created row
     const results: Record<string, unknown>[] = [];
-    for await (const row of this.runtime.execute(insertPlan)) {
+    for await (const row of this.runtime.execute<Record<string, unknown>>(insertPlan)) {
       results.push(row);
     }
 

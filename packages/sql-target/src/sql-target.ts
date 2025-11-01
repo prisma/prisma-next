@@ -1,4 +1,4 @@
-import type { CodecRegistry } from '@prisma-next/runtime';
+import type { CodecRegistry } from './codecs';
 
 export type AdapterTarget = string;
 

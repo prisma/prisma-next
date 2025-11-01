@@ -1,4 +1,4 @@
-import type { Codec, CodecRegistry } from '@prisma-next/runtime';
+import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
 
 /**
  * Core string codec: text → string (pass-through)

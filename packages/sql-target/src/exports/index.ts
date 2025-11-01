@@ -10,4 +10,5 @@ export {
   SqlQueryResult,
   SqlExplainResult,
 } from '../sql-target';
+export type { Codec, CodecRegistry } from '../codecs';
 
