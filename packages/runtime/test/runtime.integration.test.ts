@@ -18,8 +18,9 @@ import { createDevDatabase, drainAsyncIterable, executeStatement, collectAsync }
 const fixtureContract = loadContractFixture();
 const tables = schema(fixtureContract).tables;
 const adapter = createPostgresAdapter();
+const userTable = tables.user as typeof tables.user & Record<string, any>;
 const builder = sql({ contract: fixtureContract, adapter });
-const plan = builder.from(tables.user).select('id', 'email').limit(5).build();
+const plan = builder.from(tables.user).select({ id: userTable.id, email: userTable.email }).limit(5).build();
 
 describe('runtime execute integration', { timeout: 100 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;

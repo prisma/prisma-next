@@ -29,7 +29,10 @@ describe('DSL Lane Codec Type Stamping', () => {
     const plan = builder
       .from(tables.user)
       .where(userTable.id.eq({ kind: 'param-placeholder', name: 'userId' }))
-      .select('id', 'email')
+      .select({
+        id: userTable.id,
+        email: userTable.email,
+      })
       .build({ params: { userId: 1 } });
 
     expect(plan.meta.paramDescriptors.length).toBeGreaterThan(0);
@@ -43,9 +46,13 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes mapping alias → scalar type', () => {
     const builder = sql({ contract, adapter });
+    const userTable = tables.user as typeof tables.user & Record<string, any>;
     const plan = builder
       .from(tables.user)
-      .select('id', 'email')
+      .select({
+        id: userTable.id,
+        email: userTable.email,
+      })
       .build();
 
     expect(plan.meta.projectionTypes).toBeDefined();
@@ -89,7 +96,9 @@ describe('DSL Lane Codec Type Stamping', () => {
     const plan = builder
       .from(tables.user)
       .where(userTable.id.eq({ kind: 'param-placeholder', name: 'userId' }))
-      .select('id')
+      .select({
+        id: userTable.id,
+      })
       .build({ params: { userId: 1 } });
 
     const paramDesc = plan.meta.paramDescriptors[0];
@@ -135,9 +144,14 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes for all selected columns', () => {
     const builder = sql({ contract, adapter });
+    const userTable = tables.user as typeof tables.user & Record<string, any>;
     const plan = builder
       .from(tables.user)
-      .select('id', 'email', 'createdAt')
+      .select({
+        id: userTable.id,
+        email: userTable.email,
+        createdAt: userTable.createdAt,
+      })
       .build();
 
     const projectionTypes = plan.meta.projectionTypes!;
@@ -166,4 +180,3 @@ describe('DSL Lane Codec Type Stamping', () => {
     expect(projectionTypesKeys.sort()).toEqual(projectionKeys.sort());
   });
 });
-

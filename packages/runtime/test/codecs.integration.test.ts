@@ -42,6 +42,8 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   let client: Client;
   const adapter = createPostgresAdapter();
   const tables = schema(fixtureContract).tables;
+  const testDataTable = tables.test_data as typeof tables.test_data & Record<string, any>;
+  const builder = sql({ contract: fixtureContract, adapter });
 
   beforeAll(async () => {
     database = await createDevDatabase({
@@ -104,7 +106,6 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
-    const builder = sql({ contract: fixtureContract, adapter });
     const createDate = new Date('2024-01-15T10:30:00Z');
 
     // Note: We'll test encoding via the INSERT directly since DSL doesn't support INSERT yet
@@ -116,9 +117,15 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     );
 
     // Query to verify the date was stored correctly
+    const testDataTable = tables.test_data as typeof tables.test_data & Record<string, any>;
     const selectPlan = builder
       .from(tables.test_data)
-      .select('id', 'name', 'score', 'created_at')
+      .select({
+        id: testDataTable.id,
+        name: testDataTable.name,
+        score: testDataTable.score,
+        created_at: testDataTable.created_at,
+      })
       .build();
 
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
@@ -145,8 +152,14 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const builder = sql({ contract: fixtureContract, adapter });
-    const selectPlan = builder.from(tables.test_data).select('name', 'score', 'created_at').build();
+    const selectPlan = builder
+      .from(tables.test_data)
+      .select({
+        name: testDataTable.name,
+        score: testDataTable.score,
+        created_at: testDataTable.created_at,
+      })
+      .build();
 
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
     expect(rows.length).toBe(1);
@@ -170,8 +183,12 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const builder = sql({ contract: fixtureContract, adapter });
-    const selectPlan = builder.from(tables.test_data).select('score').build();
+    const selectPlan = builder
+      .from(tables.test_data)
+      .select({
+        score: testDataTable.score,
+      })
+      .build();
 
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
     expect(rows.length).toBe(1);
@@ -195,8 +212,12 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const builder = sql({ contract: fixtureContract, adapter });
-    const selectPlan = builder.from(tables.test_data).select('name').build();
+    const selectPlan = builder
+      .from(tables.test_data)
+      .select({
+        name: testDataTable.name,
+      })
+      .build();
 
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
     expect(rows.length).toBe(1);
@@ -220,8 +241,13 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const builder = sql({ contract: fixtureContract, adapter });
-    const basePlan = builder.from(tables.test_data).select('created_at').build();
+    const testDataTable = tables.test_data as typeof tables.test_data & Record<string, any>;
+    const basePlan = builder
+      .from(tables.test_data)
+      .select({
+        created_at: testDataTable.created_at,
+      })
+      .build();
 
     // Create plan with codec override annotation
     const planWithOverride = {
@@ -262,8 +288,12 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       null,
     ]);
 
-    const builder = sql({ contract: fixtureContract, adapter });
-    const selectPlan = builder.from(tables.test_data).select('created_at').build();
+    const selectPlan = builder
+      .from(tables.test_data)
+      .select({
+        created_at: testDataTable.created_at,
+      })
+      .build();
 
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
     expect(rows.length).toBe(1);
@@ -286,8 +316,14 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const builder = sql({ contract: fixtureContract, adapter });
-    const selectPlan = builder.from(tables.test_data).select('name', 'score', 'created_at').build();
+    const selectPlan = builder
+      .from(tables.test_data)
+      .select({
+        name: testDataTable.name,
+        score: testDataTable.score,
+        created_at: testDataTable.created_at,
+      })
+      .build();
 
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
     expect(rows.length).toBe(1);

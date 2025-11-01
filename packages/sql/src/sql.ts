@@ -9,6 +9,7 @@ import type {
   DslPlan,
   DslPlanMeta,
   Direction,
+  InferProjectionRow,
   LoweredStatement,
   ParamDescriptor,
   RawFactory,
@@ -30,52 +31,79 @@ interface ProjectionState {
   readonly columns: ColumnBuilder[];
 }
 
-class SelectBuilderImpl {
+class SelectBuilderImpl<Row = unknown> {
   private readonly contract: SqlContract;
   private readonly adapter: SqlBuilderOptions['adapter'];
-  private readonly state: BuilderState = {};
+  private state: BuilderState = {};
 
-  constructor(options: SqlBuilderOptions) {
+  constructor(options: SqlBuilderOptions, state?: BuilderState) {
     this.contract = options.contract;
     this.adapter = options.adapter;
-  }
-
-  from(table: TableRef) {
-    this.state.from = table;
-    return this;
-  }
-
-  where(expr: BinaryBuilder) {
-    this.state.where = expr;
-    return this;
-  }
-
-  select(...args: Array<string | Record<string, ColumnBuilder>>) {
-    if (args.length === 0) {
-      throw planInvalid('Select requires at least one field');
+    if (state) {
+      this.state = state;
     }
+  }
 
+  from(table: TableRef): SelectBuilderImpl<unknown> {
+    return new SelectBuilderImpl<unknown>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+      },
+      { ...this.state, from: table },
+    );
+  }
+
+  where(expr: BinaryBuilder): SelectBuilderImpl<Row> {
+    return new SelectBuilderImpl<Row>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+      },
+      { ...this.state, where: expr },
+    );
+  }
+
+  select<P extends Record<string, ColumnBuilder>>(
+    projection: P,
+  ): SelectBuilderImpl<InferProjectionRow<P>> {
     const table = this.ensureFrom();
-    const projection = buildProjectionState(table, args);
-    this.state.projection = projection;
-    return this;
+    const projectionState = buildProjectionState(table, projection);
+
+    return new SelectBuilderImpl<InferProjectionRow<P>>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+      },
+      { ...this.state, projection: projectionState },
+    );
   }
 
-  orderBy(order: ReturnType<ColumnBuilder['asc']>) {
-    this.state.orderBy = order;
-    return this;
+  orderBy(order: ReturnType<ColumnBuilder['asc']>): SelectBuilderImpl<Row> {
+    return new SelectBuilderImpl<Row>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+      },
+      { ...this.state, orderBy: order },
+    );
   }
 
-  limit(count: number) {
+  limit(count: number): SelectBuilderImpl<Row> {
     if (!Number.isInteger(count) || count < 0) {
       throw planInvalid('Limit must be a non-negative integer');
     }
 
-    this.state.limit = count;
-    return this;
+    return new SelectBuilderImpl<Row>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+      },
+      { ...this.state, limit: count },
+    );
   }
 
-  build(options?: BuildOptions): DslPlan {
+  build(options?: BuildOptions): DslPlan<Row> {
     const table = this.ensureFrom();
     const projection = this.ensureProjection();
 
@@ -137,7 +165,7 @@ class SelectBuilderImpl {
       ...(this.state.orderBy ? { orderBy: this.state.orderBy } : {}),
     });
 
-    const plan: DslPlan = Object.freeze({
+    const plan: DslPlan<Row> = Object.freeze({
       ast,
       sql: loweredBody.sql,
       params: loweredBody.params ?? paramValues,
@@ -166,34 +194,20 @@ class SelectBuilderImpl {
 
 function buildProjectionState(
   table: TableRef,
-  args: Array<string | Record<string, ColumnBuilder>>,
+  projection: Record<string, ColumnBuilder>,
 ): ProjectionState {
   const aliases: string[] = [];
   const columns: ColumnBuilder[] = [];
 
-  if (typeof args[0] === 'string') {
-    const columnNames = args as string[];
-    // Cast table to access columns property (TableBuilderImpl has columns)
-    const tableWithColumns = table as TableRef & { columns: Record<string, ColumnBuilder> };
-    for (const columnName of columnNames) {
-      // Always use table.columns to access columns, as direct property access
-      // can conflict with table properties (e.g., when a column is named 'name')
-      const column = tableWithColumns.columns[columnName];
-      if (!column || column.kind !== 'column') {
-        throw planInvalid(`Unknown column ${columnName} on table ${table.name}`);
-      }
-      aliases.push(columnName);
-      columns.push(column);
+  // Cast table to access columns property (TableBuilderImpl has columns)
+  const tableWithColumns = table as TableRef & { columns: Record<string, ColumnBuilder> };
+
+  for (const [alias, column] of Object.entries(projection)) {
+    if (!column || column.kind !== 'column') {
+      throw planInvalid(`Invalid column projection for alias ${alias}`);
     }
-  } else {
-    const map = args[0] as Record<string, ColumnBuilder>;
-    for (const [alias, column] of Object.entries(map)) {
-      if (!column || column.kind !== 'column') {
-        throw planInvalid(`Invalid column projection for alias ${alias}`);
-      }
-      aliases.push(alias);
-      columns.push(column);
-    }
+    aliases.push(alias);
+    columns.push(column);
   }
 
   if (aliases.length === 0) {
@@ -317,10 +331,10 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
   } satisfies DslPlanMeta);
 }
 
-type SelectBuilder = InstanceType<typeof SelectBuilderImpl>;
+type SelectBuilder = SelectBuilderImpl<unknown> & { readonly raw: RawFactory };
 
-export function sql(options: SqlBuilderOptions): SelectBuilder & { readonly raw: RawFactory } {
-  const builder = new SelectBuilderImpl(options) as SelectBuilder & { readonly raw: RawFactory };
+export function sql(options: SqlBuilderOptions): SelectBuilder {
+  const builder = new SelectBuilderImpl(options) as SelectBuilder;
   const rawFactory = createRawFactory(options.contract);
 
   Object.defineProperty(builder, 'raw', {

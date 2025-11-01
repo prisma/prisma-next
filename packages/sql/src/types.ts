@@ -1,19 +1,3 @@
-import type {
-  Adapter,
-  AdapterProfile,
-  AdapterTarget,
-  LoweredPayload,
-  Lowerer,
-  LowererContext,
-  SqlDriver,
-  SqlExecuteRequest,
-  SqlExplainResult,
-  SqlQueryResult,
-} from '@prisma-next/sql-target';
-import type { SqlContract, StorageColumn } from '@prisma-next/contract/types';
-
-export type Direction = 'asc' | 'desc';
-
 export type {
   Adapter,
   AdapterProfile,
@@ -26,6 +10,10 @@ export type {
   SqlExplainResult,
   SqlQueryResult,
 } from '@prisma-next/sql-target';
+import type { SqlContract, StorageColumn } from '@prisma-next/contract/types';
+import type { Adapter } from '@prisma-next/sql-target';
+
+export type Direction = 'asc' | 'desc';
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';
@@ -150,6 +138,39 @@ export interface PlanBase<Row = unknown, M extends PlanMetaBase = PlanMetaBase> 
   readonly params: readonly unknown[];
   readonly meta: M;
 }
+
+/**
+ * Maps contract scalar type to JavaScript type.
+ * MVP mapping: text→string, int4/float8→number, timestamptz→string
+ */
+export type ContractScalarToJsType<T extends string> = T extends 'text'
+  ? string
+  : T extends 'int4' | 'float8'
+    ? number
+    : T extends 'timestamptz' | 'timestamp'
+      ? string
+      : unknown;
+
+/**
+ * Infers JavaScript type from a ColumnBuilder based on its columnMeta.type.
+ */
+export type InferColumnType<C extends ColumnBuilder> = C extends ColumnBuilder & {
+  columnMeta: { type: infer T; nullable: infer N };
+}
+  ? T extends string
+    ? N extends true
+      ? ContractScalarToJsType<T> | null
+      : ContractScalarToJsType<T>
+    : unknown
+  : unknown;
+
+/**
+ * Infers Row type from a projection object.
+ * Maps Record<string, ColumnBuilder> to Record<string, JSType>
+ */
+export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
+  [K in keyof P]: InferColumnType<P[K]>;
+};
 
 /**
  * Utility type to extract the Row type from a Plan.

@@ -56,7 +56,10 @@ describe('sql DSL builder', () => {
 
     const plan = sql({ contract, adapter })
       .from(tables.user)
-      .select('id', 'email')
+      .select({
+        id: userColumns.id,
+        email: userColumns.email,
+      })
       .where(userColumns.id.eq(param('userId')))
       .orderBy(userColumns.createdAt.desc())
       .limit(5)
@@ -66,8 +69,8 @@ describe('sql DSL builder', () => {
       kind: 'select',
       from: { name: 'user' },
       project: [
-        { alias: 'id', expr: { table: 'user', column: 'id' } },
-        { alias: 'email', expr: { table: 'user', column: 'email' } },
+        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'email', expr: { kind: 'col', table: 'user', column: 'email' } },
       ],
       where: {
         left: { table: 'user', column: 'id' },
@@ -112,10 +115,12 @@ describe('sql DSL builder', () => {
     ]);
   });
 
-  it('throws PLAN.INVALID when selecting an unknown column', () => {
+  it('throws PLAN.INVALID when selecting an invalid column', () => {
     const builder = sql({ contract, adapter }).from(tables.user);
+    const userColumns = tables.user.columns;
 
-    expect(() => builder.select('unknown')).toThrowError(/Unknown column unknown/);
+    // Invalid: passing something that's not a ColumnBuilder
+    expect(() => builder.select({ invalid: {} as any })).toThrowError(/Invalid column projection/);
   });
 
   it('throws PLAN.INVALID when parameter value is missing', () => {
@@ -123,7 +128,9 @@ describe('sql DSL builder', () => {
 
     const builder = sql({ contract, adapter })
       .from(tables.user)
-      .select('id')
+      .select({
+        id: userColumns.id,
+      })
       .where(userColumns.id.eq(param('userId')));
 
     expect(() => builder.build()).toThrowError(/Missing value for parameter userId/);
