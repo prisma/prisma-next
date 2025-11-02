@@ -1,5 +1,6 @@
 import { type } from 'arktype';
 import type { SqlContract } from '@prisma-next/contract/types';
+import type { O } from 'ts-toolbelt';
 
 /**
  * Structural validation schema for SqlContract using Arktype.
@@ -75,7 +76,7 @@ const SqlContractSchema = type({
  */
 export function validateContractStructure<T extends SqlContract>(
   value: T,
-): Omit<T, 'targetFamily'> & { targetFamily: 'sql' } {
+): O.Overwrite<T, { targetFamily: 'sql' }> {
   const contractResult = SqlContractSchema(value);
 
   if (contractResult instanceof type.errors) {
@@ -86,9 +87,7 @@ export function validateContractStructure<T extends SqlContract>(
   // After validation, contractResult matches the schema and preserves the input structure
   // TypeScript needs an assertion here due to exactOptionalPropertyTypes differences
   // between Arktype's inferred type and the generic T, but runtime-wise they're compatible
-  return contractResult as Omit<T, 'targetFamily'> & {
-    targetFamily: 'sql';
-  };
+  return contractResult as O.Overwrite<T, { targetFamily: 'sql' }>;
 }
 
 /**
@@ -164,6 +163,11 @@ export function validateContractLogic(contract: SqlContract): void {
 
         // Validate referenced columns exist in the referenced table
         const referencedTable = storage.tables[fk.references.table];
+        if (!referencedTable) {
+          throw new Error(
+            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+          );
+        }
         const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
 
         for (const colName of fk.references.columns) {
@@ -197,7 +201,7 @@ export function validateContractLogic(contract: SqlContract): void {
  */
 export function validateContract<T extends SqlContract>(
   value: T,
-): Omit<T, 'targetFamily'> & { targetFamily: 'sql' } {
+): O.Overwrite<T, { targetFamily: 'sql' }> {
   const structurallyValid = validateContractStructure<T>(value);
 
   validateContractLogic(structurallyValid as SqlContract);
