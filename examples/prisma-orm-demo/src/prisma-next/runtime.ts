@@ -2,8 +2,8 @@ import { Client } from 'pg';
 import { createRuntime, budgets } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { PostgresDriver } from '@prisma-next/driver-postgres';
-import contract from './contract.json' assert { type: 'json' };
-import type { SqlContract } from '@prisma-next/contract/types';
+import contractJson from './contract.json' assert { type: 'json' };
+import { validateContract } from '@prisma-next/sql/schema';
 
 let runtime: ReturnType<typeof createRuntime> | undefined;
 let client: Client | undefined;
@@ -24,7 +24,7 @@ export function getPrismaNextRuntime() {
     });
 
     runtime = createRuntime({
-      contract: contract as SqlContract,
+      contract: validateContract(contractJson),
       adapter: createPostgresAdapter(),
       driver,
       verify: {

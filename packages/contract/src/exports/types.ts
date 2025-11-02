@@ -1,26 +1,11 @@
 // Shared types
-export type {
-  ContractHeader,
-  FieldType,
-  Source,
-} from '../types';
+export type { FieldType, Source } from '../types';
 
 // SQL family types
-export type {
-  StorageColumn,
-  StorageTable,
-  SqlStorage,
-  SqlContract,
-} from '../types';
+export type { StorageColumn, StorageTable, SqlStorage, SqlContract } from '../types';
 
 // Document family types
-export type {
-  DocCollection,
-  DocIndex,
-  Expr,
-  DocumentStorage,
-  DocumentContract,
-} from '../types';
+export type { DocCollection, DocIndex, Expr, DocumentStorage, DocumentContract } from '../types';
 
 // Union type
 export type { DataContract } from '../types';

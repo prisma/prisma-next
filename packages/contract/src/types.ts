@@ -1,8 +1,10 @@
 // Shared header and neutral types
-export interface ContractHeader {
-  readonly schemaVersion?: '1';
+// Note: Fields like schemaVersion and targetFamily accept string to work with JSON imports,
+// which don't preserve literal types. Runtime validation ensures correct values.
+export interface ContractBase {
+  readonly schemaVersion?: string;
   readonly target: string;
-  readonly targetFamily: 'sql' | 'document';
+  readonly targetFamily: string;
   readonly coreHash: string;
   readonly profileHash?: string;
   readonly capabilities?: Record<string, Record<string, boolean>>;
@@ -59,8 +61,9 @@ export interface SqlStorage {
   readonly tables: Record<string, StorageTable>;
 }
 
-export interface SqlContract extends ContractHeader {
-  readonly targetFamily: 'sql';
+export interface SqlContract extends ContractBase {
+  // Accept string to work with JSON imports; runtime validation ensures 'sql'
+  readonly targetFamily: string;
   readonly storage: SqlStorage;
 }
 
@@ -92,8 +95,9 @@ export interface DocumentStorage {
   };
 }
 
-export interface DocumentContract extends ContractHeader {
-  readonly targetFamily: 'document';
+export interface DocumentContract extends ContractBase {
+  // Accept string to work with JSON imports; runtime validation ensures 'document'
+  readonly targetFamily: string;
   readonly storage: DocumentStorage;
 }
 
