@@ -27,7 +27,7 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps paramDescriptors.type from columnMeta.type', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const plan = builder
       .from(tables.user)
       .where(userTable.id.eq({ kind: 'param-placeholder', name: 'userId' }))
@@ -48,7 +48,7 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes mapping alias → scalar type', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const plan = builder
       .from(tables.user)
       .select({
@@ -72,7 +72,7 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes for aliased columns', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const plan = builder
       .from(tables.user)
       .select({
@@ -94,7 +94,7 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('includes nullable in paramDescriptors', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const plan = builder
       .from(tables.user)
       .where(userTable.id.eq({ kind: 'param-placeholder', name: 'userId' }))
@@ -111,7 +111,7 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('Plan has Row generic type', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const plan = builder
       .from(tables.user)
       .select({
@@ -127,7 +127,7 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('ResultType utility extracts row type', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const plan = builder
       .from(tables.user)
       .select({
@@ -146,7 +146,7 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes for all selected columns', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const plan = builder
       .from(tables.user)
       .select({
@@ -164,7 +164,7 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('maintains projectionTypes order matching projection', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const plan = builder
       .from(tables.user)
       .select({

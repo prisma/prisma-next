@@ -400,7 +400,7 @@ export class PrismaClient extends PrismaClientImpl {
     const proxy = new Proxy(this, {
       get(target, prop) {
         if (prop in target && prop !== 'models') {
-          return (target as any)[prop];
+          return (target as Record<string, unknown>)[prop];
         }
 
         // Check if it's a model name
@@ -414,7 +414,7 @@ export class PrismaClient extends PrismaClientImpl {
 
     // Copy model properties to instance for TypeScript type checking
     for (const [modelName, delegate] of Object.entries(this.models)) {
-      (proxy as any)[modelName] = delegate;
+      (proxy as Record<string, unknown>)[modelName] = delegate;
     }
 
     return proxy;

@@ -97,7 +97,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
     const plan = builder.from(tables.user).select({ id: userTable.id, email: userTable.email }).build();
 
@@ -128,7 +128,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
     const plan = builder.from(tables.user).select({ id: userTable.id, email: userTable.email }).limit(5).build();
 
@@ -156,7 +156,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user as typeof tables.user & Record<string, any>;
+    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
     // Use LIMIT that's within heuristic but exceeds streaming budget
     const plan = builder.from(tables.user).select({ id: userTable.id, email: userTable.email }).limit(100).build();

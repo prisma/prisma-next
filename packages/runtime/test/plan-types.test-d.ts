@@ -25,7 +25,7 @@ test('execute() preserves Row type from Plan', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)
@@ -45,7 +45,7 @@ test('execute() preserves Row type from Plan', () => {
       connect: async () => {},
       execute: async function* () {},
       close: async () => {},
-    } as any,
+    } as import('@prisma-next/sql-target').SqlDriver,
     verify: { mode: 'onFirstUse', requireMarker: false },
   });
 
@@ -58,7 +58,7 @@ test('execute() signature matches Plan Row type', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)

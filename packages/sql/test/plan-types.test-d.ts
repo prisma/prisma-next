@@ -42,7 +42,7 @@ test('select() with object projection infers Row type', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)
@@ -66,7 +66,7 @@ test('build() returns DslPlan<Row> with inferred Row type', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)
@@ -85,7 +85,7 @@ test('ResultType utility extracts Row type from Plan', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)
@@ -104,7 +104,7 @@ test('execute() preserves Row type through execution', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)
@@ -124,7 +124,7 @@ test('builder chain preserves Row type through methods', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const builderAfterFrom = sql({ contract, adapter }).from(tables.user);
   const builderWithSelect = builderAfterFrom.select({
@@ -156,7 +156,7 @@ test('wrong Row type assignments fail type check', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)
@@ -185,7 +185,7 @@ test('nullable columns are handled correctly', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)
@@ -204,7 +204,7 @@ test('different column types map correctly', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, any>;
+  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
 
   const plan = sql({ contract, adapter })
     .from(tables.user)

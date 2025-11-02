@@ -1,4 +1,4 @@
-import { mapContractMarkerRow, readContractMarker } from './marker';
+import { mapContractMarkerRow, readContractMarker, type ContractMarkerRow } from './marker';
 import { evaluateRawGuardrails } from './guardrails/raw';
 import { emptyDiagnostics, freezeDiagnostics } from './diagnostics';
 import { computeSqlFingerprint } from './fingerprint';
@@ -63,7 +63,7 @@ export interface RuntimeOptions {
 }
 
 export interface Runtime {
-  execute<Row = Record<string, any>>(plan: Plan<Row>): AsyncIterable<Row>;
+  execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row>;
   diagnostics(): RuntimeDiagnostics;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
@@ -132,7 +132,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
       return;
     }
 
-    const marker = mapContractMarkerRow(result.rows[0] as any);
+    const marker = mapContractMarkerRow(result.rows[0] as ContractMarkerRow);
 
     if (marker.coreHash !== contract.coreHash) {
       throw runtimeError('CONTRACT.MARKER_MISMATCH', 'Database core hash does not match contract', {
@@ -245,7 +245,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
   }
 
   const runtime: Runtime = {
-    execute<Row = Record<string, any>>(plan: Plan<Row>): AsyncIterable<Row> {
+    execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row> {
       validatePlan(plan);
       telemetry = null;
 
@@ -280,7 +280,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
           const encodedParams = encodeParams(plan, codecRegistry, options.codecs?.overrides);
 
           // Execute query with streaming row-by-row plugin hooks
-          for await (const row of driver.execute<Record<string, any>>({
+          for await (const row of driver.execute<Record<string, unknown>>({
             sql: plan.sql,
             params: encodedParams,
           })) {

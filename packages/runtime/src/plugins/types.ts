@@ -28,6 +28,6 @@ export interface AfterExecuteResult {
 export interface Plugin {
   readonly name: string;
   beforeExecute?(plan: Plan, ctx: PluginContext): Promise<void>;
-  onRow?(row: Record<string, any>, plan: Plan, ctx: PluginContext): Promise<void>;
+  onRow?(row: Record<string, unknown>, plan: Plan, ctx: PluginContext): Promise<void>;
   afterExecute?(plan: Plan, result: AfterExecuteResult, ctx: PluginContext): Promise<void>;
 }

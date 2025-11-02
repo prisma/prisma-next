@@ -155,7 +155,7 @@ export function budgets(options?: BudgetsOptions): Plugin {
       }
     },
 
-    async onRow(row: Record<string, any>, plan: Plan, ctx: PluginContext) {
+    async onRow(row: Record<string, unknown>, plan: Plan, ctx: PluginContext) {
       observedRows += 1;
       if (observedRows > maxRows) {
         throw budgetError('BUDGET.ROWS_EXCEEDED', 'Observed row count exceeds budget', {

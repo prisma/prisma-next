@@ -116,7 +116,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     );
 
     // Query to verify the date was stored correctly
-    const testDataTable = tables.test_data as typeof tables.test_data & Record<string, any>;
+    const testDataTable = tables.test_data as typeof tables.test_data & Record<string, unknown>;
     const selectPlan = builder
       .from(tables.test_data)
       .select({
@@ -240,7 +240,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = tables.test_data as typeof tables.test_data & Record<string, any>;
+    const testDataTable = tables.test_data as typeof tables.test_data & Record<string, unknown>;
     const basePlan = builder
       .from(tables.test_data)
       .select({
