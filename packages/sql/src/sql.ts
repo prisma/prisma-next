@@ -1,6 +1,6 @@
 import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, StorageColumn } from '@prisma-next/contract/types';
 import type {
   BinaryBuilder,
   BuildOptions,
@@ -22,7 +22,7 @@ interface BuilderState {
   from?: TableRef;
   projection?: ProjectionState;
   where?: BinaryBuilder;
-  orderBy?: ReturnType<ColumnBuilder['asc']>;
+  orderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
   limit?: number;
 }
 
@@ -31,12 +31,12 @@ interface ProjectionState {
   readonly columns: ColumnBuilder[];
 }
 
-class SelectBuilderImpl<Row = unknown> {
-  private readonly contract: SqlContract;
-  private readonly adapter: SqlBuilderOptions['adapter'];
+class SelectBuilderImpl<TContract extends SqlContract = SqlContract, Row = unknown> {
+  private readonly contract: TContract;
+  private readonly adapter: SqlBuilderOptions<TContract>['adapter'];
   private state: BuilderState = {};
 
-  constructor(options: SqlBuilderOptions, state?: BuilderState) {
+  constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
     this.contract = options.contract;
     this.adapter = options.adapter;
     if (state) {
@@ -44,8 +44,8 @@ class SelectBuilderImpl<Row = unknown> {
     }
   }
 
-  from(table: TableRef): SelectBuilderImpl<unknown> {
-    return new SelectBuilderImpl<unknown>(
+  from(table: TableRef): SelectBuilderImpl<TContract, unknown> {
+    return new SelectBuilderImpl<TContract, unknown>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -54,8 +54,8 @@ class SelectBuilderImpl<Row = unknown> {
     );
   }
 
-  where(expr: BinaryBuilder): SelectBuilderImpl<Row> {
-    return new SelectBuilderImpl<Row>(
+  where(expr: BinaryBuilder): SelectBuilderImpl<TContract, Row> {
+    return new SelectBuilderImpl<TContract, Row>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -66,11 +66,11 @@ class SelectBuilderImpl<Row = unknown> {
 
   select<P extends Record<string, ColumnBuilder>>(
     projection: P,
-  ): SelectBuilderImpl<InferProjectionRow<P>> {
+  ): SelectBuilderImpl<TContract, InferProjectionRow<P>> {
     const table = this.ensureFrom();
     const projectionState = buildProjectionState(table, projection);
 
-    return new SelectBuilderImpl<InferProjectionRow<P>>(
+    return new SelectBuilderImpl<TContract, InferProjectionRow<P>>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -79,8 +79,8 @@ class SelectBuilderImpl<Row = unknown> {
     );
   }
 
-  orderBy(order: ReturnType<ColumnBuilder['asc']>): SelectBuilderImpl<Row> {
-    return new SelectBuilderImpl<Row>(
+  orderBy(order: ReturnType<ColumnBuilder['asc']>): SelectBuilderImpl<TContract, Row> {
+    return new SelectBuilderImpl<TContract, Row>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -89,12 +89,12 @@ class SelectBuilderImpl<Row = unknown> {
     );
   }
 
-  limit(count: number): SelectBuilderImpl<Row> {
+  limit(count: number): SelectBuilderImpl<TContract, Row> {
     if (!Number.isInteger(count) || count < 0) {
       throw planInvalid('Limit must be a non-negative integer');
     }
 
-    return new SelectBuilderImpl<Row>(
+    return new SelectBuilderImpl<TContract, Row>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -340,10 +340,14 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
   } satisfies DslPlanMeta);
 }
 
-type SelectBuilder = SelectBuilderImpl<unknown> & { readonly raw: RawFactory };
+type SelectBuilder<TContract extends SqlContract = SqlContract> = SelectBuilderImpl<TContract, unknown> & {
+  readonly raw: RawFactory;
+};
 
-export function sql(options: SqlBuilderOptions): SelectBuilder {
-  const builder = new SelectBuilderImpl(options) as SelectBuilder;
+export function sql<TContract extends SqlContract>(
+  options: SqlBuilderOptions<TContract>,
+): SelectBuilder<TContract> {
+  const builder = new SelectBuilderImpl<TContract>(options) as SelectBuilder<TContract>;
   const rawFactory = createRawFactory(options.contract);
 
   Object.defineProperty(builder, 'raw', {

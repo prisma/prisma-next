@@ -1,4 +1,4 @@
-export { schema } from '../schema';
-export type { SchemaHandle, SchemaTables } from '../schema';
+export { schema, makeT } from '../schema';
+export type { SchemaHandle } from '../schema';
 export { validateContract } from '../contract';
 

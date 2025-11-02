@@ -1,9 +1,5 @@
 import { planInvalid } from './errors';
-import type {
-  ContractStorage,
-  SqlContract,
-  StorageColumn,
-} from '@prisma-next/contract/types';
+import type { ContractStorage, SqlContract, StorageColumn } from '@prisma-next/contract/types';
 import type {
   BinaryBuilder,
   ColumnBuilder,
@@ -12,20 +8,25 @@ import type {
   TableRef,
 } from './types';
 
-class ColumnBuilderImpl implements ColumnBuilder {
-  readonly kind = 'column';
+class ColumnBuilderImpl<ColumnName extends string, ColumnMeta extends StorageColumn>
+  implements ColumnBuilder<ColumnName, ColumnMeta>
+{
+  readonly kind = 'column' as const;
 
   constructor(
     readonly table: string,
-    readonly column: string,
-    private readonly storageColumn: StorageColumn,
+    readonly column: ColumnName,
+    private readonly storageColumn: ColumnMeta,
   ) {}
 
-  get columnMeta(): StorageColumn {
+  get columnMeta(): ColumnMeta {
     return this.storageColumn;
   }
 
-  eq(this: ColumnBuilderImpl, value: ParamPlaceholder): BinaryBuilder {
+  eq(
+    this: ColumnBuilderImpl<ColumnName, ColumnMeta>,
+    value: ParamPlaceholder,
+  ): BinaryBuilder<ColumnName, ColumnMeta> {
     if (value.kind !== 'param-placeholder') {
       throw planInvalid('Parameter placeholder required for column comparison');
     }
@@ -38,7 +39,7 @@ class ColumnBuilderImpl implements ColumnBuilder {
     });
   }
 
-  asc(this: ColumnBuilderImpl): OrderBuilder {
+  asc(this: ColumnBuilderImpl<ColumnName, ColumnMeta>): OrderBuilder<ColumnName, ColumnMeta> {
     return Object.freeze({
       kind: 'order' as const,
       expr: this,
@@ -46,7 +47,7 @@ class ColumnBuilderImpl implements ColumnBuilder {
     });
   }
 
-  desc(this: ColumnBuilderImpl): OrderBuilder {
+  desc(this: ColumnBuilderImpl<ColumnName, ColumnMeta>): OrderBuilder<ColumnName, ColumnMeta> {
     return Object.freeze({
       kind: 'order' as const,
       expr: this,
@@ -55,31 +56,19 @@ class ColumnBuilderImpl implements ColumnBuilder {
   }
 }
 
-class TableBuilderImpl implements TableRef {
-  readonly kind = 'table';
-  readonly columns: Record<string, ColumnBuilderImpl>;
-  private readonly _name: string;
+class TableBuilderImpl<TableName extends string, Columns extends Record<string, StorageColumn>>
+  implements TableRef
+{
+  readonly kind = 'table' as const;
+  readonly columns: { readonly [K in keyof Columns]: ColumnBuilderImpl<K & string, Columns[K]> };
+  private readonly _name: TableName;
 
-  constructor(
-    name: string,
-    columns: Record<string, ColumnBuilderImpl>,
-  ) {
+  constructor(name: TableName, columns: Record<string, ColumnBuilderImpl<string, StorageColumn>>) {
     // Store name in private property to prevent overwriting
     this._name = name;
-    this.columns = columns;
-
-    // Assign columns as properties for convenient access (e.g., tables.user.id)
-    // Skip properties that would conflict with TableRef interface properties
-    for (const [key, value] of Object.entries(columns)) {
-      if (key !== 'name' && key !== 'kind' && key !== 'columns') {
-        Object.defineProperty(this, key, {
-          value,
-          enumerable: true,
-          configurable: true,
-          writable: false,
-        });
-      }
-    }
+    this.columns = columns as {
+      readonly [K in keyof Columns]: ColumnBuilderImpl<K & string, Columns[K]>;
+    };
   }
 
   get name(): string {
@@ -94,37 +83,77 @@ function buildColumns(tableName: string, storage: ContractStorage) {
     throw planInvalid(`Unknown table ${tableName}`);
   }
 
-  const result: Record<string, ColumnBuilderImpl> = {};
+  const result: Record<string, ColumnBuilderImpl<string, StorageColumn>> = {};
 
   for (const [columnName, columnDef] of Object.entries(table.columns)) {
-    result[columnName] = new ColumnBuilderImpl(tableName, columnName, columnDef);
+    result[columnName] = new ColumnBuilderImpl<string, StorageColumn>(
+      tableName,
+      columnName,
+      columnDef,
+    );
   }
 
   return result;
 }
 
-export interface SchemaTables {
-  readonly [tableName: string]: TableBuilderImpl & TableRef;
+function createTableProxy<TableName extends string, Columns extends Record<string, StorageColumn>>(
+  table: TableBuilderImpl<TableName, Columns>,
+): TableBuilderImpl<TableName, Columns> {
+  return new Proxy(table, {
+    get(target, prop) {
+      // If it's a built-in property (name, kind, columns), return it directly
+      if (prop === 'name' || prop === 'kind' || prop === 'columns') {
+        return Reflect.get(target, prop);
+      }
+      // Otherwise, check if it's a column name and route to columns
+      if (typeof prop === 'string' && prop in target.columns) {
+        return target.columns[prop as keyof typeof target.columns];
+      }
+      return undefined;
+    },
+  });
 }
 
-export interface SchemaHandle {
-  readonly tables: SchemaTables;
+type ExtractSchemaTables<Contract extends SqlContract> = {
+  readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
+    TableName & string,
+    Contract['storage']['tables'][TableName]['columns']
+  > &
+    TableRef;
+};
+
+export interface SchemaHandle<Contract extends SqlContract = SqlContract> {
+  readonly tables: ExtractSchemaTables<Contract>;
 }
 
-export function schema(contract: SqlContract): SchemaHandle {
+export function schema<Contract extends SqlContract>(contract: Contract): SchemaHandle<Contract> {
   const storage = contract.storage;
 
-  const tables = Object.fromEntries(
-    Object.keys(storage.tables).map((tableName) => {
-      const columns = buildColumns(tableName, storage);
-      return [
-        tableName,
-        Object.freeze(new TableBuilderImpl(tableName, columns)) as TableBuilderImpl & TableRef,
-      ];
-    }),
-  ) as SchemaTables;
+  const tables = {} as ExtractSchemaTables<Contract>;
+
+  for (const tableName in storage.tables) {
+    const columns = buildColumns(tableName, storage);
+    const table = new TableBuilderImpl<
+      typeof tableName & string,
+      Contract['storage']['tables'][typeof tableName]['columns']
+    >(tableName, columns);
+    const proxiedTable = createTableProxy(table);
+    (tables as Record<string, unknown>)[tableName] = Object.freeze(
+      proxiedTable,
+    ) as TableBuilderImpl<
+      typeof tableName & string,
+      Contract['storage']['tables'][typeof tableName]['columns']
+    > &
+      TableRef;
+  }
 
   return Object.freeze({ tables });
+}
+
+export function makeT<Contract extends SqlContract>(
+  contract: Contract,
+): ExtractSchemaTables<Contract> {
+  return schema(contract).tables;
 }
 
 export type { ColumnBuilderImpl as Column, TableBuilderImpl as Table };

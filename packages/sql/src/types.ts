@@ -20,26 +20,26 @@ export interface ParamPlaceholder {
   readonly name: string;
 }
 
-export interface OrderBuilder {
+export interface OrderBuilder<ColumnName extends string = string, ColumnMeta extends StorageColumn = StorageColumn> {
   readonly kind: 'order';
-  readonly expr: ColumnBuilder;
+  readonly expr: ColumnBuilder<ColumnName, ColumnMeta>;
   readonly dir: Direction;
 }
 
-export interface ColumnBuilder {
+export interface ColumnBuilder<ColumnName extends string = string, ColumnMeta extends StorageColumn = StorageColumn> {
   readonly kind: 'column';
   readonly table: string;
-  readonly column: string;
-  readonly columnMeta?: StorageColumn;
-  eq(value: ParamPlaceholder): BinaryBuilder;
-  asc(): OrderBuilder;
-  desc(): OrderBuilder;
+  readonly column: ColumnName;
+  readonly columnMeta: ColumnMeta;
+  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta>;
+  asc(): OrderBuilder<ColumnName, ColumnMeta>;
+  desc(): OrderBuilder<ColumnName, ColumnMeta>;
 }
 
-export interface BinaryBuilder {
+export interface BinaryBuilder<ColumnName extends string = string, ColumnMeta extends StorageColumn = StorageColumn> {
   readonly kind: 'binary';
   readonly op: 'eq';
-  readonly left: ColumnBuilder;
+  readonly left: ColumnBuilder<ColumnName, ColumnMeta>;
   readonly right: ParamPlaceholder;
 }
 
@@ -178,6 +178,21 @@ export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
  */
 export type ResultType<P> = P extends PlanBase<infer R> ? R : never;
 
+/**
+ * Helper types for extracting contract structure.
+ */
+export type TablesOf<TContract> = TContract extends { storage: { tables: infer U } }
+  ? U
+  : never;
+
+export type TableKey<TContract> = Extract<keyof TablesOf<TContract>, string>;
+
+export type ColumnsOf<TContract, K extends TableKey<TContract>> = K extends keyof TablesOf<TContract>
+  ? TablesOf<TContract>[K] extends { columns: infer C }
+    ? C
+    : never
+  : never;
+
 export interface DslPlan<Row = unknown> extends PlanBase<Row, DslPlanMeta> {
   readonly ast: SelectAst;
 }
@@ -229,7 +244,7 @@ export interface BuildOptions {
   readonly params?: BuildParamsMap;
 }
 
-export interface SqlBuilderOptions {
-  readonly contract: SqlContract;
+export interface SqlBuilderOptions<TContract extends SqlContract = SqlContract> {
+  readonly contract: TContract;
   readonly adapter: Adapter<SelectAst, SqlContract, LoweredStatement>;
 }

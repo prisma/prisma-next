@@ -1,23 +1,17 @@
 import { expectTypeOf, test } from 'vitest';
 import { sql } from '../src/sql';
-import { schema } from '../src/schema';
+import { schema, makeT } from '../src/schema';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { validateContract } from '../src/contract';
-import type { ResultType, Plan, DslPlan } from '../src/types';
-import type { SqlContract } from '@prisma-next/contract/types';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import type { ResultType, Plan, DslPlan, TableKey, TablesOf } from '../src/types';
+import contract from './fixtures/contract';
+import type { Tables, Models, Mappings } from './fixtures/contract.d';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const fixtureDir = join(__dirname, 'fixtures');
-
-function loadContract(name: string): SqlContract {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract(contractJson);
+// Use the contract directly - it should be typed via contract.d.ts
+// For type tests, we use the contract directly to preserve literal types
+// Runtime validation happens separately in integration tests
+function loadContract(_name: string): typeof contract {
+  // Return the contract directly to preserve literal types from contract.d.ts
+  return contract;
 }
 
 // Helper to simulate execute signature
@@ -31,7 +25,9 @@ test('builder without select() has unknown Row type', () => {
   const tables = schema(contract).tables;
 
   const builder = sql({ contract, adapter });
-  const builderAfterFrom = builder.from(tables.user);
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const builderAfterFrom = builder.from(userTable);
 
   // Before select(), Row type should be unknown
   const plan = builderAfterFrom.build();
@@ -42,13 +38,15 @@ test('select() with object projection infers Row type', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = userTable.columns;
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
+      id: userColumns['id']!,
+      email: userColumns['email']!,
     })
     .build();
 
@@ -217,4 +215,80 @@ test('different column types map correctly', () => {
 
   type Row = ResultType<typeof plan>;
   expectTypeOf(plan).toMatchTypeOf<DslPlan<Row>>();
+});
+
+test('generic contract types are preserved', () => {
+  const contract = loadContract('contract');
+  const adapter = createPostgresAdapter();
+  const tables = schema(contract).tables;
+
+  // Verify TableKey extracts correct table names
+  type ContractTableKey = TableKey<typeof contract>;
+  expectTypeOf<ContractTableKey>().toEqualTypeOf<'user'>();
+
+  // Verify TablesOf extracts correct structure
+  type ContractTables = TablesOf<typeof contract>;
+  expectTypeOf<ContractTables>().toHaveProperty('user');
+
+  // Verify schema() preserves contract generic - should have literal 'user' key
+  const schemaHandle = schema(contract);
+  expectTypeOf(schemaHandle.tables).toHaveProperty('user');
+
+  // Verify we can access with literal key
+  const userTable = schemaHandle.tables['user'];
+  expectTypeOf(userTable).not.toBeUndefined();
+});
+
+test('Contract namespace types are available', () => {
+  // Verify Tables namespace is accessible
+  type UserTable = Tables.user;
+  expectTypeOf<UserTable>().toHaveProperty('id');
+  expectTypeOf<UserTable>().toHaveProperty('email');
+  expectTypeOf<UserTable>().toHaveProperty('createdAt');
+
+  // Verify Models namespace is accessible
+  type UserModel = Models.User;
+  expectTypeOf<UserModel>().toHaveProperty('id');
+  expectTypeOf<UserModel>().toHaveProperty('email');
+  expectTypeOf<UserModel>().toHaveProperty('createdAt');
+
+  // Verify Mappings work correctly
+  type UserTableName = Mappings.ModelToTable['User'];
+  expectTypeOf<UserTableName>().toEqualTypeOf<'user'>();
+
+  type UserModelName = Mappings.TableToModel['user'];
+  expectTypeOf<UserModelName>().toEqualTypeOf<'User'>();
+});
+
+test('makeT() returns tables graph', () => {
+  const contract = loadContract('contract');
+  const t = makeT(contract);
+
+  // makeT should return the same as schema().tables
+  expectTypeOf(t).toHaveProperty('user');
+  const userTable = t['user'];
+  if (userTable) {
+    expectTypeOf(userTable).toHaveProperty('columns');
+    const columns = userTable.columns;
+    expectTypeOf(columns).toHaveProperty('id');
+    expectTypeOf(columns).toHaveProperty('email');
+    expectTypeOf(columns).toHaveProperty('createdAt');
+  }
+});
+
+test('sql() preserves contract generic through builder chain', () => {
+  const contract = loadContract('contract');
+  const adapter = createPostgresAdapter();
+  const tables = schema(contract).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+
+  const builder = sql({ contract, adapter });
+  const builderAfterFrom = builder.from(userTable);
+
+  // Builder should preserve contract type
+  expectTypeOf(builder).toMatchTypeOf<ReturnType<typeof sql<typeof contract>>>();
+  expectTypeOf(builderAfterFrom).toMatchTypeOf<
+    ReturnType<ReturnType<typeof sql<typeof contract>>['from']>
+  >();
 });
