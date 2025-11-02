@@ -83,9 +83,12 @@ export function validateContractStructure<T extends SqlContract>(
     throw new Error(`Contract structural validation failed: ${messages}`);
   }
 
-  // TypeScript narrows the type after instanceof check, but we need to assert
-  // to match the return type signature (preserving literal types while narrowing targetFamily)
-  return contractResult as Omit<T, 'targetFamily'> & { targetFamily: 'sql' };
+  // After validation, contractResult matches the schema and preserves the input structure
+  // TypeScript needs an assertion here due to exactOptionalPropertyTypes differences
+  // between Arktype's inferred type and the generic T, but runtime-wise they're compatible
+  return contractResult as Omit<T, 'targetFamily'> & {
+    targetFamily: 'sql';
+  };
 }
 
 /**
