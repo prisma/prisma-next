@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { sql } from '../src/sql';
 import { schema } from '../src/schema';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import { validateContract } from '../src/contract';
 import type { DslPlan, ResultType } from '../src/types';
 import type { SqlContract } from '@prisma-next/contract/types';
 import { readFileSync } from 'node:fs';
@@ -15,7 +16,8 @@ const fixtureDir = join(__dirname, 'fixtures');
 function loadContract(name: string): SqlContract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
-  return JSON.parse(contents) as SqlContract;
+  const contractJson = JSON.parse(contents);
+  return validateContract(contractJson);
 }
 
 describe('DSL Lane Codec Type Stamping', () => {

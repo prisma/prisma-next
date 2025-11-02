@@ -42,7 +42,6 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   let client: Client;
   const adapter = createPostgresAdapter();
   const tables = schema(fixtureContract).tables;
-  const testDataTable = tables.test_data as typeof tables.test_data & Record<string, any>;
   const builder = sql({ contract: fixtureContract, adapter });
 
   beforeAll(async () => {
@@ -121,10 +120,10 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const selectPlan = builder
       .from(tables.test_data)
       .select({
-        id: testDataTable.id,
-        name: testDataTable.name,
-        score: testDataTable.score,
-        created_at: testDataTable.created_at,
+        id: tables.test_data.columns.id,
+        name: tables.test_data.columns.name,
+        score: tables.test_data.columns.score,
+        created_at: tables.test_data.columns.created_at,
       })
       .build();
 
@@ -155,9 +154,9 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const selectPlan = builder
       .from(tables.test_data)
       .select({
-        name: testDataTable.name,
-        score: testDataTable.score,
-        created_at: testDataTable.created_at,
+        name: tables.test_data.columns.name,
+        score: tables.test_data.columns.score,
+        created_at: tables.test_data.columns.created_at,
       })
       .build();
 
@@ -186,7 +185,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const selectPlan = builder
       .from(tables.test_data)
       .select({
-        score: testDataTable.score,
+        score: tables.test_data.columns.score,
       })
       .build();
 
@@ -215,7 +214,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const selectPlan = builder
       .from(tables.test_data)
       .select({
-        name: testDataTable.name,
+        name: tables.test_data.columns.name,
       })
       .build();
 
@@ -245,7 +244,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const basePlan = builder
       .from(tables.test_data)
       .select({
-        created_at: testDataTable.created_at,
+        created_at: tables.test_data.columns.created_at,
       })
       .build();
 
@@ -291,7 +290,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const selectPlan = builder
       .from(tables.test_data)
       .select({
-        created_at: testDataTable.created_at,
+        created_at: tables.test_data.columns.created_at,
       })
       .build();
 
@@ -319,9 +318,9 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const selectPlan = builder
       .from(tables.test_data)
       .select({
-        name: testDataTable.name,
-        score: testDataTable.score,
-        created_at: testDataTable.created_at,
+        name: tables.test_data.columns.name,
+        score: tables.test_data.columns.score,
+        created_at: tables.test_data.columns.created_at,
       })
       .build();
 

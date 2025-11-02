@@ -4,26 +4,25 @@ import type { SqlContract } from '@prisma-next/contract/types';
 /**
  * Structural validation schema for SqlContract using Arktype.
  * This validates the shape and types of the contract structure.
- * Note: Record types require manual validation since Arktype doesn't support schema references in Record types.
  */
 const StorageColumnSchema = type({
   type: 'string',
-  nullable: 'boolean | undefined',
+  'nullable?': 'boolean',
 });
 
 const PrimaryKeySchema = type({
   columns: 'string[]',
-  name: 'string | undefined',
+  'name?': 'string',
 });
 
 const UniqueConstraintSchema = type({
   columns: 'string[]',
-  name: 'string | undefined',
+  'name?': 'string',
 });
 
 const IndexSchema = type({
   columns: 'string[]',
-  name: 'string | undefined',
+  'name?': 'string',
 });
 
 const ForeignKeyReferencesSchema = type({
@@ -34,7 +33,19 @@ const ForeignKeyReferencesSchema = type({
 const ForeignKeySchema = type({
   columns: 'string[]',
   references: ForeignKeyReferencesSchema,
-  name: 'string | undefined',
+  'name?': 'string',
+});
+
+const StorageTableSchema = type({
+  columns: type({ '[string]': StorageColumnSchema }),
+  'primaryKey?': PrimaryKeySchema,
+  'uniques?': UniqueConstraintSchema.array(),
+  'indexes?': IndexSchema.array(),
+  'foreignKeys?': ForeignKeySchema.array(),
+});
+
+const StorageSchema = type({
+  tables: type({ '[string]': StorageTableSchema }),
 });
 
 /**
@@ -42,18 +53,16 @@ const ForeignKeySchema = type({
  * This validates the entire contract structure at once.
  */
 const SqlContractSchema = type({
-  schemaVersion: "'1' | undefined",
+  'schemaVersion?': "'1'",
   target: 'string',
   targetFamily: "'sql'",
   coreHash: 'string',
-  profileHash: 'string | undefined',
-  capabilities: 'Record<string, Record<string, boolean>> | undefined',
-  extensions: 'Record<string, unknown> | undefined',
-  meta: 'Record<string, unknown> | undefined',
-  sources: 'Record<string, unknown> | undefined',
-  storage: {
-    tables: 'Record<string, unknown>',
-  },
+  'profileHash?': 'string',
+  'capabilities?': 'Record<string, Record<string, boolean>>',
+  'extensions?': 'Record<string, unknown>',
+  'meta?': 'Record<string, unknown>',
+  'sources?': 'Record<string, unknown>',
+  storage: StorageSchema,
 });
 
 /**
@@ -64,160 +73,19 @@ const SqlContractSchema = type({
  * @returns The validated contract if structure is valid
  * @throws Error if the contract structure is invalid
  */
-export function validateContractStructure<T extends SqlContract>(value: unknown): T {
-  // Normalize missing optional fields to undefined for Arktype validation
-  // (Arktype treats missing fields differently than undefined)
-  const contract = value as Record<string, unknown>;
-  const contractToValidate: Record<string, unknown> = {
-    schemaVersion: contract.schemaVersion ?? undefined,
-    target: contract.target,
-    targetFamily: contract.targetFamily,
-    coreHash: contract.coreHash,
-    profileHash: contract.profileHash ?? undefined,
-    capabilities: contract.capabilities ?? undefined,
-    extensions: contract.extensions ?? undefined,
-    meta: contract.meta ?? undefined,
-    sources: contract.sources ?? undefined,
-    storage: contract.storage,
-  };
+export function validateContractStructure<T extends SqlContract>(
+  value: T,
+): Omit<T, 'targetFamily'> & { targetFamily: 'sql' } {
+  const contractResult = SqlContractSchema(value);
 
-  // Validate entire contract structure using Arktype
-  const contractResult = SqlContractSchema(contractToValidate);
-  // Arktype returns an array of problems on validation failure
-  if (Array.isArray(contractResult)) {
+  if (contractResult instanceof type.errors) {
     const messages = contractResult.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Contract structural validation failed: ${messages}`);
   }
 
-  // Validate storage structure manually (since Record types with schema references aren't supported)
-  if (typeof contract.storage !== 'object' || contract.storage === null) {
-    throw new Error('Contract must have a "storage" object');
-  }
-
-  const storage = contract.storage as Record<string, unknown>;
-
-  if (
-    typeof storage.tables !== 'object' ||
-    storage.tables === null ||
-    Array.isArray(storage.tables)
-  ) {
-    throw new Error('Contract storage must have a "tables" object');
-  }
-
-  const tables = storage.tables as Record<string, unknown>;
-
-  // Validate each table structure
-  for (const [tableName, tableValue] of Object.entries(tables)) {
-    if (typeof tableValue !== 'object' || tableValue === null || Array.isArray(tableValue)) {
-      throw new Error(`Table "${tableName}" must be an object`);
-    }
-
-    const table = tableValue as Record<string, unknown>;
-
-    // Validate columns
-    if (
-      typeof table.columns !== 'object' ||
-      table.columns === null ||
-      Array.isArray(table.columns)
-    ) {
-      throw new Error(`Table "${tableName}" must have a "columns" object`);
-    }
-
-    const columns = table.columns as Record<string, unknown>;
-
-    for (const [columnName, columnValue] of Object.entries(columns)) {
-      const colObj = columnValue as Record<string, unknown>;
-      const colToValidate: Record<string, unknown> = {
-        type: colObj.type,
-        nullable: colObj.nullable ?? undefined,
-      };
-      const columnResult = StorageColumnSchema(colToValidate);
-      // Arktype returns an array of problems on validation failure
-      if (Array.isArray(columnResult)) {
-        const messages = columnResult.map((p: { message: string }) => p.message).join('; ');
-        throw new Error(`Column "${tableName}.${columnName}" validation failed: ${messages}`);
-      }
-    }
-
-    // Validate primaryKey if present
-    if (table.primaryKey !== undefined) {
-      const pkObj = table.primaryKey as Record<string, unknown>;
-      const pkToValidate: Record<string, unknown> = {
-        columns: pkObj.columns,
-        name: pkObj.name ?? undefined,
-      };
-      const pkResult = PrimaryKeySchema(pkToValidate);
-      if (Array.isArray(pkResult)) {
-        const messages = pkResult.map((p: { message: string }) => p.message).join('; ');
-        throw new Error(`Table "${tableName}" primaryKey validation failed: ${messages}`);
-      }
-    }
-
-    // Validate uniques if present
-    if (table.uniques !== undefined) {
-      if (!Array.isArray(table.uniques)) {
-        throw new Error(`Table "${tableName}" uniques must be an array`);
-      }
-
-      for (const unique of table.uniques) {
-        const uniqueObj = unique as Record<string, unknown>;
-        const uniqueToValidate: Record<string, unknown> = {
-          columns: uniqueObj.columns,
-          name: uniqueObj.name ?? undefined,
-        };
-        const uniqueResult = UniqueConstraintSchema(uniqueToValidate);
-        if (Array.isArray(uniqueResult)) {
-          const messages = uniqueResult.map((p: { message: string }) => p.message).join('; ');
-          throw new Error(`Table "${tableName}" unique constraint validation failed: ${messages}`);
-        }
-      }
-    }
-
-    // Validate indexes if present
-    if (table.indexes !== undefined) {
-      if (!Array.isArray(table.indexes)) {
-        throw new Error(`Table "${tableName}" indexes must be an array`);
-      }
-
-      for (const index of table.indexes) {
-        const indexObj = index as Record<string, unknown>;
-        const indexToValidate: Record<string, unknown> = {
-          columns: indexObj.columns,
-          name: indexObj.name ?? undefined,
-        };
-        const indexResult = IndexSchema(indexToValidate);
-        if (Array.isArray(indexResult)) {
-          const messages = indexResult.map((p: { message: string }) => p.message).join('; ');
-          throw new Error(`Table "${tableName}" index validation failed: ${messages}`);
-        }
-      }
-    }
-
-    // Validate foreignKeys if present
-    if (table.foreignKeys !== undefined) {
-      if (!Array.isArray(table.foreignKeys)) {
-        throw new Error(`Table "${tableName}" foreignKeys must be an array`);
-      }
-
-      for (const fk of table.foreignKeys) {
-        const fkObj = fk as Record<string, unknown>;
-        const fkToValidate: Record<string, unknown> = {
-          columns: fkObj.columns,
-          references: fkObj.references,
-          name: fkObj.name ?? undefined,
-        };
-        const fkResult = ForeignKeySchema(fkToValidate);
-        if (Array.isArray(fkResult)) {
-          const messages = fkResult.map((p: { message: string }) => p.message).join('; ');
-          throw new Error(`Table "${tableName}" foreignKey validation failed: ${messages}`);
-        }
-      }
-    }
-  }
-
-  // Return the original value with preserved literal types
-  // Validation has confirmed it matches SqlContract structure
-  return value as T;
+  // TypeScript narrows the type after instanceof check, but we need to assert
+  // to match the return type signature (preserving literal types while narrowing targetFamily)
+  return contractResult as Omit<T, 'targetFamily'> & { targetFamily: 'sql' };
 }
 
 /**
@@ -303,7 +171,6 @@ export function validateContractLogic(contract: SqlContract): void {
           }
         }
 
-        // Validate FK column count matches referenced column count
         if (fk.columns.length !== fk.references.columns.length) {
           throw new Error(
             `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
@@ -325,12 +192,12 @@ export function validateContractLogic(contract: SqlContract): void {
  * @returns A validated SqlContract with preserved type information
  * @throws Error if the contract structure or logic is invalid
  */
-export function validateContract<T extends SqlContract>(value: unknown): T {
-  // First, validate structure using Arktype
+export function validateContract<T extends SqlContract>(
+  value: T,
+): Omit<T, 'targetFamily'> & { targetFamily: 'sql' } {
   const structurallyValid = validateContractStructure<T>(value);
 
-  // Then, validate logical consistency
-  validateContractLogic(structurallyValid);
+  validateContractLogic(structurallyValid as SqlContract);
 
   return structurallyValid;
 }

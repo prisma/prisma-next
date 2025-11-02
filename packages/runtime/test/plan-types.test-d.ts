@@ -5,6 +5,7 @@ import type { SqlContract } from '@prisma-next/contract/types';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
+import { validateContract } from '@prisma-next/sql/schema';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +17,8 @@ const fixtureDir = join(__dirname, 'fixtures');
 function loadContract(name: string): SqlContract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
-  return JSON.parse(contents) as SqlContract;
+  const contractJson = JSON.parse(contents);
+  return validateContract(contractJson);
 }
 
 test('execute() preserves Row type from Plan', () => {
@@ -44,7 +46,7 @@ test('execute() preserves Row type from Plan', () => {
       execute: async function* () {},
       close: async () => {},
     } as any,
-    verify: { mode: 'never' },
+    verify: { mode: 'onFirstUse', requireMarker: false },
   });
 
   // execute() should accept Plan<Row> and return AsyncIterable<Row>

@@ -8,3 +8,4 @@ alwaysApply: true
 - When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc` commands from scratch
 - Use arktype instead of zod
 - Never add file extensions to imports in TypeScript
+- Don't add comments if avoidable, prefer code which expresses its intent

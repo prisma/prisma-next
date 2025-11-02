@@ -401,7 +401,8 @@ describe('validateContract', () => {
     // After validation, types should be SqlContract-compatible
     // Note: JSON imports don't preserve literal types, so we verify structure instead
     expectTypeOf(result).toMatchTypeOf<SqlContract>();
-    expectTypeOf(result.targetFamily).toEqualTypeOf<string>();
+    // targetFamily is narrowed to 'sql' literal type by validateContract
+    expectTypeOf(result.targetFamily).toEqualTypeOf<'sql'>();
     expectTypeOf(result.target).toEqualTypeOf<string>();
     // Verify table names are preserved in structure
     expectTypeOf(result.storage.tables).toHaveProperty('User');

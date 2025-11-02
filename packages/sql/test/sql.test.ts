@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
+import { validateContract } from '../src/contract';
 import type { SqlContract } from '@prisma-next/contract/types';
 import type { ParamDescriptor, Adapter, LoweredStatement, SelectAst } from '../src/types';
 
@@ -15,7 +16,8 @@ const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 function loadContract(name: string): SqlContract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
-  return JSON.parse(contents) as SqlContract;
+  const contractJson = JSON.parse(contents);
+  return validateContract(contractJson);
 }
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract, LoweredStatement> {

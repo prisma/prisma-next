@@ -7,6 +7,7 @@ import { Client } from 'pg';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
+import { validateContract } from '@prisma-next/sql/schema';
 
 import type { SqlContract } from '@prisma-next/contract/types';
 
@@ -328,5 +329,6 @@ function loadContractFixture(): SqlContract {
   const fixtureDir = dirname(fileURLToPath(import.meta.url));
   const contractPath = join(fixtureDir, '../../sql/test/fixtures/contract.json');
   const json = readFileSync(contractPath, 'utf8');
-  return JSON.parse(json) as SqlContract;
+  const contractJson = JSON.parse(json);
+  return validateContract(contractJson);
 }
