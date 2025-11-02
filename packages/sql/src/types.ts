@@ -133,7 +133,7 @@ export interface RawPlanMeta extends PlanMetaBase {
   readonly projection?: ReadonlyArray<string>;
 }
 
-export interface PlanBase<Row = unknown, M extends PlanMetaBase = PlanMetaBase> {
+export interface PlanBase<_Row = unknown, M extends PlanMetaBase = PlanMetaBase> {
   readonly sql: string;
   readonly params: readonly unknown[];
   readonly meta: M;

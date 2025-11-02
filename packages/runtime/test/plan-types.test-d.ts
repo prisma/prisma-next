@@ -84,4 +84,3 @@ test('execute() signature matches Plan Row type', () => {
   const result = runtime.execute(plan);
   expectTypeOf(result).toMatchTypeOf<AsyncIterable<Row>>();
 });
-

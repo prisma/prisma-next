@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { Client } from 'pg';
 import { PostgresDriver } from '@prisma-next/driver-postgres';
-import { createRuntime, ensureSchemaStatement, ensureTableStatement, writeContractMarker, budgets } from '../src/runtime';
+import {
+  createRuntime,
+  ensureSchemaStatement,
+  ensureTableStatement,
+  writeContractMarker,
+  budgets,
+} from '../src/runtime';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createDevDatabase } from './utils';
 import type { SqlContract } from '@prisma-next/contract/types';
@@ -99,7 +105,10 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
-    const plan = builder.from(tables.user).select({ id: userTable.id, email: userTable.email }).build();
+    const plan = builder
+      .from(tables.user)
+      .select({ id: userTable.id, email: userTable.email })
+      .build();
 
     // Unbounded SELECT should be blocked pre-exec (estimated 10_000 > maxRows 50)
     await expect(async () => {
@@ -130,7 +139,11 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
-    const plan = builder.from(tables.user).select({ id: userTable.id, email: userTable.email }).limit(5).build();
+    const plan = builder
+      .from(tables.user)
+      .select({ id: userTable.id, email: userTable.email })
+      .limit(5)
+      .build();
 
     // Bounded SELECT with LIMIT 5 should pass
     const results: Record<string, unknown>[] = [];
@@ -159,7 +172,11 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const userTable = tables.user as typeof tables.user & Record<string, unknown>;
     const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
     // Use LIMIT that's within heuristic but exceeds streaming budget
-    const plan = builder.from(tables.user).select({ id: userTable.id, email: userTable.email }).limit(100).build();
+    const plan = builder
+      .from(tables.user)
+      .select({ id: userTable.id, email: userTable.email })
+      .limit(100)
+      .build();
 
     // Should throw during streaming when observed rows > maxRows
     await expect(async () => {
@@ -228,4 +245,3 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     expect(results.length).toBeLessThanOrEqual(5);
   });
 });
-

@@ -9,7 +9,13 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import { validateContract } from '../src/contract';
 import type { SqlContract } from '@prisma-next/contract/types';
-import type { ParamDescriptor, Adapter, LoweredStatement, SelectAst, ColumnBuilder } from '../src/types';
+import type {
+  ParamDescriptor,
+  Adapter,
+  LoweredStatement,
+  SelectAst,
+  ColumnBuilder,
+} from '../src/types';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -117,7 +123,9 @@ describe('sql DSL builder', () => {
     const userColumns = tables.user.columns;
 
     // Invalid: passing something that's not a ColumnBuilder
-    expect(() => builder.select({ invalid: {} as unknown as ColumnBuilder })).toThrowError(/Invalid column projection/);
+    expect(() => builder.select({ invalid: {} as unknown as ColumnBuilder })).toThrowError(
+      /Invalid column projection/,
+    );
   });
 
   it('throws PLAN.INVALID when parameter value is missing', () => {

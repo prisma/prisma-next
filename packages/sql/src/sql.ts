@@ -137,14 +137,20 @@ class SelectBuilderImpl<Row = unknown> {
     const ast: SelectAst = {
       kind: 'select',
       from: { kind: 'table', name: table.name },
-      project: projection.aliases.map((alias, idx) => ({
-        alias,
-        expr: {
-          kind: 'col',
-          table: projection.columns[idx].table,
-          column: projection.columns[idx].column,
-        },
-      })),
+      project: projection.aliases.map((alias, idx) => {
+        const column = projection.columns[idx];
+        if (!column) {
+          throw planInvalid(`Missing column for alias ${alias} at index ${idx}`);
+        }
+        return {
+          alias,
+          expr: {
+            kind: 'col',
+            table: column.table,
+            column: column.column,
+          },
+        };
+      }),
       ...(whereExpr ? { where: whereExpr } : {}),
       ...(orderByClause ? { orderBy: orderByClause } : {}),
       ...(typeof this.state.limit === 'number' ? { limit: this.state.limit } : {}),
@@ -193,14 +199,11 @@ class SelectBuilderImpl<Row = unknown> {
 }
 
 function buildProjectionState(
-  table: TableRef,
+  _table: TableRef,
   projection: Record<string, ColumnBuilder>,
 ): ProjectionState {
   const aliases: string[] = [];
   const columns: ColumnBuilder[] = [];
-
-  // Cast table to access columns property (TableBuilderImpl has columns)
-  const tableWithColumns = table as TableRef & { columns: Record<string, ColumnBuilder> };
 
   for (const [alias, column] of Object.entries(projection)) {
     if (!column || column.kind !== 'column') {
@@ -276,7 +279,7 @@ interface MetaBuildArgs {
 function buildMeta(args: MetaBuildArgs): DslPlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();
 
-  args.projection.columns.forEach((column, index) => {
+  args.projection.columns.forEach((column) => {
     refsColumns.set(`${column.table}.${column.column}`, {
       table: column.table,
       column: column.column,
@@ -298,10 +301,13 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
   }
 
   const projectionMap = Object.fromEntries(
-    args.projection.aliases.map((alias, index) => [
-      alias,
-      `${args.projection.columns[index].table}.${args.projection.columns[index].column}`,
-    ]),
+    args.projection.aliases.map((alias, index) => {
+      const column = args.projection.columns[index];
+      if (!column) {
+        throw planInvalid(`Missing column for alias ${alias} at index ${index}`);
+      }
+      return [alias, `${column.table}.${column.column}`];
+    }),
   );
 
   // Build projectionTypes mapping: alias → contract scalar type
@@ -309,6 +315,9 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
   for (let i = 0; i < args.projection.aliases.length; i++) {
     const alias = args.projection.aliases[i];
     const column = args.projection.columns[i];
+    if (!column || !alias) {
+      continue;
+    }
     const columnMeta = column.columnMeta;
     if (columnMeta?.type) {
       projectionTypes[alias] = columnMeta.type;

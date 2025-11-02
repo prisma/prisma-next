@@ -3,37 +3,32 @@ import { sql } from '../src/sql';
 import { schema } from '../src/schema';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { validateContract } from '../src/contract';
-import type { DslPlan, ResultType } from '../src/types';
-import type { SqlContract } from '@prisma-next/contract/types';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const fixtureDir = join(__dirname, 'fixtures');
-
-function loadContract(name: string): SqlContract {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract(contractJson);
-}
+import type { DslPlan } from '../src/types';
+import contractJson from './fixtures/contract.json' assert { type: 'json' };
 
 describe('DSL Lane Codec Type Stamping', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract(contractJson);
   const tables = schema(contract).tables;
   const adapter = createPostgresAdapter();
 
   it('stamps paramDescriptors.type from columnMeta.type', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+    const userTable = tables['user'];
+    if (!userTable) {
+      throw new Error('user table not found');
+    }
+
+    const idColumn = userTable.columns['id'];
+    const emailColumn = userTable.columns['email'];
+    if (!idColumn || !emailColumn) {
+      throw new Error('columns not found');
+    }
     const plan = builder
-      .from(tables.user)
-      .where(userTable.id.eq({ kind: 'param-placeholder', name: 'userId' }))
+      .from(userTable)
+      .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
       .select({
-        id: userTable.id,
-        email: userTable.email,
+        id: idColumn,
+        email: emailColumn,
       })
       .build({ params: { userId: 1 } });
 
@@ -48,12 +43,20 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes mapping alias → scalar type', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+    const userTable = tables['user'];
+    if (!userTable) {
+      throw new Error('user table not found');
+    }
+    const idColumn = userTable.columns['id'];
+    const emailColumn = userTable.columns['email'];
+    if (!idColumn || !emailColumn) {
+      throw new Error('columns not found');
+    }
     const plan = builder
-      .from(tables.user)
+      .from(userTable)
       .select({
-        id: userTable.id,
-        email: userTable.email,
+        id: idColumn,
+        email: emailColumn,
       })
       .build();
 
@@ -64,7 +67,7 @@ describe('DSL Lane Codec Type Stamping', () => {
     expect(Object.keys(projectionTypes).length).toBeGreaterThan(0);
 
     // Verify the types are contract scalar types
-    for (const [alias, scalarType] of Object.entries(projectionTypes)) {
+    for (const [_alias, scalarType] of Object.entries(projectionTypes)) {
       expect(typeof scalarType).toBe('string');
       expect(scalarType.length).toBeGreaterThan(0);
     }
@@ -72,34 +75,49 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes for aliased columns', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+    const userTable = tables['user'];
+    if (!userTable) {
+      throw new Error('user table not found');
+    }
+    const idColumn = userTable.columns['id'];
+    const emailColumn = userTable.columns['email'];
+    if (!idColumn || !emailColumn) {
+      throw new Error('columns not found');
+    }
     const plan = builder
-      .from(tables.user)
+      .from(userTable)
       .select({
-        userId: userTable.id,
-        userEmail: userTable.email,
+        userId: idColumn,
+        userEmail: emailColumn,
       })
       .build();
 
     expect(plan.meta.projectionTypes).toBeDefined();
     const projectionTypes = plan.meta.projectionTypes!;
 
-    expect(projectionTypes.userId).toBeDefined();
-    expect(projectionTypes.userEmail).toBeDefined();
+    expect(projectionTypes['userId']).toBeDefined();
+    expect(projectionTypes['userEmail']).toBeDefined();
 
     // Verify types match the column types from contract
-    expect(typeof projectionTypes.userId).toBe('string');
-    expect(typeof projectionTypes.userEmail).toBe('string');
+    expect(typeof projectionTypes['userId']).toBe('string');
+    expect(typeof projectionTypes['userEmail']).toBe('string');
   });
 
   it('includes nullable in paramDescriptors', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+    const userTable = tables['user'];
+    if (!userTable) {
+      throw new Error('user table not found');
+    }
+    const idColumn = userTable.columns['id'];
+    if (!idColumn) {
+      throw new Error('id column not found');
+    }
     const plan = builder
-      .from(tables.user)
-      .where(userTable.id.eq({ kind: 'param-placeholder', name: 'userId' }))
+      .from(userTable)
+      .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
       .select({
-        id: userTable.id,
+        id: idColumn,
       })
       .build({ params: { userId: 1 } });
 
@@ -111,12 +129,20 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('Plan has Row generic type', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+    const userTable = tables['user'];
+    if (!userTable) {
+      throw new Error('user table not found');
+    }
+    const idColumn = userTable.columns['id'];
+    const emailColumn = userTable.columns['email'];
+    if (!idColumn || !emailColumn) {
+      throw new Error('columns not found');
+    }
     const plan = builder
-      .from(tables.user)
+      .from(userTable)
       .select({
-        id: userTable.id,
-        email: userTable.email,
+        id: idColumn,
+        email: emailColumn,
       })
       .build();
 
@@ -127,50 +153,74 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('ResultType utility extracts row type', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+    const userTable = tables['user'];
+    if (!userTable) {
+      throw new Error('user table not found');
+    }
+    const idColumn = userTable.columns['id'];
+    const emailColumn = userTable.columns['email'];
+    if (!idColumn || !emailColumn) {
+      throw new Error('columns not found');
+    }
     const plan = builder
-      .from(tables.user)
+      .from(userTable)
       .select({
-        id: userTable.id,
-        email: userTable.email,
+        id: idColumn,
+        email: emailColumn,
       })
       .build();
 
-    // Type-level test: ResultType should extract the row type
-    type Row = ResultType<typeof plan>;
-
     // Runtime check: verify plan structure supports type inference
+    // Note: ResultType<typeof plan> can be used to extract the row type at the type level
     expect(plan.meta.projection).toBeDefined();
     expect(plan.meta.projectionTypes).toBeDefined();
   });
 
   it('stamps projectionTypes for all selected columns', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+    const userTable = tables['user'];
+    if (!userTable) {
+      throw new Error('user table not found');
+    }
+    const idColumn = userTable.columns['id'];
+    const emailColumn = userTable.columns['email'];
+    const createdAtColumn = userTable.columns['createdAt'];
+    if (!idColumn || !emailColumn || !createdAtColumn) {
+      throw new Error('columns not found');
+    }
     const plan = builder
-      .from(tables.user)
+      .from(userTable)
       .select({
-        id: userTable.id,
-        email: userTable.email,
-        createdAt: userTable.createdAt,
+        id: idColumn,
+        email: emailColumn,
+        createdAt: createdAtColumn,
       })
       .build();
 
     const projectionTypes = plan.meta.projectionTypes!;
-    expect(projectionTypes.id).toBeDefined();
-    expect(projectionTypes.email).toBeDefined();
-    expect(projectionTypes.createdAt).toBeDefined();
+    expect(projectionTypes['id']).toBeDefined();
+    expect(projectionTypes['email']).toBeDefined();
+    expect(projectionTypes['createdAt']).toBeDefined();
   });
 
   it('maintains projectionTypes order matching projection', () => {
     const builder = sql({ contract, adapter });
-    const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+    const userTable = tables['user'];
+    if (!userTable) {
+      throw new Error('user table not found');
+    }
+    const idColumn = userTable.columns['id'];
+    const emailColumn = userTable.columns['email'];
+    const createdAtColumn = userTable.columns['createdAt'];
+    if (!idColumn || !emailColumn || !createdAtColumn) {
+      throw new Error('columns not found');
+    }
     const plan = builder
-      .from(tables.user)
+      .from(userTable)
       .select({
-        first: userTable.id,
-        second: userTable.email,
-        third: userTable.createdAt,
+        first: idColumn,
+        second: emailColumn,
+        third: createdAtColumn,
       })
       .build();
 
