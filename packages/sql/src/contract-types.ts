@@ -1,55 +1,79 @@
 import type { ContractBase } from '@prisma-next/contract/types';
 
 // SQL family types
-export interface StorageColumn {
+export type StorageColumn = {
   readonly type?: string;
   readonly nullable?: boolean;
-}
+};
 
-export interface StorageTable {
+export type PrimaryKey = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+};
+
+export type UniqueConstraint = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+};
+
+export type Index = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+};
+
+export type ForeignKeyReferences = {
+  readonly table: string;
+  readonly columns: readonly string[];
+};
+
+export type ForeignKey = {
+  readonly columns: readonly string[];
+  readonly references: ForeignKeyReferences;
+  readonly name?: string;
+};
+
+export type StorageTable = {
   readonly columns: Record<string, StorageColumn>;
-  readonly primaryKey?: {
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  };
-  readonly uniques?: ReadonlyArray<{
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  }>;
-  readonly indexes?: ReadonlyArray<{
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  }>;
-  readonly foreignKeys?: ReadonlyArray<{
-    readonly columns: ReadonlyArray<string>;
-    readonly references: {
-      readonly table: string;
-      readonly columns: ReadonlyArray<string>;
-    };
-    readonly name?: string;
-  }>;
-}
+  readonly primaryKey?: PrimaryKey;
+  readonly uniques?: ReadonlyArray<UniqueConstraint>;
+  readonly indexes?: ReadonlyArray<Index>;
+  readonly foreignKeys?: ReadonlyArray<ForeignKey>;
+};
 
-export interface SqlStorage {
+export type SqlStorage = {
   readonly tables: Record<string, StorageTable>;
-}
+};
 
-export interface SqlMappings {
-  readonly ModelToTable?: Record<string, string>;
-  readonly TableToModel?: Record<string, string>;
-  readonly FieldToColumn?: Record<string, Record<string, string>>;
-  readonly ColumnToField?: Record<string, Record<string, string>>;
-}
+export type ModelField = {
+  readonly column: string;
+};
 
-export interface SqlContract<
+export type ModelStorage = {
+  readonly table: string;
+};
+
+export type ModelDefinition = {
+  readonly storage: ModelStorage;
+  readonly fields: Record<string, ModelField>;
+  readonly relations?: Record<string, unknown>;
+};
+
+export type SqlMappings = {
+  readonly modelToTable?: Record<string, string>;
+  readonly tableToModel?: Record<string, string>;
+  readonly fieldToColumn?: Record<string, Record<string, string>>;
+  readonly columnToField?: Record<string, Record<string, string>>;
+};
+
+export type SqlContract<
   S extends SqlStorage = SqlStorage,
   M extends Record<string, unknown> = Record<string, unknown>,
   R extends Record<string, unknown> = Record<string, unknown>,
   Map extends SqlMappings = SqlMappings,
-> extends ContractBase {
+> = ContractBase & {
   readonly targetFamily: string;
   readonly storage: S;
   readonly models: M;
   readonly relations: R;
-  readonly Mappings: Map;
-}
+  readonly mappings: Map;
+};

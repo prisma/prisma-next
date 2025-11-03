@@ -91,6 +91,89 @@ const Schema = type({
 
 Use the `.array()` method on a schema to create an array type. Arktype will automatically validate each element of the array against the schema. No manual validation needed.
 
+## Type Inference
+
+To extract TypeScript types from Arktype schemas, use the `.infer` property:
+
+**✅ CORRECT:**
+```typescript
+import { type } from 'arktype';
+
+const UserSchema = type({
+  name: 'string',
+  platform: "'android' | 'ios'",
+  'versions?': '(number | string)[]',
+});
+
+type User = typeof UserSchema.infer;
+// User is: { name: string; platform: 'android' | 'ios'; versions?: (number | string)[] }
+```
+
+**❌ WRONG:**
+```typescript
+// Don't manually define types that duplicate the schema
+type User = {
+  name: string;
+  platform: 'android' | 'ios';
+  versions?: (number | string)[];
+};
+
+// Use .infer instead to keep types in sync with schemas
+type User = typeof UserSchema.infer;
+```
+
+The `.infer` property extracts the TypeScript type that the schema validates. This keeps your types in sync with your validation schemas automatically.
+
+## Type Declaration and Readonly Arrays
+
+When you need to ensure a schema matches a pre-existing TypeScript type (useful for maintaining type safety between type-only and runtime code), use `type.declare<>()`:
+
+**✅ CORRECT:**
+```typescript
+import { type } from 'arktype';
+
+type PrimaryKey = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+};
+
+// type.declare<>() ensures the schema matches the declared type at compile-time
+const PrimaryKeySchema = type.declare<PrimaryKey>().type({
+  columns: type.string.array().readonly(),  // Use .readonly() for readonly arrays
+  'name?': 'string',
+});
+```
+
+**For readonly arrays**, use `.array().readonly()` instead of `'string[]'`:
+
+**✅ CORRECT:**
+```typescript
+const Schema = type.declare<{ readonly items: readonly string[] }>().type({
+  items: type.string.array().readonly(),  // Creates readonly string[]
+});
+```
+
+**❌ WRONG:**
+```typescript
+// This creates a mutable array type
+const Schema = type.declare<{ readonly items: readonly string[] }>().type({
+  items: 'string[]',  // Type mismatch: mutable vs readonly
+});
+```
+
+**For arrays of schemas**, apply `.readonly()` to the array:
+
+**✅ CORRECT:**
+```typescript
+const ItemSchema = type.declare<Item>().type({ id: 'string' });
+
+const ContainerSchema = type.declare<{ readonly items: readonly Item[] }>().type({
+  items: ItemSchema.array().readonly(),  // Readonly array of Item objects
+});
+```
+
+Use `type.declare<>()` when you want compile-time guarantees that your schema matches an existing TypeScript type, especially when working with type-only modules that need to stay in sync with runtime validation code.
+
 ## Avoiding Redundant Validation
 
 **❌ WRONG:**

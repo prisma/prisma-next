@@ -61,6 +61,13 @@
         "$ref": "#/$defs/Source"
       }
     },
+    "models": {
+      "type": "object",
+      "description": "Model definitions mapping application-level models to storage tables",
+      "additionalProperties": {
+        "$ref": "#/$defs/Model"
+      }
+    },
     "storage": {
       "type": "object",
       "description": "Storage layout definition",
@@ -77,7 +84,7 @@
       "required": ["tables"]
     }
   },
-  "required": ["schemaVersion", "target", "targetFamily", "coreHash", "storage"],
+  "required": ["schemaVersion", "target", "targetFamily", "coreHash", "models", "storage"],
   "$defs": {
     "StorageTable": {
       "type": "object",
@@ -289,6 +296,91 @@
         }
       },
       "required": ["readOnly", "projection"]
+    },
+    "Model": {
+      "type": "object",
+      "description": "Model definition mapping to storage table",
+      "additionalProperties": false,
+      "properties": {
+        "storage": {
+          "type": "object",
+          "description": "Storage mapping for the model",
+          "additionalProperties": false,
+          "properties": {
+            "table": {
+              "type": "string",
+              "description": "Table name in storage.tables"
+            }
+          },
+          "required": ["table"]
+        },
+        "fields": {
+          "type": "object",
+          "description": "Field definitions mapping model fields to storage columns",
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelField"
+          }
+        },
+        "relations": {
+          "type": "object",
+          "description": "Relation definitions for the model",
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelRelation"
+          }
+        }
+      },
+      "required": ["storage", "fields"]
+    },
+    "ModelField": {
+      "type": "object",
+      "description": "Model field definition mapping to storage column",
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "type": "string",
+          "description": "Column name in the model's backing table"
+        }
+      },
+      "required": ["column"]
+    },
+    "ModelRelation": {
+      "type": "object",
+      "description": "Model relation definition",
+      "additionalProperties": false,
+      "properties": {
+        "to": {
+          "type": "string",
+          "description": "Target model name"
+        },
+        "cardinality": {
+          "type": "string",
+          "enum": ["1:1", "1:N", "N:1", "N:M"],
+          "description": "Relation cardinality"
+        },
+        "on": {
+          "type": "object",
+          "description": "Relation field mappings",
+          "additionalProperties": false,
+          "properties": {
+            "parentCols": {
+              "type": "array",
+              "description": "Parent table columns",
+              "items": {
+                "type": "string"
+              }
+            },
+            "childCols": {
+              "type": "array",
+              "description": "Child table columns",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["parentCols", "childCols"]
+        }
+      },
+      "required": ["to", "cardinality", "on"]
     }
   }
 }

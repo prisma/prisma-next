@@ -5,6 +5,16 @@
   "targetFamily": "sql",
   "coreHash": "sha256:test-core",
   "profileHash": "sha256:test-profile",
+  "models": {
+    "User": {
+      "storage": { "table": "user" },
+      "fields": {
+        "id": { "column": "id" },
+        "email": { "column": "email" },
+        "createdAt": { "column": "createdAt" }
+      }
+    }
+  },
   "storage": {
     "tables": {
       "user": {
@@ -12,6 +22,9 @@
           "id": { "type": "int4", "nullable": false },
           "email": { "type": "text", "nullable": false },
           "createdAt": { "type": "timestamptz", "nullable": false }
+        },
+        "primaryKey": {
+          "columns": ["id"]
         }
       }
     }

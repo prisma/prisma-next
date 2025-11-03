@@ -285,15 +285,15 @@ test('Contract namespace types are available', () => {
   expectTypeOf<UserModel>().toHaveProperty('email');
   expectTypeOf<UserModel>().toHaveProperty('createdAt');
 
-  // Verify Mappings work correctly
-  type UserTableName = Contract['Mappings'] extends { ModelToTable: infer MT }
+  // Verify mappings work correctly
+  type UserTableName = Contract['mappings'] extends { modelToTable: infer MT }
     ? MT extends { User: infer U }
       ? U
       : never
     : never;
   expectTypeOf<UserTableName>().toEqualTypeOf<'user'>();
 
-  type UserModelName = Contract['Mappings'] extends { TableToModel: infer TM }
+  type UserModelName = Contract['mappings'] extends { tableToModel: infer TM }
     ? TM extends { user: infer U }
       ? U
       : never
