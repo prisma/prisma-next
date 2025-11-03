@@ -6,64 +6,36 @@ import type { Plan, DslPlan } from '@prisma-next/sql/types';
  *
  * Precedence:
  * 1. Plan hint: `annotations.codecs[alias]` → select by id
- * 2. Runtime overrides: `overrides[alias]` or `overrides['table.column']` → select by id
- * 3. Projection type: `projectionTypes[alias]` → `byScalar.get(scalar)` → first candidate
- * 4. Fallback: null (pass through driver value)
+ * 2. Projection type: `projectionTypes[alias]` → `byScalar.get(scalar)` → first candidate
+ * 3. Fallback: null (pass through driver value)
  */
 function resolveRowCodec(
   alias: string,
   plan: Plan,
   registry: CodecRegistry,
-  overrides?: Record<string, string>,
 ): Codec | null {
   // 1. Plan hint: annotations.codecs[alias]
   const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;
   if (planCodecId) {
-    const codec = registry.byId.get(planCodecId);
+    const codec = registry.get(planCodecId);
     if (codec) {
       return codec;
     }
   }
 
-  // 2. Runtime overrides: check alias first, then table.column if DSL plan
-  if (overrides) {
-    const overrideId = overrides[alias];
-    if (overrideId) {
-      const codec = registry.byId.get(overrideId);
-      if (codec) {
-        return codec;
-      }
-    }
-
-    // Check table.column for DSL plans
-    if (plan.meta.lane === 'dsl') {
-      const dslPlan = plan as DslPlan;
-      const tableColumn = dslPlan.meta.projection[alias];
-      if (tableColumn) {
-        const overrideId = overrides[tableColumn];
-        if (overrideId) {
-          const codec = registry.byId.get(overrideId);
-          if (codec) {
-            return codec;
-          }
-        }
-      }
-    }
-  }
-
-  // 3. Projection type: projectionTypes[alias] → byScalar
+  // 2. Projection type: projectionTypes[alias] → byScalar
   if (plan.meta.lane === 'dsl') {
     const dslPlan = plan as DslPlan;
     const scalarType = dslPlan.meta.projectionTypes?.[alias];
     if (scalarType) {
-      const candidates = registry.byScalar.get(scalarType);
-      if (candidates && candidates.length > 0) {
+      const candidates = registry.getByScalar(scalarType);
+      if (candidates.length > 0) {
         return candidates[0] ?? null;
       }
     }
   }
 
-  // 4. Fallback: no codec
+  // 3. Fallback: no codec
   return null;
 }
 
@@ -80,7 +52,6 @@ export function decodeRow(
   row: Record<string, unknown>,
   plan: Plan,
   registry: CodecRegistry,
-  overrides?: Record<string, string>,
 ): Record<string, unknown> {
   const decoded: Record<string, unknown> = {};
 
@@ -111,7 +82,7 @@ export function decodeRow(
     }
 
     // Resolve codec
-    const codec = resolveRowCodec(alias, plan, registry, overrides);
+    const codec = resolveRowCodec(alias, plan, registry);
 
     if (!codec) {
       // No codec: pass through driver value (fallback in MVP)

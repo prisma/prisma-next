@@ -5,33 +5,109 @@ import { decodeRow } from '../src/codecs/decoding';
 import { extractScalarTypes, validateCodecRegistryCompleteness } from '../src/codecs/validation';
 import type { Plan, DslPlan, ParamDescriptor } from '@prisma-next/sql/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
-import type { CodecRegistry } from '@prisma-next/sql-target';
+import { CodecRegistry } from '@prisma-next/sql-target';
+import type { Codec } from '@prisma-next/sql-target';
 
 describe('Codec Registry', () => {
   const registry = createPostgresCodecRegistry();
 
-  it('resolves codec by ID', () => {
-    const codec = registry.byId.get('core/string@1');
+  it('resolves codec by ID using get()', () => {
+    const codec = registry.get('core/string@1');
     expect(codec).toBeDefined();
     expect(codec?.id).toBe('core/string@1');
   });
 
-  it('resolves codec by scalar type', () => {
-    const codecs = registry.byScalar.get('text');
+  it('checks if codec exists using has()', () => {
+    expect(registry.has('core/string@1')).toBe(true);
+    expect(registry.has('core/nonexistent@1')).toBe(false);
+  });
+
+  it('resolves codec by scalar type using getByScalar()', () => {
+    const codecs = registry.getByScalar('text');
     expect(codecs).toBeDefined();
-    expect(codecs?.length).toBeGreaterThan(0);
-    expect(codecs?.[0]?.['id']).toBe('core/string@1');
+    expect(codecs.length).toBeGreaterThan(0);
+    expect(codecs[0]?.id).toBe('core/string@1');
+  });
+
+  it('returns empty array for unknown scalar type using getByScalar()', () => {
+    const codecs = registry.getByScalar('unknown-type');
+    expect(codecs).toEqual([]);
+  });
+
+  it('gets default codec for scalar type', () => {
+    const codec = registry.getDefaultCodec('text');
+    expect(codec).toBeDefined();
+    expect(codec?.id).toBe('core/string@1');
+  });
+
+  it('returns undefined for default codec of unknown scalar type', () => {
+    const codec = registry.getDefaultCodec('unknown-type');
+    expect(codec).toBeUndefined();
   });
 
   it('returns multiple codecs for same scalar type', () => {
-    const timestamptzCodecs = registry.byScalar.get('timestamptz');
+    const timestamptzCodecs = registry.getByScalar('timestamptz');
     expect(timestamptzCodecs).toBeDefined();
-    expect(timestamptzCodecs?.length).toBeGreaterThan(0);
+    expect(timestamptzCodecs.length).toBeGreaterThan(0);
   });
 
-  it('returns undefined for unknown scalar type', () => {
-    const codecs = registry.byScalar.get('unknown-type');
-    expect(codecs).toBeUndefined();
+  it('iterates over all codecs', () => {
+    const codecs = Array.from(registry.values());
+    expect(codecs.length).toBeGreaterThan(0);
+    expect(codecs.some((c) => c.id === 'core/string@1')).toBe(true);
+  });
+
+  describe('CodecRegistry class methods', () => {
+    it('registers a new codec', () => {
+      const newRegistry = new CodecRegistry();
+      const codec: Codec<string, string> = {
+        id: 'test/custom@1',
+        targetTypes: ['custom'],
+        decode: (wire) => wire,
+        encode: (value) => value,
+      };
+
+      newRegistry.register(codec);
+      expect(newRegistry.get('test/custom@1')).toBe(codec);
+      expect(newRegistry.has('test/custom@1')).toBe(true);
+    });
+
+    it('throws error when registering duplicate codec ID', () => {
+      const newRegistry = new CodecRegistry();
+      const codec: Codec<string, string> = {
+        id: 'test/duplicate@1',
+        targetTypes: ['custom'],
+        decode: (wire) => wire,
+      };
+
+      newRegistry.register(codec);
+      expect(() => {
+        newRegistry.register(codec);
+      }).toThrow("Codec with ID 'test/duplicate@1' is already registered");
+    });
+
+    it('maintains codec order for scalar types', () => {
+      const newRegistry = new CodecRegistry();
+      const codec1: Codec<string, string> = {
+        id: 'test/first@1',
+        targetTypes: ['shared'],
+        decode: (wire) => wire,
+      };
+      const codec2: Codec<string, string> = {
+        id: 'test/second@1',
+        targetTypes: ['shared'],
+        decode: (wire) => wire,
+      };
+
+      newRegistry.register(codec1);
+      newRegistry.register(codec2);
+
+      const codecs = newRegistry.getByScalar('shared');
+      expect(codecs.length).toBe(2);
+      expect(codecs[0]?.id).toBe('test/first@1');
+      expect(codecs[1]?.id).toBe('test/second@1');
+      expect(newRegistry.getDefaultCodec('shared')?.id).toBe('test/first@1');
+    });
   });
 });
 
@@ -117,21 +193,6 @@ describe('Param Encoding', () => {
       registry,
     );
     expect(encoded).toBe('test');
-  });
-
-  it('uses runtime override', () => {
-    const plan = createMockPlan([
-      { name: 'param1', type: 'text', source: 'dsl', refs: { table: 'user', column: 'email' } },
-    ]);
-    const overrides = { 'user.email': 'core/string@1' };
-    const encoded = encodeParam(
-      'test@example.com',
-      plan.meta.paramDescriptors[0]!,
-      plan,
-      registry,
-      overrides,
-    );
-    expect(encoded).toBe('test@example.com');
   });
 
   it('encodes all params in plan', () => {
@@ -236,14 +297,6 @@ describe('Row Decoding', () => {
     };
     const row = { email: 'test@example.com' };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['email']).toBe('test@example.com');
-  });
-
-  it('uses runtime override', () => {
-    const plan = createMockDslPlan({ email: 'text' });
-    const overrides = { email: 'core/string@1' };
-    const row = { email: 'test@example.com' };
-    const decoded = decodeRow(row, plan, registry, overrides);
     expect(decoded['email']).toBe('test@example.com');
   });
 
@@ -452,10 +505,7 @@ describe('Codec Registry Validation', () => {
       mappings: {},
     };
 
-    const emptyRegistry: CodecRegistry = {
-      byId: new Map(),
-      byScalar: new Map(),
-    };
+    const emptyRegistry = new CodecRegistry();
 
     expect(() => validateCodecRegistryCompleteness(emptyRegistry, contract)).not.toThrow();
   });

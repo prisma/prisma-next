@@ -16,6 +16,7 @@ import type {
   SelectAst,
   ColumnBuilder,
 } from '../src/types';
+import { CodecRegistry } from '@prisma-next/sql-target';
 import type { Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -34,10 +35,7 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
       target: 'postgres',
       capabilities: {},
       codecs() {
-        return Object.freeze({
-          byId: Object.freeze(new Map()),
-          byScalar: Object.freeze(new Map()),
-        });
+        return new CodecRegistry();
       },
     },
     lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {

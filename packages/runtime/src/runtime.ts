@@ -21,19 +21,10 @@ export interface RuntimeTelemetryEvent {
 }
 
 import type { Plugin } from './plugins/types';
-import type { CodecRegistry } from '@prisma-next/sql-target';
-import { composeCodecRegistry } from './codecs/registry';
+import { CodecRegistry } from '@prisma-next/sql-target';
 import { encodeParams } from './codecs/encoding';
 import { decodeRow } from './codecs/decoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
-
-export interface RuntimeCodecOptions {
-  /**
-   * Per-alias or fully-qualified column override → namespaced codec id.
-   * Example: { 'user.createdAt': 'core/iso-datetime@1', 'createdAt': 'core/iso-datetime@1' }
-   */
-  readonly overrides?: Record<string, string>;
-}
 
 export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
@@ -44,11 +35,6 @@ export interface RuntimeOptions<
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
-  /**
-   * Codec configuration for runtime.
-   * Allows overriding codec selection per column/alias.
-   */
-  readonly codecs?: RuntimeCodecOptions;
 }
 
 export interface Runtime {
@@ -74,7 +60,6 @@ export class Runtime<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
   private readonly codecRegistry: CodecRegistry;
-  private readonly codecOverrides: Record<string, string> | undefined;
   private readonly pluginContext: import('./plugins/types').PluginContext;
 
   private verified: boolean;
@@ -90,14 +75,22 @@ export class Runtime<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     this.plugins = options.plugins ?? [];
     this.mode = options.mode ?? 'strict';
     this.verify = options.verify;
-    this.codecOverrides = options.codecs?.overrides;
 
     this.verified = options.verify.mode === 'startup' ? false : options.verify.mode === 'always';
     this.startupVerified = false;
     this._telemetry = null;
     this.codecRegistryValidated = false;
 
-    this.codecRegistry = composeCodecRegistry(this.adapter.profile.codecs(), this.codecOverrides);
+    // Compose codec registry from adapter codecs
+    const registry = new CodecRegistry();
+    const adapterRegistry = this.adapter.profile.codecs();
+
+    // Register all adapter codecs
+    for (const codec of adapterRegistry.values()) {
+      registry.register(codec);
+    }
+
+    this.codecRegistry = registry;
 
     this.pluginContext = {
       contract: this.contract,
@@ -236,7 +229,7 @@ export class Runtime<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
         }
 
         // Encode parameters before execution
-        const encodedParams = encodeParams(plan, self.codecRegistry, self.codecOverrides);
+        const encodedParams = encodeParams(plan, self.codecRegistry);
 
         // Execute query with streaming row-by-row plugin hooks
         for await (const row of self.driver.execute<Record<string, unknown>>({
@@ -244,7 +237,7 @@ export class Runtime<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
           params: encodedParams,
         })) {
           // Decode row using codec registry
-          const decodedRow = decodeRow(row, plan, self.codecRegistry, self.codecOverrides);
+          const decodedRow = decodeRow(row, plan, self.codecRegistry);
 
           // Invoke plugin onRow hooks with decoded row
           for (const plugin of self.plugins) {

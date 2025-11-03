@@ -11,7 +11,11 @@ export type {
   RuntimeTelemetryEvent,
   TelemetryOutcome,
 } from '../runtime';
-export { extractScalarTypes, validateCodecRegistryCompleteness } from '../codecs/validation';
+export {
+  extractScalarTypes,
+  validateCodecRegistryCompleteness,
+  validateContractCodecMappings,
+} from '../codecs/validation';
 export { budgets } from '../plugins/budgets';
 export type { BudgetsOptions } from '../plugins/budgets';
 export { lints } from '../plugins/lints';

@@ -63,6 +63,17 @@ export type SqlMappings = {
   readonly tableToModel?: Record<string, string>;
   readonly fieldToColumn?: Record<string, Record<string, string>>;
   readonly columnToField?: Record<string, Record<string, string>>;
+  /**
+   * Explicit codec assignments: table → column → codec ID
+   * Example: { "user": { "id": "core/int@1", "email": "core/string@1" } }
+   */
+  readonly columnToCodec?: Record<string, Record<string, string>>;
+  /**
+   * TypeScript type info for codec generation: codec ID → { input, output }
+   * Example: { "core/int@1": { "input": "number", "output": "number" } }
+   * This is populated during contract.d.ts generation, not at runtime.
+   */
+  readonly codecTypes?: Record<string, { input: string; output: string }>;
 };
 
 export type SqlContract<

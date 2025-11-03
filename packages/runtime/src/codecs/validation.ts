@@ -52,6 +52,66 @@ function runtimeError(
 }
 
 /**
+ * Validates contract codec mappings.
+ *
+ * Checks that:
+ * - Every column has a codec assigned in `contract.mappings.columnToCodec`
+ * - All assigned codec IDs exist in the registry
+ *
+ * @param registry - The codec registry to validate against
+ * @param contract - The contract to check
+ * @throws RuntimeError with code 'RUNTIME.CODEC_MAPPING_INVALID' if mappings are invalid
+ */
+export function validateContractCodecMappings(
+  registry: CodecRegistry,
+  contract: SqlContract<SqlStorage>,
+): void {
+  const mappings = contract.mappings?.columnToCodec;
+  if (!mappings) {
+    // If no mappings are provided, we can't validate - this might be okay for MVP
+    // but will be required in the future
+    return;
+  }
+
+  const missingColumns: Array<{ table: string; column: string }> = [];
+  const invalidCodecs: Array<{ table: string; column: string; codecId: string }> = [];
+
+  // Check that every column has a codec assignment
+  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+    for (const columnName of Object.keys(table.columns)) {
+      const tableMappings = mappings[tableName];
+      const codecId = tableMappings?.[columnName];
+
+      if (!codecId) {
+        missingColumns.push({ table: tableName, column: columnName });
+      } else if (!registry.has(codecId)) {
+        invalidCodecs.push({ table: tableName, column: columnName, codecId });
+      }
+    }
+  }
+
+  if (missingColumns.length > 0 || invalidCodecs.length > 0) {
+    const details: Record<string, unknown> = {
+      contractTarget: contract.target,
+    };
+
+    if (missingColumns.length > 0) {
+      details['missingColumns'] = missingColumns;
+    }
+
+    if (invalidCodecs.length > 0) {
+      details['invalidCodecs'] = invalidCodecs;
+    }
+
+    throw runtimeError(
+      'RUNTIME.CODEC_MAPPING_INVALID',
+      `Invalid codec mappings: ${missingColumns.length > 0 ? `${missingColumns.length} columns missing codec assignments` : ''}${missingColumns.length > 0 && invalidCodecs.length > 0 ? ', ' : ''}${invalidCodecs.length > 0 ? `${invalidCodecs.length} columns reference invalid codec IDs` : ''}`,
+      details,
+    );
+  }
+}
+
+/**
  * Validates that a codec registry contains codecs for all scalar types
  * required by the contract.
  *
@@ -70,8 +130,8 @@ export function validateCodecRegistryCompleteness(
   const missingTypes: string[] = [];
 
   for (const type of requiredTypes) {
-    const codecs = registry.byScalar.get(type);
-    if (!codecs || codecs.length === 0) {
+    const codecs = registry.getByScalar(type);
+    if (codecs.length === 0) {
       missingTypes.push(type);
     }
   }
@@ -86,5 +146,8 @@ export function validateCodecRegistryCompleteness(
       },
     );
   }
+
+  // Also validate contract mappings if present
+  validateContractCodecMappings(registry, contract);
 }
 

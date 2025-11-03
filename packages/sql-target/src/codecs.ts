@@ -39,18 +39,82 @@ export interface Codec<TWire = unknown, TJs = unknown> {
  * scalar type; ordering in byScalar reflects preference (adapter first,
  * then packs, then app overrides).
  */
-export interface CodecRegistry {
-  /**
-   * Direct lookup by namespaced codec ID.
-   * Example: registry.byId.get('core/string@1')
-   */
-  readonly byId: ReadonlyMap<string, Codec>;
+export class CodecRegistry {
+  private readonly _byId = new Map<string, Codec>();
+  private readonly _byScalar = new Map<string, Codec[]>();
 
   /**
-   * Lookup by contract scalar type ID, returning ordered candidates.
-   * Example: registry.byScalar.get('text') → [codec1, codec2, ...]
-   * The first codec in the array is the default/preferred candidate.
+   * Map-like interface for codec lookup by ID.
+   * Example: registry.get('core/string@1')
    */
-  readonly byScalar: ReadonlyMap<string, readonly Codec[]>;
+  get(id: string): Codec | undefined {
+    return this._byId.get(id);
+  }
+
+  /**
+   * Check if a codec with the given ID is registered.
+   */
+  has(id: string): boolean {
+    return this._byId.has(id);
+  }
+
+  /**
+   * Get all codecs that handle a given scalar type.
+   * Returns an empty frozen array if no codecs are found.
+   * Example: registry.getByScalar('text') → [codec1, codec2, ...]
+   */
+  getByScalar(scalar: string): readonly Codec[] {
+    return this._byScalar.get(scalar) ?? Object.freeze([]);
+  }
+
+  /**
+   * Get the default codec for a scalar type (first registered codec).
+   * Returns undefined if no codec handles this scalar type.
+   */
+  getDefaultCodec(scalar: string): Codec | undefined {
+    const codecs = this._byScalar.get(scalar);
+    return codecs?.[0];
+  }
+
+  /**
+   * Register a codec in the registry.
+   * Throws an error if a codec with the same ID is already registered.
+   *
+   * @param codec - The codec to register
+   * @throws Error if a codec with the same ID already exists
+   */
+  register(codec: Codec): void {
+    if (this._byId.has(codec.id)) {
+      throw new Error(`Codec with ID '${codec.id}' is already registered`);
+    }
+
+    this._byId.set(codec.id, codec);
+
+    // Update byScalar mapping
+    for (const scalarType of codec.targetTypes) {
+      const existing = this._byScalar.get(scalarType);
+      if (existing) {
+        existing.push(codec);
+      } else {
+        this._byScalar.set(scalarType, [codec]);
+      }
+    }
+  }
+
+  /**
+   * Returns an iterator over all registered codecs.
+   * Useful for iterating through codecs from another registry.
+   */
+  *[Symbol.iterator](): Iterator<Codec> {
+    for (const codec of this._byId.values()) {
+      yield codec;
+    }
+  }
+
+  /**
+   * Returns an iterable of all registered codecs.
+   */
+  values(): IterableIterator<Codec> {
+    return this._byId.values();
+  }
 }
-

@@ -1,4 +1,5 @@
-import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
+import type { Codec } from '@prisma-next/sql-target';
+import { CodecRegistry } from '@prisma-next/sql-target';
 
 /**
  * Core string codec: text → string (pass-through)
@@ -69,38 +70,10 @@ const isoDatetimeCodec: Codec<string | Date, string> = {
  * - byScalar: contract scalar type → ordered list of codec candidates
  */
 export function createPostgresCodecRegistry(): CodecRegistry {
-  const byId = new Map<string, Codec>();
-  const byScalar = new Map<string, Codec[]>();
-
-  // Register all codecs
-  const codecs = [stringCodec, numberCodec, isoDatetimeCodec];
-
-  // Populate byId map
-  for (const codec of codecs) {
-    byId.set(codec.id, codec);
-  }
-
-  // Populate byScalar map (each codec can handle multiple scalar types)
-  for (const codec of codecs) {
-    for (const scalarType of codec.targetTypes) {
-      const existing = byScalar.get(scalarType);
-      if (existing) {
-        existing.push(codec);
-      } else {
-        byScalar.set(scalarType, [codec]);
-      }
-    }
-  }
-
-  // Freeze arrays in byScalar to prevent mutation
-  const frozenByScalar = new Map<string, readonly Codec[]>();
-  for (const [scalar, codecList] of byScalar.entries()) {
-    frozenByScalar.set(scalar, Object.freeze([...codecList]));
-  }
-
-  return Object.freeze({
-    byId: Object.freeze(byId),
-    byScalar: Object.freeze(frozenByScalar),
-  });
+  const registry = new CodecRegistry();
+  registry.register(stringCodec);
+  registry.register(numberCodec);
+  registry.register(isoDatetimeCodec);
+  return registry;
 }
 
