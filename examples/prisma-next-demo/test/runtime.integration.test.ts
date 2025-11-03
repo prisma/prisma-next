@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, expectTypeOf } from 'vitest';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { PostgresDriver } from '@prisma-next/driver-postgres';
@@ -7,12 +7,15 @@ import { createRuntime, budgets } from '@prisma-next/runtime';
 import { withClient, withDevDatabase } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
+import { param } from '@prisma-next/sql/param';
 import { validateContract } from '@prisma-next/sql/schema';
+import type { ResultType, DslPlan } from '@prisma-next/sql/types';
 
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 
-import contractJson from './fixtures/basic-contract.json' assert { type: 'json' };
-const contract = validateContract(contractJson);
+import contractJson from '../src/prisma/contract.json' assert { type: 'json' };
+import type { Contract } from '../src/prisma/contract.d';
+const contract = validateContract<Contract>(contractJson);
 
 describe('runtime execute integration', () => {
   it('streams rows and enforces marker verification', async () => {
@@ -29,7 +32,7 @@ describe('runtime execute integration', () => {
           budgets({
             maxRows: 10_000,
             defaultTableRows: 10_000,
-            tableRows: { user: 10_000 },
+            tableRows: { user: 10_000, post: 10_000 },
           }),
         ],
       });
@@ -43,9 +46,12 @@ describe('runtime execute integration', () => {
 
         await withClient(connectionString, async (client) => {
           await client.query(
-            'create table if not exists "user" (id serial primary key, email text not null, "createdAt" timestamptz not null default now())',
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
-          await client.query('truncate table "user" restart identity');
+          await client.query(
+            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+          );
+          await client.query('truncate table "post", "user" restart identity cascade');
           await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
             'alice@example.com',
           ]);
@@ -68,9 +74,10 @@ describe('runtime execute integration', () => {
           .limit(10)
           .build();
 
-        const rows: Array<{ id: number; email: string }> = [];
+        type PlanRow = ResultType<typeof plan>;
+        const rows: PlanRow[] = [];
         for await (const row of runtime.execute(plan)) {
-          rows.push(row as { id: number; email: string });
+          rows.push(row);
         }
 
         expect(rows).toHaveLength(1);
@@ -83,9 +90,10 @@ describe('runtime execute integration', () => {
           limit ${1}
         `;
 
-        const templateRows: Array<{ id: number; email: string }> = [];
+        type TemplatePlanRow = ResultType<typeof templatePlan>;
+        const templateRows: TemplatePlanRow[] = [];
         for await (const row of runtime.execute(templatePlan)) {
-          templateRows.push(row as { id: number; email: string });
+          templateRows.push(row);
         }
         expect(templateRows).toHaveLength(1);
 
@@ -95,9 +103,10 @@ describe('runtime execute integration', () => {
           annotations: { intent: 'report', limit: 1 },
         });
 
-        const functionRows: Array<{ id: number }> = [];
+        type FunctionPlanRow = ResultType<typeof functionPlan>;
+        const functionRows: FunctionPlanRow[] = [];
         for await (const row of runtime.execute(functionPlan)) {
-          functionRows.push(row as { id: number });
+          functionRows.push(row);
         }
         expect(functionRows).toHaveLength(1);
 
@@ -111,6 +120,97 @@ describe('runtime execute integration', () => {
           const iterator = runtime.execute(plan)[Symbol.asyncIterator]();
           await iterator.next();
         }).rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISMATCH' });
+      } finally {
+        await runtime.close();
+      }
+    });
+  });
+
+  it('infers correct types from query plans', async () => {
+    await withDevDatabase(async ({ connectionString }) => {
+      const adapter = createPostgresAdapter();
+      const pool = new Pool({ connectionString });
+      const driver = new PostgresDriver({ connect: { pool }, cursor: { disabled: true } });
+      const runtime = createRuntime({
+        contract,
+        adapter,
+        driver,
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000, post: 10_000 },
+          }),
+        ],
+      });
+
+      try {
+        await stampMarker({
+          connectionString,
+          coreHash: contract.coreHash,
+          profileHash: contract.profileHash ?? contract.coreHash,
+        });
+
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query(
+            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+          );
+          await client.query('truncate table "post", "user" restart identity cascade');
+          await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+            'alice@example.com',
+          ]);
+          await client.query(
+            'insert into "post" (title, "userId", "createdAt") values ($1, $2, now())',
+            ['First Post', 1],
+          );
+        });
+
+        const tables = schema(contract).tables;
+        const userTable = tables['user']!;
+        const postTable = tables['post']!;
+
+        const userPlan = sql({ contract, adapter })
+          .from(userTable)
+          .select({
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
+            createdAt: userTable.columns['createdAt']!,
+          })
+          .limit(10)
+          .build();
+
+        type UserRow = ResultType<typeof userPlan>;
+
+        const postPlan = sql({ contract, adapter })
+          .from(postTable)
+          .where(postTable.columns['userId']!.eq(param('userId')))
+          .select({
+            id: postTable.columns['id']!,
+            title: postTable.columns['title']!,
+            userId: postTable.columns['userId']!,
+            createdAt: postTable.columns['createdAt']!,
+          })
+          .build({ params: { userId: 1 } });
+
+        type PostRow = ResultType<typeof postPlan>;
+
+        const userRows: UserRow[] = [];
+        for await (const row of runtime.execute(userPlan)) {
+          userRows.push(row);
+        }
+        expect(userRows).toHaveLength(1);
+        expect(userRows[0]).toMatchObject({ email: 'alice@example.com' });
+
+        const postRows: PostRow[] = [];
+        for await (const row of runtime.execute(postPlan)) {
+          postRows.push(row);
+        }
+        expect(postRows).toHaveLength(1);
+        expect(postRows[0]).toMatchObject({ title: 'First Post', userId: 1 });
       } finally {
         await runtime.close();
       }
@@ -131,7 +231,7 @@ describe('runtime execute integration', () => {
           budgets({
             maxRows: 50,
             defaultTableRows: 10_000,
-            tableRows: { user: 10_000 },
+            tableRows: { user: 10_000, post: 10_000 },
           }),
         ],
       });
@@ -145,10 +245,9 @@ describe('runtime execute integration', () => {
 
         await withClient(connectionString, async (client) => {
           await client.query(
-            'create table if not exists "user" (id serial primary key, email text not null, "createdAt" timestamptz not null default now())',
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
           await client.query('truncate table "user" restart identity');
-          // Insert enough rows to exceed budget
           for (let i = 0; i < 100; i++) {
             await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
               `user${i}@example.com`,
@@ -158,7 +257,6 @@ describe('runtime execute integration', () => {
 
         const tables = schema(contract).tables;
         const userTable = tables['user']!;
-        // Unbounded SELECT should be blocked
         const unboundedPlan = sql({ contract, adapter })
           .from(tables['user']!)
           .select({
@@ -176,7 +274,6 @@ describe('runtime execute integration', () => {
           category: 'BUDGET',
         });
 
-        // Bounded SELECT should pass
         const boundedPlan = sql({ contract, adapter })
           .from(tables['user']!)
           .select({
@@ -186,9 +283,10 @@ describe('runtime execute integration', () => {
           .limit(10)
           .build();
 
-        const rows: Array<{ id: number; email: string }> = [];
+        type BoundedPlanRow = ResultType<typeof boundedPlan>;
+        const rows: BoundedPlanRow[] = [];
         for await (const row of runtime.execute(boundedPlan)) {
-          rows.push(row as { id: number; email: string });
+          rows.push(row);
         }
         expect(rows.length).toBeLessThanOrEqual(10);
       } finally {
@@ -211,7 +309,7 @@ describe('runtime execute integration', () => {
           budgets({
             maxRows: 10,
             defaultTableRows: 10_000,
-            tableRows: { user: 10_000 },
+            tableRows: { user: 10_000, post: 10_000 },
           }),
         ],
       });
@@ -225,10 +323,9 @@ describe('runtime execute integration', () => {
 
         await withClient(connectionString, async (client) => {
           await client.query(
-            'create table if not exists "user" (id serial primary key, email text not null, "createdAt" timestamptz not null default now())',
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
           await client.query('truncate table "user" restart identity');
-          // Insert rows
           for (let i = 0; i < 50; i++) {
             await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
               `user${i}@example.com`,
@@ -238,7 +335,6 @@ describe('runtime execute integration', () => {
 
         const tables = schema(contract).tables;
         const userTable = tables['user']!;
-        // Query with LIMIT > maxRows should throw during streaming
         const plan = sql({ contract, adapter })
           .from(tables['user']!)
           .select({

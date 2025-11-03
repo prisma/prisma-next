@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "stamp-marker": "pnpm esr src/prisma/scripts/stamp-marker.ts",
+    "start": "pnpm esr src/main.ts",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
