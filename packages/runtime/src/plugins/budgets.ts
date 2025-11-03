@@ -204,11 +204,15 @@ export function budgets(options?: BudgetsOptions): Plugin {
           const estimatedRows = await computeEstimatedRows(plan, ctx.driver);
           if (estimatedRows !== undefined) {
             if (estimatedRows > maxRows) {
-              const error = budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
-                source: 'explain',
-                estimatedRows,
-                maxRows,
-              });
+              const error = budgetError(
+                'BUDGET.ROWS_EXCEEDED',
+                'Estimated row count exceeds budget',
+                {
+                  source: 'explain',
+                  estimatedRows,
+                  maxRows,
+                },
+              );
 
               const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
               if (shouldBlock) {

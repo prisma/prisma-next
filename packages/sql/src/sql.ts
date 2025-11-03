@@ -119,10 +119,16 @@ class SelectBuilderImpl<
 
     const paramDescriptors: ParamDescriptor[] = [];
     const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
 
-    const whereExpr = this.state.where
-      ? buildWhereExpr(this.state.where, paramsMap, paramDescriptors, paramValues)
+    const whereResult = this.state.where
+      ? this._buildWhereExpr(this.state.where, paramsMap, paramDescriptors, paramValues)
       : undefined;
+    const whereExpr = whereResult?.expr;
+
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
 
     const orderByClause = this.state.orderBy
       ? ([
@@ -170,6 +176,7 @@ class SelectBuilderImpl<
       table,
       projection,
       paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
       ...(this.state.where ? { where: this.state.where } : {}),
       ...(this.state.orderBy ? { orderBy: this.state.orderBy } : {}),
     });
@@ -199,6 +206,63 @@ class SelectBuilderImpl<
 
     return this.state.projection;
   }
+
+  private _buildWhereExpr(
+    where: BinaryBuilder,
+    paramsMap: Record<string, unknown>,
+    descriptors: ParamDescriptor[],
+    values: unknown[],
+  ): {
+    expr: {
+      readonly kind: 'bin';
+      readonly op: 'eq';
+      readonly left: { kind: 'col'; table: string; column: string };
+      readonly right: { kind: 'param'; index: number; name?: string };
+    };
+    codecId?: string;
+    paramName: string;
+  } {
+    const placeholder = where.right;
+    const paramName = placeholder.name;
+
+    if (!Object.prototype.hasOwnProperty.call(paramsMap, paramName)) {
+      throw planInvalid(`Missing value for parameter ${paramName}`);
+    }
+
+    const value = paramsMap[paramName];
+    const index = values.push(value);
+
+    const meta = (where.left.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+
+    descriptors.push({
+      name: paramName,
+      source: 'dsl',
+      refs: { table: where.left.table, column: where.left.column },
+      ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+    });
+
+    const codecId = this.contract.mappings?.columnToCodec?.[where.left.table]?.[where.left.column];
+
+    return {
+      expr: {
+        kind: 'bin',
+        op: 'eq',
+        left: {
+          kind: 'col',
+          table: where.left.table,
+          column: where.left.column,
+        },
+        right: {
+          kind: 'param',
+          index,
+          name: paramName,
+        },
+      },
+      ...(codecId ? { codecId } : {}),
+      paramName,
+    };
+  }
 }
 
 function buildProjectionState(
@@ -223,53 +287,6 @@ function buildProjectionState(
   return { aliases, columns };
 }
 
-function buildWhereExpr(
-  where: BinaryBuilder,
-  paramsMap: Record<string, unknown>,
-  descriptors: ParamDescriptor[],
-  values: unknown[],
-): {
-  readonly kind: 'bin';
-  readonly op: 'eq';
-  readonly left: { kind: 'col'; table: string; column: string };
-  readonly right: { kind: 'param'; index: number; name?: string };
-} {
-  const placeholder = where.right;
-  const paramName = placeholder.name;
-
-  if (!Object.prototype.hasOwnProperty.call(paramsMap, paramName)) {
-    throw planInvalid(`Missing value for parameter ${paramName}`);
-  }
-
-  const value = paramsMap[paramName];
-  const index = values.push(value);
-
-  const meta = (where.left.columnMeta ?? {}) as { type?: string; nullable?: boolean };
-
-  descriptors.push({
-    name: paramName,
-    source: 'dsl',
-    refs: { table: where.left.table, column: where.left.column },
-    ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
-    ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
-  });
-
-  return {
-    kind: 'bin',
-    op: 'eq',
-    left: {
-      kind: 'col',
-      table: where.left.table,
-      column: where.left.column,
-    },
-    right: {
-      kind: 'param',
-      index,
-      name: paramName,
-    },
-  };
-}
-
 interface MetaBuildArgs {
   readonly contract: SqlContract<SqlStorage>;
   readonly table: TableRef;
@@ -277,6 +294,7 @@ interface MetaBuildArgs {
   readonly where?: BinaryBuilder;
   readonly orderBy?: ReturnType<ColumnBuilder['asc']>;
   readonly paramDescriptors: ParamDescriptor[];
+  readonly paramCodecs?: Record<string, string>;
 }
 
 function buildMeta(args: MetaBuildArgs): PlanMeta {
@@ -327,6 +345,27 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     }
   }
 
+  // Build codec assignments from contract mappings
+  const projectionCodecs: Record<string, string> = {};
+  for (let i = 0; i < args.projection.aliases.length; i++) {
+    const alias = args.projection.aliases[i];
+    const column = args.projection.columns[i];
+    if (!column || !alias) {
+      continue;
+    }
+    const tableMappings = args.contract.mappings?.columnToCodec?.[column.table];
+    const codecId = tableMappings?.[column.column];
+    if (codecId) {
+      projectionCodecs[alias] = codecId;
+    }
+  }
+
+  // Merge projection and parameter codecs
+  const allCodecs: Record<string, string> = {
+    ...projectionCodecs,
+    ...(args.paramCodecs ? args.paramCodecs : {}),
+  };
+
   return Object.freeze({
     target: args.contract.target,
     ...(args.contract.targetFamily ? { targetFamily: args.contract.targetFamily } : {}),
@@ -338,6 +377,9 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     },
     projection: projectionMap,
     ...(Object.keys(projectionTypes).length > 0 ? { projectionTypes } : {}),
+    ...(Object.keys(allCodecs).length > 0
+      ? { annotations: Object.freeze({ codecs: Object.freeze(allCodecs) }) }
+      : {}),
     paramDescriptors: args.paramDescriptors,
     ...(args.contract.profileHash !== undefined ? { profileHash: args.contract.profileHash } : {}),
   } satisfies PlanMeta);

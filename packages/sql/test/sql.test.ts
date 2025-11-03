@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+import { expectTypeOf } from 'vitest';
 
 import { param } from '../src/param';
 import { schema } from '../src/schema';
@@ -15,6 +16,7 @@ import type {
   LoweredStatement,
   SelectAst,
   ColumnBuilder,
+  ResultType,
 } from '../src/types';
 import { CodecRegistry } from '@prisma-next/sql-target';
 import type { Contract } from './fixtures/contract.d';
@@ -137,5 +139,191 @@ describe('sql DSL builder', () => {
       .where(userColumns.id.eq(param('userId')));
 
     expect(() => builder.build()).toThrowError(/Missing value for parameter userId/);
+  });
+
+  describe('codec assignments', () => {
+    it('encodes codec assignments from contract mappings for projections', () => {
+      const contractWithCodecs = {
+        ...contract,
+        mappings: {
+          ...contract.mappings,
+          columnToCodec: {
+            user: {
+              id: 'core/int@1',
+              email: 'core/string@1',
+            },
+          },
+        },
+      } as Contract;
+
+      const userColumns = tables.user.columns;
+      const plan = sql({ contract: contractWithCodecs, adapter })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .build();
+
+      expect(plan.meta.annotations).toBeDefined();
+      expect(plan.meta.annotations?.codecs).toEqual({
+        id: 'core/int@1',
+        email: 'core/string@1',
+      });
+    });
+
+    it('encodes codec assignments from contract mappings for WHERE parameters', () => {
+      const contractWithCodecs = {
+        ...contract,
+        mappings: {
+          ...contract.mappings,
+          columnToCodec: {
+            user: {
+              id: 'core/int@1',
+            },
+          },
+        },
+      } as Contract;
+
+      const userColumns = tables.user.columns;
+      const plan = sql({ contract: contractWithCodecs, adapter })
+        .from(tables.user)
+        .select({
+          email: userColumns.email,
+        })
+        .where(userColumns.id.eq(param('userId')))
+        .build({ params: { userId: 42 } });
+
+      expect(plan.meta.annotations).toBeDefined();
+      expect(plan.meta.annotations?.codecs).toEqual({
+        userId: 'core/int@1',
+      });
+    });
+
+    it('merges projection and parameter codec assignments', () => {
+      const contractWithCodecs = {
+        ...contract,
+        mappings: {
+          ...contract.mappings,
+          columnToCodec: {
+            user: {
+              id: 'core/int@1',
+              email: 'core/string@1',
+            },
+          },
+        },
+      } as Contract;
+
+      const userColumns = tables.user.columns;
+      const plan = sql({ contract: contractWithCodecs, adapter })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .where(userColumns.id.eq(param('userId')))
+        .build({ params: { userId: 42 } });
+
+      expect(plan.meta.annotations).toBeDefined();
+      expect(plan.meta.annotations?.codecs).toEqual({
+        id: 'core/int@1',
+        email: 'core/string@1',
+        userId: 'core/int@1',
+      });
+    });
+
+    it('does not include annotations when no codec mappings exist', () => {
+      const userColumns = tables.user.columns;
+      const plan = sql({ contract, adapter })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .build();
+
+      expect(plan.meta.annotations).toBeUndefined();
+    });
+
+    it('only includes codecs for columns with mappings', () => {
+      const contractWithPartialCodecs = {
+        ...contract,
+        mappings: {
+          ...contract.mappings,
+          columnToCodec: {
+            user: {
+              id: 'core/int@1',
+            },
+          },
+        },
+      } as Contract;
+
+      const userColumns = tables.user.columns;
+      const plan = sql({ contract: contractWithPartialCodecs, adapter })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .build();
+
+      expect(plan.meta.annotations?.codecs).toEqual({
+        id: 'core/int@1',
+      });
+    });
+
+    it('infers ResultType correctly when codec mappings and codecTypes are present', () => {
+      type ContractWithCodecs = SqlContract<
+        Contract['storage'],
+        Contract['models'],
+        Contract['relations'],
+        Contract['mappings'] & {
+          readonly columnToCodec: {
+            readonly user: {
+              readonly id: 'core/string@1';
+              readonly email: 'core/string@1';
+            };
+          };
+          readonly codecTypes: {
+            readonly 'core/string@1': { readonly input: 'string'; readonly output: 'string' };
+          };
+        }
+      >;
+
+      const contractValidated = validateContract<Contract>(contract);
+      const contractWithCodecs: ContractWithCodecs = {
+        ...contractValidated,
+        mappings: {
+          ...contractValidated.mappings,
+          columnToCodec: { user: { id: 'core/string@1', email: 'core/string@1' } },
+          codecTypes: { 'core/string@1': { input: 'string', output: 'string' } },
+        },
+      } as ContractWithCodecs;
+
+      const testTables = schema(contractWithCodecs).tables;
+      const userColumns = testTables.user.columns;
+      const plan = sql({ contract: contractWithCodecs, adapter })
+        .from(testTables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .build();
+
+      expect(plan.meta.annotations?.codecs).toEqual({
+        id: 'core/string@1',
+        email: 'core/string@1',
+      });
+
+      type Row = ResultType<typeof plan>;
+
+      expectTypeOf<Row>().toExtend<{
+        id: string;
+        email: string;
+      }>();
+
+      const _row: Row = { id: '1', email: 'test@example.com' } as unknown as Row;
+      expect(_row).toBeDefined();
+    });
   });
 });

@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
+import { param } from '@prisma-next/sql/param';
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { PostgresDriver } from '../../driver-postgres/src/postgres-driver';
@@ -349,5 +350,106 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     expect(row['name']).toBe('Test User');
     expect(row['score']).toBe(95.5);
     expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  });
+
+  it('uses codec assignments from contract columnToCodec mappings', async () => {
+    const contractWithCodecs: SqlContract<SqlStorage> = {
+      ...fixtureContract,
+      mappings: {
+        ...fixtureContract.mappings,
+        columnToCodec: {
+          test_data: {
+            created_at: 'core/iso-datetime@1',
+            name: 'core/string@1',
+          },
+        },
+      },
+    };
+
+    const runtime = createRuntime({
+      contract: contractWithCodecs,
+      adapter,
+      driver: sharedDriver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
+      'Test User',
+      95.5,
+      '2024-01-15T10:30:00.000Z',
+    ]);
+
+    const testDataTable = schema(contractWithCodecs).tables['test_data']!;
+    const testDataColumns = testDataTable.columns;
+    const testBuilder = sql({ contract: contractWithCodecs, adapter });
+    const selectPlan = testBuilder
+      .from(testDataTable)
+      .select({
+        name: testDataColumns['name']!,
+        created_at: testDataColumns['created_at']!,
+      })
+      .build();
+
+    expect(selectPlan.meta.annotations).toBeDefined();
+    expect(selectPlan.meta.annotations?.codecs).toEqual({
+      name: 'core/string@1',
+      created_at: 'core/iso-datetime@1',
+    });
+
+    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    expect(rows.length).toBe(1);
+
+    const row = rows[0]!;
+    expect(typeof row['name']).toBe('string');
+    expect(typeof row['created_at']).toBe('string');
+    expect(row['name']).toBe('Test User');
+    expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  });
+
+  it('uses codec assignments from contract for WHERE clause parameters', async () => {
+    const contractWithCodecs: SqlContract<SqlStorage> = {
+      ...fixtureContract,
+      mappings: {
+        ...fixtureContract.mappings,
+        columnToCodec: {
+          test_data: {
+            id: 'core/number@1',
+          },
+        },
+      },
+    };
+
+    const runtime = createRuntime({
+      contract: contractWithCodecs,
+      adapter,
+      driver: sharedDriver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
+      'Test User',
+      95.5,
+      '2024-01-15T10:30:00.000Z',
+    ]);
+
+    const testDataTable = schema(contractWithCodecs).tables['test_data']!;
+    const testDataColumns = testDataTable.columns;
+    const testBuilder = sql({ contract: contractWithCodecs, adapter });
+    const selectPlan = testBuilder
+      .from(testDataTable)
+      .select({
+        name: testDataColumns['name']!,
+      })
+      .where(testDataColumns['id']!.eq(param('id')))
+      .build({ params: { id: 1 } });
+
+    expect(selectPlan.meta.annotations).toBeDefined();
+    expect(selectPlan.meta.annotations?.codecs).toEqual({
+      id: 'core/number@1',
+    });
+
+    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    expect(rows.length).toBe(1);
+    expect(rows[0]!['name']).toBe('Test User');
   });
 });
