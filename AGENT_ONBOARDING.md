@@ -78,6 +78,20 @@ function loadContract(): Contract {
 
 **Why?** JSON imports lose literal types (`nullable: true` → `nullable: boolean`). The `.d.ts` file provides precise types; `validateContract` validates structure at runtime.
 
+**Contract Structure**:
+```typescript
+SqlContract<
+  SqlStorage,           // { tables: Record<string, StorageTable> }
+  Models,               // { User: ModelDef & { id: number, ... } }
+  Relations,            // { user: { posts: RelationDef } }
+  Mappings              // { ModelToTable, TableToModel, FieldToColumn, ColumnToField, columnToCodec, codecTypes }
+>
+```
+
+**Codec Mappings** (in `Mappings`):
+- `columnToCodec`: `Record<table, Record<column, codecId>>` - Explicit codec assignments per column
+- `codecTypes`: `Record<codecId, { input: string, output: string }>` - TypeScript type info for codec input/output types
+
 ### Query DSL Pattern
 
 ```typescript
@@ -176,33 +190,18 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 }
 ```
 
-## 📦 Recent Changes (Current State)
+## 📦 Current State
 
-### SQL Contract Types Refactor (Latest)
+### Codec System
 
-- **SQL-specific types moved** from `@prisma-next/contract` → `@prisma-next/sql/src/contract-types.ts`
-- **`validateContract` updated** to accept type parameter: `validateContract<TContract>(json)`
-- **Schema moved**: `contract/schemas/data-contract-sql-v1.json` → `sql/schemas/data-contract-sql-v1.json`
-- **All tests updated** to use type parameter pattern
+- **Codec Registry**: Class-based registry (`CodecRegistry`) with `register()`, `get()`, `has()`, `getByScalar()`, `getDefaultCodec()`, and `values()` methods
+- **Contract Codec Mappings**: Contracts include `mappings.columnToCodec` (explicit codec assignments per column) and `mappings.codecTypes` (TypeScript type info for codec input/output)
+- **Plan Annotations**: SQL DSL encodes codec assignments from `contract.mappings.columnToCodec` into `plan.meta.annotations.codecs`
+- **Runtime Resolution**: Runtime uses `plan.meta.annotations.codecs[alias]` for codec lookups during encoding/decoding
+- **Contract Validation**: Validates that all columns have explicit codec assignments in `columnToCodec` mappings
 
-Key files:
-- `packages/sql/src/contract-types.ts` - SQL contract type definitions
-- `packages/sql/src/contract.ts` - Contract validation (structural + logical)
-- `packages/sql/test/fixtures/contract.d.ts` - Example contract type definition
-
-### Contract Structure
-
-Contracts have this structure:
-```typescript
-SqlContract<
-  SqlStorage,           // { tables: Record<string, StorageTable> }
-  Models,               // { User: ModelDef & { id: number, ... } }
-  Relations,            // { user: { posts: RelationDef } }
-  Mappings              // { ModelToTable, TableToModel, FieldToColumn, ColumnToField }
->
-```
-
-The `contract.d.ts` file defines all four generic parameters with precise literal types.
+**Not Yet Implemented**:
+- Type system codec inference: `InferColumnType` should use `codecTypes[codecId].output` instead of `ContractScalarToJsType` when codec assignments are present (see "What to Work On Next" below)
 
 ## 🧪 Testing
 
@@ -245,6 +244,7 @@ test('Plan type inference works', () => {
 7. **Column access** - Use `table.columns[fieldName]` or `table['columns'][fieldName]` to avoid conflicts with table properties like `name`.
 8. **Type tests** - Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 9. **Core is lane-agnostic** - Never create discriminated unions based on `lane` field. The core should not be aware of specific lane implementations.
+10. **Codec assignments** - Codec assignments from `contract.mappings.columnToCodec` are encoded into `plan.meta.annotations.codecs` at plan build time. The runtime uses these for codec resolution, but the type system doesn't yet use `codecTypes` for type inference (see "What to Work On Next").
 
 ## 📖 Documentation Location
 
@@ -254,6 +254,17 @@ test('Plan type inference works', () => {
 - **Workspace Rules**: `.cursor/rules/` (Arktype usage, architecture guidance)
 
 ## 🎯 What to Work On Next
+
+### Immediate Next Steps
+
+1. **Implement codec-based type inference** (`packages/sql/src/types.ts`):
+   - Update `InferColumnType` to check `contract.mappings.columnToCodec` for codec assignments
+   - When a codec is assigned, look up its output type from `contract.mappings.codecTypes[codecId].output`
+   - Use the codec output type instead of `ContractScalarToJsType` for that column
+   - This will make `ResultType<typeof plan>` correctly infer types based on codec output types
+   - See test in `packages/sql/test/sql.test.ts` - "infers ResultType correctly when codec mappings and codecTypes are present"
+
+### MVP Goals
 
 Check the TODO comments in code (especially `packages/sql/src/contract.ts` - "TODO: compute mappings") and open issues. The MVP goals are:
 1. Type-safe query DSL
@@ -288,6 +299,33 @@ const plan = sql({ contract, adapter })
   .build();
 
 type UserRow = ResultType<typeof plan>;  // Inferred type: { id: number; email: string }
+```
+
+**Codec assignments in contracts:**
+```typescript
+// Contract with codec mappings
+const contract: SqlContract<Storage, Models, Relations, {
+  columnToCodec: {
+    user: {
+      id: 'core/string@1',      // Column 'id' uses codec 'core/string@1'
+      email: 'core/string@1'
+    }
+  },
+  codecTypes: {
+    'core/string@1': { input: 'string', output: 'string' }
+  }
+}> = /* ... */;
+
+// Plans encode codec assignments in annotations
+const plan = sql({ contract, adapter })
+  .from(tables.user)
+  .select({ id: t.user.id })
+  .build();
+
+plan.meta.annotations?.codecs;  // { id: 'core/string@1' }
+
+// Runtime uses these for codec resolution during encoding/decoding
+// Future: Type system will use codecTypes.output for ResultType inference
 ```
 
 ---
