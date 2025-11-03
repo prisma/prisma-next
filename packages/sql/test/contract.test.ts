@@ -4,10 +4,10 @@ import {
   validateContractStructure,
   validateContractLogic,
 } from '../src/contract';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '../src/contract-types';
 
 describe('validateContractStructure', () => {
-  const validContract: SqlContract = {
+  const validContract = validateContract<SqlContract<SqlStorage>>({
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
@@ -23,7 +23,7 @@ describe('validateContractStructure', () => {
         },
       },
     },
-  };
+  });
 
   it('accepts valid contract structure', () => {
     const result = validateContractStructure(validContract);
@@ -31,27 +31,27 @@ describe('validateContractStructure', () => {
   });
 
   it('throws on missing targetFamily', () => {
-    const invalid = { ...validContract, targetFamily: undefined };
+    const invalid = { ...validContract, targetFamily: undefined } as any;
     expect(() => validateContractStructure(invalid)).toThrow(/targetFamily/);
   });
 
   it('throws on wrong targetFamily', () => {
-    const invalid = { ...validContract, targetFamily: 'document' };
+    const invalid = { ...validContract, targetFamily: 'document' } as any;
     expect(() => validateContractStructure(invalid)).toThrow(/targetFamily/);
   });
 
   it('throws on missing target', () => {
-    const invalid = { ...validContract, target: undefined };
+    const invalid = { ...validContract, target: undefined } as any;
     expect(() => validateContractStructure(invalid)).toThrow(/target/);
   });
 
   it('throws on missing coreHash', () => {
-    const invalid = { ...validContract, coreHash: undefined };
+    const invalid = { ...validContract, coreHash: undefined } as any;
     expect(() => validateContractStructure(invalid)).toThrow(/coreHash/);
   });
 
   it('throws on missing storage', () => {
-    const invalid = { ...validContract, storage: undefined };
+    const invalid = { ...validContract, storage: undefined } as any;
     expect(() => validateContractStructure(invalid)).toThrow(/storage/);
   });
 
@@ -67,7 +67,7 @@ describe('validateContractStructure', () => {
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractStructure(invalid)).toThrow(
       /Column.*validation failed|type.*must be.*string/,
     );
@@ -85,7 +85,7 @@ describe('validateContractStructure', () => {
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractStructure(invalid)).toThrow(
       /Column.*validation failed|nullable.*must be.*boolean/,
     );
@@ -105,7 +105,7 @@ describe('validateContractStructure', () => {
 });
 
 describe('validateContractLogic', () => {
-  const validContract: SqlContract = {
+  const validContract = validateContract<SqlContract<SqlStorage>>({
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
@@ -138,7 +138,7 @@ describe('validateContractLogic', () => {
         },
       },
     },
-  };
+  });
 
   it('accepts valid contract logic', () => {
     expect(() => validateContractLogic(validContract)).not.toThrow();
@@ -150,12 +150,12 @@ describe('validateContractLogic', () => {
       storage: {
         tables: {
           User: {
-            ...validContract.storage.tables.User,
+            ...validContract.storage.tables['User'],
             primaryKey: { columns: ['nonExistent'] },
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractLogic(invalid)).toThrow(
       /primaryKey references non-existent column/,
     );
@@ -167,12 +167,12 @@ describe('validateContractLogic', () => {
       storage: {
         tables: {
           User: {
-            ...validContract.storage.tables.User,
+            ...validContract.storage.tables['User'],
             uniques: [{ columns: ['nonExistent'] }],
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractLogic(invalid)).toThrow(
       /unique constraint references non-existent column/,
     );
@@ -184,12 +184,12 @@ describe('validateContractLogic', () => {
       storage: {
         tables: {
           User: {
-            ...validContract.storage.tables.User,
+            ...validContract.storage.tables['User'],
             indexes: [{ columns: ['nonExistent'] }],
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractLogic(invalid)).toThrow(/index references non-existent column/);
   });
 
@@ -199,7 +199,7 @@ describe('validateContractLogic', () => {
       storage: {
         tables: {
           Post: {
-            ...validContract.storage.tables.Post,
+            ...validContract.storage.tables['Post'],
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -209,7 +209,7 @@ describe('validateContractLogic', () => {
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractLogic(invalid)).toThrow(
       /foreignKey references non-existent table/,
     );
@@ -221,7 +221,7 @@ describe('validateContractLogic', () => {
       storage: {
         tables: {
           Post: {
-            ...validContract.storage.tables.Post,
+            ...validContract.storage.tables['Post'],
             foreignKeys: [
               {
                 columns: ['nonExistent'],
@@ -231,7 +231,7 @@ describe('validateContractLogic', () => {
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractLogic(invalid)).toThrow(
       /foreignKey references non-existent column.*nonExistent/,
     );
@@ -242,9 +242,9 @@ describe('validateContractLogic', () => {
       ...validContract,
       storage: {
         tables: {
-          User: validContract.storage.tables.User,
+          User: validContract.storage.tables['User'],
           Post: {
-            ...validContract.storage.tables.Post,
+            ...validContract.storage.tables['Post'],
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -254,7 +254,7 @@ describe('validateContractLogic', () => {
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractLogic(invalid)).toThrow(
       /foreignKey references non-existent column.*nonExistent.*User/,
     );
@@ -265,9 +265,9 @@ describe('validateContractLogic', () => {
       ...validContract,
       storage: {
         tables: {
-          User: validContract.storage.tables.User,
+          User: validContract.storage.tables['User'],
           Post: {
-            ...validContract.storage.tables.Post,
+            ...validContract.storage.tables['Post'],
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -277,7 +277,7 @@ describe('validateContractLogic', () => {
           },
         },
       },
-    };
+    } as any;
     expect(() => validateContractLogic(invalid)).toThrow(/column count.*does not match/);
   });
 
@@ -333,7 +333,7 @@ describe('validateContractLogic', () => {
 });
 
 describe('validateContract', () => {
-  const validContract: SqlContract = {
+  const validContract = validateContract<SqlContract<SqlStorage>>({
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
@@ -350,16 +350,16 @@ describe('validateContract', () => {
         },
       },
     },
-  };
+  });
 
   it('performs both structural and logical validation', () => {
-    const result = validateContract(validContract);
+    const result = validateContract<SqlContract<SqlStorage>>(validContract);
     expect(result).toEqual(validContract);
   });
 
   it('throws on structural validation failure', () => {
-    const invalid = { ...validContract, targetFamily: undefined };
-    expect(() => validateContract(invalid)).toThrow(
+    const invalid = { ...validContract, targetFamily: undefined } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /Invalid targetFamily|Contract header validation failed|structural validation failed/,
     );
   });
@@ -370,18 +370,21 @@ describe('validateContract', () => {
       storage: {
         tables: {
           User: {
-            ...validContract.storage.tables.User,
+            ...validContract.storage.tables['User'],
             primaryKey: { columns: ['nonExistent'] },
           },
         },
       },
-    };
-    expect(() => validateContract(invalid)).toThrow(/primaryKey references non-existent column/);
+    } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /primaryKey references non-existent column/,
+    );
   });
 
-  it('preserves structure types from JSON imports', () => {
+  it('accepts type parameter for strict contract type', () => {
     // Simulate JSON import - TypeScript infers string types, not literal types
-    const contract = {
+    // The type parameter provides the strict type from contract.d.ts
+    const contractJson = {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
@@ -397,16 +400,11 @@ describe('validateContract', () => {
         },
       },
     };
-    const result = validateContract(contract);
-    // After validation, types should be SqlContract-compatible
-    // Note: JSON imports don't preserve literal types, so we verify structure instead
-    expectTypeOf(result).toMatchTypeOf<SqlContract>();
-    // targetFamily is narrowed to 'sql' literal type by validateContract
-    expectTypeOf(result.targetFamily).toEqualTypeOf<'sql'>();
-    expectTypeOf(result.target).toEqualTypeOf<string>();
-    // Verify table names are preserved in structure
-    expectTypeOf(result.storage.tables).toHaveProperty('User');
-    // Verify column names are preserved
-    expectTypeOf(result.storage.tables.User.columns).toHaveProperty('id');
+    const result = validateContract<SqlContract<SqlStorage>>(contractJson);
+    // After validation, types should match the type parameter
+    expectTypeOf(result).toMatchTypeOf<SqlContract<SqlStorage>>();
+    // Verify structure is validated at runtime
+    expect(result.storage.tables).toHaveProperty('User');
+    expect(result.storage.tables['User']?.columns).toHaveProperty('id');
   });
 });

@@ -3,24 +3,22 @@ import { sql } from '../src/sql';
 import { schema, makeT } from '../src/schema';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { ResultType, Plan, DslPlan, TableKey, TablesOf } from '../src/types';
-import contract from './fixtures/contract';
-import type { Tables, Models, Mappings } from './fixtures/contract.d';
-
-// Use the contract directly - it should be typed via contract.d.ts
-// For type tests, we use the contract directly to preserve literal types
-// Runtime validation happens separately in integration tests
-function loadContract(_name: string): typeof contract {
-  // Return the contract directly to preserve literal types from contract.d.ts
-  return contract;
-}
+import contractJson from './fixtures/contract.json' assert { type: 'json' };
+import { validateContract } from '../src/contract';
+import type { Contract } from './fixtures/contract.d';
 
 // Helper to simulate execute signature
-function execute<Row>(plan: Plan<Row>): AsyncIterable<Row> {
+function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
   return (async function* () {})();
 }
 
+// Helper to safely access table columns
+function getTableColumns<T extends { columns: Record<string, unknown> }>(table: T): T['columns'] {
+  return table.columns;
+}
+
 test('builder without select() has unknown Row type', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
 
@@ -35,7 +33,7 @@ test('builder without select() has unknown Row type', () => {
 });
 
 test('select() with object projection infers Row type', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
   const userTable = tables['user'];
@@ -61,16 +59,21 @@ test('select() with object projection infers Row type', () => {
 });
 
 test('build() returns DslPlan<Row> with inferred Row type', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = userTable.columns;
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
+      id: idColumn,
+      email: emailColumn,
     })
     .build();
 
@@ -80,16 +83,21 @@ test('build() returns DslPlan<Row> with inferred Row type', () => {
 });
 
 test('ResultType utility extracts Row type from Plan', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
+      id: idColumn,
+      email: emailColumn,
     })
     .build();
 
@@ -99,16 +107,21 @@ test('ResultType utility extracts Row type from Plan', () => {
 });
 
 test('execute() preserves Row type through execution', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
+      id: idColumn,
+      email: emailColumn,
     })
     .build();
 
@@ -119,22 +132,27 @@ test('execute() preserves Row type through execution', () => {
 });
 
 test('builder chain preserves Row type through methods', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const builderAfterFrom = sql({ contract, adapter }).from(tables.user);
+  const builderAfterFrom = sql({ contract, adapter }).from(userTable);
   const builderWithSelect = builderAfterFrom.select({
-    id: userTable.id,
-    email: userTable.email,
+    id: idColumn,
+    email: emailColumn,
   });
 
   // All methods should preserve Row type
   const builderWithWhere = builderWithSelect.where(
-    userTable.id.eq({ kind: 'param-placeholder', name: 'userId' }),
+    idColumn.eq({ kind: 'param-placeholder', name: 'userId' }),
   );
-  const builderWithOrder = builderWithSelect.orderBy(userTable.id.asc());
+  const builderWithOrder = builderWithSelect.orderBy(idColumn.asc());
   const builderWithLimit = builderWithSelect.limit(10);
 
   const plan = builderWithSelect.build();
@@ -151,16 +169,21 @@ test('builder chain preserves Row type through methods', () => {
 });
 
 test('wrong Row type assignments fail type check', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
+      id: idColumn,
+      email: emailColumn,
     })
     .build();
 
@@ -173,23 +196,27 @@ test('wrong Row type assignments fail type check', () => {
   // If Row is inferred correctly, it should not be assignable to a completely different type
   // Note: Due to TypeScript's structural typing with unknown, this test may not fail
   // but the important thing is that Row is correctly inferred from the projection
-  type TestRow = { completelyDifferent: boolean };
   // This assignment would fail if Row was a specific type (not unknown)
   // For now, we verify that Row is inferred (even if as unknown) by checking the plan structure
   expectTypeOf(plan).toMatchTypeOf<DslPlan<Row>>();
 });
 
 test('nullable columns are handled correctly', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
+      id: idColumn,
+      email: emailColumn,
     })
     .build();
 
@@ -199,17 +226,23 @@ test('nullable columns are handled correctly', () => {
 });
 
 test('different column types map correctly', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  const createdAtColumn = userColumns['createdAt'];
+  if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
-      createdAt: userTable.createdAt,
+      id: idColumn,
+      email: emailColumn,
+      createdAt: createdAtColumn,
     })
     .build();
 
@@ -218,9 +251,9 @@ test('different column types map correctly', () => {
 });
 
 test('generic contract types are preserved', () => {
-  const contract = loadContract('contract');
-  const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const contract = validateContract<Contract>(contractJson);
+  createPostgresAdapter(); // Used for type checking only
+  schema(contract); // Used for type checking only
 
   // Verify TableKey extracts correct table names
   type ContractTableKey = TableKey<typeof contract>;
@@ -241,27 +274,35 @@ test('generic contract types are preserved', () => {
 
 test('Contract namespace types are available', () => {
   // Verify Tables namespace is accessible
-  type UserTable = Tables.user;
+  type UserTable = Contract['storage']['tables']['user'];
   expectTypeOf<UserTable>().toHaveProperty('id');
   expectTypeOf<UserTable>().toHaveProperty('email');
   expectTypeOf<UserTable>().toHaveProperty('createdAt');
 
   // Verify Models namespace is accessible
-  type UserModel = Models.User;
+  type UserModel = Contract['models']['User'];
   expectTypeOf<UserModel>().toHaveProperty('id');
   expectTypeOf<UserModel>().toHaveProperty('email');
   expectTypeOf<UserModel>().toHaveProperty('createdAt');
 
   // Verify Mappings work correctly
-  type UserTableName = Mappings.ModelToTable['User'];
+  type UserTableName = Contract['Mappings'] extends { ModelToTable: infer MT }
+    ? MT extends { User: infer U }
+      ? U
+      : never
+    : never;
   expectTypeOf<UserTableName>().toEqualTypeOf<'user'>();
 
-  type UserModelName = Mappings.TableToModel['user'];
+  type UserModelName = Contract['Mappings'] extends { TableToModel: infer TM }
+    ? TM extends { user: infer U }
+      ? U
+      : never
+    : never;
   expectTypeOf<UserModelName>().toEqualTypeOf<'User'>();
 });
 
 test('makeT() returns tables graph', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const t = makeT(contract);
 
   // makeT should return the same as schema().tables
@@ -277,7 +318,7 @@ test('makeT() returns tables graph', () => {
 });
 
 test('sql() preserves contract generic through builder chain', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
   const userTable = tables['user'];

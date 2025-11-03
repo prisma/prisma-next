@@ -1,5 +1,5 @@
 import { type } from 'arktype';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from './contract-types';
 import type { O } from 'ts-toolbelt';
 
 /**
@@ -74,8 +74,8 @@ const SqlContractSchema = type({
  * @returns The validated contract if structure is valid
  * @throws Error if the contract structure is invalid
  */
-export function validateContractStructure<T extends SqlContract>(
-  value: T,
+export function validateContractStructure<T extends SqlContract<SqlStorage>>(
+  value: unknown,
 ): O.Overwrite<T, { targetFamily: 'sql' }> {
   const contractResult = SqlContractSchema(value);
 
@@ -83,6 +83,8 @@ export function validateContractStructure<T extends SqlContract>(
     const messages = contractResult.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Contract structural validation failed: ${messages}`);
   }
+
+  // TODO: compute mappings
 
   // After validation, contractResult matches the schema and preserves the input structure
   // TypeScript needs an assertion here due to exactOptionalPropertyTypes differences
@@ -98,7 +100,7 @@ export function validateContractStructure<T extends SqlContract>(
  * @param contract - The validated SqlContract to check for logical consistency
  * @throws Error if logical validation fails
  */
-export function validateContractLogic(contract: SqlContract): void {
+export function validateContractLogic(contract: SqlContract<SqlStorage>): void {
   const { storage } = contract;
   const tableNames = new Set(Object.keys(storage.tables));
 
@@ -190,21 +192,35 @@ export function validateContractLogic(contract: SqlContract): void {
 
 /**
  * Validates that an unknown value conforms to the SqlContract structure
- * and returns a fully typed SqlContract with preserved literal types.
+ * and returns a fully typed SqlContract.
  *
  * Performs both structural validation (using Arktype) and logical validation
  * (ensuring all references are valid).
  *
+ * The type parameter `TContract` should be the strict contract type from contract.d.ts.
+ * This function validates the runtime structure but does not infer types from JSON,
+ * as JSON imports lose literal type information.
+ *
  * @param value - The contract value to validate (typically from a JSON import)
- * @returns A validated SqlContract with preserved type information
+ * @returns A validated contract matching the TContract type
  * @throws Error if the contract structure or logic is invalid
  */
-export function validateContract<T extends SqlContract>(
-  value: T,
-): O.Overwrite<T, { targetFamily: 'sql' }> {
-  const structurallyValid = validateContractStructure<T>(value);
+export function validateContract<TContract extends SqlContract<SqlStorage>>(
+  value: unknown,
+): TContract {
+  const structurallyValid = validateContractStructure<SqlContract<SqlStorage>>(value);
 
-  validateContractLogic(structurallyValid as SqlContract);
+  validateContractLogic(structurallyValid as SqlContract<SqlStorage>);
 
-  return structurallyValid;
+  // Add default values for optional metadata fields if missing
+  const withDefaults = {
+    ...structurallyValid,
+    models: (structurallyValid as any).models ?? {},
+    relations: (structurallyValid as any).relations ?? {},
+    Mappings: (structurallyValid as any).Mappings ?? {},
+  };
+
+  // Type assertion: The caller provides the strict type via TContract.
+  // We validate the structure matches, but the precise types come from contract.d.ts
+  return withDefaults as TContract;
 }

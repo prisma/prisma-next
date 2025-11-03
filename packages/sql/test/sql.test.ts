@@ -8,7 +8,7 @@ import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import { validateContract } from '../src/contract';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '../src/contract-types';
 import type {
   ParamDescriptor,
   Adapter,
@@ -16,17 +16,18 @@ import type {
   SelectAst,
   ColumnBuilder,
 } from '../src/types';
+import type { Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
-function loadContract(name: string): SqlContract {
+function loadContract(name: string): Contract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
   const contractJson = JSON.parse(contents);
-  return validateContract(contractJson);
+  return validateContract<Contract>(contractJson);
 }
 
-function createStubAdapter(): Adapter<SelectAst, SqlContract, LoweredStatement> {
+function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
     profile: {
       id: 'stub-profile',
@@ -39,7 +40,7 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract, LoweredStatement> 
         });
       },
     },
-    lower(ast: SelectAst, ctx: { contract: SqlContract; params?: readonly unknown[] }) {
+    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
       return {
         profileId: this.profile.id,
@@ -120,7 +121,6 @@ describe('sql DSL builder', () => {
 
   it('throws PLAN.INVALID when selecting an invalid column', () => {
     const builder = sql({ contract, adapter }).from(tables.user);
-    const userColumns = tables.user.columns;
 
     // Invalid: passing something that's not a ColumnBuilder
     expect(() => builder.select({ invalid: {} as unknown as ColumnBuilder })).toThrowError(

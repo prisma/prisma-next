@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { createRuntime } from '../src/runtime';
 import type { Plan, ResultType } from '@prisma-next/sql/types';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
@@ -14,11 +14,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixtureDir = join(__dirname, 'fixtures');
 
-function loadContract(name: string): SqlContract {
+function loadContract(name: string): SqlContract<SqlStorage> {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
   const contractJson = JSON.parse(contents);
-  return validateContract(contractJson);
+  return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
 
 test('execute() preserves Row type from Plan', () => {

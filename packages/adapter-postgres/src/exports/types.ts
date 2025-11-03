@@ -1,7 +1,6 @@
 export type {
   BinaryExpr,
   ColumnRef,
-  ContractStorage,
   OrderClause,
   ParamRef,
   PostgresAdapterOptions,

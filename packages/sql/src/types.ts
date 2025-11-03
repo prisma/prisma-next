@@ -10,7 +10,7 @@ export type {
   SqlExplainResult,
   SqlQueryResult,
 } from '@prisma-next/sql-target';
-import type { SqlContract, StorageColumn } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from './contract-types';
 import type { Adapter } from '@prisma-next/sql-target';
 
 export type Direction = 'asc' | 'desc';
@@ -187,6 +187,49 @@ export type TablesOf<TContract> = TContract extends { storage: { tables: infer U
 
 export type TableKey<TContract> = Extract<keyof TablesOf<TContract>, string>;
 
+// Common types for contract.d.ts generation (SQL-specific)
+// These types are used by emitted contract.d.ts files to provide type-safe DSL/ORM types
+
+/**
+ * Unique symbol for metadata property to avoid collisions with user-defined properties
+ */
+export declare const META: unique symbol;
+
+/**
+ * Extracts metadata from a type that has a META property
+ */
+export type Meta<T extends { [META]: unknown }> = T[typeof META];
+
+/**
+ * Metadata interface for table definitions
+ */
+export interface TableMetadata<Name extends string> {
+  name: Name;
+}
+
+/**
+ * Metadata interface for model definitions
+ */
+export interface ModelMetadata<Name extends string> {
+  name: Name;
+}
+
+/**
+ * Base interface for table definitions with metadata
+ * Used in contract.d.ts to define storage-level table types
+ */
+export interface TableDef<Name extends string> {
+  readonly [META]: TableMetadata<Name>;
+}
+
+/**
+ * Base interface for model definitions with metadata
+ * Used in contract.d.ts to define application-level model types
+ */
+export interface ModelDef<Name extends string> {
+  readonly [META]: ModelMetadata<Name>;
+}
+
 export type ColumnsOf<TContract, K extends TableKey<TContract>> = K extends keyof TablesOf<TContract>
   ? TablesOf<TContract>[K] extends { columns: infer C }
     ? C
@@ -244,7 +287,7 @@ export interface BuildOptions {
   readonly params?: BuildParamsMap;
 }
 
-export interface SqlBuilderOptions<TContract extends SqlContract = SqlContract> {
+export interface SqlBuilderOptions<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> {
   readonly contract: TContract;
-  readonly adapter: Adapter<SelectAst, SqlContract, LoweredStatement>;
+  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
 }

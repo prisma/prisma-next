@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';
-import type { DataContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 import { Client } from 'pg';
 import { PostgresDriver } from '@prisma-next/driver-postgres';
 import {
@@ -37,7 +37,7 @@ async function createDevDatabase(options?: StartServerOptions): Promise<DevDatab
   };
 }
 
-const testContract: DataContract = {
+const testContract: SqlContract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
   coreHash: 'sha256:test-core',

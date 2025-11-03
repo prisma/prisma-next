@@ -9,7 +9,7 @@ import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
 import { validateContract } from '@prisma-next/sql/schema';
 
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
@@ -97,7 +97,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 
   it('throws when marker hash mismatches contract', async () => {
-    const mismatchedContract: SqlContract = {
+    const mismatchedContract: SqlContract<SqlStorage> = {
       ...fixtureContract,
       coreHash: 'sha256:mismatch',
     };
@@ -329,10 +329,10 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 });
 
-function loadContractFixture(): SqlContract {
+function loadContractFixture(): SqlContract<SqlStorage> {
   const fixtureDir = dirname(fileURLToPath(import.meta.url));
   const contractPath = join(fixtureDir, '../../sql/test/fixtures/contract.json');
   const json = readFileSync(contractPath, 'utf8');
   const contractJson = JSON.parse(json);
-  return validateContract(contractJson);
+  return validateContract<SqlContract<SqlStorage>>(contractJson);
 }

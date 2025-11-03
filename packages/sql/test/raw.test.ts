@@ -8,7 +8,7 @@ import { rawOptions } from '../src/raw';
 import { sql } from '../src/sql';
 import { sql as exportedSql, rawOptions as exportedRawOptions } from '../src/exports/sql';
 import { validateContract } from '../src/contract';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '../src/contract-types';
 import type {
   Adapter,
   LoweredStatement,
@@ -19,14 +19,14 @@ import type {
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
-function loadContract(name: string): SqlContract {
+function loadContract(name: string): SqlContract<SqlStorage> {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract(contractJson);
+  const contractJson = JSON.parse(contents) as unknown;
+  return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
 
-function createStubAdapter(): Adapter<SelectAst, SqlContract, LoweredStatement> {
+function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
     profile: {
       id: 'stub-profile',
@@ -39,7 +39,7 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract, LoweredStatement> 
         });
       },
     },
-    lower(ast: SelectAst, ctx: { contract: SqlContract; params?: readonly unknown[] }) {
+    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
       return {
         profileId: this.profile.id,

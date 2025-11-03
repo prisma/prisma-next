@@ -1,34 +1,43 @@
-// Shared types
-export type { FieldType, Source } from '../types';
+import type { DocumentContract } from '../types';
 
-// SQL family types
-export type { StorageColumn, StorageTable, SqlStorage, SqlContract } from '../types';
+// Shared types
+export type { FieldType, Source, ContractBase } from '../types';
+
+// SQL family types - re-exported from @prisma-next/sql/contract-types
+export type {
+  StorageColumn,
+  StorageTable,
+  SqlStorage,
+  SqlContract,
+} from '@prisma-next/sql/contract-types';
 
 // Document family types
 export type { DocCollection, DocIndex, Expr, DocumentStorage, DocumentContract } from '../types';
 
-// Union type
-export type { DataContract } from '../types';
-
-// Backward compatibility: deprecated types
-/**
- * @deprecated Use `SqlContract` or `DocumentContract` instead. This type is kept for backward compatibility.
- */
-export type { ContractStorage } from '../types';
-
-// Type guards
-import type { DataContract, SqlContract, DocumentContract } from '../types';
-
 /**
  * Type guard to check if a contract is a SQL contract
  */
-export function isSqlContract(contract: DataContract): contract is SqlContract {
-  return contract.targetFamily === 'sql';
+export function isSqlContract(
+  contract: unknown,
+): contract is import('@prisma-next/sql/contract-types').SqlContract<
+  import('@prisma-next/sql/contract-types').SqlStorage
+> {
+  return (
+    typeof contract === 'object' &&
+    contract !== null &&
+    'targetFamily' in contract &&
+    contract.targetFamily === 'sql'
+  );
 }
 
 /**
  * Type guard to check if a contract is a Document contract
  */
-export function isDocumentContract(contract: DataContract): contract is DocumentContract {
-  return contract.targetFamily === 'document';
+export function isDocumentContract(contract: unknown): contract is DocumentContract {
+  return (
+    typeof contract === 'object' &&
+    contract !== null &&
+    'targetFamily' in contract &&
+    contract.targetFamily === 'document'
+  );
 }

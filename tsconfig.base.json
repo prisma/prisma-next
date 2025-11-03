@@ -28,6 +28,7 @@
       "@prisma-next/sql-target": ["packages/sql-target/src/exports/index.ts"],
       "@prisma-next/sql-target/*": ["packages/sql-target/src/exports/*.ts"],
       "@prisma-next/sql/*": ["packages/sql/src/exports/*.ts"],
+      "@prisma-next/sql/contract-types": ["packages/sql/src/contract-types.ts"],
       "@prisma-next/contract": ["packages/contract/src/exports/types.ts"],
       "@prisma-next/contract/*": ["packages/contract/src/exports/*.ts"],
       "@prisma-next/compat-prisma": ["packages/compat-prisma/src/exports/index.ts"],

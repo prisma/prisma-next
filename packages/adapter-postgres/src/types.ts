@@ -1,9 +1,9 @@
 import type {
-  ContractStorage,
   SqlContract,
+  SqlStorage,
   StorageColumn,
   StorageTable,
-} from '@prisma-next/contract/types';
+} from '@prisma-next/sql/contract-types';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -17,7 +17,7 @@ export interface PostgresAdapterOptions {
   readonly profileId?: string;
 }
 
-export type PostgresContract = SqlContract & { readonly target: 'postgres' };
+export type PostgresContract = SqlContract<SqlStorage> & { readonly target: 'postgres' };
 
 export type Expr = ColumnRef | ParamRef;
 
@@ -28,13 +28,4 @@ export interface OrderClause {
 
 export type PostgresLoweredStatement = LoweredStatement;
 
-export type {
-  BinaryExpr,
-  ColumnRef,
-  ContractStorage,
-  Direction,
-  ParamRef,
-  SelectAst,
-  StorageColumn,
-  StorageTable,
-};
+export type { BinaryExpr, ColumnRef, Direction, ParamRef, SelectAst, StorageColumn, StorageTable };

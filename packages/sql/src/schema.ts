@@ -1,5 +1,5 @@
 import { planInvalid } from './errors';
-import type { ContractStorage, SqlContract, StorageColumn } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from './contract-types';
 import type {
   BinaryBuilder,
   ColumnBuilder,
@@ -76,7 +76,7 @@ class TableBuilderImpl<TableName extends string, Columns extends Record<string, 
   }
 }
 
-function buildColumns(tableName: string, storage: ContractStorage) {
+function buildColumns(tableName: string, storage: SqlStorage) {
   const table = storage.tables[tableName];
 
   if (!table) {
@@ -86,10 +86,11 @@ function buildColumns(tableName: string, storage: ContractStorage) {
   const result: Record<string, ColumnBuilderImpl<string, StorageColumn>> = {};
 
   for (const [columnName, columnDef] of Object.entries(table.columns)) {
+    if (!columnDef) continue;
     result[columnName] = new ColumnBuilderImpl<string, StorageColumn>(
       tableName,
       columnName,
-      columnDef,
+      columnDef as StorageColumn,
     );
   }
 
@@ -114,7 +115,7 @@ function createTableProxy<TableName extends string, Columns extends Record<strin
   });
 }
 
-type ExtractSchemaTables<Contract extends SqlContract> = {
+type ExtractSchemaTables<Contract extends SqlContract<SqlStorage>> = {
   readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
     TableName & string,
     Contract['storage']['tables'][TableName]['columns']
@@ -122,11 +123,13 @@ type ExtractSchemaTables<Contract extends SqlContract> = {
     TableRef;
 };
 
-export interface SchemaHandle<Contract extends SqlContract = SqlContract> {
+export interface SchemaHandle<Contract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> {
   readonly tables: ExtractSchemaTables<Contract>;
 }
 
-export function schema<Contract extends SqlContract>(contract: Contract): SchemaHandle<Contract> {
+export function schema<Contract extends SqlContract<SqlStorage>>(
+  contract: Contract,
+): SchemaHandle<Contract> {
   const storage = contract.storage;
 
   const tables = {} as ExtractSchemaTables<Contract>;
@@ -150,7 +153,7 @@ export function schema<Contract extends SqlContract>(contract: Contract): Schema
   return Object.freeze({ tables });
 }
 
-export function makeT<Contract extends SqlContract>(
+export function makeT<Contract extends SqlContract<SqlStorage>>(
   contract: Contract,
 ): ExtractSchemaTables<Contract> {
   return schema(contract).tables;

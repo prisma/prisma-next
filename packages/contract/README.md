@@ -6,15 +6,13 @@ Data contract type definitions and JSON schema for Prisma Next.
 
 This package provides TypeScript type definitions and JSON Schemas for Prisma Next data contracts. The data contract is the canonical description of an application's data model and storage layout, independent of any specific query language or database target.
 
-The contract supports two target families:
-- **SQL**: For relational databases (Postgres, MySQL, SQLite, etc.)
+The contract supports document target families:
 - **Document**: For document databases (MongoDB, Firestore, etc.)
 
 ## Package Contents
 
-- **TypeScript Types**: Type definitions for `DataContract`, `SqlContract`, `DocumentContract`, and related types
+- **TypeScript Types**: Type definitions for `DocumentContract` and related types
 - **JSON Schemas**: Schema definitions for validating `contract.json` files in IDEs and tooling
-  - `data-contract-sql-v1.json` (SQL family)
   - `data-contract-document-v1.json` (Document family)
 
 ## Usage
@@ -24,15 +22,12 @@ The contract supports two target families:
 Import contract types in your TypeScript code:
 
 ```typescript
-import type { DataContract, SqlContract, DocumentContract } from '@prisma-next/contract/types';
-import { isSqlContract, isDocumentContract } from '@prisma-next/contract/types';
+import type { DocumentContract } from '@prisma-next/contract/types';
+import { isDocumentContract } from '@prisma-next/contract/types';
 
 // Use type guards to narrow the contract type
-function processContract(contract: DataContract) {
-  if (isSqlContract(contract)) {
-    // contract is SqlContract
-    console.log(contract.storage.tables);
-  } else if (isDocumentContract(contract)) {
+function processContract(contract: DocumentContract) {
+  if (isDocumentContract(contract)) {
     // contract is DocumentContract
     console.log(contract.storage.document.collections);
   }
@@ -43,13 +38,38 @@ function processContract(contract: DataContract) {
 
 Reference the appropriate JSON schema in your `contract.json` files to enable IDE validation and autocomplete.
 
-#### SQL Family
+#### Document Family
 
-For SQL targets (Postgres, MySQL, SQLite, etc.):
+For document targets (MongoDB, Firestore, etc.):
 
 ```json
 {
-  "$schema": "node_modules/@prisma-next/contract/schemas/data-contract-sql-v1.json",
+  "$schema": "node_modules/@prisma-next/contract/schemas/data-contract-document-v1.json",
+  "schemaVersion": "1",
+  "target": "mongodb",
+  "targetFamily": "document",
+  "coreHash": "sha256:...",
+  "storage": {
+    "document": {
+      "collections": {
+        "users": {
+          "name": "users",
+          "fields": {
+            "id": { "type": "objectId", "nullable": false },
+            "email": { "type": "string", "nullable": false }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Note:** For SQL contracts, use `@prisma-next/sql/schema-sql` instead:
+
+```json
+{
+  "$schema": "node_modules/@prisma-next/sql/schemas/data-contract-sql-v1.json",
   "schemaVersion": "1",
   "target": "postgres",
   "targetFamily": "sql",
@@ -71,48 +91,6 @@ For SQL targets (Postgres, MySQL, SQLite, etc.):
 }
 ```
 
-#### Document Family
-
-For Document targets (MongoDB, Firestore, etc.):
-
-```json
-{
-  "$schema": "node_modules/@prisma-next/contract/schemas/data-contract-document-v1.json",
-  "schemaVersion": "1",
-  "target": "mongo",
-  "targetFamily": "document",
-  "coreHash": "sha256:...",
-  "storage": {
-    "document": {
-      "collections": {
-        "users": {
-          "name": "users",
-          "fields": {
-            "id": { "type": "objectId", "nullable": false },
-            "email": { "type": "string", "nullable": false },
-            "profile": {
-              "type": "object",
-              "nullable": true,
-              "properties": {
-                "name": { "type": "string", "nullable": false },
-                "age": { "type": "int32", "nullable": true }
-              }
-            }
-          },
-          "indexes": [
-            {
-              "name": "email_idx",
-              "keys": { "email": "asc" },
-              "unique": true
-            }
-          ]
-        }
-      }
-    }
-  }
-}
-```
-
 After installing this package, IDEs like VS Code will automatically:
 - Validate your contract structure
 - Provide autocomplete for properties
@@ -127,23 +105,13 @@ All contracts share these common fields:
 
 - **`schemaVersion`** (required): Contract schema version (currently `"1"`)
 - **`target`** (required): Database target identifier (e.g., `"postgres"`, `"mongo"`, `"firestore"`)
-- **`targetFamily`** (required): Target family classification (`"sql"` or `"document"`)
+- **`targetFamily`** (required): Target family classification (`"document"` for document contracts)
 - **`coreHash`** (required): SHA-256 hash of the core schema structure
 - **`profileHash`** (optional): SHA-256 hash of the capability profile
 - **`capabilities`** (optional): Capability flags declared by the contract
 - **`extensions`** (optional): Extension packs and their configuration
 - **`meta`** (optional): Non-semantic metadata (excluded from hashing)
 - **`sources`** (optional): Read-only sources (views, etc.) available for querying
-
-### SQL Family Structure
-
-- **`storage.tables`**: Object mapping table names to table definitions
-  - Each table includes:
-    - **`columns`**: Column definitions with `type` and `nullable` properties
-    - **`primaryKey`** (optional): Primary key constraint
-    - **`uniques`** (optional): Array of unique constraints
-    - **`indexes`** (optional): Array of index definitions
-    - **`foreignKeys`** (optional): Array of foreign key constraints
 
 ### Document Family Structure
 
@@ -157,25 +125,12 @@ All contracts share these common fields:
 
 ## Type System
 
-### Union Type
-
-`DataContract` is a union type that can be either `SqlContract` or `DocumentContract`:
-
-```typescript
-type DataContract = SqlContract | DocumentContract;
-```
-
 ### Type Guards
 
 Use type guards to narrow the contract type:
 
 ```typescript
-import { isSqlContract, isDocumentContract } from '@prisma-next/contract/types';
-
-if (isSqlContract(contract)) {
-  // TypeScript knows contract is SqlContract
-  const tables = contract.storage.tables;
-}
+import { isDocumentContract } from '@prisma-next/contract/types';
 
 if (isDocumentContract(contract)) {
   // TypeScript knows contract is DocumentContract
@@ -186,7 +141,6 @@ if (isDocumentContract(contract)) {
 ## Exports
 
 - `./types`: TypeScript type definitions and type guards
-- `./schema-sql`: SQL family JSON Schema (`schemas/data-contract-sql-v1.json`)
 - `./schema-document`: Document family JSON Schema (`schemas/data-contract-document-v1.json`)
 
 ## Related Packages

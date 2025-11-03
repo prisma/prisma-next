@@ -1,5 +1,5 @@
 import { planInvalid } from './errors';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from './contract-types';
 import type {
   ParamDescriptor,
   RawFactory,
@@ -22,14 +22,14 @@ type TemplateInvocation = {
 };
 
 interface RawPlanBuildArgs {
-  readonly contract: SqlContract;
+  readonly contract: SqlContract<SqlStorage>;
   readonly sql: string;
   readonly params: readonly unknown[];
   readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
   readonly options?: RawTemplateOptions;
 }
 
-export function createRawFactory(contract: SqlContract): RawFactory {
+export function createRawFactory(contract: SqlContract<SqlStorage>): RawFactory {
   if (contract.target !== POSTGRES_TARGET) {
     throw planInvalid('Raw lane currently supports only postgres target', {
       expectedTarget: POSTGRES_TARGET,
@@ -138,7 +138,7 @@ function buildRawPlan(args: RawPlanBuildArgs): RawPlan {
 }
 
 interface RawMetaBuildArgs {
-  readonly contract: SqlContract;
+  readonly contract: SqlContract<SqlStorage>;
   readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
   readonly options?: RawTemplateOptions;
 }

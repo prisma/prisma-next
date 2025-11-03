@@ -2,14 +2,13 @@ import { createRuntime, type Runtime } from '@prisma-next/runtime';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 import { param } from '@prisma-next/sql/param';
-import type { DataContract, SqlContract, DocumentContract } from '@prisma-next/contract/types';
-import { isSqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
 import type { TableRef, ColumnBuilder } from '@prisma-next/sql/types';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
 
 interface PrismaClientOptions {
-  readonly contract: DataContract;
+  readonly contract: SqlContract<SqlStorage>;
   readonly runtime?: Runtime;
   readonly connectionString?: string;
 }
@@ -36,9 +35,8 @@ class ModelDelegate {
 
   constructor(
     private readonly runtime: Runtime,
-    private readonly contract: SqlContract, // Narrowed from DataContract in PrismaClientImpl
+    private readonly contract: SqlContract<SqlStorage>,
     private readonly table: TableRef & Record<string, ColumnBuilder>,
-    private readonly schemaTables: ReturnType<typeof schema>['tables'],
     tableName: string,
   ) {
     // Store table name explicitly (from schema key)
@@ -102,7 +100,11 @@ class ModelDelegate {
       }
 
       if (whereConditions.length === 1) {
-        const { column } = whereConditions[0];
+        const condition = whereConditions[0];
+        if (!condition) {
+          throw this.unsupportedError('Invalid where condition');
+        }
+        const { column } = condition;
         const paramPlaceholder = param(`${tableName}_${column.column}`);
         query.where(column.eq(paramPlaceholder));
       } else if (whereConditions.length > 1) {
@@ -177,7 +179,11 @@ class ModelDelegate {
         throw this.unsupportedError('Multiple orderBy fields not supported in MVP');
       }
 
-      const [field, direction] = orderByEntries[0];
+      const orderByEntry = orderByEntries[0];
+      if (!orderByEntry) {
+        throw this.unsupportedError('Invalid orderBy entry');
+      }
+      const [field, direction] = orderByEntry;
       const tableDef = this.contract.storage.tables[this.tableName];
       if (!tableDef || !tableDef.columns[field]) {
         throw this.unsupportedError(`Unknown field '${field}' in orderBy clause`);
@@ -280,17 +286,21 @@ class ModelDelegate {
       throw new Error('INSERT did not return a row');
     }
 
-    return results[0];
+    const result = results[0];
+    if (!result) {
+      throw new Error('INSERT did not return a row');
+    }
+    return result;
   }
 
-  async update(args: {
+  async update(_args: {
     where: Record<string, unknown>;
     data: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
     throw this.unsupportedError('update() mutations are not supported in MVP compatibility layer');
   }
 
-  async delete(args: { where: Record<string, unknown> }): Promise<Record<string, unknown>> {
+  async delete(_args: { where: Record<string, unknown> }): Promise<Record<string, unknown>> {
     throw this.unsupportedError('delete() mutations are not supported in MVP compatibility layer');
   }
 
@@ -326,7 +336,7 @@ class ModelDelegate {
 
 class PrismaClientImpl {
   readonly runtime: Runtime;
-  readonly contract: SqlContract;
+  readonly contract: SqlContract<SqlStorage>;
   readonly schemaHandle: ReturnType<typeof schema>;
   readonly models: Record<string, ModelDelegate> = {};
 
@@ -334,13 +344,7 @@ class PrismaClientImpl {
   [key: string]: unknown;
 
   constructor(options: PrismaClientOptions) {
-    // Support both SQL and Document contracts (currently only SQL is implemented)
-    if (!isSqlContract(options.contract)) {
-      throw new Error(
-        `Document contracts are not yet supported in PrismaClient compatibility layer. ` +
-          `Only SQL contracts (targetFamily: 'sql') are currently supported.`,
-      );
-    }
+    // Currently only SQL contracts are supported
     this.contract = options.contract;
 
     // Initialize runtime if not provided
@@ -348,7 +352,7 @@ class PrismaClientImpl {
       this.runtime = options.runtime;
     } else {
       const adapter = createPostgresAdapter();
-      const connectionString = options.connectionString ?? process.env.DATABASE_URL;
+      const connectionString = options.connectionString ?? process.env['DATABASE_URL'];
 
       if (!connectionString) {
         throw new Error('DATABASE_URL environment variable or connectionString option is required');
@@ -379,7 +383,6 @@ class PrismaClientImpl {
         this.runtime,
         this.contract,
         table as unknown as TableRef & Record<string, ColumnBuilder>,
-        this.schemaHandle.tables,
         tableName,
       );
     }
@@ -400,7 +403,10 @@ export class PrismaClient extends PrismaClientImpl {
     const proxy = new Proxy(this, {
       get(target, prop) {
         if (prop in target && prop !== 'models') {
-          return (target as Record<string, unknown>)[prop];
+          if (typeof prop === 'string' || typeof prop === 'number') {
+            return (target as Record<string | number, unknown>)[prop];
+          }
+          return undefined;
         }
 
         // Check if it's a model name

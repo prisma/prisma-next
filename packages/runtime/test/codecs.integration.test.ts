@@ -7,9 +7,9 @@ import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { PostgresDriver } from '../../driver-postgres/src/postgres-driver';
 import { createDevDatabase, executeStatement, collectAsync } from './utils';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 
-const fixtureContract: SqlContract = {
+const fixtureContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',

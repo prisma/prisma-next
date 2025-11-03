@@ -1,6 +1,6 @@
 import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
-import type { SqlContract, StorageColumn } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from './contract-types';
 import type {
   BinaryBuilder,
   BuildOptions,
@@ -31,7 +31,10 @@ interface ProjectionState {
   readonly columns: ColumnBuilder[];
 }
 
-class SelectBuilderImpl<TContract extends SqlContract = SqlContract, Row = unknown> {
+class SelectBuilderImpl<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  Row = unknown,
+> {
   private readonly contract: TContract;
   private readonly adapter: SqlBuilderOptions<TContract>['adapter'];
   private state: BuilderState = {};
@@ -268,7 +271,7 @@ function buildWhereExpr(
 }
 
 interface MetaBuildArgs {
-  readonly contract: SqlContract;
+  readonly contract: SqlContract<SqlStorage>;
   readonly table: TableRef;
   readonly projection: ProjectionState;
   readonly where?: BinaryBuilder;
@@ -340,11 +343,12 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
   } satisfies DslPlanMeta);
 }
 
-type SelectBuilder<TContract extends SqlContract = SqlContract> = SelectBuilderImpl<TContract, unknown> & {
-  readonly raw: RawFactory;
-};
+type SelectBuilder<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> =
+  SelectBuilderImpl<TContract, unknown> & {
+    readonly raw: RawFactory;
+  };
 
-export function sql<TContract extends SqlContract>(
+export function sql<TContract extends SqlContract<SqlStorage>>(
   options: SqlBuilderOptions<TContract>,
 ): SelectBuilder<TContract> {
   const builder = new SelectBuilderImpl<TContract>(options) as SelectBuilder<TContract>;

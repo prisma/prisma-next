@@ -1,8 +1,8 @@
 // Shared header and neutral types
-// Note: Fields like schemaVersion and targetFamily accept string to work with JSON imports,
-// which don't preserve literal types. Runtime validation ensures correct values.
+// Note: Fields like targetFamily accept string to work with JSON imports,
+// which don't preserve literal types. Runtime validation ensures correct values
 export interface ContractBase {
-  readonly schemaVersion?: string;
+  readonly schemaVersion: string;
   readonly target: string;
   readonly targetFamily: string;
   readonly coreHash: string;
@@ -25,46 +25,6 @@ export interface Source {
   readonly projection: Record<string, FieldType>;
   readonly origin?: Record<string, unknown>;
   readonly capabilities?: Record<string, boolean>;
-}
-
-// SQL family types
-export interface StorageColumn {
-  readonly type?: string;
-  readonly nullable?: boolean;
-}
-
-export interface StorageTable {
-  readonly columns: Record<string, StorageColumn>;
-  readonly primaryKey?: {
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  };
-  readonly uniques?: ReadonlyArray<{
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  }>;
-  readonly indexes?: ReadonlyArray<{
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  }>;
-  readonly foreignKeys?: ReadonlyArray<{
-    readonly columns: ReadonlyArray<string>;
-    readonly references: {
-      readonly table: string;
-      readonly columns: ReadonlyArray<string>;
-    };
-    readonly name?: string;
-  }>;
-}
-
-export interface SqlStorage {
-  readonly tables: Record<string, StorageTable>;
-}
-
-export interface SqlContract extends ContractBase {
-  // Accept string to work with JSON imports; runtime validation ensures 'sql'
-  readonly targetFamily: string;
-  readonly storage: SqlStorage;
 }
 
 // Document family types
@@ -99,15 +59,4 @@ export interface DocumentContract extends ContractBase {
   // Accept string to work with JSON imports; runtime validation ensures 'document'
   readonly targetFamily: string;
   readonly storage: DocumentStorage;
-}
-
-// Union type for both families
-export type DataContract = SqlContract | DocumentContract;
-
-// Backward compatibility: deprecated types
-/**
- * @deprecated Use `SqlContract` or `DocumentContract` instead. This type is kept for backward compatibility.
- */
-export interface ContractStorage {
-  readonly tables: Record<string, StorageTable>;
 }

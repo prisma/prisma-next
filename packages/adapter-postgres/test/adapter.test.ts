@@ -1,24 +1,28 @@
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '../src/adapter';
+import { validateContract } from 'packages/sql/dist/exports/schema';
+import { PostgresContract } from '../src/types';
 
-const contract = Object.freeze({
-  target: 'postgres',
-  targetFamily: 'sql' as const,
-  coreHash: 'sha256:test-core',
-  profileHash: 'sha256:test-profile',
-  storage: {
-    tables: {
-      user: {
-        columns: {
-          id: { type: 'int4', nullable: false },
-          email: { type: 'text', nullable: false },
-          createdAt: { type: 'timestamptz', nullable: false },
+const contract = Object.freeze(
+  validateContract<PostgresContract>({
+    target: 'postgres',
+    targetFamily: 'sql' as const,
+    coreHash: 'sha256:test-core',
+    profileHash: 'sha256:test-profile',
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { type: 'int4', nullable: false },
+            email: { type: 'text', nullable: false },
+            createdAt: { type: 'timestamptz', nullable: false },
+          },
         },
       },
     },
-  },
-});
+  }),
+);
 
 describe('createPostgresAdapter', () => {
   it('lowers select AST into canonical SQL with positional params', () => {

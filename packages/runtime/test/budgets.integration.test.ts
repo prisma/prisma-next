@@ -10,11 +10,11 @@ import {
 } from '../src/runtime';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createDevDatabase } from './utils';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 
-const fixtureContract: SqlContract = {
+const fixtureContract: SqlContract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
   coreHash: 'sha256:test-core',

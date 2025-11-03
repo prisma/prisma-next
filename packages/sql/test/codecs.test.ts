@@ -4,10 +4,11 @@ import { schema } from '../src/schema';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { validateContract } from '../src/contract';
 import type { DslPlan } from '../src/types';
+import type { SqlContract, SqlStorage } from '../src/contract-types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 
 describe('DSL Lane Codec Type Stamping', () => {
-  const contract = validateContract(contractJson);
+  const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
   const tables = schema(contract).tables;
   const adapter = createPostgresAdapter();
 

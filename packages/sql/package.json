@@ -20,6 +20,10 @@
     "typescript": "^5.9.3",
     "vitest": "^2.1.1"
   },
+  "files": [
+    "dist",
+    "schemas"
+  ],
   "exports": {
     "./sql": {
       "types": "./dist/exports/sql.d.ts",
@@ -40,6 +44,11 @@
     "./errors": {
       "types": "./dist/exports/errors.d.ts",
       "import": "./dist/exports/errors.js"
-    }
+    },
+    "./contract-types": {
+      "types": "./dist/exports/contract-types.d.ts",
+      "import": "./dist/exports/contract-types.js"
+    },
+    "./schema-sql": "./schemas/data-contract-sql-v1.json"
   }
 }

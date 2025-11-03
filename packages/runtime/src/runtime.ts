@@ -2,7 +2,7 @@ import { mapContractMarkerRow, readContractMarker, type ContractMarkerRow } from
 import { evaluateRawGuardrails } from './guardrails/raw';
 import { emptyDiagnostics, freezeDiagnostics } from './diagnostics';
 import { computeSqlFingerprint } from './fingerprint';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
 import type { Adapter, LoweredStatement, SelectAst, Plan, RawPlan } from '@prisma-next/sql/types';
 
 import type { SqlDriver } from '@prisma-next/sql-target';
@@ -48,8 +48,8 @@ export interface RuntimeCodecOptions {
 }
 
 export interface RuntimeOptions {
-  readonly contract: SqlContract;
-  readonly adapter: Adapter<SelectAst, SqlContract, LoweredStatement>;
+  readonly contract: SqlContract<SqlStorage>;
+  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
   readonly guardrails?: RuntimeGuardrailOptions;
