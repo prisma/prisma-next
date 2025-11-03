@@ -25,13 +25,14 @@ test('execute() preserves Row type from Plan', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user']!;
+  const userColumns = userTable.columns;
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
+      id: userColumns['id']!,
+      email: userColumns['email']!,
     })
     .build();
 
@@ -41,11 +42,11 @@ test('execute() preserves Row type from Plan', () => {
   const runtime = createRuntime({
     contract,
     adapter,
-    driver: {
-      connect: async () => {},
-      execute: async function* () {},
-      close: async () => {},
-    } as import('@prisma-next/sql-target').SqlDriver,
+      driver: {
+        connect: async () => {},
+        execute: async function* () {},
+        close: async () => {},
+      } as unknown as import('@prisma-next/sql-target').SqlDriver,
     verify: { mode: 'onFirstUse', requireMarker: false },
   });
 
@@ -58,13 +59,14 @@ test('execute() signature matches Plan Row type', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
-  const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+  const userTable = tables['user']!;
+  const userColumns = userTable.columns;
 
   const plan = sql({ contract, adapter })
-    .from(tables.user)
+    .from(userTable)
     .select({
-      id: userTable.id,
-      email: userTable.email,
+      id: userColumns['id']!,
+      email: userColumns['email']!,
     })
     .build();
 
@@ -76,7 +78,7 @@ test('execute() signature matches Plan Row type', () => {
   }
 
   const runtime: Runtime = {
-    execute<Row>(plan: Plan<Row>): AsyncIterable<Row> {
+    execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
       return (async function* () {})();
     },
   };

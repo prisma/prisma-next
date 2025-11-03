@@ -44,7 +44,6 @@ export function budgets(options?: BudgetsOptions): Plugin {
 
   // Per-execution state (reset on each beforeExecute)
   let observedRows = 0;
-  let startTime = 0;
 
   /**
    * Estimate rows for DSL lane SELECT queries
@@ -89,8 +88,8 @@ export function budgets(options?: BudgetsOptions): Plugin {
     // MVP: no SQL parsing, so rely on lane-provided hints only
     const rawPlan = plan as RawPlan;
     return (
-      typeof rawPlan.meta.annotations?.limit === 'number' ||
-      typeof rawPlan.meta.annotations?.LIMIT === 'number'
+      typeof rawPlan.meta.annotations?.['limit'] === 'number' ||
+      typeof rawPlan.meta.annotations?.['LIMIT'] === 'number'
     );
   }
 
@@ -100,7 +99,7 @@ export function budgets(options?: BudgetsOptions): Plugin {
     async beforeExecute(plan: Plan, ctx: PluginContext) {
       // Reset per-execution state
       observedRows = 0;
-      startTime = ctx.now();
+      void ctx.now(); // Track start time for potential future use
 
       // Pre-exec heuristic: check estimated rows for DSL lane
       const estimated = estimateRows(plan);
@@ -155,7 +154,7 @@ export function budgets(options?: BudgetsOptions): Plugin {
       }
     },
 
-    async onRow(row: Record<string, unknown>, plan: Plan, ctx: PluginContext) {
+    async onRow(_row: Record<string, unknown>, _plan: Plan, _ctx: PluginContext) {
       observedRows += 1;
       if (observedRows > maxRows) {
         throw budgetError('BUDGET.ROWS_EXCEEDED', 'Observed row count exceeds budget', {
@@ -167,7 +166,7 @@ export function budgets(options?: BudgetsOptions): Plugin {
     },
 
     async afterExecute(
-      plan: Plan,
+      _plan: Plan,
       result: import('./types').AfterExecuteResult,
       ctx: PluginContext,
     ) {

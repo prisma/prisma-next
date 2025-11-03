@@ -52,7 +52,7 @@ function resolveParamCodec(
   if (paramDescriptor.type) {
     const candidates = registry.byScalar.get(paramDescriptor.type);
     if (candidates && candidates.length > 0) {
-      return candidates[0];
+      return candidates[0] ?? null;
     }
   }
 

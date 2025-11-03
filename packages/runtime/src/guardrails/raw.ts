@@ -61,7 +61,7 @@ export function evaluateRawGuardrails(plan: RawPlan, config?: RawGuardrailConfig
     lints.push(
       createLint('LINT.READ_ONLY_MUTATION', 'error', 'Raw SQL plan mutates data despite read-only intent', {
         sql: snippet(plan.sql),
-        intent: plan.meta.annotations?.intent,
+        intent: plan.meta.annotations?.['intent'],
       }),
     );
   }
@@ -124,7 +124,7 @@ function isMutationStatement(statement: 'select' | 'mutation' | 'other'): boolea
 }
 
 function isReadOnlyIntent(meta: RawPlanMeta): boolean {
-  const intent = typeof meta.annotations?.intent === 'string' ? meta.annotations.intent.toLowerCase() : undefined;
+  const intent = typeof meta.annotations?.['intent'] === 'string' ? meta.annotations['intent'].toLowerCase() : undefined;
   return intent !== undefined && READ_ONLY_INTENTS.has(intent);
 }
 

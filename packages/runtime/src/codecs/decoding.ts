@@ -58,7 +58,7 @@ function resolveRowCodec(
     if (scalarType) {
       const candidates = registry.byScalar.get(scalarType);
       if (candidates && candidates.length > 0) {
-        return candidates[0];
+        return candidates[0] ?? null;
       }
     }
   }
@@ -127,16 +127,22 @@ export function decodeRow(
       // Wrap error in RUNTIME.DECODE_FAILED envelope
       const decodeError = new Error(
         `Failed to decode row alias '${alias}' with codec '${codec.id}': ${error instanceof Error ? error.message : String(error)}`,
-      ) as Error & { code: string; category: string; severity: string; details?: Record<string, unknown> };
+      ) as Error & {
+        code: string;
+        category: string;
+        severity: string;
+        details?: Record<string, unknown>;
+      };
       decodeError.code = 'RUNTIME.DECODE_FAILED';
       decodeError.category = 'RUNTIME';
       decodeError.severity = 'error';
       decodeError.details = {
         alias,
         codec: codec.id,
-        wirePreview: typeof wireValue === 'string' && wireValue.length > 100
-          ? wireValue.substring(0, 100) + '...'
-          : String(wireValue).substring(0, 100),
+        wirePreview:
+          typeof wireValue === 'string' && wireValue.length > 100
+            ? wireValue.substring(0, 100) + '...'
+            : String(wireValue).substring(0, 100),
       };
       throw decodeError;
     }
@@ -144,4 +150,3 @@ export function decodeRow(
 
   return decoded;
 }
-

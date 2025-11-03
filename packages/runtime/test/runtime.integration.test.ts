@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { Client } from 'pg';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { schema } from '@prisma-next/sql/schema';
@@ -19,11 +19,12 @@ import { createDevDatabase, drainAsyncIterable, executeStatement, collectAsync }
 const fixtureContract = loadContractFixture();
 const tables = schema(fixtureContract).tables;
 const adapter = createPostgresAdapter();
-const userTable = tables.user as typeof tables.user & Record<string, unknown>;
+const userTable = tables['user']!;
+const userColumns = userTable.columns;
 const builder = sql({ contract: fixtureContract, adapter });
 const plan = builder
-  .from(tables.user)
-  .select({ id: userTable.id, email: userTable.email })
+  .from(userTable)
+  .select({ id: userColumns['id']!, email: userColumns['email']! })
   .limit(5)
   .build();
 
@@ -93,7 +94,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(plan));
 
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows.map((r) => r.email)).toContain('ada@example.com');
+    expect(rows.map((r) => r['email'])).toContain('ada@example.com');
   });
 
   it('throws when marker hash mismatches contract', async () => {
@@ -292,7 +293,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       (finding) => finding.code === 'BUDGET.ROWS_EXCEEDED',
     );
     expect(budgetFinding).toBeDefined();
-    expect(budgetFinding?.details?.estimatedRows).toBeTypeOf('number');
+    expect(budgetFinding?.details?.['estimatedRows']).toBeTypeOf('number');
 
     const telemetry = runtime.telemetry();
     expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });

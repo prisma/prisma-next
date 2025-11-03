@@ -111,7 +111,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
     },
   };
 
-  async function verifyPlanIfNeeded(plan: Plan) {
+  async function verifyPlanIfNeeded(_plan: Plan) {
     if (options.verify.mode === 'always') {
       verified = false;
     }
@@ -132,7 +132,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
       return;
     }
 
-    const marker = mapContractMarkerRow(result.rows[0] as ContractMarkerRow);
+    const marker = mapContractMarkerRow(result.rows[0] as unknown as ContractMarkerRow);
 
     if (marker.coreHash !== contract.coreHash) {
       throw runtimeError('CONTRACT.MARKER_MISMATCH', 'Database core hash does not match contract', {
@@ -402,14 +402,14 @@ function findPlanRows(node: unknown): number | undefined {
   }
 
   if ('Plan' in (node as Record<string, unknown>)) {
-    const nested = findPlanRows((node as Record<string, unknown>).Plan);
+    const nested = findPlanRows((node as Record<string, unknown>)['Plan']);
     if (nested !== undefined) {
       return nested;
     }
   }
 
-  if (Array.isArray((node as Record<string, unknown>).Plans)) {
-    for (const child of (node as Record<string, unknown>).Plans as unknown[]) {
+  if (Array.isArray((node as Record<string, unknown>)['Plans'])) {
+    for (const child of (node as Record<string, unknown>)['Plans'] as unknown[]) {
       const nested = findPlanRows(child);
       if (nested !== undefined) {
         return nested;
