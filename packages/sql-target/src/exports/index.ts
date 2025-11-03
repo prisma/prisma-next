@@ -12,4 +12,3 @@ export {
 } from '../sql-target';
 export type { Codec } from '../codecs';
 export { CodecRegistry } from '../codecs';
-

@@ -58,7 +58,8 @@ export function encodeParam(
 
   // Special case: JS Date + type timestamp|timestamptz
   if (value instanceof Date && paramDescriptor.type) {
-    const isTimestampType = paramDescriptor.type === 'timestamp' || paramDescriptor.type === 'timestamptz';
+    const isTimestampType =
+      paramDescriptor.type === 'timestamp' || paramDescriptor.type === 'timestamptz';
     if (isTimestampType) {
       // Try to resolve codec, or use iso-datetime codec directly
       const codec = resolveParamCodec(paramDescriptor, plan, registry);
@@ -98,10 +99,7 @@ export function encodeParam(
 /**
  * Encodes all parameters in a plan using codec registry.
  */
-export function encodeParams(
-  plan: Plan,
-  registry: CodecRegistry,
-): readonly unknown[] {
+export function encodeParams(plan: Plan, registry: CodecRegistry): readonly unknown[] {
   if (plan.params.length === 0) {
     return plan.params;
   }
@@ -122,4 +120,3 @@ export function encodeParams(
 
   return Object.freeze(encoded);
 }
-

@@ -102,8 +102,7 @@ test('ResultType utility extracts Row type from Plan', () => {
     .build();
 
   type ExtractedRow = ResultType<typeof plan>;
-  type Row = ResultType<typeof plan>;
-  expectTypeOf<ExtractedRow>().toEqualTypeOf<Row>();
+  expectTypeOf<ExtractedRow>().toExtend<{ id: number; email: string }>();
 });
 
 test('execute() preserves Row type through execution', () => {

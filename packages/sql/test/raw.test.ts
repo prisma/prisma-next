@@ -134,4 +134,3 @@ describe('raw lane', () => {
     expect(exportedRawOptions({ refs: { tables: [] } })).toBeDefined();
   });
 });
-

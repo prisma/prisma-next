@@ -20,13 +20,19 @@ export interface ParamPlaceholder {
   readonly name: string;
 }
 
-export interface OrderBuilder<ColumnName extends string = string, ColumnMeta extends StorageColumn = StorageColumn> {
+export interface OrderBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+> {
   readonly kind: 'order';
   readonly expr: ColumnBuilder<ColumnName, ColumnMeta>;
   readonly dir: Direction;
 }
 
-export interface ColumnBuilder<ColumnName extends string = string, ColumnMeta extends StorageColumn = StorageColumn> {
+export interface ColumnBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+> {
   readonly kind: 'column';
   readonly table: string;
   readonly column: ColumnName;
@@ -36,7 +42,10 @@ export interface ColumnBuilder<ColumnName extends string = string, ColumnMeta ex
   desc(): OrderBuilder<ColumnName, ColumnMeta>;
 }
 
-export interface BinaryBuilder<ColumnName extends string = string, ColumnMeta extends StorageColumn = StorageColumn> {
+export interface BinaryBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+> {
   readonly kind: 'binary';
   readonly op: 'eq';
   readonly left: ColumnBuilder<ColumnName, ColumnMeta>;
@@ -176,14 +185,19 @@ export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
  * Utility type to extract the Row type from a Plan.
  * Example: `type Row = ResultType<typeof plan>`
  */
-export type ResultType<P> = P extends PlanBase<infer R> ? R : never;
+export type ResultType<P> =
+  P extends DslPlan<infer R>
+    ? R
+    : P extends RawPlan<infer R>
+      ? R
+      : P extends PlanBase<infer R>
+        ? R
+        : never;
 
 /**
  * Helper types for extracting contract structure.
  */
-export type TablesOf<TContract> = TContract extends { storage: { tables: infer U } }
-  ? U
-  : never;
+export type TablesOf<TContract> = TContract extends { storage: { tables: infer U } } ? U : never;
 
 export type TableKey<TContract> = Extract<keyof TablesOf<TContract>, string>;
 
@@ -230,7 +244,10 @@ export interface ModelDef<Name extends string> {
   readonly [META]: ModelMetadata<Name>;
 }
 
-export type ColumnsOf<TContract, K extends TableKey<TContract>> = K extends keyof TablesOf<TContract>
+export type ColumnsOf<
+  TContract,
+  K extends TableKey<TContract>,
+> = K extends keyof TablesOf<TContract>
   ? TablesOf<TContract>[K] extends { columns: infer C }
     ? C
     : never
@@ -287,7 +304,9 @@ export interface BuildOptions {
   readonly params?: BuildParamsMap;
 }
 
-export interface SqlBuilderOptions<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> {
+export interface SqlBuilderOptions<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+> {
   readonly contract: TContract;
   readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
 }

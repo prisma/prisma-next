@@ -9,11 +9,7 @@ import type { Plan, DslPlan } from '@prisma-next/sql/types';
  * 2. Projection type: `projectionTypes[alias]` → `byScalar.get(scalar)` → first candidate
  * 3. Fallback: null (pass through driver value)
  */
-function resolveRowCodec(
-  alias: string,
-  plan: Plan,
-  registry: CodecRegistry,
-): Codec | null {
+function resolveRowCodec(alias: string, plan: Plan, registry: CodecRegistry): Codec | null {
   // 1. Plan hint: annotations.codecs[alias]
   const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;
   if (planCodecId) {
