@@ -1,4 +1,4 @@
-import { describe, expect, it, expectTypeOf } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { PostgresDriver } from '@prisma-next/driver-postgres';
@@ -9,7 +9,7 @@ import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
 import { param } from '@prisma-next/sql/param';
 import { validateContract } from '@prisma-next/sql/schema';
-import type { ResultType, DslPlan } from '@prisma-next/sql/types';
+import type { ResultType } from '@prisma-next/sql/types';
 
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 

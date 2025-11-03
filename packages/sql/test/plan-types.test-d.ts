@@ -2,7 +2,7 @@ import { expectTypeOf, test } from 'vitest';
 import { sql } from '../src/sql';
 import { schema, makeT } from '../src/schema';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { ResultType, Plan, DslPlan, TableKey, TablesOf } from '../src/types';
+import type { ResultType, Plan, TableKey, TablesOf } from '../src/types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 import { validateContract } from '../src/contract';
 import type { Contract } from './fixtures/contract.d';
@@ -54,11 +54,10 @@ test('select() with object projection infers Row type', () => {
   // Should have id and email properties
   // Note: exact types depend on columnMeta, but structure should be correct
   // Verify plan structure
-  expectTypeOf(plan).toMatchTypeOf<DslPlan<Row>>();
-  expectTypeOf(plan).toMatchTypeOf<Plan<Row>>();
+  expectTypeOf(plan).toExtend<Plan<Row>>();
 });
 
-test('build() returns DslPlan<Row> with inferred Row type', () => {
+test('build() returns Plan<Row> with inferred Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema(contract).tables;
@@ -78,8 +77,7 @@ test('build() returns DslPlan<Row> with inferred Row type', () => {
     .build();
 
   type Row = ResultType<typeof plan>;
-  expectTypeOf(plan).toMatchTypeOf<DslPlan<Row>>();
-  expectTypeOf(plan).toMatchTypeOf<Plan<Row>>();
+  expectTypeOf(plan).toExtend<Plan<Row>>();
 });
 
 test('ResultType utility extracts Row type from Plan', () => {
@@ -127,7 +125,7 @@ test('execute() preserves Row type through execution', () => {
   type Row = ResultType<typeof plan>;
   const result = execute(plan);
 
-  expectTypeOf(result).toMatchTypeOf<AsyncIterable<Row>>();
+  expectTypeOf(result).toExtend<AsyncIterable<Row>>();
 });
 
 test('builder chain preserves Row type through methods', () => {
@@ -189,7 +187,7 @@ test('wrong Row type assignments fail type check', () => {
   // This should compile - correct type
   type Row = ResultType<typeof plan>;
   const correct: Plan<Row> = plan;
-  expectTypeOf(correct).toMatchTypeOf<Plan<Row>>();
+  expectTypeOf(correct).toExtend<Plan<Row>>();
 
   // Type system should preserve Row type through the chain
   // If Row is inferred correctly, it should not be assignable to a completely different type
@@ -197,7 +195,7 @@ test('wrong Row type assignments fail type check', () => {
   // but the important thing is that Row is correctly inferred from the projection
   // This assignment would fail if Row was a specific type (not unknown)
   // For now, we verify that Row is inferred (even if as unknown) by checking the plan structure
-  expectTypeOf(plan).toMatchTypeOf<DslPlan<Row>>();
+  expectTypeOf(plan).toExtend<Plan<Row>>();
 });
 
 test('nullable columns are handled correctly', () => {
@@ -221,7 +219,7 @@ test('nullable columns are handled correctly', () => {
 
   type Row = ResultType<typeof plan>;
   // Row should have the projection properties
-  expectTypeOf(plan).toMatchTypeOf<DslPlan<Row>>();
+  expectTypeOf(plan).toExtend<Plan<Row>>();
 });
 
 test('different column types map correctly', () => {
@@ -246,7 +244,7 @@ test('different column types map correctly', () => {
     .build();
 
   type Row = ResultType<typeof plan>;
-  expectTypeOf(plan).toMatchTypeOf<DslPlan<Row>>();
+  expectTypeOf(plan).toExtend<Plan<Row>>();
 });
 
 test('generic contract types are preserved', () => {
@@ -327,8 +325,8 @@ test('sql() preserves contract generic through builder chain', () => {
   const builderAfterFrom = builder.from(userTable);
 
   // Builder should preserve contract type
-  expectTypeOf(builder).toMatchTypeOf<ReturnType<typeof sql<typeof contract>>>();
-  expectTypeOf(builderAfterFrom).toMatchTypeOf<
+  expectTypeOf(builder).toExtend<ReturnType<typeof sql<typeof contract>>>();
+  expectTypeOf(builderAfterFrom).toExtend<
     ReturnType<ReturnType<typeof sql<typeof contract>>['from']>
   >();
 });

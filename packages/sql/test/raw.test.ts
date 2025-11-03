@@ -9,13 +9,7 @@ import { sql } from '../src/sql';
 import { sql as exportedSql, rawOptions as exportedRawOptions } from '../src/exports/sql';
 import { validateContract } from '../src/contract';
 import type { SqlContract, SqlStorage } from '../src/contract-types';
-import type {
-  Adapter,
-  LoweredStatement,
-  ParamDescriptor,
-  RawPlanMeta,
-  SelectAst,
-} from '../src/types';
+import type { Adapter, LoweredStatement, ParamDescriptor, PlanMeta, SelectAst } from '../src/types';
 import { CodecRegistry } from '@prisma-next/sql-target';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -93,7 +87,7 @@ describe('raw lane', () => {
 
     expect(plan.params).toEqual([email]);
 
-    const meta = plan.meta as RawPlanMeta;
+    const meta = plan.meta as PlanMeta;
     expect(meta.annotations).toEqual({ intent: 'report' });
     expect(meta.refs).toEqual({
       tables: ['user'],
@@ -119,7 +113,7 @@ describe('raw lane', () => {
       { index: 2, name: 'p2', source: 'raw' },
     ]);
 
-    const meta = plan.meta as RawPlanMeta;
+    const meta = plan.meta as PlanMeta;
     expect(meta.annotations).toEqual({ intent: 'report' });
     expect(meta.refs?.tables).toEqual(['user']);
     expect(meta.projection).toEqual(['id']);

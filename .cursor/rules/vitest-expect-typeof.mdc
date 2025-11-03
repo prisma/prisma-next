@@ -1,0 +1,26 @@
+# Vitest expectTypeOf API
+
+## Deprecated: `toMatchTypeOf`
+
+The `toMatchTypeOf()` matcher has been deprecated in Vitest's `expectTypeOf` API.
+
+**Do not use:**
+```typescript
+expectTypeOf(plan).toMatchTypeOf<Plan<Row>>();
+```
+
+## Use `toExtend()` instead
+
+Use `toExtend()` to verify that a type extends or matches another type:
+
+**Correct usage:**
+```typescript
+expectTypeOf(plan).toExtend<Plan<Row>>();
+```
+
+## When to use `toExtend()` vs `toEqualTypeOf()`
+
+- `toExtend<T>()`: Verifies that the type extends `T` (allows subtypes). Use when checking that a value's type matches or is a subtype of the expected type.
+- `toEqualTypeOf<T>()`: Verifies exact type equality. Use when checking for exact type matches.
+
+For most cases where you're verifying that a plan or object has the correct type structure, `toExtend()` is the appropriate choice.

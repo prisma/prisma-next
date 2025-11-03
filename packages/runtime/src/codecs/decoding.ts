@@ -1,5 +1,5 @@
 import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
-import type { Plan, DslPlan } from '@prisma-next/sql/types';
+import type { Plan } from '@prisma-next/sql/types';
 
 /**
  * Resolves a codec for row decoding using precedence rules.
@@ -20,9 +20,8 @@ function resolveRowCodec(alias: string, plan: Plan, registry: CodecRegistry): Co
   }
 
   // 2. Projection type: projectionTypes[alias] → byScalar
-  if (plan.meta.lane === 'dsl') {
-    const dslPlan = plan as DslPlan;
-    const scalarType = dslPlan.meta.projectionTypes?.[alias];
+  if (plan.meta.projectionTypes) {
+    const scalarType = plan.meta.projectionTypes[alias];
     if (scalarType) {
       const candidates = registry.getByScalar(scalarType);
       if (candidates.length > 0) {
@@ -53,19 +52,16 @@ export function decodeRow(
 
   // Get projection aliases
   let aliases: readonly string[];
-  if (plan.meta.lane === 'dsl') {
-    const dslPlan = plan as DslPlan;
-    aliases = Object.keys(dslPlan.meta.projection);
+  const projection = plan.meta.projection;
+  if (projection && !Array.isArray(projection)) {
+    // DSL plan: projection is Record<string, string>
+    aliases = Object.keys(projection);
+  } else if (projection && Array.isArray(projection)) {
+    // Raw plan: projection is ReadonlyArray<string>
+    aliases = projection;
   } else {
-    // Raw plan: use projection array or row keys
-    const rawPlan = plan;
-    const rawProjection = rawPlan.meta.projection;
-    if (rawProjection && Array.isArray(rawProjection)) {
-      // Raw plan projection is ReadonlyArray<string>
-      aliases = rawProjection;
-    } else {
-      aliases = Object.keys(row);
-    }
+    // No projection: use row keys
+    aliases = Object.keys(row);
   }
 
   for (const alias of aliases) {

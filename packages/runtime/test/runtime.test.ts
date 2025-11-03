@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createRuntime } from '../src/runtime';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
-import type { Plan, DslPlan } from '@prisma-next/sql/types';
+import type { Plan } from '@prisma-next/sql/types';
 import type { SqlDriver } from '@prisma-next/sql-target';
 import type { Plugin } from '../src/plugins/types';
 
@@ -45,7 +45,7 @@ describe('Runtime class', () => {
       project: [],
       limit: 1,
     },
-  } as DslPlan;
+  } as Plan;
 
   const createMockDriver = (): SqlDriver => ({
     connect: vi.fn(),

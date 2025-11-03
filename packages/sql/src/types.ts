@@ -97,35 +97,6 @@ export interface ParamDescriptor {
 }
 
 export interface PlanRefs {
-  readonly tables: readonly string[];
-  readonly columns: ReadonlyArray<{ table: string; column: string }>;
-}
-
-export interface PlanMetaBase {
-  readonly target: string;
-  readonly targetFamily?: string;
-  readonly coreHash: string;
-  readonly profileHash?: string;
-  readonly lane: 'dsl' | 'raw';
-  readonly annotations?: {
-    codecs?: Record<string, string>; // alias/param → codec id ('ns/name@v')
-    [key: string]: unknown;
-  };
-  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
-}
-
-export interface DslPlanMeta extends PlanMetaBase {
-  readonly lane: 'dsl';
-  readonly refs: PlanRefs;
-  readonly projection: Record<string, string>;
-  /**
-   * Optional mapping of projection alias → contract scalar type ID.
-   * Used for codec resolution when AST+refs don't provide enough type info.
-   */
-  readonly projectionTypes?: Record<string, string>;
-}
-
-export interface RawPlanRefs {
   readonly tables?: readonly string[];
   readonly columns?: ReadonlyArray<{ table: string; column: string }>;
   readonly indexes?: ReadonlyArray<{
@@ -135,17 +106,24 @@ export interface RawPlanRefs {
   }>;
 }
 
-export interface RawPlanMeta extends PlanMetaBase {
-  readonly lane: 'raw';
-  readonly target: 'postgres';
-  readonly refs?: RawPlanRefs;
-  readonly projection?: ReadonlyArray<string>;
-}
-
-export interface PlanBase<_Row = unknown, M extends PlanMetaBase = PlanMetaBase> {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-  readonly meta: M;
+export interface PlanMeta {
+  readonly target: string;
+  readonly targetFamily?: string;
+  readonly coreHash: string;
+  readonly profileHash?: string;
+  readonly lane: string;
+  readonly annotations?: {
+    codecs?: Record<string, string>; // alias/param → codec id ('ns/name@v')
+    [key: string]: unknown;
+  };
+  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
+  readonly refs?: PlanRefs;
+  readonly projection?: Record<string, string> | ReadonlyArray<string>;
+  /**
+   * Optional mapping of projection alias → contract scalar type ID.
+   * Used for codec resolution when AST+refs don't provide enough type info.
+   */
+  readonly projectionTypes?: Record<string, string>;
 }
 
 /**
@@ -185,14 +163,7 @@ export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
  * Utility type to extract the Row type from a Plan.
  * Example: `type Row = ResultType<typeof plan>`
  */
-export type ResultType<P> =
-  P extends DslPlan<infer R>
-    ? R
-    : P extends RawPlan<infer R>
-      ? R
-      : P extends PlanBase<infer R>
-        ? R
-        : never;
+export type ResultType<P> = P extends Plan<infer R> ? R : never;
 
 /**
  * Helper types for extracting contract structure.
@@ -253,16 +224,15 @@ export type ColumnsOf<
     : never
   : never;
 
-export interface DslPlan<Row = unknown> extends PlanBase<Row, DslPlanMeta> {
-  readonly ast: SelectAst;
+export interface Plan<_Row = unknown> {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+  readonly ast?: SelectAst;
+  readonly meta: PlanMeta;
 }
 
-export interface RawPlan<Row = unknown> extends PlanBase<Row, RawPlanMeta> {}
-
-export type Plan<Row = unknown> = DslPlan<Row> | RawPlan<Row>;
-
 export interface RawTemplateOptions {
-  readonly refs?: RawPlanRefs;
+  readonly refs?: PlanRefs;
   readonly annotations?: Record<string, unknown>;
   readonly projection?: ReadonlyArray<string>;
 }
@@ -272,11 +242,11 @@ export interface RawFunctionOptions extends RawTemplateOptions {
 }
 
 export interface RawTemplateFactory {
-  (strings: TemplateStringsArray, ...values: readonly unknown[]): RawPlan;
+  (strings: TemplateStringsArray, ...values: readonly unknown[]): Plan;
 }
 
 export interface RawFactory extends RawTemplateFactory {
-  (text: string, options: RawFunctionOptions): RawPlan;
+  (text: string, options: RawFunctionOptions): Plan;
   with(options: RawTemplateOptions): RawTemplateFactory;
 }
 

@@ -3,7 +3,7 @@ import { createPostgresCodecRegistry } from '../../adapter-postgres/src/codecs';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import { decodeRow } from '../src/codecs/decoding';
 import { extractScalarTypes, validateCodecRegistryCompleteness } from '../src/codecs/validation';
-import type { Plan, DslPlan, ParamDescriptor } from '@prisma-next/sql/types';
+import type { Plan, ParamDescriptor } from '@prisma-next/sql/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
 import { CodecRegistry } from '@prisma-next/sql-target';
 import type { Codec } from '@prisma-next/sql-target';
@@ -132,7 +132,7 @@ describe('Param Encoding', () => {
         refs: { tables: [], columns: [] },
         projection: {},
       },
-    } as DslPlan;
+    } as Plan;
   };
 
   it('encodes string value', () => {
@@ -212,7 +212,7 @@ describe('Param Encoding', () => {
 describe('Row Decoding', () => {
   const registry = createPostgresCodecRegistry();
 
-  const createMockDslPlan = (projectionTypes?: Record<string, string>): DslPlan => {
+  const createMockDslPlan = (projectionTypes?: Record<string, string>): Plan => {
     return {
       sql: 'SELECT * FROM test',
       params: [],
@@ -308,7 +308,9 @@ describe('Row Decoding', () => {
       meta: {
         ...plan.meta,
         projection: {
-          ...plan.meta.projection,
+          ...(typeof plan.meta.projection === 'object' && !Array.isArray(plan.meta.projection)
+            ? plan.meta.projection
+            : {}),
           unknownField: 'test.unknownField',
         },
       },

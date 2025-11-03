@@ -71,9 +71,7 @@ class ModelDelegate {
   async findMany(args: FindManyArgs = {}): Promise<Record<string, unknown>[]> {
     const tableName = this.tableName;
     const adapter = createPostgresAdapter();
-    const query = sql({ contract: this.contract, adapter });
-
-    query.from(this.tableRef);
+    let query = sql({ contract: this.contract, adapter }).from(this.tableRef);
 
     // Handle where clause (equality only for MVP)
     if (args.where) {
@@ -86,8 +84,9 @@ class ModelDelegate {
         if (!tableDef || !tableDef.columns[field]) {
           throw this.unsupportedError(`Unknown field '${field}' in where clause`);
         }
-        // Access column from table object (columns are assigned as properties)
-        const column = this.table[field];
+        // Access column via columns property to avoid conflicts with table properties
+        const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+        const column = columns?.[field];
         if (
           !column ||
           typeof column !== 'object' ||
@@ -106,7 +105,7 @@ class ModelDelegate {
         }
         const { column } = condition;
         const paramPlaceholder = param(`${tableName}_${column.column}`);
-        query.where(column.eq(paramPlaceholder));
+        query = query.where(column.eq(paramPlaceholder));
       } else if (whereConditions.length > 1) {
         throw this.unsupportedError('Multiple where conditions (AND/OR) not supported in MVP');
       }
@@ -122,7 +121,8 @@ class ModelDelegate {
           if (!tableDef || !tableDef.columns[field]) {
             throw this.unsupportedError(`Unknown field '${field}' in select clause`);
           }
-          const column = this.table[field];
+          const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+          const column = columns?.[field];
           if (
             !column ||
             typeof column !== 'object' ||
@@ -137,10 +137,11 @@ class ModelDelegate {
     } else {
       // Default: select all columns from contract definition
       const tableDef = this.contract.storage.tables[tableName];
-      if (tableDef) {
+      const tableColumns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+      if (tableDef && tableColumns) {
         for (const columnName of Object.keys(tableDef.columns)) {
-          // Access column from original table object (columns are assigned as properties)
-          const column = this.table[columnName];
+          // Access column via columns property to avoid conflicts with table properties like 'name'
+          const column = tableColumns[columnName];
           if (
             column &&
             typeof column === 'object' &&
@@ -152,13 +153,10 @@ class ModelDelegate {
         }
       }
 
-      // Fallback: iterate table properties to find columns
-      if (Object.keys(projection).length === 0) {
-        for (const key in this.table) {
-          if (key === 'name' || key === 'kind') {
-            continue; // Skip name/kind properties
-          }
-          const value = this.table[key];
+      // Fallback: iterate table columns directly
+      if (Object.keys(projection).length === 0 && tableColumns) {
+        for (const key in tableColumns) {
+          const value = tableColumns[key];
           if (value && typeof value === 'object' && 'kind' in value && value.kind === 'column') {
             projection[key] = value;
           }
@@ -170,7 +168,7 @@ class ModelDelegate {
       }
     }
 
-    query.select(projection);
+    query = query.select(projection);
 
     // Handle orderBy
     if (args.orderBy) {
@@ -188,7 +186,8 @@ class ModelDelegate {
       if (!tableDef || !tableDef.columns[field]) {
         throw this.unsupportedError(`Unknown field '${field}' in orderBy clause`);
       }
-      const column = this.table[field];
+      const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+      const column = columns?.[field];
       if (
         !column ||
         typeof column !== 'object' ||
@@ -198,12 +197,12 @@ class ModelDelegate {
         throw this.unsupportedError(`Invalid column '${field}' in orderBy clause`);
       }
 
-      query.orderBy(direction === 'asc' ? column.asc() : column.desc());
+      query = query.orderBy(direction === 'asc' ? column.asc() : column.desc());
     }
 
     // Handle pagination
     if (args.take !== undefined) {
-      query.limit(args.take);
+      query = query.limit(args.take);
     }
 
     if (args.skip !== undefined) {

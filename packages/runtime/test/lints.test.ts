@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { lints } from '../src/plugins/lints';
-import type { RawPlan, DslPlan } from '@prisma-next/sql/types';
+import type { Plan } from '@prisma-next/sql/types';
 import type { PluginContext } from '../src/plugins/types';
 
 describe('lints plugin', () => {
@@ -21,10 +21,14 @@ describe('lints plugin', () => {
     it('ignores DSL plans', async () => {
       const plugin = lints();
       const ctx = createMockContext();
-      const plan: DslPlan = {
+      const plan: Plan = {
         sql: 'SELECT * FROM "user"',
         params: [],
-        ast: {} as DslPlan['ast'],
+        ast: {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [],
+        },
         meta: {
           target: 'postgres',
           coreHash: 'sha256:test',
@@ -44,7 +48,7 @@ describe('lints plugin', () => {
     it('throws error for SELECT * in raw plans', async () => {
       const plugin = lints();
       const ctx = createMockContext();
-      const plan: RawPlan = {
+      const plan: Plan = {
         sql: 'SELECT * FROM "user"',
         params: [],
         meta: {
@@ -63,7 +67,7 @@ describe('lints plugin', () => {
     it('logs warning for missing LIMIT in raw SELECT', async () => {
       const plugin = lints();
       const ctx = createMockContext();
-      const plan: RawPlan = {
+      const plan: Plan = {
         sql: 'SELECT id FROM "user"',
         params: [],
         meta: {
@@ -86,7 +90,7 @@ describe('lints plugin', () => {
     it('does not warn for SELECT with LIMIT', async () => {
       const plugin = lints();
       const ctx = createMockContext();
-      const plan: RawPlan = {
+      const plan: Plan = {
         sql: 'SELECT id FROM "user" LIMIT 10',
         params: [],
         meta: {
@@ -105,7 +109,7 @@ describe('lints plugin', () => {
     it('throws error for mutation with read-only intent', async () => {
       const plugin = lints();
       const ctx = createMockContext();
-      const plan: RawPlan = {
+      const plan: Plan = {
         sql: 'INSERT INTO "user" (email) VALUES ($1)',
         params: ['test@example.com'],
         meta: {
@@ -125,7 +129,7 @@ describe('lints plugin', () => {
     it('logs warning for unindexed predicate when refs provided', async () => {
       const plugin = lints();
       const ctx = createMockContext();
-      const plan: RawPlan = {
+      const plan: Plan = {
         sql: 'SELECT id FROM "user" WHERE email = $1',
         params: ['test@example.com'],
         meta: {
@@ -153,7 +157,7 @@ describe('lints plugin', () => {
     it('does not warn for indexed predicate', async () => {
       const plugin = lints();
       const ctx = createMockContext();
-      const plan: RawPlan = {
+      const plan: Plan = {
         sql: 'SELECT id FROM "user" WHERE email = $1',
         params: ['test@example.com'],
         meta: {
@@ -190,7 +194,7 @@ describe('lints plugin', () => {
         },
       });
       const ctx = createMockContext();
-      const plan: RawPlan = {
+      const plan: Plan = {
         sql: 'SELECT * FROM "user"',
         params: [],
         meta: {
@@ -217,7 +221,7 @@ describe('lints plugin', () => {
         },
       });
       const ctx = createMockContext();
-      const plan: RawPlan = {
+      const plan: Plan = {
         sql: 'SELECT id FROM "user"',
         params: [],
         meta: {

@@ -1,4 +1,4 @@
-import type { RawPlan, RawPlanMeta, RawPlanRefs } from '@prisma-next/sql/types';
+import type { Plan, PlanMeta, PlanRefs } from '@prisma-next/sql/types';
 
 import type { BudgetFinding, BudgetSeverity, LintFinding } from '../diagnostics';
 
@@ -21,7 +21,7 @@ export interface RawGuardrailResult {
   readonly statement: 'select' | 'mutation' | 'other';
 }
 
-export function evaluateRawGuardrails(plan: RawPlan, config?: RawGuardrailConfig): RawGuardrailResult {
+export function evaluateRawGuardrails(plan: Plan, config?: RawGuardrailConfig): RawGuardrailResult {
   const lints: LintFinding[] = [];
   const budgets: BudgetFinding[] = [];
 
@@ -74,7 +74,7 @@ export function evaluateRawGuardrails(plan: RawPlan, config?: RawGuardrailConfig
   return { lints, budgets, statement: statementType };
 }
 
-function evaluateIndexCoverage(refs: RawPlanRefs, lints: LintFinding[]) {
+function evaluateIndexCoverage(refs: PlanRefs, lints: LintFinding[]) {
   const predicateColumns = refs.columns ?? [];
   if (predicateColumns.length === 0) {
     return;
@@ -123,7 +123,7 @@ function isMutationStatement(statement: 'select' | 'mutation' | 'other'): boolea
   return statement === 'mutation';
 }
 
-function isReadOnlyIntent(meta: RawPlanMeta): boolean {
+function isReadOnlyIntent(meta: PlanMeta): boolean {
   const intent = typeof meta.annotations?.['intent'] === 'string' ? meta.annotations['intent'].toLowerCase() : undefined;
   return intent !== undefined && READ_ONLY_INTENTS.has(intent);
 }

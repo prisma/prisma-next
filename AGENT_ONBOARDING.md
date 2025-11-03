@@ -90,19 +90,40 @@ const contract = validateContract<Contract>(contractJson);
 const t = makeT(contract);  // Table/column accessor: t.user.id
 const tables = schema(contract).tables;  // Table builders
 
+// Builder methods return new instances - chain them properly
 const plan = sql({ contract, adapter })
   .from(tables.user)
   .where(t.user.id.eq(param('userId')))
   .select({ id: t.user.id, email: t.user.email })
+  .limit(10)
   .build();  // Returns immutable Plan
+
+// Extract row type from plan
+type UserRow = ResultType<typeof plan>;
 ```
+
+**Key points:**
+- Builder methods (`from()`, `where()`, `select()`, etc.) return new builder instances - always chain them
+- Access columns via `table.columns[fieldName]` or `table['columns'][fieldName]` to avoid conflicts with table properties like `name`
+- Use `ResultType<typeof plan>` to extract the inferred row type
 
 ### Plan Model
 
 - **Plans are immutable** - Built once, never mutated
 - **One query = one statement** - No hidden multi-queries
-- **Plans include metadata**: `{ ast, params, meta: { refs, projection, target, coreHash, lane } }`
+- **Unified Plan interface** - All plans use the same `Plan<Row>` interface per ADR 011:
+  ```typescript
+  interface Plan<Row = unknown> {
+    readonly sql: string;
+    readonly params: readonly unknown[];
+    readonly ast?: SelectAst;  // Optional - present for DSL plans
+    readonly meta: PlanMeta;   // Unified metadata with lane as string
+  }
+  ```
+- **Core is lane-agnostic** - Never use discriminated unions based on `lane` field. The `lane` field is metadata only, not for type narrowing. Use optional fields (`ast?`) to distinguish capabilities.
+- **Plans include metadata**: `{ ast?, params, meta: { refs?, projection?, target, coreHash, lane } }`
 - **Plans are hashable** - Enable verification and caching
+- **Extract row types**: Use `ResultType<typeof plan>` to get the inferred row type from a plan
 
 ## 🛠️ Development Conventions
 
@@ -189,15 +210,27 @@ The `contract.d.ts` file defines all four generic parameters with precise litera
 - **Type-level tests**: Use `plan-types.test-d.ts` pattern (`.test-d.ts` extension)
 - **Integration tests**: Spin up Postgres, create tables, execute queries
 - **Test fixtures**: `test/fixtures/contract.json` + `contract.d.ts`
+- **Type assertions**: Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 
 Example type test:
 ```typescript
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/contract.d';
+import type { ResultType, Plan } from '@prisma-next/sql/types';
 
 test('Contract types are correct', () => {
   type UserTable = Contract['storage']['tables']['user'];
   expectTypeOf<UserTable>().toHaveProperty('id');
+});
+
+test('Plan type inference works', () => {
+  const plan = sql({ contract, adapter })
+    .from(tables.user)
+    .select({ id: t.user.id, email: t.user.email })
+    .build();
+
+  type Row = ResultType<typeof plan>;
+  expectTypeOf(plan).toExtend<Plan<Row>>();  // Use toExtend, not toMatchTypeOf
 });
 ```
 
@@ -208,6 +241,10 @@ test('Contract types are correct', () => {
 3. **SQL types belong in SQL package** - Don't put `SqlContract` in `@prisma-next/contract`.
 4. **Use bracket notation for index signatures** - `tables['user']` not `tables.user` when TypeScript requires it.
 5. **Arktype optional syntax** - Use `'key?'` not `key: 'Type | undefined'`.
+6. **Builder chaining** - SQL builder methods return new instances. Always chain: `let query = sql(...).from(...); query = query.where(...); query = query.select(...);`
+7. **Column access** - Use `table.columns[fieldName]` or `table['columns'][fieldName]` to avoid conflicts with table properties like `name`.
+8. **Type tests** - Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
+9. **Core is lane-agnostic** - Never create discriminated unions based on `lane` field. The core should not be aware of specific lane implementations.
 
 ## 📖 Documentation Location
 
@@ -241,12 +278,16 @@ const plan = sql({ contract, adapter })
   .build();
 ```
 
-**Execute:**
+**Extract row type from plan:**
 ```typescript
-const runtime = createRuntime({ contract, adapter, driver });
-for await (const row of runtime.execute(plan)) {
-  // Process row
-}
+import type { ResultType } from '@prisma-next/sql/types';
+
+const plan = sql({ contract, adapter })
+  .from(tables.user)
+  .select({ id: t.user.id, email: t.user.email })
+  .build();
+
+type UserRow = ResultType<typeof plan>;  // Inferred type: { id: number; email: string }
 ```
 
 ---

@@ -6,12 +6,12 @@ import type {
   BuildOptions,
   ColumnBuilder,
   ColumnRef,
-  DslPlan,
-  DslPlanMeta,
   Direction,
   InferProjectionRow,
   LoweredStatement,
   ParamDescriptor,
+  Plan,
+  PlanMeta,
   RawFactory,
   SelectAst,
   SqlBuilderOptions,
@@ -106,7 +106,7 @@ class SelectBuilderImpl<
     );
   }
 
-  build(options?: BuildOptions): DslPlan<Row> {
+  build(options?: BuildOptions): Plan<Row> {
     const table = this.ensureFrom();
     const projection = this.ensureProjection();
 
@@ -174,7 +174,7 @@ class SelectBuilderImpl<
       ...(this.state.orderBy ? { orderBy: this.state.orderBy } : {}),
     });
 
-    const plan: DslPlan<Row> = Object.freeze({
+    const plan: Plan<Row> = Object.freeze({
       ast,
       sql: loweredBody.sql,
       params: loweredBody.params ?? paramValues,
@@ -279,7 +279,7 @@ interface MetaBuildArgs {
   readonly paramDescriptors: ParamDescriptor[];
 }
 
-function buildMeta(args: MetaBuildArgs): DslPlanMeta {
+function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();
 
   args.projection.columns.forEach((column) => {
@@ -331,7 +331,7 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
     target: args.contract.target,
     ...(args.contract.targetFamily ? { targetFamily: args.contract.targetFamily } : {}),
     coreHash: args.contract.coreHash,
-    lane: 'dsl' as const,
+    lane: 'dsl',
     refs: {
       tables: [args.table.name],
       columns: Array.from(refsColumns.values()),
@@ -340,7 +340,7 @@ function buildMeta(args: MetaBuildArgs): DslPlanMeta {
     ...(Object.keys(projectionTypes).length > 0 ? { projectionTypes } : {}),
     paramDescriptors: args.paramDescriptors,
     ...(args.contract.profileHash !== undefined ? { profileHash: args.contract.profileHash } : {}),
-  } satisfies DslPlanMeta);
+  } satisfies PlanMeta);
 }
 
 type SelectBuilder<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> =

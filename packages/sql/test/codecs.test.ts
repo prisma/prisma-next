@@ -3,7 +3,7 @@ import { sql } from '../src/sql';
 import { schema } from '../src/schema';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { validateContract } from '../src/contract';
-import type { DslPlan } from '../src/types';
+import type { Plan } from '../src/types';
 import type { SqlContract, SqlStorage } from '../src/contract-types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 
@@ -148,7 +148,7 @@ describe('DSL Lane Codec Type Stamping', () => {
       .build();
 
     // Type check: Plan should be generic
-    const typedPlan: DslPlan = plan;
+    const typedPlan: Plan = plan;
     expect(typedPlan).toBeDefined();
   });
 
@@ -226,7 +226,11 @@ describe('DSL Lane Codec Type Stamping', () => {
       .build();
 
     const projectionTypes = plan.meta.projectionTypes!;
-    const projectionKeys = Object.keys(plan.meta.projection);
+    const projection = plan.meta.projection;
+    if (!projection || Array.isArray(projection)) {
+      throw new Error('Expected projection to be Record<string, string>');
+    }
+    const projectionKeys = Object.keys(projection);
     const projectionTypesKeys = Object.keys(projectionTypes);
 
     // Both should have the same keys

@@ -1,5 +1,5 @@
 import type { Plugin, PluginContext } from './types';
-import type { Plan, RawPlan } from '@prisma-next/sql/types';
+import type { Plan } from '@prisma-next/sql/types';
 import { evaluateRawGuardrails } from '../guardrails/raw';
 
 export interface LintsOptions {
@@ -35,12 +35,12 @@ export function lints(options?: LintsOptions): Plugin {
     name: 'lints',
 
     async beforeExecute(plan: Plan, ctx: PluginContext) {
-      if (plan.meta.lane !== 'raw') {
+      // Only evaluate guardrails for plans without AST (raw plans)
+      if (plan.ast) {
         return;
       }
 
-      const rawPlan = plan as RawPlan;
-      const evaluation = evaluateRawGuardrails(rawPlan);
+      const evaluation = evaluateRawGuardrails(plan);
 
       for (const lint of evaluation.lints) {
         const configuredSeverity = getConfiguredSeverity(lint.code, options);

@@ -49,8 +49,8 @@ function createTableRef(
   if (!table) {
     throw new Error(`Table ${tableName} not found`);
   }
-  // Use Object.assign with name last to ensure table name overwrites column
-  return Object.assign({}, table, { name: tableName }) as TableRef & Record<string, ColumnBuilder>;
+  // Return table directly - columns are accessed via table.columns now, so no conflict
+  return table;
 }
 
 describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () => {
@@ -111,10 +111,22 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
 
         const tables = schema(contract as DataContract).tables;
-        const tableRef = createTableRef(tables, 'User');
+        const userTable = tables['User'];
+        if (!userTable) {
+          throw new Error('User table not found');
+        }
+        const userColumns = userTable.columns;
+        const idColumn = userColumns['id'];
+        const emailColumn = userColumns['email'];
+        if (!idColumn || !emailColumn) {
+          throw new Error('Columns id or email not found');
+        }
         const plan = sql({ contract: contract as DataContract, adapter })
-          .from(tableRef)
-          .select('id', 'email')
+          .from(userTable)
+          .select({
+            id: idColumn,
+            email: emailColumn,
+          })
           .build();
 
         // Unbounded SELECT should be blocked pre-exec
@@ -191,10 +203,22 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
 
         const tables = schema(contract as DataContract).tables;
-        const tableRef = createTableRef(tables, 'User');
+        const userTable = tables['User'];
+        if (!userTable) {
+          throw new Error('User table not found');
+        }
+        const userColumns = userTable.columns;
+        const idColumn = userColumns['id'];
+        const emailColumn = userColumns['email'];
+        if (!idColumn || !emailColumn) {
+          throw new Error('Columns id or email not found');
+        }
         const plan = sql({ contract: contract as DataContract, adapter })
-          .from(tableRef)
-          .select('id', 'email')
+          .from(userTable)
+          .select({
+            id: idColumn,
+            email: emailColumn,
+          })
           .limit(10)
           .build();
 
@@ -269,10 +293,22 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
 
         const tables = schema(contract as DataContract).tables;
-        const tableRef = createTableRef(tables, 'User');
+        const userTable = tables['User'];
+        if (!userTable) {
+          throw new Error('User table not found');
+        }
+        const userColumns = userTable.columns;
+        const idColumn = userColumns['id'];
+        const emailColumn = userColumns['email'];
+        if (!idColumn || !emailColumn) {
+          throw new Error('Columns id or email not found');
+        }
         const plan = sql({ contract: contract as DataContract, adapter })
-          .from(tableRef)
-          .select('id', 'email')
+          .from(userTable)
+          .select({
+            id: idColumn,
+            email: emailColumn,
+          })
           .limit(50)
           .build();
 

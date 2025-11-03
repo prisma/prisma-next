@@ -1,5 +1,5 @@
 import type { Plugin, PluginContext } from './types';
-import type { DslPlan, Plan, RawPlan } from '@prisma-next/sql/types';
+import type { Plan } from '@prisma-next/sql/types';
 
 export interface BudgetsOptions {
   readonly maxRows?: number;
@@ -20,7 +20,7 @@ export interface BudgetsOptions {
  * Returns undefined if explain is not available or fails.
  */
 async function computeEstimatedRows(
-  plan: RawPlan,
+  plan: Plan,
   driver: PluginContext['driver'],
 ): Promise<number | undefined> {
   if (typeof driver.explain !== 'function') {
@@ -119,13 +119,12 @@ export function budgets(options?: BudgetsOptions): Plugin {
    * Returns null for non-DSL lanes or if unable to estimate
    */
   function estimateRows(plan: Plan): number | null {
-    // Only DSL lane has AST we can trust for LIMIT in MVP
-    if (plan.meta.lane !== 'dsl') {
+    // Only plans with AST can provide LIMIT information
+    if (!plan.ast) {
       return null;
     }
 
-    const dslPlan = plan as DslPlan;
-    const table = dslPlan.meta.refs?.tables?.[0];
+    const table = plan.meta.refs?.tables?.[0];
     if (!table) {
       return null;
     }
@@ -133,9 +132,9 @@ export function budgets(options?: BudgetsOptions): Plugin {
     const tableEstimate = tableRows[table] ?? defaultTableRows;
 
     // Check if there's a LIMIT in the AST
-    if (typeof dslPlan.ast.limit === 'number') {
+    if (typeof plan.ast.limit === 'number') {
       // Bounded: use min of LIMIT and table estimate
-      return Math.min(dslPlan.ast.limit, tableEstimate);
+      return Math.min(plan.ast.limit, tableEstimate);
     }
 
     // Unbounded SELECT - treat as full table estimate
@@ -148,17 +147,16 @@ export function budgets(options?: BudgetsOptions): Plugin {
    * For raw lane: check meta.annotations or refs hints (if provided)
    */
   function hasDetectableLimit(plan: Plan): boolean {
-    if (plan.meta.lane === 'dsl') {
-      const dslPlan = plan as DslPlan;
-      return typeof dslPlan.ast.limit === 'number';
+    // Check AST limit if available
+    if (plan.ast && typeof plan.ast.limit === 'number') {
+      return true;
     }
 
-    // For raw lane, check if annotations provide limit hint
+    // Check if annotations provide limit hint
     // MVP: no SQL parsing, so rely on lane-provided hints only
-    const rawPlan = plan as RawPlan;
     return (
-      typeof rawPlan.meta.annotations?.['limit'] === 'number' ||
-      typeof rawPlan.meta.annotations?.['LIMIT'] === 'number'
+      typeof plan.meta.annotations?.['limit'] === 'number' ||
+      typeof plan.meta.annotations?.['LIMIT'] === 'number'
     );
   }
 
@@ -196,15 +194,14 @@ export function budgets(options?: BudgetsOptions): Plugin {
         return;
       }
 
-      // For raw lane: try explain if enabled, otherwise fall back to heuristic
-      if (plan.meta.lane === 'raw') {
-        const rawPlan = plan as RawPlan;
+      // For plans without AST: try explain if enabled, otherwise fall back to heuristic
+      if (!plan.ast) {
         const explainEnabled = options?.explain?.enabled === true;
         const sqlUpper = plan.sql.trimStart().toUpperCase();
         const isSelect = sqlUpper.startsWith('SELECT');
 
         if (explainEnabled && isSelect) {
-          const estimatedRows = await computeEstimatedRows(rawPlan, ctx.driver);
+          const estimatedRows = await computeEstimatedRows(plan, ctx.driver);
           if (estimatedRows !== undefined) {
             if (estimatedRows > maxRows) {
               const error = budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {

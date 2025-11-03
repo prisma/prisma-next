@@ -2,11 +2,11 @@ import { planInvalid } from './errors';
 import type { SqlContract, SqlStorage } from './contract-types';
 import type {
   ParamDescriptor,
+  Plan,
+  PlanMeta,
+  PlanRefs,
   RawFactory,
   RawFunctionOptions,
-  RawPlan,
-  RawPlanMeta,
-  RawPlanRefs,
   RawTemplateFactory,
   RawTemplateOptions,
 } from './types';
@@ -118,7 +118,7 @@ function compileTemplateToPositional(
   };
 }
 
-function buildRawPlan(args: RawPlanBuildArgs): RawPlan {
+function buildRawPlan(args: RawPlanBuildArgs): Plan {
   const params = Array.from(args.params);
   const descriptors = args.paramDescriptors.map((descriptor) =>
     Object.freeze({ ...descriptor, source: 'raw' as const }),
@@ -143,10 +143,10 @@ interface RawMetaBuildArgs {
   readonly options?: RawTemplateOptions;
 }
 
-function buildRawMeta(args: RawMetaBuildArgs): RawPlanMeta {
+function buildRawMeta(args: RawMetaBuildArgs): PlanMeta {
   const { contract, paramDescriptors, options } = args;
 
-  const meta: RawPlanMeta = {
+  const meta: PlanMeta = {
     target: POSTGRES_TARGET,
     ...(contract.targetFamily ? { targetFamily: contract.targetFamily } : {}),
     coreHash: contract.coreHash,
@@ -161,7 +161,7 @@ function buildRawMeta(args: RawMetaBuildArgs): RawPlanMeta {
   return Object.freeze(meta);
 }
 
-function freezeRefs(refs: RawPlanRefs): RawPlanRefs {
+function freezeRefs(refs: PlanRefs): PlanRefs {
   return Object.freeze({
     ...(refs.tables ? { tables: Object.freeze([...refs.tables]) } : {}),
     ...(refs.columns ? { columns: Object.freeze(refs.columns.map((col) => Object.freeze({ ...col }))) } : {}),
