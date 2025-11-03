@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { createPostgresCodecRegistry } from '../../adapter-postgres/src/codecs';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import { decodeRow } from '../src/codecs/decoding';
+import { extractScalarTypes, validateCodecRegistryCompleteness } from '../src/codecs/validation';
 import type { Plan, DslPlan, ParamDescriptor } from '@prisma-next/sql/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
+import type { CodecRegistry } from '@prisma-next/sql-target';
 
 describe('Codec Registry', () => {
   const registry = createPostgresCodecRegistry();
@@ -290,5 +293,170 @@ describe('Row Decoding', () => {
     // But if we had validation, it would throw
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['id']).toBe('not-a-number'); // Current behavior: pass through
+  });
+});
+
+describe('Codec Registry Validation', () => {
+  it('extracts scalar types from contract', () => {
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'int4', nullable: false },
+              email: { type: 'text', nullable: false },
+              createdAt: { type: 'timestamptz', nullable: true },
+            },
+          },
+          post: {
+            columns: {
+              id: { type: 'int4', nullable: false },
+              title: { type: 'text', nullable: false },
+            },
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    };
+
+    const types = extractScalarTypes(contract);
+    expect(types.size).toBe(3);
+    expect(types.has('int4')).toBe(true);
+    expect(types.has('text')).toBe(true);
+    expect(types.has('timestamptz')).toBe(true);
+  });
+
+  it('handles contract with no tables', () => {
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      storage: {
+        tables: {},
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    };
+
+    const types = extractScalarTypes(contract);
+    expect(types.size).toBe(0);
+  });
+
+  it('handles columns without type', () => {
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'int4', nullable: false },
+              email: { nullable: false },
+            },
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    };
+
+    const types = extractScalarTypes(contract);
+    expect(types.size).toBe(1);
+    expect(types.has('int4')).toBe(true);
+  });
+
+  it('validates complete registry passes', () => {
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'int4', nullable: false },
+              email: { type: 'text', nullable: false },
+              createdAt: { type: 'timestamptz', nullable: false },
+            },
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    };
+
+    const registry = createPostgresCodecRegistry();
+    expect(() => validateCodecRegistryCompleteness(registry, contract)).not.toThrow();
+  });
+
+  it('throws RUNTIME.CODEC_MISSING for missing codecs', () => {
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'int4', nullable: false },
+              email: { type: 'text', nullable: false },
+              unknownType: { type: 'unknown-scalar-type', nullable: false },
+            },
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    };
+
+    const registry = createPostgresCodecRegistry();
+    expect(() => validateCodecRegistryCompleteness(registry, contract)).toThrow();
+    try {
+      validateCodecRegistryCompleteness(registry, contract);
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      const runtimeError = error as Error & { code: string; details?: Record<string, unknown> };
+      expect(runtimeError.code).toBe('RUNTIME.CODEC_MISSING');
+      expect(runtimeError.details).toBeDefined();
+      expect(runtimeError.details?.['missingTypes']).toContain('unknown-scalar-type');
+      expect(runtimeError.details?.['contractTarget']).toBe('postgres');
+    }
+  });
+
+  it('validates empty registry against empty contract', () => {
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      storage: {
+        tables: {},
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    };
+
+    const emptyRegistry: CodecRegistry = {
+      byId: new Map(),
+      byScalar: new Map(),
+    };
+
+    expect(() => validateCodecRegistryCompleteness(emptyRegistry, contract)).not.toThrow();
   });
 });

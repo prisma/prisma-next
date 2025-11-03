@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
@@ -14,8 +10,6 @@ import { sql } from '@prisma-next/sql/sql';
 import { validateContract } from '@prisma-next/sql/schema';
 
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import contractJson from './fixtures/basic-contract.json' assert { type: 'json' };
 const contract = validateContract(contractJson);
@@ -64,12 +58,12 @@ describe('runtime execute integration', () => {
         expect(rowCount).toBe(1);
 
         const tables = schema(contract).tables;
-        const userTable = tables.user as typeof tables.user & Record<string, any>;
+        const userTable = tables['user']!;
         const plan = sql({ contract, adapter })
-          .from(tables.user)
+          .from(tables['user']!)
           .select({
-            id: userTable.id,
-            email: userTable.email,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
           })
           .limit(10)
           .build();
@@ -163,13 +157,13 @@ describe('runtime execute integration', () => {
         });
 
         const tables = schema(contract).tables;
-        const userTable = tables.user as typeof tables.user & Record<string, any>;
+        const userTable = tables['user']!;
         // Unbounded SELECT should be blocked
         const unboundedPlan = sql({ contract, adapter })
-          .from(tables.user)
+          .from(tables['user']!)
           .select({
-            id: userTable.id,
-            email: userTable.email,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
           })
           .build();
 
@@ -184,10 +178,10 @@ describe('runtime execute integration', () => {
 
         // Bounded SELECT should pass
         const boundedPlan = sql({ contract, adapter })
-          .from(tables.user)
+          .from(tables['user']!)
           .select({
-            id: userTable.id,
-            email: userTable.email,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
           })
           .limit(10)
           .build();
@@ -243,13 +237,13 @@ describe('runtime execute integration', () => {
         });
 
         const tables = schema(contract).tables;
-        const userTable = tables.user as typeof tables.user & Record<string, any>;
+        const userTable = tables['user']!;
         // Query with LIMIT > maxRows should throw during streaming
         const plan = sql({ contract, adapter })
-          .from(tables.user)
+          .from(tables['user']!)
           .select({
-            id: userTable.id,
-            email: userTable.email,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
           })
           .limit(50)
           .build();

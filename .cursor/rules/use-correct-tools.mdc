@@ -10,3 +10,4 @@ alwaysApply: true
 - Never add file extensions to imports in TypeScript
 - Don't add comments if avoidable, prefer code which expresses its intent
 - Don't add exports for backwards compatibility unless requested to do so
+- Always write tests before creating or modifying implementation

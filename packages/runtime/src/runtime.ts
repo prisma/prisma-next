@@ -38,6 +38,7 @@ import type { CodecRegistry } from '@prisma-next/sql-target';
 import { composeCodecRegistry } from './codecs/registry';
 import { encodeParams } from './codecs/encoding';
 import { decodeRow } from './codecs/decoding';
+import { validateCodecRegistryCompleteness } from './codecs/validation';
 
 export interface RuntimeCodecOptions {
   /**
@@ -47,8 +48,10 @@ export interface RuntimeCodecOptions {
   readonly overrides?: Record<string, string>;
 }
 
-export interface RuntimeOptions {
-  readonly contract: SqlContract<SqlStorage>;
+export interface RuntimeOptions<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+> {
+  readonly contract: TContract;
   readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
@@ -76,72 +79,108 @@ interface RuntimeErrorEnvelope extends Error {
   readonly details?: Record<string, unknown>;
 }
 
-export function createRuntime(options: RuntimeOptions): Runtime {
-  const { driver, contract, adapter } = options;
-  const plugins = options.plugins ?? [];
-  const mode = options.mode ?? 'strict';
-  let verified = options.verify.mode === 'startup' ? false : options.verify.mode === 'always';
-  let startupVerified = false;
-  let diagnostics: RuntimeDiagnostics = emptyDiagnostics;
-  let telemetry: RuntimeTelemetryEvent | null = null;
+export class Runtime<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
+  implements Runtime
+{
+  private readonly contract: TContract;
+  private readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
+  private readonly driver: SqlDriver;
+  private readonly plugins: readonly Plugin[];
+  private readonly mode: 'strict' | 'permissive';
+  private readonly verify: RuntimeVerifyOptions;
+  private readonly guardrails: RuntimeGuardrailOptions | undefined;
+  private readonly codecRegistry: CodecRegistry;
+  private readonly codecOverrides: Record<string, string> | undefined;
+  private readonly pluginContext: import('./plugins/types').PluginContext;
 
-  // Compose codec registry from adapter and runtime overrides
-  const codecRegistry: CodecRegistry = composeCodecRegistry(
-    adapter.profile.codecs(),
-    options.codecs?.overrides,
-  );
+  private verified: boolean;
+  private startupVerified: boolean;
+  private _diagnostics: RuntimeDiagnostics;
+  private _telemetry: RuntimeTelemetryEvent | null;
+  private codecRegistryValidated: boolean;
 
-  // Create plugin context (reused across executions)
-  const pluginContext: import('./plugins/types').PluginContext = {
-    contract,
-    adapter,
-    driver,
-    mode,
-    now: () => Date.now(),
-    log: {
-      info: (_event) => {
-        // No-op in MVP - diagnostics stay out of runtime core
-      },
-      warn: (_event) => {
-        // No-op in MVP - diagnostics stay out of runtime core
-      },
-      error: (_event) => {
-        // No-op in MVP - diagnostics stay out of runtime core
-      },
-    },
-  };
+  constructor(options: RuntimeOptions<TContract>) {
+    const { driver, contract, adapter } = options;
+    this.contract = contract;
+    this.adapter = adapter;
+    this.driver = driver;
+    this.plugins = options.plugins ?? [];
+    this.mode = options.mode ?? 'strict';
+    this.verify = options.verify;
+    this.guardrails = options.guardrails;
+    this.codecOverrides = options.codecs?.overrides;
 
-  async function verifyPlanIfNeeded(_plan: Plan) {
-    if (options.verify.mode === 'always') {
-      verified = false;
+    this.verified = options.verify.mode === 'startup' ? false : options.verify.mode === 'always';
+    this.startupVerified = false;
+    this._diagnostics = emptyDiagnostics;
+    this._telemetry = null;
+    this.codecRegistryValidated = false;
+
+    this.codecRegistry = composeCodecRegistry(this.adapter.profile.codecs(), this.codecOverrides);
+
+    this.pluginContext = {
+      contract: this.contract,
+      adapter: this.adapter,
+      driver: this.driver,
+      mode: this.mode,
+      now: () => Date.now(),
+      log: {
+        info: (_event) => {
+          // No-op in MVP - diagnostics stay out of runtime core
+        },
+        warn: (_event) => {
+          // No-op in MVP - diagnostics stay out of runtime core
+        },
+        error: (_event) => {
+          // No-op in MVP - diagnostics stay out of runtime core
+        },
+      },
+    };
+
+    if (options.verify.mode === 'startup') {
+      validateCodecRegistryCompleteness(this.codecRegistry, this.contract);
+      this.codecRegistryValidated = true;
+    }
+  }
+
+  private ensureCodecRegistryValidated(): void {
+    if (!this.codecRegistryValidated) {
+      validateCodecRegistryCompleteness(this.codecRegistry, this.contract);
+      this.codecRegistryValidated = true;
+    }
+  }
+
+  private async verifyPlanIfNeeded(_plan: Plan): Promise<void> {
+    if (this.verify.mode === 'always') {
+      this.verified = false;
     }
 
-    if (verified) {
+    if (this.verified) {
       return;
     }
 
     const readStatement = readContractMarker();
-    const result = await driver.query(readStatement.sql, readStatement.params);
+    const result = await this.driver.query(readStatement.sql, readStatement.params);
 
     if (result.rows.length === 0) {
-      if (options.verify.requireMarker) {
+      if (this.verify.requireMarker) {
         throw runtimeError('CONTRACT.MARKER_MISSING', 'Contract marker not found in database');
       }
 
-      verified = true;
+      this.verified = true;
       return;
     }
 
     const marker = mapContractMarkerRow(result.rows[0] as unknown as ContractMarkerRow);
 
-    if (marker.coreHash !== contract.coreHash) {
+    if (marker.coreHash !== this.contract.coreHash) {
       throw runtimeError('CONTRACT.MARKER_MISMATCH', 'Database core hash does not match contract', {
-        expected: contract.coreHash,
+        expected: this.contract.coreHash,
         actual: marker.coreHash,
       });
     }
 
-    const expectedProfile = contract.profileHash ?? null;
+    const expectedProfile = this.contract.profileHash ?? null;
     if (expectedProfile !== null && marker.profileHash !== expectedProfile) {
       throw runtimeError(
         'CONTRACT.MARKER_MISMATCH',
@@ -153,57 +192,57 @@ export function createRuntime(options: RuntimeOptions): Runtime {
       );
     }
 
-    verified = true;
-    startupVerified = true;
+    this.verified = true;
+    this.startupVerified = true;
   }
 
-  function validatePlan(plan: Plan) {
-    if (plan.meta.target !== contract.target) {
+  private validatePlan(plan: Plan): void {
+    if (plan.meta.target !== this.contract.target) {
       throw runtimeError('PLAN.TARGET_MISMATCH', 'Plan target does not match runtime target', {
         planTarget: plan.meta.target,
-        runtimeTarget: contract.target,
+        runtimeTarget: this.contract.target,
       });
     }
 
-    if (plan.meta.coreHash !== contract.coreHash) {
+    if (plan.meta.coreHash !== this.contract.coreHash) {
       throw runtimeError('PLAN.HASH_MISMATCH', 'Plan core hash does not match runtime contract', {
         planCoreHash: plan.meta.coreHash,
-        runtimeCoreHash: contract.coreHash,
+        runtimeCoreHash: this.contract.coreHash,
       });
     }
   }
 
-  function recordTelemetry(plan: Plan, outcome: TelemetryOutcome, durationMs?: number) {
-    telemetry = Object.freeze({
+  private recordTelemetry(plan: Plan, outcome: TelemetryOutcome, durationMs?: number): void {
+    this._telemetry = Object.freeze({
       lane: plan.meta.lane,
       target: plan.meta.target,
       fingerprint: computeSqlFingerprint(plan.sql),
-      diagnostics,
+      diagnostics: this._diagnostics,
       outcome,
       ...(durationMs !== undefined ? { durationMs } : {}),
     });
   }
 
-  async function applyGuardrails(plan: Plan): Promise<void> {
-    diagnostics = emptyDiagnostics;
+  private async applyGuardrails(plan: Plan): Promise<void> {
+    this._diagnostics = emptyDiagnostics;
 
     if (plan.meta.lane !== 'raw') {
       return;
     }
 
     const rawPlan = plan as RawPlan;
-    const budgetsConfig = options.guardrails?.budgets;
+    const budgetsConfig = this.guardrails?.budgets;
     const unboundedSeverity: BudgetSeverity = budgetsConfig?.unboundedSelectSeverity ?? 'error';
 
     let evaluation = evaluateRawGuardrails(rawPlan, {
       budgets: { unboundedSelectSeverity: unboundedSeverity },
     });
 
-    diagnostics = freezeDiagnostics({ lints: evaluation.lints, budgets: evaluation.budgets });
+    this._diagnostics = freezeDiagnostics({ lints: evaluation.lints, budgets: evaluation.budgets });
 
     const fatalLint = evaluation.lints.find((lint) => lint.severity === 'error');
     if (fatalLint) {
-      recordTelemetry(plan, 'lint-error');
+      this.recordTelemetry(plan, 'lint-error');
       throw runtimeError(fatalLint.code, fatalLint.message, fatalLint.details);
     }
 
@@ -211,7 +250,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
 
     const explainEnabled = budgetsConfig?.explain?.enabled === true;
     if (explainEnabled && evaluation.statement === 'select') {
-      const estimatedRows = await computeEstimatedRows(rawPlan);
+      const estimatedRows = await this.computeEstimatedRows(rawPlan);
       if (estimatedRows !== undefined) {
         evaluation = evaluateRawGuardrails(rawPlan, {
           budgets: {
@@ -220,131 +259,143 @@ export function createRuntime(options: RuntimeOptions): Runtime {
           },
         });
 
-        diagnostics = freezeDiagnostics({ lints: evaluation.lints, budgets: evaluation.budgets });
+        this._diagnostics = freezeDiagnostics({
+          lints: evaluation.lints,
+          budgets: evaluation.budgets,
+        });
         fatalBudget = evaluation.budgets.find((budget) => budget.severity === 'error');
       }
     }
 
     if (fatalBudget) {
-      recordTelemetry(plan, 'budget-error');
+      this.recordTelemetry(plan, 'budget-error');
       throw runtimeError(fatalBudget.code, fatalBudget.message, fatalBudget.details);
     }
   }
 
-  async function computeEstimatedRows(plan: RawPlan): Promise<number | undefined> {
-    if (typeof driver.explain !== 'function') {
+  private async computeEstimatedRows(plan: RawPlan): Promise<number | undefined> {
+    if (typeof this.driver.explain !== 'function') {
       return undefined;
     }
 
     try {
-      const result = await driver.explain({ sql: plan.sql, params: plan.params });
+      const result = await this.driver.explain({ sql: plan.sql, params: plan.params });
       return extractEstimatedRows(result.rows);
     } catch {
       return undefined;
     }
   }
 
-  const runtime: Runtime = {
-    execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row> {
-      validatePlan(plan);
-      telemetry = null;
+  execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row> {
+    this.ensureCodecRegistryValidated();
+    this.validatePlan(plan);
+    this._telemetry = null;
 
-      const iterator = async function* (): AsyncGenerator<Row, void, unknown> {
-        const startedAt = Date.now();
-        let rowCount = 0;
-        let completed = false;
+    const iterator = async function* (
+      self: Runtime<TContract>,
+    ): AsyncGenerator<Row, void, unknown> {
+      const startedAt = Date.now();
+      let rowCount = 0;
+      let completed = false;
 
-        if (!startupVerified && options.verify.mode === 'startup') {
-          await verifyPlanIfNeeded(plan);
+      if (!self.startupVerified && self.verify.mode === 'startup') {
+        await self.verifyPlanIfNeeded(plan);
+      }
+
+      if (self.verify.mode === 'onFirstUse') {
+        await self.verifyPlanIfNeeded(plan);
+      }
+
+      try {
+        if (self.verify.mode === 'always') {
+          await self.verifyPlanIfNeeded(plan);
         }
 
-        if (options.verify.mode === 'onFirstUse') {
-          await verifyPlanIfNeeded(plan);
+        await self.applyGuardrails(plan);
+
+        // Invoke plugin beforeExecute hooks
+        for (const plugin of self.plugins) {
+          if (plugin.beforeExecute) {
+            await plugin.beforeExecute(plan, self.pluginContext);
+          }
         }
 
-        try {
-          if (options.verify.mode === 'always') {
-            await verifyPlanIfNeeded(plan);
-          }
+        // Encode parameters before execution
+        const encodedParams = encodeParams(plan, self.codecRegistry, self.codecOverrides);
 
-          await applyGuardrails(plan);
+        // Execute query with streaming row-by-row plugin hooks
+        for await (const row of self.driver.execute<Record<string, unknown>>({
+          sql: plan.sql,
+          params: encodedParams,
+        })) {
+          // Decode row using codec registry
+          const decodedRow = decodeRow(row, plan, self.codecRegistry, self.codecOverrides);
 
-          // Invoke plugin beforeExecute hooks
-          for (const plugin of plugins) {
-            if (plugin.beforeExecute) {
-              await plugin.beforeExecute(plan, pluginContext);
+          // Invoke plugin onRow hooks with decoded row
+          for (const plugin of self.plugins) {
+            if (plugin.onRow) {
+              await plugin.onRow(decodedRow, plan, self.pluginContext);
             }
           }
-
-          // Encode parameters before execution
-          const encodedParams = encodeParams(plan, codecRegistry, options.codecs?.overrides);
-
-          // Execute query with streaming row-by-row plugin hooks
-          for await (const row of driver.execute<Record<string, unknown>>({
-            sql: plan.sql,
-            params: encodedParams,
-          })) {
-            // Decode row using codec registry
-            const decodedRow = decodeRow(row, plan, codecRegistry, options.codecs?.overrides);
-
-            // Invoke plugin onRow hooks with decoded row
-            for (const plugin of plugins) {
-              if (plugin.onRow) {
-                await plugin.onRow(decodedRow, plan, pluginContext);
-              }
-            }
-            rowCount++;
-            yield decodedRow as Row;
-          }
-
-          completed = true;
-          recordTelemetry(plan, 'success', Date.now() - startedAt);
-        } catch (error) {
-          if (telemetry === null) {
-            recordTelemetry(plan, 'runtime-error', Date.now() - startedAt);
-          }
-
-          // Invoke plugin afterExecute hooks even on error
-          const latencyMs = Date.now() - startedAt;
-          for (const plugin of plugins) {
-            if (plugin.afterExecute) {
-              try {
-                await plugin.afterExecute(plan, { rowCount, latencyMs, completed }, pluginContext);
-              } catch {
-                // Ignore errors from afterExecute hooks
-              }
-            }
-          }
-
-          throw error;
+          rowCount++;
+          yield decodedRow as Row;
         }
 
-        // Invoke plugin afterExecute hooks on success
+        completed = true;
+        self.recordTelemetry(plan, 'success', Date.now() - startedAt);
+      } catch (error) {
+        if (self._telemetry === null) {
+          self.recordTelemetry(plan, 'runtime-error', Date.now() - startedAt);
+        }
+
+        // Invoke plugin afterExecute hooks even on error
         const latencyMs = Date.now() - startedAt;
-        for (const plugin of plugins) {
+        for (const plugin of self.plugins) {
           if (plugin.afterExecute) {
-            await plugin.afterExecute(plan, { rowCount, latencyMs, completed }, pluginContext);
+            try {
+              await plugin.afterExecute(
+                plan,
+                { rowCount, latencyMs, completed },
+                self.pluginContext,
+              );
+            } catch {
+              // Ignore errors from afterExecute hooks
+            }
           }
         }
-      };
 
-      return iterator();
-    },
+        throw error;
+      }
 
-    diagnostics() {
-      return diagnostics;
-    },
+      // Invoke plugin afterExecute hooks on success
+      const latencyMs = Date.now() - startedAt;
+      for (const plugin of self.plugins) {
+        if (plugin.afterExecute) {
+          await plugin.afterExecute(plan, { rowCount, latencyMs, completed }, self.pluginContext);
+        }
+      }
+    };
 
-    telemetry() {
-      return telemetry;
-    },
+    return iterator(this);
+  }
 
-    close() {
-      return driver.close();
-    },
-  };
+  diagnostics(): RuntimeDiagnostics {
+    return this._diagnostics;
+  }
 
-  return runtime;
+  telemetry(): RuntimeTelemetryEvent | null {
+    return this._telemetry;
+  }
+
+  close(): Promise<void> {
+    return this.driver.close();
+  }
+}
+
+export function createRuntime<TContract extends SqlContract<SqlStorage>>(
+  options: RuntimeOptions<TContract>,
+): Runtime<TContract> {
+  return new Runtime(options);
 }
 
 function runtimeError(

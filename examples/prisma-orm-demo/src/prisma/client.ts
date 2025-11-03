@@ -2,6 +2,7 @@ import { PrismaClient as LegacyPrismaClient } from '@prisma/client';
 import { PrismaClient as CompatPrismaClient } from '@prisma-next/compat-prisma';
 import { getPrismaNextRuntime } from '../prisma-next/runtime';
 import contract from '../prisma-next/contract.json' assert { type: 'json' };
+import { validateContract } from '@prisma-next/sql/schema';
 import type { SqlContract } from '@prisma-next/contract/types';
 
 let legacyPrisma: LegacyPrismaClient | undefined;
@@ -14,14 +15,14 @@ let compatPrisma: CompatPrismaClient | undefined;
  */
 export async function getPrisma() {
   // Check USE_COMPAT env var
-  const useCompat = process.env.USE_COMPAT === 'true';
+  const useCompat = process.env['USE_COMPAT'] === 'true';
 
   if (useCompat) {
     // Use Prisma Next compatibility layer
     if (!compatPrisma) {
       const runtime = getPrismaNextRuntime();
       compatPrisma = new CompatPrismaClient({
-        contract: contract as SqlContract,
+        contract: validateContract<SqlContract>(contract),
         runtime,
       });
     }

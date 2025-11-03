@@ -38,6 +38,7 @@ async function createDevDatabase(options?: StartServerOptions): Promise<DevDatab
 }
 
 const testContract: SqlContract<SqlStorage> = {
+  schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
   coreHash: 'sha256:test-core',
@@ -54,6 +55,9 @@ const testContract: SqlContract<SqlStorage> = {
       },
     },
   },
+  models: {},
+  relations: {},
+  mappings: {},
 };
 
 // Shared query module that accepts a client with used methods
@@ -173,10 +177,10 @@ describe(
         });
 
         expect(result).toBeDefined();
-        expect(result.id).toBe('test-1');
-        expect(result.email).toBe('test@example.com');
-        expect(result.name).toBe('Test User');
-        expect(result.createdAt).toBeDefined();
+        expect(result['id']).toBe('test-1');
+        expect(result['email']).toBe('test@example.com');
+        expect(result['name']).toBe('Test User');
+        expect(result['createdAt']).toBeDefined();
       });
 
       it('finds a unique user by id', async () => {
@@ -190,9 +194,9 @@ describe(
         const result = await readUserById(prismaPN, 'test-1');
 
         expect(result).toBeDefined();
-        expect(result?.id).toBe('test-1');
-        expect(result?.email).toBe('test@example.com');
-        expect(result?.name).toBe('Test User');
+        expect(result?.['id']).toBe('test-1');
+        expect(result?.['email']).toBe('test@example.com');
+        expect(result?.['name']).toBe('Test User');
       });
 
       it('returns null for findUnique when not found', async () => {
@@ -217,8 +221,8 @@ describe(
         const results = await prismaPN.user.findMany();
 
         expect(results.length).toBe(2);
-        expect(results.some((u: Record<string, unknown>) => u.id === 'test-1')).toBe(true);
-        expect(results.some((u: Record<string, unknown>) => u.id === 'test-2')).toBe(true);
+        expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-1')).toBe(true);
+        expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-2')).toBe(true);
       });
 
       it('finds first user with where clause', async () => {
@@ -233,7 +237,7 @@ describe(
         });
 
         expect(result).toBeDefined();
-        expect(result?.email).toBe('test@example.com');
+        expect(result?.['email']).toBe('test@example.com');
       });
     });
 

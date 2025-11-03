@@ -6,12 +6,13 @@ import {
   writeContractMarker,
 } from '@prisma-next/runtime';
 import contract from './contract.json' assert { type: 'json' };
+import { validateContract } from '@prisma-next/sql/schema';
 import type { SqlContract } from '@prisma-next/contract/types';
 
-const contractData = contract as SqlContract;
+const contractData = validateContract<SqlContract>(contract);
 
 export async function stampMarker() {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = process.env['DATABASE_URL'];
   if (!connectionString) {
     throw new Error('DATABASE_URL environment variable is required');
   }

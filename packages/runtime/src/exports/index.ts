@@ -1,12 +1,12 @@
 export {
   createRuntime,
+  Runtime,
   ensureSchemaStatement,
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
 } from '../runtime';
 export type {
-  Runtime,
   RuntimeOptions,
   RuntimeVerifyOptions,
   RuntimeGuardrailOptions,
@@ -16,6 +16,7 @@ export type {
   RuntimeTelemetryEvent,
   TelemetryOutcome,
 } from '../runtime';
+export { extractScalarTypes, validateCodecRegistryCompleteness } from '../codecs/validation';
 export { budgets } from '../plugins/budgets';
 export type { BudgetsOptions } from '../plugins/budgets';
 export type { Plugin, PluginContext, Log, AfterExecuteResult } from '../plugins/types';
