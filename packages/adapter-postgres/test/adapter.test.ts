@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '../src/adapter';
-import { validateContract } from 'packages/sql/dist/exports/schema';
+import { validateContract } from '@prisma-next/sql/schema';
 import { PostgresContract } from '../src/types';
 
 const contract = Object.freeze(
@@ -21,6 +21,9 @@ const contract = Object.freeze(
         },
       },
     },
+    models: {},
+    relations: {},
+    mappings: {},
   }),
 );
 

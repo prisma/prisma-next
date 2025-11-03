@@ -1,13 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { Client } from 'pg';
 import { PostgresDriver } from '@prisma-next/driver-postgres';
-import {
-  createRuntime,
-  ensureSchemaStatement,
-  ensureTableStatement,
-  writeContractMarker,
-  budgets,
-} from '../src/runtime';
+import { createRuntime } from '../src/runtime';
+import { budgets } from '../src/plugins/budgets';
+import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createDevDatabase } from './utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';

@@ -408,113 +408,6 @@ describe('Runtime class', () => {
     });
   });
 
-  describe('applyGuardrails', () => {
-    it('skips guardrails for DSL plans', async () => {
-      const mockDriver = createMockDriver();
-      const adapter = createPostgresAdapter();
-
-      mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
-
-      const runtime = createRuntime({
-        contract: mockContract,
-        adapter,
-        driver: mockDriver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        guardrails: {
-          budgets: {
-            unboundedSelectSeverity: 'error',
-          },
-        },
-      });
-
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
-
-      const diagnostics = runtime.diagnostics();
-      expect(diagnostics.lints).toEqual([]);
-      expect(diagnostics.budgets).toEqual([]);
-    });
-
-    it('handles explain not available on driver', async () => {
-      const mockDriver = createMockDriver();
-      const adapter = createPostgresAdapter();
-
-      delete (mockDriver as { explain?: unknown }).explain;
-
-      mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
-
-      const rawPlan: Plan = {
-        sql: 'SELECT id FROM "user"',
-        params: [],
-        meta: {
-          target: 'postgres',
-          coreHash: 'sha256:test-core',
-          lane: 'raw',
-          paramDescriptors: [],
-        },
-      };
-
-      const runtime = createRuntime({
-        contract: mockContract,
-        adapter,
-        driver: mockDriver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        guardrails: {
-          budgets: {
-            unboundedSelectSeverity: 'warn',
-            explain: { enabled: true },
-          },
-        },
-      });
-
-      for await (const _row of runtime.execute(rawPlan)) {
-        break;
-      }
-
-      expect(mockDriver.explain).toBeUndefined();
-    });
-
-    it('handles explain error gracefully', async () => {
-      const mockDriver = createMockDriver();
-      const adapter = createPostgresAdapter();
-
-      mockDriver.explain = vi.fn().mockRejectedValue(new Error('Explain failed'));
-      mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
-
-      const rawPlan: Plan = {
-        sql: 'SELECT id FROM "user"',
-        params: [],
-        meta: {
-          target: 'postgres',
-          coreHash: 'sha256:test-core',
-          lane: 'raw',
-          paramDescriptors: [],
-        },
-      };
-
-      const runtime = createRuntime({
-        contract: mockContract,
-        adapter,
-        driver: mockDriver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        guardrails: {
-          budgets: {
-            unboundedSelectSeverity: 'warn',
-            explain: { enabled: true },
-          },
-        },
-      });
-
-      // Should not throw even if explain fails
-      const promise = (async () => {
-        for await (const _row of runtime.execute(rawPlan)) {
-          break;
-        }
-      })();
-      await expect(promise).resolves.not.toThrow();
-    });
-  });
 
   describe('plugin hooks', () => {
     it('invokes beforeExecute hook', async () => {
@@ -759,7 +652,6 @@ describe('Runtime class', () => {
         lane: 'dsl',
         target: 'postgres',
         fingerprint: expect.any(String),
-        diagnostics: expect.any(Object),
         durationMs: expect.any(Number),
       });
     });
@@ -822,22 +714,6 @@ describe('Runtime class', () => {
       const secondTelemetry = runtime.telemetry();
       expect(secondTelemetry).not.toBeNull();
       expect(secondTelemetry).not.toBe(firstTelemetry);
-    });
-
-    it('returns empty diagnostics initially', () => {
-      const mockDriver = createMockDriver();
-      const adapter = createPostgresAdapter();
-
-      const runtime = createRuntime({
-        contract: mockContract,
-        adapter,
-        driver: mockDriver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-      });
-
-      const diagnostics = runtime.diagnostics();
-      expect(diagnostics.lints).toEqual([]);
-      expect(diagnostics.budgets).toEqual([]);
     });
 
     it('returns null telemetry initially', () => {

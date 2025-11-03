@@ -15,6 +15,75 @@ export interface BudgetsOptions {
   };
 }
 
+/**
+ * Computes estimated rows for a raw plan using driver.explain if available.
+ * Returns undefined if explain is not available or fails.
+ */
+async function computeEstimatedRows(
+  plan: RawPlan,
+  driver: PluginContext['driver'],
+): Promise<number | undefined> {
+  if (typeof driver.explain !== 'function') {
+    return undefined;
+  }
+
+  try {
+    const result = await driver.explain({ sql: plan.sql, params: plan.params });
+    return extractEstimatedRows(result.rows);
+  } catch {
+    return undefined;
+  }
+}
+
+function extractEstimatedRows(rows: ReadonlyArray<Record<string, unknown>>): number | undefined {
+  for (const row of rows) {
+    const estimate = findPlanRows(row);
+    if (estimate !== undefined) {
+      return estimate;
+    }
+  }
+
+  return undefined;
+}
+
+function findPlanRows(node: unknown): number | undefined {
+  if (!node || typeof node !== 'object') {
+    return undefined;
+  }
+
+  const planRows = (node as Record<string, unknown>)['Plan Rows'];
+  if (typeof planRows === 'number') {
+    return planRows;
+  }
+
+  if ('Plan' in (node as Record<string, unknown>)) {
+    const nested = findPlanRows((node as Record<string, unknown>)['Plan']);
+    if (nested !== undefined) {
+      return nested;
+    }
+  }
+
+  if (Array.isArray((node as Record<string, unknown>)['Plans'])) {
+    for (const child of (node as Record<string, unknown>)['Plans'] as unknown[]) {
+      const nested = findPlanRows(child);
+      if (nested !== undefined) {
+        return nested;
+      }
+    }
+  }
+
+  for (const value of Object.values(node as Record<string, unknown>)) {
+    if (typeof value === 'object' && value !== null) {
+      const nested = findPlanRows(value);
+      if (nested !== undefined) {
+        return nested;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 function budgetError(code: string, message: string, details?: Record<string, unknown>) {
   const error = new Error(message) as Error & {
     code: string;
@@ -127,11 +196,40 @@ export function budgets(options?: BudgetsOptions): Plugin {
         return;
       }
 
-      // For non-DSL lanes or unestimable plans, check if SELECT without detectable LIMIT
-      // Per spec: "Any SELECT without a detectable LIMIT is treated as over the row budget"
-      const sqlUpper = plan.sql.trimStart().toUpperCase();
-      if (sqlUpper.startsWith('SELECT')) {
-        if (!hasDetectableLimit(plan)) {
+      // For raw lane: try explain if enabled, otherwise fall back to heuristic
+      if (plan.meta.lane === 'raw') {
+        const rawPlan = plan as RawPlan;
+        const explainEnabled = options?.explain?.enabled === true;
+        const sqlUpper = plan.sql.trimStart().toUpperCase();
+        const isSelect = sqlUpper.startsWith('SELECT');
+
+        if (explainEnabled && isSelect) {
+          const estimatedRows = await computeEstimatedRows(rawPlan, ctx.driver);
+          if (estimatedRows !== undefined) {
+            if (estimatedRows > maxRows) {
+              const error = budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+                source: 'explain',
+                estimatedRows,
+                maxRows,
+              });
+
+              const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
+              if (shouldBlock) {
+                throw error;
+              }
+              ctx.log.warn({
+                code: error.code,
+                message: error.message,
+                details: error.details,
+              });
+            }
+            return;
+          }
+          // Fall through to heuristic check if explain failed or unavailable
+        }
+
+        // For raw lane without explain or when explain unavailable: check if SELECT without detectable LIMIT
+        if (isSelect && !hasDetectableLimit(plan)) {
           const error = budgetError(
             'BUDGET.ROWS_EXCEEDED',
             'Unbounded SELECT query exceeds budget',
@@ -151,6 +249,7 @@ export function budgets(options?: BudgetsOptions): Plugin {
             details: error.details,
           });
         }
+        return;
       }
     },
 

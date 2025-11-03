@@ -12,6 +12,8 @@ import { validateContract } from '@prisma-next/sql/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 
 import { createRuntime } from '../src/runtime';
+import { budgets } from '../src/plugins/budgets';
+import { lints } from '../src/plugins/lints';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { PostgresDriver } from '../../driver-postgres/src/postgres-driver';
 import { createDevDatabase, drainAsyncIterable, executeStatement, collectAsync } from './utils';
@@ -121,6 +123,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
+      plugins: [lints()],
     });
 
     const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
@@ -131,16 +134,9 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       await drainAsyncIterable(runtime.execute(rawPlan));
     }).rejects.toMatchObject({ code: 'LINT.SELECT_STAR' });
 
-    const diagnostics = runtime.diagnostics();
-    expect(diagnostics.lints).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'LINT.SELECT_STAR', severity: 'error' }),
-      ]),
-    );
-
     const telemetry = runtime.telemetry();
     expect(telemetry).toMatchObject({
-      outcome: 'lint-error',
+      outcome: 'runtime-error',
       lane: 'raw',
       target: 'postgres',
     });
@@ -153,6 +149,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
+      plugins: [lints(), budgets()],
     });
 
     const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
@@ -163,20 +160,8 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       await drainAsyncIterable(runtime.execute(rawPlan));
     }).rejects.toMatchObject({ code: 'BUDGET.ROWS_EXCEEDED' });
 
-    const diagnostics = runtime.diagnostics();
-    expect(diagnostics.lints).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'LINT.NO_LIMIT', severity: 'warn' }),
-      ]),
-    );
-    expect(diagnostics.budgets).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED', severity: 'error' }),
-      ]),
-    );
-
     const telemetry = runtime.telemetry();
-    expect(telemetry).toMatchObject({ outcome: 'budget-error', lane: 'raw' });
+    expect(telemetry).toMatchObject({ outcome: 'runtime-error', lane: 'raw' });
   });
 
   it('records unindexed predicate warning when refs lack indexes', async () => {
@@ -185,6 +170,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
+      plugins: [lints()],
     });
 
     const rawPlan = sql({ contract: fixtureContract, adapter }).raw(
@@ -205,13 +191,6 @@ describe('runtime execute integration', { timeout: 100 }, () => {
 
     expect(rows.length).toBeGreaterThan(0);
 
-    const diagnostics = runtime.diagnostics();
-    expect(diagnostics.lints).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'LINT.UNINDEXED_PREDICATE', severity: 'warn' }),
-      ]),
-    );
-
     const telemetry = runtime.telemetry();
     expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
   });
@@ -222,6 +201,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
+      plugins: [lints()],
     });
 
     const rawPlan = sql({ contract: fixtureContract, adapter }).raw(
@@ -236,15 +216,8 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       await drainAsyncIterable(runtime.execute(rawPlan));
     }).rejects.toMatchObject({ code: 'LINT.READ_ONLY_MUTATION' });
 
-    const diagnostics = runtime.diagnostics();
-    expect(diagnostics.lints).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'LINT.READ_ONLY_MUTATION', severity: 'error' }),
-      ]),
-    );
-
     const telemetry = runtime.telemetry();
-    expect(telemetry).toMatchObject({ outcome: 'lint-error', lane: 'raw' });
+    expect(telemetry).toMatchObject({ outcome: 'runtime-error', lane: 'raw' });
   });
 
   it('respects unbounded select severity override', async () => {
@@ -253,7 +226,12 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
-      guardrails: { budgets: { unboundedSelectSeverity: 'warn' } },
+      plugins: [
+        budgets({
+          severities: { rowCount: 'warn' },
+        }),
+      ],
+      mode: 'permissive',
     });
 
     const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
@@ -261,13 +239,6 @@ describe('runtime execute integration', { timeout: 100 }, () => {
     `;
 
     await drainAsyncIterable(runtime.execute(rawPlan));
-
-    const diagnostics = runtime.diagnostics();
-    expect(diagnostics.budgets).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED', severity: 'warn' }),
-      ]),
-    );
 
     const telemetry = runtime.telemetry();
     expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
@@ -279,7 +250,13 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
-      guardrails: { budgets: { unboundedSelectSeverity: 'warn', explain: { enabled: true } } },
+      plugins: [
+        budgets({
+          explain: { enabled: true },
+          severities: { rowCount: 'warn' },
+        }),
+      ],
+      mode: 'permissive',
     });
 
     const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
@@ -287,13 +264,6 @@ describe('runtime execute integration', { timeout: 100 }, () => {
     `;
 
     await drainAsyncIterable(runtime.execute(rawPlan));
-
-    const diagnostics = runtime.diagnostics();
-    const budgetFinding = diagnostics.budgets.find(
-      (finding) => finding.code === 'BUDGET.ROWS_EXCEEDED',
-    );
-    expect(budgetFinding).toBeDefined();
-    expect(budgetFinding?.details?.['estimatedRows']).toBeTypeOf('number');
 
     const telemetry = runtime.telemetry();
     expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
@@ -306,7 +276,6 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: true },
-      guardrails: { budgets: { unboundedSelectSeverity: 'warn' } },
     });
 
     const planOne = sql({ contract: fixtureContract, adapter }).raw(

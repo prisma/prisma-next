@@ -5,6 +5,9 @@
   "targetFamily": "sql",
   "coreHash": "sha256:test-core",
   "profileHash": "sha256:test-profile",
+  "models": {},
+  "relations": {},
+  "mappings": {},
   "storage": {
     "tables": {
       "user": {
