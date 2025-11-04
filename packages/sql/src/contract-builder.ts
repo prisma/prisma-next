@@ -9,9 +9,9 @@ import type {
 } from './contract-types';
 import { computeMappings } from './contract';
 
-export interface ColumnOptions<TTypeId extends string = string> {
+export interface ColumnOptions<TType extends string = string> {
   nullable?: boolean;
-  typeId?: TTypeId;
+  type?: TType;
 }
 
 type CanonicalizeType<
@@ -26,29 +26,26 @@ type CanonicalizeType<
 type BuildStorageColumn<
   Scalar extends string,
   Nullable extends boolean,
-  TypeId extends string | undefined,
+  Type extends string | undefined,
   Target extends string,
 > = {
-  readonly type: TypeId extends string ? TypeId : CanonicalizeType<Scalar, Target>;
+  readonly type: Type extends string ? Type : CanonicalizeType<Scalar, Target>;
   readonly nullable: Nullable;
 };
 
 type BuildStorageTable<
   _TableName extends string,
-  Columns extends Record<
-    string,
-    { scalar: string; nullable: boolean; typeId?: string | undefined }
-  >,
+  Columns extends Record<string, { scalar: string; nullable: boolean; type?: unknown }>,
   PK extends readonly string[] | undefined,
   Target extends string,
 > = {
   readonly columns: {
-    readonly [K in keyof Columns]: Columns[K] extends { typeId: infer TId }
-      ? TId extends string
+    readonly [K in keyof Columns]: Columns[K] extends { type: infer TType }
+      ? TType extends string
         ? BuildStorageColumn<
             Columns[K]['scalar'] & string,
             Columns[K]['nullable'] & boolean,
-            TId & string,
+            TType,
             Target
           >
         : BuildStorageColumn<
@@ -73,8 +70,8 @@ type ExtractPrimaryKey<T extends TableBuilderState<any, any, any>> =
   T extends TableBuilderState<any, any, infer PK> ? PK : never;
 
 type NormalizeColumns<C extends Record<string, ColumnBuilderState<any, any, any, any>>> = {
-  [K in keyof C]: C[K] extends ColumnBuilderState<any, infer S, infer Null, infer TId>
-    ? { scalar: S & string; nullable: Null & boolean; typeId: TId }
+  [K in keyof C]: C[K] extends ColumnBuilderState<any, infer S, infer Null, infer TType>
+    ? { scalar: S & string; nullable: Null & boolean; type: TType }
     : never;
 };
 
@@ -112,12 +109,12 @@ interface ColumnBuilderState<
   Name extends string = string,
   Scalar extends string = string,
   Nullable extends boolean = boolean,
-  TypeId extends string | undefined = string | undefined,
+  Type extends string | undefined = string | undefined,
 > {
   readonly name: Name;
   readonly scalar: Scalar;
   readonly nullable: Nullable;
-  readonly typeId: TypeId;
+  readonly type: Type;
 }
 
 interface TableBuilderState<
@@ -147,39 +144,39 @@ export class ColumnBuilder<
   Name extends string,
   Scalar extends string,
   Nullable extends boolean = false,
-  TypeId extends string | undefined = undefined,
+  Type extends string | undefined = undefined,
 > {
   private readonly _name: Name;
   private readonly _scalar: Scalar;
   private readonly _nullable: Nullable;
-  private readonly _typeId: TypeId;
+  private readonly _type: Type;
 
-  constructor(name: Name, scalar: Scalar, nullable: Nullable = false as Nullable, typeId?: TypeId) {
+  constructor(name: Name, scalar: Scalar, nullable: Nullable = false as Nullable, type?: Type) {
     this._name = name;
     this._scalar = scalar;
     this._nullable = nullable;
-    this._typeId = typeId as TypeId;
+    this._type = type as Type;
   }
 
   nullable<Value extends boolean>(
     value: Value = true as Value,
-  ): ColumnBuilder<Name, Scalar, Value, TypeId> {
-    return new ColumnBuilder(this._name, this._scalar, value, this._typeId);
+  ): ColumnBuilder<Name, Scalar, Value, Type> {
+    return new ColumnBuilder(this._name, this._scalar, value, this._type);
   }
 
-  typeId<Id extends string>(id: Id): ColumnBuilder<Name, Scalar, Nullable, Id> {
+  type<Id extends string>(id: Id): ColumnBuilder<Name, Scalar, Nullable, Id> {
     if (typeof id !== 'string' || !id.includes('@')) {
-      throw new Error(`typeId must be in format "namespace/name@version", got "${id}"`);
+      throw new Error(`type must be in format "namespace/name@version", got "${id}"`);
     }
     return new ColumnBuilder(this._name, this._scalar, this._nullable, id);
   }
 
-  build(): ColumnBuilderState<Name, Scalar, Nullable, TypeId> {
+  build(): ColumnBuilderState<Name, Scalar, Nullable, Type> {
     return {
       name: this._name,
       scalar: this._scalar,
       nullable: this._nullable,
-      typeId: this._typeId,
+      type: this._type,
     };
   }
 }
@@ -205,11 +202,11 @@ class TableBuilder<
   column<
     ColName extends string,
     Scalar extends string,
-    Options extends ColumnOptions<any> | undefined = undefined,
+    TOptions extends { nullable?: boolean; type?: string } | undefined = undefined,
   >(
     name: ColName,
     scalar: Scalar,
-    options?: Options,
+    options?: TOptions,
   ): TableBuilder<
     Name,
     Columns &
@@ -218,45 +215,39 @@ class TableBuilder<
         ColumnBuilderState<
           ColName,
           Scalar,
-          Options extends { nullable: true } ? true : false,
-          Options extends { typeId: infer TTypeId }
-            ? TTypeId extends string
-              ? TTypeId
+          TOptions extends { nullable: true } ? true : false,
+          TOptions extends { type: infer TType }
+            ? TType extends string
+              ? TType
               : undefined
             : undefined
         >
       >,
     PrimaryKey
   > {
-    if (options?.typeId) {
-      if (typeof options.typeId !== 'string' || !options.typeId.includes('@')) {
-        throw new Error(
-          `typeId must be in format "namespace/name@version", got "${options.typeId}"`,
-        );
+    if (options?.type) {
+      if (typeof options.type !== 'string' || !options.type.includes('@')) {
+        throw new Error(`type must be in format "namespace/name@version", got "${options.type}"`);
       }
     }
-    const nullable = (options?.nullable ?? false) as Options extends { nullable: true }
+    const nullable = (options?.nullable ?? false) as TOptions extends { nullable: true }
       ? true
       : false;
-    const typeId = options?.typeId as Options extends { typeId: infer T }
-      ? T extends string
-        ? T
-        : undefined
-      : undefined as Options extends { typeId: infer T }
-      ? T extends string
-        ? T
-        : undefined
-      : undefined;
+    const type = options?.type;
     const columnState = {
       name,
       scalar,
       nullable,
-      typeId,
+      type,
     } as ColumnBuilderState<
       ColName,
       Scalar,
-      Options extends { nullable: true } ? true : false,
-      Options extends { typeId: infer T } ? (T extends string ? T : undefined) : undefined
+      TOptions extends { nullable: true } ? true : false,
+      TOptions extends { type: infer TType }
+        ? TType extends string
+          ? TType
+          : undefined
+        : undefined
     >;
     return new TableBuilder(
       this._name,
@@ -266,8 +257,12 @@ class TableBuilder<
           ColumnBuilderState<
             ColName,
             Scalar,
-            Options extends { nullable: true } ? true : false,
-            Options extends { typeId: infer T } ? (T extends string ? T : undefined) : undefined
+            TOptions extends { nullable: true } ? true : false,
+            TOptions extends { type: infer TType }
+              ? TType extends string
+                ? TType
+                : undefined
+              : undefined
           >
         >,
       this._primaryKey,
@@ -509,10 +504,6 @@ class ContractBuilder<
 
       // Build columns object
       const columns: Partial<Record<string, StorageColumn>> = {};
-      const columnDecorations: Array<{
-        ref: { kind: string; table: string; column: string };
-        payload?: { typeId?: string };
-      }> = [];
 
       // Iterate over columns
       for (const columnName in tableStateTyped.columns) {
@@ -520,27 +511,14 @@ class ContractBuilder<
         if (!columnState) continue;
 
         const scalar = columnState.scalar;
-        const typeId =
-          columnState.typeId ||
+        const type =
+          columnState.type ||
           (scalar.includes('/') && scalar.includes('@') ? scalar : `pg/${scalar}@1`);
         const column: StorageColumn = {
-          type: typeId,
+          type: type,
           nullable: columnState.nullable ?? false,
         };
         columns[columnName] = column;
-
-        if (columnState.typeId) {
-          columnDecorations.push({
-            ref: {
-              kind: 'column',
-              table: tableStateTyped.name,
-              column: columnName,
-            },
-            payload: {
-              typeId: columnState.typeId,
-            },
-          });
-        }
       }
 
       const primaryKeyColumns = tableStateTyped.primaryKey
@@ -564,27 +542,6 @@ class ContractBuilder<
 
       // Assign to storage tables - type assertion preserves literal keys
       (storageTables as Record<string, StorageTable>)[tableName] = table;
-
-      if (columnDecorations.length > 0) {
-        if (!extensions['core']) {
-          extensions['core'] = {};
-        }
-        const coreExt = extensions['core'] as {
-          decorations?: {
-            columns?: Array<{
-              ref: { kind: string; table: string; column: string };
-              payload?: { typeId?: string };
-            }>;
-          };
-        };
-        if (!coreExt.decorations) {
-          coreExt.decorations = {};
-        }
-        if (!coreExt.decorations.columns) {
-          coreExt.decorations.columns = [];
-        }
-        coreExt.decorations.columns.push(...columnDecorations);
-      }
     }
 
     // Build models - construct as partial first, then assert full type

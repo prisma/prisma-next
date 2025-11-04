@@ -6,6 +6,7 @@ import { sql } from '../src/sql';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { ResultType, Plan } from '../src/types';
 import type { Contract, CodecTypes } from './fixtures/contract.d';
+import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
 
 test('builder contract types match fixture contract types', () => {
   const builderContract = defineContract<CodecTypes>()
@@ -99,14 +100,14 @@ test('ResultType inference works identically to fixture contract', () => {
   expectTypeOf(plan).toExtend<Plan<BuilderRow>>();
 });
 
-test('codec type inference via typeId decorations', () => {
+test('codec type inference via type option', () => {
   const contract = defineContract<CodecTypes>()
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', 'int4', { nullable: false, typeId: 'pg/int4@1' })
-        .column('email', 'text', { nullable: false, typeId: 'pg/text@1' })
-        .column('createdAt', 'timestamptz', { nullable: false, typeId: 'pg/timestamptz@1' }),
+        .column('id', 'int4', { nullable: false, type: dataTypes.int4 })
+        .column('email', 'text', { nullable: false, type: dataTypes.text })
+        .column('createdAt', 'timestamptz', { nullable: false, type: dataTypes.timestamptz }),
     )
     .model('User', 'user', (m) =>
       m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),

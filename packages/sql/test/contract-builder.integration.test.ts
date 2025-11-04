@@ -7,6 +7,7 @@ import type { SqlContract, SqlStorage, ModelDefinition } from '../src/contract-t
 import type { Adapter, LoweredStatement, SelectAst, ResultType } from '../src/types';
 import { CodecRegistry } from '@prisma-next/sql-target';
 import type { CodecTypes } from './fixtures/contract.d';
+import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 import type { Contract } from './fixtures/contract.d';
 
@@ -310,34 +311,18 @@ describe('builder integration', () => {
     expectTypeOf(builderContract.models['User']['fields']).toHaveProperty('createdAt');
   });
 
-  it('supports typeId decorations', () => {
+  it('supports type option with dataTypes constants', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false, typeId: 'pg/int4@1' })
-          .column('email', 'text', { nullable: false, typeId: 'pg/text@1' }),
+          .column('id', 'int4', { nullable: false, type: dataTypes.int4 })
+          .column('email', 'text', { nullable: false, type: dataTypes.text }),
       )
       .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
       .build();
 
-    // Runtime checks
-    expect(contract.extensions).toBeDefined();
-    expect(contract.extensions?.['core']).toBeDefined();
-    const coreExt = contract.extensions?.['core'] as {
-      decorations?: {
-        columns?: Array<{
-          ref: { kind: string; table: string; column: string };
-          payload?: { typeId?: string };
-        }>;
-      };
-    };
-    expect(coreExt.decorations?.columns).toBeDefined();
-    expect(coreExt.decorations?.columns?.length).toBe(2);
-    expect(coreExt.decorations?.columns?.[0]?.payload?.typeId).toBe('pg/int4@1');
-    expect(coreExt.decorations?.columns?.[1]?.payload?.typeId).toBe('pg/text@1');
-
-    // Type checks - verify typeId preserves literal types
+    // Type checks - verify type preserves literal types
     expectTypeOf(
       contract.storage.tables['user']['columns']['id']['type'],
     ).toEqualTypeOf<'pg/int4@1'>();
@@ -346,12 +331,12 @@ describe('builder integration', () => {
     ).toEqualTypeOf<'pg/text@1'>();
   });
 
-  it('validates typeId format', () => {
+  it('validates type format', () => {
     expect(() => {
       defineContract<CodecTypes>()
         .target('postgres')
-        .table('user', (t) => t.column('id', 'int4', { typeId: 'invalid' }))
+        .table('user', (t) => t.column('id', 'int4', { type: 'invalid' }))
         .build();
-    }).toThrow(/typeId must be in format/);
+    }).toThrow(/type must be in format/);
   });
 });
