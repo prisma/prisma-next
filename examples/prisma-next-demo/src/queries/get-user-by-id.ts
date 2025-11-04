@@ -3,7 +3,7 @@ import { schema } from '@prisma-next/sql/schema';
 import { param } from '@prisma-next/sql/param';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { getRuntime } from '../prisma/runtime';
-import type { Contract } from '../prisma/contract.d';
+import type { Contract, CodecTypes } from '../prisma/contract.d';
 import contractJson from '../prisma/contract.json' assert { type: 'json' };
 import { validateContract } from '@prisma-next/sql/schema';
 import type { ResultType } from '@prisma-next/sql/types';
@@ -13,10 +13,10 @@ const adapter = createPostgresAdapter();
 
 export async function getUserById(userId: number) {
   const runtime = getRuntime();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user']!;
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .where(userTable.columns['id']!.eq(param('userId')))
     .select({
@@ -37,4 +37,3 @@ export async function getUserById(userId: number) {
 
   return rows[0] ?? null;
 }
-

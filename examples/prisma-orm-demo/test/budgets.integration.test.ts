@@ -13,6 +13,7 @@ import { unstable_startServer } from '@prisma/dev';
 import type { StartServerOptions } from '@prisma/dev';
 import contract from '../src/prisma-next/contract.json' assert { type: 'json' };
 import type { DataContract } from '@prisma-next/contract/types';
+import type { Contract, CodecTypes } from '../src/prisma-next/contract.d';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 import type { TableRef, ColumnBuilder } from '@prisma-next/sql/types';
@@ -110,7 +111,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           ],
         });
 
-        const tables = schema(contract as DataContract).tables;
+        const tables = schema<Contract, CodecTypes>(contract as Contract).tables;
         const userTable = tables['User'];
         if (!userTable) {
           throw new Error('User table not found');
@@ -121,7 +122,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }
-        const plan = sql({ contract: contract as DataContract, adapter })
+        const plan = sql<Contract, CodecTypes>({ contract: contract as Contract, adapter })
           .from(userTable)
           .select({
             id: idColumn,
@@ -202,7 +203,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           ],
         });
 
-        const tables = schema(contract as DataContract).tables;
+        const tables = schema<Contract, CodecTypes>(contract as Contract).tables;
         const userTable = tables['User'];
         if (!userTable) {
           throw new Error('User table not found');
@@ -213,7 +214,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }
-        const plan = sql({ contract: contract as DataContract, adapter })
+        const plan = sql<Contract, CodecTypes>({ contract: contract as Contract, adapter })
           .from(userTable)
           .select({
             id: idColumn,
@@ -292,7 +293,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           ],
         });
 
-        const tables = schema(contract as DataContract).tables;
+        const tables = schema<Contract, CodecTypes>(contract as Contract).tables;
         const userTable = tables['User'];
         if (!userTable) {
           throw new Error('User table not found');
@@ -303,7 +304,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }
-        const plan = sql({ contract: contract as DataContract, adapter })
+        const plan = sql<Contract, CodecTypes>({ contract: contract as Contract, adapter })
           .from(userTable)
           .select({
             id: idColumn,

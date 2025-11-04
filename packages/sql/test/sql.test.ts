@@ -19,7 +19,7 @@ import type {
   ResultType,
 } from '../src/types';
 import { CodecRegistry } from '@prisma-next/sql-target';
-import type { Contract } from './fixtures/contract.d';
+import type { Contract, CodecTypes } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -52,13 +52,13 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 
 describe('sql DSL builder', () => {
   const contract = loadContract('contract');
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const adapter = createStubAdapter();
 
   it('builds a select plan with projection, where, order, and limit', () => {
     const userColumns = tables.user.columns;
 
-    const plan = sql({ contract, adapter })
+    const plan = sql<Contract, CodecTypes>({ contract, adapter })
       .from(tables.user)
       .select({
         id: userColumns.id,
@@ -120,7 +120,7 @@ describe('sql DSL builder', () => {
   });
 
   it('throws PLAN.INVALID when selecting an invalid column', () => {
-    const builder = sql({ contract, adapter }).from(tables.user);
+    const builder = sql<Contract, CodecTypes>({ contract, adapter, codecTypes: {} as CodecTypes }).from(tables.user);
 
     // Invalid: passing something that's not a ColumnBuilder
     expect(() => builder.select({ invalid: {} as unknown as ColumnBuilder })).toThrowError(
@@ -131,7 +131,7 @@ describe('sql DSL builder', () => {
   it('throws PLAN.INVALID when parameter value is missing', () => {
     const userColumns = tables.user.columns;
 
-    const builder = sql({ contract, adapter })
+    const builder = sql<Contract, CodecTypes>({ contract, adapter, codecTypes: {} as CodecTypes })
       .from(tables.user)
       .select({
         id: userColumns.id,
@@ -164,9 +164,9 @@ describe('sql DSL builder', () => {
       };
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
-      const userColumns = schema(contractValidated).tables.user.columns;
-      const plan = sql({ contract: contractValidated, adapter })
-        .from(schema(contractValidated).tables.user)
+      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
+        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -198,9 +198,9 @@ describe('sql DSL builder', () => {
       };
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
-      const userColumns = schema(contractValidated).tables.user.columns;
-      const plan = sql({ contract: contractValidated, adapter })
-        .from(schema(contractValidated).tables.user)
+      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
+        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
         .select({
           email: userColumns.email,
         })
@@ -235,9 +235,9 @@ describe('sql DSL builder', () => {
       };
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
-      const userColumns = schema(contractValidated).tables.user.columns;
-      const plan = sql({ contract: contractValidated, adapter })
-        .from(schema(contractValidated).tables.user)
+      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
+        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -256,7 +256,7 @@ describe('sql DSL builder', () => {
     it('includes codec annotations when extension decorations exist', () => {
       // Contract fixture already has extension decorations
       const userColumns = tables.user.columns;
-      const plan = sql({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ contract, adapter })
         .from(tables.user)
         .select({
           id: userColumns.id,
@@ -290,9 +290,9 @@ describe('sql DSL builder', () => {
       };
 
       const contractValidated = validateContract<Contract>(contractWithPartialCodecs);
-      const userColumns = schema(contractValidated).tables.user.columns;
-      const plan = sql({ contract: contractValidated, adapter })
-        .from(schema(contractValidated).tables.user)
+      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
+        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -328,9 +328,9 @@ describe('sql DSL builder', () => {
 
       const contractValidated = validateContract<Contract>(contractWithExtensions);
 
-      const testTables = schema(contractValidated).tables;
+      const testTables = schema<Contract, CodecTypes>(contractValidated, {} as CodecTypes).tables;
       const userColumns = testTables.user.columns;
-      const plan = sql({ contract: contractValidated, adapter })
+      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter, codecTypes: {} as CodecTypes })
         .from(testTables.user)
         .select({
           id: userColumns.id,
@@ -345,6 +345,11 @@ describe('sql DSL builder', () => {
 
       type Row = ResultType<typeof plan>;
 
+      // Strict checks: verify fields are NOT never
+      expectTypeOf<Row['id']>().toEqualTypeOf<string>();
+      expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+      // Also verify the overall structure
       expectTypeOf<Row>().toExtend<{
         id: string;
         email: string;
@@ -363,9 +368,9 @@ describe('sql DSL builder', () => {
 
       const contractValidated = validateContract<Contract>(contractWithoutCodecs);
 
-      const testTables = schema(contractValidated).tables;
+      const testTables = schema<Contract, CodecTypes>(contractValidated, {} as CodecTypes).tables;
       const userColumns = testTables.user.columns;
-      const plan = sql({ contract: contractValidated, adapter })
+      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter, codecTypes: {} as CodecTypes })
         .from(testTables.user)
         .select({
           id: userColumns.id, // int4 → number via ScalarToJs
@@ -380,6 +385,12 @@ describe('sql DSL builder', () => {
       type Row = ResultType<typeof plan>;
 
       // Verify types come from ScalarToJs mapping (adapter-provided)
+      // Strict checks: verify fields are NOT never
+      expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+      expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+      expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
+
+      // Also verify the overall structure
       expectTypeOf<Row>().toExtend<{
         id: number; // int4 → number
         email: string; // text → string
@@ -414,9 +425,9 @@ describe('sql DSL builder', () => {
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
 
-      const testTables = schema(contractValidated).tables;
+      const testTables = schema<Contract, CodecTypes>(contractValidated, {} as CodecTypes).tables;
       const userColumns = testTables.user.columns;
-      const plan = sql({ contract: contractValidated, adapter })
+      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter, codecTypes: {} as CodecTypes })
         .from(testTables.user)
         .select({
           id: userColumns.id, // Should be string (codec) not number (scalar)
@@ -432,6 +443,11 @@ describe('sql DSL builder', () => {
       type Row = ResultType<typeof plan>;
 
       // Codec output types should take precedence over ScalarToJs
+      // Strict checks: verify fields are NOT never
+      expectTypeOf<Row['id']>().toEqualTypeOf<string>();
+      expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+      // Also verify the overall structure
       expectTypeOf<Row>().toExtend<{
         id: string; // Codec overrides int4 → number, uses string codec output
         email: string;

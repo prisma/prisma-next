@@ -23,32 +23,35 @@ export interface ParamPlaceholder {
 export interface OrderBuilder<
   ColumnName extends string = string,
   ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
 > {
   readonly kind: 'order';
-  readonly expr: ColumnBuilder<ColumnName, ColumnMeta>;
+  readonly expr: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
   readonly dir: Direction;
 }
 
 export interface ColumnBuilder<
   ColumnName extends string = string,
   ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
 > {
   readonly kind: 'column';
   readonly table: string;
   readonly column: ColumnName;
   readonly columnMeta: ColumnMeta;
-  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta>;
-  asc(): OrderBuilder<ColumnName, ColumnMeta>;
-  desc(): OrderBuilder<ColumnName, ColumnMeta>;
+  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
+  desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
 }
 
 export interface BinaryBuilder<
   ColumnName extends string = string,
   ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
 > {
   readonly kind: 'binary';
   readonly op: 'eq';
-  readonly left: ColumnBuilder<ColumnName, ColumnMeta>;
+  readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
   readonly right: ParamPlaceholder;
 }
 
@@ -175,18 +178,31 @@ export type CodecOutputToJsType<T extends string> = T extends 'string'
           : unknown;
 
 /**
+ * Helper type to check if CodecTypes is empty/default (Record<string, never>).
+ * When CodecTypes is Record<string, never>, keyof is never, so we can detect it.
+ * Uses a tuple to avoid distributive conditional type behavior.
+ */
+type IsEmptyCodecTypes<CodecTypes extends Record<string, { output: unknown }>> = [
+  keyof CodecTypes,
+] extends [never]
+  ? true
+  : false;
+
+/**
  * Helper type to extract codec output type from contract mappings.
+ * Returns never if CodecTypes is empty/default or if the codecId is not found.
  */
 type ExtractCodecOutputType<
   CodecId extends string,
-  CodecTypes extends Record<string, { output: string }>,
-> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId] extends { output: infer Output }
-    ? Output extends string
-      ? Output
-      : never
-    : never
-  : never;
+  CodecTypes extends Record<string, { output: unknown }>,
+> =
+  IsEmptyCodecTypes<CodecTypes> extends true
+    ? never // CodecTypes is empty, can't look up codec
+    : CodecId extends keyof CodecTypes
+      ? CodecTypes[CodecId] extends { output: infer Output }
+        ? Output
+        : never
+      : never;
 
 /**
  * Helper type to extract typeId from extension decorations for a column.
@@ -228,51 +244,45 @@ type GetColumnTypeId<
     : never;
 
 /**
- * Infers JavaScript type from a ColumnBuilder.
+ * Computes JavaScript type for a column at column creation time.
+ * Reuses the same inference logic as InferColumnType but structured for direct use.
  *
  * Type inference rules (in order of precedence):
  * 1. If column has a typeId in extension decorations, look up CodecTypes[typeId].output
  * 2. Otherwise, if mappings.scalarToJs exists and has the scalar type, use that adapter-provided mapping
  * 3. Fallback to legacy ContractScalarToJsType (deprecated, for migration safety)
  * 4. Nullability propagates from storage column metadata in all branches
- *
- * Note: CodecTypes and ScalarToJs should be imported from contract.d.ts and provided via
- * the contract type's mappings. If not provided, falls back to legacy scalar mapping.
  */
-export type InferColumnType<
-  C extends ColumnBuilder,
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: string }> = Record<string, { output: string }>,
-> = C extends ColumnBuilder & {
-  table: infer TableName;
-  column: infer ColumnName;
-  columnMeta: { type: infer T; nullable: infer N };
-}
-  ? TableName extends string
-    ? ColumnName extends string
-      ? TContract['mappings'] extends infer Mappings
-        ? Mappings extends { scalarToJs?: Record<string, unknown> }
-          ? GetColumnTypeId<TableName, ColumnName, TContract['extensions']> extends infer TypeId
-            ? TypeId extends string
-              ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
-                ? CodecOutput extends string
-                  ? N extends true
-                    ? CodecOutputToJsType<CodecOutput> | null
-                    : CodecOutputToJsType<CodecOutput>
-                  : T extends string
-                    ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
-                      ? IsNotFound<ScalarType> extends true
-                        ? N extends true
-                          ? ContractScalarToJsType<T> | null
-                          : ContractScalarToJsType<T>
-                        : N extends true
-                          ? ScalarType | null
-                          : ScalarType
-                      : N extends true
-                        ? ContractScalarToJsType<T> | null
-                        : ContractScalarToJsType<T>
-                    : unknown
-                : T extends string
+export type ComputeColumnJsType<
+  Contract extends SqlContract<SqlStorage>,
+  TableName extends string,
+  ColumnName extends string,
+  ColumnMeta extends StorageColumn,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+> = ColumnMeta extends { type: infer T; nullable: infer N }
+  ? Contract['mappings'] extends infer Mappings
+    ? Mappings extends { scalarToJs?: Record<string, unknown> }
+      ? IsEmptyCodecTypes<CodecTypes> extends true
+        ? // CodecTypes is empty, skip codec lookup entirely and use scalar directly
+          T extends string
+          ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
+            ? IsNotFound<ScalarType> extends true
+              ? N extends true
+                ? ContractScalarToJsType<T> | null
+                : ContractScalarToJsType<T>
+              : N extends true
+                ? ScalarType | null
+                : ScalarType
+            : N extends true
+              ? ContractScalarToJsType<T> | null
+              : ContractScalarToJsType<T>
+          : unknown
+        : GetColumnTypeId<TableName, ColumnName, Contract['extensions']> extends infer TypeId
+          ? TypeId extends string
+            ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
+              ? CodecOutput extends never
+                ? // CodecId not found in CodecTypes, fall back to scalar
+                  T extends string
                   ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
                     ? IsNotFound<ScalarType> extends true
                       ? N extends true
@@ -285,6 +295,10 @@ export type InferColumnType<
                       ? ContractScalarToJsType<T> | null
                       : ContractScalarToJsType<T>
                   : unknown
+                : // Use codec output type directly
+                  N extends true
+                  ? CodecOutput | null
+                  : CodecOutput
               : T extends string
                 ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
                   ? IsNotFound<ScalarType> extends true
@@ -312,25 +326,36 @@ export type InferColumnType<
                   : ContractScalarToJsType<T>
               : unknown
           : T extends string
-            ? N extends true
-              ? ContractScalarToJsType<T> | null
-              : ContractScalarToJsType<T>
+            ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
+              ? IsNotFound<ScalarType> extends true
+                ? N extends true
+                  ? ContractScalarToJsType<T> | null
+                  : ContractScalarToJsType<T>
+                : N extends true
+                  ? ScalarType | null
+                  : ScalarType
+              : N extends true
+                ? ContractScalarToJsType<T> | null
+                : ContractScalarToJsType<T>
             : unknown
+      : T extends string
+        ? N extends true
+          ? ContractScalarToJsType<T> | null
+          : ContractScalarToJsType<T>
         : unknown
-      : unknown
     : unknown
   : unknown;
 
 /**
  * Infers Row type from a projection object.
  * Maps Record<string, ColumnBuilder> to Record<string, JSType>
+ *
+ * Extracts the pre-computed JsType from each ColumnBuilder in the projection.
  */
-export type InferProjectionRow<
-  P extends Record<string, ColumnBuilder>,
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: string }> = Record<string, { output: string }>,
-> = {
-  [K in keyof P]: InferColumnType<P[K], TContract, CodecTypes>;
+export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
+  [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
+    ? JsType
+    : never;
 };
 
 /**
@@ -450,7 +475,9 @@ export interface BuildOptions {
 
 export interface SqlBuilderOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > {
   readonly contract: TContract;
   readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
+  readonly codecTypes?: CodecTypes;
 }

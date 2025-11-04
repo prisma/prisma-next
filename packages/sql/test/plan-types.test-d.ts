@@ -5,7 +5,7 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import type { ResultType, Plan, TableKey, TablesOf } from '../src/types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 import { validateContract } from '../src/contract';
-import type { Contract, ScalarToJs } from './fixtures/contract.d';
+import type { Contract, CodecTypes, ScalarToJs } from './fixtures/contract.d';
 
 // Helper to simulate execute signature
 function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
@@ -20,9 +20,9 @@ function getTableColumns<T extends { columns: Record<string, unknown> }>(table: 
 test('builder without select() has unknown Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
 
-  const builder = sql({ contract, adapter });
+  const builder = sql<Contract, CodecTypes>({ contract, adapter });
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const builderAfterFrom = builder.from(userTable);
@@ -35,12 +35,12 @@ test('builder without select() has unknown Row type', () => {
 test('select() with object projection infers Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: userColumns['id']!,
@@ -60,7 +60,7 @@ test('select() with object projection infers Row type', () => {
 test('build() returns Plan<Row> with inferred Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
@@ -68,7 +68,7 @@ test('build() returns Plan<Row> with inferred Row type', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -77,13 +77,18 @@ test('build() returns Plan<Row> with inferred Row type', () => {
     .build();
 
   type Row = ResultType<typeof plan>;
+
+  // Strict checks: verify fields have correct types (will fail if never)
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
   expectTypeOf(plan).toExtend<Plan<Row>>();
 });
 
 test('ResultType utility extracts Row type from Plan', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -91,7 +96,7 @@ test('ResultType utility extracts Row type from Plan', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -102,13 +107,19 @@ test('ResultType utility extracts Row type from Plan', () => {
   type ExtractedRow = ResultType<typeof plan>;
   // Contract fixture has extension decorations, so types come from codecs
   // id has typeId 'core/number@1' → number, email has 'core/string@1' → string
+
+  // Strict checks: verify fields are NOT never and have correct types
+  expectTypeOf<ExtractedRow['id']>().toEqualTypeOf<number>();
+  expectTypeOf<ExtractedRow['email']>().toEqualTypeOf<string>();
+
+  // Also verify the overall structure
   expectTypeOf<ExtractedRow>().toExtend<{ id: number; email: string }>();
 });
 
 test('execute() preserves Row type through execution', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -116,7 +127,7 @@ test('execute() preserves Row type through execution', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -133,7 +144,7 @@ test('execute() preserves Row type through execution', () => {
 test('builder chain preserves Row type through methods', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -170,7 +181,7 @@ test('builder chain preserves Row type through methods', () => {
 test('wrong Row type assignments fail type check', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -178,7 +189,7 @@ test('wrong Row type assignments fail type check', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -203,7 +214,7 @@ test('wrong Row type assignments fail type check', () => {
 test('nullable columns are handled correctly', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -211,7 +222,7 @@ test('nullable columns are handled correctly', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -227,7 +238,7 @@ test('nullable columns are handled correctly', () => {
 test('different column types map correctly', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -236,7 +247,7 @@ test('different column types map correctly', () => {
   const createdAtColumn = userColumns['createdAt'];
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -252,7 +263,7 @@ test('different column types map correctly', () => {
 test('generic contract types are preserved', () => {
   const contract = validateContract<Contract>(contractJson);
   createPostgresAdapter(); // Used for type checking only
-  schema(contract); // Used for type checking only
+  schema<Contract, CodecTypes>(contract); // Used for type checking only
 
   // Verify TableKey extracts correct table names
   type ContractTableKey = TableKey<typeof contract>;
@@ -263,7 +274,7 @@ test('generic contract types are preserved', () => {
   expectTypeOf<ContractTables>().toHaveProperty('user');
 
   // Verify schema() preserves contract generic - should have literal 'user' key
-  const schemaHandle = schema(contract);
+  const schemaHandle = schema<Contract, CodecTypes>(contract);
   expectTypeOf(schemaHandle.tables).toHaveProperty('user');
 
   // Verify we can access with literal key
@@ -302,7 +313,7 @@ test('Contract namespace types are available', () => {
 
 test('makeT() returns tables graph', () => {
   const contract = validateContract<Contract>(contractJson);
-  const t = makeT(contract);
+  const t = makeT<Contract, CodecTypes>(contract);
 
   // makeT should return the same as schema().tables
   expectTypeOf(t).toHaveProperty('user');
@@ -319,17 +330,17 @@ test('makeT() returns tables graph', () => {
 test('sql() preserves contract generic through builder chain', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
 
-  const builder = sql({ contract, adapter });
+  const builder = sql<Contract, CodecTypes>({ contract, adapter });
   const builderAfterFrom = builder.from(userTable);
 
   // Builder should preserve contract type
-  expectTypeOf(builder).toExtend<ReturnType<typeof sql<typeof contract>>>();
+  expectTypeOf(builder).toExtend<ReturnType<typeof sql<Contract, CodecTypes>>>();
   expectTypeOf(builderAfterFrom).toExtend<
-    ReturnType<ReturnType<typeof sql<typeof contract>>['from']>
+    ReturnType<ReturnType<typeof sql<Contract, CodecTypes>>['from']>
   >();
 });
 
@@ -341,7 +352,7 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
   };
   const contract = validateContract<Contract>(contractWithoutCodecs);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -350,7 +361,7 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
   const createdAtColumn = userColumns['createdAt']; // timestamptz
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -362,6 +373,12 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
   type Row = ResultType<typeof plan>;
 
   // Verify ScalarToJs mapping: int4 → number, text → string, timestamptz → string
+  // Strict checks: verify fields are NOT never
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
+
+  // Also verify the overall structure
   expectTypeOf<Row>().toExtend<{
     id: number; // int4 → number via ScalarToJs
     email: string; // text → string via ScalarToJs
@@ -397,7 +414,7 @@ test('nullable columns preserve nullability in ResultType', () => {
   };
   const contract = validateContract<Contract>(contractWithNullable);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -405,7 +422,7 @@ test('nullable columns preserve nullability in ResultType', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn, // nullable: false
@@ -416,6 +433,11 @@ test('nullable columns preserve nullability in ResultType', () => {
   type Row = ResultType<typeof plan>;
 
   // Nullable column should be T | null, non-nullable should be T
+  // Strict checks: verify fields are NOT never
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string | null>();
+
+  // Also verify the overall structure
   expectTypeOf<Row>().toExtend<{
     id: number; // non-nullable int4 → number
     email: string | null; // nullable text → string | null
@@ -446,7 +468,7 @@ test('codec types take precedence over ScalarToJs fallback', () => {
   };
   const contract = validateContract<Contract>(contractWithCodecs);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -455,7 +477,7 @@ test('codec types take precedence over ScalarToJs fallback', () => {
   const createdAtColumn = userColumns['createdAt'];
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn, // Has codec → string (not number from ScalarToJs)
@@ -467,6 +489,12 @@ test('codec types take precedence over ScalarToJs fallback', () => {
   type Row = ResultType<typeof plan>;
 
   // Codec types should override ScalarToJs
+  // Strict checks: verify fields are NOT never
+  expectTypeOf<Row['id']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
+
+  // Also verify the overall structure
   expectTypeOf<Row>().toExtend<{
     id: string; // Codec overrides int4 → number, uses string codec output
     email: string; // Codec output
@@ -501,7 +529,7 @@ test('representative contract resolves types correctly end-to-end', () => {
   };
   const contract = validateContract<Contract>(representativeContract);
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
@@ -510,7 +538,7 @@ test('representative contract resolves types correctly end-to-end', () => {
   const createdAtColumn = userColumns['createdAt'];
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -522,10 +550,15 @@ test('representative contract resolves types correctly end-to-end', () => {
   type Row = ResultType<typeof plan>;
 
   // All types should resolve correctly via codec mappings
+  // Strict checks: verify fields are NOT never
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
+
+  // Also verify the overall structure
   expectTypeOf<Row>().toExtend<{
     id: number; // core/number@1 → number
     email: string; // core/string@1 → string
     createdAt: string; // core/iso-datetime@1 → string
   }>();
-
 });

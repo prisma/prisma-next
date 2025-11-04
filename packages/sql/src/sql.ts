@@ -34,34 +34,42 @@ interface ProjectionState {
 class SelectBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > {
   private readonly contract: TContract;
-  private readonly adapter: SqlBuilderOptions<TContract>['adapter'];
+  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly codecTypes: CodecTypes;
   private state: BuilderState = {};
 
-  constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
+  constructor(
+    options: SqlBuilderOptions<TContract, CodecTypes>,
+    state?: BuilderState,
+  ) {
     this.contract = options.contract;
     this.adapter = options.adapter;
+    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
     if (state) {
       this.state = state;
     }
   }
 
-  from(table: TableRef): SelectBuilderImpl<TContract, unknown> {
-    return new SelectBuilderImpl<TContract, unknown>(
+  from(table: TableRef): SelectBuilderImpl<TContract, unknown, CodecTypes> {
+    return new SelectBuilderImpl<TContract, unknown, CodecTypes>(
       {
         contract: this.contract,
         adapter: this.adapter,
+        codecTypes: this.codecTypes,
       },
       { ...this.state, from: table },
     );
   }
 
-  where(expr: BinaryBuilder): SelectBuilderImpl<TContract, Row> {
-    return new SelectBuilderImpl<TContract, Row>(
+  where(expr: BinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes> {
+    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
       {
         contract: this.contract,
         adapter: this.adapter,
+        codecTypes: this.codecTypes,
       },
       { ...this.state, where: expr },
     );
@@ -69,38 +77,41 @@ class SelectBuilderImpl<
 
   select<P extends Record<string, ColumnBuilder>>(
     projection: P,
-  ): SelectBuilderImpl<TContract, InferProjectionRow<P, TContract>> {
+  ): SelectBuilderImpl<TContract, InferProjectionRow<P>, CodecTypes> {
     const table = this.ensureFrom();
     const projectionState = buildProjectionState(table, projection);
 
-    return new SelectBuilderImpl<TContract, InferProjectionRow<P, TContract>>(
+    return new SelectBuilderImpl<TContract, InferProjectionRow<P>, CodecTypes>(
       {
         contract: this.contract,
         adapter: this.adapter,
+        codecTypes: this.codecTypes,
       },
       { ...this.state, projection: projectionState },
     );
   }
 
-  orderBy(order: ReturnType<ColumnBuilder['asc']>): SelectBuilderImpl<TContract, Row> {
-    return new SelectBuilderImpl<TContract, Row>(
+  orderBy(order: ReturnType<ColumnBuilder['asc']>): SelectBuilderImpl<TContract, Row, CodecTypes> {
+    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
       {
         contract: this.contract,
         adapter: this.adapter,
+        codecTypes: this.codecTypes,
       },
       { ...this.state, orderBy: order },
     );
   }
 
-  limit(count: number): SelectBuilderImpl<TContract, Row> {
+  limit(count: number): SelectBuilderImpl<TContract, Row, CodecTypes> {
     if (!Number.isInteger(count) || count < 0) {
       throw planInvalid('Limit must be a non-negative integer');
     }
 
-    return new SelectBuilderImpl<TContract, Row>(
+    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
       {
         contract: this.contract,
         adapter: this.adapter,
+        codecTypes: this.codecTypes,
       },
       { ...this.state, limit: count },
     );
@@ -437,15 +448,20 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   } satisfies PlanMeta);
 }
 
-type SelectBuilder<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> =
-  SelectBuilderImpl<TContract, unknown> & {
-    readonly raw: RawFactory;
-  };
+type SelectBuilder<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+> = SelectBuilderImpl<TContract, unknown, CodecTypes> & {
+  readonly raw: RawFactory;
+};
 
-export function sql<TContract extends SqlContract<SqlStorage>>(
-  options: SqlBuilderOptions<TContract>,
-): SelectBuilder<TContract> {
-  const builder = new SelectBuilderImpl<TContract>(options) as SelectBuilder<TContract>;
+export function sql<
+  TContract extends SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+>(options: SqlBuilderOptions<TContract, CodecTypes>): SelectBuilder<TContract, CodecTypes> {
+  const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes>(
+    options,
+  ) as SelectBuilder<TContract, CodecTypes>;
   const rawFactory = createRawFactory(options.contract);
 
   Object.defineProperty(builder, 'raw', {

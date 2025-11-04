@@ -14,7 +14,7 @@ import type { ResultType } from '@prisma-next/sql/types';
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 
 import contractJson from '../src/prisma/contract.json' assert { type: 'json' };
-import type { Contract } from '../src/prisma/contract.d';
+import type { Contract, CodecTypes } from '../src/prisma/contract.d';
 const contract = validateContract<Contract>(contractJson);
 
 describe('runtime execute integration', () => {
@@ -63,9 +63,9 @@ describe('runtime execute integration', () => {
         });
         expect(rowCount).toBe(1);
 
-        const tables = schema(contract).tables;
+        const tables = schema<Contract, CodecTypes>(contract).tables;
         const userTable = tables['user']!;
-        const plan = sql({ contract, adapter })
+        const plan = sql<Contract, CodecTypes>({ contract, adapter })
           .from(tables['user']!)
           .select({
             id: userTable.columns['id']!,
@@ -83,7 +83,7 @@ describe('runtime execute integration', () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ email: 'alice@example.com' });
 
-        const root = sql({ contract, adapter });
+        const root = sql<Contract, CodecTypes>({ contract, adapter });
         const templatePlan = root.raw.with({ annotations: { limit: 1 } })`
           select id, email from "user"
           where email = ${'alice@example.com'}
@@ -169,7 +169,7 @@ describe('runtime execute integration', () => {
           );
         });
 
-        const tables = schema(contract).tables;
+        const tables = schema<Contract, CodecTypes>(contract).tables;
         const userTable = tables['user']!;
         const postTable = tables['post']!;
 
@@ -255,7 +255,7 @@ describe('runtime execute integration', () => {
           }
         });
 
-        const tables = schema(contract).tables;
+        const tables = schema<Contract, CodecTypes>(contract).tables;
         const userTable = tables['user']!;
         const unboundedPlan = sql({ contract, adapter })
           .from(tables['user']!)
@@ -333,9 +333,9 @@ describe('runtime execute integration', () => {
           }
         });
 
-        const tables = schema(contract).tables;
+        const tables = schema<Contract, CodecTypes>(contract).tables;
         const userTable = tables['user']!;
-        const plan = sql({ contract, adapter })
+        const plan = sql<Contract, CodecTypes>({ contract, adapter })
           .from(tables['user']!)
           .select({
             id: userTable.columns['id']!,
