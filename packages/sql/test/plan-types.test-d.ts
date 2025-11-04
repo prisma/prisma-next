@@ -5,7 +5,7 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import type { ResultType, Plan, TableKey, TablesOf } from '../src/types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 import { validateContract } from '../src/contract';
-import type { Contract } from './fixtures/contract.d';
+import type { Contract, ScalarToJs } from './fixtures/contract.d';
 
 // Helper to simulate execute signature
 function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
@@ -100,6 +100,8 @@ test('ResultType utility extracts Row type from Plan', () => {
     .build();
 
   type ExtractedRow = ResultType<typeof plan>;
+  // Contract fixture has extension decorations, so types come from codecs
+  // id has typeId 'core/number@1' → number, email has 'core/string@1' → string
   expectTypeOf<ExtractedRow>().toExtend<{ id: number; email: string }>();
 });
 
@@ -329,4 +331,207 @@ test('sql() preserves contract generic through builder chain', () => {
   expectTypeOf(builderAfterFrom).toExtend<
     ReturnType<ReturnType<typeof sql<typeof contract>>['from']>
   >();
+});
+
+test('ScalarToJs mapping resolves scalar types correctly', () => {
+  // Create a contract without extension decorations to test ScalarToJs fallback
+  const contractWithoutCodecs = {
+    ...contractJson,
+    extensions: undefined,
+  };
+  const contract = validateContract<Contract>(contractWithoutCodecs);
+  const adapter = createPostgresAdapter();
+  const tables = schema(contract).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id']; // int4
+  const emailColumn = userColumns['email']; // text
+  const createdAtColumn = userColumns['createdAt']; // timestamptz
+  if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
+
+  const plan = sql({ contract, adapter })
+    .from(userTable)
+    .select({
+      id: idColumn,
+      email: emailColumn,
+      createdAt: createdAtColumn,
+    })
+    .build();
+
+  type Row = ResultType<typeof plan>;
+
+  // Verify ScalarToJs mapping: int4 → number, text → string, timestamptz → string
+  expectTypeOf<Row>().toExtend<{
+    id: number; // int4 → number via ScalarToJs
+    email: string; // text → string via ScalarToJs
+    createdAt: string; // timestamptz → string via ScalarToJs
+  }>();
+
+  // Verify ScalarToJs is actually from adapter (not legacy fallback)
+  // Contract should have scalarToJs in mappings (types-only)
+  type ContractScalarToJs = Contract['mappings'] extends { scalarToJs: infer S } ? S : never;
+  expectTypeOf<ContractScalarToJs>().toExtend<ScalarToJs>();
+});
+
+test('nullable columns preserve nullability in ResultType', () => {
+  // Create a contract with nullable columns
+  const contractWithNullable = {
+    ...contractJson,
+    storage: {
+      ...contractJson.storage,
+      tables: {
+        ...contractJson.storage.tables,
+        user: {
+          ...contractJson.storage.tables.user,
+          columns: {
+            ...contractJson.storage.tables.user.columns,
+            id: { ...contractJson.storage.tables.user.columns.id, nullable: false },
+            email: { ...contractJson.storage.tables.user.columns.email, nullable: true },
+            createdAt: { ...contractJson.storage.tables.user.columns.createdAt, nullable: false },
+          },
+        },
+      },
+    },
+    extensions: undefined, // Use ScalarToJs fallback
+  };
+  const contract = validateContract<Contract>(contractWithNullable);
+  const adapter = createPostgresAdapter();
+  const tables = schema(contract).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
+
+  const plan = sql({ contract, adapter })
+    .from(userTable)
+    .select({
+      id: idColumn, // nullable: false
+      email: emailColumn, // nullable: true
+    })
+    .build();
+
+  type Row = ResultType<typeof plan>;
+
+  // Nullable column should be T | null, non-nullable should be T
+  expectTypeOf<Row>().toExtend<{
+    id: number; // non-nullable int4 → number
+    email: string | null; // nullable text → string | null
+  }>();
+});
+
+test('codec types take precedence over ScalarToJs fallback', () => {
+  // Contract with extension decorations that override scalar mapping
+  const contractWithCodecs = {
+    ...contractJson,
+    extensions: {
+      postgres: {
+        decorations: {
+          columns: [
+            {
+              ref: { kind: 'column', table: 'user', column: 'id' },
+              payload: { typeId: 'core/string@1' }, // Override int4 → number with string codec
+            },
+            {
+              ref: { kind: 'column', table: 'user', column: 'email' },
+              payload: { typeId: 'core/string@1' },
+            },
+            // createdAt has no decoration, should use ScalarToJs fallback
+          ],
+        },
+      },
+    },
+  };
+  const contract = validateContract<Contract>(contractWithCodecs);
+  const adapter = createPostgresAdapter();
+  const tables = schema(contract).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  const createdAtColumn = userColumns['createdAt'];
+  if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
+
+  const plan = sql({ contract, adapter })
+    .from(userTable)
+    .select({
+      id: idColumn, // Has codec → string (not number from ScalarToJs)
+      email: emailColumn, // Has codec → string
+      createdAt: createdAtColumn, // No codec → string (from ScalarToJs)
+    })
+    .build();
+
+  type Row = ResultType<typeof plan>;
+
+  // Codec types should override ScalarToJs
+  expectTypeOf<Row>().toExtend<{
+    id: string; // Codec overrides int4 → number, uses string codec output
+    email: string; // Codec output
+    createdAt: string; // Fallback to ScalarToJs (timestamptz → string)
+  }>();
+});
+
+test('representative contract resolves types correctly end-to-end', () => {
+  // Full representative contract with mixed codecs and scalars
+  const representativeContract = {
+    ...contractJson,
+    extensions: {
+      postgres: {
+        decorations: {
+          columns: [
+            {
+              ref: { kind: 'column', table: 'user', column: 'id' },
+              payload: { typeId: 'core/number@1' },
+            },
+            {
+              ref: { kind: 'column', table: 'user', column: 'email' },
+              payload: { typeId: 'core/string@1' },
+            },
+            {
+              ref: { kind: 'column', table: 'user', column: 'createdAt' },
+              payload: { typeId: 'core/iso-datetime@1' },
+            },
+          ],
+        },
+      },
+    },
+  };
+  const contract = validateContract<Contract>(representativeContract);
+  const adapter = createPostgresAdapter();
+  const tables = schema(contract).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  const createdAtColumn = userColumns['createdAt'];
+  if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
+
+  const plan = sql({ contract, adapter })
+    .from(userTable)
+    .select({
+      id: idColumn,
+      email: emailColumn,
+      createdAt: createdAtColumn,
+    })
+    .build();
+
+  type Row = ResultType<typeof plan>;
+
+  // All types should resolve correctly via codec mappings
+  expectTypeOf<Row>().toExtend<{
+    id: number; // core/number@1 → number
+    email: string; // core/string@1 → string
+    createdAt: string; // core/iso-datetime@1 → string
+  }>();
+
+  // Verify the plan has correct codec annotations
+  expectTypeOf(plan.meta.annotations?.codecs).toExtend<{
+    id: string;
+    email: string;
+    createdAt: string;
+  }>();
 });
