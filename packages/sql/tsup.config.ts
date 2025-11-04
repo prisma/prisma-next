@@ -7,6 +7,7 @@ export default defineConfig({
     param: 'src/exports/param.ts',
     types: 'src/exports/types.ts',
     errors: 'src/exports/errors.ts',
+    'contract-builder': 'src/exports/contract-builder.ts',
     'contract-types': 'src/contract-types.ts',
   },
   outDir: 'dist/exports',

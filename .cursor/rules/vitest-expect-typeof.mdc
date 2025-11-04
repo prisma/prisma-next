@@ -1,4 +1,5 @@
 ---
+description: When writing type tests
 alwaysApply: false
 ---
 # Vitest expectTypeOf API

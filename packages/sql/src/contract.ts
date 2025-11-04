@@ -202,7 +202,7 @@ function canonicalizeStorageTypes(
  * @param existingMappings - Existing mappings from contract input (optional)
  * @returns Computed mappings dictionary
  */
-function computeMappings(
+export function computeMappings(
   models: Record<string, ModelDefinition>,
   _storage: SqlStorage,
   existingMappings?: Partial<SqlMappings>,
