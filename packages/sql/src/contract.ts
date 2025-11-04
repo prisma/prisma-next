@@ -168,10 +168,7 @@ function canonicalizeColumnType(scalar: string, target: string): string {
  * @param target - The database target
  * @returns New storage object with canonicalized types
  */
-function canonicalizeStorageTypes(
-  storage: SqlStorage,
-  target: string,
-): SqlStorage {
+function canonicalizeStorageTypes(storage: SqlStorage, target: string): SqlStorage {
   const canonicalized: SqlStorage = {
     tables: {},
   };
@@ -486,8 +483,12 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
 }
 
 /**
- * Validates that an unknown value conforms to the SqlContract structure
+ * Validates that a JSON import conforms to the SqlContract structure
  * and returns a fully typed SqlContract.
+ *
+ * This function is specifically for validating JSON imports (e.g., from contract.json).
+ * Contracts created via the builder API (defineContract) are already valid and should
+ * not be passed to this function - use them directly without validation.
  *
  * Performs both structural validation (using Arktype) and logical validation
  * (ensuring all references are valid).
@@ -496,13 +497,10 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
  * This function validates the runtime structure but does not infer types from JSON,
  * as JSON imports lose literal type information.
  *
- * @param value - The contract value to validate (typically from a JSON import)
+ * @param value - The contract value to validate (must be from a JSON import, not a builder)
  * @returns A validated contract matching the TContract type
  * @throws Error if the contract structure or logic is invalid
  */
-export function validateContract<TContract extends SqlContract<SqlStorage>>(
-  value: TContract,
-): TContract;
 export function validateContract<TContract extends SqlContract<SqlStorage>>(
   value: unknown,
 ): TContract {
@@ -525,7 +523,8 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
   validateContractLogic(contractWithCanonicalTypes);
 
   // Extract existing mappings (optional - will be computed if missing)
-  const existingMappings = (contractWithCanonicalTypes as { mappings?: Partial<SqlMappings> }).mappings;
+  const existingMappings = (contractWithCanonicalTypes as { mappings?: Partial<SqlMappings> })
+    .mappings;
 
   // Compute mappings from models and storage
   const mappings = computeMappings(

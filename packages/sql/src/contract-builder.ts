@@ -9,9 +9,9 @@ import type {
 } from './contract-types';
 import { computeMappings } from './contract';
 
-export interface ColumnOptions {
+export interface ColumnOptions<TTypeId extends string = string> {
   nullable?: boolean;
-  typeId?: string;
+  typeId?: TTypeId;
 }
 
 type CanonicalizeType<
@@ -205,7 +205,7 @@ class TableBuilder<
   column<
     ColName extends string,
     Scalar extends string,
-    Options extends ColumnOptions | undefined = undefined,
+    Options extends ColumnOptions<any> | undefined = undefined,
   >(
     name: ColName,
     scalar: Scalar,
@@ -219,7 +219,11 @@ class TableBuilder<
           ColName,
           Scalar,
           Options extends { nullable: true } ? true : false,
-          Options extends { typeId: infer T } ? (T extends string ? T : undefined) : undefined
+          Options extends { typeId: infer TTypeId }
+            ? TTypeId extends string
+              ? TTypeId
+              : undefined
+            : undefined
         >
       >,
     PrimaryKey

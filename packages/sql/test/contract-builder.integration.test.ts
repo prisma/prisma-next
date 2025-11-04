@@ -138,9 +138,8 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validated = validateContract(contract);
-    expect(validated.target).toBe('postgres');
-    expect(validated.storage.tables['user']).toBeDefined();
+    expect(contract.target).toBe('postgres');
+    expect(contract.storage.tables['user']).toBeDefined();
   });
 
   it('contract works with schema() function', () => {
@@ -159,8 +158,7 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validated = validateContract(contract);
-    const tables = schema<typeof validated, CodecTypes>(validated).tables;
+    const tables = schema<typeof contract, CodecTypes>(contract).tables;
     const userTable = tables['user'];
     expect(userTable).toBeDefined();
     expect(userTable?.columns).toHaveProperty('id');
@@ -184,13 +182,12 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validated = validateContract(contract);
     const adapter = createStubAdapter();
-    const tables = schema<typeof validated, CodecTypes>(validated).tables;
+    const tables = schema<typeof contract, CodecTypes>(contract).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
 
-    const plan = sql<typeof validated, CodecTypes>({ contract: validated, adapter })
+    const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
       .from(userTable)
       .select({
         id: userTable.columns['id']!,
@@ -230,13 +227,12 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validated = validateContract(contract);
     const adapter = createStubAdapter();
-    const tables = schema<typeof validated, CodecTypes>(validated).tables;
+    const tables = schema<typeof contract, CodecTypes>(contract).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
 
-    const plan = sql<typeof validated, CodecTypes>({ contract: validated, adapter })
+    const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
       .from(userTable)
       .select({
         id: userTable.columns['id']!,
@@ -277,48 +273,41 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validatedBuilderContract = validateContract(builderContract);
     const fixtureContract = validateContract<Contract>(contractJson);
 
     // Runtime checks
-    expect(validatedBuilderContract.schemaVersion).toBe(fixtureContract.schemaVersion);
-    expect(validatedBuilderContract.target).toBe(fixtureContract.target);
-    expect(validatedBuilderContract.targetFamily).toBe(fixtureContract.targetFamily);
-    const builderUserTable = validatedBuilderContract.storage.tables['user'];
+    expect(builderContract.schemaVersion).toBe(fixtureContract.schemaVersion);
+    expect(builderContract.target).toBe(fixtureContract.target);
+    expect(builderContract.targetFamily).toBe(fixtureContract.targetFamily);
+    const builderUserTable = builderContract.storage.tables['user'];
     const fixtureUserTable = fixtureContract.storage.tables['user'];
     expect(builderUserTable?.columns['id']?.type).toBe(fixtureUserTable?.columns['id']?.type);
     expect(builderUserTable?.columns['email']?.type).toBe(fixtureUserTable?.columns['email']?.type);
     expect(builderUserTable?.columns['createdAt']?.type).toBe(
       fixtureUserTable?.columns['createdAt']?.type,
     );
-    const builderUserModel = validatedBuilderContract.models['User'] as unknown as ModelDefinition;
+    const builderUserModel = builderContract.models['User'] as unknown as ModelDefinition;
     const fixtureUserModel = fixtureContract.models['User'] as unknown as ModelDefinition;
     expect(builderUserModel.storage.table).toBe(fixtureUserModel.storage.table);
     expect(Object.keys(builderUserModel.fields)).toEqual(Object.keys(fixtureUserModel.fields));
 
     // Type checks - verify builder contract preserves types like fixture
-    expectTypeOf(validatedBuilderContract.target).toEqualTypeOf<'postgres'>();
-    expectTypeOf(validatedBuilderContract.targetFamily).toEqualTypeOf<'sql'>();
-    expectTypeOf(validatedBuilderContract.schemaVersion).toEqualTypeOf<'1'>();
+    expectTypeOf(builderContract.target).toEqualTypeOf<'postgres'>();
+    expectTypeOf(builderContract.targetFamily).toEqualTypeOf<'sql'>();
+    expectTypeOf(builderContract.schemaVersion).toEqualTypeOf<'1'>();
 
     // Verify table and column types match
-    expectTypeOf(validatedBuilderContract.storage.tables).toHaveProperty('user');
-    expectTypeOf(validatedBuilderContract.storage.tables['user']['columns']).toHaveProperty('id');
-    expectTypeOf(validatedBuilderContract.storage.tables['user']['columns']).toHaveProperty(
-      'email',
-    );
-    expectTypeOf(validatedBuilderContract.storage.tables['user']['columns']).toHaveProperty(
-      'createdAt',
-    );
+    expectTypeOf(builderContract.storage.tables).toHaveProperty('user');
+    expectTypeOf(builderContract.storage.tables['user']['columns']).toHaveProperty('id');
+    expectTypeOf(builderContract.storage.tables['user']['columns']).toHaveProperty('email');
+    expectTypeOf(builderContract.storage.tables['user']['columns']).toHaveProperty('createdAt');
 
     // Verify model types match
-    expectTypeOf(validatedBuilderContract.models).toHaveProperty('User');
-    expectTypeOf(
-      validatedBuilderContract.models['User']['storage']['table'],
-    ).toEqualTypeOf<'user'>();
-    expectTypeOf(validatedBuilderContract.models['User']['fields']).toHaveProperty('id');
-    expectTypeOf(validatedBuilderContract.models['User']['fields']).toHaveProperty('email');
-    expectTypeOf(validatedBuilderContract.models['User']['fields']).toHaveProperty('createdAt');
+    expectTypeOf(builderContract.models).toHaveProperty('User');
+    expectTypeOf(builderContract.models['User']['storage']['table']).toEqualTypeOf<'user'>();
+    expectTypeOf(builderContract.models['User']['fields']).toHaveProperty('id');
+    expectTypeOf(builderContract.models['User']['fields']).toHaveProperty('email');
+    expectTypeOf(builderContract.models['User']['fields']).toHaveProperty('createdAt');
   });
 
   it('supports typeId decorations', () => {
