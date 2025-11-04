@@ -1,5 +1,6 @@
 import type { SqlContract } from '@prisma-next/sql/contract-types';
 import type { TableDef, ModelDef } from '@prisma-next/sql/types';
+import type { CodecTypes, ScalarToJs } from '@prisma-next/adapter-postgres/codec-types';
 
 export type Contract = SqlContract<
   {
@@ -70,6 +71,7 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
+    readonly scalarToJs: ScalarToJs;
   }
 > & {
   readonly storage: {
@@ -88,6 +90,9 @@ export type Contract = SqlContract<
     };
   };
 };
+
+// Codec type map and scalar mapping imported from adapter - used for type inference in lanes
+export type { CodecTypes, ScalarToJs };
 
 export type User = Contract['models']['User'];
 export type Post = Contract['models']['Post'];

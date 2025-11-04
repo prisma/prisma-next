@@ -7,7 +7,12 @@
   "profileHash": "sha256:test-profile",
   "models": {},
   "relations": {},
-  "mappings": {},
+  "mappings": {
+    "modelToTable": {},
+    "tableToModel": {},
+    "fieldToColumn": {},
+    "columnToField": {}
+  },
   "storage": {
     "tables": {
       "user": {
@@ -16,6 +21,26 @@
           "email": { "type": "text", "nullable": false },
           "createdAt": { "type": "timestamptz", "nullable": false }
         }
+      }
+    }
+  },
+  "extensions": {
+    "postgres": {
+      "decorations": {
+        "columns": [
+          {
+            "ref": { "kind": "column", "table": "user", "column": "id" },
+            "payload": { "typeId": "core/number@1" }
+          },
+          {
+            "ref": { "kind": "column", "table": "user", "column": "email" },
+            "payload": { "typeId": "core/string@1" }
+          },
+          {
+            "ref": { "kind": "column", "table": "user", "column": "createdAt" },
+            "payload": { "typeId": "core/iso-datetime@1" }
+          }
+        ]
       }
     }
   }

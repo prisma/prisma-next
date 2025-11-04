@@ -118,7 +118,9 @@ export function validateContractCodecMappings(
   // Check that all declared typeIds have codec implementations
   for (const [key, typeId] of typeIds.entries()) {
     if (!registry.has(typeId)) {
-      const [table, column] = key.split('.');
+      const parts = key.split('.');
+      const table = parts[0] ?? '';
+      const column = parts[1] ?? '';
       invalidCodecs.push({ table, column, typeId });
     }
   }
@@ -157,7 +159,6 @@ export function validateCodecRegistryCompleteness(
 
   // Then validate scalar types for columns without typeId
   const typeIds = extractTypeIdsFromExtensions(contract);
-  const requiredTypes = extractScalarTypes(contract);
   const missingTypes: string[] = [];
 
   // Only check scalar types for columns that don't have a typeId
