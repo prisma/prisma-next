@@ -1,3 +1,6 @@
+---
+alwaysApply: false
+---
 # Vitest expectTypeOf API
 
 ## Deprecated: `toMatchTypeOf`

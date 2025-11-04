@@ -26,6 +26,10 @@
     "./types": {
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
+    },
+    "./codec-types": {
+      "types": "./dist/exports/codec-types.d.ts",
+      "import": "./dist/exports/codec-types.js"
     }
   }
 }

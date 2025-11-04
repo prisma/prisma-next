@@ -139,15 +139,127 @@ export type ContractScalarToJsType<T extends string> = T extends 'text'
       : unknown;
 
 /**
- * Infers JavaScript type from a ColumnBuilder based on its columnMeta.type.
+ * Maps codec output type string literal to JavaScript type.
+ * Maps TypeScript type string literals (e.g., 'string', 'number') to actual TypeScript types.
  */
-export type InferColumnType<C extends ColumnBuilder> = C extends ColumnBuilder & {
+export type CodecOutputToJsType<T extends string> = T extends 'string'
+  ? string
+  : T extends 'number'
+    ? number
+    : T extends 'boolean'
+      ? boolean
+      : T extends 'bigint'
+        ? bigint
+        : T extends 'Date'
+          ? Date
+          : unknown;
+
+/**
+ * Helper type to extract codec output type from contract mappings.
+ */
+type ExtractCodecOutputType<
+  CodecId extends string,
+  CodecTypes extends Record<string, { output: string }>,
+> = CodecId extends keyof CodecTypes
+  ? CodecTypes[CodecId] extends { output: infer Output }
+    ? Output extends string
+      ? Output
+      : never
+    : never
+  : never;
+
+/**
+ * Helper type to extract typeId from extension decorations for a column.
+ * Searches through all extensions for a decoration matching the table/column.
+ */
+type GetColumnTypeId<
+  TableName extends string,
+  ColumnName extends string,
+  Extensions extends Record<string, unknown> | undefined,
+> = Extensions extends Record<string, unknown>
+  ? {
+      [K in keyof Extensions]: Extensions[K] extends {
+        decorations?: {
+          columns?: Array<{
+            ref?: { kind?: string; table?: string; column?: string };
+            payload?: { typeId?: string };
+          }>;
+        };
+      }
+        ? Extensions[K]['decorations'] extends {
+            columns?: Array<infer D>;
+          }
+          ? D extends {
+              ref?: { kind?: string; table?: infer T; column?: infer C };
+              payload?: { typeId?: infer TId };
+            }
+              ? T extends TableName
+                ? C extends ColumnName
+                  ? TId extends string
+                    ? TId
+                    : never
+                  : never
+                : never
+              : never
+          : never
+        : never;
+    }[keyof Extensions]
+  : never;
+
+/**
+ * Infers JavaScript type from a ColumnBuilder.
+ *
+ * Type inference rules:
+ * 1. If column has a typeId in extension decorations, look up CodecTypes[typeId].output
+ * 2. Otherwise, map storage scalar → JS type per target family
+ * 3. Nullability propagates from storage column metadata
+ *
+ * Note: CodecTypes should be imported from contract.d.ts and passed as a type parameter.
+ * If not provided, falls back to scalar mapping.
+ */
+export type InferColumnType<
+  C extends ColumnBuilder,
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: string }> = Record<string, { output: string }>,
+> = C extends ColumnBuilder & {
+  table: infer TableName;
+  column: infer ColumnName;
   columnMeta: { type: infer T; nullable: infer N };
 }
-  ? T extends string
-    ? N extends true
-      ? ContractScalarToJsType<T> | null
-      : ContractScalarToJsType<T>
+  ? TableName extends string
+    ? ColumnName extends string
+      ? GetColumnTypeId<
+          TableName,
+          ColumnName,
+          TContract['extensions']
+        > extends infer TypeId
+        ? TypeId extends string
+          ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
+            ? CodecOutput extends string
+              ? N extends true
+                ? CodecOutputToJsType<CodecOutput> | null
+                : CodecOutputToJsType<CodecOutput>
+              : T extends string
+                ? N extends true
+                  ? ContractScalarToJsType<T> | null
+                  : ContractScalarToJsType<T>
+                : unknown
+            : T extends string
+              ? N extends true
+                ? ContractScalarToJsType<T> | null
+                : ContractScalarToJsType<T>
+              : unknown
+          : T extends string
+            ? N extends true
+              ? ContractScalarToJsType<T> | null
+              : ContractScalarToJsType<T>
+            : unknown
+        : T extends string
+          ? N extends true
+            ? ContractScalarToJsType<T> | null
+            : ContractScalarToJsType<T>
+          : unknown
+      : unknown
     : unknown
   : unknown;
 
@@ -155,8 +267,12 @@ export type InferColumnType<C extends ColumnBuilder> = C extends ColumnBuilder &
  * Infers Row type from a projection object.
  * Maps Record<string, ColumnBuilder> to Record<string, JSType>
  */
-export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
-  [K in keyof P]: InferColumnType<P[K]>;
+export type InferProjectionRow<
+  P extends Record<string, ColumnBuilder>,
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: string }> = Record<string, { output: string }>,
+> = {
+  [K in keyof P]: InferColumnType<P[K], TContract, CodecTypes>;
 };
 
 /**

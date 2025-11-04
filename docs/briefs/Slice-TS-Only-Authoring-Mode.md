@@ -140,3 +140,4 @@ type Row = ResultType<typeof plan>; // { id: number; createdAt: string } with nu
 5. Add examples and type tests demonstrating TS‑only authoring and `ResultType` inference.
 
 
+

@@ -41,3 +41,4 @@ Related: ADR 010 (Canonicalization), ADR 011 (Unified Plan), ADR 020 (Result typ
 - Inferring types from a runtime-built registry: rejected due to editor/CI determinism concerns and environment coupling.
 
 
+

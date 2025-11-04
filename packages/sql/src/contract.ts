@@ -125,11 +125,13 @@ function validateContractStructure<T extends SqlContract<SqlStorage>>(
  *
  * @param models - Models object from contract
  * @param storage - Storage object from contract
+ * @param existingMappings - Existing mappings from contract input (optional)
  * @returns Computed mappings dictionary
  */
 function computeMappings(
   models: Record<string, ModelDefinition>,
   _storage: SqlStorage,
+  existingMappings?: Partial<SqlMappings>,
 ): SqlMappings {
   const modelToTable: Record<string, string> = {};
   const tableToModel: Record<string, string> = {};
@@ -154,11 +156,12 @@ function computeMappings(
     fieldToColumn[modelName] = modelFieldToColumn;
   }
 
+  // Preserve existing mappings if provided, otherwise use computed ones
   return {
-    modelToTable,
-    tableToModel,
-    fieldToColumn,
-    columnToField,
+    modelToTable: existingMappings?.modelToTable ?? modelToTable,
+    tableToModel: existingMappings?.tableToModel ?? tableToModel,
+    fieldToColumn: existingMappings?.fieldToColumn ?? fieldToColumn,
+    columnToField: existingMappings?.columnToField ?? columnToField,
   };
 }
 
@@ -335,6 +338,77 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
       }
     }
   }
+
+  // Validate extension decorations with typeId
+  if (contract.extensions) {
+    for (const [namespace, extension] of Object.entries(contract.extensions)) {
+      if (typeof extension !== 'object' || extension === null) {
+        continue;
+      }
+
+      const ext = extension as {
+        decorations?: {
+          columns?: Array<{
+            ref?: { kind?: string; table?: string; column?: string };
+            payload?: { typeId?: string };
+          }>;
+        };
+      };
+
+      if (ext.decorations?.columns) {
+        for (const decoration of ext.decorations.columns) {
+          // Validate decoration structure
+          if (!decoration.ref) {
+            throw new Error(
+              `Extension "${namespace}" decoration is missing required "ref" property`,
+            );
+          }
+
+          if (decoration.ref.kind !== 'column') {
+            continue; // Only validate column decorations here
+          }
+
+          if (!decoration.ref.table || !decoration.ref.column) {
+            throw new Error(
+              `Extension "${namespace}" column decoration ref must have "table" and "column" properties`,
+            );
+          }
+
+          // Validate referenced table exists
+          if (!tableNames.has(decoration.ref.table)) {
+            throw new Error(
+              `Extension "${namespace}" decoration references non-existent table "${decoration.ref.table}"`,
+            );
+          }
+
+          // Validate referenced column exists
+          const table = storage.tables[decoration.ref.table];
+          if (!table) {
+            throw new Error(
+              `Extension "${namespace}" decoration references non-existent table "${decoration.ref.table}"`,
+            );
+          }
+
+          const columnNames = new Set(Object.keys(table.columns));
+          if (!columnNames.has(decoration.ref.column)) {
+            throw new Error(
+              `Extension "${namespace}" decoration references non-existent column "${decoration.ref.column}" in table "${decoration.ref.table}"`,
+            );
+          }
+
+          // Validate typeId if present
+          if (decoration.payload?.typeId) {
+            const typeId = decoration.payload.typeId;
+            if (typeof typeId !== 'string' || !typeId.includes('@')) {
+              throw new Error(
+                `Extension "${namespace}" decoration has invalid typeId "${typeId}". Expected format: "namespace/name@version"`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -358,12 +432,17 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
   const structurallyValid = validateContractStructure<SqlContract<SqlStorage>>(value);
 
   const contractForValidation = structurallyValid as SqlContract<SqlStorage>;
+
   validateContractLogic(contractForValidation);
+
+  // Extract existing mappings (optional - will be computed if missing)
+  const existingMappings = (contractForValidation as { mappings?: Partial<SqlMappings> }).mappings;
 
   // Compute mappings from models and storage
   const mappings = computeMappings(
     contractForValidation.models as Record<string, ModelDefinition>,
     contractForValidation.storage,
+    existingMappings,
   );
 
   // Add default values for optional metadata fields if missing

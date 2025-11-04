@@ -52,102 +52,142 @@ function runtimeError(
 }
 
 /**
- * Validates contract codec mappings.
+ * Extracts all typeIds declared in extension decorations.
+ *
+ * @param contract - The contract to extract typeIds from
+ * @returns Map of table.column → typeId
+ */
+function extractTypeIdsFromExtensions(
+  contract: SqlContract<SqlStorage>,
+): Map<string, string> {
+  const typeIds = new Map<string, string>();
+
+  if (!contract.extensions) {
+    return typeIds;
+  }
+
+  for (const [_namespace, extension] of Object.entries(contract.extensions)) {
+    if (typeof extension !== 'object' || extension === null) {
+      continue;
+    }
+
+    const ext = extension as {
+      decorations?: {
+        columns?: Array<{
+          ref?: { kind?: string; table?: string; column?: string };
+          payload?: { typeId?: string };
+        }>;
+      };
+    };
+
+    if (ext.decorations?.columns) {
+      for (const decoration of ext.decorations.columns) {
+        if (
+          decoration.ref?.kind === 'column' &&
+          decoration.ref.table &&
+          decoration.ref.column &&
+          decoration.payload?.typeId
+        ) {
+          const key = `${decoration.ref.table}.${decoration.ref.column}`;
+          typeIds.set(key, decoration.payload.typeId);
+        }
+      }
+    }
+  }
+
+  return typeIds;
+}
+
+/**
+ * Validates that all declared typeIds in extension decorations have codec implementations.
  *
  * Checks that:
- * - Every column has a codec assigned in `contract.mappings.columnToCodec`
- * - All assigned codec IDs exist in the registry
+ * - All typeIds declared in extension decorations exist in the registry
  *
  * @param registry - The codec registry to validate against
  * @param contract - The contract to check
- * @throws RuntimeError with code 'RUNTIME.CODEC_MAPPING_INVALID' if mappings are invalid
+ * @throws RuntimeError with code 'RUNTIME.CODEC_MISSING' if any typeIds are missing
  */
 export function validateContractCodecMappings(
   registry: CodecRegistry,
   contract: SqlContract<SqlStorage>,
 ): void {
-  const mappings = contract.mappings?.columnToCodec;
-  if (!mappings) {
-    // If no mappings are provided, we can't validate - this might be okay for MVP
-    // but will be required in the future
-    return;
-  }
+  const typeIds = extractTypeIdsFromExtensions(contract);
+  const invalidCodecs: Array<{ table: string; column: string; typeId: string }> = [];
 
-  const missingColumns: Array<{ table: string; column: string }> = [];
-  const invalidCodecs: Array<{ table: string; column: string; codecId: string }> = [];
-
-  // Check that every column has a codec assignment
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
-    for (const columnName of Object.keys(table.columns)) {
-      const tableMappings = mappings[tableName];
-      const codecId = tableMappings?.[columnName];
-
-      if (!codecId) {
-        missingColumns.push({ table: tableName, column: columnName });
-      } else if (!registry.has(codecId)) {
-        invalidCodecs.push({ table: tableName, column: columnName, codecId });
-      }
+  // Check that all declared typeIds have codec implementations
+  for (const [key, typeId] of typeIds.entries()) {
+    if (!registry.has(typeId)) {
+      const [table, column] = key.split('.');
+      invalidCodecs.push({ table, column, typeId });
     }
   }
 
-  if (missingColumns.length > 0 || invalidCodecs.length > 0) {
+  if (invalidCodecs.length > 0) {
     const details: Record<string, unknown> = {
       contractTarget: contract.target,
+      invalidCodecs,
     };
 
-    if (missingColumns.length > 0) {
-      details['missingColumns'] = missingColumns;
-    }
-
-    if (invalidCodecs.length > 0) {
-      details['invalidCodecs'] = invalidCodecs;
-    }
-
     throw runtimeError(
-      'RUNTIME.CODEC_MAPPING_INVALID',
-      `Invalid codec mappings: ${missingColumns.length > 0 ? `${missingColumns.length} columns missing codec assignments` : ''}${missingColumns.length > 0 && invalidCodecs.length > 0 ? ', ' : ''}${invalidCodecs.length > 0 ? `${invalidCodecs.length} columns reference invalid codec IDs` : ''}`,
+      'RUNTIME.CODEC_MISSING',
+      `Missing codec implementations for declared typeIds: ${invalidCodecs.map((c) => `${c.table}.${c.column} (${c.typeId})`).join(', ')}`,
       details,
     );
   }
 }
 
 /**
- * Validates that a codec registry contains codecs for all scalar types
- * required by the contract.
+ * Validates that a codec registry contains codecs for all requirements of the contract.
  *
- * Checks that for each scalar type found in the contract's storage tables,
- * there is at least one codec in the registry's `byScalar` map.
+ * Checks:
+ * 1. All typeIds declared in extension decorations have codec implementations
+ * 2. For columns without typeId, there is at least one codec for the scalar type
  *
  * @param registry - The codec registry to validate
  * @param contract - The contract to check against
- * @throws RuntimeError with code 'RUNTIME.CODEC_MISSING' if any types are missing
+ * @throws RuntimeError with code 'RUNTIME.CODEC_MISSING' if any requirements are missing
  */
 export function validateCodecRegistryCompleteness(
   registry: CodecRegistry,
   contract: SqlContract<SqlStorage>,
 ): void {
+  // First validate that all declared typeIds have implementations
+  validateContractCodecMappings(registry, contract);
+
+  // Then validate scalar types for columns without typeId
+  const typeIds = extractTypeIdsFromExtensions(contract);
   const requiredTypes = extractScalarTypes(contract);
   const missingTypes: string[] = [];
 
-  for (const type of requiredTypes) {
-    const codecs = registry.getByScalar(type);
-    if (codecs.length === 0) {
-      missingTypes.push(type);
+  // Only check scalar types for columns that don't have a typeId
+  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      const key = `${tableName}.${columnName}`;
+      // Skip columns that have a typeId (they're already validated above)
+      if (typeIds.has(key)) {
+        continue;
+      }
+
+      // For columns without typeId, ensure there's a codec for the scalar type
+      if (column.type) {
+        const codecs = registry.getByScalar(column.type);
+        if (codecs.length === 0 && !missingTypes.includes(column.type)) {
+          missingTypes.push(column.type);
+        }
+      }
     }
   }
 
   if (missingTypes.length > 0) {
     throw runtimeError(
       'RUNTIME.CODEC_MISSING',
-      `Missing codecs for contract scalar types: ${missingTypes.join(', ')}`,
+      `Missing codecs for contract scalar types (columns without typeId): ${missingTypes.join(', ')}`,
       {
         missingTypes,
         contractTarget: contract.target,
       },
     );
   }
-
-  // Also validate contract mappings if present
-  validateContractCodecMappings(registry, contract);
 }
 

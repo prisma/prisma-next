@@ -28,5 +28,47 @@
         }
       }
     }
+  },
+  "extensions": {
+    "postgres": {
+      "decorations": {
+        "columns": [
+          {
+            "ref": { "kind": "column", "table": "user", "column": "id" },
+            "payload": { "typeId": "core/number@1" }
+          },
+          {
+            "ref": { "kind": "column", "table": "user", "column": "email" },
+            "payload": { "typeId": "core/string@1" }
+          },
+          {
+            "ref": { "kind": "column", "table": "user", "column": "createdAt" },
+            "payload": { "typeId": "core/iso-datetime@1" }
+          }
+        ]
+      }
+    }
+  },
+  "mappings": {
+    "modelToTable": {
+      "User": "user"
+    },
+    "tableToModel": {
+      "user": "User"
+    },
+    "fieldToColumn": {
+      "User": {
+        "id": "id",
+        "email": "email",
+        "createdAt": "createdAt"
+      }
+    },
+    "columnToField": {
+      "user": {
+        "id": "id",
+        "email": "email",
+        "createdAt": "createdAt"
+      }
+    }
   }
 }

@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     adapter: 'src/exports/adapter.ts',
     types: 'src/exports/types.ts',
+    'codec-types': 'src/exports/codec-types.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],

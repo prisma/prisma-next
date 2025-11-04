@@ -359,6 +359,17 @@ describe('validateContract', () => {
         },
       },
     },
+    mappings: {
+      columnToCodec: {
+        User: {
+          id: 'core/string@1',
+          email: 'core/string@1',
+        },
+      },
+      codecTypes: {
+        'core/string@1': { input: 'string', output: 'string' },
+      },
+    },
   });
 
   it('performs both structural and logical validation', () => {
@@ -416,5 +427,144 @@ describe('validateContract', () => {
     // Verify structure is validated at runtime
     expect(result.storage.tables).toHaveProperty('User');
     expect(result.storage.tables['User']?.columns).toHaveProperty('id');
+  });
+});
+
+describe('validateContract extension decoration validation', () => {
+  const baseContract = {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    coreHash: 'sha256:test',
+    models: {
+      User: {
+        storage: { table: 'user' },
+        fields: {
+          id: { column: 'id' },
+          email: { column: 'email' },
+        },
+      },
+    },
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { type: 'int4', nullable: false },
+            email: { type: 'text', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+        },
+      },
+    },
+  };
+
+  const validExtensions = {
+    extensions: {
+      postgres: {
+        decorations: {
+          columns: [
+            {
+              ref: { kind: 'column', table: 'user', column: 'id' },
+              payload: { typeId: 'core/number@1' },
+            },
+            {
+              ref: { kind: 'column', table: 'user', column: 'email' },
+              payload: { typeId: 'core/string@1' },
+            },
+          ],
+        },
+      },
+    },
+  };
+
+  it('succeeds when extension decorations are valid', () => {
+    const valid = {
+      ...baseContract,
+      ...validExtensions,
+    };
+    expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();
+  });
+
+  it('throws if extension decoration references non-existent table', () => {
+    const invalid = {
+      ...baseContract,
+      extensions: {
+        postgres: {
+          decorations: {
+            columns: [
+              {
+                ref: { kind: 'column', table: 'nonexistent', column: 'id' },
+                payload: { typeId: 'core/number@1' },
+              },
+            ],
+          },
+        },
+      },
+    } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /decoration references non-existent table/,
+    );
+  });
+
+  it('throws if extension decoration references non-existent column', () => {
+    const invalid = {
+      ...baseContract,
+      extensions: {
+        postgres: {
+          decorations: {
+            columns: [
+              {
+                ref: { kind: 'column', table: 'user', column: 'nonexistent' },
+                payload: { typeId: 'core/string@1' },
+              },
+            ],
+          },
+        },
+      },
+    } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /decoration references non-existent column/,
+    );
+  });
+
+  it('throws if extension decoration has invalid typeId format', () => {
+    const invalid = {
+      ...baseContract,
+      extensions: {
+        postgres: {
+          decorations: {
+            columns: [
+              {
+                ref: { kind: 'column', table: 'user', column: 'id' },
+                payload: { typeId: 'invalid-format' },
+              },
+            ],
+          },
+        },
+      },
+    } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /invalid typeId.*Expected format/,
+    );
+  });
+
+  it('throws if extension decoration is missing ref', () => {
+    const invalid = {
+      ...baseContract,
+      extensions: {
+        postgres: {
+          decorations: {
+            columns: [
+              {
+                payload: { typeId: 'core/string@1' },
+              },
+            ],
+          },
+        },
+      },
+    } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /decoration is missing required.*ref/,
+    );
   });
 });

@@ -19,7 +19,7 @@ import type {
   ResultType,
 } from '../src/types';
 import { CodecRegistry } from '@prisma-next/sql-target';
-import type { Contract } from './fixtures/contract.d';
+import type { Contract, CodecTypes } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -232,7 +232,7 @@ describe('sql DSL builder', () => {
       });
     });
 
-    it('does not include annotations when no codec mappings exist', () => {
+    it('includes codec annotations when codec mappings exist', () => {
       const userColumns = tables.user.columns;
       const plan = sql({ contract, adapter })
         .from(tables.user)
@@ -242,7 +242,11 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.meta.annotations).toBeUndefined();
+      expect(plan.meta.annotations).toBeDefined();
+      expect(plan.meta.annotations?.codecs).toEqual({
+        id: 'core/int@1',
+        email: 'core/string@1',
+      });
     });
 
     it('only includes codecs for columns with mappings', () => {
@@ -272,37 +276,33 @@ describe('sql DSL builder', () => {
       });
     });
 
-    it('infers ResultType correctly when codec mappings and codecTypes are present', () => {
-      type ContractWithCodecs = SqlContract<
-        Contract['storage'],
-        Contract['models'],
-        Contract['relations'],
-        Contract['mappings'] & {
-          readonly columnToCodec: {
-            readonly user: {
-              readonly id: 'core/string@1';
-              readonly email: 'core/string@1';
-            };
-          };
-          readonly codecTypes: {
-            readonly 'core/string@1': { readonly input: 'string'; readonly output: 'string' };
-          };
-        }
-      >;
-
-      const contractValidated = validateContract<Contract>(contract);
-      const contractWithCodecs: ContractWithCodecs = {
-        ...contractValidated,
-        mappings: {
-          ...contractValidated.mappings,
-          columnToCodec: { user: { id: 'core/string@1', email: 'core/string@1' } },
-          codecTypes: { 'core/string@1': { input: 'string', output: 'string' } },
+    it('infers ResultType correctly when extension decorations with typeId are present', () => {
+      // Create a contract with extension decorations
+      const contractWithExtensions = {
+        ...contract,
+        extensions: {
+          postgres: {
+            decorations: {
+              columns: [
+                {
+                  ref: { kind: 'column', table: 'user', column: 'id' },
+                  payload: { typeId: 'core/string@1' },
+                },
+                {
+                  ref: { kind: 'column', table: 'user', column: 'email' },
+                  payload: { typeId: 'core/string@1' },
+                },
+              ],
+            },
+          },
         },
-      } as ContractWithCodecs;
+      };
 
-      const testTables = schema(contractWithCodecs).tables;
+      const contractValidated = validateContract<Contract>(contractWithExtensions);
+
+      const testTables = schema(contractValidated).tables;
       const userColumns = testTables.user.columns;
-      const plan = sql({ contract: contractWithCodecs, adapter })
+      const plan = sql({ contract: contractValidated, adapter })
         .from(testTables.user)
         .select({
           id: userColumns.id,

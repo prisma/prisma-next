@@ -69,11 +69,11 @@ class SelectBuilderImpl<
 
   select<P extends Record<string, ColumnBuilder>>(
     projection: P,
-  ): SelectBuilderImpl<TContract, InferProjectionRow<P>> {
+  ): SelectBuilderImpl<TContract, InferProjectionRow<P, TContract>> {
     const table = this.ensureFrom();
     const projectionState = buildProjectionState(table, projection);
 
-    return new SelectBuilderImpl<TContract, InferProjectionRow<P>>(
+    return new SelectBuilderImpl<TContract, InferProjectionRow<P, TContract>>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -242,7 +242,11 @@ class SelectBuilderImpl<
       ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
     });
 
-    const codecId = this.contract.mappings?.columnToCodec?.[where.left.table]?.[where.left.column];
+    const codecId = extractTypeIdFromExtensions(
+      this.contract.extensions,
+      where.left.table,
+      where.left.column,
+    );
 
     return {
       expr: {
@@ -263,6 +267,50 @@ class SelectBuilderImpl<
       paramName,
     };
   }
+}
+
+/**
+ * Extracts typeId from extension decorations for a given table/column.
+ * Searches through all extensions for a decoration matching the table/column.
+ */
+function extractTypeIdFromExtensions(
+  extensions: Record<string, unknown> | undefined,
+  table: string,
+  column: string,
+): string | undefined {
+  if (!extensions) {
+    return undefined;
+  }
+
+  for (const [_namespace, extension] of Object.entries(extensions)) {
+    if (typeof extension !== 'object' || extension === null) {
+      continue;
+    }
+
+    const ext = extension as {
+      decorations?: {
+        columns?: Array<{
+          ref?: { kind?: string; table?: string; column?: string };
+          payload?: { typeId?: string };
+        }>;
+      };
+    };
+
+    if (ext.decorations?.columns) {
+      for (const decoration of ext.decorations.columns) {
+        if (
+          decoration.ref?.kind === 'column' &&
+          decoration.ref.table === table &&
+          decoration.ref.column === column &&
+          decoration.payload?.typeId
+        ) {
+          return decoration.payload.typeId;
+        }
+      }
+    }
+  }
+
+  return undefined;
 }
 
 function buildProjectionState(
@@ -345,7 +393,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     }
   }
 
-  // Build codec assignments from contract mappings
+  // Build codec assignments from extension decorations
   const projectionCodecs: Record<string, string> = {};
   for (let i = 0; i < args.projection.aliases.length; i++) {
     const alias = args.projection.aliases[i];
@@ -353,10 +401,14 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column || !alias) {
       continue;
     }
-    const tableMappings = args.contract.mappings?.columnToCodec?.[column.table];
-    const codecId = tableMappings?.[column.column];
-    if (codecId) {
-      projectionCodecs[alias] = codecId;
+    // Extract typeId from extension decorations
+    const typeId = extractTypeIdFromExtensions(
+      args.contract.extensions,
+      column.table,
+      column.column,
+    );
+    if (typeId) {
+      projectionCodecs[alias] = typeId;
     }
   }
 
