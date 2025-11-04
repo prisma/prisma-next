@@ -19,7 +19,7 @@ import type {
   ResultType,
 } from '../src/types';
 import { CodecRegistry } from '@prisma-next/sql-target';
-import type { Contract, CodecTypes } from './fixtures/contract.d';
+import type { Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -358,7 +358,7 @@ describe('sql DSL builder', () => {
       // Contract without extension decorations - should use scalarToJs fallback
       const contractWithoutCodecs = {
         ...contract,
-        extensions: undefined,
+        extensions: {},
       };
 
       const contractValidated = validateContract<Contract>(contractWithoutCodecs);

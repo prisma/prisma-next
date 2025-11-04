@@ -352,15 +352,22 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
-  it('uses codec assignments from contract columnToCodec mappings', async () => {
+  it('uses codec assignments from contract extension decorations', async () => {
     const contractWithCodecs: SqlContract<SqlStorage> = {
       ...fixtureContract,
-      mappings: {
-        ...fixtureContract.mappings,
-        columnToCodec: {
-          test_data: {
-            created_at: 'core/iso-datetime@1',
-            name: 'core/string@1',
+      extensions: {
+        postgres: {
+          decorations: {
+            columns: [
+              {
+                ref: { kind: 'column', table: 'test_data', column: 'created_at' },
+                payload: { typeId: 'core/iso-datetime@1' },
+              },
+              {
+                ref: { kind: 'column', table: 'test_data', column: 'name' },
+                payload: { typeId: 'core/string@1' },
+              },
+            ],
           },
         },
       },
@@ -409,11 +416,15 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   it('uses codec assignments from contract for WHERE clause parameters', async () => {
     const contractWithCodecs: SqlContract<SqlStorage> = {
       ...fixtureContract,
-      mappings: {
-        ...fixtureContract.mappings,
-        columnToCodec: {
-          test_data: {
-            id: 'core/number@1',
+      extensions: {
+        postgres: {
+          decorations: {
+            columns: [
+              {
+                ref: { kind: 'column', table: 'test_data', column: 'id' },
+                payload: { typeId: 'core/number@1' },
+              },
+            ],
           },
         },
       },

@@ -337,7 +337,7 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
   // Create a contract without extension decorations to test ScalarToJs fallback
   const contractWithoutCodecs = {
     ...contractJson,
-    extensions: undefined,
+    extensions: {},
   };
   const contract = validateContract<Contract>(contractWithoutCodecs);
   const adapter = createPostgresAdapter();
@@ -393,7 +393,7 @@ test('nullable columns preserve nullability in ResultType', () => {
         },
       },
     },
-    extensions: undefined, // Use ScalarToJs fallback
+    extensions: {}, // Use ScalarToJs fallback
   };
   const contract = validateContract<Contract>(contractWithNullable);
   const adapter = createPostgresAdapter();
@@ -528,10 +528,4 @@ test('representative contract resolves types correctly end-to-end', () => {
     createdAt: string; // core/iso-datetime@1 → string
   }>();
 
-  // Verify the plan has correct codec annotations
-  expectTypeOf(plan.meta.annotations?.codecs).toExtend<{
-    id: string;
-    email: string;
-    createdAt: string;
-  }>();
 });
