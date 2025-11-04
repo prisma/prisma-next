@@ -11,12 +11,13 @@ import {
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { unstable_startServer } from '@prisma/dev';
 import type { StartServerOptions } from '@prisma/dev';
-import contract from '../src/prisma-next/contract.json' assert { type: 'json' };
-import type { DataContract } from '@prisma-next/contract/types';
+import contractJson from '../src/prisma-next/contract.json' assert { type: 'json' };
 import type { Contract, CodecTypes } from '../src/prisma-next/contract.d';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
-import type { TableRef, ColumnBuilder } from '@prisma-next/sql/types';
+import { validateContract } from '@prisma-next/sql/schema';
+
+const contract = validateContract<Contract>(contractJson);
 
 // Copy of withDevDatabase helper (like compat-prisma does)
 function normalizeConnectionString(raw: string): string {
@@ -39,19 +40,6 @@ async function withDevDatabase<T>(
   } finally {
     await server.close();
   }
-}
-
-// Helper to create a table ref with correct name property (avoids name column conflict)
-function createTableRef(
-  tables: { readonly [key: string]: TableRef & Record<string, ColumnBuilder> },
-  tableName: string,
-): TableRef & Record<string, ColumnBuilder> {
-  const table = tables[tableName];
-  if (!table) {
-    throw new Error(`Table ${tableName} not found`);
-  }
-  // Return table directly - columns are accessed via table.columns now, so no conflict
-  return table;
 }
 
 describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () => {
@@ -90,15 +78,15 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         await client.query(ensureTableStatement.sql);
 
         const write = writeContractMarker({
-          coreHash: (contract as DataContract).coreHash,
-          profileHash: (contract as DataContract).profileHash ?? 'sha256:test-profile',
+          coreHash: contract.coreHash,
+          profileHash: contract.profileHash ?? 'sha256:test-profile',
           contractJson: contract,
           canonicalVersion: 1,
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
         const runtime = createRuntime({
-          contract: contract as DataContract,
+          contract,
           adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
@@ -111,7 +99,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           ],
         });
 
-        const tables = schema<Contract, CodecTypes>(contract as Contract).tables;
+        const tables = schema<Contract, CodecTypes>(contract).tables;
         const userTable = tables['User'];
         if (!userTable) {
           throw new Error('User table not found');
@@ -122,7 +110,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }
-        const plan = sql<Contract, CodecTypes>({ contract: contract as Contract, adapter })
+        const plan = sql<Contract, CodecTypes>({ contract, adapter })
           .from(userTable)
           .select({
             id: idColumn,
@@ -182,15 +170,15 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         await client.query(ensureTableStatement.sql);
 
         const write = writeContractMarker({
-          coreHash: (contract as DataContract).coreHash,
-          profileHash: (contract as DataContract).profileHash ?? 'sha256:test-profile',
+          coreHash: contract.coreHash,
+          profileHash: contract.profileHash ?? 'sha256:test-profile',
           contractJson: contract,
           canonicalVersion: 1,
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
         const runtime = createRuntime({
-          contract: contract as DataContract,
+          contract,
           adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
@@ -203,7 +191,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           ],
         });
 
-        const tables = schema<Contract, CodecTypes>(contract as Contract).tables;
+        const tables = schema<Contract, CodecTypes>(contract).tables;
         const userTable = tables['User'];
         if (!userTable) {
           throw new Error('User table not found');
@@ -214,7 +202,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }
-        const plan = sql<Contract, CodecTypes>({ contract: contract as Contract, adapter })
+        const plan = sql<Contract, CodecTypes>({ contract, adapter })
           .from(userTable)
           .select({
             id: idColumn,
@@ -272,15 +260,15 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         await client.query(ensureTableStatement.sql);
 
         const write = writeContractMarker({
-          coreHash: (contract as DataContract).coreHash,
-          profileHash: (contract as DataContract).profileHash ?? 'sha256:test-profile',
+          coreHash: contract.coreHash,
+          profileHash: contract.profileHash ?? 'sha256:test-profile',
           contractJson: contract,
           canonicalVersion: 1,
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
         const runtime = createRuntime({
-          contract: contract as DataContract,
+          contract,
           adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
@@ -293,7 +281,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           ],
         });
 
-        const tables = schema<Contract, CodecTypes>(contract as Contract).tables;
+        const tables = schema<Contract, CodecTypes>(contract).tables;
         const userTable = tables['User'];
         if (!userTable) {
           throw new Error('User table not found');
@@ -304,7 +292,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }
-        const plan = sql<Contract, CodecTypes>({ contract: contract as Contract, adapter })
+        const plan = sql<Contract, CodecTypes>({ contract, adapter })
           .from(userTable)
           .select({
             id: idColumn,

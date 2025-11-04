@@ -109,7 +109,7 @@ describe('sql DSL builder', () => {
     expect(plan.meta.paramDescriptors).toEqual<ParamDescriptor[]>([
       {
         name: 'userId',
-        type: 'int4',
+        type: 'pg/int4@1',
         nullable: false,
         source: 'dsl',
         refs: { table: 'user', column: 'id' },
@@ -178,24 +178,8 @@ describe('sql DSL builder', () => {
       });
     });
 
-    it('encodes codec assignments from extension decorations for WHERE parameters', () => {
-      const contractWithCodecs = {
-        ...contract,
-        extensions: {
-          postgres: {
-            decorations: {
-              columns: [
-                {
-                  ref: { kind: 'column', table: 'user', column: 'id' },
-                  payload: { typeId: 'pg/int4@1' },
-                },
-              ],
-            },
-          },
-        },
-      };
-
-      const contractValidated = validateContract<Contract>(contractWithCodecs);
+    it('encodes codec assignments from column types for WHERE parameters', () => {
+      const contractValidated = validateContract<Contract>(contract);
       const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
       const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
         .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
@@ -207,6 +191,7 @@ describe('sql DSL builder', () => {
 
       expect(plan.meta.annotations).toBeDefined();
       expect(plan.meta.annotations?.codecs).toEqual({
+        email: 'pg/text@1',
         userId: 'pg/int4@1',
       });
     });

@@ -5,9 +5,10 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
 import type { Plan } from '@prisma-next/sql/types';
 import type { SqlDriver } from '@prisma-next/sql-target';
 import type { Plugin } from '../src/plugins/types';
+import { validateContract } from '@prisma-next/sql/schema';
 
 describe('Runtime class', () => {
-  const mockContract: SqlContract<SqlStorage> = {
+  const mockContractRaw: SqlContract<SqlStorage> = {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
@@ -17,8 +18,8 @@ describe('Runtime class', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'int4', nullable: false },
-            email: { type: 'text', nullable: false },
+            id: { type: 'pg/int4@1', nullable: false },
+            email: { type: 'pg/text@1', nullable: false },
           },
         },
       },
@@ -27,6 +28,7 @@ describe('Runtime class', () => {
     relations: {},
     mappings: {},
   };
+  const mockContract = validateContract(mockContractRaw);
 
   const mockPlan: Plan = {
     sql: 'SELECT id, email FROM "user" LIMIT 1',

@@ -84,13 +84,19 @@ SqlContract<
   SqlStorage,           // { tables: Record<string, StorageTable> }
   Models,               // { User: ModelDef & { id: number, ... } }
   Relations,            // { user: { posts: RelationDef } }
-  Mappings              // { ModelToTable, TableToModel, FieldToColumn, ColumnToField, columnToCodec, codecTypes }
+  Mappings              // { ModelToTable, TableToModel, FieldToColumn, ColumnToField, scalarToJs }
 >
 ```
 
-**Codec Mappings** (in `Mappings`):
-- `columnToCodec`: `Record<table, Record<column, codecId>>` - Explicit codec assignments per column
-- `codecTypes`: `Record<codecId, { input: string, output: string }>` - TypeScript type info for codec input/output types
+**Column Types**:
+- Every column `type` is a fully qualified type ID: `pg/int4@1`, `pg/text@1`, `pg/timestamptz@1`, etc.
+- Bare scalars in `contract.json` (e.g., `int4`, `text`) are automatically canonicalized during validation
+- No codec decorations or extension metadata needed - the type ID is the source of truth
+
+**CodecTypes** (imported from adapter):
+- `CodecTypes`: `Record<codecId, { input: unknown, output: unknown }>` - TypeScript type info for codec input/output types
+- Imported from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
+- Provided as generic parameter to `sql()` and `schema()` functions
 
 ### Query DSL Pattern
 
@@ -98,14 +104,14 @@ SqlContract<
 import { sql, schema, makeT } from '@prisma-next/sql';
 import { validateContract } from '@prisma-next/sql/schema';
 import contractJson from './contract.json' assert { type: 'json' };
-import type { Contract } from './contract.d';
+import type { Contract, CodecTypes } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
-const t = makeT(contract);  // Table/column accessor: t.user.id
-const tables = schema(contract).tables;  // Table builders
+const t = makeT<Contract, CodecTypes>(contract);  // Table/column accessor: t.user.id
+const tables = schema<Contract, CodecTypes>(contract).tables;  // Table builders
 
 // Builder methods return new instances - chain them properly
-const plan = sql({ contract, adapter })
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
   .where(t.user.id.eq(param('userId')))
   .select({ id: t.user.id, email: t.user.email })
@@ -181,27 +187,33 @@ return value;  // Preserve literal types from input
 ```typescript
 // In @prisma-next/sql/src/contract.ts
 export function validateContract<TContract extends SqlContract<SqlStorage>>(
-  value: unknown,  // Arbitrary JSON input
-): TContract {     // Returns strict type from contract.d.ts
+  value: unknown,  // Arbitrary JSON input (may have bare scalars like "int4")
+): TContract {     // Returns strict type from contract.d.ts (with canonicalized types)
   // 1. Validate structure (Arktype)
-  // 2. Validate logic (foreign keys, etc.)
-  // 3. Add defaults for models/relations/Mappings if missing
-  // 4. Return with type assertion
+  // 2. Canonicalize column types: bare scalars → type IDs (e.g., "int4" → "pg/int4@1")
+  // 3. Validate logic (foreign keys, etc.)
+  // 4. Add defaults for models/relations/Mappings if missing
+  // 5. Return with type assertion
 }
 ```
+
+**Type Canonicalization**:
+- Bare scalars in `contract.json` (e.g., `type: "int4"`) are automatically converted to canonical type IDs (e.g., `type: "pg/int4@1"`)
+- This happens during `validateContract()` - always validate contracts before use
+- The canonicalized contract matches the types defined in `contract.d.ts`
 
 ## 📦 Current State
 
 ### Codec System
 
+- **Unified Type Identifiers**: Every column `type` is a fully qualified type ID (`ns/name@version`, e.g., `pg/int4@1`, `pg/text@1`, `pg/timestamptz@1`). No bare scalars or codec decorations.
+- **Type Canonicalization**: Contract validation automatically converts bare scalars (e.g., `int4`, `text`) to canonical type IDs (e.g., `pg/int4@1`, `pg/text@1`) based on the target database.
 - **Codec Registry**: Class-based registry (`CodecRegistry`) with `register()`, `get()`, `has()`, `getByScalar()`, `getDefaultCodec()`, and `values()` methods
-- **Contract Codec Mappings**: Contracts include `mappings.columnToCodec` (explicit codec assignments per column) and `mappings.codecTypes` (TypeScript type info for codec input/output)
-- **Plan Annotations**: SQL DSL encodes codec assignments from `contract.mappings.columnToCodec` into `plan.meta.annotations.codecs`
-- **Runtime Resolution**: Runtime uses `plan.meta.annotations.codecs[alias]` for codec lookups during encoding/decoding
-- **Contract Validation**: Validates that all columns have explicit codec assignments in `columnToCodec` mappings
-
-**Not Yet Implemented**:
-- Type system codec inference: `InferColumnType` should use `codecTypes[codecId].output` instead of `ContractScalarToJsType` when codec assignments are present (see "What to Work On Next" below)
+- **CodecTypes Generic**: `CodecTypes` (mapping codec IDs to input/output types) is provided as a generic parameter to `sql()` and `schema()` functions
+- **Plan Annotations**: SQL DSL encodes column type IDs into `plan.meta.annotations.codecs` and `plan.meta.projectionTypes`
+- **Runtime Resolution**: Runtime uses `plan.meta.annotations.codecs[alias]` or `plan.meta.projectionTypes[alias]` for codec lookups by type ID
+- **Type Inference**: `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` by looking up `CodecTypes[typeId].output`. `InferProjectionRow` extracts these pre-computed types.
+- **No Fallbacks**: Removed `ScalarToJs` fallback logic. Type inference directly uses `CodecTypes[typeId].output` - if codec not found, returns `unknown`
 
 ## 🧪 Testing
 
@@ -244,7 +256,11 @@ test('Plan type inference works', () => {
 7. **Column access** - Use `table.columns[fieldName]` or `table['columns'][fieldName]` to avoid conflicts with table properties like `name`.
 8. **Type tests** - Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 9. **Core is lane-agnostic** - Never create discriminated unions based on `lane` field. The core should not be aware of specific lane implementations.
-10. **Codec assignments** - Codec assignments from `contract.mappings.columnToCodec` are encoded into `plan.meta.annotations.codecs` at plan build time. The runtime uses these for codec resolution, but the type system doesn't yet use `codecTypes` for type inference (see "What to Work On Next").
+10. **Unified Type Identifiers** - Every column `type` must be a fully qualified type ID (`ns/name@version`). Bare scalars are canonicalized during validation. No codec decorations or scalar fallbacks.
+11. **CodecTypes Generic** - Always provide `CodecTypes` as a generic parameter to `sql()` and `schema()` functions. Import from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
+12. **Contract Validation** - Always validate contracts with `validateContract<Contract>(contractJson)` before use. This canonicalizes types and ensures type safety.
+13. **No Backward Compatibility** - Never add backward compatibility code, migration paths, or deprecation warnings. This project has no external consumers - change implementations directly.
+14. **Runtime Agnostic** - The runtime must not contain target-specific logic (e.g., special-case Date handling for specific codec IDs). Use generic codec resolution only.
 
 ## 📖 Documentation Location
 
@@ -255,14 +271,16 @@ test('Plan type inference works', () => {
 
 ## 🎯 What to Work On Next
 
-### Immediate Next Steps
+### Recent Implementation (Completed)
 
-1. **Implement codec-based type inference** (`packages/sql/src/types.ts`):
-   - Update `InferColumnType` to check `contract.mappings.columnToCodec` for codec assignments
-   - When a codec is assigned, look up its output type from `contract.mappings.codecTypes[codecId].output`
-   - Use the codec output type instead of `ContractScalarToJsType` for that column
-   - This will make `ResultType<typeof plan>` correctly infer types based on codec output types
-   - See test in `packages/sql/test/sql.test.ts` - "infers ResultType correctly when codec mappings and codecTypes are present"
+1. **Unified Type Identifiers** - All column types are now fully qualified type IDs (`ns/name@version`). Bare scalars are canonicalized during validation.
+2. **Simplified Type Inference** - `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` using `CodecTypes[typeId].output`. No fallbacks or scalar mappings.
+3. **Runtime Simplification** - Removed target-specific logic from runtime. Codec resolution uses type IDs directly.
+
+### Future Work
+
+- Additional adapters (MySQL, SQLite, etc.) with their own codec type IDs
+- Extension packs (e.g., pgvector) that register additional codecs
 
 ### MVP Goals
 
@@ -277,15 +295,21 @@ Check the TODO comments in code (especially `packages/sql/src/contract.ts` - "TO
 **Load a contract:**
 ```typescript
 import { validateContract } from '@prisma-next/sql/schema';
-import type { Contract } from './contract.d';
+import type { Contract, CodecTypes } from './contract.d';
+import contractJson from './contract.json' assert { type: 'json' };
+
+// Always validate - this canonicalizes bare scalars to type IDs
 const contract = validateContract<Contract>(contractJson);
 ```
 
 **Create a query:**
 ```typescript
-const plan = sql({ contract, adapter })
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+
+const tables = schema<Contract, CodecTypes>(contract).tables;
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .select({ id: t.user.id })
+  .select({ id: tables.user.columns.id })
   .build();
 ```
 
@@ -293,39 +317,53 @@ const plan = sql({ contract, adapter })
 ```typescript
 import type { ResultType } from '@prisma-next/sql/types';
 
-const plan = sql({ contract, adapter })
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .select({ id: t.user.id, email: t.user.email })
+  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
   .build();
 
 type UserRow = ResultType<typeof plan>;  // Inferred type: { id: number; email: string }
 ```
 
-**Codec assignments in contracts:**
+**Contract column types:**
 ```typescript
-// Contract with codec mappings
-const contract: SqlContract<Storage, Models, Relations, {
-  columnToCodec: {
-    user: {
-      id: 'core/string@1',      // Column 'id' uses codec 'core/string@1'
-      email: 'core/string@1'
+// contract.json - bare scalars (will be canonicalized during validation)
+{
+  "storage": {
+    "tables": {
+      "user": {
+        "columns": {
+          "id": { "type": "int4", "nullable": false },
+          "email": { "type": "text", "nullable": false }
+        }
+      }
     }
-  },
-  codecTypes: {
-    'core/string@1': { input: 'string', output: 'string' }
   }
-}> = /* ... */;
+}
 
-// Plans encode codec assignments in annotations
-const plan = sql({ contract, adapter })
+// contract.d.ts - canonicalized type IDs
+export type Contract = SqlContract<{
+  readonly tables: {
+    readonly user: {
+      readonly columns: {
+        readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+        readonly email: { readonly type: 'pg/text@1'; nullable: false };
+      };
+    };
+  };
+}>;
+
+// Plans encode type IDs in annotations
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .select({ id: t.user.id })
+  .select({ id: tables.user.columns.id })
   .build();
 
-plan.meta.annotations?.codecs;  // { id: 'core/string@1' }
+plan.meta.annotations?.codecs;  // { id: 'pg/int4@1' }
+plan.meta.projectionTypes;       // { id: 'pg/int4@1' }
 
-// Runtime uses these for codec resolution during encoding/decoding
-// Future: Type system will use codecTypes.output for ResultType inference
+// Runtime uses type IDs for codec resolution
+// Type system uses CodecTypes[typeId].output for ResultType inference
 ```
 
 ---

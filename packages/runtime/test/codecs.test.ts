@@ -7,6 +7,7 @@ import type { Plan, ParamDescriptor } from '@prisma-next/sql/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
 import { CodecRegistry } from '@prisma-next/sql-target';
 import type { Codec } from '@prisma-next/sql-target';
+import { validateContract } from '@prisma-next/sql/schema';
 
 describe('Codec Registry', () => {
   const registry = createPostgresCodecRegistry();
@@ -136,19 +137,19 @@ describe('Param Encoding', () => {
   };
 
   it('encodes string value', () => {
-    const plan = createMockPlan([{ name: 'param1', type: 'text', source: 'dsl' }]);
+    const plan = createMockPlan([{ name: 'param1', type: 'pg/text@1', source: 'dsl' }]);
     const encoded = encodeParam('hello', plan.meta.paramDescriptors[0]!, plan, registry);
     expect(encoded).toBe('hello');
   });
 
   it('encodes number value', () => {
-    const plan = createMockPlan([{ name: 'param1', type: 'int4', source: 'dsl' }]);
+    const plan = createMockPlan([{ name: 'param1', type: 'pg/int4@1', source: 'dsl' }]);
     const encoded = encodeParam(42, plan.meta.paramDescriptors[0]!, plan, registry);
     expect(encoded).toBe(42);
   });
 
   it('encodes JS Date to ISO string for timestamptz', () => {
-    const plan = createMockPlan([{ name: 'param1', type: 'timestamptz', source: 'dsl' }]);
+    const plan = createMockPlan([{ name: 'param1', type: 'pg/timestamptz@1', source: 'dsl' }]);
     const date = new Date('2024-01-15T10:30:00Z');
     const encoded = encodeParam(date, plan.meta.paramDescriptors[0]!, plan, registry);
     expect(encoded).toBe('2024-01-15T10:30:00.000Z');
@@ -156,27 +157,27 @@ describe('Param Encoding', () => {
   });
 
   it('encodes JS Date to ISO string for timestamp', () => {
-    const plan = createMockPlan([{ name: 'param1', type: 'timestamp', source: 'dsl' }]);
+    const plan = createMockPlan([{ name: 'param1', type: 'pg/timestamp@1', source: 'dsl' }]);
     const date = new Date('2024-01-15T10:30:00Z');
     const encoded = encodeParam(date, plan.meta.paramDescriptors[0]!, plan, registry);
     expect(encoded).toBe('2024-01-15T10:30:00.000Z');
   });
 
   it('passes through null without encoding', () => {
-    const plan = createMockPlan([{ name: 'param1', type: 'text', source: 'dsl' }]);
+    const plan = createMockPlan([{ name: 'param1', type: 'pg/text@1', source: 'dsl' }]);
     const encoded = encodeParam(null, plan.meta.paramDescriptors[0]!, plan, registry);
     expect(encoded).toBeNull();
   });
 
   it('converts undefined to null', () => {
-    const plan = createMockPlan([{ name: 'param1', type: 'text', source: 'dsl' }]);
+    const plan = createMockPlan([{ name: 'param1', type: 'pg/text@1', source: 'dsl' }]);
     // Our implementation converts undefined to null (null short-circuit)
     const encoded = encodeParam(undefined, plan.meta.paramDescriptors[0]!, plan, registry);
     expect(encoded).toBeNull();
   });
 
   it('uses plan annotation codec override', () => {
-    const plan = createMockPlan([{ name: 'param1', type: 'text', source: 'dsl' }]);
+    const plan = createMockPlan([{ name: 'param1', type: 'pg/text@1', source: 'dsl' }]);
     const planWithOverride: Plan = {
       ...plan,
       meta: {
@@ -197,8 +198,8 @@ describe('Param Encoding', () => {
 
   it('encodes all params in plan', () => {
     const plan = createMockPlan([
-      { name: 'id', type: 'int4', source: 'dsl' },
-      { name: 'email', type: 'text', source: 'dsl' },
+      { name: 'id', type: 'pg/int4@1', source: 'dsl' },
+      { name: 'email', type: 'pg/text@1', source: 'dsl' },
     ]);
     const planWithParams = {
       ...plan,
@@ -235,21 +236,21 @@ describe('Row Decoding', () => {
   };
 
   it('decodes string value', () => {
-    const plan = createMockDslPlan({ email: 'text' });
+    const plan = createMockDslPlan({ email: 'pg/text@1' });
     const row = { email: 'test@example.com' };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['email']).toBe('test@example.com');
   });
 
   it('decodes number value', () => {
-    const plan = createMockDslPlan({ id: 'int4' });
+    const plan = createMockDslPlan({ id: 'pg/int4@1' });
     const row = { id: 42 };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['id']).toBe(42);
   });
 
   it('decodes timestamptz to ISO string', () => {
-    const plan = createMockDslPlan({ createdAt: 'timestamptz' });
+    const plan = createMockDslPlan({ createdAt: 'pg/timestamptz@1' });
     const row = { createdAt: '2024-01-15T10:30:00.000Z' };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['createdAt']).toBe('2024-01-15T10:30:00.000Z');
@@ -257,14 +258,14 @@ describe('Row Decoding', () => {
   });
 
   it('decodes timestamp to ISO string', () => {
-    const plan = createMockDslPlan({ createdAt: 'timestamp' });
+    const plan = createMockDslPlan({ createdAt: 'pg/timestamp@1' });
     const row = { createdAt: '2024-01-15T10:30:00.000Z' };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['createdAt']).toBe('2024-01-15T10:30:00.000Z');
   });
 
   it('handles Date object from driver', () => {
-    const plan = createMockDslPlan({ createdAt: 'timestamptz' });
+    const plan = createMockDslPlan({ createdAt: 'pg/timestamptz@1' });
     const date = new Date('2024-01-15T10:30:00Z');
     const row = { createdAt: date };
     const decoded = decodeRow(row, plan, registry);
@@ -272,14 +273,14 @@ describe('Row Decoding', () => {
   });
 
   it('passes through null without decoding', () => {
-    const plan = createMockDslPlan({ email: 'text' });
+    const plan = createMockDslPlan({ email: 'pg/text@1' });
     const row = { email: null };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['email']).toBeNull();
   });
 
   it('passes through undefined without decoding', () => {
-    const plan = createMockDslPlan({ email: 'text' });
+    const plan = createMockDslPlan({ email: 'pg/text@1' });
     const row = { email: undefined };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['email']).toBeUndefined();
@@ -287,9 +288,9 @@ describe('Row Decoding', () => {
 
   it('uses plan annotation codec override', () => {
     const plan = {
-      ...createMockDslPlan({ email: 'text' }),
+      ...createMockDslPlan({ email: 'pg/text@1' }),
       meta: {
-        ...createMockDslPlan({ email: 'text' }).meta,
+        ...createMockDslPlan({ email: 'pg/text@1' }).meta,
         annotations: {
           codecs: { email: 'pg/text@1' },
         },
@@ -322,9 +323,9 @@ describe('Row Decoding', () => {
 
   it('decodes multiple fields', () => {
     const plan = createMockDslPlan({
-      id: 'int4',
-      email: 'text',
-      createdAt: 'timestamptz',
+      id: 'pg/int4@1',
+      email: 'pg/text@1',
+      createdAt: 'pg/timestamptz@1',
     });
     const row = {
       id: 42,
@@ -338,7 +339,7 @@ describe('Row Decoding', () => {
   });
 
   it('throws RUNTIME.DECODE_FAILED on decode error', () => {
-    const plan = createMockDslPlan({ id: 'int4' });
+    const plan = createMockDslPlan({ id: 'pg/int4@1' });
     // Create a row with invalid data that would cause decode to fail
     // For number codec, passing a non-number string might cause issues
     // But our current codec just passes through, so let's test with a codec that might fail
@@ -352,8 +353,8 @@ describe('Row Decoding', () => {
 });
 
 describe('Codec Registry Validation', () => {
-  it('extracts scalar types from contract', () => {
-    const contract: SqlContract<SqlStorage> = {
+  it('extracts type IDs from contract', () => {
+    const contractRaw: SqlContract<SqlStorage> = {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
@@ -380,6 +381,7 @@ describe('Codec Registry Validation', () => {
       mappings: {},
     };
 
+    const contract = validateContract(contractRaw);
     const typeIds = extractTypeIds(contract);
     expect(typeIds.size).toBe(3);
     expect(typeIds.has('pg/int4@1')).toBe(true);
@@ -406,7 +408,7 @@ describe('Codec Registry Validation', () => {
   });
 
   it('handles columns without type', () => {
-    const contract: SqlContract<SqlStorage> = {
+    const contractRaw: SqlContract<SqlStorage> = {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
@@ -426,13 +428,14 @@ describe('Codec Registry Validation', () => {
       mappings: {},
     };
 
+    const contract = validateContract(contractRaw);
     const typeIds = extractTypeIds(contract);
     expect(typeIds.size).toBe(1);
     expect(typeIds.has('pg/int4@1')).toBe(true);
   });
 
   it('validates complete registry passes', () => {
-    const contract: SqlContract<SqlStorage> = {
+    const contractRaw: SqlContract<SqlStorage> = {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
@@ -452,12 +455,14 @@ describe('Codec Registry Validation', () => {
       relations: {},
       mappings: {},
     };
+    const contract = validateContract(contractRaw);
 
     const registry = createPostgresCodecRegistry();
     expect(() => validateCodecRegistryCompleteness(registry, contract)).not.toThrow();
   });
 
   it('throws RUNTIME.CODEC_MISSING for missing codecs', () => {
+    // Create contract with unknown type ID directly (bypassing validation)
     const contract: SqlContract<SqlStorage> = {
       schemaVersion: '1',
       target: 'postgres',
@@ -467,9 +472,9 @@ describe('Codec Registry Validation', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'int4', nullable: false },
-              email: { type: 'text', nullable: false },
-              unknownType: { type: 'unknown-scalar-type', nullable: false },
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
+              unknownType: { type: 'unknown/type@1', nullable: false },
             },
           },
         },
@@ -488,7 +493,9 @@ describe('Codec Registry Validation', () => {
       const runtimeError = error as Error & { code: string; details?: Record<string, unknown> };
       expect(runtimeError.code).toBe('RUNTIME.CODEC_MISSING');
       expect(runtimeError.details).toBeDefined();
-      expect(runtimeError.details?.['missingTypes']).toContain('unknown-scalar-type');
+      const invalidCodecs = runtimeError.details?.['invalidCodecs'] as Array<{ table: string; column: string; typeId: string }> | undefined;
+      expect(invalidCodecs).toBeDefined();
+      expect(invalidCodecs?.some(c => c.typeId === 'unknown/type@1')).toBe(true);
       expect(runtimeError.details?.['contractTarget']).toBe('postgres');
     }
   });

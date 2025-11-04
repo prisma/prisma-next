@@ -4,13 +4,14 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import { schema } from '@prisma-next/sql/schema';
 import { sql } from '@prisma-next/sql/sql';
 import { param } from '@prisma-next/sql/param';
+import { validateContract } from '@prisma-next/sql/schema';
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { PostgresDriver } from '../../driver-postgres/src/postgres-driver';
 import { createDevDatabase, executeStatement, collectAsync } from './utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 
-const fixtureContract: SqlContract<SqlStorage> = {
+const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
@@ -39,6 +40,7 @@ const fixtureContract: SqlContract<SqlStorage> = {
   relations: {},
   mappings: {},
 };
+const fixtureContract = validateContract(fixtureContractRaw);
 
 describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -420,6 +422,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
 
     expect(selectPlan.meta.annotations).toBeDefined();
     expect(selectPlan.meta.annotations?.codecs).toEqual({
+      name: 'pg/text@1',
       id: 'pg/int4@1',
     });
 
