@@ -78,28 +78,5 @@
       }
     }
   },
-  "extensions": {
-    "postgres": {
-      "decorations": {
-        "columns": [
-          {
-            "ref": { "kind": "column", "table": "User", "column": "id" },
-            "payload": { "typeId": "core/string@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "User", "column": "email" },
-            "payload": { "typeId": "core/string@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "User", "column": "name" },
-            "payload": { "typeId": "core/string@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "User", "column": "createdAt" },
-            "payload": { "typeId": "core/iso-datetime@1" }
-          }
-        ]
-      }
-    }
-  }
+  "extensions": {}
 }

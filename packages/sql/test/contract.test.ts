@@ -454,11 +454,11 @@ describe('validateContract extension decoration validation', () => {
           columns: [
             {
               ref: { kind: 'column', table: 'user', column: 'id' },
-              payload: { typeId: 'core/number@1' },
+              payload: { typeId: 'pg/int4@1' },
             },
             {
               ref: { kind: 'column', table: 'user', column: 'email' },
-              payload: { typeId: 'core/string@1' },
+              payload: { typeId: 'pg/text@1' },
             },
           ],
         },
@@ -483,7 +483,7 @@ describe('validateContract extension decoration validation', () => {
             columns: [
               {
                 ref: { kind: 'column', table: 'nonexistent', column: 'id' },
-                payload: { typeId: 'core/number@1' },
+                payload: { typeId: 'pg/int4@1' },
               },
             ],
           },
@@ -504,7 +504,7 @@ describe('validateContract extension decoration validation', () => {
             columns: [
               {
                 ref: { kind: 'column', table: 'user', column: 'nonexistent' },
-                payload: { typeId: 'core/string@1' },
+                payload: { typeId: 'pg/text@1' },
               },
             ],
           },
@@ -545,7 +545,7 @@ describe('validateContract extension decoration validation', () => {
           decorations: {
             columns: [
               {
-                payload: { typeId: 'core/string@1' },
+                payload: { typeId: 'pg/text@1' },
               },
             ],
           },

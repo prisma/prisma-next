@@ -7,10 +7,10 @@ export type Contract = SqlContract<
     readonly tables: {
       readonly User: {
         readonly columns: {
-          readonly id: { readonly type: 'text'; nullable: false };
-          readonly email: { readonly type: 'text'; nullable: false };
-          readonly name: { readonly type: 'text'; nullable: false };
-          readonly createdAt: { readonly type: 'timestamptz'; nullable: false };
+          readonly id: { readonly type: 'pg/text@1'; nullable: false };
+          readonly email: { readonly type: 'pg/text@1'; nullable: false };
+          readonly name: { readonly type: 'pg/text@1'; nullable: false };
+          readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
         };
       };
     };

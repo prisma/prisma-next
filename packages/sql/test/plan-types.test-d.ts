@@ -105,8 +105,8 @@ test('ResultType utility extracts Row type from Plan', () => {
     .build();
 
   type ExtractedRow = ResultType<typeof plan>;
-  // Contract fixture has extension decorations, so types come from codecs
-  // id has typeId 'core/number@1' → number, email has 'core/string@1' → string
+  // Contract fixture has column types as pg/*@1 IDs, so types come from CodecTypes
+  // id has typeId 'pg/int4@1' → number, email has 'pg/text@1' → string
 
   // Strict checks: verify fields are NOT never and have correct types
   expectTypeOf<ExtractedRow['id']>().toEqualTypeOf<number>();
@@ -385,149 +385,18 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
     createdAt: string; // timestamptz → string via ScalarToJs
   }>();
 
-  // Verify ScalarToJs is actually from adapter (not legacy fallback)
+  // Verify ScalarToJs is from adapter
   // Contract should have scalarToJs in mappings (types-only)
   type ContractScalarToJs = Contract['mappings'] extends { scalarToJs: infer S } ? S : never;
   expectTypeOf<ContractScalarToJs>().toExtend<ScalarToJs>();
 });
 
-test('nullable columns preserve nullability in ResultType', () => {
-  // Create a contract with nullable columns
-  const contractWithNullable = {
-    ...contractJson,
-    storage: {
-      ...contractJson.storage,
-      tables: {
-        ...contractJson.storage.tables,
-        user: {
-          ...contractJson.storage.tables.user,
-          columns: {
-            ...contractJson.storage.tables.user.columns,
-            id: { ...contractJson.storage.tables.user.columns.id, nullable: false },
-            email: { ...contractJson.storage.tables.user.columns.email, nullable: true },
-            createdAt: { ...contractJson.storage.tables.user.columns.createdAt, nullable: false },
-          },
-        },
-      },
-    },
-    extensions: {}, // Use ScalarToJs fallback
-  };
-  const contract = validateContract<Contract>(contractWithNullable);
-  const adapter = createPostgresAdapter();
-  const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
-  if (!userTable) throw new Error('user table not found');
-  const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
-  if (!idColumn || !emailColumn) throw new Error('columns not found');
-
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
-    .from(userTable)
-    .select({
-      id: idColumn, // nullable: false
-      email: emailColumn, // nullable: true
-    })
-    .build();
-
-  type Row = ResultType<typeof plan>;
-
-  // Nullable column should be T | null, non-nullable should be T
-  // Strict checks: verify fields are NOT never
-  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
-  expectTypeOf<Row['email']>().toEqualTypeOf<string | null>();
-
-  // Also verify the overall structure
-  expectTypeOf<Row>().toExtend<{
-    id: number; // non-nullable int4 → number
-    email: string | null; // nullable text → string | null
-  }>();
-});
-
-test('codec types take precedence over ScalarToJs fallback', () => {
-  // Contract with extension decorations that override scalar mapping
-  const contractWithCodecs = {
-    ...contractJson,
-    extensions: {
-      postgres: {
-        decorations: {
-          columns: [
-            {
-              ref: { kind: 'column', table: 'user', column: 'id' },
-              payload: { typeId: 'core/string@1' }, // Override int4 → number with string codec
-            },
-            {
-              ref: { kind: 'column', table: 'user', column: 'email' },
-              payload: { typeId: 'core/string@1' },
-            },
-            // createdAt has no decoration, should use ScalarToJs fallback
-          ],
-        },
-      },
-    },
-  };
-  const contract = validateContract<Contract>(contractWithCodecs);
-  const adapter = createPostgresAdapter();
-  const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
-  if (!userTable) throw new Error('user table not found');
-  const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
-  const createdAtColumn = userColumns['createdAt'];
-  if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
-
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
-    .from(userTable)
-    .select({
-      id: idColumn, // Has codec → string (not number from ScalarToJs)
-      email: emailColumn, // Has codec → string
-      createdAt: createdAtColumn, // No codec → string (from ScalarToJs)
-    })
-    .build();
-
-  type Row = ResultType<typeof plan>;
-
-  // Codec types should override ScalarToJs
-  // Strict checks: verify fields are NOT never
-  expectTypeOf<Row['id']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
-
-  // Also verify the overall structure
-  expectTypeOf<Row>().toExtend<{
-    id: string; // Codec overrides int4 → number, uses string codec output
-    email: string; // Codec output
-    createdAt: string; // Fallback to ScalarToJs (timestamptz → string)
-  }>();
-});
+// Note: Nullable column test removed - runtime-modified contracts are not supported.
+// Contract.json must match contract.d.ts exactly, including nullability.
 
 test('representative contract resolves types correctly end-to-end', () => {
-  // Full representative contract with mixed codecs and scalars
-  const representativeContract = {
-    ...contractJson,
-    extensions: {
-      postgres: {
-        decorations: {
-          columns: [
-            {
-              ref: { kind: 'column', table: 'user', column: 'id' },
-              payload: { typeId: 'core/number@1' },
-            },
-            {
-              ref: { kind: 'column', table: 'user', column: 'email' },
-              payload: { typeId: 'core/string@1' },
-            },
-            {
-              ref: { kind: 'column', table: 'user', column: 'createdAt' },
-              payload: { typeId: 'core/iso-datetime@1' },
-            },
-          ],
-        },
-      },
-    },
-  };
-  const contract = validateContract<Contract>(representativeContract);
+  // Full representative contract with column types as pg/*@1 IDs
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
   const userTable = tables['user'];
@@ -549,7 +418,7 @@ test('representative contract resolves types correctly end-to-end', () => {
 
   type Row = ResultType<typeof plan>;
 
-  // All types should resolve correctly via codec mappings
+  // All types should resolve correctly via CodecTypes[typeId].output
   // Strict checks: verify fields are NOT never
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
@@ -557,8 +426,8 @@ test('representative contract resolves types correctly end-to-end', () => {
 
   // Also verify the overall structure
   expectTypeOf<Row>().toExtend<{
-    id: number; // core/number@1 → number
-    email: string; // core/string@1 → string
-    createdAt: string; // core/iso-datetime@1 → string
+    id: number; // pg/int4@1 → number
+    email: string; // pg/text@1 → string
+    createdAt: string; // pg/timestamptz@1 → string
   }>();
 });

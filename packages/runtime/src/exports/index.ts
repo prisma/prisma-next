@@ -12,7 +12,7 @@ export type {
   TelemetryOutcome,
 } from '../runtime';
 export {
-  extractScalarTypes,
+  extractTypeIds,
   validateCodecRegistryCompleteness,
   validateContractCodecMappings,
 } from '../codecs/validation';

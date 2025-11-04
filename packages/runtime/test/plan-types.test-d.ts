@@ -1,8 +1,8 @@
 import { expectTypeOf, test } from 'vitest';
 import { createRuntime } from '../src/runtime';
 import type { Plan, ResultType } from '@prisma-next/sql/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import type { Contract, CodecTypes } from '../../sql/test/fixtures/contract.d';
 import { sql } from '@prisma-next/sql/sql';
 import { schema } from '@prisma-next/sql/schema';
 import { validateContract } from '@prisma-next/sql/schema';
@@ -12,23 +12,23 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const fixtureDir = join(__dirname, 'fixtures');
+const fixtureDir = join(__dirname, '../../sql/test/fixtures');
 
-function loadContract(name: string): SqlContract<SqlStorage> {
+function loadContract(name: string): Contract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
   const contractJson = JSON.parse(contents);
-  return validateContract<SqlContract<SqlStorage>>(contractJson);
+  return validateContract<Contract>(contractJson);
 }
 
 test('execute() preserves Row type from Plan', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<typeof contract, CodecTypes>(contract).tables;
   const userTable = tables['user']!;
   const userColumns = userTable.columns;
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: userColumns['id']!,
@@ -38,15 +38,19 @@ test('execute() preserves Row type from Plan', () => {
 
   type Row = ResultType<typeof plan>;
 
+  // Verify Row type is correctly inferred
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
   // Create runtime with stub driver for type testing
   const runtime = createRuntime({
     contract,
     adapter,
-      driver: {
-        connect: async () => {},
-        execute: async function* () {},
-        close: async () => {},
-      } as unknown as import('@prisma-next/sql-target').SqlDriver,
+    driver: {
+      connect: async () => {},
+      execute: async function* () {},
+      close: async () => {},
+    } as unknown as import('@prisma-next/sql-target').SqlDriver,
     verify: { mode: 'onFirstUse', requireMarker: false },
   });
 
@@ -58,11 +62,11 @@ test('execute() preserves Row type from Plan', () => {
 test('execute() signature matches Plan Row type', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
+  const tables = schema<typeof contract, CodecTypes>(contract).tables;
   const userTable = tables['user']!;
   const userColumns = userTable.columns;
 
-  const plan = sql({ contract, adapter })
+  const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: userColumns['id']!,
@@ -71,6 +75,10 @@ test('execute() signature matches Plan Row type', () => {
     .build();
 
   type Row = ResultType<typeof plan>;
+
+  // Verify Row type is correctly inferred
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
 
   // Verify that execute signature matches
   interface Runtime {

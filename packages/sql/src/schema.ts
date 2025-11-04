@@ -202,7 +202,7 @@ export interface SchemaHandle<
 export function schema<
   Contract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(contract: Contract, _codecTypes?: CodecTypes): SchemaHandle<Contract, CodecTypes> {
+>(contract: Contract, codecTypes?: CodecTypes): SchemaHandle<Contract, CodecTypes> {
   const storage = contract.storage;
 
   const tables = {} as ExtractSchemaTables<Contract, CodecTypes>;
@@ -212,7 +212,7 @@ export function schema<
       tableName,
       storage,
       contract,
-      {} as CodecTypes,
+      (codecTypes ?? {}) as CodecTypes,
     );
     const table = new TableBuilderImpl<
       Contract,

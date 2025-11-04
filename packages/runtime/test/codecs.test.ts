@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createPostgresCodecRegistry } from '../../adapter-postgres/src/codecs';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import { decodeRow } from '../src/codecs/decoding';
-import { extractScalarTypes, validateCodecRegistryCompleteness } from '../src/codecs/validation';
+import { extractTypeIds, validateCodecRegistryCompleteness } from '../src/codecs/validation';
 import type { Plan, ParamDescriptor } from '@prisma-next/sql/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
 import { CodecRegistry } from '@prisma-next/sql-target';
@@ -12,21 +12,21 @@ describe('Codec Registry', () => {
   const registry = createPostgresCodecRegistry();
 
   it('resolves codec by ID using get()', () => {
-    const codec = registry.get('core/string@1');
+    const codec = registry.get('pg/text@1');
     expect(codec).toBeDefined();
-    expect(codec?.id).toBe('core/string@1');
+    expect(codec?.id).toBe('pg/text@1');
   });
 
   it('checks if codec exists using has()', () => {
-    expect(registry.has('core/string@1')).toBe(true);
-    expect(registry.has('core/nonexistent@1')).toBe(false);
+    expect(registry.has('pg/text@1')).toBe(true);
+    expect(registry.has('pg/nonexistent@1')).toBe(false);
   });
 
   it('resolves codec by scalar type using getByScalar()', () => {
     const codecs = registry.getByScalar('text');
     expect(codecs).toBeDefined();
     expect(codecs.length).toBeGreaterThan(0);
-    expect(codecs[0]?.id).toBe('core/string@1');
+    expect(codecs[0]?.id).toBe('pg/text@1');
   });
 
   it('returns empty array for unknown scalar type using getByScalar()', () => {
@@ -37,7 +37,7 @@ describe('Codec Registry', () => {
   it('gets default codec for scalar type', () => {
     const codec = registry.getDefaultCodec('text');
     expect(codec).toBeDefined();
-    expect(codec?.id).toBe('core/string@1');
+    expect(codec?.id).toBe('pg/text@1');
   });
 
   it('returns undefined for default codec of unknown scalar type', () => {
@@ -54,7 +54,7 @@ describe('Codec Registry', () => {
   it('iterates over all codecs', () => {
     const codecs = Array.from(registry.values());
     expect(codecs.length).toBeGreaterThan(0);
-    expect(codecs.some((c) => c.id === 'core/string@1')).toBe(true);
+    expect(codecs.some((c) => c.id === 'pg/text@1')).toBe(true);
   });
 
   describe('CodecRegistry class methods', () => {
@@ -182,7 +182,7 @@ describe('Param Encoding', () => {
       meta: {
         ...plan.meta,
         annotations: {
-          codecs: { param1: 'core/string@1' },
+          codecs: { param1: 'pg/text@1' },
         },
       },
     } as Plan;
@@ -291,7 +291,7 @@ describe('Row Decoding', () => {
       meta: {
         ...createMockDslPlan({ email: 'text' }).meta,
         annotations: {
-          codecs: { email: 'core/string@1' },
+          codecs: { email: 'pg/text@1' },
         },
       },
     };
@@ -380,11 +380,11 @@ describe('Codec Registry Validation', () => {
       mappings: {},
     };
 
-    const types = extractScalarTypes(contract);
-    expect(types.size).toBe(3);
-    expect(types.has('int4')).toBe(true);
-    expect(types.has('text')).toBe(true);
-    expect(types.has('timestamptz')).toBe(true);
+    const typeIds = extractTypeIds(contract);
+    expect(typeIds.size).toBe(3);
+    expect(typeIds.has('pg/int4@1')).toBe(true);
+    expect(typeIds.has('pg/text@1')).toBe(true);
+    expect(typeIds.has('pg/timestamptz@1')).toBe(true);
   });
 
   it('handles contract with no tables', () => {
@@ -401,8 +401,8 @@ describe('Codec Registry Validation', () => {
       mappings: {},
     };
 
-    const types = extractScalarTypes(contract);
-    expect(types.size).toBe(0);
+    const typeIds = extractTypeIds(contract);
+    expect(typeIds.size).toBe(0);
   });
 
   it('handles columns without type', () => {
@@ -426,9 +426,9 @@ describe('Codec Registry Validation', () => {
       mappings: {},
     };
 
-    const types = extractScalarTypes(contract);
-    expect(types.size).toBe(1);
-    expect(types.has('int4')).toBe(true);
+    const typeIds = extractTypeIds(contract);
+    expect(typeIds.size).toBe(1);
+    expect(typeIds.has('pg/int4@1')).toBe(true);
   });
 
   it('validates complete registry passes', () => {

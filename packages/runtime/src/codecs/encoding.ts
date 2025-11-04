@@ -6,7 +6,7 @@ import type { Plan, ParamDescriptor } from '@prisma-next/sql/types';
  *
  * Precedence:
  * 1. Plan hint: `annotations.codecs[paramName]` → select by id
- * 2. Registry by scalar: `byScalar.get(type)` → first candidate
+ * 2. Param descriptor type: `paramDescriptor.type` → select by typeId
  * 3. Fallback: null (no encoding)
  */
 function resolveParamCodec(
@@ -25,11 +25,11 @@ function resolveParamCodec(
     }
   }
 
-  // 2. Registry by scalar type
+  // 2. Param descriptor type: paramDescriptor.type → registry.get(typeId)
   if (paramDescriptor.type) {
-    const candidates = registry.getByScalar(paramDescriptor.type);
-    if (candidates.length > 0) {
-      return candidates[0] ?? null;
+    const codec = registry.get(paramDescriptor.type);
+    if (codec) {
+      return codec;
     }
   }
 
@@ -42,7 +42,6 @@ function resolveParamCodec(
  *
  * Special handling:
  * - Null/undefined: pass through as null without encoding
- * - JS Date + type timestamp|timestamptz: apply core/iso-datetime@1 if no codec resolved
  * - If codec has encode, apply it; else pass through
  */
 export function encodeParam(
@@ -54,24 +53,6 @@ export function encodeParam(
   // Null short-circuit: pass through without encoding
   if (value === null || value === undefined) {
     return null;
-  }
-
-  // Special case: JS Date + type timestamp|timestamptz
-  if (value instanceof Date && paramDescriptor.type) {
-    const isTimestampType =
-      paramDescriptor.type === 'timestamp' || paramDescriptor.type === 'timestamptz';
-    if (isTimestampType) {
-      // Try to resolve codec, or use iso-datetime codec directly
-      const codec = resolveParamCodec(paramDescriptor, plan, registry);
-      if (codec && codec.encode) {
-        return codec.encode(value);
-      }
-      // Fallback: use iso-datetime codec directly
-      const isoDatetimeCodec = registry.get('core/iso-datetime@1');
-      if (isoDatetimeCodec && isoDatetimeCodec.encode) {
-        return isoDatetimeCodec.encode(value);
-      }
-    }
   }
 
   // Resolve codec

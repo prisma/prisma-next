@@ -7,7 +7,7 @@
 export interface Codec<TWire = unknown, TJs = unknown> {
   /**
    * Namespaced codec identifier in format 'namespace/name@version'
-   * Examples: 'core/string@1', 'pg/uuid@1', 'core/iso-datetime@1'
+   * Examples: 'pg/text@1', 'pg/uuid@1', 'pg/timestamptz@1'
    */
   readonly id: string;
 
@@ -45,7 +45,7 @@ export class CodecRegistry {
 
   /**
    * Map-like interface for codec lookup by ID.
-   * Example: registry.get('core/string@1')
+   * Example: registry.get('pg/text@1')
    */
   get(id: string): Codec | undefined {
     return this._byId.get(id);

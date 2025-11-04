@@ -41,10 +41,7 @@ class SelectBuilderImpl<
   private readonly codecTypes: CodecTypes;
   private state: BuilderState = {};
 
-  constructor(
-    options: SqlBuilderOptions<TContract, CodecTypes>,
-    state?: BuilderState,
-  ) {
+  constructor(options: SqlBuilderOptions<TContract, CodecTypes>, state?: BuilderState) {
     this.contract = options.contract;
     this.adapter = options.adapter;
     this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
@@ -253,11 +250,10 @@ class SelectBuilderImpl<
       ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
     });
 
-    const codecId = extractTypeIdFromExtensions(
-      this.contract.extensions,
-      where.left.table,
-      where.left.column,
-    );
+    // Get codec ID from column metadata type (already canonicalized)
+    const contractTable = this.contract.storage.tables[where.left.table];
+    const columnMeta = contractTable?.columns[where.left.column];
+    const codecId = columnMeta?.type;
 
     return {
       expr: {
@@ -280,49 +276,6 @@ class SelectBuilderImpl<
   }
 }
 
-/**
- * Extracts typeId from extension decorations for a given table/column.
- * Searches through all extensions for a decoration matching the table/column.
- */
-function extractTypeIdFromExtensions(
-  extensions: Record<string, unknown> | undefined,
-  table: string,
-  column: string,
-): string | undefined {
-  if (!extensions) {
-    return undefined;
-  }
-
-  for (const [_namespace, extension] of Object.entries(extensions)) {
-    if (typeof extension !== 'object' || extension === null) {
-      continue;
-    }
-
-    const ext = extension as {
-      decorations?: {
-        columns?: Array<{
-          ref?: { kind?: string; table?: string; column?: string };
-          payload?: { typeId?: string };
-        }>;
-      };
-    };
-
-    if (ext.decorations?.columns) {
-      for (const decoration of ext.decorations.columns) {
-        if (
-          decoration.ref?.kind === 'column' &&
-          decoration.ref.table === table &&
-          decoration.ref.column === column &&
-          decoration.payload?.typeId
-        ) {
-          return decoration.payload.typeId;
-        }
-      }
-    }
-  }
-
-  return undefined;
-}
 
 function buildProjectionState(
   _table: TableRef,
@@ -390,7 +343,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     }),
   );
 
-  // Build projectionTypes mapping: alias → contract scalar type
+  // Build projectionTypes mapping: alias → column type ID
   const projectionTypes: Record<string, string> = {};
   for (let i = 0; i < args.projection.aliases.length; i++) {
     const alias = args.projection.aliases[i];
@@ -404,7 +357,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     }
   }
 
-  // Build codec assignments from extension decorations
+  // Build codec assignments from column types
   const projectionCodecs: Record<string, string> = {};
   for (let i = 0; i < args.projection.aliases.length; i++) {
     const alias = args.projection.aliases[i];
@@ -412,14 +365,10 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column || !alias) {
       continue;
     }
-    // Extract typeId from extension decorations
-    const typeId = extractTypeIdFromExtensions(
-      args.contract.extensions,
-      column.table,
-      column.column,
-    );
-    if (typeId) {
-      projectionCodecs[alias] = typeId;
+    // Use columnMeta.type directly as typeId (already canonicalized)
+    const columnMeta = column.columnMeta;
+    if (columnMeta?.type) {
+      projectionCodecs[alias] = columnMeta.type;
     }
   }
 
@@ -448,20 +397,23 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   } satisfies PlanMeta);
 }
 
-type SelectBuilder<
+export type SelectBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  Row = unknown,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> = SelectBuilderImpl<TContract, unknown, CodecTypes> & {
+> = SelectBuilderImpl<TContract, Row, CodecTypes> & {
   readonly raw: RawFactory;
 };
 
 export function sql<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(options: SqlBuilderOptions<TContract, CodecTypes>): SelectBuilder<TContract, CodecTypes> {
-  const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes>(
-    options,
-  ) as SelectBuilder<TContract, CodecTypes>;
+>(options: SqlBuilderOptions<TContract, CodecTypes>): SelectBuilder<TContract, unknown, CodecTypes> {
+  const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes>(options) as SelectBuilder<
+    TContract,
+    unknown,
+    CodecTypes
+  >;
   const rawFactory = createRawFactory(options.contract);
 
   Object.defineProperty(builder, 'raw', {

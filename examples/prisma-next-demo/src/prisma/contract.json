@@ -147,41 +147,6 @@
       }
     }
   },
-  "extensions": {
-    "postgres": {
-      "decorations": {
-        "columns": [
-          {
-            "ref": { "kind": "column", "table": "user", "column": "id" },
-            "payload": { "typeId": "core/number@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "user", "column": "email" },
-            "payload": { "typeId": "core/string@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "user", "column": "createdAt" },
-            "payload": { "typeId": "core/iso-datetime@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "post", "column": "id" },
-            "payload": { "typeId": "core/number@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "post", "column": "title" },
-            "payload": { "typeId": "core/string@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "post", "column": "userId" },
-            "payload": { "typeId": "core/number@1" }
-          },
-          {
-            "ref": { "kind": "column", "table": "post", "column": "createdAt" },
-            "payload": { "typeId": "core/iso-datetime@1" }
-          }
-        ]
-      }
-    }
-  }
+  "extensions": {}
 }
 

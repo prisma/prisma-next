@@ -1,4 +1,4 @@
-export { sql } from '../sql';
+export { sql, SelectBuilder } from '../sql';
 export { rawOptions } from '../raw';
 export type {
   SqlBuilderOptions,
@@ -9,4 +9,3 @@ export type {
   TableKey,
   ColumnsOf,
 } from '../types';
-

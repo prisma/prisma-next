@@ -6,7 +6,7 @@ import type { Plan } from '@prisma-next/sql/types';
  *
  * Precedence:
  * 1. Plan hint: `annotations.codecs[alias]` → select by id
- * 2. Projection type: `projectionTypes[alias]` → `byScalar.get(scalar)` → first candidate
+ * 2. Projection type: `projectionTypes[alias]` → select by typeId
  * 3. Fallback: null (pass through driver value)
  */
 function resolveRowCodec(alias: string, plan: Plan, registry: CodecRegistry): Codec | null {
@@ -19,13 +19,13 @@ function resolveRowCodec(alias: string, plan: Plan, registry: CodecRegistry): Co
     }
   }
 
-  // 2. Projection type: projectionTypes[alias] → byScalar
+  // 2. Projection type: projectionTypes[alias] → registry.get(typeId)
   if (plan.meta.projectionTypes) {
-    const scalarType = plan.meta.projectionTypes[alias];
-    if (scalarType) {
-      const candidates = registry.getByScalar(scalarType);
-      if (candidates.length > 0) {
-        return candidates[0] ?? null;
+    const typeId = plan.meta.projectionTypes[alias];
+    if (typeId) {
+      const codec = registry.get(typeId);
+      if (codec) {
+        return codec;
       }
     }
   }

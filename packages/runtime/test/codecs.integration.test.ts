@@ -268,7 +268,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
         annotations: {
           ...basePlan.meta.annotations,
           codecs: {
-            created_at: 'core/iso-datetime@1',
+            created_at: 'pg/timestamptz@1',
           },
         },
       },
@@ -352,29 +352,9 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
-  it('uses codec assignments from contract extension decorations', async () => {
-    const contractWithCodecs: SqlContract<SqlStorage> = {
-      ...fixtureContract,
-      extensions: {
-        postgres: {
-          decorations: {
-            columns: [
-              {
-                ref: { kind: 'column', table: 'test_data', column: 'created_at' },
-                payload: { typeId: 'core/iso-datetime@1' },
-              },
-              {
-                ref: { kind: 'column', table: 'test_data', column: 'name' },
-                payload: { typeId: 'core/string@1' },
-              },
-            ],
-          },
-        },
-      },
-    };
-
+  it('uses codec assignments from contract column types', async () => {
     const runtime = createRuntime({
-      contract: contractWithCodecs,
+      contract: fixtureContract,
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: false },
@@ -386,9 +366,9 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = schema(contractWithCodecs).tables['test_data']!;
+    const testDataTable = schema(fixtureContract).tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const testBuilder = sql({ contract: contractWithCodecs, adapter });
+    const testBuilder = sql({ contract: fixtureContract, adapter });
     const selectPlan = testBuilder
       .from(testDataTable)
       .select({
@@ -399,8 +379,8 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
 
     expect(selectPlan.meta.annotations).toBeDefined();
     expect(selectPlan.meta.annotations?.codecs).toEqual({
-      name: 'core/string@1',
-      created_at: 'core/iso-datetime@1',
+      name: 'pg/text@1',
+      created_at: 'pg/timestamptz@1',
     });
 
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
@@ -413,25 +393,9 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
-  it('uses codec assignments from contract for WHERE clause parameters', async () => {
-    const contractWithCodecs: SqlContract<SqlStorage> = {
-      ...fixtureContract,
-      extensions: {
-        postgres: {
-          decorations: {
-            columns: [
-              {
-                ref: { kind: 'column', table: 'test_data', column: 'id' },
-                payload: { typeId: 'core/number@1' },
-              },
-            ],
-          },
-        },
-      },
-    };
-
+  it('uses codec assignments from contract column types for WHERE clause parameters', async () => {
     const runtime = createRuntime({
-      contract: contractWithCodecs,
+      contract: fixtureContract,
       adapter,
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: false },
@@ -443,9 +407,9 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = schema(contractWithCodecs).tables['test_data']!;
+    const testDataTable = schema(fixtureContract).tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const testBuilder = sql({ contract: contractWithCodecs, adapter });
+    const testBuilder = sql({ contract: fixtureContract, adapter });
     const selectPlan = testBuilder
       .from(testDataTable)
       .select({
@@ -456,7 +420,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
 
     expect(selectPlan.meta.annotations).toBeDefined();
     expect(selectPlan.meta.annotations?.codecs).toEqual({
-      id: 'core/number@1',
+      id: 'pg/int4@1',
     });
 
     const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
