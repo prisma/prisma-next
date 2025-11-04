@@ -35,17 +35,34 @@ type BuildStorageColumn<
 
 type BuildStorageTable<
   _TableName extends string,
-  Columns extends Record<string, { scalar: string; nullable: boolean; typeId?: string }>,
+  Columns extends Record<
+    string,
+    { scalar: string; nullable: boolean; typeId?: string | undefined }
+  >,
   PK extends readonly string[] | undefined,
   Target extends string,
 > = {
   readonly columns: {
-    readonly [K in keyof Columns]: BuildStorageColumn<
-      Columns[K]['scalar'] & string,
-      Columns[K]['nullable'] & boolean,
-      Columns[K]['typeId'],
-      Target
-    >;
+    readonly [K in keyof Columns]: Columns[K] extends { typeId: infer TId }
+      ? TId extends string
+        ? BuildStorageColumn<
+            Columns[K]['scalar'] & string,
+            Columns[K]['nullable'] & boolean,
+            TId & string,
+            Target
+          >
+        : BuildStorageColumn<
+            Columns[K]['scalar'] & string,
+            Columns[K]['nullable'] & boolean,
+            undefined,
+            Target
+          >
+      : BuildStorageColumn<
+          Columns[K]['scalar'] & string,
+          Columns[K]['nullable'] & boolean,
+          undefined,
+          Target
+        >;
   };
 } & (PK extends readonly string[] ? { readonly primaryKey: { readonly columns: PK } } : {});
 
@@ -68,8 +85,7 @@ type BuildStorage<
   readonly tables: {
     readonly [K in keyof Tables]: BuildStorageTable<
       K & string,
-      NormalizeColumns<ExtractColumns<Tables[K]>> &
-        Record<string, { scalar: string; nullable: boolean; typeId?: string }>,
+      NormalizeColumns<ExtractColumns<Tables[K]>>,
       ExtractPrimaryKey<Tables[K]>,
       Target
     >;
@@ -173,7 +189,7 @@ class TableBuilder<
   Columns extends Record<
     string,
     ColumnBuilderState<string, string, boolean, string | undefined>
-  > = Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+  > = {},
   PrimaryKey extends readonly string[] | undefined = undefined,
 > {
   private readonly _name: Name;
@@ -289,7 +305,7 @@ class TableBuilder<
 class ModelBuilder<
   Name extends string,
   Table extends string,
-  Fields extends Record<string, string> = Record<string, string>,
+  Fields extends Record<string, string> = {},
 > {
   private readonly _name: Name;
   private readonly _table: Table;
@@ -359,18 +375,8 @@ class ContractBuilder<
       Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
       readonly string[] | undefined
     >
-  > = Record<
-    string,
-    TableBuilderState<
-      string,
-      Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
-      readonly string[] | undefined
-    >
-  >,
-  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>> = Record<
-    string,
-    ModelBuilderState<string, string, Record<string, string>>
-  >,
+  > = {},
+  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>> = {},
   CoreHash extends string | undefined = undefined,
 > {
   private readonly state: ContractBuilderState<Target, Tables, Models, CoreHash>;
@@ -467,28 +473,48 @@ class ContractBuilder<
         readonly coreHash: CoreHash extends string ? CoreHash : string;
       }
     : never {
+    // Type helper to ensure literal types are preserved in return type
+    type BuiltContract = Target extends string
+      ? SqlContract<BuildStorage<Tables, Target & string>, BuildModels<Models>, {}, SqlMappings> & {
+          readonly schemaVersion: '1';
+          readonly target: Target;
+          readonly targetFamily: 'sql';
+          readonly coreHash: CoreHash extends string ? CoreHash : string;
+        }
+      : never;
     if (!this.state.target) {
       throw new Error('target is required. Call .target() before .build()');
     }
 
     const target = this.state.target as Target & string;
-    const storageRuntime: { tables: Record<string, StorageTable> } = { tables: {} };
-    const modelsRuntime: Record<string, ModelDefinition> = {};
+
+    // Build storage tables - construct as partial first, then assert full type
+    const storageTables: Partial<BuildStorage<Tables, Target & string>['tables']> = {};
     const extensions: Record<string, unknown> = {};
 
-    for (const [tableName, tableState] of Object.entries(this.state.tables)) {
-      const columns = {} as Record<string, StorageColumn>;
+    // Iterate over tables - TypeScript will see keys as string, but type assertion preserves literals
+    for (const tableName in this.state.tables) {
+      const tableState = this.state.tables[tableName];
+      if (!tableState) continue;
+
+      const tableStateTyped = tableState as unknown as {
+        name: string;
+        columns: Record<string, ColumnBuilderState>;
+        primaryKey?: readonly string[] | { columns: readonly string[] };
+      };
+
+      // Build columns object
+      const columns: Partial<Record<string, StorageColumn>> = {};
       const columnDecorations: Array<{
         ref: { kind: string; table: string; column: string };
         payload?: { typeId?: string };
       }> = [];
 
-      const tableStateTyped = tableState as unknown as {
-        columns: Record<string, ColumnBuilderState>;
-        primaryKey?: readonly string[] | { columns: readonly string[] };
-      };
+      // Iterate over columns
+      for (const columnName in tableStateTyped.columns) {
+        const columnState = tableStateTyped.columns[columnName];
+        if (!columnState) continue;
 
-      for (const [columnName, columnState] of Object.entries(tableStateTyped.columns)) {
         const scalar = columnState.scalar;
         const typeId =
           columnState.typeId ||
@@ -503,7 +529,7 @@ class ContractBuilder<
           columnDecorations.push({
             ref: {
               kind: 'column',
-              table: tableName,
+              table: tableStateTyped.name,
               column: columnName,
             },
             payload: {
@@ -522,7 +548,7 @@ class ContractBuilder<
         : undefined;
 
       const table: StorageTable = {
-        columns,
+        columns: columns as Record<string, StorageColumn>,
         ...(primaryKeyColumns
           ? {
               primaryKey: {
@@ -532,7 +558,8 @@ class ContractBuilder<
           : {}),
       };
 
-      storageRuntime.tables[tableName] = table;
+      // Assign to storage tables - type assertion preserves literal keys
+      (storageTables as Record<string, StorageTable>)[tableName] = table;
 
       if (columnDecorations.length > 0) {
         if (!extensions['core']) {
@@ -556,56 +583,67 @@ class ContractBuilder<
       }
     }
 
-    for (const [modelName, modelState] of Object.entries(this.state.models)) {
-      const fields: Record<string, ModelField> = {};
-      const modelStateTyped = modelState as { table: string; fields: Record<string, string> };
+    // Build models - construct as partial first, then assert full type
+    const modelsPartial: Partial<BuildModels<Models>> = {};
 
-      for (const [fieldName, columnName] of Object.entries(modelStateTyped.fields)) {
-        fields[fieldName] = {
-          column: columnName,
-        };
+    // Iterate over models - TypeScript will see keys as string, but type assertion preserves literals
+    for (const modelName in this.state.models) {
+      const modelState = this.state.models[modelName];
+      if (!modelState) continue;
+
+      const modelStateTyped = modelState as unknown as {
+        name: string;
+        table: string;
+        fields: Record<string, string>;
+      };
+
+      // Build fields object
+      const fields: Partial<Record<string, ModelField>> = {};
+
+      // Iterate over fields
+      for (const fieldName in modelStateTyped.fields) {
+        const columnName = modelStateTyped.fields[fieldName];
+        if (columnName) {
+          fields[fieldName] = {
+            column: columnName,
+          };
+        }
       }
 
-      modelsRuntime[modelName] = {
+      // Assign to models - type assertion preserves literal keys
+      (modelsPartial as Record<string, ModelDefinition>)[modelName] = {
         storage: {
           table: modelStateTyped.table,
         },
-        fields,
+        fields: fields as Record<string, ModelField>,
       };
     }
 
-    const mappings = computeMappings(modelsRuntime, storageRuntime as SqlStorage);
+    // Type assertions to preserve literal types from generics
+    // The type system knows these match BuildStorage/BuildModels from the generics
+    const storage = { tables: storageTables } as unknown as BuildStorage<Tables, Target & string>;
+    const models = modelsPartial as unknown as BuildModels<Models>;
 
+    const mappings = computeMappings(
+      models as Record<string, ModelDefinition>,
+      storage as SqlStorage,
+    );
+
+    // Construct contract with explicit type that matches the generic parameters
+    // This ensures TypeScript infers literal types from the generics, not runtime values
     const contract = {
       schemaVersion: '1' as const,
       target,
       targetFamily: 'sql' as const,
       coreHash: this.state.coreHash || `sha256:ts-builder-placeholder`,
-      models: modelsRuntime,
+      models,
       relations: {},
-      storage: storageRuntime,
+      storage,
       mappings,
       ...(Object.keys(extensions).length > 0 ? { extensions } : {}),
-    } as SqlContract<
-      BuildStorage<Tables, Target & string>,
-      BuildModels<Models>,
-      {},
-      SqlMappings
-    > & {
-      readonly schemaVersion: '1';
-      readonly target: Target;
-      readonly targetFamily: 'sql';
-      readonly coreHash: CoreHash extends string ? CoreHash : string;
-    };
+    } as unknown as BuiltContract;
 
-    return contract as Target extends string
-      ? SqlContract<BuildStorage<Tables, Target & string>, BuildModels<Models>, {}, SqlMappings> & {
-          readonly schemaVersion: '1';
-          readonly target: Target;
-          readonly targetFamily: 'sql';
-          readonly coreHash: CoreHash extends string ? CoreHash : string;
-        }
-      : never;
+    return contract as BuiltContract;
   }
 }
 

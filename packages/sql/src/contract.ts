@@ -501,6 +501,9 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
  * @throws Error if the contract structure or logic is invalid
  */
 export function validateContract<TContract extends SqlContract<SqlStorage>>(
+  value: TContract,
+): TContract;
+export function validateContract<TContract extends SqlContract<SqlStorage>>(
   value: unknown,
 ): TContract {
   const structurallyValid = validateContractStructure<SqlContract<SqlStorage>>(value);

@@ -138,7 +138,7 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validated = validateContract<SqlContract<SqlStorage>>(contract);
+    const validated = validateContract(contract);
     expect(validated.target).toBe('postgres');
     expect(validated.storage.tables['user']).toBeDefined();
   });
@@ -159,7 +159,7 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validated = validateContract<SqlContract<SqlStorage>>(contract);
+    const validated = validateContract(contract);
     const tables = schema<typeof validated, CodecTypes>(validated).tables;
     const userTable = tables['user'];
     expect(userTable).toBeDefined();
@@ -184,7 +184,7 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validated = validateContract<SqlContract<SqlStorage>>(contract);
+    const validated = validateContract(contract);
     const adapter = createStubAdapter();
     const tables = schema<typeof validated, CodecTypes>(validated).tables;
     const userTable = tables['user'];
@@ -230,7 +230,7 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validated = validateContract<SqlContract<SqlStorage>>(contract);
+    const validated = validateContract(contract);
     const adapter = createStubAdapter();
     const tables = schema<typeof validated, CodecTypes>(validated).tables;
     const userTable = tables['user'];
@@ -248,12 +248,12 @@ describe('builder integration', () => {
     type Row = ResultType<typeof plan>;
 
     // Runtime check
-    const _row: Row = {
+    const row: Row = {
       id: 1,
       email: 'test@example.com',
       createdAt: '2024-01-01T00:00:00Z',
     };
-    expect(_row).toBeDefined();
+    expect(row).toBeDefined();
 
     // Type checks - verify ResultType has specific field names and types
     expectTypeOf<Row['id']>().toEqualTypeOf<number>();
@@ -277,7 +277,7 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const validatedBuilderContract = validateContract<SqlContract<SqlStorage>>(builderContract);
+    const validatedBuilderContract = validateContract(builderContract);
     const fixtureContract = validateContract<Contract>(contractJson);
 
     // Runtime checks
