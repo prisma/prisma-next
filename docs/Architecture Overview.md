@@ -182,12 +182,14 @@ sequenceDiagram
 
 - Runtime verifies marker `coreHash` and `profileHash` equality with the contract and applies lint rules and budgets configured by policy
 - Extensible linting highlights potential issues before execution
+ - Runtime validates declared codec `typeId` coverage: if the contract declares a per-column `typeId` (via extension decoration), a matching codec must be present in the composed registry or execution fails with a stable error
 
 **Execution**
 
 - Runtime streams results through adapters while extension codecs decode branded types deterministically
 - Results are exposed as `AsyncIterable<Row>` with pre‑emission buffer vs stream selection based on adapter capabilities and configured thresholds (ADR 124, ADR 125)
 - Guardrail plugins observe execution for telemetry, throttling, or policy enforcement
+ - Query lanes infer result types from `contract.d.ts` (or builder generics in no‑emit mode) and do not depend on runtime registries for typing; runtime owns encode/decode implementations
 
 **Feedback loop**
 
