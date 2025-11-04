@@ -359,17 +359,6 @@ describe('validateContract', () => {
         },
       },
     },
-    mappings: {
-      columnToCodec: {
-        User: {
-          id: 'core/string@1',
-          email: 'core/string@1',
-        },
-      },
-      codecTypes: {
-        'core/string@1': { input: 'string', output: 'string' },
-      },
-    },
   });
 
   it('performs both structural and logical validation', () => {

@@ -127,8 +127,28 @@ export interface PlanMeta {
 }
 
 /**
- * Maps contract scalar type to JavaScript type.
- * MVP mapping: text→string, int4/float8→number, timestamptz→string
+ * Helper type to lookup scalar → JS type from adapter-provided ScalarToJs mapping.
+ * Returns the mapped type if found, otherwise returns a sentinel type to indicate "not found".
+ */
+type ScalarToJsLookup<
+  Mappings extends { scalarToJs?: Record<string, unknown> },
+  Scalar extends string,
+> =
+  Mappings['scalarToJs'] extends Record<string, unknown>
+    ? Scalar extends keyof Mappings['scalarToJs']
+      ? Mappings['scalarToJs'][Scalar]
+      : '__NOT_FOUND__'
+    : '__NOT_FOUND__';
+
+/**
+ * Helper type to check if a type is the "not found" sentinel.
+ */
+type IsNotFound<T> = T extends '__NOT_FOUND__' ? true : false;
+
+/**
+ * Legacy fallback type (deprecated).
+ * Kept temporarily as last-resort fallback during migration.
+ * @deprecated Use adapter-provided ScalarToJs mapping via contract.d.ts instead.
  */
 export type ContractScalarToJsType<T extends string> = T extends 'text'
   ? string
@@ -176,23 +196,24 @@ type GetColumnTypeId<
   TableName extends string,
   ColumnName extends string,
   Extensions extends Record<string, unknown> | undefined,
-> = Extensions extends Record<string, unknown>
-  ? {
-      [K in keyof Extensions]: Extensions[K] extends {
-        decorations?: {
-          columns?: Array<{
-            ref?: { kind?: string; table?: string; column?: string };
-            payload?: { typeId?: string };
-          }>;
-        };
-      }
-        ? Extensions[K]['decorations'] extends {
-            columns?: Array<infer D>;
-          }
-          ? D extends {
-              ref?: { kind?: string; table?: infer T; column?: infer C };
-              payload?: { typeId?: infer TId };
+> =
+  Extensions extends Record<string, unknown>
+    ? {
+        [K in keyof Extensions]: Extensions[K] extends {
+          decorations?: {
+            columns?: Array<{
+              ref?: { kind?: string; table?: string; column?: string };
+              payload?: { typeId?: string };
+            }>;
+          };
+        }
+          ? Extensions[K]['decorations'] extends {
+              columns?: Array<infer D>;
             }
+            ? D extends {
+                ref?: { kind?: string; table?: infer T; column?: infer C };
+                payload?: { typeId?: infer TId };
+              }
               ? T extends TableName
                 ? C extends ColumnName
                   ? TId extends string
@@ -201,21 +222,22 @@ type GetColumnTypeId<
                   : never
                 : never
               : never
-          : never
-        : never;
-    }[keyof Extensions]
-  : never;
+            : never
+          : never;
+      }[keyof Extensions]
+    : never;
 
 /**
  * Infers JavaScript type from a ColumnBuilder.
  *
- * Type inference rules:
+ * Type inference rules (in order of precedence):
  * 1. If column has a typeId in extension decorations, look up CodecTypes[typeId].output
- * 2. Otherwise, map storage scalar → JS type per target family
- * 3. Nullability propagates from storage column metadata
+ * 2. Otherwise, if mappings.scalarToJs exists and has the scalar type, use that adapter-provided mapping
+ * 3. Fallback to legacy ContractScalarToJsType (deprecated, for migration safety)
+ * 4. Nullability propagates from storage column metadata in all branches
  *
- * Note: CodecTypes should be imported from contract.d.ts and passed as a type parameter.
- * If not provided, falls back to scalar mapping.
+ * Note: CodecTypes and ScalarToJs should be imported from contract.d.ts and provided via
+ * the contract type's mappings. If not provided, falls back to legacy scalar mapping.
  */
 export type InferColumnType<
   C extends ColumnBuilder,
@@ -228,37 +250,73 @@ export type InferColumnType<
 }
   ? TableName extends string
     ? ColumnName extends string
-      ? GetColumnTypeId<
-          TableName,
-          ColumnName,
-          TContract['extensions']
-        > extends infer TypeId
-        ? TypeId extends string
-          ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
-            ? CodecOutput extends string
-              ? N extends true
-                ? CodecOutputToJsType<CodecOutput> | null
-                : CodecOutputToJsType<CodecOutput>
+      ? TContract['mappings'] extends infer Mappings
+        ? Mappings extends { scalarToJs?: Record<string, unknown> }
+          ? GetColumnTypeId<TableName, ColumnName, TContract['extensions']> extends infer TypeId
+            ? TypeId extends string
+              ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
+                ? CodecOutput extends string
+                  ? N extends true
+                    ? CodecOutputToJsType<CodecOutput> | null
+                    : CodecOutputToJsType<CodecOutput>
+                  : T extends string
+                    ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
+                      ? IsNotFound<ScalarType> extends true
+                        ? N extends true
+                          ? ContractScalarToJsType<T> | null
+                          : ContractScalarToJsType<T>
+                        : N extends true
+                          ? ScalarType | null
+                          : ScalarType
+                      : N extends true
+                        ? ContractScalarToJsType<T> | null
+                        : ContractScalarToJsType<T>
+                    : unknown
+                : T extends string
+                  ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
+                    ? IsNotFound<ScalarType> extends true
+                      ? N extends true
+                        ? ContractScalarToJsType<T> | null
+                        : ContractScalarToJsType<T>
+                      : N extends true
+                        ? ScalarType | null
+                        : ScalarType
+                    : N extends true
+                      ? ContractScalarToJsType<T> | null
+                      : ContractScalarToJsType<T>
+                  : unknown
               : T extends string
-                ? N extends true
-                  ? ContractScalarToJsType<T> | null
-                  : ContractScalarToJsType<T>
+                ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
+                  ? IsNotFound<ScalarType> extends true
+                    ? N extends true
+                      ? ContractScalarToJsType<T> | null
+                      : ContractScalarToJsType<T>
+                    : N extends true
+                      ? ScalarType | null
+                      : ScalarType
+                  : N extends true
+                    ? ContractScalarToJsType<T> | null
+                    : ContractScalarToJsType<T>
                 : unknown
             : T extends string
-              ? N extends true
-                ? ContractScalarToJsType<T> | null
-                : ContractScalarToJsType<T>
+              ? ScalarToJsLookup<Mappings, T> extends infer ScalarType
+                ? IsNotFound<ScalarType> extends true
+                  ? N extends true
+                    ? ContractScalarToJsType<T> | null
+                    : ContractScalarToJsType<T>
+                  : N extends true
+                    ? ScalarType | null
+                    : ScalarType
+                : N extends true
+                  ? ContractScalarToJsType<T> | null
+                  : ContractScalarToJsType<T>
               : unknown
           : T extends string
             ? N extends true
               ? ContractScalarToJsType<T> | null
               : ContractScalarToJsType<T>
             : unknown
-        : T extends string
-          ? N extends true
-            ? ContractScalarToJsType<T> | null
-            : ContractScalarToJsType<T>
-          : unknown
+        : unknown
       : unknown
     : unknown
   : unknown;

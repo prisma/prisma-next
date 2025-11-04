@@ -142,23 +142,31 @@ describe('sql DSL builder', () => {
   });
 
   describe('codec assignments', () => {
-    it('encodes codec assignments from contract mappings for projections', () => {
+    it('encodes codec assignments from extension decorations for projections', () => {
       const contractWithCodecs = {
         ...contract,
-        mappings: {
-          ...contract.mappings,
-          columnToCodec: {
-            user: {
-              id: 'core/int@1',
-              email: 'core/string@1',
+        extensions: {
+          postgres: {
+            decorations: {
+              columns: [
+                {
+                  ref: { kind: 'column', table: 'user', column: 'id' },
+                  payload: { typeId: 'core/number@1' },
+                },
+                {
+                  ref: { kind: 'column', table: 'user', column: 'email' },
+                  payload: { typeId: 'core/string@1' },
+                },
+              ],
             },
           },
         },
-      } as Contract;
+      };
 
-      const userColumns = tables.user.columns;
-      const plan = sql({ contract: contractWithCodecs, adapter })
-        .from(tables.user)
+      const contractValidated = validateContract<Contract>(contractWithCodecs);
+      const userColumns = schema(contractValidated).tables.user.columns;
+      const plan = sql({ contract: contractValidated, adapter })
+        .from(schema(contractValidated).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -167,27 +175,32 @@ describe('sql DSL builder', () => {
 
       expect(plan.meta.annotations).toBeDefined();
       expect(plan.meta.annotations?.codecs).toEqual({
-        id: 'core/int@1',
+        id: 'core/number@1',
         email: 'core/string@1',
       });
     });
 
-    it('encodes codec assignments from contract mappings for WHERE parameters', () => {
+    it('encodes codec assignments from extension decorations for WHERE parameters', () => {
       const contractWithCodecs = {
         ...contract,
-        mappings: {
-          ...contract.mappings,
-          columnToCodec: {
-            user: {
-              id: 'core/int@1',
+        extensions: {
+          postgres: {
+            decorations: {
+              columns: [
+                {
+                  ref: { kind: 'column', table: 'user', column: 'id' },
+                  payload: { typeId: 'core/number@1' },
+                },
+              ],
             },
           },
         },
-      } as Contract;
+      };
 
-      const userColumns = tables.user.columns;
-      const plan = sql({ contract: contractWithCodecs, adapter })
-        .from(tables.user)
+      const contractValidated = validateContract<Contract>(contractWithCodecs);
+      const userColumns = schema(contractValidated).tables.user.columns;
+      const plan = sql({ contract: contractValidated, adapter })
+        .from(schema(contractValidated).tables.user)
         .select({
           email: userColumns.email,
         })
@@ -196,27 +209,35 @@ describe('sql DSL builder', () => {
 
       expect(plan.meta.annotations).toBeDefined();
       expect(plan.meta.annotations?.codecs).toEqual({
-        userId: 'core/int@1',
+        userId: 'core/number@1',
       });
     });
 
     it('merges projection and parameter codec assignments', () => {
       const contractWithCodecs = {
         ...contract,
-        mappings: {
-          ...contract.mappings,
-          columnToCodec: {
-            user: {
-              id: 'core/int@1',
-              email: 'core/string@1',
+        extensions: {
+          postgres: {
+            decorations: {
+              columns: [
+                {
+                  ref: { kind: 'column', table: 'user', column: 'id' },
+                  payload: { typeId: 'core/number@1' },
+                },
+                {
+                  ref: { kind: 'column', table: 'user', column: 'email' },
+                  payload: { typeId: 'core/string@1' },
+                },
+              ],
             },
           },
         },
-      } as Contract;
+      };
 
-      const userColumns = tables.user.columns;
-      const plan = sql({ contract: contractWithCodecs, adapter })
-        .from(tables.user)
+      const contractValidated = validateContract<Contract>(contractWithCodecs);
+      const userColumns = schema(contractValidated).tables.user.columns;
+      const plan = sql({ contract: contractValidated, adapter })
+        .from(schema(contractValidated).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -226,13 +247,14 @@ describe('sql DSL builder', () => {
 
       expect(plan.meta.annotations).toBeDefined();
       expect(plan.meta.annotations?.codecs).toEqual({
-        id: 'core/int@1',
+        id: 'core/number@1',
         email: 'core/string@1',
-        userId: 'core/int@1',
+        userId: 'core/number@1',
       });
     });
 
-    it('includes codec annotations when codec mappings exist', () => {
+    it('includes codec annotations when extension decorations exist', () => {
+      // Contract fixture already has extension decorations
       const userColumns = tables.user.columns;
       const plan = sql({ contract, adapter })
         .from(tables.user)
@@ -244,27 +266,33 @@ describe('sql DSL builder', () => {
 
       expect(plan.meta.annotations).toBeDefined();
       expect(plan.meta.annotations?.codecs).toEqual({
-        id: 'core/int@1',
+        id: 'core/number@1',
         email: 'core/string@1',
       });
     });
 
-    it('only includes codecs for columns with mappings', () => {
+    it('only includes codecs for columns with extension decorations', () => {
       const contractWithPartialCodecs = {
         ...contract,
-        mappings: {
-          ...contract.mappings,
-          columnToCodec: {
-            user: {
-              id: 'core/int@1',
+        extensions: {
+          postgres: {
+            decorations: {
+              columns: [
+                {
+                  ref: { kind: 'column', table: 'user', column: 'id' },
+                  payload: { typeId: 'core/number@1' },
+                },
+                // email doesn't have a decoration
+              ],
             },
           },
         },
-      } as Contract;
+      };
 
-      const userColumns = tables.user.columns;
-      const plan = sql({ contract: contractWithPartialCodecs, adapter })
-        .from(tables.user)
+      const contractValidated = validateContract<Contract>(contractWithPartialCodecs);
+      const userColumns = schema(contractValidated).tables.user.columns;
+      const plan = sql({ contract: contractValidated, adapter })
+        .from(schema(contractValidated).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -272,7 +300,7 @@ describe('sql DSL builder', () => {
         .build();
 
       expect(plan.meta.annotations?.codecs).toEqual({
-        id: 'core/int@1',
+        id: 'core/number@1',
       });
     });
 
@@ -319,6 +347,93 @@ describe('sql DSL builder', () => {
 
       expectTypeOf<Row>().toExtend<{
         id: string;
+        email: string;
+      }>();
+
+      const _row: Row = { id: '1', email: 'test@example.com' } as unknown as Row;
+      expect(_row).toBeDefined();
+    });
+
+    it('infers ResultType using adapter-provided ScalarToJs when no codec is assigned', () => {
+      // Contract without extension decorations - should use scalarToJs fallback
+      const contractWithoutCodecs = {
+        ...contract,
+        extensions: undefined,
+      };
+
+      const contractValidated = validateContract<Contract>(contractWithoutCodecs);
+
+      const testTables = schema(contractValidated).tables;
+      const userColumns = testTables.user.columns;
+      const plan = sql({ contract: contractValidated, adapter })
+        .from(testTables.user)
+        .select({
+          id: userColumns.id, // int4 → number via ScalarToJs
+          email: userColumns.email, // text → string via ScalarToJs
+          createdAt: userColumns.createdAt, // timestamptz → string via ScalarToJs
+        })
+        .build();
+
+      // Should not have codec annotations since no typeId decorations
+      expect(plan.meta.annotations?.codecs).toBeUndefined();
+
+      type Row = ResultType<typeof plan>;
+
+      // Verify types come from ScalarToJs mapping (adapter-provided)
+      expectTypeOf<Row>().toExtend<{
+        id: number; // int4 → number
+        email: string; // text → string
+        createdAt: string; // timestamptz → string
+      }>();
+
+      const _row: Row = { id: 1, email: 'test@example.com', createdAt: '2024-01-01T00:00:00Z' } as unknown as Row;
+      expect(_row).toBeDefined();
+    });
+
+    it('codec mapping takes precedence over ScalarToJs fallback', () => {
+      // Contract with extension decorations that override scalar mapping
+      const contractWithCodecs = {
+        ...contract,
+        extensions: {
+          postgres: {
+            decorations: {
+              columns: [
+                {
+                  ref: { kind: 'column', table: 'user', column: 'id' },
+                  payload: { typeId: 'core/string@1' }, // Override int4 → number with string codec
+                },
+                {
+                  ref: { kind: 'column', table: 'user', column: 'email' },
+                  payload: { typeId: 'core/string@1' },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const contractValidated = validateContract<Contract>(contractWithCodecs);
+
+      const testTables = schema(contractValidated).tables;
+      const userColumns = testTables.user.columns;
+      const plan = sql({ contract: contractValidated, adapter })
+        .from(testTables.user)
+        .select({
+          id: userColumns.id, // Should be string (codec) not number (scalar)
+          email: userColumns.email,
+        })
+        .build();
+
+      expect(plan.meta.annotations?.codecs).toEqual({
+        id: 'core/string@1',
+        email: 'core/string@1',
+      });
+
+      type Row = ResultType<typeof plan>;
+
+      // Codec output types should take precedence over ScalarToJs
+      expectTypeOf<Row>().toExtend<{
+        id: string; // Codec overrides int4 → number, uses string codec output
         email: string;
       }>();
 

@@ -4,7 +4,7 @@
 
 import type { SqlContract } from '../../src/contract-types';
 import type { TableDef, ModelDef } from '../../src/types';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import type { CodecTypes, ScalarToJs } from '@prisma-next/adapter-postgres/codec-types';
 
 // Contract type representing the contract data structure
 // This type matches the structure of contract.json and can be used as a return type
@@ -49,6 +49,7 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
+    readonly scalarToJs: ScalarToJs;
   }
 > & {
   readonly storage: {
@@ -62,8 +63,8 @@ export type Contract = SqlContract<
   };
 };
 
-// Codec type map imported from adapter - used for type inference in lanes
-export type { CodecTypes };
+// Codec type map and scalar mapping imported from adapter - used for type inference in lanes
+export type { CodecTypes, ScalarToJs };
 
 // Direct model exports for easy importing: import type { User } from './contract.d'
 export type User = Contract['models']['User'];
