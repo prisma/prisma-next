@@ -1,16 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { createPostgresCodecRegistry } from '../../adapter-postgres/src/codecs';
+import { CodecRegistry } from '@prisma-next/sql-target';
+import { codecDefinitions } from '../../adapter-postgres/src/codecs';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import { decodeRow } from '../src/codecs/decoding';
 import { extractTypeIds, validateCodecRegistryCompleteness } from '../src/codecs/validation';
 import type { Plan, ParamDescriptor } from '@prisma-next/sql/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
-import { CodecRegistry } from '@prisma-next/sql-target';
 import type { Codec } from '@prisma-next/sql-target';
 import { validateContract } from '@prisma-next/sql/schema';
 
+function createRegistry(): CodecRegistry {
+  const registry = new CodecRegistry();
+  for (const definition of Object.values(codecDefinitions)) {
+    registry.register(definition.codec);
+  }
+  return registry;
+}
+
 describe('Codec Registry', () => {
-  const registry = createPostgresCodecRegistry();
+  const registry = createRegistry();
 
   it('resolves codec by ID using get()', () => {
     const codec = registry.get('pg/text@1');
@@ -113,7 +121,7 @@ describe('Codec Registry', () => {
 });
 
 describe('Param Encoding', () => {
-  const registry = createPostgresCodecRegistry();
+  const registry = createRegistry();
 
   const createMockPlan = (paramDescriptors: ParamDescriptor[]): Plan => {
     return {
@@ -211,7 +219,7 @@ describe('Param Encoding', () => {
 });
 
 describe('Row Decoding', () => {
-  const registry = createPostgresCodecRegistry();
+  const registry = createRegistry();
 
   const createMockDslPlan = (projectionTypes?: Record<string, string>): Plan => {
     return {
@@ -457,7 +465,7 @@ describe('Codec Registry Validation', () => {
     };
     const contract = validateContract(contractRaw);
 
-    const registry = createPostgresCodecRegistry();
+    const registry = createRegistry();
     expect(() => validateCodecRegistryCompleteness(registry, contract)).not.toThrow();
   });
 
@@ -484,7 +492,7 @@ describe('Codec Registry Validation', () => {
       mappings: {},
     };
 
-    const registry = createPostgresCodecRegistry();
+    const registry = createRegistry();
     expect(() => validateCodecRegistryCompleteness(registry, contract)).toThrow();
     try {
       validateCodecRegistryCompleteness(registry, contract);

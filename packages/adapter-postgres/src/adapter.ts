@@ -1,4 +1,5 @@
 import type { Adapter, AdapterProfile, LowererContext } from '@prisma-next/sql-target';
+import { CodecRegistry } from '@prisma-next/sql-target';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -8,7 +9,7 @@ import type {
   PostgresLoweredStatement,
   SelectAst,
 } from './types';
-import { createPostgresCodecRegistry } from './codecs';
+import { codecDefinitions } from './codecs';
 
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -21,7 +22,13 @@ class PostgresAdapterImpl
   implements Adapter<SelectAst, PostgresContract, PostgresLoweredStatement>
 {
   readonly profile: AdapterProfile<'postgres'>;
-  private readonly codecRegistry = createPostgresCodecRegistry();
+  private readonly codecRegistry = (() => {
+    const registry = new CodecRegistry();
+    for (const definition of Object.values(codecDefinitions)) {
+      registry.register(definition.codec);
+    }
+    return registry;
+  })();
 
   constructor(options?: PostgresAdapterOptions) {
     this.profile = Object.freeze({
