@@ -1,15 +1,17 @@
+import type { O } from 'ts-toolbelt';
+
 /**
  * Codec interface for encoding/decoding values between wire format and JavaScript types.
  *
  * Codecs are pure, synchronous functions with no side effects or IO.
  * They provide deterministic conversion between database wire types and JS values.
  */
-export interface Codec<TWire = unknown, TJs = unknown> {
+export interface Codec<Id extends string = string, TWire = unknown, TJs = unknown> {
   /**
    * Namespaced codec identifier in format 'namespace/name@version'
    * Examples: 'pg/text@1', 'pg/uuid@1', 'pg/timestamptz@1'
    */
-  readonly id: string;
+  readonly id: Id;
 
   /**
    * Contract scalar type IDs that this codec can handle.
@@ -40,14 +42,14 @@ export interface Codec<TWire = unknown, TJs = unknown> {
  * then packs, then app overrides).
  */
 export class CodecRegistry {
-  private readonly _byId = new Map<string, Codec>();
-  private readonly _byScalar = new Map<string, Codec[]>();
+  private readonly _byId = new Map<string, Codec<string>>();
+  private readonly _byScalar = new Map<string, Codec<string>[]>();
 
   /**
    * Map-like interface for codec lookup by ID.
    * Example: registry.get('pg/text@1')
    */
-  get(id: string): Codec | undefined {
+  get(id: string): Codec<string> | undefined {
     return this._byId.get(id);
   }
 
@@ -63,7 +65,7 @@ export class CodecRegistry {
    * Returns an empty frozen array if no codecs are found.
    * Example: registry.getByScalar('text') → [codec1, codec2, ...]
    */
-  getByScalar(scalar: string): readonly Codec[] {
+  getByScalar(scalar: string): readonly Codec<string>[] {
     return this._byScalar.get(scalar) ?? Object.freeze([]);
   }
 
@@ -71,7 +73,7 @@ export class CodecRegistry {
    * Get the default codec for a scalar type (first registered codec).
    * Returns undefined if no codec handles this scalar type.
    */
-  getDefaultCodec(scalar: string): Codec | undefined {
+  getDefaultCodec(scalar: string): Codec<string> | undefined {
     const codecs = this._byScalar.get(scalar);
     return codecs?.[0];
   }
@@ -83,7 +85,7 @@ export class CodecRegistry {
    * @param codec - The codec to register
    * @throws Error if a codec with the same ID already exists
    */
-  register(codec: Codec): void {
+  register(codec: Codec<string>): void {
     if (this._byId.has(codec.id)) {
       throw new Error(`Codec with ID '${codec.id}' is already registered`);
     }
@@ -105,7 +107,7 @@ export class CodecRegistry {
    * Returns an iterator over all registered codecs.
    * Useful for iterating through codecs from another registry.
    */
-  *[Symbol.iterator](): Iterator<Codec> {
+  *[Symbol.iterator](): Iterator<Codec<string>> {
     for (const codec of this._byId.values()) {
       yield codec;
     }
@@ -114,7 +116,172 @@ export class CodecRegistry {
   /**
    * Returns an iterable of all registered codecs.
    */
-  values(): IterableIterator<Codec> {
+  values(): IterableIterator<Codec<string>> {
     return this._byId.values();
   }
+}
+
+/**
+ * Codec factory - creates a codec with typeId and encode/decode functions.
+ */
+export function codec<Id extends string, TWire, TJs>(config: {
+  typeId: Id;
+  targetTypes: readonly string[];
+  encode: (value: TJs) => TWire;
+  decode: (wire: TWire) => TJs;
+}): Codec<Id, TWire, TJs> {
+  return {
+    id: config.typeId,
+    targetTypes: config.targetTypes,
+    encode: config.encode,
+    decode: config.decode,
+  };
+}
+
+/**
+ * Type helpers to extract codec types.
+ */
+export type CodecInput<T> = T extends Codec<infer _Id, infer _WireT, infer JsT> ? JsT : never;
+export type CodecOutput<T> = T extends Codec<infer _Id, infer _WireT, infer JsT> ? JsT : never;
+
+/**
+ * Type helper to extract codec types from builder instance.
+ */
+export type ExtractCodecTypes<
+  ScalarNames extends Record<string, Codec<string>> = Record<string, never>,
+> = {
+  readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id, any, any>
+    ? Id
+    : never]: {
+    readonly input: CodecInput<ScalarNames[K]>;
+    readonly output: CodecOutput<ScalarNames[K]>;
+  };
+};
+
+/**
+ * Type helper to extract scalar-to-JS type mapping from builder instance.
+ */
+export type ExtractScalarToJs<ScalarNames extends Record<string, Codec<string>>> = {
+  readonly [K in keyof ScalarNames]: CodecOutput<ScalarNames[K]>;
+};
+
+/**
+ * Builder DSL for declaring codecs.
+ */
+export class CodecDefBuilder<
+  ScalarNames extends Record<string, Codec<string>> = Record<string, never>,
+> {
+  private readonly _codecs: ScalarNames;
+
+  public readonly CodecTypes: ExtractCodecTypes<ScalarNames>;
+  public readonly ScalarToJs: ExtractScalarToJs<ScalarNames>;
+
+  constructor(codecs: ScalarNames) {
+    this._codecs = codecs;
+
+    // Populate CodecTypes from codecs
+    const codecTypes: Record<string, { readonly input: unknown; readonly output: unknown }> = {};
+    for (const [, codecImpl] of Object.entries(this._codecs)) {
+      codecTypes[codecImpl.id] = {
+        input: undefined as unknown as CodecInput<typeof codecImpl>,
+        output: undefined as unknown as CodecOutput<typeof codecImpl>,
+      };
+    }
+    this.CodecTypes = codecTypes as ExtractCodecTypes<ScalarNames>;
+
+    // Populate ScalarToJs from codecs
+    const scalarToJs: Record<string, unknown> = {};
+    for (const [scalarName, codecImpl] of Object.entries(this._codecs)) {
+      scalarToJs[scalarName] = undefined as unknown as CodecOutput<typeof codecImpl>;
+    }
+    this.ScalarToJs = scalarToJs as ExtractScalarToJs<ScalarNames>;
+  }
+
+  add<ScalarName extends string, CodecImpl extends Codec<string>>(
+    scalarName: ScalarName,
+    codecImpl: CodecImpl,
+  ): CodecDefBuilder<O.Overwrite<ScalarNames, Record<ScalarName, CodecImpl>>> {
+    return new CodecDefBuilder({
+      ...this._codecs,
+      [scalarName]: codecImpl,
+    } as O.Overwrite<ScalarNames, Record<ScalarName, CodecImpl>>);
+  }
+
+  /**
+   * Derive codecDefinitions structure.
+   */
+  get codecDefinitions(): {
+    readonly [K in keyof ScalarNames]: {
+      readonly typeId: ScalarNames[K] extends Codec<infer Id, any, any> ? Id : never;
+      readonly scalar: K;
+      readonly codec: ScalarNames[K];
+      readonly input: CodecInput<ScalarNames[K]>;
+      readonly output: CodecOutput<ScalarNames[K]>;
+      readonly jsType: CodecOutput<ScalarNames[K]>;
+    };
+  } {
+    const result: Record<
+      string,
+      {
+        typeId: string;
+        scalar: string;
+        codec: Codec;
+        input: unknown;
+        output: unknown;
+        jsType: unknown;
+      }
+    > = {};
+
+    for (const [scalarName, codecImpl] of Object.entries(this._codecs)) {
+      result[scalarName] = {
+        typeId: codecImpl.id,
+        scalar: scalarName,
+        codec: codecImpl,
+        input: undefined as unknown as CodecInput<typeof codecImpl>,
+        output: undefined as unknown as CodecOutput<typeof codecImpl>,
+        jsType: undefined as unknown as CodecOutput<typeof codecImpl>,
+      };
+    }
+
+    return result as {
+      readonly [K in keyof ScalarNames]: {
+        readonly typeId: ScalarNames[K] extends Codec<infer Id, any, any> ? Id : never;
+        readonly scalar: K;
+        readonly codec: ScalarNames[K];
+        readonly input: CodecInput<ScalarNames[K]>;
+        readonly output: CodecOutput<ScalarNames[K]>;
+        readonly jsType: CodecOutput<ScalarNames[K]>;
+      };
+    };
+  }
+
+  /**
+   * Derive dataTypes constant.
+   */
+  get dataTypes(): {
+    readonly [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id, any, any>
+      ? Id
+      : never;
+  } {
+    const result: Partial<{
+      readonly [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id, any, any>
+        ? Id
+        : never;
+    }> = {};
+    for (const [scalarName, codecImpl] of Object.entries(this._codecs)) {
+      (result as any)[scalarName] = codecImpl.id;
+    }
+    return result as {
+      readonly [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id, any, any>
+        ? Id
+        : never;
+    };
+  }
+}
+
+/**
+ * Create a new codec definition builder.
+ */
+export function defineCodecs(): CodecDefBuilder<Record<string, never>> {
+  return new CodecDefBuilder({});
 }

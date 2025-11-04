@@ -10,5 +10,12 @@ export {
   SqlQueryResult,
   SqlExplainResult,
 } from '../sql-target';
-export type { Codec } from '../codecs';
-export { CodecRegistry } from '../codecs';
+export type {
+  Codec,
+  CodecInput,
+  CodecOutput,
+  CodecDefBuilder,
+  ExtractCodecTypes,
+  ExtractScalarToJs,
+} from '../codecs';
+export { CodecRegistry, codec, defineCodecs } from '../codecs';
