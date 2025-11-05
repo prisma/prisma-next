@@ -5,7 +5,7 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { SqlContract, SqlStorage, ModelDefinition } from '../src/contract-types';
 import type { Adapter, LoweredStatement, SelectAst, ResultType } from '../src/types';
-import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
 import type { CodecTypes } from './fixtures/contract.d';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };

@@ -1,5 +1,5 @@
 import type { Adapter, AdapterProfile, LowererContext } from '@prisma-next/sql-target';
-import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
 import type {
   BinaryExpr,
   ColumnRef,

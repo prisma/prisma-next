@@ -10,7 +10,7 @@ import { sql as exportedSql, rawOptions as exportedRawOptions } from '../src/exp
 import { validateContract } from '../src/contract';
 import type { SqlContract, SqlStorage } from '../src/contract-types';
 import type { Adapter, LoweredStatement, ParamDescriptor, PlanMeta, SelectAst } from '../src/types';
-import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

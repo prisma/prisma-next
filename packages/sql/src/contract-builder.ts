@@ -140,45 +140,15 @@ interface ModelBuilderState<
   readonly fields: Fields;
 }
 
-class ColumnBuilder<
+export interface ColumnBuilder<
   Name extends string,
   Scalar extends string,
   Nullable extends boolean = false,
   Type extends string | undefined = undefined,
 > {
-  private readonly _name: Name;
-  private readonly _scalar: Scalar;
-  private readonly _nullable: Nullable;
-  private readonly _type: Type;
-
-  constructor(name: Name, scalar: Scalar, nullable: Nullable = false as Nullable, type?: Type) {
-    this._name = name;
-    this._scalar = scalar;
-    this._nullable = nullable;
-    this._type = type as Type;
-  }
-
-  nullable<Value extends boolean>(
-    value: Value = true as Value,
-  ): ColumnBuilder<Name, Scalar, Value, Type> {
-    return new ColumnBuilder(this._name, this._scalar, value, this._type);
-  }
-
-  type<Id extends string>(id: Id): ColumnBuilder<Name, Scalar, Nullable, Id> {
-    if (typeof id !== 'string' || !id.includes('@')) {
-      throw new Error(`type must be in format "namespace/name@version", got "${id}"`);
-    }
-    return new ColumnBuilder(this._name, this._scalar, this._nullable, id);
-  }
-
-  build(): ColumnBuilderState<Name, Scalar, Nullable, Type> {
-    return {
-      name: this._name,
-      scalar: this._scalar,
-      nullable: this._nullable,
-      type: this._type,
-    };
-  }
+  nullable<Value extends boolean>(value?: Value): ColumnBuilder<Name, Scalar, Value, Type>;
+  type<Id extends string>(id: Id): ColumnBuilder<Name, Scalar, Nullable, Id>;
+  build(): ColumnBuilderState<Name, Scalar, Nullable, Type>;
 }
 
 class TableBuilder<

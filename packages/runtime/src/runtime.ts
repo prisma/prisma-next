@@ -202,7 +202,7 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
     this._telemetry = null;
 
     const iterator = async function* (
-      self: Runtime<TContract>,
+      self: RuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
       const startedAt = Date.now();
       let rowCount = 0;

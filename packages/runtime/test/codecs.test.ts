@@ -69,11 +69,11 @@ describe('Codec Registry', () => {
   describe('CodecRegistry class methods', () => {
     it('registers a new codec', () => {
       const newRegistry = createCodecRegistry();
-      const codec: Codec<string, string> = {
+      const codec: Codec<string, string, string> = {
         id: 'test/custom@1',
         targetTypes: ['custom'],
-        decode: (wire) => wire,
-        encode: (value) => value,
+        decode: (wire: string) => wire,
+        encode: (value: string) => value,
       };
 
       newRegistry.register(codec);
@@ -83,7 +83,7 @@ describe('Codec Registry', () => {
 
     it('throws error when registering duplicate codec ID', () => {
       const newRegistry = createCodecRegistry();
-      const codec: Codec<string, string> = {
+      const codec: Codec<string, string, string> = {
         id: 'test/duplicate@1',
         targetTypes: ['custom'],
         decode: (wire) => wire,
@@ -522,7 +522,7 @@ describe('Codec Registry Validation', () => {
       mappings: {},
     };
 
-    const emptyRegistry = new CodecRegistry();
+    const emptyRegistry = createCodecRegistry();
 
     expect(() => validateCodecRegistryCompleteness(emptyRegistry, contract)).not.toThrow();
   });

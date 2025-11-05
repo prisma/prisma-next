@@ -104,17 +104,7 @@ const codecs = defineCodecs()
   .add('float8', pgFloat8Codec)
   .add('timestamp', pgTimestampCodec)
   .add('timestamptz', pgTimestamptzCodec)
-  .add('bool', pgBoolCodec) as unknown as CodecDefBuilder<{
-  text: typeof pgTextCodec;
-  int4: typeof pgInt4Codec;
-  int2: typeof pgInt2Codec;
-  int8: typeof pgInt8Codec;
-  float4: typeof pgFloat4Codec;
-  float8: typeof pgFloat8Codec;
-  timestamp: typeof pgTimestampCodec;
-  timestamptz: typeof pgTimestamptzCodec;
-  bool: typeof pgBoolCodec;
-}>;
+  .add('bool', pgBoolCodec);
 
 // Export derived structures directly from codecs builder
 export const codecDefinitions = codecs.codecDefinitions;

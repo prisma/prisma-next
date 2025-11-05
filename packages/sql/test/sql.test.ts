@@ -16,7 +16,7 @@ import type {
   SelectAst,
   ColumnBuilder,
 } from '../src/types';
-import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
 import type { Contract, CodecTypes } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -118,7 +118,11 @@ describe('sql DSL builder', () => {
   });
 
   it('throws PLAN.INVALID when selecting an invalid column', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter, codecTypes: {} as CodecTypes }).from(tables.user);
+    const builder = sql<Contract, CodecTypes>({
+      contract,
+      adapter,
+      codecTypes: {} as CodecTypes,
+    }).from(tables.user);
 
     // Invalid: passing something that's not a ColumnBuilder
     expect(() => builder.select({ invalid: {} as unknown as ColumnBuilder })).toThrowError(
@@ -253,6 +257,5 @@ describe('sql DSL builder', () => {
         email: 'pg/text@1',
       });
     });
-
   });
 });
