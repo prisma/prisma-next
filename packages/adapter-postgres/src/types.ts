@@ -3,7 +3,7 @@ import type {
   SqlStorage,
   StorageColumn,
   StorageTable,
-} from '@prisma-next/sql-query/contract-types';
+} from '@prisma-next/sql-target';
 import type {
   BinaryExpr,
   ColumnRef,

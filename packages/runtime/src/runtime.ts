@@ -1,6 +1,6 @@
 import { mapContractMarkerRow, readContractMarker, type ContractMarkerRow } from './marker';
 import { computeSqlFingerprint } from './fingerprint';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-query/contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { Adapter, LoweredStatement, SelectAst, Plan } from '@prisma-next/sql-query/types';
 
 import type { SqlDriver } from '@prisma-next/sql-target';

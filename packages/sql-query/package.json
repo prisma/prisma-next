@@ -45,10 +45,6 @@
       "types": "./dist/exports/errors.d.ts",
       "import": "./dist/exports/errors.js"
     },
-    "./contract-types": {
-      "types": "./dist/exports/contract-types.d.ts",
-      "import": "./dist/exports/contract-types.js"
-    },
     "./contract-builder": {
       "types": "./dist/exports/contract-builder.d.ts",
       "import": "./dist/exports/contract-builder.js"

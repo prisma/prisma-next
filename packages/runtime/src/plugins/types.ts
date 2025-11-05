@@ -1,4 +1,4 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-query/contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { Plan, Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-query/types';
 import type { SqlDriver } from '@prisma-next/sql-target';
 

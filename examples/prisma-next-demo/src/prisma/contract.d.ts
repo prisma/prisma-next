@@ -1,7 +1,12 @@
 // Generated contract types
 import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 
-import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from './contract-types';
+import type {
+  SqlContract,
+  SqlStorage,
+  SqlMappings,
+  ModelDefinition,
+} from '@prisma-next/sql-target';
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
