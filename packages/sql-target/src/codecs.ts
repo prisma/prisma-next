@@ -270,10 +270,17 @@ class CodecDefBuilderImpl<
     }
     this.ScalarToJs = scalarToJs as ExtractScalarToJs<ScalarNames>;
 
-    // Populate dataTypes from codecs
-    // Use type assertion to construct object without index signature
-    // The type system knows this matches the return type from the generic constraint
-    this.dataTypes = this._codecs as unknown as {
+    // Populate dataTypes from codecs - extract id property from each codec
+    // Build object preserving keys from ScalarNames
+    // Type assertion is safe because we know ScalarNames structure matches the return type
+    const dataTypes = {} as any;
+    for (const key in this._codecs) {
+      if (Object.prototype.hasOwnProperty.call(this._codecs, key)) {
+        const codec = this._codecs[key] as Codec<string>;
+        dataTypes[key] = codec.id;
+      }
+    }
+    this.dataTypes = dataTypes as {
       readonly [K in keyof ScalarNames]: {
         readonly [Id in keyof ExtractCodecTypes<Record<K, ScalarNames[K]>>]: Id;
       }[keyof ExtractCodecTypes<Record<K, ScalarNames[K]>>];

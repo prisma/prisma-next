@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';
 import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
+import { validateContract } from '@prisma-next/sql/schema';
 import { Client } from 'pg';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
@@ -116,8 +117,11 @@ describe(
         cursor: { disabled: true },
       });
 
+      // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
+      const validatedContract = validateContract(testContract);
+
       const runtime = createRuntime({
-        contract: testContract,
+        contract: validatedContract,
         adapter: createPostgresAdapter(),
         driver,
         verify: {
@@ -127,7 +131,7 @@ describe(
       });
 
       prismaPN = new PrismaClient({
-        contract: testContract,
+        contract: validatedContract,
         runtime,
       });
     });

@@ -12,7 +12,7 @@
  * at compile time (to derive CodecTypes and ScalarToJs types).
  */
 
-import { codec, defineCodecs, type CodecDefBuilder } from '@prisma-next/sql-target';
+import { codec, defineCodecs } from '@prisma-next/sql-target';
 
 // Create individual codec instances
 const pgTextCodec = codec({

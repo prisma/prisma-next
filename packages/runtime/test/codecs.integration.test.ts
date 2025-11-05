@@ -52,9 +52,9 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
 
   beforeAll(async () => {
     database = await createDevDatabase({
-      acceleratePort: 54000,
-      databasePort: 54001,
-      shadowDatabasePort: 54002,
+      acceleratePort: 54003,
+      databasePort: 54004,
+      shadowDatabasePort: 54005,
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
