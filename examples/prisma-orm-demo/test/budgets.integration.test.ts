@@ -44,7 +44,8 @@ async function withDevDatabase<T>(
 
 describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () => {
   it('blocks unbounded SELECT queries', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
+    await withDevDatabase(
+      async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const client = new Client({ connectionString });
       await client.connect();
@@ -132,11 +133,18 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       } finally {
         await client.end();
       }
-    });
+    },
+      {
+        acceleratePort: 54020,
+        databasePort: 54021,
+        shadowDatabasePort: 54022,
+      },
+    );
   });
 
   it('allows bounded SELECT queries within budget', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
+    await withDevDatabase(
+      async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const client = new Client({ connectionString });
       await client.connect();
@@ -222,11 +230,18 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       } finally {
         await client.end();
       }
-    });
+    },
+      {
+        acceleratePort: 54030,
+        databasePort: 54031,
+        shadowDatabasePort: 54032,
+      },
+    );
   });
 
   it('enforces streaming row budget', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
+    await withDevDatabase(
+      async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const client = new Client({ connectionString });
       await client.connect();
@@ -314,6 +329,12 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       } finally {
         await client.end();
       }
-    });
+    },
+      {
+        acceleratePort: 54040,
+        databasePort: 54041,
+        shadowDatabasePort: 54042,
+      },
+    );
   });
 });

@@ -10,14 +10,14 @@ function computeHash(content: string): string {
 
 export function computeCoreHash(contract: Record<string, unknown>): string {
   const coreContract: ContractIR = {
-    schemaVersion: contract['schemaVersion'] as string | undefined,
+    ...(contract['schemaVersion'] !== undefined ? { schemaVersion: contract['schemaVersion'] as string } : {}),
     targetFamily: contract['targetFamily'] as string,
     target: contract['target'] as string,
-    models: contract['models'] as Record<string, unknown> | undefined,
-    relations: contract['relations'] as Record<string, unknown> | undefined,
-    storage: contract['storage'] as Record<string, unknown> | undefined,
-    extensions: contract['extensions'] as Record<string, unknown> | undefined,
-    sources: contract['sources'] as Record<string, unknown> | undefined,
+    ...(contract['models'] !== undefined ? { models: contract['models'] as Record<string, unknown> } : {}),
+    ...(contract['relations'] !== undefined ? { relations: contract['relations'] as Record<string, unknown> } : {}),
+    ...(contract['storage'] !== undefined ? { storage: contract['storage'] as Record<string, unknown> } : {}),
+    ...(contract['extensions'] !== undefined ? { extensions: contract['extensions'] as Record<string, unknown> } : {}),
+    ...(contract['sources'] !== undefined ? { sources: contract['sources'] as Record<string, unknown> } : {}),
   };
   const canonical = canonicalizeContract(coreContract);
   return computeHash(canonical);
@@ -25,10 +25,10 @@ export function computeCoreHash(contract: Record<string, unknown>): string {
 
 export function computeProfileHash(contract: Record<string, unknown>): string {
   const profileContract: ContractIR = {
-    schemaVersion: contract['schemaVersion'] as string | undefined,
+    ...(contract['schemaVersion'] !== undefined ? { schemaVersion: contract['schemaVersion'] as string } : {}),
     targetFamily: contract['targetFamily'] as string,
     target: contract['target'] as string,
-    capabilities: contract['capabilities'] as Record<string, Record<string, boolean>> | undefined,
+    ...(contract['capabilities'] !== undefined ? { capabilities: contract['capabilities'] as Record<string, Record<string, boolean>> } : {}),
   };
   const canonical = canonicalizeContract(profileContract);
   return computeHash(canonical);
