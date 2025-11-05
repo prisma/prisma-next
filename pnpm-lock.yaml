@@ -50,9 +50,9 @@ importers:
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
-      '@prisma-next/sql':
+      '@prisma-next/sql-query':
         specifier: workspace:*
-        version: link:../../packages/sql
+        version: link:../../packages/sql-query
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -136,9 +136,9 @@ importers:
 
   packages/adapter-postgres:
     dependencies:
-      '@prisma-next/sql':
+      '@prisma-next/sql-query':
         specifier: workspace:*
-        version: link:../sql
+        version: link:../sql-query
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
@@ -167,9 +167,9 @@ importers:
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../runtime
-      '@prisma-next/sql':
+      '@prisma-next/sql-query':
         specifier: workspace:*
-        version: link:../sql
+        version: link:../sql-query
     devDependencies:
       '@prisma/dev':
         specifier: ^0.1.1
@@ -272,9 +272,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../driver-postgres
-      '@prisma-next/sql':
+      '@prisma-next/sql-query':
         specifier: workspace:*
-        version: link:../sql
+        version: link:../sql-query
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
@@ -298,7 +298,7 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
-  packages/sql:
+  packages/sql-query:
     dependencies:
       '@prisma-next/contract':
         specifier: workspace:*

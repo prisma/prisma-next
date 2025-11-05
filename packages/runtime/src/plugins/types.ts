@@ -1,5 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
-import type { Plan, Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-query/contract-types';
+import type { Plan, Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-query/types';
 import type { SqlDriver } from '@prisma-next/sql-target';
 
 export type Severity = 'error' | 'warn' | 'info';

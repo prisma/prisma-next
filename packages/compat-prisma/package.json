@@ -12,7 +12,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/runtime": "workspace:*",
-    "@prisma-next/sql": "workspace:*",
+    "@prisma-next/sql-query": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*"
   },

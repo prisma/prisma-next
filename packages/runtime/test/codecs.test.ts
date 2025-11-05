@@ -4,10 +4,10 @@ import { codecDefinitions } from '../../adapter-postgres/src/codecs';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import { decodeRow } from '../src/codecs/decoding';
 import { extractTypeIds, validateCodecRegistryCompleteness } from '../src/codecs/validation';
-import type { Plan, ParamDescriptor } from '@prisma-next/sql/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
+import type { Plan, ParamDescriptor } from '@prisma-next/sql-query/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-query/contract-types';
 import type { Codec } from '@prisma-next/sql-target';
-import { validateContract } from '@prisma-next/sql/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 
 function createRegistry(): CodecRegistry {
   const registry = createCodecRegistry();

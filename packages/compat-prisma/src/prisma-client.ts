@@ -1,9 +1,9 @@
 import { createRuntime, type Runtime } from '@prisma-next/runtime';
-import { sql } from '@prisma-next/sql/sql';
-import { schema } from '@prisma-next/sql/schema';
-import { param } from '@prisma-next/sql/param';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
-import type { TableRef, ColumnBuilder } from '@prisma-next/sql/types';
+import { sql } from '@prisma-next/sql-query/sql';
+import { schema } from '@prisma-next/sql-query/schema';
+import { param } from '@prisma-next/sql-query/param';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-query/contract-types';
+import type { TableRef, ColumnBuilder } from '@prisma-next/sql-query/types';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
 

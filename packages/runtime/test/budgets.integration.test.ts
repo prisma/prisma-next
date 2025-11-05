@@ -7,9 +7,9 @@ import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createDevDatabase } from './utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
-import { sql } from '@prisma-next/sql/sql';
-import { schema } from '@prisma-next/sql/schema';
-import { validateContract } from '@prisma-next/sql/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import { schema } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',

@@ -1,5 +1,5 @@
 import { getRuntime } from '../prisma/runtime';
-import type { ResultType } from '@prisma-next/sql/types';
+import type { ResultType } from '@prisma-next/sql-query/types';
 import { schema, sql } from '../prisma/query';
 
 export async function getUsers(limit: number = 10) {

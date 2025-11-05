@@ -1,11 +1,11 @@
 import { expectTypeOf, test } from 'vitest';
 import { createRuntime } from '../src/runtime';
-import type { Plan, ResultType } from '@prisma-next/sql/types';
+import type { Plan, ResultType } from '@prisma-next/sql-query/types';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { Contract, CodecTypes } from '../../sql/test/fixtures/contract.d';
-import { sql } from '@prisma-next/sql/sql';
-import { schema } from '@prisma-next/sql/schema';
-import { validateContract } from '@prisma-next/sql/schema';
+import type { Contract, CodecTypes } from '../../sql-query/test/fixtures/contract.d';
+import { sql } from '@prisma-next/sql-query/sql';
+import { schema } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

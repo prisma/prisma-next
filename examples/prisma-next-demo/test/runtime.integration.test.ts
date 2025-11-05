@@ -5,11 +5,11 @@ import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { Pool } from 'pg';
 import { createRuntime, budgets } from '@prisma-next/runtime';
 import { withClient, withDevDatabase } from '@prisma-next/runtime/test/utils';
-import { schema } from '@prisma-next/sql/schema';
-import { sql } from '@prisma-next/sql/sql';
-import { param } from '@prisma-next/sql/param';
-import { validateContract } from '@prisma-next/sql/schema';
-import type { ResultType } from '@prisma-next/sql/types';
+import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import { param } from '@prisma-next/sql-query/param';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import type { ResultType } from '@prisma-next/sql-query/types';
 
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 

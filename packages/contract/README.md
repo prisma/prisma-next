@@ -65,11 +65,11 @@ For document targets (MongoDB, Firestore, etc.):
 }
 ```
 
-**Note:** For SQL contracts, use `@prisma-next/sql/schema-sql` instead:
+**Note:** For SQL contracts, use `@prisma-next/sql-query/schema-sql` instead:
 
 ```json
 {
-  "$schema": "node_modules/@prisma-next/sql/schemas/data-contract-sql-v1.json",
+  "$schema": "node_modules/@prisma-next/sql-query/schemas/data-contract-sql-v1.json",
   "schemaVersion": "1",
   "target": "postgres",
   "targetFamily": "sql",
@@ -145,5 +145,5 @@ if (isDocumentContract(contract)) {
 
 ## Related Packages
 
-- `@prisma-next/sql`: SQL query builder and plan types
+- `@prisma-next/sql-query`: SQL query builder and plan types
 - `@prisma-next/runtime`: Runtime execution engine that consumes contracts

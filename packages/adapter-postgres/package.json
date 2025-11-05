@@ -10,7 +10,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma-next/sql": "workspace:*",
+    "@prisma-next/sql-query": "workspace:*",
     "@prisma-next/sql-target": "workspace:*"
   },
   "devDependencies": {

@@ -13,9 +13,9 @@ import { unstable_startServer } from '@prisma/dev';
 import type { StartServerOptions } from '@prisma/dev';
 import contractJson from '../src/prisma-next/contract.json' assert { type: 'json' };
 import type { Contract, CodecTypes } from '../src/prisma-next/contract.d';
-import { sql } from '@prisma-next/sql/sql';
-import { schema } from '@prisma-next/sql/schema';
-import { validateContract } from '@prisma-next/sql/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import { schema } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 
 const contract = validateContract<Contract>(contractJson);
 

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createRuntime } from '../src/runtime';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
-import type { Plan } from '@prisma-next/sql/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-query/contract-types';
+import type { Plan } from '@prisma-next/sql-query/types';
 import type { SqlDriver } from '@prisma-next/sql-target';
 import type { Plugin } from '../src/plugins/types';
-import { validateContract } from '@prisma-next/sql/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 
 describe('Runtime class', () => {
   const mockContractRaw: SqlContract<SqlStorage> = {

@@ -1,5 +1,5 @@
-import type { SqlContract } from '@prisma-next/sql/contract-types';
-import type { TableDef, ModelDef } from '@prisma-next/sql/types';
+import type { SqlContract } from '@prisma-next/sql-query/contract-types';
+import type { TableDef, ModelDef } from '@prisma-next/sql-query/types';
 import type { CodecTypes, ScalarToJs } from '@prisma-next/adapter-postgres/codec-types';
 
 export type Contract = SqlContract<

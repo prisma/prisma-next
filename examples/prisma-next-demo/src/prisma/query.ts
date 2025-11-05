@@ -1,9 +1,9 @@
-import { sql as sqlBuilder } from '@prisma-next/sql/sql';
-import { schema as schemaBuilder } from '@prisma-next/sql/schema';
+import { sql as sqlBuilder } from '@prisma-next/sql-query/sql';
+import { schema as schemaBuilder } from '@prisma-next/sql-query/schema';
 import { CodecTypes, Contract } from './contract';
 import contractJson from './contract.json' assert { type: 'json' };
 import { adapter } from './adapter';
-import { validateContract } from '@prisma-next/sql/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 
 const contract = validateContract<Contract>(contractJson);
 

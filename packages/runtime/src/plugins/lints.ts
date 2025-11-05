@@ -1,5 +1,5 @@
 import type { Plugin, PluginContext } from './types';
-import type { Plan } from '@prisma-next/sql/types';
+import type { Plan } from '@prisma-next/sql-query/types';
 import { evaluateRawGuardrails } from '../guardrails/raw';
 
 export interface LintsOptions {

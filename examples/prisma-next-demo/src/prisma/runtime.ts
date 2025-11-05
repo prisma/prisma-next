@@ -2,7 +2,7 @@ import { Client } from 'pg';
 import { createRuntime, budgets } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { validateContract } from '@prisma-next/sql/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 import contractJson from './contract.json' assert { type: 'json' };
 import type { Contract } from './contract.d';
 

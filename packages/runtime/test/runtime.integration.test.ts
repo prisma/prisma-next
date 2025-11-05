@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { Client } from 'pg';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { schema } from '@prisma-next/sql/schema';
-import { sql } from '@prisma-next/sql/sql';
-import { validateContract } from '@prisma-next/sql/schema';
+import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import { validateContract } from '@prisma-next/sql-query/schema';
 
 import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 
@@ -301,7 +301,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
 
 function loadContractFixture(): SqlContract<SqlStorage> {
   const fixtureDir = dirname(fileURLToPath(import.meta.url));
-  const contractPath = join(fixtureDir, '../../sql/test/fixtures/contract.json');
+  const contractPath = join(fixtureDir, '../../sql-query/test/fixtures/contract.json');
   const json = readFileSync(contractPath, 'utf8');
   const contractJson = JSON.parse(json);
   return validateContract<SqlContract<SqlStorage>>(contractJson);

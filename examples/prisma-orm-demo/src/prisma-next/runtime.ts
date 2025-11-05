@@ -3,7 +3,7 @@ import { createRuntime, budgets } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import contractJson from './contract.json' assert { type: 'json' };
-import { validateContract } from '@prisma-next/sql/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 
 let runtime: ReturnType<typeof createRuntime> | undefined;
 let client: Client | undefined;

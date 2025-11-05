@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/sql": "workspace:*",
+    "@prisma-next/sql-query": "workspace:*",
     "@prisma-next/sql-target": "workspace:*"
   },
   "devDependencies": {

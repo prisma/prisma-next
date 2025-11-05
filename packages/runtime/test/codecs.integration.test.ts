@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { Client } from 'pg';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { schema } from '@prisma-next/sql/schema';
-import { sql } from '@prisma-next/sql/sql';
-import { param } from '@prisma-next/sql/param';
-import { validateContract } from '@prisma-next/sql/schema';
+import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import { param } from '@prisma-next/sql-query/param';
+import { validateContract } from '@prisma-next/sql-query/schema';
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';

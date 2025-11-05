@@ -3,7 +3,7 @@ import type {
   SqlStorage,
   StorageColumn,
   StorageTable,
-} from '@prisma-next/sql/contract-types';
+} from '@prisma-next/sql-query/contract-types';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -11,7 +11,7 @@ import type {
   LoweredStatement,
   ParamRef,
   SelectAst,
-} from '@prisma-next/sql/types';
+} from '@prisma-next/sql-query/types';
 
 export interface PostgresAdapterOptions {
   readonly profileId?: string;

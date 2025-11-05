@@ -1,5 +1,5 @@
 import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
-import type { Plan, ParamDescriptor } from '@prisma-next/sql/types';
+import type { Plan, ParamDescriptor } from '@prisma-next/sql-query/types';
 
 /**
  * Resolves a codec for parameter encoding using precedence rules.

@@ -1,6 +1,6 @@
-import { param } from '@prisma-next/sql/param';
+import { param } from '@prisma-next/sql-query/param';
 import { getRuntime } from '../prisma/runtime';
-import type { ResultType } from '@prisma-next/sql/types';
+import type { ResultType } from '@prisma-next/sql-query/types';
 import { schema, sql } from '../prisma/query';
 
 export async function getUserPosts(userId: number) {

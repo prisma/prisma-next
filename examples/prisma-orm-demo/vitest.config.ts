@@ -10,9 +10,9 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   resolve: {
     alias: {
-      '@prisma-next/sql/sql': path.resolve(__dirname, '../../packages/sql/src/exports/sql.ts'),
-      '@prisma-next/sql/schema': path.resolve(__dirname, '../../packages/sql/src/exports/schema.ts'),
-      '@prisma-next/sql/types': path.resolve(__dirname, '../../packages/sql/src/exports/types.ts'),
+      '@prisma-next/sql-query-query/sql': path.resolve(__dirname, '../../packages/sql-query/src/exports/sql.ts'),
+      '@prisma-next/sql-query-query/schema': path.resolve(__dirname, '../../packages/sql-query/src/exports/schema.ts'),
+      '@prisma-next/sql-query-query/types': path.resolve(__dirname, '../../packages/sql-query/src/exports/types.ts'),
     },
   },
   test: {

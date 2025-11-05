@@ -1,4 +1,4 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql/contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-query/contract-types';
 import type { CodecRegistry } from '@prisma-next/sql-target';
 
 /**

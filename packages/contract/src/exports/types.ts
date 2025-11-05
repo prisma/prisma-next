@@ -3,13 +3,13 @@ import type { DocumentContract } from '../types';
 // Shared types
 export type { FieldType, Source, ContractBase } from '../types';
 
-// SQL family types - re-exported from @prisma-next/sql/contract-types
+// SQL family types - re-exported from @prisma-next/sql-query/contract-types
 export type {
   StorageColumn,
   StorageTable,
   SqlStorage,
   SqlContract,
-} from '@prisma-next/sql/contract-types';
+} from '@prisma-next/sql-query/contract-types';
 
 // Document family types
 export type { DocCollection, DocIndex, Expr, DocumentStorage, DocumentContract } from '../types';
@@ -19,8 +19,8 @@ export type { DocCollection, DocIndex, Expr, DocumentStorage, DocumentContract }
  */
 export function isSqlContract(
   contract: unknown,
-): contract is import('@prisma-next/sql/contract-types').SqlContract<
-  import('@prisma-next/sql/contract-types').SqlStorage
+): contract is import('@prisma-next/sql-query/contract-types').SqlContract<
+  import('@prisma-next/sql-query/contract-types').SqlStorage
 > {
   return (
     typeof contract === 'object' &&

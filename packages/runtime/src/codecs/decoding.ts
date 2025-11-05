@@ -1,5 +1,5 @@
 import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
-import type { Plan } from '@prisma-next/sql/types';
+import type { Plan } from '@prisma-next/sql-query/types';
 
 /**
  * Resolves a codec for row decoding using precedence rules.
