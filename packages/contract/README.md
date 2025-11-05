@@ -143,6 +143,43 @@ if (isDocumentContract(contract)) {
 - `./types`: TypeScript type definitions and type guards
 - `./schema-document`: Document family JSON Schema (`schemas/data-contract-document-v1.json`)
 
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph "Contract Package"
+        TYPES[Type Definitions]
+        SCHEMA[JSON Schemas]
+        GUARDS[Type Guards]
+    end
+
+    subgraph "Consumers"
+        EMITTER[Emitter]
+        RUNTIME[Runtime]
+        QUERY[Query Builder]
+    end
+
+    TYPES --> EMITTER
+    TYPES --> RUNTIME
+    TYPES --> QUERY
+    SCHEMA --> EMITTER
+    GUARDS --> RUNTIME
+    GUARDS --> QUERY
+```
+
+## Related Subsystems
+
+- **[Data Contract](../../docs/architecture%20docs/subsystems/1.%20Data%20Contract.md)**: Detailed subsystem specification
+- **[Contract Emitter & Types](../../docs/architecture%20docs/subsystems/2.%20Contract%20Emitter%20&%20Types.md)**: Contract emission
+
+## Related ADRs
+
+- [ADR 001 - Migrations as Edges](../../docs/architecture%20docs/adrs/ADR%20001%20-%20Migrations%20as%20Edges.md)
+- [ADR 004 - Core Hash vs Profile Hash](../../docs/architecture%20docs/adrs/ADR%20004%20-%20Core%20Hash%20vs%20Profile%20Hash.md)
+- [ADR 006 - Dual Authoring Modes](../../docs/architecture%20docs/adrs/ADR%20006%20-%20Dual%20Authoring%20Modes.md)
+- [ADR 010 - Canonicalization Rules](../../docs/architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)
+- [ADR 021 - Contract Marker Storage](../../docs/architecture%20docs/adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md)
+
 ## Related Packages
 
 - `@prisma-next/sql-query`: SQL query builder and plan types
