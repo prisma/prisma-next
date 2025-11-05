@@ -328,9 +328,6 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
-      '@prisma-next/sql':
-        specifier: workspace:*
-        version: link:../sql
     devDependencies:
       ts-toolbelt:
         specifier: ^9.6.0

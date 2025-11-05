@@ -8,7 +8,7 @@ import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import { validateContract } from '../src/contract';
-import type { SqlContract, SqlStorage } from '../src/contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type {
   ParamDescriptor,
   Adapter,

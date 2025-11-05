@@ -10,8 +10,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma-next/emitter": "workspace:*",
-    "@prisma-next/sql": "workspace:*"
+    "@prisma-next/emitter": "workspace:*"
   },
   "devDependencies": {
     "ts-toolbelt": "^9.6.0",

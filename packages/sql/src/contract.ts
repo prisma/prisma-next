@@ -13,7 +13,7 @@ import type {
   Index,
   ForeignKeyReferences,
   ForeignKey,
-} from './contract-types';
+} from '@prisma-next/sql-target';
 import type { O } from 'ts-toolbelt';
 
 /**

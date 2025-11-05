@@ -8,7 +8,7 @@ import { rawOptions } from '../src/raw';
 import { sql } from '../src/sql';
 import { sql as exportedSql, rawOptions as exportedRawOptions } from '../src/exports/sql';
 import { validateContract } from '../src/contract';
-import type { SqlContract, SqlStorage } from '../src/contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { Adapter, LoweredStatement, ParamDescriptor, PlanMeta, SelectAst } from '../src/types';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 

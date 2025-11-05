@@ -3,7 +3,7 @@ import { defineContract } from '../src/contract-builder';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { SqlContract, SqlStorage, ModelDefinition } from '../src/contract-types';
+import type { SqlContract, SqlStorage, ModelDefinition } from '@prisma-next/sql-target';
 import type { Adapter, LoweredStatement, SelectAst, ResultType } from '../src/types';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import type { CodecTypes } from './fixtures/contract.d';

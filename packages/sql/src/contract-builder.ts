@@ -6,7 +6,7 @@ import type {
   StorageColumn,
   StorageTable,
   SqlMappings,
-} from './contract-types';
+} from '@prisma-next/sql-target';
 import { computeMappings } from './contract';
 
 export interface ColumnOptions<TType extends string = string> {

@@ -4,12 +4,7 @@ import type {
   ExtensionPackManifest,
   TypesImportSpec,
 } from '@prisma-next/emitter';
-import type {
-  ModelDefinition,
-  ModelField,
-  SqlStorage,
-  StorageTable,
-} from '@prisma-next/sql/contract-types';
+import type { ModelDefinition, ModelField, SqlStorage, StorageTable } from './contract-types';
 
 export const sqlTargetFamilyHook = {
   id: 'sql',
@@ -220,7 +215,7 @@ export const sqlTargetFamilyHook = {
     return `// Generated contract types
 ${importLines.join('\n')}
 
-import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql/contract-types';
+import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from './contract-types';
 
 export type CodecTypes = ${codecTypes || 'Record<string, never>'};
 export type LaneCodecTypes = CodecTypes;

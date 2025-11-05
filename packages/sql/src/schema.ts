@@ -1,5 +1,5 @@
 import { planInvalid } from './errors';
-import type { SqlContract, SqlStorage, StorageColumn } from './contract-types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 import type {
   BinaryBuilder,
   ColumnBuilder,

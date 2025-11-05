@@ -6,4 +6,4 @@ export type {
   SqlMappings,
   StorageColumn,
   StorageTable,
-} from '../contract-types';
+} from '@prisma-next/sql-target';

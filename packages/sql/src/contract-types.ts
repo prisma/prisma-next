@@ -1,85 +1,17 @@
-import type { ContractBase } from '@prisma-next/contract/types';
-
-// SQL family types
-export type StorageColumn = {
-  readonly type?: string;
-  readonly nullable?: boolean;
-};
-
-export type PrimaryKey = {
-  readonly columns: readonly string[];
-  readonly name?: string;
-};
-
-export type UniqueConstraint = {
-  readonly columns: readonly string[];
-  readonly name?: string;
-};
-
-export type Index = {
-  readonly columns: readonly string[];
-  readonly name?: string;
-};
-
-export type ForeignKeyReferences = {
-  readonly table: string;
-  readonly columns: readonly string[];
-};
-
-export type ForeignKey = {
-  readonly columns: readonly string[];
-  readonly references: ForeignKeyReferences;
-  readonly name?: string;
-};
-
-export type StorageTable = {
-  readonly columns: Record<string, StorageColumn>;
-  readonly primaryKey?: PrimaryKey;
-  readonly uniques?: ReadonlyArray<UniqueConstraint>;
-  readonly indexes?: ReadonlyArray<Index>;
-  readonly foreignKeys?: ReadonlyArray<ForeignKey>;
-};
-
-export type SqlStorage = {
-  readonly tables: Record<string, StorageTable>;
-};
-
-export type ModelField = {
-  readonly column: string;
-};
-
-export type ModelStorage = {
-  readonly table: string;
-};
-
-export type ModelDefinition = {
-  readonly storage: ModelStorage;
-  readonly fields: Record<string, ModelField>;
-  readonly relations?: Record<string, unknown>;
-};
-
-export type SqlMappings = {
-  readonly modelToTable?: Record<string, string>;
-  readonly tableToModel?: Record<string, string>;
-  readonly fieldToColumn?: Record<string, Record<string, string>>;
-  readonly columnToField?: Record<string, Record<string, string>>;
-  /**
-   * Types-only scalar to JavaScript type mapping.
-   * Provided via contract.d.ts imports from adapter exports.
-   * Not present in contract.json; compile-time only.
-   */
-  readonly scalarToJs?: Record<string, unknown>;
-};
-
-export type SqlContract<
-  S extends SqlStorage = SqlStorage,
-  M extends Record<string, unknown> = Record<string, unknown>,
-  R extends Record<string, unknown> = Record<string, unknown>,
-  Map extends SqlMappings = SqlMappings,
-> = ContractBase & {
-  readonly targetFamily: string;
-  readonly storage: S;
-  readonly models: M;
-  readonly relations: R;
-  readonly mappings: Map;
-};
+// Re-export contract types from sql-target to break circular dependency
+// This file exists for backwards compatibility
+export type {
+  SqlContract,
+  SqlStorage,
+  SqlMappings,
+  StorageColumn,
+  StorageTable,
+  ModelDefinition,
+  ModelField,
+  ModelStorage,
+  PrimaryKey,
+  UniqueConstraint,
+  Index,
+  ForeignKey,
+  ForeignKeyReferences,
+} from '@prisma-next/sql-target';

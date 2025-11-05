@@ -1,6 +1,6 @@
 import { describe, expect, it, expectTypeOf } from 'vitest';
 import { validateContract } from '../src/contract';
-import type { SqlContract, SqlStorage } from '../src/contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 describe('validateContract structure validation', () => {
   const validContractInput = {

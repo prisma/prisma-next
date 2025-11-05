@@ -11,6 +11,7 @@ describe('sql-target-family-hook', () => {
         postgres: {
           version: '15.0.0',
         },
+        pg: {},
       },
       storage: {
         tables: {

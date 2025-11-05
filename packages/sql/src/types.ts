@@ -9,9 +9,21 @@ export type {
   SqlExecuteRequest,
   SqlExplainResult,
   SqlQueryResult,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  SqlMappings,
+  StorageTable,
+  ModelDefinition,
+  ModelField,
+  ModelStorage,
 } from '@prisma-next/sql-target';
-import type { SqlContract, SqlStorage, StorageColumn } from './contract-types';
-import type { Adapter } from '@prisma-next/sql-target';
+import type {
+  Adapter,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+} from '@prisma-next/sql-target';
 
 export type Direction = 'asc' | 'desc';
 
