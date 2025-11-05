@@ -1,32 +1,15 @@
 {
-  "$schema": "../../../../packages/sql-query/schemas/data-contract-sql-v1.json",
   "schemaVersion": "1",
-  "target": "postgres",
   "targetFamily": "sql",
-  "coreHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-  "profileHash": "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+  "target": "postgres",
+  "coreHash": "sha256:84bfb187760304609f1f5de730012912f965af5ebf052275a256678bb5095625",
+  "profileHash": "sha256:28ccf0c9c2899807cc8791c378d6bd821b9d3d3996443984949d4f6ce2b3728d",
   "models": {
-    "User": {
-      "storage": {
-        "table": "user"
-      },
+    "Post": {
       "fields": {
-        "id": {
-          "column": "id"
-        },
-        "email": {
-          "column": "email"
-        },
         "createdAt": {
           "column": "createdAt"
-        }
-      }
-    },
-    "Post": {
-      "storage": {
-        "table": "post"
-      },
-      "fields": {
+        },
         "id": {
           "column": "id"
         },
@@ -35,118 +18,75 @@
         },
         "userId": {
           "column": "userId"
-        },
+        }
+      },
+      "storage": {
+        "table": "post"
+      }
+    },
+    "User": {
+      "fields": {
         "createdAt": {
           "column": "createdAt"
+        },
+        "email": {
+          "column": "email"
+        },
+        "id": {
+          "column": "id"
         }
-      }
-    }
-  },
-  "relations": {},
-  "mappings": {
-    "modelToTable": {
-      "User": "user",
-      "Post": "post"
-    },
-    "tableToModel": {
-      "user": "User",
-      "post": "Post"
-    },
-    "fieldToColumn": {
-      "User": {
-        "id": "id",
-        "email": "email",
-        "createdAt": "createdAt"
       },
-      "Post": {
-        "id": "id",
-        "title": "title",
-        "userId": "userId",
-        "createdAt": "createdAt"
-      }
-    },
-    "columnToField": {
-      "user": {
-        "id": "id",
-        "email": "email",
-        "createdAt": "createdAt"
-      },
-      "post": {
-        "id": "id",
-        "title": "title",
-        "userId": "userId",
-        "createdAt": "createdAt"
+      "storage": {
+        "table": "user"
       }
     }
   },
   "storage": {
     "tables": {
-      "user": {
-        "columns": {
-          "id": {
-            "type": "pg/int4@1",
-            "nullable": false
-          },
-          "email": {
-            "type": "pg/text@1",
-            "nullable": false
-          },
-          "createdAt": {
-            "type": "pg/timestamptz@1",
-            "nullable": false
-          }
-        },
-        "primaryKey": {
-          "columns": ["id"],
-          "name": "user_pkey"
-        },
-        "uniques": [
-          {
-            "columns": ["email"],
-            "name": "user_email_key"
-          }
-        ],
-        "indexes": [],
-        "foreignKeys": []
-      },
       "post": {
         "columns": {
+          "createdAt": {
+            "type": "pg/timestamptz@1"
+          },
           "id": {
-            "type": "pg/int4@1",
-            "nullable": false
+            "type": "pg/int4@1"
           },
           "title": {
-            "type": "pg/text@1",
-            "nullable": false
+            "type": "pg/text@1"
           },
           "userId": {
-            "type": "pg/int4@1",
-            "nullable": false
-          },
-          "createdAt": {
-            "type": "pg/timestamptz@1",
-            "nullable": false
+            "type": "pg/int4@1"
           }
         },
         "primaryKey": {
-          "columns": ["id"],
-          "name": "post_pkey"
-        },
-        "uniques": [],
-        "indexes": [],
-        "foreignKeys": [
-          {
-            "columns": ["userId"],
-            "references": {
-              "table": "user",
-              "columns": ["id"]
-            },
-            "name": "post_userId_fkey"
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "user": {
+        "columns": {
+          "createdAt": {
+            "type": "pg/timestamptz@1"
+          },
+          "email": {
+            "type": "pg/text@1"
+          },
+          "id": {
+            "type": "pg/int4@1"
           }
-        ]
+        },
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        }
       }
     }
   },
-  "extensions": {}
+  "extensions": {
+    "postgres": {
+      "version": "15.0.0"
+    }
+  }
 }
-

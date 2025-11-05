@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
+import { resolve, join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
@@ -10,12 +12,39 @@ import { sql } from '@prisma-next/sql-query/sql';
 import { param } from '@prisma-next/sql-query/param';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { ResultType } from '@prisma-next/sql-query/types';
+import { loadContractFromTs } from '@prisma-next/cli';
+import { emit, loadExtensionPacks, targetFamilyRegistry } from '@prisma-next/emitter';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
+import type { Contract } from '../src/prisma/contract.d';
 
-import contractJson from '../src/prisma/contract.json' assert { type: 'json' };
-import type { Contract, CodecTypes } from '../src/prisma/contract.d';
-const contract = validateContract<Contract>(contractJson);
+let contract: ReturnType<typeof validateContract>;
+
+beforeAll(async () => {
+  if (!targetFamilyRegistry.has('sql')) {
+    targetFamilyRegistry.register(sqlTargetFamilyHook);
+  }
+
+  const contractPath = resolve(__dirname, '../contracts/contract.ts');
+  const outputDir = resolve(__dirname, '../src/prisma');
+  const adapterPath = resolve(__dirname, '../../../packages/adapter-postgres');
+
+  const contractIR = await loadContractFromTs(contractPath);
+  const packs = loadExtensionPacks(adapterPath, []);
+
+  const result = await emit(contractIR, {
+    outputDir,
+    packs,
+  });
+
+  mkdirSync(outputDir, { recursive: true });
+  writeFileSync(join(outputDir, 'contract.json'), result.contractJson, 'utf-8');
+  writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
+
+  const contractJson = JSON.parse(result.contractJson);
+  contract = validateContract<Contract>(contractJson);
+});
 
 describe('runtime execute integration', () => {
   it('streams rows and enforces marker verification', async () => {
@@ -63,9 +92,9 @@ describe('runtime execute integration', () => {
         });
         expect(rowCount).toBe(1);
 
-        const tables = schema<Contract, CodecTypes>(contract).tables;
+        const tables = schema(contract).tables;
         const userTable = tables['user']!;
-        const plan = sql<Contract, CodecTypes>({ contract, adapter })
+        const plan = sql({ contract, adapter })
           .from(tables['user']!)
           .select({
             id: userTable.columns['id']!,
@@ -83,7 +112,7 @@ describe('runtime execute integration', () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ email: 'alice@example.com' });
 
-        const root = sql<Contract, CodecTypes>({ contract, adapter });
+        const root = sql({ contract, adapter });
         const templatePlan = root.raw.with({ annotations: { limit: 1 } })`
           select id, email from "user"
           where email = ${'alice@example.com'}
@@ -169,7 +198,7 @@ describe('runtime execute integration', () => {
           );
         });
 
-        const tables = schema<Contract, CodecTypes>(contract).tables;
+        const tables = schema(contract).tables;
         const userTable = tables['user']!;
         const postTable = tables['post']!;
 
@@ -255,7 +284,7 @@ describe('runtime execute integration', () => {
           }
         });
 
-        const tables = schema<Contract, CodecTypes>(contract).tables;
+        const tables = schema(contract).tables;
         const userTable = tables['user']!;
         const unboundedPlan = sql({ contract, adapter })
           .from(tables['user']!)
@@ -333,9 +362,9 @@ describe('runtime execute integration', () => {
           }
         });
 
-        const tables = schema<Contract, CodecTypes>(contract).tables;
+        const tables = schema(contract).tables;
         const userTable = tables['user']!;
-        const plan = sql<Contract, CodecTypes>({ contract, adapter })
+        const plan = sql({ contract, adapter })
           .from(tables['user']!)
           .select({
             id: userTable.columns['id']!,

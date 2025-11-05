@@ -5,6 +5,7 @@
   "scripts": {
     "stamp-marker": "pnpm esr src/prisma/scripts/stamp-marker.ts",
     "start": "pnpm esr src/main.ts",
+    "emit": "prisma-next emit --contract contracts/contract.ts --out src/prisma --adapter ../../packages/adapter-postgres",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
@@ -16,6 +17,7 @@
     "pg": "^8.11.5"
   },
   "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
     "@prisma/dev": "^0.1.1",
     "esbuild-runner": "^2.2.2",
     "vite-tsconfig-paths": "^5.1.4",
