@@ -11,16 +11,16 @@ This slice assumes the authoring source (TS builder or PSL) has already been par
 ### Inputs
 
 - Contract IR: models, storage (tables/columns), constraints, extensions payloads
-- Adapter and extension manifests (treat adapters as packs) with:
+- Extension manifests (adapter + all extensions, treated identically) with:
   - `types.codecTypes.import`: package/name/alias for types-only map
-  - `types.canonicalScalarMap`: scalar → typeId mapping for the chosen target
+- **Note**: All column `type` values in the IR must already be fully qualified type IDs (`ns/name@version`). Canonicalization happens at authoring time (PSL parser or TS builder), not during emission.
 
 ### Outputs
 
 - `contract.json` with:
   - `schemaVersion`, `targetFamily`, `target`, `coreHash`, `profileHash?`
   - `models`, `storage` (columns: `{ type: 'ns/name@v', nullable?: boolean }`)
-  - `extensions.<ns>` blocks (pack-owned data), no codec decorations/mappings
+  - `extensions.<ns>` blocks (adapter appears first, e.g., `extensions.postgres`, followed by other extension packs)
 - `contract.d.ts` with:
   - `import type { CodecTypes as <Alias> }` for adapter (+ extensions)
   - `export type CodecTypes = <Alias> /* & ExtA & ExtB ... */`
@@ -28,14 +28,9 @@ This slice assumes the authoring source (TS builder or PSL) has already been par
 
 ### Work Items
 
-1) Canonicalization
-- Normalize all column `type` values to fully qualified typeIds using `types.canonicalScalarMap` for the adapter target.
-- Validate typeId format (`ns/name@version`).
-- Keep extension data canonical per ADR 106.
-
-2) Validation
+1) Validation
 - Structural: models ↔ storage refs; PK/UK/IDX/FKs.
-- Types: error if a scalar cannot be canonicalized and is not an already valid typeId.
+- Types: validate all column `type` values are valid type IDs (`ns/name@version`) that come from extensions referenced in `contract.extensions`.
 - Extensions: validate against pack schemas; deterministic ordering.
 
 3) Hashing
@@ -52,18 +47,33 @@ This slice assumes the authoring source (TS builder or PSL) has already been par
 
 ### TDD & Tests
 
+**TDD Requirement**: Each component must be implemented using TDD. Write failing tests first, then implement until green.
+
 - Unit:
-  - Canonicalization: scalar → typeId, idempotency, error on unknown scalar.
+  - Type validation: ensure all type IDs come from referenced extensions; error on unknown type IDs.
   - Hashing stability: same IR → same hashes; order-insensitivity where applicable.
   - Types gen: correct import path and alias; `LaneCodecTypes` exported.
   - Validation errors: clear messages for unknown typeIds and reference issues.
 - Integration:
   - Given IR → emit artifacts → consume in lanes with `LaneCodecTypes` → build plan → assert SQL/params/meta and `ResultType`.
+  - **Round-Trip Test**: IR → JSON (emit) → IR (parse JSON) → compare with original IR → JSON (emit again) → compare with first emit. Both JSON outputs must be byte-identical, proving canonicalization and determinism.
+
+### Emitter I/O Decoupling
+
+- The emitter is decoupled from file I/O. The `emit()` function returns `EmitResult` containing:
+  - `contractJson`: canonical JSON string (caller writes to file)
+  - `contractDts`: TypeScript definitions string (caller writes to file)
+  - `coreHash`: computed core hash
+  - `profileHash`: computed profile hash (optional)
+- The caller (CLI or other tooling) is responsible for all file I/O operations (reading IR, writing JSON/DTS files).
 
 ### Acceptance Criteria
 
-- `contract.json` only contains canonical typeIds for columns; no codec decorations/mappings.
+- `contract.json` only contains fully qualified typeIds for columns; no codec decorations/mappings.
+- Adapter appears in `extensions.<namespace>` as the first extension (identified by `contract.target`).
 - `contract.d.ts` imports full adapter `CodecTypes` (MVP) and exports `LaneCodecTypes`.
+- Emitter returns strings; caller handles all file I/O.
+- Round-trip test passes: IR → JSON → IR → JSON (both JSON outputs identical).
 - Lanes+runtime behave per contract; tests pass.
 
 

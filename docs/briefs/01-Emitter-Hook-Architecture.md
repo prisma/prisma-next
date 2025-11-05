@@ -19,7 +19,7 @@ Refactor the emitter to a hook-based architecture keyed by `targetFamily` (e.g.,
 
 ### Scope
 
-- One emitter core with `targetFamily` hooks for family-specific concerns; adapters/extension packs provide manifests. Unified typeId model: every column `type` is a fully qualified type ID (`ns/name@version`).
+- One emitter core with `targetFamily` hooks for family-specific concerns; adapters and extension packs provide manifests. Unified typeId model: every column `type` is a fully qualified type ID (`ns/name@version`). The adapter is treated identically to extension packs and appears as the first entry in `contract.extensions.<namespace>`.
 - Generate full `contract.d.ts` with:
   - `Contract` type (extending family-specific base, e.g., `SqlContract`)
   - Tables/columns with canonical type IDs
@@ -36,8 +36,8 @@ export interface TargetFamilyHook {
   // family id e.g. 'sql'
   readonly id: string;
 
-  // Canonicalize a scalar or type string to a fully-qualified typeId (ns/name@version)
-  canonicalizeType(input: string, packManifests: ExtensionPackManifest[]): string;
+  // Validate that all type IDs in the contract come from referenced extensions
+  validateTypes(ir: ContractIR, packManifests: ExtensionPackManifest[]): void;
 
   // Additional family-specific structural validation over core checks
   validateStructure(ir: ContractIR): void;
@@ -52,18 +52,20 @@ export interface TargetFamilyHook {
 
 Core types (emitter): `ExtensionPackManifest`, `ExtensionPack`, `ContractIR`, `TypesImportSpec`, `EmitOptions`.
 
-### Treat Adapters as Packs
+### Treat Adapters as Extension Packs
 
-- Use the same manifest shape and location, with a `types` section for the emitter:
+- Adapters and extension packs use the same manifest shape and location:
   - `types.codecTypes.import` (package/named/alias)
-  - `types.canonicalScalarMap` (scalar → typeId)
+- The adapter is treated identically to extension packs and appears in `contract.extensions.<adapter-namespace>` (e.g., `extensions.postgres`).
+- The adapter is the first extension in the collection, identified by `contract.target`.
 - Manifest path example: `packages/adapter-postgres/packs/manifest.json`
+- **Note**: Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission. The emitter only validates that all type IDs come from referenced extensions.
 
 ### SQL Family Hook (MVP)
 
 File: `packages/sql-target/src/emitter-hook.ts` (or `packages/emitter/src/families/sql.ts`)
 
-- canonicalizeType: map bare scalars via `canonicalScalarMap`; pass-through if already `ns/name@version`; error otherwise.
+- validateTypes: verify all column `type` values are valid type IDs (`ns/name@version`) that come from extensions referenced in `contract.extensions`.
 - validateStructure: SQL PK/UK/IDX/FK checks (mirror core SQL validation in `@prisma-next/sql`).
 - generateContractTypes:
   - Import `SqlContract`, `TableDef`, `ModelDef` from `@prisma-next/sql/contract-types`.
@@ -79,15 +81,23 @@ File: `packages/sql-target/src/emitter-hook.ts` (or `packages/emitter/src/famili
 
 File: `packages/emitter/src/emitter.ts`
 
-1) Load extension packs (adapter first) manifests
+1) Load extension packs (adapter + all extensions) manifests
 2) Resolve and load `targetFamily` hook
 3) Core structural validation (family-agnostic)
-4) Family canonicalization of column types to typeIds
+4) Family type validation (ensure all type IDs come from referenced extensions)
 5) Family structural validation
-6) Extensions canonicalization/validation
+6) Extensions validation
 7) Canonicalize JSON and compute `coreHash`/`profileHash`
-8) Write `contract.json`
-9) Generate `contract.d.ts` via `hook.generateContractTypes()` and write
+8) Generate `contract.json` content (returns string, caller handles I/O)
+9) Generate `contract.d.ts` content via `hook.generateContractTypes()` (returns string, caller handles I/O)
+
+**Emitter I/O Decoupling**: The emitter is decoupled from file I/O. The `emit()` function returns `EmitResult` containing:
+- `contractJson`: canonical JSON string (caller writes to file)
+- `contractDts`: TypeScript definitions string (caller writes to file)
+- `coreHash`: computed core hash
+- `profileHash`: computed profile hash (optional)
+
+The caller is responsible for all file I/O operations.
 
 ### Types-Only Generation Policies
 
@@ -106,9 +116,12 @@ File: `packages/emitter/src/emitter.ts`
 
 ### Testing & TDD
 
-- Unit (emitter core): manifest load/validate, canonicalization (scalar → typeId), hashing stability, error paths.
-- Unit (SQL hook): PK/UK/IDX/FK checks, type generation emits expected `.d.ts` content.
+**TDD Requirement**: Each component must be implemented using TDD (Test-Driven Development). Write failing tests first, then implement until green.
+
+- Unit (emitter core): manifest load/validate, type ID validation (ensure all IDs come from extensions), hashing stability, error paths.
+- Unit (SQL hook): PK/UK/IDX/FK checks, type validation, type generation emits expected `.d.ts` content.
 - Integration: IR → artifacts → lanes (`schema(contract, LaneCodecTypes)` + `sql({ contract, adapter, codecTypes: LaneCodecTypes })`) → plan built/executed; assert SQL/params/meta and `ResultType`.
+- **Integration Test (Round-Trip)**: IR → JSON (emit) → IR (parse JSON) → compare with original IR → JSON (emit again) → compare with first emit. Both JSON outputs must be identical (byte-for-byte), proving canonicalization and determinism.
 - Parity: TS-only loader path and (later) PSL path must yield identical plans/types.
 
 

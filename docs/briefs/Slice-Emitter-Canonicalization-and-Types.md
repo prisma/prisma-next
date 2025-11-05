@@ -12,7 +12,7 @@ Implement the emitter pipeline that converts authored input (PSL or TS builder) 
 - Canonical, code-free `contract.json` with stable hashing
 - Minimal, types-only `contract.d.ts` for compile-time inference by lanes
 
-Align with the unified type identifier model: every column `type` canonicalizes to a fully qualified type ID (`ns/name@version`) owned by the adapter or an extension pack. Keep codecs out of JSON artifacts; provide type information via `.d.ts` only.
+Align with the unified type identifier model: every column `type` is a fully qualified type ID (`ns/name@version`) owned by the adapter or an extension pack. **Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission.** The emitter only validates that all type IDs come from referenced extensions. Keep codecs out of JSON artifacts; provide type information via `.d.ts` only.
 
 ### References
 
@@ -26,12 +26,12 @@ Align with the unified type identifier model: every column `type` canonicalizes 
 
 ### Inputs
 
-- Authoring source: PSL AST or TS builder IR
-- Adapter target (`contract.target`) and (optional) extension manifests/pins
+- Authoring source: PSL AST or TS builder IR (with all types already canonicalized to fully qualified IDs)
+- Extension manifests (adapter + all extensions, treated identically) for validation and types import info
 
-Adapter/Pack manifest (treat adapters as packs)
-- Location: `packages/<adapter>/packs/manifest.json`
-- Reuse pack manifest shape with an added `types` section for the emitter:
+Extension Pack Manifest (adapter and extensions use the same shape)
+- Location: `packages/<adapter>/packs/manifest.json` or `packages/<extension>/packs/manifest.json`
+- Manifest shape with `types` section for the emitter:
 ```json
 {
   "id": "postgres",
@@ -45,44 +45,44 @@ Adapter/Pack manifest (treat adapters as packs)
         "named": "CodecTypes",
         "alias": "PgTypes"
       }
-    },
-    "canonicalScalarMap": {
-      "int2": "pg/int2@1",
-      "int4": "pg/int4@1",
-      "int8": "pg/int8@1",
-      "float4": "pg/float4@1",
-      "float8": "pg/float8@1",
-      "text": "pg/text@1",
-      "timestamp": "pg/timestamp@1",
-      "timestamptz": "pg/timestamptz@1",
-      "bool": "pg/bool@1"
     }
   }
 }
 ```
-Extensions will supply analogous manifests; the emitter reads all manifests to canonicalize types and generate `.d.ts` imports.
+**Note**: The adapter is treated identically to extension packs. It appears in `contract.extensions.<adapter-namespace>` (e.g., `extensions.postgres`) as the first extension, identified by `contract.target`. The authoring surface (PSL parser or TS builder) uses extension manifests to canonicalize shorthand types to fully qualified IDs. The emitter only validates that all type IDs come from referenced extensions.
 
 ### Outputs
 
 - `contract.json` (canonicalized)
   - `schemaVersion`, `targetFamily`, `target`, `coreHash`, `profileHash`
   - `models`, `storage` (tables/columns), constraints and indexes
-  - `extensions.<ns>` payloads (where packs add their data)
-  - Columns: `columns[name]: { type: string; nullable?: boolean }` where `type` is a typeId `ns/name@version`
+  - `extensions.<ns>` payloads (adapter appears first, e.g., `extensions.postgres`, followed by other extension packs)
+  - Columns: `columns[name]: { type: string; nullable?: boolean }` where `type` is a fully qualified typeId `ns/name@version`
 - `contract.d.ts` (types-only)
   - Codec type map: `typeId → { input; output }` assembled from adapter + extensions. For MVP, import the full adapter/pack `CodecTypes` maps (do not Pick only used IDs).
   - Optionally re-export of Tables/Models/Relations interfaces as today
 
 Note: Lanes take an optional generic/argument `codecTypes` to enable compile-time inference (see `ComputeColumnJsType`). The emitter should make it straightforward to import and pass this type map from `contract.d.ts` into `schema(contract, codecTypes)` and `sql({ contract, adapter, codecTypes })`.
 
-### Canonicalization Rules (Emitter)
+### Canonicalization Rules (Authoring Surface)
 
-1) Column type normalization
-- Accept authored column `type` as either:
-  - Bare scalar (e.g., `int4`, `text`, `timestamptz`) or
-  - Fully qualified typeId (e.g., `pg/int4@1`, `pg/text@1`, `core/iso-datetime@1`)
-- Canonicalize all bare scalars to adapter-owned typeIds (e.g., `int4 → pg/int4@1`).
-- Validate typeId format `ns/name@semverLike` and normalize case and separators consistently.
+**Type canonicalization happens at authoring time, not during emission:**
+
+1) PSL Parser canonicalization
+- Map PSL scalars (e.g., `Int`, `String`) to adapter type IDs (e.g., `pg/int4@1`, `pg/text@1`) using extension manifests
+- Map extension-provided types to their namespace (e.g., `pgvector/vector@1`)
+- Already qualified types pass through unchanged
+
+2) TS Builder canonicalization
+- Map shorthand types to fully qualified type IDs using extension manifests during builder construction
+- All types must be fully qualified before the contract IR is produced
+
+### Validation Rules (Emitter)
+
+1) Type ID validation
+- All column `type` values must be valid type IDs (`ns/name@version` format)
+- All type IDs must come from extensions referenced in `contract.extensions`
+- Error if a type ID is not found in any referenced extension
 
 2) Remove codec decorations for columns
 - Do not emit `extensions.<ns>.decorations.columns[].payload.typeId` for codec selection.
@@ -92,10 +92,15 @@ Note: Lanes take an optional generic/argument `codecTypes` to enable compile-tim
 - Do not emit `mappings.columnToCodec` or `mappings.codecTypes` in JSON.
 - JSON remains code-free; the column `type` id plus `nullable` are sufficient.
 
-4) Capability profile
+4) Extensions structure
+- Adapter appears as first extension in `extensions.<adapter-namespace>` (e.g., `extensions.postgres`)
+- Adapter is identified by `contract.target`
+- All extensions (adapter + packs) are treated identically
+
+5) Capability profile
 - Compute `profileHash` from declared capability keys and pinned adapter/extension versions as per ADR 004, independent of codecs.
 
-5) Hashing
+6) Hashing
 - Canonicalize JSON per ADR 010 (key ordering, stable arrays, normalized scalars) and compute `coreHash` (schema meaning) and `profileHash` (capabilities/pins).
 
 ### Types Generation (`contract.d.ts`)
@@ -119,11 +124,13 @@ export type LaneCodecTypes = CodecTypes; // convenient alias for lanes
 
 - Structural: models ↔ storage, constraints, FKs, etc. (unchanged)
 - Types:
-  - Ensure each column `type` is a known typeId or scalar canonicalizable to a known typeId for the chosen adapter.
-  - (Optional/strict) Verify that for each used typeId, a corresponding type entry exists in the referenced adapter/pack `CodecTypes` (compile-time) and that runtime registries are expected to provide implementations (not validated here).
-- Extensions: validate extension payloads against pack schemas; deterministic canonicalization.
+  - Ensure each column `type` is a valid typeId (`ns/name@version` format)
+  - Verify that all type IDs come from extensions referenced in `contract.extensions`
+  - Error with clear message if a type ID is not found in any referenced extension
+  - (Optional/strict) Verify that for each used typeId, a corresponding type entry exists in the referenced adapter/pack `CodecTypes` (compile-time) and that runtime registries are expected to provide implementations (not validated here)
+- Extensions: validate extension payloads against pack schemas; deterministic canonicalization; adapter appears first
 
-Implementation alignment: The current code already canonicalizes storage column types to adapter IDs and drops JSON codec mappings. Ensure validation errors refer to unknown typeIds when a scalar can’t be canonicalized.
+Implementation alignment: The authoring surface (PSL parser or TS builder) canonicalizes types to fully qualified IDs. The emitter only validates that all type IDs come from referenced extensions.
 
 ### Lane and Runtime Contracts (for emitter outputs)
 
@@ -133,17 +140,39 @@ Implementation alignment: The current code already canonicalizes storage column 
   - `sql({ contract, adapter, codecTypes: CodecTypes })`
 - Runtime: resolves codecs strictly by `registry.byId(column.type)`. Plan hints/overrides may supersede. Validate that all used typeIds are registered at startup/first execute.
 
+### Emitter I/O Decoupling
+
+- The emitter is decoupled from file I/O operations.
+- The `emit()` function returns `EmitResult` containing:
+  - `contractJson`: canonical JSON string (caller writes to file)
+  - `contractDts`: TypeScript definitions string (caller writes to file)
+  - `coreHash`: computed core hash
+  - `profileHash`: computed profile hash (optional)
+- The caller (CLI, build tool, or other tooling) is responsible for:
+  - Reading input IR (from file, memory, or other source)
+  - Writing emitted `contract.json` to file
+  - Writing emitted `contract.d.ts` to file
+- This decoupling enables:
+  - Testing without file system dependencies
+  - Streaming output for large contracts
+  - In-memory processing for no-emit workflows
+  - Flexible integration with different build systems
+
 ### Acceptance Criteria
 
-- `contract.json` contains only canonicalized adapter/extension typeIds for columns; no codec decorations/mappings.
+- `contract.json` contains only fully qualified adapter/extension typeIds for columns; no codec decorations/mappings.
+- Adapter appears in `extensions.<namespace>` as the first extension (identified by `contract.target`).
 - `contract.d.ts` exports a minimal `CodecTypes` for used ids, referencing adapter/pack types.
+- Emitter returns strings; caller handles all file I/O.
 - Hashes are stable and reproducible across environments.
+- Round-trip test passes: IR → JSON → IR → JSON (both JSON outputs byte-identical).
 - Query lane type tests pass when using only `contract.json` + `contract.d.ts`.
 - Runtime can execute with adapter codecs registered by id; missing codec ids produce a clear error.
 
 ### Migration/Compatibility Notes
 
-- Authoring may continue to specify bare scalars; emitter canonicalizes to adapter ids.
+- Authoring surfaces (PSL parser or TS builder) canonicalize shorthand types to fully qualified IDs using extension manifests.
+- The emitter validates that all type IDs come from referenced extensions; it does not perform canonicalization.
 - Existing tests referring to `mappings.columnToCodec`/decorations should be updated to rely on `column.type` ids.
 
 ### Test Plan (Emitter + TS-only Authoring Parity)
@@ -173,18 +202,24 @@ Goal: Prove emitter artifacts and TS-only authoring are equivalent for lanes and
 
 ### TDD and Test Strategy
 
+**TDD Requirement**: Each component must be implemented using TDD. Write failing tests first, then implement until green.
+
 - Use TDD for all changes:
   - Write failing unit tests first for each element, then implement until green.
 - Unit tests per element:
-  - Canonicalization: bare scalar → adapter typeId; unknown scalar errors; idempotency when already typeId.
-  - Manifest loading: adapter manifest parsed; `canonicalScalarMap` and `types.codecTypes.import` consumed correctly.
+  - Type validation: ensure all type IDs come from referenced extensions; unknown type ID errors.
+  - Manifest loading: adapter and extension manifests parsed; `types.codecTypes.import` consumed correctly.
   - Types generation: `.d.ts` imports full adapter `CodecTypes`, exports `LaneCodecTypes` alias.
   - Lane wiring: passing `codecTypes` into `schema`/`sql` yields correct `ComputeColumnJsType` output types, including nullability.
   - Plan annotations: `projectionTypes` and `annotations.codecs` sourced from `columnMeta.type` for projections and params.
   - Runtime validation: error when a `column.type` id is missing in the registry; success when present.
+  - PSL parser canonicalization: PSL scalars → adapter type IDs; extension types → extension type IDs.
+  - TS builder canonicalization: shorthand types → fully qualified type IDs.
+  - Emitter I/O: emitter returns strings, no file I/O operations.
 - Integration tests end-to-end:
   - Emit path: author schema → emit artifacts → build plan → execute; assert SQL/params/meta and types.
   - TS-only path: same plan and execution outcomes; assert parity with emit path.
+  - **Round-Trip Test (Required)**: IR → JSON (emit) → IR (parse JSON) → compare with original IR → JSON (emit again) → compare with first emit. Both JSON outputs must be byte-identical, proving canonicalization and determinism.
 
 ### Example App Update (prisma-next-demo)
 
@@ -197,10 +232,10 @@ Goal: Prove emitter artifacts and TS-only authoring are equivalent for lanes and
 
 1) Adapter typeId namespace and versions
 - Confirm canonical adapter ids to use for base scalars (e.g., `pg/int4@1`, `pg/text@1`, `pg/timestamptz@1`).
-- Provide the authoritative mapping from bare scalars → adapter typeIds in the emitter (or adapter-provided table).
+- Provide the authoritative mapping from bare scalars → adapter typeIds in the authoring surface (PSL parser or TS builder).
 
 2) Unknown type handling
-- If a column `type` is an unknown id (neither scalar nor recognized typeId), should the emitter fail hard, or allow and defer to runtime validation? Proposed: fail at emit.
+- If a column `type` is an unknown id (not found in any referenced extension), should the emitter fail hard, or allow and defer to runtime validation? Proposed: fail at emit.
 
 3) Minimal `.d.ts` scope
 - Decision: for MVP, import the full adapter/pack `CodecTypes` maps (no Pick). Optimization to Pick used IDs can be added later.
@@ -228,8 +263,8 @@ Out of scope (MVP)
 4) Extension types
 - For extension typeIds, can we rely on pack-provided `CodecTypes` being importable at emit time? If not present, should emitter fail or omit types? Proposed: fail to preserve determinism.
 
-5) Bare scalar support timeline
-- Keep scalar authoring support indefinitely (with canonicalization), or require explicit typeIds post-MVP? Proposed: keep support; canonicalize.
+5) Shorthand type support timeline
+- Keep shorthand type authoring support indefinitely (with canonicalization at authoring time), or require explicit typeIds post-MVP? Proposed: keep support; canonicalize at authoring time.
 
 6) Profile hash inputs
 - Any adapter/extension pinning that must participate in `profileHash` beyond capability keys? Confirm fields.
