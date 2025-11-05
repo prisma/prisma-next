@@ -2,6 +2,7 @@ import { targetFamilyRegistry } from './target-family-registry';
 import { computeCoreHash, computeProfileHash } from './hashing';
 import { canonicalizeContract } from './canonicalization';
 import type { ContractIR, EmitOptions, EmitResult, ExtensionPack } from './types';
+import { format } from 'prettier';
 
 function validateCoreStructure(ir: ContractIR): void {
   if (!ir.targetFamily) {
@@ -68,7 +69,13 @@ export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitRe
 
   const contractJsonString = canonicalizeContract(contractWithHashes);
 
-  const contractDts = hook.generateContractTypes(ir, packs);
+  const contractDtsRaw = hook.generateContractTypes(ir, packs);
+  const contractDts = await format(contractDtsRaw, {
+    parser: 'typescript',
+    singleQuote: true,
+    semi: true,
+    printWidth: 100,
+  });
 
   return {
     contractJson: contractJsonString,

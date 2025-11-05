@@ -57,6 +57,9 @@ importers:
         specifier: ^8.11.5
         version: 8.16.3
     devDependencies:
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@prisma/dev':
         specifier: ^0.1.1
         version: 0.1.1(typescript@5.9.3)
@@ -161,6 +164,9 @@ importers:
       '@prisma-next/node-utils':
         specifier: workspace:*
         version: link:../node-utils
+      '@prisma-next/sql-target':
+        specifier: workspace:*
+        version: link:../sql-target
       commander:
         specifier: ^12.0.0
         version: 12.1.0
@@ -171,9 +177,6 @@ importers:
       '@prisma-next/sql-query':
         specifier: workspace:*
         version: link:../sql-query
-      '@prisma-next/sql-target':
-        specifier: workspace:*
-        version: link:../sql-target
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.24
@@ -272,6 +275,9 @@ importers:
       arktype:
         specifier: ^2.0.0
         version: 2.1.25
+      prettier:
+        specifier: ^3.3.3
+        version: 3.6.2
     devDependencies:
       '@types/node':
         specifier: ^20.0.0

@@ -206,6 +206,6 @@ export function canonicalizeContract(
   const withSortedKeys = sortObjectKeys(withSortedStorage) as Record<string, unknown>;
   const withOrderedTopLevel = orderTopLevel(withSortedKeys);
 
-  return JSON.stringify(withOrderedTopLevel);
+  return JSON.stringify(withOrderedTopLevel, null, 2);
 }
 
