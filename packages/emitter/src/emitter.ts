@@ -1,5 +1,6 @@
 import { targetFamilyRegistry } from './target-family-registry';
 import { computeCoreHash, computeProfileHash } from './hashing';
+import { canonicalizeContract } from './canonicalization';
 import type { ContractIR, EmitOptions, EmitResult, ExtensionPack } from './types';
 
 function validateCoreStructure(ir: ContractIR): void {
@@ -58,15 +59,16 @@ export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitRe
   const coreHash = computeCoreHash(contractJson);
   const profileHash = computeProfileHash(contractJson);
 
-  const contractWithHashes = {
-    ...contractJson,
+  const contractWithHashes: ContractIR & { coreHash?: string; profileHash?: string } = {
+    ...ir,
+    schemaVersion: contractJson.schemaVersion,
     coreHash,
     ...(profileHash ? { profileHash } : {}),
   };
 
-  const contractDts = hook.generateContractTypes(ir, packs);
+  const contractJsonString = canonicalizeContract(contractWithHashes);
 
-  const contractJsonString = JSON.stringify(contractWithHashes, null, 2) + '\n';
+  const contractDts = hook.generateContractTypes(ir, packs);
 
   return {
     contractJson: contractJsonString,

@@ -1,26 +1,6 @@
 import { createHash } from 'node:crypto';
-
-function sortKeys(obj: unknown): unknown {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => sortKeys(item));
-  }
-
-  const sorted: Record<string, unknown> = {};
-  const keys = Object.keys(obj).sort();
-  for (const key of keys) {
-    sorted[key] = sortKeys((obj as Record<string, unknown>)[key]);
-  }
-  return sorted;
-}
-
-function canonicalizeJson(obj: unknown): string {
-  const sorted = sortKeys(obj);
-  return JSON.stringify(sorted);
-}
+import { canonicalizeContract } from './canonicalization';
+import type { ContractIR } from './types';
 
 function computeHash(content: string): string {
   const hash = createHash('sha256');
@@ -29,28 +9,28 @@ function computeHash(content: string): string {
 }
 
 export function computeCoreHash(contract: Record<string, unknown>): string {
-  const coreContract = {
-    schemaVersion: contract['schemaVersion'],
-    targetFamily: contract['targetFamily'],
-    target: contract['target'],
-    models: contract['models'],
-    relations: contract['relations'],
-    storage: contract['storage'],
-    extensions: contract['extensions'],
-    sources: contract['sources'],
+  const coreContract: ContractIR = {
+    schemaVersion: contract['schemaVersion'] as string | undefined,
+    targetFamily: contract['targetFamily'] as string,
+    target: contract['target'] as string,
+    models: contract['models'] as Record<string, unknown> | undefined,
+    relations: contract['relations'] as Record<string, unknown> | undefined,
+    storage: contract['storage'] as Record<string, unknown> | undefined,
+    extensions: contract['extensions'] as Record<string, unknown> | undefined,
+    sources: contract['sources'] as Record<string, unknown> | undefined,
   };
-  const canonical = canonicalizeJson(coreContract);
+  const canonical = canonicalizeContract(coreContract);
   return computeHash(canonical);
 }
 
 export function computeProfileHash(contract: Record<string, unknown>): string {
-  const profileContract = {
-    schemaVersion: contract['schemaVersion'],
-    targetFamily: contract['targetFamily'],
-    target: contract['target'],
-    capabilities: contract['capabilities'],
+  const profileContract: ContractIR = {
+    schemaVersion: contract['schemaVersion'] as string | undefined,
+    targetFamily: contract['targetFamily'] as string,
+    target: contract['target'] as string,
+    capabilities: contract['capabilities'] as Record<string, Record<string, boolean>> | undefined,
   };
-  const canonical = canonicalizeJson(profileContract);
+  const canonical = canonicalizeContract(profileContract);
   return computeHash(canonical);
 }
 

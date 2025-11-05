@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { emit } from '../src/emitter';
-import { targetFamilyRegistry } from '../src/target-family-registry';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
 import type { TargetFamilyHook } from '../src/target-family';
+import { targetFamilyRegistry } from '../src/target-family-registry';
 import { join } from 'node:path';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
   validateTypes: (ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>) => {
-    const storage = ir.storage as { tables?: Record<string, { columns?: Record<string, { type?: string }> }> } | undefined;
+    const storage = ir.storage as
+      | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
+      | undefined;
     if (!storage?.tables) {
       return;
     }
@@ -68,139 +70,26 @@ export type Contract = unknown;
   getTypesImports: () => [],
 };
 
-describe('emitter integration', () => {
+describe('emitter round-trip', () => {
   beforeEach(() => {
     if (!targetFamilyRegistry.has('sql')) {
       targetFamilyRegistry.register(mockSqlHook);
     }
   });
 
-  it('emits complete contract from IR to artifacts', async () => {
+  it('round-trip with minimal IR', async () => {
     const ir: ContractIR = {
-      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
       extensions: {
-        postgres: {
-          version: '15.0.0',
-        },
+        postgres: { version: '15.0.0' },
         pg: {},
-      },
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-          },
-        },
       },
       storage: {
         tables: {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-          },
-        },
-      },
-    };
-
-    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
-    const options: EmitOptions = {
-      outputDir: '',
-      packs,
-    };
-
-    const result = await emit(ir, options);
-
-    expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-    expect(result.contractDts).toContain('export type Contract');
-    expect(result.contractDts).toContain('CodecTypes');
-    expect(result.contractDts).toContain('LaneCodecTypes');
-
-    const contractJson = JSON.parse(result.contractJson);
-    expect(contractJson.schemaVersion).toBe('1');
-    expect(contractJson.targetFamily).toBe('sql');
-    expect(contractJson.target).toBe('postgres');
-    expect(contractJson.coreHash).toBe(result.coreHash);
-    expect(contractJson.storage.tables.user.columns.id.type).toBe('pg/int4@1');
-    expect(contractJson.storage.tables.user.columns.email.type).toBe('pg/text@1');
-  });
-
-  it('produces stable hashes for identical input', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      extensions: {
-        postgres: {
-          version: '15.0.0',
-        },
-        pg: {},
-      },
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-          },
-        },
-      },
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-          },
-        },
-      },
-    };
-
-    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
-    const options: EmitOptions = {
-      outputDir: '',
-      packs,
-    };
-
-    const result1 = await emit(ir, options);
-    const result2 = await emit(ir, options);
-
-    expect(result1.coreHash).toBe(result2.coreHash);
-    expect(result1.contractDts).toBe(result2.contractDts);
-    expect(result1.contractJson).toBe(result2.contractJson);
-  });
-
-  it('round-trip: IR → JSON → parse JSON → compare', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      extensions: {
-        postgres: {
-          version: '15.0.0',
-        },
-        pg: {},
-      },
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-          },
-        },
-      },
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
           },
@@ -235,5 +124,198 @@ describe('emitter integration', () => {
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);
   });
-});
 
+  it('round-trip with complex IR', async () => {
+    const ir: ContractIR = {
+      targetFamily: 'sql',
+      target: 'postgres',
+      extensions: {
+        postgres: { version: '15.0.0' },
+      },
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: {
+            id: { column: 'id' },
+            email: { column: 'email' },
+            name: { column: 'name' },
+          },
+        },
+        Post: {
+          storage: { table: 'post' },
+          fields: {
+            id: { column: 'id' },
+            title: { column: 'title' },
+            userId: { column: 'user_id' },
+          },
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
+              name: { type: 'pg/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [{ columns: ['email'], name: 'user_email_key' }],
+            indexes: [{ columns: ['name'], name: 'user_name_idx' }],
+          },
+          post: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+              title: { type: 'pg/text@1', nullable: false },
+              user_id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [
+              {
+                columns: ['user_id'],
+                references: { table: 'user', columns: ['id'] },
+                name: 'post_user_id_fkey',
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    const result1 = await emit(ir, options);
+    const contractJson1 = JSON.parse(result1.contractJson);
+
+    const ir2: ContractIR = {
+      schemaVersion: contractJson1.schemaVersion,
+      targetFamily: contractJson1.targetFamily,
+      target: contractJson1.target,
+      extensions: contractJson1.extensions,
+      models: contractJson1.models,
+      relations: contractJson1.relations,
+      storage: contractJson1.storage,
+      capabilities: contractJson1.capabilities,
+      meta: contractJson1.meta,
+      sources: contractJson1.sources,
+    };
+
+    const result2 = await emit(ir2, options);
+
+    expect(result1.contractJson).toBe(result2.contractJson);
+    expect(result1.coreHash).toBe(result2.coreHash);
+  });
+
+  it('round-trip with nullable fields', async () => {
+    const ir: ContractIR = {
+      targetFamily: 'sql',
+      target: 'postgres',
+      extensions: {
+        postgres: { version: '15.0.0' },
+        pg: {},
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: true },
+              name: { type: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+          },
+        },
+      },
+    };
+
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    const result1 = await emit(ir, options);
+    const contractJson1 = JSON.parse(result1.contractJson);
+
+    const ir2: ContractIR = {
+      schemaVersion: contractJson1.schemaVersion,
+      targetFamily: contractJson1.targetFamily,
+      target: contractJson1.target,
+      extensions: contractJson1.extensions,
+      models: contractJson1.models,
+      relations: contractJson1.relations,
+      storage: contractJson1.storage,
+      capabilities: contractJson1.capabilities,
+      meta: contractJson1.meta,
+      sources: contractJson1.sources,
+    };
+
+    const result2 = await emit(ir2, options);
+
+    expect(result1.contractJson).toBe(result2.contractJson);
+    expect(result1.coreHash).toBe(result2.coreHash);
+
+    const parsed2 = JSON.parse(result2.contractJson);
+    expect(parsed2.storage.tables.user.columns.id.nullable).toBeUndefined();
+    expect(parsed2.storage.tables.user.columns.email.nullable).toBe(true);
+    expect(parsed2.storage.tables.user.columns.name.nullable).toBeUndefined();
+  });
+
+  it('round-trip with capabilities', async () => {
+    const ir: ContractIR = {
+      targetFamily: 'sql',
+      target: 'postgres',
+      extensions: {
+        postgres: { version: '15.0.0' },
+        pg: {},
+      },
+      capabilities: {
+        postgres: {
+          jsonAgg: true,
+          lateral: true,
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+          },
+        },
+      },
+    };
+
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    const result1 = await emit(ir, options);
+    const contractJson1 = JSON.parse(result1.contractJson);
+
+    const ir2: ContractIR = {
+      schemaVersion: contractJson1.schemaVersion,
+      targetFamily: contractJson1.targetFamily,
+      target: contractJson1.target,
+      extensions: contractJson1.extensions,
+      models: contractJson1.models,
+      relations: contractJson1.relations,
+      storage: contractJson1.storage,
+      capabilities: contractJson1.capabilities,
+      meta: contractJson1.meta,
+      sources: contractJson1.sources,
+    };
+
+    const result2 = await emit(ir2, options);
+
+    expect(result1.contractJson).toBe(result2.contractJson);
+    expect(result1.coreHash).toBe(result2.coreHash);
+    expect(result1.profileHash).toBe(result2.profileHash);
+  });
+});
