@@ -13,7 +13,6 @@ export interface ExtensionPackManifest {
     readonly codecTypes?: {
       readonly import: TypesImportSpec;
     };
-    readonly canonicalScalarMap?: Record<string, string>;
   };
 }
 

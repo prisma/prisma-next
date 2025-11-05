@@ -153,8 +153,8 @@ describe('Runtime class', () => {
           tables: {
             user: {
               columns: {
-                id: { type: 'int4', nullable: false },
-                email: { type: 'text', nullable: false },
+                id: { type: 'pg/int4@1', nullable: false },
+                email: { type: 'pg/text@1', nullable: false },
                 unknown: { type: 'unknown-scalar-type', nullable: false },
               },
             },

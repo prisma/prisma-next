@@ -21,10 +21,10 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
     tables: {
       test_data: {
         columns: {
-          id: { type: 'int4', nullable: false },
-          name: { type: 'text', nullable: false },
-          score: { type: 'float8', nullable: false },
-          created_at: { type: 'timestamptz', nullable: false },
+          id: { type: 'pg/int4@1', nullable: false },
+          name: { type: 'pg/text@1', nullable: false },
+          score: { type: 'pg/float8@1', nullable: false },
+          created_at: { type: 'pg/timestamptz@1', nullable: false },
         },
         primaryKey: {
           columns: ['id'],

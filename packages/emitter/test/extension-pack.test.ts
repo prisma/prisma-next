@@ -7,7 +7,7 @@ describe('extension-pack', () => {
     const manifest = loadExtensionPackManifest(join(__dirname, '../../adapter-postgres'));
     expect(manifest.id).toBe('postgres');
     expect(manifest.version).toBe('15.0.0');
-    expect(manifest.types?.canonicalScalarMap?.['int4']).toBe('pg/int4@1');
+    expect(manifest.types?.codecTypes?.import.package).toBe('@prisma-next/adapter-postgres/codec-types');
   });
 
   it('loads extension packs with adapter first', () => {

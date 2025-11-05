@@ -13,8 +13,8 @@ describe('validateContract structure validation', () => {
       tables: {
         User: {
           columns: {
-            id: { type: 'text', nullable: false },
-            email: { type: 'text', nullable: false },
+            id: { type: 'pg/text@1', nullable: false },
+            email: { type: 'pg/text@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
         },
@@ -82,7 +82,7 @@ describe('validateContract structure validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'text', nullable: 'yes' },
+              id: { type: 'pg/text@1', nullable: 'yes' },
             },
           },
         },
@@ -118,9 +118,9 @@ describe('validateContract logic validation', () => {
       tables: {
         User: {
           columns: {
-            id: { type: 'text', nullable: false },
-            email: { type: 'text', nullable: false },
-            name: { type: 'text', nullable: true },
+            id: { type: 'pg/text@1', nullable: false },
+            email: { type: 'pg/text@1', nullable: false },
+            name: { type: 'pg/text@1', nullable: true },
           },
           primaryKey: { columns: ['id'] },
           uniques: [{ columns: ['email'] }],
@@ -128,9 +128,9 @@ describe('validateContract logic validation', () => {
         },
         Post: {
           columns: {
-            id: { type: 'text', nullable: false },
-            userId: { type: 'text', nullable: false },
-            title: { type: 'text', nullable: false },
+            id: { type: 'pg/text@1', nullable: false },
+            userId: { type: 'pg/text@1', nullable: false },
+            title: { type: 'pg/text@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [
@@ -296,8 +296,8 @@ describe('validateContract logic validation', () => {
         tables: {
           UserRole: {
             columns: {
-              userId: { type: 'text', nullable: false },
-              roleId: { type: 'text', nullable: false },
+              userId: { type: 'pg/text@1', nullable: false },
+              roleId: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['userId', 'roleId'] },
           },
@@ -314,16 +314,16 @@ describe('validateContract logic validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'text', nullable: false },
-              tenantId: { type: 'text', nullable: false },
+              id: { type: 'pg/text@1', nullable: false },
+              tenantId: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id', 'tenantId'] },
           },
           Post: {
             columns: {
-              id: { type: 'text', nullable: false },
-              userId: { type: 'text', nullable: false },
-              tenantId: { type: 'text', nullable: false },
+              id: { type: 'pg/text@1', nullable: false },
+              userId: { type: 'pg/text@1', nullable: false },
+              tenantId: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             foreignKeys: [
@@ -351,8 +351,8 @@ describe('validateContract', () => {
       tables: {
         User: {
           columns: {
-            id: { type: 'text', nullable: false },
-            email: { type: 'text', nullable: false },
+            id: { type: 'pg/text@1', nullable: false },
+            email: { type: 'pg/text@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [],
@@ -403,7 +403,7 @@ describe('validateContract', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'text', nullable: false },
+              id: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
           },

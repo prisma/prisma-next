@@ -84,15 +84,15 @@
       "user": {
         "columns": {
           "id": {
-            "type": "int4",
+            "type": "pg/int4@1",
             "nullable": false
           },
           "email": {
-            "type": "text",
+            "type": "pg/text@1",
             "nullable": false
           },
           "createdAt": {
-            "type": "timestamptz",
+            "type": "pg/timestamptz@1",
             "nullable": false
           }
         },
@@ -112,19 +112,19 @@
       "post": {
         "columns": {
           "id": {
-            "type": "int4",
+            "type": "pg/int4@1",
             "nullable": false
           },
           "title": {
-            "type": "text",
+            "type": "pg/text@1",
             "nullable": false
           },
           "userId": {
-            "type": "int4",
+            "type": "pg/int4@1",
             "nullable": false
           },
           "createdAt": {
-            "type": "timestamptz",
+            "type": "pg/timestamptz@1",
             "nullable": false
           }
         },

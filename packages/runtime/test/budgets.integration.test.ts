@@ -21,8 +21,8 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
     tables: {
       user: {
         columns: {
-          id: { type: 'text', nullable: false },
-          email: { type: 'text', nullable: false },
+          id: { type: 'pg/text@1', nullable: false },
+          email: { type: 'pg/text@1', nullable: false },
         },
       },
     },

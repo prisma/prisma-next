@@ -120,77 +120,6 @@ function validateContractStructure<T extends SqlContract<SqlStorage>>(
 }
 
 /**
- * Canonicalizes a column type from a bare scalar to a fully qualified type ID.
- * Maps bare scalars (e.g., "int4", "text") to adapter type IDs (e.g., "pg/int4@1", "pg/text@1").
- * If the input is already a type ID (contains "/" and "@"), returns it as-is.
- *
- * @param scalar - The scalar type or type ID to canonicalize
- * @param target - The database target (e.g., "postgres")
- * @returns The canonicalized type ID
- */
-function canonicalizeColumnType(scalar: string, target: string): string {
-  // If already a type ID (contains "/" and "@"), return as-is
-  if (scalar.includes('/') && scalar.includes('@')) {
-    return scalar;
-  }
-
-  // Map bare scalars to adapter type IDs based on target
-  if (target === 'postgres') {
-    const scalarMap: Record<string, string> = {
-      int4: 'pg/int4@1',
-      int2: 'pg/int2@1',
-      int8: 'pg/int8@1',
-      float4: 'pg/float4@1',
-      float8: 'pg/float8@1',
-      text: 'pg/text@1',
-      timestamp: 'pg/timestamp@1',
-      timestamptz: 'pg/timestamptz@1',
-      bool: 'pg/bool@1',
-    };
-
-    const typeId = scalarMap[scalar];
-    if (typeId) {
-      return typeId;
-    }
-  }
-
-  // If scalar not found in map, throw error
-  throw new Error(
-    `Unknown scalar type "${scalar}" for target "${target}". Expected a known scalar or a fully qualified type ID (ns/name@version).`,
-  );
-}
-
-/**
- * Canonicalizes all column types in a storage structure.
- * Returns a new storage object with canonicalized column types.
- *
- * @param storage - The storage structure to canonicalize
- * @param target - The database target
- * @returns New storage object with canonicalized types
- */
-function canonicalizeStorageTypes(storage: SqlStorage, target: string): SqlStorage {
-  const canonicalized: SqlStorage = {
-    tables: {},
-  };
-
-  for (const [tableName, table] of Object.entries(storage.tables)) {
-    canonicalized.tables[tableName] = {
-      ...table,
-      columns: {},
-    };
-
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      canonicalized.tables[tableName].columns[columnName] = {
-        ...column,
-        ...(column.type ? { type: canonicalizeColumnType(column.type, target) } : {}),
-      };
-    }
-  }
-
-  return canonicalized;
-}
-
-/**
  * Computes mapping dictionaries from models and storage structures.
  * Assumes valid input - validation happens separately in validateContractLogic().
  *
@@ -437,37 +366,25 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 
   const contractForValidation = structurallyValid as SqlContract<SqlStorage>;
 
-  // Canonicalize column types before validation
-  const canonicalizedStorage = canonicalizeStorageTypes(
-    contractForValidation.storage,
-    contractForValidation.target,
-  );
-
-  // Create contract with canonicalized storage
-  const contractWithCanonicalTypes = {
-    ...contractForValidation,
-    storage: canonicalizedStorage,
-  };
-
-  validateContractLogic(contractWithCanonicalTypes);
+  // Validate contract logic (contracts must already have fully qualified type IDs)
+  validateContractLogic(contractForValidation);
 
   // Extract existing mappings (optional - will be computed if missing)
-  const existingMappings = (contractWithCanonicalTypes as { mappings?: Partial<SqlMappings> })
-    .mappings;
+  const existingMappings = (contractForValidation as { mappings?: Partial<SqlMappings> }).mappings;
 
   // Compute mappings from models and storage
   const mappings = computeMappings(
-    contractWithCanonicalTypes.models as Record<string, ModelDefinition>,
-    contractWithCanonicalTypes.storage,
+    contractForValidation.models as Record<string, ModelDefinition>,
+    contractForValidation.storage,
     existingMappings,
   );
 
   // Add default values for optional metadata fields if missing
   const contractWithMappings = {
     ...structurallyValid,
-    models: contractWithCanonicalTypes.models,
-    relations: contractWithCanonicalTypes.relations,
-    storage: contractWithCanonicalTypes.storage,
+    models: contractForValidation.models,
+    relations: contractForValidation.relations,
+    storage: contractForValidation.storage,
     mappings,
   };
 

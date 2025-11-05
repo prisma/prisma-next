@@ -371,15 +371,15 @@ describe('Codec Registry Validation', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'int4', nullable: false },
-              email: { type: 'text', nullable: false },
-              createdAt: { type: 'timestamptz', nullable: true },
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
+              createdAt: { type: 'pg/timestamptz@1', nullable: true },
             },
           },
           post: {
             columns: {
-              id: { type: 'int4', nullable: false },
-              title: { type: 'text', nullable: false },
+              id: { type: 'pg/int4@1', nullable: false },
+              title: { type: 'pg/text@1', nullable: false },
             },
           },
         },
@@ -425,7 +425,7 @@ describe('Codec Registry Validation', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'int4', nullable: false },
+              id: { type: 'pg/int4@1', nullable: false },
               email: { nullable: false },
             },
           },
@@ -452,9 +452,9 @@ describe('Codec Registry Validation', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'int4', nullable: false },
-              email: { type: 'text', nullable: false },
-              createdAt: { type: 'timestamptz', nullable: false },
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
+              createdAt: { type: 'pg/timestamptz@1', nullable: false },
             },
           },
         },

@@ -18,7 +18,6 @@ const ExtensionPackManifestSchema = type({
     'codecTypes?': type({
       import: TypesImportSpecSchema,
     }),
-    'canonicalScalarMap?': type({ '[string]': 'string' }),
   }),
 });
 

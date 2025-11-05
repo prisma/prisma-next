@@ -10,19 +10,19 @@
       "User": {
         "columns": {
           "id": {
-            "type": "text",
+            "type": "pg/text@1",
             "nullable": false
           },
           "email": {
-            "type": "text",
+            "type": "pg/text@1",
             "nullable": false
           },
           "name": {
-            "type": "text",
+            "type": "pg/text@1",
             "nullable": false
           },
           "createdAt": {
-            "type": "timestamptz",
+            "type": "pg/timestamptz@1",
             "nullable": false
           }
         },
