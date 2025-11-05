@@ -51,6 +51,8 @@ Extension Pack Manifest (adapter and extensions use the same shape)
 ```
 **Note**: The adapter is treated identically to extension packs. It appears in `contract.extensions.<adapter-namespace>` (e.g., `extensions.postgres`) as the first extension, identified by `contract.target`. The authoring surface (PSL parser or TS builder) uses extension manifests to canonicalize shorthand types to fully qualified IDs. The emitter only validates that all type IDs come from referenced extensions.
 
+**Important**: Extension manifests do not include `canonicalScalarMap`. Type canonicalization happens at authoring time using extension manifests, not via a scalar map in the manifest. Manifests are focused on type imports for code generation.
+
 ### Outputs
 
 - `contract.json` (canonicalized)
@@ -265,6 +267,25 @@ Out of scope (MVP)
 
 5) Shorthand type support timeline
 - Keep shorthand type authoring support indefinitely (with canonicalization at authoring time), or require explicit typeIds post-MVP? Proposed: keep support; canonicalize at authoring time.
+
+### Design Decisions
+
+**No Canonicalization in validateContract**:
+- `validateContract()` does not perform canonicalization. It expects all types to already be fully qualified type IDs (`pg/int4@1`, not `int4`).
+- Contracts must always have fully qualified type IDs - there is no fallback canonicalization.
+- Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation.
+- This enforces the design principle that canonicalization happens at authoring time, keeping validation focused on structural and logical validation only.
+
+**No Target-Specific Branches**:
+- Core packages must not branch on `target` (e.g., `if (target === 'postgres')`).
+- Target-specific logic belongs in adapters or extension packs.
+- This aligns with ADR 005 - Thin Core, Fat Targets.
+- See `.cursor/rules/no-target-branches.mdc` for detailed guidance.
+
+**No canonicalScalarMap in Extension Manifests**:
+- Extension manifests do not include `canonicalScalarMap`.
+- Type canonicalization happens at authoring time using extension manifests, not via a scalar map in the manifest.
+- Manifests are focused on type imports for code generation (`types.codecTypes.import`).
 
 6) Profile hash inputs
 - Any adapter/extension pinning that must participate in `profileHash` beyond capability keys? Confirm fields.

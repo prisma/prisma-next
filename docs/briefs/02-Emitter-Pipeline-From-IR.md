@@ -76,4 +76,18 @@ This slice assumes the authoring source (TS builder or PSL) has already been par
 - Round-trip test passes: IR → JSON → IR → JSON (both JSON outputs identical).
 - Lanes+runtime behave per contract; tests pass.
 
+### Design Decisions
+
+**No Canonicalization in validateContract**:
+- `validateContract()` does not perform canonicalization. It expects all types to already be fully qualified type IDs (`pg/int4@1`, not `int4`).
+- Contracts must always have fully qualified type IDs - there is no fallback canonicalization.
+- Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation.
+- This enforces the design principle that canonicalization happens at authoring time, keeping validation focused on structural and logical validation only.
+
+**No Target-Specific Branches**:
+- Core packages must not branch on `target` (e.g., `if (target === 'postgres')`).
+- Target-specific logic belongs in adapters or extension packs.
+- This aligns with ADR 005 - Thin Core, Fat Targets.
+- See `.cursor/rules/no-target-branches.mdc` for detailed guidance.
+
 

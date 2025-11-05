@@ -47,6 +47,7 @@ Implement TS-only contract loading and a CLI command that produces `contract.jso
 - Integration:
   - Load a minimal TS contract → emit → consume with lanes (`LaneCodecTypes`) → build/execute plan; assert parity with an equivalent emit path.
   - **Round-Trip Test**: TS contract → IR → JSON → IR (parse) → compare with original IR → JSON (emit again) → compare with first emit. Both JSON outputs must be byte-identical.
+  - **CLI Integration Test** (in `packages/integration-tests`): Test the CLI operation to emit a contract from a TS-authored contract source. Full round trip: execute CLI to emit contract → parse the emitted `contract.json` → load and validate the original TS contract → compare parsed JSON to loaded contract structure. Ensures CLI correctly transforms TS contract source into canonical JSON artifacts.
   - CI task to run both TS-only and emit-path suites.
 
 ### Acceptance Criteria
@@ -57,6 +58,13 @@ Implement TS-only contract loading and a CLI command that produces `contract.jso
 - Enforced import allowlist with clear diagnostics.
 - Round-trip test passes: TS contract → IR → JSON → IR → JSON (both JSON outputs identical).
 - Artifacts identical (modulo hashes) to those produced when starting from the same IR.
+
+### Design Decisions
+
+**No Canonicalization in validateContract**:
+- The TS builder must canonicalize all types to fully qualified type IDs before producing the contract IR.
+- `validateContract()` does not perform canonicalization - it expects all types to already be fully qualified.
+- Contracts (whether from TS builder or JSON) must always have fully qualified type IDs.
 
 ### Open Questions
 

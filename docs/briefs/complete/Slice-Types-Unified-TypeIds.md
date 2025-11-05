@@ -83,7 +83,8 @@ export type CodecTypes = {
 8) Tests & Fixtures
 - Update `packages/sql/test/fixtures/contract.json`:
   - Remove codec decorations for columns;
-  - Keep `storage.tables.*.columns.*.type` as bare scalars for readability; validator will canonicalize to adapter type IDs.
+  - **Use fully qualified type IDs** (`pg/int4@1`, not `int4`) - contracts must always have fully qualified type IDs.
+  - `validateContract()` does not perform canonicalization - it expects all types to already be fully qualified.
 - Update or add `packages/sql/test/fixtures/contract.d.ts`:
   - Export `CodecTypes` referencing adapter types (`pg/*@1`) and any extensions.
 - Update `packages/sql/test/sql.test.ts` expectations:
@@ -93,7 +94,9 @@ export type CodecTypes = {
 
 ### Acceptance Criteria
 
-- Column `type` is canonicalized to a namespaced typeId across the validated contract in memory.
+- Column `type` must be a fully qualified typeId (`ns/name@version`) in all contracts (JSON, test fixtures, etc.).
+- `validateContract()` does not perform canonicalization - it expects all types to already be fully qualified.
+- Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation.
 - No codec decorations for columns, no `mappings.columnToCodec`/`mappings.codecTypes` required in JSON.
 - Lanes infer result types solely from `CodecTypes[typeId].output` and nullability.
 - Plan annotations encode codec IDs using the column `type` id for both projections and params.
