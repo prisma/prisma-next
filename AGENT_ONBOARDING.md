@@ -30,25 +30,38 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 
 4. **Key ADRs** (Architecture Decision Records):
    - `ADR 007 - Types Only Emission.md` - Why we don't generate runtime code
+   - `ADR 010 - Canonicalization Rules.md` - Canonicalization and hashing rules
    - `ADR 011 - Unified Plan Model.md` - Plans are immutable, hashable artifacts
    - `ADR 121 - Contract.d.ts structure.md` - Type definition structure
+   - `ADR 131 - Codec typing separation.md` - Codec typing separation
+
+5. **Emitter Briefs** (Implementation details):
+   - `Slice-Emitter-Canonicalization-and-Types.md` - Overview of emitter slice
+   - `01-Emitter-Hook-Architecture.md` - Hook-based architecture design
+   - `02-Emitter-Pipeline-From-IR.md` - Emission pipeline implementation
+   - `03-TS-Contract-Loader-and-CLI.md` - TS-only contract loading (future)
+   - `04-PSL-Parser-and-CLI.md` - PSL parser implementation (future)
 
 ## 🏗️ Repository Structure
 
 ### Core Packages
 
-- **`@prisma-next/contract`** - Core contract types (`ContractBase`, `Source`). **SQL-specific types live in `@prisma-next/sql`**
-- **`@prisma-next/sql`** - SQL query DSL, contract validation, SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
+- **`@prisma-next/contract`** - Core contract types (`ContractBase`, `Source`). **SQL-specific types live in `@prisma-next/sql-target`**
+- **`@prisma-next/emitter`** - Contract emission engine that transforms IR into `contract.json` and `contract.d.ts` using a hook-based architecture
+- **`@prisma-next/sql-query`** - SQL query DSL, contract validation, SQL-specific contract types (re-exported from `@prisma-next/sql-target`)
 - **`@prisma-next/runtime`** - Execution engine, plugins (budgets, lints), contract verification
-- **`@prisma-next/sql-target`** - Target abstraction for SQL dialects
-- **`@prisma-next/adapter-postgres`** - Postgres adapter implementation
+- **`@prisma-next/sql-target`** - SQL target family abstraction, emitter hook implementation, and SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
+- **`@prisma-next/adapter-postgres`** - Postgres adapter implementation (extension pack)
 - **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
 - **`@prisma-next/compat-prisma`** - Compatibility layer for Prisma ORM import-swap
+- **`@prisma-next/node-utils`** - Node.js file I/O utilities (readJsonFile, readTextFile)
 
 ### Package Organization Principles
 
-- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql/src/contract-types.ts`
+- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-target/src/contract-types.ts` (moved from `sql-query` to break circular dependency)
 - **Core contract types** (`ContractBase`) live in `@prisma-next/contract`
+- **Emitter is hook-based**: Target family hooks (e.g., SQL) extend emission with family-specific validation and type generation
+- **Adapters are extension packs**: Adapters and extension packs use the same manifest structure and are treated identically
 - Each package exports curated, tree-shakeable modules
 - All packages use ESM and TypeScript source
 
@@ -57,8 +70,16 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 ### Contract Flow
 
 1. **Authoring**: Developer writes `schema.psl` (or uses TypeScript builders)
-2. **Emission**: Tool generates `contract.json` + `contract.d.ts`
+   - Authoring surface canonicalizes shorthand types to fully qualified type IDs (`ns/name@version`) using extension manifests
+   - Produces Contract IR with all types already canonicalized
+2. **Emission**: Emitter validates IR and generates `contract.json` + `contract.d.ts`
+   - Emitter validates that all type IDs come from referenced extensions
+   - Emitter uses target family hooks (e.g., SQL hook) for family-specific validation and type generation
+   - Emitter computes `coreHash` and `profileHash` from canonical JSON
+   - Emitter returns strings; caller handles file I/O
 3. **Validation**: `validateContract<TContract>(json)` validates structure and returns typed contract
+   - Note: Type canonicalization happens at authoring time, not during validation
+   - Contract JSON should contain only fully qualified type IDs
 4. **Usage**: DSL functions (`sql()`, `schema()`, `makeT()`) accept contract and propagate types
 
 ### Contract Types Pattern
@@ -90,7 +111,9 @@ SqlContract<
 
 **Column Types**:
 - Every column `type` is a fully qualified type ID: `pg/int4@1`, `pg/text@1`, `pg/timestamptz@1`, etc.
-- Bare scalars in `contract.json` (e.g., `int4`, `text`) are automatically canonicalized during validation
+- **Type canonicalization happens at authoring time** (PSL parser or TS builder), not during emission or validation
+- Bare scalars in authoring inputs (e.g., `int4`, `text`) are canonicalized to type IDs (e.g., `pg/int4@1`, `pg/text@1`) using extension manifests
+- The emitter validates that all type IDs come from referenced extensions but does not perform canonicalization
 - No codec decorations or extension metadata needed - the type ID is the source of truth
 
 **CodecTypes** (imported from adapter):
@@ -101,8 +124,8 @@ SqlContract<
 ### Query DSL Pattern
 
 ```typescript
-import { sql, schema, makeT } from '@prisma-next/sql';
-import { validateContract } from '@prisma-next/sql/schema';
+import { sql, schema, makeT } from '@prisma-next/sql-query/sql';
+import { validateContract } from '@prisma-next/sql-query/schema';
 import contractJson from './contract.json' assert { type: 'json' };
 import type { Contract, CodecTypes } from './contract.d';
 
@@ -185,38 +208,90 @@ return value;  // Preserve literal types from input
 ### Contract Validation
 
 ```typescript
-// In @prisma-next/sql/src/contract.ts
+// In @prisma-next/sql-query/src/contract.ts
 export function validateContract<TContract extends SqlContract<SqlStorage>>(
-  value: unknown,  // Arbitrary JSON input (may have bare scalars like "int4")
-): TContract {     // Returns strict type from contract.d.ts (with canonicalized types)
+  value: unknown,  // Arbitrary JSON input (should already have canonicalized type IDs)
+): TContract {     // Returns strict type from contract.d.ts
   // 1. Validate structure (Arktype)
-  // 2. Canonicalize column types: bare scalars → type IDs (e.g., "int4" → "pg/int4@1")
-  // 3. Validate logic (foreign keys, etc.)
-  // 4. Add defaults for models/relations/Mappings if missing
-  // 5. Return with type assertion
+  // 2. Validate logic (foreign keys, etc.)
+  // 3. Add defaults for models/relations/Mappings if missing
+  // 4. Return with type assertion
 }
 ```
 
 **Type Canonicalization**:
-- Bare scalars in `contract.json` (e.g., `type: "int4"`) are automatically converted to canonical type IDs (e.g., `type: "pg/int4@1"`)
-- This happens during `validateContract()` - always validate contracts before use
-- The canonicalized contract matches the types defined in `contract.d.ts`
+- **Type canonicalization happens at authoring time** (PSL parser or TS builder), not during validation
+- Authoring surfaces use extension manifests to map shorthand types to fully qualified type IDs
+- `validateContract()` expects all types to already be canonicalized (e.g., `pg/int4@1`, not `int4`)
+- The contract JSON should contain only fully qualified type IDs
+- The emitter validates that all type IDs come from referenced extensions but does not canonicalize
 
-### Emitter architecture (hooks) & TS-only emission
+### Emitter Architecture (Hook-Based)
 
-- One emitter core with `targetFamily` hooks (e.g., SQL), matching thin core, fat targets. Adapters are treated as packs with manifests providing:
-  - `types.codecTypes.import` (how `contract.d.ts` imports `CodecTypes`)
-  - `types.canonicalScalarMap` (scalar → typeId for canonicalization)
-- `contract.d.ts` composes helpers (`SqlContract`, `TableDef`, `ModelDef`), exports `CodecTypes` and `LaneCodecTypes`, and keeps ergonomic aliases (`Tables`, `Models`, `Relations`).
-- TS-only emission: esbuild bundles a dedicated contract entry with an allowlist (`@prisma-next/*`); a small runner imports the bundle, validates purity, canonicalizes, and writes artifacts. CLI surface (MVP): `prisma-next emit --contract src/contract.ts --out contracts/`.
-- See briefs: `docs/briefs/02-Emitter-Pipeline-From-IR.md`, `docs/briefs/03-TS-Contract-Loader-and-CLI.md`, `docs/briefs/04-PSL-Parser-and-CLI.md`.
+The emitter uses a **hook-based architecture** where target families (SQL, Document, etc.) extend emission behavior through pluggable hooks.
+
+**Key Design Decisions:**
+- **Target Family Hooks**: Each target family implements `TargetFamilyHook` with:
+  - `validateTypes`: Validates all type IDs come from referenced extensions
+  - `validateStructure`: Family-specific structural validation
+  - `generateContractTypes`: Generates `contract.d.ts` content
+  - `getTypesImports`: Determines required type imports from packs
+- **Adapters as Extension Packs**: Adapters are treated identically to extension packs. Both use the same manifest structure (`packs/manifest.json`) with:
+  - `types.codecTypes.import`: Package/named/alias for importing `CodecTypes`
+  - `types.canonicalScalarMap`: Scalar → typeId mapping (used by authoring surfaces, not emitter)
+- **Type Canonicalization**: Type canonicalization (shorthand → fully qualified IDs) happens at **authoring time** (PSL parser or TS builder), **not during emission**. The emitter only validates that all type IDs come from referenced extensions.
+- **I/O Decoupling**: The emitter is decoupled from file I/O. `emit()` returns strings (`contractJson`, `contractDts`); the caller handles all file operations.
+- **No Adapter Special Treatment**: The emitter treats all extension packs uniformly. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
+
+**Implementation:**
+- Core emitter: `packages/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
+- Target family registry: `packages/emitter/src/target-family-registry.ts` - manages hook registration
+- SQL hook: `packages/sql-target/src/emitter-hook.ts` - implements SQL-specific validation and type generation
+- Extension pack loading: `packages/emitter/src/extension-pack.ts` - loads manifests (uses `@prisma-next/node-utils` for file I/O)
+
+**Outputs:**
+- `contract.json`: Canonical JSON with `coreHash` and `profileHash`, all column types as fully qualified IDs (`ns/name@version`)
+- `contract.d.ts`: Types-only definitions with `CodecTypes` imports and `Contract` type mapping fields to `CodecTypes[typeId].output`
+
+**Extension Pack Manifests:**
+- Location: `packages/<adapter-or-extension>/packs/manifest.json`
+- Structure (adapter and extensions use the same shape):
+  ```json
+  {
+    "id": "postgres",
+    "version": "15.0.0",
+    "targets": { "postgres": { "minVersion": "12" } },
+    "capabilities": {},
+    "types": {
+      "codecTypes": {
+        "import": {
+          "package": "@prisma-next/adapter-postgres/exports/codec-types",
+          "named": "CodecTypes",
+          "alias": "PgTypes"
+        }
+      },
+      "canonicalScalarMap": {
+        "int4": "pg/int4@1",
+        "text": "pg/text@1"
+      }
+    }
+  }
+  ```
+- `types.codecTypes.import`: Used by emitter to generate `contract.d.ts` imports
+- `types.canonicalScalarMap`: Used by authoring surfaces (PSL parser or TS builder) to canonicalize shorthand types to fully qualified type IDs
+- Adapter appears first in `contract.extensions` but is otherwise identical to other packs
+
+**Future Work (Briefs):**
+- TS-only emission: esbuild bundles contract entry with allowlist (`@prisma-next/*`); runner imports bundle, validates purity, canonicalizes, and writes artifacts
+- CLI surface: `prisma-next emit --contract src/contract.ts --out contracts/` (TS) or `--psl schema.psl` (PSL)
+- See briefs: `docs/briefs/Slice-Emitter-Canonicalization-and-Types.md`, `docs/briefs/01-Emitter-Hook-Architecture.md`, `docs/briefs/02-Emitter-Pipeline-From-IR.md`, `docs/briefs/03-TS-Contract-Loader-and-CLI.md`, `docs/briefs/04-PSL-Parser-and-CLI.md`.
 
 ## 📦 Current State
 
 ### Codec System
 
 - **Unified Type Identifiers**: Every column `type` is a fully qualified type ID (`ns/name@version`, e.g., `pg/int4@1`, `pg/text@1`, `pg/timestamptz@1`). No bare scalars or codec decorations.
-- **Type Canonicalization**: Contract validation automatically converts bare scalars (e.g., `int4`, `text`) to canonical type IDs (e.g., `pg/int4@1`, `pg/text@1`) based on the target database.
+- **Type Canonicalization**: Type canonicalization happens at **authoring time** (PSL parser or TS builder), not during emission or validation. Authoring surfaces use extension manifests to map shorthand types to fully qualified type IDs.
 - **Codec Registry**: Interface-based registry (`CodecRegistry`) with factory function `createCodecRegistry()`. Classes are private implementation details. Use `register()`, `get()`, `has()`, `getByScalar()`, `getDefaultCodec()`, and `values()` methods.
 - **CodecDefBuilder**: Interface-based builder with factory function `defineCodecs()`. The `dataTypes` property returns type IDs (strings), not codec objects. Use `.add(scalarName, codec)` to build codec definitions.
 - **CodecTypes Generic**: `CodecTypes` (mapping codec IDs to input/output types) is provided as a generic parameter to `sql()` and `schema()` functions
@@ -352,7 +427,7 @@ Example type test:
 ```typescript
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/contract.d';
-import type { ResultType, Plan } from '@prisma-next/sql/types';
+import type { ResultType, Plan } from '@prisma-next/sql-query/types';
 
 test('Contract types are correct', () => {
   type UserTable = Contract['storage']['tables']['user'];
@@ -383,22 +458,26 @@ test('Type IDs are literal types', () => {
 
 1. **Don't infer types from JSON** - JSON imports lose literal types. Use type parameter pattern.
 2. **Don't generate runtime code** - Emit types only (`contract.d.ts`), not executable JS.
-3. **SQL types belong in SQL package** - Don't put `SqlContract` in `@prisma-next/contract`.
+3. **SQL types belong in sql-target package** - `SqlContract`, `SqlStorage`, etc. live in `@prisma-next/sql-target` (moved from `sql-query` to break circular dependency).
 4. **Use bracket notation for index signatures** - `tables['user']` not `tables.user` when TypeScript requires it.
 5. **Arktype optional syntax** - Use `'key?'` not `key: 'Type | undefined'`.
 6. **Builder chaining** - SQL builder methods return new instances. Always chain: `let query = sql(...).from(...); query = query.where(...); query = query.select(...);`
 7. **Column access** - Use `table.columns[fieldName]` or `table['columns'][fieldName]` to avoid conflicts with table properties like `name`.
 8. **Type tests** - Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 9. **Core is lane-agnostic** - Never create discriminated unions based on `lane` field. The core should not be aware of specific lane implementations.
-10. **Unified Type Identifiers** - Every column `type` must be a fully qualified type ID (`ns/name@version`). Bare scalars are canonicalized during validation. No codec decorations or scalar fallbacks.
+10. **Unified Type Identifiers** - Every column `type` must be a fully qualified type ID (`ns/name@version`). Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation. No codec decorations or scalar fallbacks.
 11. **CodecTypes Generic** - Always provide `CodecTypes` as a generic parameter to `sql()` and `schema()` functions. Import from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
-12. **Contract Validation** - Always validate contracts with `validateContract<Contract>(contractJson)` before use. This canonicalizes types and ensures type safety. This includes test fixtures!
+12. **Contract Validation** - Always validate contracts with `validateContract<Contract>(contractJson)` before use. Note: type canonicalization happens at authoring time, not during validation. The contract JSON should contain only fully qualified type IDs.
 13. **No Backward Compatibility** - Never add backward compatibility code, migration paths, or deprecation warnings. This project has no external consumers - change implementations directly.
 14. **Runtime Agnostic** - The runtime must not contain target-specific logic (e.g., special-case Date handling for specific codec IDs). Use generic codec resolution only.
 15. **Interface-Based APIs** - Export interfaces and factory functions, not classes. Keep implementation classes private. Use `createX()` factory functions instead of `new X()` constructors.
 16. **Type Preservation** - Use mapped types `{ readonly [K in keyof T]: ... }` instead of `Record<string, T>` in generic constraints to preserve literal types. Use `Record<never, never>` for empty defaults, not `{}`.
 17. **Test Port Management** - Assign unique port ranges to each test suite to avoid conflicts during parallel test execution.
 18. **Type Tests** - Use Vitest's `expectTypeOf` helpers instead of manual type checks with conditional types. See `.cursor/rules/vitest-expect-typeof.mdc` for details.
+19. **Emitter I/O Decoupling** - The emitter returns strings (`contractJson`, `contractDts`); the caller handles all file I/O. This enables testing without file system dependencies and flexible integration with build systems.
+20. **Adapters as Extension Packs** - Adapters and extension packs use the same manifest structure and are treated identically. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
+21. **Type Canonicalization Timing** - Type canonicalization happens at authoring time (PSL parser or TS builder), not during emission or validation. The emitter only validates that all type IDs come from referenced extensions.
+22. **Package Naming** - The SQL query package was renamed from `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose.
 
 ## 📖 Documentation Location
 
@@ -411,12 +490,18 @@ test('Type IDs are literal types', () => {
 
 ### Recent Implementation (Completed)
 
-1. **Unified Type Identifiers** - All column types are now fully qualified type IDs (`ns/name@version`). Bare scalars are canonicalized during validation.
-2. **Simplified Type Inference** - `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` using `CodecTypes[typeId].output`. No fallbacks or scalar mappings.
-3. **Runtime Simplification** - Removed target-specific logic from runtime. Codec resolution uses type IDs directly.
-4. **Interface-Based Design** - Refactored codec system to export interfaces and factory functions (`createCodecRegistry()`, `defineCodecs()`) instead of classes. Implementation classes are private.
-5. **Type Preservation** - Fixed generic type system to preserve literal string types (e.g., `'pg/text@1'`) through mapped types and careful constraints. Removed index signatures from generic parameters.
-6. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
+1. **Emitter Hook-Based Architecture** - Refactored emitter to use pluggable `TargetFamilyHook` system. SQL hook lives in `sql-target` package. Adapters treated identically to extension packs.
+2. **Type Canonicalization at Authoring Time** - Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission or validation. Emitter only validates type IDs come from referenced extensions.
+3. **Emitter I/O Decoupling** - Emitter returns strings (`contractJson`, `contractDts`); caller handles all file I/O. Enables testing without file system dependencies and flexible build system integration.
+4. **SQL Contract Types Migration** - Moved SQL contract types (`SqlContract`, `SqlStorage`, etc.) from `sql-query` to `sql-target` to break circular dependency. All SQL-specific types now live in `sql-target`.
+5. **Package Rename** - Renamed `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose as query builder.
+6. **Node Utils Package** - Created `@prisma-next/node-utils` package for file I/O utilities (`readJsonFile`, `readTextFile`). Extracted from emitter to keep I/O concerns separate.
+7. **Unified Type Identifiers** - All column types are fully qualified type IDs (`ns/name@version`). Canonicalization happens at authoring time.
+8. **Simplified Type Inference** - `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` using `CodecTypes[typeId].output`. No fallbacks or scalar mappings.
+9. **Runtime Simplification** - Removed target-specific logic from runtime. Codec resolution uses type IDs directly.
+10. **Interface-Based Design** - Refactored codec system to export interfaces and factory functions (`createCodecRegistry()`, `defineCodecs()`) instead of classes. Implementation classes are private.
+11. **Type Preservation** - Fixed generic type system to preserve literal string types (e.g., `'pg/text@1'`) through mapped types and careful constraints. Removed index signatures from generic parameters.
+12. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
 
 ### Future Work
 
@@ -425,7 +510,7 @@ test('Type IDs are literal types', () => {
 
 ### MVP Goals
 
-Check the TODO comments in code (especially `packages/sql/src/contract.ts` - "TODO: compute mappings") and open issues. The MVP goals are:
+Check the TODO comments in code (especially `packages/sql-query/src/contract.ts` - "TODO: compute mappings") and open issues. The MVP goals are:
 1. Type-safe query DSL
 2. Compatibility layer for Prisma ORM import-swap
 3. Budgets plugin blocking unbounded reads
@@ -435,11 +520,12 @@ Check the TODO comments in code (especially `packages/sql/src/contract.ts` - "TO
 
 **Load a contract:**
 ```typescript
-import { validateContract } from '@prisma-next/sql/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 import type { Contract, CodecTypes } from './contract.d';
 import contractJson from './contract.json' assert { type: 'json' };
 
-// Always validate - this canonicalizes bare scalars to type IDs
+// Always validate - ensures structure and type safety
+// Note: type canonicalization happens at authoring time, not during validation
 const contract = validateContract<Contract>(contractJson);
 ```
 
@@ -454,9 +540,32 @@ const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .build();
 ```
 
+**Emit a contract:**
+```typescript
+import { emit } from '@prisma-next/emitter';
+import { loadExtensionPacks } from '@prisma-next/emitter';
+import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
+
+// Load extension packs (adapter + extensions)
+const packs = loadExtensionPacks(
+  './packages/adapter-postgres',
+  ['./packages/extension-pack']
+);
+
+// Emit contract (returns strings, caller handles file I/O)
+const result = await emit(ir, {
+  outputDir: './dist',
+  packs,
+});
+
+// Write files (caller responsibility)
+await writeFile('./contract.json', result.contractJson);
+await writeFile('./contract.d.ts', result.contractDts);
+```
+
 **Extract row type from plan:**
 ```typescript
-import type { ResultType } from '@prisma-next/sql/types';
+import type { ResultType } from '@prisma-next/sql-query/types';
 
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
@@ -468,21 +577,22 @@ type UserRow = ResultType<typeof plan>;  // Inferred type: { id: number; email: 
 
 **Contract column types:**
 ```typescript
-// contract.json - bare scalars (will be canonicalized during validation)
+// Authoring surface (PSL or TS builder) canonicalizes bare scalars to type IDs
+// contract.json - already contains fully qualified type IDs
 {
   "storage": {
     "tables": {
       "user": {
         "columns": {
-          "id": { "type": "int4", "nullable": false },
-          "email": { "type": "text", "nullable": false }
+          "id": { "type": "pg/int4@1", "nullable": false },
+          "email": { "type": "pg/text@1", "nullable": false }
         }
       }
     }
   }
 }
 
-// contract.d.ts - canonicalized type IDs
+// contract.d.ts - matches JSON with canonicalized type IDs
 export type Contract = SqlContract<{
   readonly tables: {
     readonly user: {
@@ -505,6 +615,29 @@ plan.meta.projectionTypes;       // { id: 'pg/int4@1' }
 
 // Runtime uses type IDs for codec resolution
 // Type system uses CodecTypes[typeId].output for ResultType inference
+```
+
+**Extension Pack Manifest:**
+```json
+{
+  "id": "postgres",
+  "version": "15.0.0",
+  "targets": { "postgres": { "minVersion": "12" } },
+  "capabilities": {},
+  "types": {
+    "codecTypes": {
+      "import": {
+        "package": "@prisma-next/adapter-postgres/exports/codec-types",
+        "named": "CodecTypes",
+        "alias": "PgTypes"
+      }
+    },
+    "canonicalScalarMap": {
+      "int4": "pg/int4@1",
+      "text": "pg/text@1"
+    }
+  }
+}
 ```
 
 ---

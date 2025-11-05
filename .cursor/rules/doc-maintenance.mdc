@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+
+- Whenever you receive a correction or correct a mistake, make sure it's documented in .cursor/rules either by updating an existing doc or adding a new one
+- Whenever you make changes to a package, make sure its README stays up to date. READMEs should include:
+  - A description of the package
+  - Its responsibilities
+  - Dependencies it has on other packages, or other packages on it
+  - An architecture mermaid diagram
+  - Links to relevant subsystem docs or ADRs
+  - Any other context a developer needs when working in that package
+- If you establish a new design decision, update the architecture docs in `docs/architecture docs`
