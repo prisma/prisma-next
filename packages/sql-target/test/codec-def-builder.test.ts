@@ -178,7 +178,11 @@ describe('CodecDefBuilder interface', () => {
       const builder2 = builder1.add('immutable1', codec1);
 
       expect(builder1).not.toBe(builder2);
-      expect(builder1.codecDefinitions['immutable1']).toBeUndefined();
+      expect(
+        'immutable1' in builder1.codecDefinitions
+          ? builder1.codecDefinitions['immutable1']
+          : undefined,
+      ).toBeUndefined();
       expect(builder2.codecDefinitions['immutable1']).toBeDefined();
     });
   });
