@@ -14,8 +14,7 @@ export type {
   Codec,
   CodecInput,
   CodecOutput,
-  CodecDefBuilder,
   ExtractCodecTypes,
   ExtractScalarToJs,
 } from '../codecs';
-export { CodecRegistry, codec, defineCodecs } from '../codecs';
+export { CodecRegistry, CodecDefBuilder, codec, defineCodecs } from '../codecs';
