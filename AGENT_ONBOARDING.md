@@ -202,6 +202,15 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 - This happens during `validateContract()` - always validate contracts before use
 - The canonicalized contract matches the types defined in `contract.d.ts`
 
+### Emitter architecture (hooks) & TS-only emission
+
+- One emitter core with `targetFamily` hooks (e.g., SQL), matching thin core, fat targets. Adapters are treated as packs with manifests providing:
+  - `types.codecTypes.import` (how `contract.d.ts` imports `CodecTypes`)
+  - `types.canonicalScalarMap` (scalar → typeId for canonicalization)
+- `contract.d.ts` composes helpers (`SqlContract`, `TableDef`, `ModelDef`), exports `CodecTypes` and `LaneCodecTypes`, and keeps ergonomic aliases (`Tables`, `Models`, `Relations`).
+- TS-only emission: esbuild bundles a dedicated contract entry with an allowlist (`@prisma-next/*`); a small runner imports the bundle, validates purity, canonicalizes, and writes artifacts. CLI surface (MVP): `prisma-next emit --contract src/contract.ts --out contracts/`.
+- See briefs: `docs/briefs/02-Emitter-Pipeline-From-IR.md`, `docs/briefs/03-TS-Contract-Loader-and-CLI.md`, `docs/briefs/04-PSL-Parser-and-CLI.md`.
+
 ## 📦 Current State
 
 ### Codec System

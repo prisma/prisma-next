@@ -1,3 +1,5 @@
+import '../emitter-hook-init';
+
 export {
   Adapter,
   AdapterProfile,
@@ -13,3 +15,4 @@ export {
 export type { Codec, CodecInput, CodecOutput } from '../codecs';
 export type { CodecRegistry, CodecDefBuilder } from '../codecs';
 export { createCodecRegistry, codec, defineCodecs } from '../codecs';
+export { sqlTargetFamilyHook } from '../emitter-hook';

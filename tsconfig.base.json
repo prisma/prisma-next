@@ -31,6 +31,8 @@
       "@prisma-next/sql/contract-types": ["packages/sql/src/contract-types.ts"],
       "@prisma-next/contract": ["packages/contract/src/exports/types.ts"],
       "@prisma-next/contract/*": ["packages/contract/src/exports/*.ts"],
+      "@prisma-next/emitter": ["packages/emitter/src/exports/index.ts"],
+      "@prisma-next/emitter/*": ["packages/emitter/src/exports/*.ts"],
       "@prisma-next/compat-prisma": ["packages/compat-prisma/src/exports/index.ts"],
       "@prisma-next/compat-prisma/*": ["packages/compat-prisma/src/exports/*.ts"]
     }

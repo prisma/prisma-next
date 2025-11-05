@@ -1,0 +1,394 @@
+import type {
+  ContractIR,
+  ExtensionPack,
+  ExtensionPackManifest,
+  TypesImportSpec,
+} from '@prisma-next/emitter';
+import type {
+  ModelDefinition,
+  ModelField,
+  SqlStorage,
+  StorageTable,
+} from '@prisma-next/sql/contract-types';
+
+export const sqlTargetFamilyHook = {
+  id: 'sql',
+
+  canonicalizeType(input: string, packManifests: ReadonlyArray<ExtensionPackManifest>): string {
+    if (input.includes('/') && input.includes('@')) {
+      return input;
+    }
+
+    for (const pack of packManifests) {
+      const scalarMap = pack.types?.canonicalScalarMap;
+      if (scalarMap && scalarMap[input]) {
+        return scalarMap[input];
+      }
+    }
+
+    throw new Error(
+      `Unknown scalar type "${input}". Expected a known scalar or a fully qualified type ID (ns/name@version).`,
+    );
+  },
+
+  validateStructure(ir: ContractIR): void {
+    if (ir.targetFamily !== 'sql') {
+      throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
+    }
+
+    const storage = ir.storage as SqlStorage | undefined;
+    if (!storage || !storage.tables) {
+      throw new Error('SQL contract must have storage.tables');
+    }
+
+    const models = ir.models as Record<string, ModelDefinition> | undefined;
+    const tableNames = new Set(Object.keys(storage.tables));
+
+    if (models) {
+      for (const [modelName, modelUnknown] of Object.entries(models)) {
+        const model = modelUnknown as ModelDefinition;
+        if (!model.storage?.table) {
+          throw new Error(`Model "${modelName}" is missing storage.table`);
+        }
+
+        const tableName = model.storage.table;
+        if (!tableNames.has(tableName)) {
+          throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
+        }
+
+        const table = storage.tables[tableName];
+        if (!table) {
+          throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
+        }
+
+        if (!table.primaryKey) {
+          throw new Error(`Model "${modelName}" table "${tableName}" is missing a primary key`);
+        }
+
+        const columnNames = new Set(Object.keys(table.columns));
+        if (!model.fields) {
+          throw new Error(`Model "${modelName}" is missing fields`);
+        }
+
+        for (const [fieldName, fieldUnknown] of Object.entries(model.fields)) {
+          const field = fieldUnknown as ModelField;
+          if (!field.column) {
+            throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
+          }
+
+          if (!columnNames.has(field.column)) {
+            throw new Error(
+              `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${tableName}"`,
+            );
+          }
+        }
+      }
+    }
+
+    for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
+      const table = tableUnknown as StorageTable;
+      const columnNames = new Set(Object.keys(table.columns));
+
+      if (table.primaryKey) {
+        for (const colName of table.primaryKey.columns) {
+          if (!columnNames.has(colName)) {
+            throw new Error(
+              `Table "${tableName}" primaryKey references non-existent column "${colName}"`,
+            );
+          }
+        }
+      }
+
+      if (table.uniques) {
+        for (const unique of table.uniques) {
+          for (const colName of unique.columns) {
+            if (!columnNames.has(colName)) {
+              throw new Error(
+                `Table "${tableName}" unique constraint references non-existent column "${colName}"`,
+              );
+            }
+          }
+        }
+      }
+
+      if (table.indexes) {
+        for (const index of table.indexes) {
+          for (const colName of index.columns) {
+            if (!columnNames.has(colName)) {
+              throw new Error(
+                `Table "${tableName}" index references non-existent column "${colName}"`,
+              );
+            }
+          }
+        }
+      }
+
+      if (table.foreignKeys) {
+        for (const fk of table.foreignKeys) {
+          for (const colName of fk.columns) {
+            if (!columnNames.has(colName)) {
+              throw new Error(
+                `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
+              );
+            }
+          }
+
+          if (!tableNames.has(fk.references.table)) {
+            throw new Error(
+              `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+            );
+          }
+
+          const referencedTable = storage.tables[fk.references.table];
+          if (!referencedTable) {
+            throw new Error(
+              `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+            );
+          }
+
+          const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
+          for (const colName of fk.references.columns) {
+            if (!referencedColumnNames.has(colName)) {
+              throw new Error(
+                `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
+              );
+            }
+          }
+
+          if (fk.columns.length !== fk.references.columns.length) {
+            throw new Error(
+              `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
+            );
+          }
+        }
+      }
+    }
+  },
+
+  generateContractTypes(ir: ContractIR, packs: ReadonlyArray<ExtensionPack>): string {
+    const imports = this.getTypesImports(packs);
+    const importLines = imports.map(
+      (imp) => `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`,
+    );
+
+    const codecTypes = imports.map((imp) => imp.alias).join(' & ');
+
+    const storage = ir.storage as SqlStorage;
+    const models = ir.models as Record<string, ModelDefinition>;
+
+    const storageType = this.generateStorageType(storage);
+    const modelsType = this.generateModelsType(models);
+    const relationsType = this.generateRelationsType(models);
+    const mappingsType = this.generateMappingsType(models, storage);
+
+    return `// Generated contract types
+${importLines.join('\n')}
+
+import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql/contract-types';
+
+export type CodecTypes = ${codecTypes || 'Record<string, never>'};
+export type LaneCodecTypes = CodecTypes;
+
+export type Contract = SqlContract<
+  ${storageType},
+  ${modelsType},
+  ${relationsType},
+  ${mappingsType}
+>;
+
+export type Tables = Contract['storage']['tables'];
+export type Models = Contract['models'];
+export type Relations = Contract['relations'];
+`;
+  },
+
+  getTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec> {
+    const imports: TypesImportSpec[] = [];
+    for (const pack of packs) {
+      const codecTypes = pack.manifest.types?.codecTypes;
+      if (codecTypes?.import) {
+        imports.push(codecTypes.import);
+      }
+    }
+    return imports;
+  },
+
+  generateStorageType(storage: SqlStorage): string {
+    const tables: string[] = [];
+    for (const [tableName, table] of Object.entries(storage.tables)) {
+      const columns: string[] = [];
+      for (const [colName, col] of Object.entries(table.columns)) {
+        const nullable = col.nullable ? 'true' : 'false';
+        const type = col.type ? `'${col.type}'` : 'string';
+        columns.push(
+          `readonly ${colName}: { readonly type: ${type}; readonly nullable: ${nullable} }`,
+        );
+      }
+
+      const tableParts: string[] = [`columns: { ${columns.join('; ')} }`];
+
+      if (table.primaryKey) {
+        const pkCols = table.primaryKey.columns.map((c) => `'${c}'`).join(', ');
+        tableParts.push(
+          `primaryKey: { readonly columns: readonly [${pkCols}]${table.primaryKey.name ? `; readonly name: '${table.primaryKey.name}'` : ''} }`,
+        );
+      }
+
+      if (table.uniques && table.uniques.length > 0) {
+        const uniques = table.uniques
+          .map((u) => {
+            const cols = u.columns.map((c) => `'${c}'`).join(', ');
+            return `{ readonly columns: readonly [${cols}]${u.name ? `; readonly name: '${u.name}'` : ''} }`;
+          })
+          .join(', ');
+        tableParts.push(`uniques: readonly [${uniques}]`);
+      }
+
+      if (table.indexes && table.indexes.length > 0) {
+        const indexes = table.indexes
+          .map((i) => {
+            const cols = i.columns.map((c) => `'${c}'`).join(', ');
+            return `{ readonly columns: readonly [${cols}]${i.name ? `; readonly name: '${i.name}'` : ''} }`;
+          })
+          .join(', ');
+        tableParts.push(`indexes: readonly [${indexes}]`);
+      }
+
+      if (table.foreignKeys && table.foreignKeys.length > 0) {
+        const fks = table.foreignKeys
+          .map((fk) => {
+            const cols = fk.columns.map((c) => `'${c}'`).join(', ');
+            const refCols = fk.references.columns.map((c) => `'${c}'`).join(', ');
+            return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${fk.name ? `; readonly name: '${fk.name}'` : ''} }`;
+          })
+          .join(', ');
+        tableParts.push(`foreignKeys: readonly [${fks}]`);
+      }
+
+      tables.push(`readonly ${tableName}: { ${tableParts.join('; ')} }`);
+    }
+
+    return `{ readonly tables: { ${tables.join('; ')} } }`;
+  },
+
+  generateModelsType(models: Record<string, ModelDefinition> | undefined): string {
+    if (!models) {
+      return 'Record<string, never>';
+    }
+
+    const modelTypes: string[] = [];
+    for (const [modelName, model] of Object.entries(models)) {
+      const fields: string[] = [];
+      for (const [fieldName, field] of Object.entries(model.fields)) {
+        fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+      }
+
+      const tableName = model.storage.table;
+      const relations: string[] = [];
+      if (model.relations) {
+        for (const [relName, rel] of Object.entries(model.relations)) {
+          if (typeof rel === 'object' && rel !== null && 'on' in rel) {
+            const on = rel.on as { parentCols?: string[]; childCols?: string[] };
+            if (on.parentCols && on.childCols) {
+              const parentCols = on.parentCols.map((c) => `'${c}'`).join(', ');
+              const childCols = on.childCols.map((c) => `'${c}'`).join(', ');
+              relations.push(
+                `readonly ${relName}: { readonly on: { readonly parentCols: readonly [${parentCols}]; readonly childCols: readonly [${childCols}] } }`,
+              );
+            }
+          }
+        }
+      }
+
+      const modelParts: string[] = [
+        `storage: { readonly table: '${tableName}' }`,
+        `fields: { ${fields.join('; ')} }`,
+      ];
+
+      if (relations.length > 0) {
+        modelParts.push(`relations: { ${relations.join('; ')} }`);
+      }
+
+      modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
+    }
+
+    return `{ ${modelTypes.join('; ')} }`;
+  },
+
+  generateRelationsType(models: Record<string, ModelDefinition> | undefined): string {
+    if (!models) {
+      return 'Record<string, never>';
+    }
+
+    const relationTypes: string[] = [];
+    for (const [modelName, model] of Object.entries(models)) {
+      if (model.relations) {
+        for (const [relName] of Object.entries(model.relations)) {
+          relationTypes.push(`readonly ${modelName}.${relName}: unknown`);
+        }
+      }
+    }
+
+    if (relationTypes.length === 0) {
+      return 'Record<string, never>';
+    }
+
+    return `{ ${relationTypes.join('; ')} }`;
+  },
+
+  generateMappingsType(
+    models: Record<string, ModelDefinition> | undefined,
+    storage: SqlStorage,
+  ): string {
+    if (!models) {
+      return 'SqlMappings';
+    }
+
+    const modelToTable: string[] = [];
+    const tableToModel: string[] = [];
+    const fieldToColumn: string[] = [];
+    const columnToField: string[] = [];
+
+    for (const [modelName, model] of Object.entries(models)) {
+      const tableName = model.storage.table;
+      modelToTable.push(`readonly ${modelName}: '${tableName}'`);
+      tableToModel.push(`readonly ${tableName}: '${modelName}'`);
+
+      const fieldMap: string[] = [];
+      for (const [fieldName, field] of Object.entries(model.fields)) {
+        fieldMap.push(`readonly ${fieldName}: '${field.column}'`);
+      }
+
+      if (fieldMap.length > 0) {
+        fieldToColumn.push(`readonly ${modelName}: { ${fieldMap.join('; ')} }`);
+      }
+
+      if (storage.tables[tableName]) {
+        const colMap: string[] = [];
+        for (const [fieldName, field] of Object.entries(model.fields)) {
+          colMap.push(`readonly ${field.column}: '${fieldName}'`);
+        }
+
+        if (colMap.length > 0) {
+          columnToField.push(`readonly ${tableName}: { ${colMap.join('; ')} }`);
+        }
+      }
+    }
+
+    const parts: string[] = [];
+    if (modelToTable.length > 0) {
+      parts.push(`modelToTable: { ${modelToTable.join('; ')} }`);
+    }
+    if (tableToModel.length > 0) {
+      parts.push(`tableToModel: { ${tableToModel.join('; ')} }`);
+    }
+    if (fieldToColumn.length > 0) {
+      parts.push(`fieldToColumn: { ${fieldToColumn.join('; ')} }`);
+    }
+    if (columnToField.length > 0) {
+      parts.push(`columnToField: { ${columnToField.join('; ')} }`);
+    }
+
+    return `{ ${parts.join('; ')} }`;
+  },
+} as const;

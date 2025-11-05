@@ -1,0 +1,267 @@
+---
+description: TypeScript and architecture patterns for this codebase
+alwaysApply: false
+---
+# TypeScript and Architecture Patterns
+
+This document covers important TypeScript patterns and architectural principles used in this codebase.
+
+## Interface-Based Design with Factory Functions
+
+**Pattern**: Export interfaces and factory functions, keep classes as private implementation details.
+
+### Why?
+
+This aligns with the "Types-Only Emission" principle and allows for better abstraction. Consumers work with interfaces, not concrete classes, which enables:
+- Better encapsulation
+- Easier testing with mocks
+- Future flexibility to change implementations
+- Cleaner API surface
+
+### Implementation
+
+**✅ CORRECT: Export interface and factory function**
+
+```typescript
+export interface CodecRegistry {
+  register(codec: Codec<string>): void;
+  get(id: string): Codec<string> | undefined;
+  has(id: string): boolean;
+  // ... other methods
+}
+
+export function createCodecRegistry(): CodecRegistry {
+  return new CodecRegistryImpl();  // Private implementation class
+}
+
+// Private implementation - not exported
+class CodecRegistryImpl implements CodecRegistry {
+  private codecs = new Map<string, Codec<string>>();
+
+  register(codec: Codec<string>): void {
+    this.codecs.set(codec.id, codec);
+  }
+
+  get(id: string): Codec<string> | undefined {
+    return this.codecs.get(id);
+  }
+
+  has(id: string): boolean {
+    return this.codecs.has(id);
+  }
+}
+```
+
+**❌ WRONG: Don't export classes directly**
+
+```typescript
+// Don't do this - exposes implementation details
+export class CodecRegistry {
+  private codecs = new Map<string, Codec<string>>();
+  // ...
+}
+```
+
+### Examples in Codebase
+
+- `CodecRegistry` → `createCodecRegistry()`
+- `CodecDefBuilder` → `defineCodecs()`
+- `Runtime` → `createRuntime()`
+- `PostgresDriver` → `createPostgresDriverFromOptions()`
+- `PostgresAdapter` → `createPostgresAdapter()`
+
+### Internal Use
+
+If you need the interface or type for internal use (e.g., in tests), you can export it from an internal module or use it within the same package:
+
+```typescript
+// ✅ CORRECT: Export interface for internal use
+export interface ColumnBuilder {
+  // ...
+}
+
+// Internal implementation - not exported
+class ColumnBuilderImpl implements ColumnBuilder {
+  // ...
+}
+
+export function createColumnBuilder(): ColumnBuilder {
+  return new ColumnBuilderImpl();
+}
+```
+
+## Type Preservation in Generics
+
+**Challenge**: Preserving literal string types (e.g., `'pg/text@1'`) through complex generic type manipulations.
+
+### The Problem
+
+TypeScript's `infer` in conditional types widens literal types to their base types (`'pg/text@1'` → `string`). This is problematic when working with codec IDs, which must remain as literal types.
+
+### The Solution
+
+Use mapped types with careful constraints to avoid index signatures:
+
+**❌ WRONG: `Record<string, T>` introduces index signature**
+
+```typescript
+type ExtractCodecTypes<ScalarNames extends Record<string, Codec<string>>> = {
+  [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id>
+    ? { input: unknown; output: unknown }
+    : never;
+};
+```
+
+This creates an index signature `[x: string]: ...`, which loses literal key types.
+
+**✅ CORRECT: Mapped type preserves literal keys**
+
+```typescript
+type ExtractCodecTypes<
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> }
+> = {
+  readonly [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id>
+    ? { input: unknown; output: unknown }
+    : never;
+};
+```
+
+This preserves literal keys like `'text'` and `'int4'` instead of widening them to `string`.
+
+### Empty Defaults
+
+Use `Record<never, never>` for empty object types without index signatures:
+
+**❌ WRONG: `{}` can be problematic**
+
+```typescript
+type CodecDefBuilder<
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = {}
+> = {
+  // ...
+};
+```
+
+**✅ CORRECT: `Record<never, never>` is explicit empty type**
+
+```typescript
+type CodecDefBuilder<
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>
+> = {
+  // ...
+};
+```
+
+`Record<never, never>` is an explicit way to represent an empty object type that has no index signature.
+
+### Key Insight
+
+When extracting literal types from codecs, use mapped types that extract keys (which preserve literals) rather than inferring values (which widen to `string`):
+
+```typescript
+// Extract the Id type from a Codec by using the key in a mapped type
+type ExtractDataTypes<
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> }
+> = {
+  readonly [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id>
+    ? Id extends string
+      ? Id
+      : never
+    : never;
+};
+```
+
+## Contract Validation in Tests
+
+**Always validate contracts in tests** - even test fixtures need canonicalization.
+
+### The Problem
+
+Contracts may contain bare scalar types (e.g., `type: 'text'`) that need to be canonicalized to type IDs (e.g., `type: 'pg/text@1'`). This canonicalization happens during `validateContract()`.
+
+### The Solution
+
+**❌ WRONG: Test contract with bare scalars**
+
+```typescript
+const testContract: SqlContract<SqlStorage> = {
+  storage: {
+    tables: {
+      user: {
+        columns: {
+          id: { type: 'text', nullable: false },  // Bare scalar!
+        },
+      },
+    },
+  },
+};
+
+// Using this contract directly may cause issues because types aren't canonicalized
+const runtime = createRuntime({ contract: testContract, adapter });
+```
+
+**✅ CORRECT: Validate to canonicalize types**
+
+```typescript
+import { validateContract } from '@prisma-next/sql/schema';
+
+const testContract = validateContract<SqlContract<SqlStorage>>({
+  storage: {
+    tables: {
+      user: {
+        columns: {
+          id: { type: 'text', nullable: false },  // Will be canonicalized to 'pg/text@1'
+        },
+      },
+    },
+  },
+});
+
+// Now types are canonicalized and the contract is ready to use
+const runtime = createRuntime({ contract: testContract, adapter });
+```
+
+### Why This Matters
+
+1. **Type canonicalization**: Bare scalars are converted to type IDs during validation
+2. **Type safety**: Validation ensures the contract structure is correct
+3. **Consistency**: Validated contracts match the types defined in `contract.d.ts`
+
+## Test Port Management
+
+**Issue**: Parallel test execution causes port conflicts when multiple tests use the same hardcoded ports.
+
+**Solution**: Assign unique port ranges to each test suite.
+
+### Pattern
+
+```typescript
+// packages/compat-prisma/test/prisma-client.test.ts
+database = await createDevDatabase({
+  acceleratePort: 54000,
+  databasePort: 54001,
+  shadowDatabasePort: 54002,
+});
+
+// packages/runtime/test/codecs.integration.test.ts
+database = await createDevDatabase({
+  acceleratePort: 54003,  // Different range
+  databasePort: 54004,
+  shadowDatabasePort: 54005,
+});
+```
+
+### Current Port Assignments
+
+- `compat-prisma`: 54000-54002
+- `codecs.integration.test.ts`: 54003-54005
+- `budgets.integration.test.ts`: 54010-54012
+- `runtime.integration.test.ts`: 53213-53215
+- `marker.test.ts`: 54216-54218
+
+### Best Practices
+
+1. **Assign ranges**: Use ranges of 3-5 ports per test suite
+2. **Leave gaps**: Leave gaps between ranges to avoid conflicts
+3. **Document**: Update port assignments in this file when adding new test suites
+4. **Consistency**: Use the same port range for all ports in a test suite (e.g., 54000-54002)

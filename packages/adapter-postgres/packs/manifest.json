@@ -1,0 +1,31 @@
+{
+  "id": "postgres",
+  "version": "15.0.0",
+  "targets": {
+    "postgres": {
+      "minVersion": "12"
+    }
+  },
+  "capabilities": {},
+  "types": {
+    "codecTypes": {
+      "import": {
+        "package": "@prisma-next/adapter-postgres/codec-types",
+        "named": "CodecTypes",
+        "alias": "PgTypes"
+      }
+    },
+    "canonicalScalarMap": {
+      "int2": "pg/int2@1",
+      "int4": "pg/int4@1",
+      "int8": "pg/int8@1",
+      "float4": "pg/float4@1",
+      "float8": "pg/float8@1",
+      "text": "pg/text@1",
+      "timestamp": "pg/timestamp@1",
+      "timestamptz": "pg/timestamptz@1",
+      "bool": "pg/bool@1"
+    }
+  }
+}
+

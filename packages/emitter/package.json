@@ -1,20 +1,19 @@
 {
-  "name": "@prisma-next/sql-target",
+  "name": "@prisma-next/emitter",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma-next/emitter": "workspace:*",
-    "@prisma-next/sql": "workspace:*"
+    "arktype": "^2.0.0"
   },
   "devDependencies": {
-    "ts-toolbelt": "^9.6.0",
+    "@types/node": "^20.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.1"
@@ -26,3 +25,4 @@
     }
   }
 }
+
