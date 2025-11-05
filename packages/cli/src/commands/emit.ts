@@ -1,7 +1,8 @@
 import { Command } from 'commander';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { emit, loadExtensionPacks, targetFamilyRegistry } from '@prisma-next/emitter';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { loadContractFromTs } from '../load-ts-contract';
 
 export function createEmitCommand(): Command {
@@ -22,6 +23,10 @@ export function createEmitCommand(): Command {
       extensions?: string | string[];
     }) => {
       try {
+        if (!targetFamilyRegistry.has('sql')) {
+          targetFamilyRegistry.register(sqlTargetFamilyHook);
+        }
+
         const contractPath = resolve(options.contract);
         const outputDir = resolve(options.out);
         const adapterPath = options.adapter ? resolve(options.adapter) : undefined;
