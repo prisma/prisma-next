@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { emit } from '../src/emitter';
 import { targetFamilyRegistry } from '../src/target-family-registry';
+import { loadExtensionPacks } from '../src/extension-pack';
 import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
 import type { TargetFamilyHook } from '../src/target-family';
 import { join } from 'node:path';
@@ -80,6 +81,7 @@ describe('emitter', () => {
         postgres: {
           version: '15.0.0',
         },
+        pg: {},
       },
       models: {
         User: {
@@ -103,9 +105,10 @@ describe('emitter', () => {
       },
     };
 
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: '',
-      adapterPath: join(__dirname, '../../adapter-postgres'),
+      packs,
     };
 
     const result = await emit(ir, options);
@@ -135,9 +138,10 @@ describe('emitter', () => {
       },
     };
 
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: '',
-      adapterPath: join(__dirname, '../../adapter-postgres'),
+      packs,
     };
 
     await expect(emit(ir, options)).rejects.toThrow();
@@ -160,9 +164,10 @@ describe('emitter', () => {
       },
     };
 
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: '',
-      adapterPath: join(__dirname, '../../adapter-postgres'),
+      packs,
     };
 
     await expect(emit(ir, options)).rejects.toThrow('invalid type ID format');

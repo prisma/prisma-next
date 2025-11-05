@@ -1,17 +1,13 @@
 {
-  "name": "@prisma-next/emitter",
+  "name": "@prisma-next/node-utils",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@prisma-next/node-utils": "workspace:*",
-    "arktype": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

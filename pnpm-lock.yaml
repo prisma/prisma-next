@@ -232,13 +232,28 @@ importers:
 
   packages/emitter:
     dependencies:
+      '@prisma-next/node-utils':
+        specifier: workspace:*
+        version: link:../node-utils
       arktype:
         specifier: ^2.0.0
         version: 2.1.25
     devDependencies:
-      '@prisma-next/sql-target':
-        specifier: workspace:*
-        version: link:../sql-target
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.24
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
+
+  packages/node-utils:
+    devDependencies:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.24

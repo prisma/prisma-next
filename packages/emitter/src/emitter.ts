@@ -1,7 +1,6 @@
 import { targetFamilyRegistry } from './target-family-registry';
-import { loadExtensionPacks } from './extension-pack';
 import { computeCoreHash, computeProfileHash } from './hashing';
-import type { ContractIR, EmitOptions, EmitResult } from './types';
+import type { ContractIR, EmitOptions, EmitResult, ExtensionPack } from './types';
 
 function validateCoreStructure(ir: ContractIR): void {
   if (!ir.targetFamily) {
@@ -12,23 +11,25 @@ function validateCoreStructure(ir: ContractIR): void {
   }
 }
 
-function validateExtensions(ir: ContractIR, adapterId: string | undefined): void {
+function validateExtensions(ir: ContractIR, packs: ReadonlyArray<ExtensionPack>): void {
   const extensions = ir.extensions as Record<string, unknown> | undefined;
   if (!extensions) {
     return;
   }
 
-  if (adapterId && !extensions[adapterId]) {
-    throw new Error(
-      `Adapter "${adapterId}" (identified by contract.target "${ir.target}") must appear as first extension in contract.extensions.${adapterId}`,
-    );
+  for (const pack of packs) {
+    const packId = pack.manifest.id;
+    if (!extensions[packId]) {
+      throw new Error(
+        `Extension pack "${packId}" (loaded from manifest) must appear in contract.extensions.${packId}`,
+      );
+    }
   }
 }
 
 export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitResult> {
-  const { adapterPath, extensionPackPaths = [] } = options;
+  const { packs } = options;
 
-  const packs = loadExtensionPacks(adapterPath, extensionPackPaths);
   const packManifests = packs.map((p) => p.manifest);
 
   const hook = targetFamilyRegistry.require(ir.targetFamily);
@@ -39,7 +40,7 @@ export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitRe
 
   hook.validateStructure(ir);
 
-  validateExtensions(ir, adapterPath ? packs[0]?.manifest.id : undefined);
+  validateExtensions(ir, packs);
 
   const contractJson = {
     schemaVersion: ir.schemaVersion || '1',

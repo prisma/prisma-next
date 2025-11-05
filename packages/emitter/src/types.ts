@@ -37,9 +37,7 @@ export interface ContractIR {
 
 export interface EmitOptions {
   readonly outputDir: string;
-  readonly adapterId?: string;
-  readonly adapterPath?: string;
-  readonly extensionPackPaths?: ReadonlyArray<string>;
+  readonly packs: ReadonlyArray<ExtensionPack>;
 }
 
 export interface EmitResult {

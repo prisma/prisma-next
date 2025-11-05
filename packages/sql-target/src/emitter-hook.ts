@@ -307,7 +307,10 @@ export type Relations = Contract['relations'];
     return `{ readonly tables: { ${tables.join('; ')} } }`;
   },
 
-  generateModelsType(models: Record<string, ModelDefinition> | undefined, storage: SqlStorage): string {
+  generateModelsType(
+    models: Record<string, ModelDefinition> | undefined,
+    storage: SqlStorage,
+  ): string {
     if (!models) {
       return 'Record<string, never>';
     }
@@ -317,7 +320,7 @@ export type Relations = Contract['relations'];
       const fields: string[] = [];
       const tableName = model.storage.table;
       const table = storage.tables[tableName];
-      
+
       if (table) {
         for (const [fieldName, field] of Object.entries(model.fields)) {
           const column = table.columns[field.column];
@@ -328,10 +331,10 @@ export type Relations = Contract['relations'];
 
           const typeId = column.type || 'string';
           const nullable = column.nullable ?? false;
-          const jsType = nullable 
+          const jsType = nullable
             ? `CodecTypes['${typeId}']['output'] | null`
             : `CodecTypes['${typeId}']['output']`;
-          
+
           fields.push(`readonly ${fieldName}: ${jsType}`);
         }
       } else {

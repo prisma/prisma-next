@@ -34,7 +34,9 @@
       "@prisma-next/emitter": ["packages/emitter/src/exports/index.ts"],
       "@prisma-next/emitter/*": ["packages/emitter/src/exports/*.ts"],
       "@prisma-next/compat-prisma": ["packages/compat-prisma/src/exports/index.ts"],
-      "@prisma-next/compat-prisma/*": ["packages/compat-prisma/src/exports/*.ts"]
+      "@prisma-next/compat-prisma/*": ["packages/compat-prisma/src/exports/*.ts"],
+      "@prisma-next/node-utils": ["packages/node-utils/src/exports/index.ts"],
+      "@prisma-next/node-utils/*": ["packages/node-utils/src/exports/*.ts"]
     }
   },
   "references": [
