@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Client } from 'pg';
-import { PostgresDriver } from '@prisma-next/driver-postgres';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
   createRuntime,
   budgets,
@@ -48,7 +48,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       const adapter = createPostgresAdapter();
       const client = new Client({ connectionString });
       await client.connect();
-      const driver = new PostgresDriver({
+      const driver = createPostgresDriverFromOptions({
         connect: { client },
         cursor: { disabled: true },
       });
@@ -140,7 +140,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       const adapter = createPostgresAdapter();
       const client = new Client({ connectionString });
       await client.connect();
-      const driver = new PostgresDriver({
+      const driver = createPostgresDriverFromOptions({
         connect: { client },
         cursor: { disabled: true },
       });
@@ -230,7 +230,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       const adapter = createPostgresAdapter();
       const client = new Client({ connectionString });
       await client.connect();
-      const driver = new PostgresDriver({
+      const driver = createPostgresDriverFromOptions({
         connect: { client },
         cursor: { disabled: true },
       });

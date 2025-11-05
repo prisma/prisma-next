@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { codec, defineCodecs, CodecDefBuilder } from '../src/codecs';
+import { codec, defineCodecs } from '../src/codecs';
 
 describe('defineCodecs() function', () => {
   it('returns empty CodecDefBuilder instance', () => {
     const builder = defineCodecs();
-    expect(builder).toBeInstanceOf(CodecDefBuilder);
+    expect(builder).toBeDefined();
+    expect(builder.codecDefinitions).toEqual({});
   });
 
   it('builder starts with empty codecs record', () => {
@@ -17,10 +18,10 @@ describe('defineCodecs() function', () => {
   });
 });
 
-describe('CodecDefBuilder class', () => {
-  describe('constructor', () => {
+describe('CodecDefBuilder interface', () => {
+  describe('builder creation', () => {
     it('initializes with empty codecs', () => {
-      const builder = new CodecDefBuilder({});
+      const builder = defineCodecs();
       expect(builder.codecDefinitions).toEqual({});
       expect(builder.dataTypes).toEqual({});
     });
@@ -33,12 +34,12 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: string) => wire,
       });
 
-      const builder = new CodecDefBuilder({ init: testCodec });
+      const builder = defineCodecs().add('init', testCodec);
       const definitions = builder.codecDefinitions;
-      expect(definitions.init).toBeDefined();
-      expect(definitions.init.typeId).toBe('test/init@1');
-      expect(definitions.init.scalar).toBe('init');
-      expect(definitions.init.codec).toBe(testCodec);
+      expect(definitions['init']).toBeDefined();
+      expect(definitions['init']?.typeId).toBe('test/init@1');
+      expect(definitions['init']?.scalar).toBe('init');
+      expect(definitions['init']?.codec).toBe(testCodec);
     });
 
     it('populates CodecTypes property correctly', () => {
@@ -49,7 +50,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: string) => wire,
       });
 
-      const builder = new CodecDefBuilder({ codectypes: testCodec });
+      const builder = defineCodecs().add('codectypes', testCodec);
       expect(builder.CodecTypes).toBeDefined();
       expect(builder.CodecTypes['test/codectypes@1']).toBeDefined();
       expect(builder.CodecTypes['test/codectypes@1']).toHaveProperty('input');
@@ -64,7 +65,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: string) => wire,
       });
 
-      const builder = new CodecDefBuilder({ scalartojs: testCodec });
+      const builder = defineCodecs().add('scalartojs', testCodec);
       expect(builder.ScalarToJs).toBeDefined();
       expect('scalartojs' in builder.ScalarToJs).toBe(true);
       expect(Object.keys(builder.ScalarToJs)).toContain('scalartojs');
@@ -81,7 +82,8 @@ describe('CodecDefBuilder class', () => {
       });
 
       const builder = defineCodecs().add('add', testCodec);
-      expect(builder).toBeInstanceOf(CodecDefBuilder);
+      expect(builder).toBeDefined();
+      expect(builder.codecDefinitions).toBeDefined();
       expect(builder.codecDefinitions['add']).toBeDefined();
       expect(builder.codecDefinitions['add']!.typeId).toBe('test/add@1');
     });
@@ -317,7 +319,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: string) => wire,
       });
 
-      const builder = new CodecDefBuilder({ codectypes: testCodec });
+      const builder = defineCodecs().add('codectypes', testCodec);
       expect(builder.CodecTypes).toBeDefined();
       expect(Object.keys(builder.CodecTypes).length).toBeGreaterThan(0);
     });
@@ -369,7 +371,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: string) => wire,
       });
 
-      const builder = new CodecDefBuilder({ scalartojs: testCodec });
+      const builder = defineCodecs().add('scalartojs', testCodec);
       expect(builder.ScalarToJs).toBeDefined();
       expect(Object.keys(builder.ScalarToJs).length).toBeGreaterThan(0);
     });

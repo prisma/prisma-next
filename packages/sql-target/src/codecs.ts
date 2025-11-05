@@ -34,14 +34,27 @@ export interface Codec<Id extends string = string, TWire = unknown, TJs = unknow
 }
 
 /**
- * Registry of codecs organized by ID and by contract scalar type.
+ * Registry interface for codecs organized by ID and by contract scalar type.
  *
  * The registry allows looking up codecs by their namespaced ID or by the
  * contract scalar types they handle. Multiple codecs may handle the same
  * scalar type; ordering in byScalar reflects preference (adapter first,
  * then packs, then app overrides).
  */
-export class CodecRegistry {
+export interface CodecRegistry {
+  get(id: string): Codec<string> | undefined;
+  has(id: string): boolean;
+  getByScalar(scalar: string): readonly Codec<string>[];
+  getDefaultCodec(scalar: string): Codec<string> | undefined;
+  register(codec: Codec<string>): void;
+  [Symbol.iterator](): Iterator<Codec<string>>;
+  values(): IterableIterator<Codec<string>>;
+}
+
+/**
+ * Implementation of CodecRegistry.
+ */
+class CodecRegistryImpl implements CodecRegistry {
   private readonly _byId = new Map<string, Codec<string>>();
   private readonly _byScalar = new Map<string, Codec<string>[]>();
 
@@ -166,11 +179,40 @@ export type ExtractScalarToJs<ScalarNames extends Record<string, Codec<string>>>
 };
 
 /**
- * Builder DSL for declaring codecs.
+ * Builder interface for declaring codecs.
  */
-export class CodecDefBuilder<
+export interface CodecDefBuilder<
   ScalarNames extends Record<string, Codec<string>> = Record<string, never>,
 > {
+  readonly CodecTypes: ExtractCodecTypes<ScalarNames>;
+  readonly ScalarToJs: ExtractScalarToJs<ScalarNames>;
+  add<ScalarName extends string, CodecImpl extends Codec<string>>(
+    scalarName: ScalarName,
+    codecImpl: CodecImpl,
+  ): CodecDefBuilder<O.Overwrite<ScalarNames, Record<ScalarName, CodecImpl>>>;
+  readonly codecDefinitions: {
+    readonly [K in keyof ScalarNames]: {
+      readonly typeId: ScalarNames[K] extends Codec<infer Id, any, any> ? Id : never;
+      readonly scalar: K;
+      readonly codec: ScalarNames[K];
+      readonly input: CodecInput<ScalarNames[K]>;
+      readonly output: CodecOutput<ScalarNames[K]>;
+      readonly jsType: CodecOutput<ScalarNames[K]>;
+    };
+  };
+  readonly dataTypes: {
+    readonly [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id, any, any>
+      ? Id
+      : never;
+  };
+}
+
+/**
+ * Implementation of CodecDefBuilder.
+ */
+class CodecDefBuilderImpl<ScalarNames extends Record<string, Codec<string>> = Record<string, never>>
+  implements CodecDefBuilder<ScalarNames>
+{
   private readonly _codecs: ScalarNames;
 
   public readonly CodecTypes: ExtractCodecTypes<ScalarNames>;
@@ -201,7 +243,7 @@ export class CodecDefBuilder<
     scalarName: ScalarName,
     codecImpl: CodecImpl,
   ): CodecDefBuilder<O.Overwrite<ScalarNames, Record<ScalarName, CodecImpl>>> {
-    return new CodecDefBuilder({
+    return new CodecDefBuilderImpl({
       ...this._codecs,
       [scalarName]: codecImpl,
     } as O.Overwrite<ScalarNames, Record<ScalarName, CodecImpl>>);
@@ -280,8 +322,15 @@ export class CodecDefBuilder<
 }
 
 /**
+ * Create a new codec registry.
+ */
+export function createCodecRegistry(): CodecRegistry {
+  return new CodecRegistryImpl();
+}
+
+/**
  * Create a new codec definition builder.
  */
 export function defineCodecs(): CodecDefBuilder<Record<string, never>> {
-  return new CodecDefBuilder({});
+  return new CodecDefBuilderImpl({});
 }

@@ -15,7 +15,7 @@ import { createRuntime } from '../src/runtime';
 import { budgets } from '../src/plugins/budgets';
 import { lints } from '../src/plugins/lints';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
-import { PostgresDriver } from '../../driver-postgres/src/postgres-driver';
+import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import { createDevDatabase, drainAsyncIterable, executeStatement, collectAsync } from './utils';
 
 const fixtureContract = loadContractFixture();
@@ -32,7 +32,7 @@ const plan = builder
 
 describe('runtime execute integration', { timeout: 100 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  let sharedDriver: PostgresDriver;
+  let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   /** Raw Postgres client for direct interaction with the database */
   let client: Client;
 
@@ -44,7 +44,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    sharedDriver = new PostgresDriver({
+    sharedDriver = createPostgresDriverFromOptions({
       connect: { client: client },
       cursor: { disabled: true },
     });

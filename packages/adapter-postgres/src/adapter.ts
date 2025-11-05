@@ -1,5 +1,5 @@
 import type { Adapter, AdapterProfile, LowererContext } from '@prisma-next/sql-target';
-import { CodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -23,7 +23,7 @@ class PostgresAdapterImpl
 {
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecRegistry = (() => {
-    const registry = new CodecRegistry();
+    const registry = createCodecRegistry();
     for (const definition of Object.values(codecDefinitions)) {
       registry.register(definition.codec);
     }
@@ -97,4 +97,3 @@ export function createPostgresAdapter(options?: PostgresAdapterOptions) {
   return Object.freeze(new PostgresAdapterImpl(options));
 }
 
-export { PostgresAdapterImpl as PostgresAdapter };

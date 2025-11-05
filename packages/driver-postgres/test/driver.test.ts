@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newDb } from 'pg-mem';
 
-import { PostgresDriver } from '../src/postgres-driver';
+import { createPostgresDriverFromOptions } from '../src/postgres-driver';
 
 describe('@prisma-next/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -19,7 +19,7 @@ describe('@prisma-next/driver-postgres', () => {
     const { Pool } = db.adapters.createPg();
     const pool = new Pool();
 
-    const driver = new PostgresDriver({
+    const driver = createPostgresDriverFromOptions({
       connect: { pool: pool as unknown as typeof Pool },
       cursor: { disabled: true },
     });

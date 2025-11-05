@@ -21,7 +21,7 @@ export interface RuntimeTelemetryEvent {
 }
 
 import type { Plugin } from './plugins/types';
-import { CodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
 import { encodeParams } from './codecs/encoding';
 import { decodeRow } from './codecs/decoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
@@ -50,7 +50,7 @@ interface RuntimeErrorEnvelope extends Error {
   readonly details?: Record<string, unknown>;
 }
 
-export class Runtime<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
+class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
   implements Runtime
 {
   private readonly contract: TContract;
@@ -82,7 +82,7 @@ export class Runtime<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     this.codecRegistryValidated = false;
 
     // Compose codec registry from adapter codecs
-    const registry = new CodecRegistry();
+    const registry = createCodecRegistry();
     const adapterRegistry = this.adapter.profile.codecs();
 
     // Register all adapter codecs
@@ -298,8 +298,8 @@ export class Runtime<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
 
 export function createRuntime<TContract extends SqlContract<SqlStorage>>(
   options: RuntimeOptions<TContract>,
-): Runtime<TContract> {
-  return new Runtime(options);
+): Runtime {
+  return new RuntimeImpl(options);
 }
 
 function runtimeError(

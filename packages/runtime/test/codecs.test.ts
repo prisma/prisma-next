@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
 import { codecDefinitions } from '../../adapter-postgres/src/codecs';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import { decodeRow } from '../src/codecs/decoding';
@@ -10,7 +10,7 @@ import type { Codec } from '@prisma-next/sql-target';
 import { validateContract } from '@prisma-next/sql/schema';
 
 function createRegistry(): CodecRegistry {
-  const registry = new CodecRegistry();
+  const registry = createCodecRegistry();
   for (const definition of Object.values(codecDefinitions)) {
     registry.register(definition.codec);
   }
@@ -68,7 +68,7 @@ describe('Codec Registry', () => {
 
   describe('CodecRegistry class methods', () => {
     it('registers a new codec', () => {
-      const newRegistry = new CodecRegistry();
+      const newRegistry = createCodecRegistry();
       const codec: Codec<string, string> = {
         id: 'test/custom@1',
         targetTypes: ['custom'],
@@ -82,7 +82,7 @@ describe('Codec Registry', () => {
     });
 
     it('throws error when registering duplicate codec ID', () => {
-      const newRegistry = new CodecRegistry();
+      const newRegistry = createCodecRegistry();
       const codec: Codec<string, string> = {
         id: 'test/duplicate@1',
         targetTypes: ['custom'],
@@ -96,7 +96,7 @@ describe('Codec Registry', () => {
     });
 
     it('maintains codec order for scalar types', () => {
-      const newRegistry = new CodecRegistry();
+      const newRegistry = createCodecRegistry();
       const codec1: Codec<string, string> = {
         id: 'test/first@1',
         targetTypes: ['shared'],

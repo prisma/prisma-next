@@ -29,7 +29,7 @@ export interface PostgresDriverOptions {
 
 const DEFAULT_BATCH_SIZE = 100;
 
-export class PostgresDriver implements SqlDriver {
+class PostgresDriverImpl implements SqlDriver {
   private readonly pool: PoolType | undefined;
   private readonly directClient: Client | undefined;
   private readonly cursorBatchSize: number;
@@ -182,13 +182,17 @@ export interface CreatePostgresDriverOptions {
 export function createPostgresDriver(
   connectionString: string,
   options?: CreatePostgresDriverOptions,
-): PostgresDriver {
+): SqlDriver {
   const PoolImpl: typeof Pool = options?.poolFactory ?? Pool;
   const pool = new PoolImpl({ connectionString });
-  return new PostgresDriver({
+  return new PostgresDriverImpl({
     connect: { pool },
     cursor: options?.cursor,
   });
+}
+
+export function createPostgresDriverFromOptions(options: PostgresDriverOptions): SqlDriver {
+  return new PostgresDriverImpl(options);
 }
 
 function readCursor<Row>(cursor: Cursor<Row>, size: number): Promise<Row[]> {

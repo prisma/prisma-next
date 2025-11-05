@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { Client } from 'pg';
-import { PostgresDriver } from '@prisma-next/driver-postgres';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { createRuntime } from '../src/runtime';
 import { budgets } from '../src/plugins/budgets';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
@@ -35,7 +35,7 @@ const fixtureContract = validateContract(fixtureContractRaw);
 
 describe('budgets plugin integration', { timeout: 100 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  let sharedDriver: PostgresDriver;
+  let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
 
   beforeAll(async () => {
@@ -46,7 +46,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    sharedDriver = new PostgresDriver({
+    sharedDriver = createPostgresDriverFromOptions({
       connect: { client },
       cursor: { disabled: true },
     });

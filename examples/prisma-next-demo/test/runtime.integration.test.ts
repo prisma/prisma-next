@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { PostgresDriver } from '@prisma-next/driver-postgres';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { Pool } from 'pg';
 import { createRuntime, budgets } from '@prisma-next/runtime';
 import { withClient, withDevDatabase } from '@prisma-next/runtime/test/utils';
@@ -22,7 +22,7 @@ describe('runtime execute integration', () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
-      const driver = new PostgresDriver({ connect: { pool }, cursor: { disabled: true } });
+      const driver = createPostgresDriverFromOptions({ connect: { pool }, cursor: { disabled: true } });
       const runtime = createRuntime({
         contract,
         adapter,
@@ -130,7 +130,7 @@ describe('runtime execute integration', () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
-      const driver = new PostgresDriver({ connect: { pool }, cursor: { disabled: true } });
+      const driver = createPostgresDriverFromOptions({ connect: { pool }, cursor: { disabled: true } });
       const runtime = createRuntime({
         contract,
         adapter,
@@ -221,7 +221,7 @@ describe('runtime execute integration', () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
-      const driver = new PostgresDriver({ connect: { pool }, cursor: { disabled: true } });
+      const driver = createPostgresDriverFromOptions({ connect: { pool }, cursor: { disabled: true } });
       const runtime = createRuntime({
         contract,
         adapter,
@@ -299,7 +299,7 @@ describe('runtime execute integration', () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
-      const driver = new PostgresDriver({ connect: { pool }, cursor: { disabled: true } });
+      const driver = createPostgresDriverFromOptions({ connect: { pool }, cursor: { disabled: true } });
       const runtime = createRuntime({
         contract,
         adapter,

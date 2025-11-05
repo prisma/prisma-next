@@ -7,7 +7,7 @@ import { param } from '@prisma-next/sql/param';
 import { validateContract } from '@prisma-next/sql/schema';
 import { createRuntime } from '../src/runtime';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
-import { PostgresDriver } from '../../driver-postgres/src/postgres-driver';
+import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import { createDevDatabase, executeStatement, collectAsync } from './utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 
@@ -44,7 +44,7 @@ const fixtureContract = validateContract(fixtureContractRaw);
 
 describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  let sharedDriver: PostgresDriver;
+  let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
   const adapter = createPostgresAdapter();
   const tables = schema(fixtureContract).tables;
@@ -58,7 +58,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    sharedDriver = new PostgresDriver({
+    sharedDriver = createPostgresDriverFromOptions({
       connect: { client },
       cursor: { disabled: true },
     });

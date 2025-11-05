@@ -1,4 +1,5 @@
-export { createRuntime, Runtime } from '../runtime';
+export { createRuntime } from '../runtime';
+export type { Runtime } from '../runtime';
 export {
   ensureSchemaStatement,
   ensureTableStatement,

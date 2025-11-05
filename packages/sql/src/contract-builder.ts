@@ -140,7 +140,7 @@ interface ModelBuilderState<
   readonly fields: Fields;
 }
 
-export class ColumnBuilder<
+class ColumnBuilder<
   Name extends string,
   Scalar extends string,
   Nullable extends boolean = false,

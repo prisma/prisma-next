@@ -11,4 +11,5 @@ export {
   SqlExplainResult,
 } from '../sql-target';
 export type { Codec, CodecInput, CodecOutput } from '../codecs';
-export { CodecRegistry, CodecDefBuilder, codec, defineCodecs } from '../codecs';
+export type { CodecRegistry, CodecDefBuilder } from '../codecs';
+export { createCodecRegistry, codec, defineCodecs } from '../codecs';

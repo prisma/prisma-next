@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';
 import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
 import { Client } from 'pg';
-import { PostgresDriver } from '@prisma-next/driver-postgres';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
   createRuntime,
   ensureSchemaStatement,
@@ -111,7 +111,7 @@ describe(
       `);
 
       // Use the same client connection to avoid multiple connections to dev database
-      const driver = new PostgresDriver({
+      const driver = createPostgresDriverFromOptions({
         connect: { client },
         cursor: { disabled: true },
       });
