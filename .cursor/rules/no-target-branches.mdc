@@ -1,0 +1,139 @@
+---
+description: Never branch on target - use adapters instead
+alwaysApply: true
+---
+
+# No Target-Specific Branches
+
+**CRITICAL**: Never branch on `target` in the codebase. Target-specific logic belongs in adapters, not in core packages.
+
+## The Problem
+
+Target-specific branches like `if (target === 'postgres')` create several problems:
+
+1. **Violates thin core principle**: Core packages should be target-agnostic
+2. **Hard to extend**: Adding new targets requires changes across the codebase
+3. **Tight coupling**: Core logic becomes dependent on specific target implementations
+4. **Difficult to test**: Requires mocking or testing with specific targets
+
+## The Solution
+
+**❌ WRONG: Branch on target in core packages**
+
+```typescript
+// ❌ WRONG: Don't do this in core packages
+function canonicalizeColumnType(scalar: string, target: string): string {
+  if (target === 'postgres') {
+    const scalarMap: Record<string, string> = {
+      int4: 'pg/int4@1',
+      text: 'pg/text@1',
+      // ...
+    };
+    return scalarMap[scalar] ?? scalar;
+  }
+  // ...
+}
+```
+
+**✅ CORRECT: Use adapters or extension packs**
+
+```typescript
+// ✅ CORRECT: Adapter handles target-specific logic
+interface Adapter {
+  canonicalizeType(scalar: string): string;
+}
+
+class PostgresAdapter implements Adapter {
+  canonicalizeType(scalar: string): string {
+    const scalarMap: Record<string, string> = {
+      int4: 'pg/int4@1',
+      text: 'pg/text@1',
+      // ...
+    };
+    return scalarMap[scalar] ?? scalar;
+  }
+}
+```
+
+**✅ CORRECT: Use extension pack manifests**
+
+```typescript
+// ✅ CORRECT: Extension pack manifest defines type mappings
+// packages/adapter-postgres/packs/manifest.json
+{
+  "id": "postgres",
+  "types": {
+    "codecTypes": {
+      "import": {
+        "package": "@prisma-next/adapter-postgres/exports/codec-types",
+        "named": "CodecTypes"
+      }
+    }
+  }
+}
+```
+
+## When Is Target Branching Acceptable?
+
+Target-specific branching is **only acceptable** in:
+
+1. **Target-specific packages**: Code in `packages/adapter-*` or `packages/driver-*` packages
+2. **Target-specific lanes**: Code in lane-specific modules (e.g., `raw.ts` for postgres-only features)
+3. **Tests**: Target-specific test fixtures or mocks
+
+**Example of acceptable target branching:**
+
+```typescript
+// ✅ ACCEPTABLE: In adapter package
+export function createPostgresAdapter(): PostgresAdapter {
+  // Postgres-specific logic here is fine
+}
+
+// ✅ ACCEPTABLE: In target-specific lane
+export function createRawFactory(contract: SqlContract<SqlStorage>): RawFactory {
+  if (contract.target !== 'postgres') {
+    throw new Error('Raw lane currently supports only postgres');
+  }
+  // Postgres-specific raw SQL handling
+}
+```
+
+## Architecture Principle
+
+This aligns with **ADR 005 - Thin Core, Fat Targets**:
+
+- **Core packages** (`@prisma-next/contract`, `@prisma-next/emitter`, `@prisma-next/runtime`) must remain target-agnostic
+- **Target packages** (`@prisma-next/sql-target`, `@prisma-next/adapter-*`) handle target-specific logic
+- **Adapters** provide target-specific implementations through well-defined interfaces
+- **Extension packs** define target-specific type mappings and capabilities
+
+## How to Refactor
+
+If you find target-specific branching in core packages:
+
+1. **Move logic to adapter**: If it's adapter-specific, move it to the adapter package
+2. **Use extension packs**: If it's type mapping, use extension pack manifests
+3. **Use adapter interface**: If it's runtime behavior, define an adapter method
+4. **Use capabilities**: If it's feature detection, use adapter capabilities
+
+## Examples from Codebase
+
+**Good patterns:**
+- Adapters register codecs: `adapter.profile.codecs().register(codec)`
+- Extension packs define type mappings in manifests
+- Capabilities drive conditional behavior: `if (adapter.profile.capabilities.jsonAgg)`
+
+**Bad patterns (to avoid):**
+- `if (target === 'postgres')` in core packages
+- `switch (target)` in validation logic
+- Hardcoded target-specific type mappings in core
+
+## Testing
+
+When testing target-specific behavior:
+
+1. **Test adapters directly**: Test target-specific logic in adapter packages
+2. **Mock adapters**: Use adapter interfaces for testing core packages
+3. **Test fixtures**: Use target-specific fixtures in adapter test packages
+
+Never test target-specific behavior by branching on `target` in core package tests.

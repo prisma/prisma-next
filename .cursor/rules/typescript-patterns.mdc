@@ -173,11 +173,11 @@ type ExtractDataTypes<
 
 ## Contract Validation in Tests
 
-**Always validate contracts in tests** - even test fixtures need canonicalization.
+**Always validate contracts in tests** - contracts must have fully qualified type IDs.
 
 ### The Problem
 
-Contracts may contain bare scalar types (e.g., `type: 'text'`) that need to be canonicalized to type IDs (e.g., `type: 'pg/text@1'`). This canonicalization happens during `validateContract()`.
+Contracts must contain fully qualified type IDs (e.g., `type: 'pg/text@1'`), not bare scalars (e.g., `type: 'text'`). Type canonicalization happens at authoring time, not during validation.
 
 ### The Solution
 
@@ -189,43 +189,45 @@ const testContract: SqlContract<SqlStorage> = {
     tables: {
       user: {
         columns: {
-          id: { type: 'text', nullable: false },  // Bare scalar!
+          id: { type: 'text', nullable: false },  // Bare scalar - invalid!
         },
       },
     },
   },
 };
-
-// Using this contract directly may cause issues because types aren't canonicalized
-const runtime = createRuntime({ contract: testContract, adapter });
 ```
 
-**✅ CORRECT: Validate to canonicalize types**
+**✅ CORRECT: Use fully qualified type IDs**
 
 ```typescript
-import { validateContract } from '@prisma-next/sql/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
 
 const testContract = validateContract<SqlContract<SqlStorage>>({
   storage: {
     tables: {
       user: {
         columns: {
-          id: { type: 'text', nullable: false },  // Will be canonicalized to 'pg/text@1'
+          id: { type: 'pg/text@1', nullable: false },  // Fully qualified type ID
         },
       },
     },
   },
 });
 
-// Now types are canonicalized and the contract is ready to use
+// Now contract is validated and ready to use
 const runtime = createRuntime({ contract: testContract, adapter });
 ```
 
 ### Why This Matters
 
-1. **Type canonicalization**: Bare scalars are converted to type IDs during validation
+1. **Type IDs required**: Contracts must use fully qualified type IDs (`ns/name@version`)
 2. **Type safety**: Validation ensures the contract structure is correct
 3. **Consistency**: Validated contracts match the types defined in `contract.d.ts`
+4. **No target branching**: Type mappings come from extension packs, not target-specific branches
+
+### No Target-Specific Branches
+
+**CRITICAL**: Never branch on `target` in core packages. See `.cursor/rules/no-target-branches.mdc` for details.
 
 ## Test Port Management
 
