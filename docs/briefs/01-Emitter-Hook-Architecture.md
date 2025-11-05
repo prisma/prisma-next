@@ -1,0 +1,114 @@
+## Emitter Hook-Based Architecture and Complete Contract.d.ts Generation
+
+### Purpose
+
+Refactor the emitter to a hook-based architecture keyed by `targetFamily` (e.g., SQL, Document), treating adapters as extension packs. Produce canonical `contract.json` and a complete, types-only `contract.d.ts` that exposes the full `Contract` surface (tables, models, mappings) and a `CodecTypes` map for compile-time lane inference.
+
+### Relevant Design Docs
+
+- Architecture Overview: [../Architecture Overview.md](../Architecture%20Overview.md)
+- Data Contract (structure, determinism): [../architecture docs/subsystems/1. Data Contract.md](../architecture%20docs/subsystems/1.%20Data%20Contract.md)
+- Contract Emitter & Types: [../architecture docs/subsystems/2. Contract Emitter & Types.md](../architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md)
+- Query Lanes (Plan model, typing rules): [../architecture docs/subsystems/3. Query Lanes.md](../architecture%20docs/subsystems/3.%20Query%20Lanes.md)
+- Ecosystem Extensions & Packs: [../architecture docs/subsystems/6. Ecosystem Extensions & Packs.md](../architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md)
+- No-Emit Workflow (TS-only authoring): [../architecture docs/subsystems/9. No-Emit Workflow.md](../architecture%20docs/subsystems/9.%20No-Emit%20Workflow.md)
+- ADR 010 Canonicalization Rules: [../architecture docs/adrs/ADR 010 - Canonicalization Rules.md](../architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)
+- ADR 011 Unified Plan Model: [../architecture docs/adrs/ADR 011 - Unified Plan Model.md](../architecture%20docs/adrs/ADR%20011%20-%20Unified%20Plan%20Model.md)
+- ADR 114 Codecs & Branded Types: [../architecture docs/adrs/ADR 114 - Extension codecs & branded types.md](../architecture%20docs/adrs/ADR%20114%20-%20Extension%20codecs%20%26%20branded%20types.md)
+- ADR 131 Codec Typing Separation: [../architecture docs/adrs/ADR 131 - Codec typing separation.md](../architecture%20docs/adrs/ADR%20131%20-%20Codec%20typing%20separation.md)
+
+### Scope
+
+- One emitter core with `targetFamily` hooks for family-specific concerns; adapters/extension packs provide manifests. Unified typeId model: every column `type` is a fully qualified type ID (`ns/name@version`).
+- Generate full `contract.d.ts` with:
+  - `Contract` type (extending family-specific base, e.g., `SqlContract`)
+  - Tables/columns with canonical type IDs
+  - Models mapped to JS types via `CodecTypes[typeId].output` (nullability from storage)
+  - Mappings (model↔table, field↔column)
+  - Exported `CodecTypes` (full maps for MVP) and `LaneCodecTypes` alias
+
+### SPI: Target Family Hook
+
+File: `packages/emitter/src/target-family.ts`
+
+```ts
+export interface TargetFamilyHook {
+  // family id e.g. 'sql'
+  readonly id: string;
+
+  // Canonicalize a scalar or type string to a fully-qualified typeId (ns/name@version)
+  canonicalizeType(input: string, packManifests: ExtensionPackManifest[]): string;
+
+  // Additional family-specific structural validation over core checks
+  validateStructure(ir: ContractIR): void;
+
+  // Generate the complete contract.d.ts content for this family
+  generateContractTypes(ir: ContractIR, packs: ExtensionPack[]): string;
+
+  // Return types-only imports needed for .d.ts (e.g., adapter/pack CodecTypes)
+  getTypesImports(packs: ExtensionPack[]): TypesImportSpec[];
+}
+```
+
+Core types (emitter): `ExtensionPackManifest`, `ExtensionPack`, `ContractIR`, `TypesImportSpec`, `EmitOptions`.
+
+### Treat Adapters as Packs
+
+- Use the same manifest shape and location, with a `types` section for the emitter:
+  - `types.codecTypes.import` (package/named/alias)
+  - `types.canonicalScalarMap` (scalar → typeId)
+- Manifest path example: `packages/adapter-postgres/packs/manifest.json`
+
+### SQL Family Hook (MVP)
+
+File: `packages/sql-target/src/emitter-hook.ts` (or `packages/emitter/src/families/sql.ts`)
+
+- canonicalizeType: map bare scalars via `canonicalScalarMap`; pass-through if already `ns/name@version`; error otherwise.
+- validateStructure: SQL PK/UK/IDX/FK checks (mirror core SQL validation in `@prisma-next/sql`).
+- generateContractTypes:
+  - Import `SqlContract`, `TableDef`, `ModelDef` from `@prisma-next/sql/contract-types`.
+  - Import `CodecTypes` (and optionally `ScalarToJs` if needed) from adapter/packs.
+  - Emit `export type CodecTypes = PgTypes /* & ExtTypes */` and `export type LaneCodecTypes = CodecTypes`.
+  - Emit `export type Contract = SqlContract<Storage, Models, Relations, Mappings>` with:
+    - Storage: tables/columns literal types with canonical typeIds and nullability.
+    - Models: fields mapped to `CodecTypes[typeId].output` (nullability preserved).
+    - Mappings: `modelToTable`, `tableToModel`, `fieldToColumn`, `columnToField`.
+  - Optionally export model/row convenience types and ergonomic aliases (`Tables`, `Models`, `Relations`).
+
+### Core Emitter Flow
+
+File: `packages/emitter/src/emitter.ts`
+
+1) Load extension packs (adapter first) manifests
+2) Resolve and load `targetFamily` hook
+3) Core structural validation (family-agnostic)
+4) Family canonicalization of column types to typeIds
+5) Family structural validation
+6) Extensions canonicalization/validation
+7) Canonicalize JSON and compute `coreHash`/`profileHash`
+8) Write `contract.json`
+9) Generate `contract.d.ts` via `hook.generateContractTypes()` and write
+
+### Types-Only Generation Policies
+
+- Import full adapter/pack `CodecTypes` maps for MVP (no Pick optimization); lanes use `LaneCodecTypes` in `schema`/`sql` generics/args to enable `ComputeColumnJsType` inference.
+- Do not generate runtime code; `.d.ts` is types-only per ADR 007/114.
+
+### Manifests & Registry
+
+- `packages/emitter/src/extension-pack.ts`: load/validate multiple manifests (adapter + packs).
+- `packages/emitter/src/target-family-registry.ts`: resolve hooks by id; default includes SQL.
+
+### Hashing & Profile
+
+- Follow ADR 010 for canonicalization.
+- `coreHash` depends on schema meaning; `profileHash` depends on declared capabilities and explicit pins declared in manifests/contract (see Overview and Subsystems refs).
+
+### Testing & TDD
+
+- Unit (emitter core): manifest load/validate, canonicalization (scalar → typeId), hashing stability, error paths.
+- Unit (SQL hook): PK/UK/IDX/FK checks, type generation emits expected `.d.ts` content.
+- Integration: IR → artifacts → lanes (`schema(contract, LaneCodecTypes)` + `sql({ contract, adapter, codecTypes: LaneCodecTypes })`) → plan built/executed; assert SQL/params/meta and `ResultType`.
+- Parity: TS-only loader path and (later) PSL path must yield identical plans/types.
+
+
