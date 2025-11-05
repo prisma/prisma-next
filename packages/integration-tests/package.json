@@ -1,0 +1,25 @@
+{
+  "name": "@prisma-next/integration-tests",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pretest": "pnpm -w build"
+  },
+  "dependencies": {
+    "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/sql-query": "workspace:*",
+    "@prisma-next/sql-target": "workspace:*",
+    "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.1",
+    "typescript": "^5.9.3"
+  }
+}
+
