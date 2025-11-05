@@ -208,12 +208,127 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 
 - **Unified Type Identifiers**: Every column `type` is a fully qualified type ID (`ns/name@version`, e.g., `pg/int4@1`, `pg/text@1`, `pg/timestamptz@1`). No bare scalars or codec decorations.
 - **Type Canonicalization**: Contract validation automatically converts bare scalars (e.g., `int4`, `text`) to canonical type IDs (e.g., `pg/int4@1`, `pg/text@1`) based on the target database.
-- **Codec Registry**: Class-based registry (`CodecRegistry`) with `register()`, `get()`, `has()`, `getByScalar()`, `getDefaultCodec()`, and `values()` methods
+- **Codec Registry**: Interface-based registry (`CodecRegistry`) with factory function `createCodecRegistry()`. Classes are private implementation details. Use `register()`, `get()`, `has()`, `getByScalar()`, `getDefaultCodec()`, and `values()` methods.
+- **CodecDefBuilder**: Interface-based builder with factory function `defineCodecs()`. The `dataTypes` property returns type IDs (strings), not codec objects. Use `.add(scalarName, codec)` to build codec definitions.
 - **CodecTypes Generic**: `CodecTypes` (mapping codec IDs to input/output types) is provided as a generic parameter to `sql()` and `schema()` functions
 - **Plan Annotations**: SQL DSL encodes column type IDs into `plan.meta.annotations.codecs` and `plan.meta.projectionTypes`
 - **Runtime Resolution**: Runtime uses `plan.meta.annotations.codecs[alias]` or `plan.meta.projectionTypes[alias]` for codec lookups by type ID
 - **Type Inference**: `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` by looking up `CodecTypes[typeId].output`. `InferProjectionRow` extracts these pre-computed types.
 - **No Fallbacks**: Removed `ScalarToJs` fallback logic. Type inference directly uses `CodecTypes[typeId].output` - if codec not found, returns `unknown`
+
+## 🏗️ Architecture Patterns
+
+### Interface-Based Design with Factory Functions
+
+**Pattern**: Export interfaces and factory functions, keep classes as private implementation details.
+
+```typescript
+// ✅ CORRECT: Export interface and factory function
+export interface CodecRegistry {
+  register(codec: Codec<string>): void;
+  get(id: string): Codec<string> | undefined;
+  // ... other methods
+}
+
+export function createCodecRegistry(): CodecRegistry {
+  return new CodecRegistryImpl();  // Private implementation class
+}
+
+// ❌ WRONG: Don't export classes directly
+export class CodecRegistry { ... }
+```
+
+**Why?** This aligns with the "Types-Only Emission" principle and allows for better abstraction. Consumers work with interfaces, not concrete classes.
+
+**Examples in codebase:**
+- `CodecRegistry` → `createCodecRegistry()`
+- `CodecDefBuilder` → `defineCodecs()`
+- `Runtime` → `createRuntime()`
+- `PostgresDriver` → `createPostgresDriverFromOptions()`
+
+### Type Preservation in Generics
+
+**Challenge**: Preserving literal string types (e.g., `'pg/text@1'`) through complex generic type manipulations.
+
+**Solution**: Use mapped types with careful constraints to avoid index signatures:
+
+```typescript
+// ❌ WRONG: Record<string, T> introduces index signature
+type ExtractCodecTypes<ScalarNames extends Record<string, Codec<string>>>
+
+// ✅ CORRECT: Mapped type preserves literal keys
+type ExtractCodecTypes<
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> }
+>
+
+// Use Record<never, never> for empty defaults (not {})
+type CodecDefBuilder<
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>
+>
+```
+
+**Key insight**: When extracting literal types from codecs, use mapped types that extract keys (which preserve literals) rather than inferring values (which widen to `string`).
+
+### Contract Validation in Tests
+
+**Always validate contracts in tests** - even test fixtures need canonicalization:
+
+```typescript
+// ❌ WRONG: Test contract with bare scalars
+const testContract: SqlContract<SqlStorage> = {
+  storage: {
+    tables: {
+      user: {
+        columns: {
+          id: { type: 'text', nullable: false },  // Bare scalar!
+        },
+      },
+    },
+  },
+};
+
+// ✅ CORRECT: Validate to canonicalize types
+const testContract = validateContract<SqlContract<SqlStorage>>({
+  storage: {
+    tables: {
+      user: {
+        columns: {
+          id: { type: 'text', nullable: false },  // Will be canonicalized to 'pg/text@1'
+        },
+      },
+    },
+  },
+});
+```
+
+### Test Port Management
+
+**Issue**: Parallel test execution causes port conflicts when multiple tests use the same hardcoded ports.
+
+**Solution**: Assign unique port ranges to each test suite:
+
+```typescript
+// packages/compat-prisma/test/prisma-client.test.ts
+database = await createDevDatabase({
+  acceleratePort: 54000,
+  databasePort: 54001,
+  shadowDatabasePort: 54002,
+});
+
+// packages/runtime/test/codecs.integration.test.ts
+database = await createDevDatabase({
+  acceleratePort: 54003,  // Different range
+  databasePort: 54004,
+  shadowDatabasePort: 54005,
+});
+```
+
+**Current port assignments:**
+- `compat-prisma`: 54000-54002
+- `codecs.integration.test.ts`: 54003-54005
+- `budgets.integration.test.ts`: 54010-54012
+- `runtime.integration.test.ts`: 53213-53215
+- `marker.test.ts`: 54216-54218
 
 ## 🧪 Testing
 
@@ -222,6 +337,7 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 - **Integration tests**: Spin up Postgres, create tables, execute queries
 - **Test fixtures**: `test/fixtures/contract.json` + `contract.d.ts`
 - **Type assertions**: Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
+- **Type tests**: Use `expectTypeOf` helpers, not manual type checks with conditional types - see `.cursor/rules/vitest-expect-typeof.mdc`
 
 Example type test:
 ```typescript
@@ -243,6 +359,15 @@ test('Plan type inference works', () => {
   type Row = ResultType<typeof plan>;
   expectTypeOf(plan).toExtend<Plan<Row>>();  // Use toExtend, not toMatchTypeOf
 });
+
+// ✅ CORRECT: Use expectTypeOf for type assertions
+test('Type IDs are literal types', () => {
+  type TextTypeId = 'pg/text@1';
+  expectTypeOf<TextTypeId>().toEqualTypeOf<'pg/text@1'>();
+});
+
+// ❌ WRONG: Don't use manual type checks
+// const _check: TextTypeId extends 'pg/text@1' ? true : false = true;
 ```
 
 ## 🚨 Common Pitfalls
@@ -258,9 +383,13 @@ test('Plan type inference works', () => {
 9. **Core is lane-agnostic** - Never create discriminated unions based on `lane` field. The core should not be aware of specific lane implementations.
 10. **Unified Type Identifiers** - Every column `type` must be a fully qualified type ID (`ns/name@version`). Bare scalars are canonicalized during validation. No codec decorations or scalar fallbacks.
 11. **CodecTypes Generic** - Always provide `CodecTypes` as a generic parameter to `sql()` and `schema()` functions. Import from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
-12. **Contract Validation** - Always validate contracts with `validateContract<Contract>(contractJson)` before use. This canonicalizes types and ensures type safety.
+12. **Contract Validation** - Always validate contracts with `validateContract<Contract>(contractJson)` before use. This canonicalizes types and ensures type safety. This includes test fixtures!
 13. **No Backward Compatibility** - Never add backward compatibility code, migration paths, or deprecation warnings. This project has no external consumers - change implementations directly.
 14. **Runtime Agnostic** - The runtime must not contain target-specific logic (e.g., special-case Date handling for specific codec IDs). Use generic codec resolution only.
+15. **Interface-Based APIs** - Export interfaces and factory functions, not classes. Keep implementation classes private. Use `createX()` factory functions instead of `new X()` constructors.
+16. **Type Preservation** - Use mapped types `{ readonly [K in keyof T]: ... }` instead of `Record<string, T>` in generic constraints to preserve literal types. Use `Record<never, never>` for empty defaults, not `{}`.
+17. **Test Port Management** - Assign unique port ranges to each test suite to avoid conflicts during parallel test execution.
+18. **Type Tests** - Use Vitest's `expectTypeOf` helpers instead of manual type checks with conditional types. See `.cursor/rules/vitest-expect-typeof.mdc` for details.
 
 ## 📖 Documentation Location
 
@@ -276,6 +405,9 @@ test('Plan type inference works', () => {
 1. **Unified Type Identifiers** - All column types are now fully qualified type IDs (`ns/name@version`). Bare scalars are canonicalized during validation.
 2. **Simplified Type Inference** - `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` using `CodecTypes[typeId].output`. No fallbacks or scalar mappings.
 3. **Runtime Simplification** - Removed target-specific logic from runtime. Codec resolution uses type IDs directly.
+4. **Interface-Based Design** - Refactored codec system to export interfaces and factory functions (`createCodecRegistry()`, `defineCodecs()`) instead of classes. Implementation classes are private.
+5. **Type Preservation** - Fixed generic type system to preserve literal string types (e.g., `'pg/text@1'`) through mapped types and careful constraints. Removed index signatures from generic parameters.
+6. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
 
 ### Future Work
 
