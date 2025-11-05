@@ -101,9 +101,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: number) => wire,
       });
 
-      const builder = defineCodecs()
-        .add('preserve1', codec1)
-        .add('preserve2', codec2);
+      const builder = defineCodecs().add('preserve1', codec1).add('preserve2', codec2);
 
       expect(builder.codecDefinitions['preserve1']).toBeDefined();
       expect(builder.codecDefinitions['preserve2']).toBeDefined();
@@ -126,9 +124,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: number) => wire,
       });
 
-      const builder = defineCodecs()
-        .add('overwrite', codec1)
-        .add('overwrite', codec2);
+      const builder = defineCodecs().add('overwrite', codec1).add('overwrite', codec2);
 
       expect(builder.codecDefinitions['overwrite']).toBeDefined();
       expect(builder.codecDefinitions['overwrite']!.typeId).toBe('test/overwrite2@1');
@@ -228,10 +224,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: boolean) => wire,
       });
 
-      const builder = defineCodecs()
-        .add('all1', codec1)
-        .add('all2', codec2)
-        .add('all3', codec3);
+      const builder = defineCodecs().add('all1', codec1).add('all2', codec2).add('all3', codec3);
 
       const definitions = builder.codecDefinitions;
       expect(definitions['all1']).toBeDefined();
@@ -293,9 +286,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: number) => wire,
       });
 
-      const builder = defineCodecs()
-        .add('data1', codec1)
-        .add('data2', codec2);
+      const builder = defineCodecs().add('data1', codec1).add('data2', codec2);
 
       expect(builder.dataTypes['data1']).toBe('test/data1@1');
       expect(builder.dataTypes['data2']).toBe('test/data2@1');
@@ -346,9 +337,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: number) => wire,
       });
 
-      const builder = defineCodecs()
-        .add('key1', codec1)
-        .add('key2', codec2);
+      const builder = defineCodecs().add('key1', codec1).add('key2', codec2);
 
       expect(builder.CodecTypes['test/key1@1']).toBeDefined();
       expect(builder.CodecTypes['test/key2@1']).toBeDefined();
@@ -400,9 +389,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: number) => wire,
       });
 
-      const builder = defineCodecs()
-        .add('scalar1', codec1)
-        .add('scalar2', codec2);
+      const builder = defineCodecs().add('scalar1', codec1).add('scalar2', codec2);
 
       expect('scalar1' in builder.ScalarToJs).toBe(true);
       expect('scalar2' in builder.ScalarToJs).toBe(true);
@@ -425,9 +412,7 @@ describe('CodecDefBuilder class', () => {
         decode: (wire: number) => wire,
       });
 
-      const builder = defineCodecs()
-        .add('string', stringCodec)
-        .add('number', numberCodec);
+      const builder = defineCodecs().add('string', stringCodec).add('number', numberCodec);
 
       expect('string' in builder.ScalarToJs).toBe(true);
       expect('number' in builder.ScalarToJs).toBe(true);
@@ -436,4 +421,3 @@ describe('CodecDefBuilder class', () => {
     });
   });
 });
-
