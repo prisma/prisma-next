@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
