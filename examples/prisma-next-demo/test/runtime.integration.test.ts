@@ -26,7 +26,7 @@ beforeAll(async () => {
     targetFamilyRegistry.register(sqlTargetFamilyHook);
   }
 
-  const contractPath = resolve(__dirname, '../contracts/contract.ts');
+  const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
   const adapterPath = resolve(__dirname, '../../../packages/adapter-postgres');
 

@@ -5,7 +5,7 @@
   "scripts": {
     "stamp-marker": "pnpm esr src/prisma/scripts/stamp-marker.ts",
     "start": "pnpm esr src/main.ts",
-    "emit": "prisma-next emit --contract contracts/contract.ts --out src/prisma --adapter ../../packages/adapter-postgres",
+    "emit": "prisma-next emit --contract prisma/contract.ts --out src/prisma --adapter ../../packages/adapter-postgres",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
