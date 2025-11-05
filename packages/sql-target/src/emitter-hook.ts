@@ -251,25 +251,23 @@ export type Relations = Contract['relations'];
       for (const [colName, col] of Object.entries(table.columns)) {
         const nullable = col.nullable ? 'true' : 'false';
         const type = col.type ? `'${col.type}'` : 'string';
-        columns.push(
-          `readonly ${colName}: { readonly type: ${type}; readonly nullable: ${nullable} }`,
-        );
+        columns.push(`readonly ${colName}: { readonly type: ${type}; readonly nullable: ${nullable} }`);
       }
 
       const tableParts: string[] = [`columns: { ${columns.join('; ')} }`];
 
       if (table.primaryKey) {
         const pkCols = table.primaryKey.columns.map((c) => `'${c}'`).join(', ');
-        tableParts.push(
-          `primaryKey: { readonly columns: readonly [${pkCols}]${table.primaryKey.name ? `; readonly name: '${table.primaryKey.name}'` : ''} }`,
-        );
+        const pkName = table.primaryKey.name ? `; readonly name: '${table.primaryKey.name}'` : '';
+        tableParts.push(`primaryKey: { readonly columns: readonly [${pkCols}]${pkName} }`);
       }
 
       if (table.uniques && table.uniques.length > 0) {
         const uniques = table.uniques
           .map((u) => {
             const cols = u.columns.map((c) => `'${c}'`).join(', ');
-            return `{ readonly columns: readonly [${cols}]${u.name ? `; readonly name: '${u.name}'` : ''} }`;
+            const name = u.name ? `; readonly name: '${u.name}'` : '';
+            return `{ readonly columns: readonly [${cols}]${name} }`;
           })
           .join(', ');
         tableParts.push(`uniques: readonly [${uniques}]`);
@@ -279,7 +277,8 @@ export type Relations = Contract['relations'];
         const indexes = table.indexes
           .map((i) => {
             const cols = i.columns.map((c) => `'${c}'`).join(', ');
-            return `{ readonly columns: readonly [${cols}]${i.name ? `; readonly name: '${i.name}'` : ''} }`;
+            const name = i.name ? `; readonly name: '${i.name}'` : '';
+            return `{ readonly columns: readonly [${cols}]${name} }`;
           })
           .join(', ');
         tableParts.push(`indexes: readonly [${indexes}]`);
@@ -290,7 +289,8 @@ export type Relations = Contract['relations'];
           .map((fk) => {
             const cols = fk.columns.map((c) => `'${c}'`).join(', ');
             const refCols = fk.references.columns.map((c) => `'${c}'`).join(', ');
-            return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${fk.name ? `; readonly name: '${fk.name}'` : ''} }`;
+            const name = fk.name ? `; readonly name: '${fk.name}'` : '';
+            return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${name} }`;
           })
           .join(', ');
         tableParts.push(`foreignKeys: readonly [${fks}]`);
