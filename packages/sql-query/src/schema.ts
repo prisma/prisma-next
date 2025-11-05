@@ -1,5 +1,5 @@
 import { planInvalid } from './errors';
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
+import type { SqlContract, SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-target';
 import type {
   BinaryBuilder,
   ColumnBuilder,
@@ -182,22 +182,54 @@ function createTableProxy<
 type ExtractSchemaTables<
   Contract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> = {
-  readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
-    Contract,
-    TableName & string,
-    Contract['storage']['tables'][TableName]['columns'],
-    CodecTypes
-  > &
-    TableRef;
-};
+> = Contract['storage'] extends { tables: infer Tables }
+  ? Tables extends { readonly [K in keyof Tables]: StorageTable }
+    ? {
+        readonly [TableName in keyof Tables]: TableBuilderImpl<
+          Contract,
+          TableName & string,
+          Tables[TableName] extends { columns: infer C }
+            ? C extends Record<string, StorageColumn>
+              ? C
+              : never
+            : never,
+          CodecTypes
+        > &
+          TableRef;
+      }
+    : {
+        readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
+          Contract,
+          TableName & string,
+          Contract['storage']['tables'][TableName] extends { columns: infer C }
+            ? C extends Record<string, StorageColumn>
+              ? C
+              : never
+            : never,
+          CodecTypes
+        > &
+          TableRef;
+      }
+  : {
+      readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
+        Contract,
+        TableName & string,
+        Contract['storage']['tables'][TableName] extends { columns: infer C }
+          ? C extends Record<string, StorageColumn>
+            ? C
+            : never
+          : never,
+        CodecTypes
+      > &
+        TableRef;
+    };
 
-export interface SchemaHandle<
+export type SchemaHandle<
   Contract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> {
+> = {
   readonly tables: ExtractSchemaTables<Contract, CodecTypes>;
-}
+};
 
 export function schema<
   Contract extends SqlContract<SqlStorage>,
@@ -220,7 +252,12 @@ export function schema<
       Contract['storage']['tables'][typeof tableName]['columns'],
       CodecTypes
     >(tableName, columns);
-    const proxiedTable = createTableProxy<Contract, typeof tableName & string, Contract['storage']['tables'][typeof tableName]['columns'], CodecTypes>(table);
+    const proxiedTable = createTableProxy<
+      Contract,
+      typeof tableName & string,
+      Contract['storage']['tables'][typeof tableName]['columns'],
+      CodecTypes
+    >(table);
     (tables as Record<string, unknown>)[tableName] = Object.freeze(
       proxiedTable,
     ) as TableBuilderImpl<
