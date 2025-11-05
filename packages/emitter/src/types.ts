@@ -40,11 +40,10 @@ export interface EmitOptions {
   readonly adapterId?: string;
   readonly adapterPath?: string;
   readonly extensionPackPaths?: ReadonlyArray<string>;
-  readonly writeFiles?: boolean;
 }
 
 export interface EmitResult {
-  readonly contractJson: Record<string, unknown>;
+  readonly contractJson: string;
   readonly contractDts: string;
   readonly coreHash: string;
   readonly profileHash?: string;

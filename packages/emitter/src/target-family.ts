@@ -3,7 +3,7 @@ import type { ContractIR, ExtensionPack, ExtensionPackManifest, TypesImportSpec 
 export interface TargetFamilyHook {
   readonly id: string;
 
-  canonicalizeType(input: string, packManifests: ReadonlyArray<ExtensionPackManifest>): string;
+  validateTypes(ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>): void;
 
   validateStructure(ir: ContractIR): void;
 
@@ -11,4 +11,3 @@ export interface TargetFamilyHook {
 
   getTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec>;
 }
-

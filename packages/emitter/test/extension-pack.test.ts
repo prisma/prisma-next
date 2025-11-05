@@ -4,7 +4,6 @@ import { join } from 'node:path';
 
 describe('extension-pack', () => {
   it('loads valid manifest', () => {
-    const manifestPath = join(__dirname, '../../adapter-postgres/packs/manifest.json');
     const manifest = loadExtensionPackManifest(join(__dirname, '../../adapter-postgres'));
     expect(manifest.id).toBe('postgres');
     expect(manifest.version).toBe('15.0.0');
@@ -17,7 +16,7 @@ describe('extension-pack', () => {
       [],
     );
     expect(packs.length).toBe(1);
-    expect(packs[0].manifest.id).toBe('postgres');
+    expect(packs[0]?.manifest.id).toBe('postgres');
   });
 
   it('throws error for invalid manifest', () => {

@@ -6,7 +6,7 @@ describe('target-family-registry', () => {
   it('registers and retrieves hooks', () => {
     const mockHook: TargetFamilyHook = {
       id: 'test',
-      canonicalizeType: () => 'test',
+      validateTypes: () => {},
       validateStructure: () => {},
       generateContractTypes: () => '',
       getTypesImports: () => [],
@@ -20,7 +20,7 @@ describe('target-family-registry', () => {
   it('throws error for duplicate registration', () => {
     const mockHook: TargetFamilyHook = {
       id: 'duplicate',
-      canonicalizeType: () => 'test',
+      validateTypes: () => {},
       validateStructure: () => {},
       generateContractTypes: () => '',
       getTypesImports: () => [],

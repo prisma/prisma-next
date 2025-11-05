@@ -151,7 +151,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@24.7.2)
+        version: 2.1.9(@types/node@20.19.24)
 
   packages/compat-prisma:
     dependencies:
@@ -188,7 +188,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@24.7.2)
+        version: 2.1.9(@types/node@20.19.24)
 
   packages/contract:
     devDependencies:
@@ -228,7 +228,29 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@24.7.2)
+        version: 2.1.9(@types/node@20.19.24)
+
+  packages/emitter:
+    dependencies:
+      arktype:
+        specifier: ^2.0.0
+        version: 2.1.25
+    devDependencies:
+      '@prisma-next/sql-target':
+        specifier: workspace:*
+        version: link:../sql-target
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.24
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
 
   packages/runtime:
     dependencies:
@@ -259,7 +281,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@24.7.2)
+        version: 2.1.9(@types/node@20.19.24)
 
   packages/sql:
     dependencies:
@@ -284,9 +306,16 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@24.7.2)
+        version: 2.1.9(@types/node@20.19.24)
 
   packages/sql-target:
+    dependencies:
+      '@prisma-next/emitter':
+        specifier: workspace:*
+        version: link:../emitter
+      '@prisma-next/sql':
+        specifier: workspace:*
+        version: link:../sql
     devDependencies:
       ts-toolbelt:
         specifier: ^9.6.0
@@ -299,7 +328,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@24.7.2)
+        version: 2.1.9(@types/node@20.19.24)
 
 packages:
 
@@ -3263,6 +3292,14 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 1.2.0
 
+  '@vitest/mocker@2.1.9(vite@5.4.20(@types/node@20.19.24))':
+    dependencies:
+      '@vitest/spy': 2.1.9
+      estree-walker: 3.0.3
+      magic-string: 0.30.19
+    optionalDependencies:
+      vite: 5.4.20(@types/node@20.19.24)
+
   '@vitest/mocker@2.1.9(vite@5.4.20(@types/node@24.7.2))':
     dependencies:
       '@vitest/spy': 2.1.9
@@ -4636,6 +4673,24 @@ snapshots:
       - supports-color
       - terser
 
+  vite-node@2.1.9(@types/node@20.19.24):
+    dependencies:
+      cac: 6.7.14
+      debug: 4.4.3
+      es-module-lexer: 1.7.0
+      pathe: 1.1.2
+      vite: 5.4.20(@types/node@20.19.24)
+    transitivePeerDependencies:
+      - '@types/node'
+      - less
+      - lightningcss
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+
   vite-node@2.1.9(@types/node@24.7.2):
     dependencies:
       cac: 6.7.14
@@ -4710,6 +4765,41 @@ snapshots:
     transitivePeerDependencies:
       - less
       - lightningcss
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+
+  vitest@2.1.9(@types/node@20.19.24):
+    dependencies:
+      '@vitest/expect': 2.1.9
+      '@vitest/mocker': 2.1.9(vite@5.4.20(@types/node@20.19.24))
+      '@vitest/pretty-format': 2.1.9
+      '@vitest/runner': 2.1.9
+      '@vitest/snapshot': 2.1.9
+      '@vitest/spy': 2.1.9
+      '@vitest/utils': 2.1.9
+      chai: 5.3.3
+      debug: 4.4.3
+      expect-type: 1.2.2
+      magic-string: 0.30.19
+      pathe: 1.1.2
+      std-env: 3.9.0
+      tinybench: 2.9.0
+      tinyexec: 0.3.2
+      tinypool: 1.1.1
+      tinyrainbow: 1.2.0
+      vite: 5.4.20(@types/node@20.19.24)
+      vite-node: 2.1.9(@types/node@20.19.24)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 20.19.24
+    transitivePeerDependencies:
+      - less
+      - lightningcss
+      - msw
       - sass
       - sass-embedded
       - stylus

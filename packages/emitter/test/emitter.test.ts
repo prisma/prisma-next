@@ -1,16 +1,73 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { emit } from '../src/emitter';
 import { targetFamilyRegistry } from '../src/target-family-registry';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
-import type { ContractIR, EmitOptions } from '../src/types';
+import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
+import type { TargetFamilyHook } from '../src/target-family';
 import { join } from 'node:path';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+
+const mockSqlHook: TargetFamilyHook = {
+  id: 'sql',
+  validateTypes: (ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>) => {
+    const storage = ir.storage as { tables?: Record<string, { columns?: Record<string, { type?: string }> }> } | undefined;
+    if (!storage?.tables) {
+      return;
+    }
+
+    const packNamespaces = new Set(packManifests.map((p) => p.id));
+    const referencedNamespaces = new Set<string>();
+    const extensions = ir.extensions as Record<string, unknown> | undefined;
+    if (extensions) {
+      for (const namespace of Object.keys(extensions)) {
+        referencedNamespaces.add(namespace);
+      }
+    }
+
+    const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
+
+    for (const [tableName, table] of Object.entries(storage.tables)) {
+      if (!table.columns) continue;
+      for (const [colName, col] of Object.entries(table.columns)) {
+        if (!col.type) {
+          throw new Error(`Column "${colName}" in table "${tableName}" is missing type`);
+        }
+
+        if (!typeIdRegex.test(col.type)) {
+          throw new Error(
+            `Column "${colName}" in table "${tableName}" has invalid type ID format "${col.type}". Expected format: ns/name@version`,
+          );
+        }
+
+        const match = col.type.match(typeIdRegex);
+        if (match && match[1]) {
+          const namespace = match[1];
+          if (!referencedNamespaces.has(namespace) && !packNamespaces.has(namespace)) {
+            throw new Error(
+              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions or available in loaded packs`,
+            );
+          }
+        }
+      }
+    }
+  },
+  validateStructure: (ir: ContractIR) => {
+    if (ir.targetFamily !== 'sql') {
+      throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
+    }
+  },
+  generateContractTypes: () => {
+    return `// Generated contract types
+export type CodecTypes = Record<string, never>;
+export type LaneCodecTypes = CodecTypes;
+export type Contract = unknown;
+`;
+  },
+  getTypesImports: () => [],
+};
 
 describe('emitter', () => {
   beforeEach(() => {
     if (!targetFamilyRegistry.has('sql')) {
-      targetFamilyRegistry.register(sqlTargetFamilyHook);
+      targetFamilyRegistry.register(mockSqlHook);
     }
   });
 
@@ -19,6 +76,11 @@ describe('emitter', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
+      extensions: {
+        postgres: {
+          version: '15.0.0',
+        },
+      },
       models: {
         User: {
           storage: { table: 'user' },
@@ -32,8 +94,8 @@ describe('emitter', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'int4', nullable: false },
-              email: { type: 'text', nullable: false },
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
           },
@@ -41,34 +103,31 @@ describe('emitter', () => {
       },
     };
 
-    const tempDir = await mkdtemp(join(tmpdir(), 'emitter-test-'));
     const options: EmitOptions = {
-      outputDir: tempDir,
+      outputDir: '',
       adapterPath: join(__dirname, '../../adapter-postgres'),
-      writeFiles: true,
     };
 
-    try {
-      const result = await emit(ir, options);
-      expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-      expect(result.contractDts).toContain('export type Contract');
-      expect(result.contractDts).toContain('CodecTypes');
-    } finally {
-      await rm(tempDir, { recursive: true, force: true });
-    }
+    const result = await emit(ir, options);
+    expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(result.contractDts).toContain('export type Contract');
+    expect(result.contractDts).toContain('CodecTypes');
+
+    const contractJson = JSON.parse(result.contractJson);
+    expect(contractJson.storage.tables.user.columns.id.type).toBe('pg/int4@1');
+    expect(contractJson.storage.tables.user.columns.email.type).toBe('pg/text@1');
   });
 
-  it('canonicalizes bare scalars to typeIds', async () => {
+  it('validates type IDs come from referenced extensions', async () => {
     const ir: ContractIR = {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      models: {},
       storage: {
         tables: {
           user: {
             columns: {
-              id: { type: 'int4', nullable: false },
+              id: { type: 'unknown/type@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
           },
@@ -76,20 +135,37 @@ describe('emitter', () => {
       },
     };
 
-    const tempDir = await mkdtemp(join(tmpdir(), 'emitter-test-'));
     const options: EmitOptions = {
-      outputDir: tempDir,
+      outputDir: '',
       adapterPath: join(__dirname, '../../adapter-postgres'),
-      writeFiles: true,
     };
 
-    try {
-      const result = await emit(ir, options);
-      const storage = result.contractJson.storage as { tables: { user: { columns: { id: { type: string } } } } };
-      expect(storage.tables.user.columns.id.type).toBe('pg/int4@1');
-    } finally {
-      await rm(tempDir, { recursive: true, force: true });
-    }
+    await expect(emit(ir, options)).rejects.toThrow();
+  });
+
+  it('validates type ID format', async () => {
+    const ir: ContractIR = {
+      schemaVersion: '1',
+      targetFamily: 'sql',
+      target: 'postgres',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'invalid-format', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+          },
+        },
+      },
+    };
+
+    const options: EmitOptions = {
+      outputDir: '',
+      adapterPath: join(__dirname, '../../adapter-postgres'),
+    };
+
+    await expect(emit(ir, options)).rejects.toThrow('invalid type ID format');
   });
 });
 

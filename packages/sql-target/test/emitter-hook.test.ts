@@ -3,40 +3,118 @@ import { sqlTargetFamilyHook } from '../src/emitter-hook';
 import type { ContractIR, ExtensionPackManifest } from '@prisma-next/emitter';
 
 describe('sql-target-family-hook', () => {
-  it('canonicalizes bare scalars', () => {
-    const manifests: ExtensionPackManifest[] = [
-      {
-        id: 'postgres',
-        version: '1.0.0',
-        types: {
-          canonicalScalarMap: {
-            int4: 'pg/int4@1',
-            text: 'pg/text@1',
+  it('validates types from referenced extensions', () => {
+    const ir: ContractIR = {
+      targetFamily: 'sql',
+      target: 'test-db',
+      extensions: {
+        postgres: {
+          version: '15.0.0',
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
           },
         },
       },
+    };
+
+    const manifests: ExtensionPackManifest[] = [
+      {
+        id: 'postgres',
+        version: '15.0.0',
+      },
     ];
 
-    expect(sqlTargetFamilyHook.canonicalizeType('int4', manifests)).toBe('pg/int4@1');
-    expect(sqlTargetFamilyHook.canonicalizeType('text', manifests)).toBe('pg/text@1');
-  });
-
-  it('passes through typeIds', () => {
-    const manifests: ExtensionPackManifest[] = [];
-    expect(sqlTargetFamilyHook.canonicalizeType('pg/int4@1', manifests)).toBe('pg/int4@1');
-  });
-
-  it('throws error for unknown scalar', () => {
-    const manifests: ExtensionPackManifest[] = [];
     expect(() => {
-      sqlTargetFamilyHook.canonicalizeType('unknown', manifests);
+      sqlTargetFamilyHook.validateTypes(ir, manifests);
+    }).not.toThrow();
+  });
+
+  it('throws error for type ID from unreferenced extension', () => {
+    const ir: ContractIR = {
+      targetFamily: 'sql',
+      target: 'test-db',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'unknown/type@1', nullable: false },
+            },
+          },
+        },
+      },
+    };
+
+    const manifests: ExtensionPackManifest[] = [
+      {
+        id: 'postgres',
+        version: '15.0.0',
+      },
+    ];
+
+    expect(() => {
+      sqlTargetFamilyHook.validateTypes(ir, manifests);
     }).toThrow();
+  });
+
+  it('throws error for invalid type ID format', () => {
+    const ir: ContractIR = {
+      targetFamily: 'sql',
+      target: 'test-db',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'invalid-format', nullable: false },
+            },
+          },
+        },
+      },
+    };
+
+    const manifests: ExtensionPackManifest[] = [];
+
+    expect(() => {
+      sqlTargetFamilyHook.validateTypes(ir, manifests);
+    }).toThrow('invalid type ID format');
+  });
+
+  it('validates types from loaded packs even if not in extensions', () => {
+    const ir: ContractIR = {
+      targetFamily: 'sql',
+      target: 'test-db',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'postgres/int4@1', nullable: false },
+            },
+          },
+        },
+      },
+    };
+
+    const manifests: ExtensionPackManifest[] = [
+      {
+        id: 'postgres',
+        version: '15.0.0',
+      },
+    ];
+
+    expect(() => {
+      sqlTargetFamilyHook.validateTypes(ir, manifests);
+    }).not.toThrow();
   });
 
   it('validates SQL structure', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
-      target: 'postgres',
+      target: 'test-db',
       models: {
         User: {
           storage: { table: 'user' },
@@ -49,7 +127,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { type: 'sql/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
           },
@@ -65,7 +143,7 @@ describe('sql-target-family-hook', () => {
   it('throws error for invalid structure', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
-      target: 'postgres',
+      target: 'test-db',
       models: {
         User: {
           storage: { table: 'nonexistent' },
@@ -89,7 +167,7 @@ describe('sql-target-family-hook', () => {
   it('generates contract types', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
-      target: 'postgres',
+      target: 'test-db',
       models: {
         User: {
           storage: { table: 'user' },
@@ -102,7 +180,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { type: 'sql/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
           },
@@ -119,14 +197,14 @@ describe('sql-target-family-hook', () => {
     const packs = [
       {
         manifest: {
-          id: 'postgres',
+          id: 'test-adapter',
           version: '1.0.0',
           types: {
             codecTypes: {
               import: {
-                package: '@prisma-next/adapter-postgres/codec-types',
+                package: '@test/adapter/codec-types',
                 named: 'CodecTypes',
-                alias: 'PgTypes',
+                alias: 'TestTypes',
               },
             },
           },
@@ -137,9 +215,8 @@ describe('sql-target-family-hook', () => {
 
     const imports = sqlTargetFamilyHook.getTypesImports(packs);
     expect(imports.length).toBe(1);
-    expect(imports[0].package).toBe('@prisma-next/adapter-postgres/codec-types');
-    expect(imports[0].named).toBe('CodecTypes');
-    expect(imports[0].alias).toBe('PgTypes');
+    expect(imports[0]?.package).toBe('@test/adapter/codec-types');
+    expect(imports[0]?.named).toBe('CodecTypes');
+    expect(imports[0]?.alias).toBe('TestTypes');
   });
 });
-

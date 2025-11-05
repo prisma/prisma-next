@@ -30,14 +30,14 @@ function computeHash(content: string): string {
 
 export function computeCoreHash(contract: Record<string, unknown>): string {
   const coreContract = {
-    schemaVersion: contract.schemaVersion,
-    targetFamily: contract.targetFamily,
-    target: contract.target,
-    models: contract.models,
-    relations: contract.relations,
-    storage: contract.storage,
-    extensions: contract.extensions,
-    sources: contract.sources,
+    schemaVersion: contract['schemaVersion'],
+    targetFamily: contract['targetFamily'],
+    target: contract['target'],
+    models: contract['models'],
+    relations: contract['relations'],
+    storage: contract['storage'],
+    extensions: contract['extensions'],
+    sources: contract['sources'],
   };
   const canonical = canonicalizeJson(coreContract);
   return computeHash(canonical);
@@ -45,10 +45,10 @@ export function computeCoreHash(contract: Record<string, unknown>): string {
 
 export function computeProfileHash(contract: Record<string, unknown>): string {
   const profileContract = {
-    schemaVersion: contract.schemaVersion,
-    targetFamily: contract.targetFamily,
-    target: contract.target,
-    capabilities: contract.capabilities,
+    schemaVersion: contract['schemaVersion'],
+    targetFamily: contract['targetFamily'],
+    target: contract['target'],
+    capabilities: contract['capabilities'],
   };
   const canonical = canonicalizeJson(profileContract);
   return computeHash(canonical);

@@ -14,21 +14,57 @@ import type {
 export const sqlTargetFamilyHook = {
   id: 'sql',
 
-  canonicalizeType(input: string, packManifests: ReadonlyArray<ExtensionPackManifest>): string {
-    if (input.includes('/') && input.includes('@')) {
-      return input;
+  validateTypes(ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>): void {
+    const storage = ir.storage as SqlStorage | undefined;
+    if (!storage || !storage.tables) {
+      return;
     }
 
-    for (const pack of packManifests) {
-      const scalarMap = pack.types?.canonicalScalarMap;
-      if (scalarMap && scalarMap[input]) {
-        return scalarMap[input];
+    const referencedNamespaces = new Set<string>();
+    const extensions = ir.extensions as Record<string, unknown> | undefined;
+    if (extensions) {
+      for (const namespace of Object.keys(extensions)) {
+        referencedNamespaces.add(namespace);
       }
     }
 
-    throw new Error(
-      `Unknown scalar type "${input}". Expected a known scalar or a fully qualified type ID (ns/name@version).`,
-    );
+    const packNamespaces = new Set<string>();
+    for (const pack of packManifests) {
+      packNamespaces.add(pack.id);
+    }
+
+    const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
+
+    const usedTypeIds = new Set<string>();
+    for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
+      const table = tableUnknown as StorageTable;
+      for (const [colName, colUnknown] of Object.entries(table.columns)) {
+        const col = colUnknown as { type?: string; nullable?: boolean };
+        if (!col.type) {
+          throw new Error(`Column "${colName}" in table "${tableName}" is missing type`);
+        }
+
+        if (!typeIdRegex.test(col.type)) {
+          throw new Error(
+            `Column "${colName}" in table "${tableName}" has invalid type ID format "${col.type}". Expected format: ns/name@version`,
+          );
+        }
+
+        usedTypeIds.add(col.type);
+
+        const match = col.type.match(typeIdRegex);
+        if (!match || !match[1]) {
+          continue;
+        }
+
+        const namespace = match[1];
+        if (!referencedNamespaces.has(namespace) && !packNamespaces.has(namespace)) {
+          throw new Error(
+            `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions or available in loaded packs`,
+          );
+        }
+      }
+    }
   },
 
   validateStructure(ir: ContractIR): void {
@@ -177,7 +213,7 @@ export const sqlTargetFamilyHook = {
     const models = ir.models as Record<string, ModelDefinition>;
 
     const storageType = this.generateStorageType(storage);
-    const modelsType = this.generateModelsType(models);
+    const modelsType = this.generateModelsType(models, storage);
     const relationsType = this.generateRelationsType(models);
     const mappingsType = this.generateMappingsType(models, storage);
 
@@ -271,7 +307,7 @@ export type Relations = Contract['relations'];
     return `{ readonly tables: { ${tables.join('; ')} } }`;
   },
 
-  generateModelsType(models: Record<string, ModelDefinition> | undefined): string {
+  generateModelsType(models: Record<string, ModelDefinition> | undefined, storage: SqlStorage): string {
     if (!models) {
       return 'Record<string, never>';
     }
@@ -279,11 +315,31 @@ export type Relations = Contract['relations'];
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models)) {
       const fields: string[] = [];
-      for (const [fieldName, field] of Object.entries(model.fields)) {
-        fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+      const tableName = model.storage.table;
+      const table = storage.tables[tableName];
+      
+      if (table) {
+        for (const [fieldName, field] of Object.entries(model.fields)) {
+          const column = table.columns[field.column];
+          if (!column) {
+            fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+            continue;
+          }
+
+          const typeId = column.type || 'string';
+          const nullable = column.nullable ?? false;
+          const jsType = nullable 
+            ? `CodecTypes['${typeId}']['output'] | null`
+            : `CodecTypes['${typeId}']['output']`;
+          
+          fields.push(`readonly ${fieldName}: ${jsType}`);
+        }
+      } else {
+        for (const [fieldName, field] of Object.entries(model.fields)) {
+          fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+        }
       }
 
-      const tableName = model.storage.table;
       const relations: string[] = [];
       if (model.relations) {
         for (const [relName, rel] of Object.entries(model.relations)) {

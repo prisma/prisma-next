@@ -1,61 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { targetFamilyRegistry } from './target-family-registry';
 import { loadExtensionPacks } from './extension-pack';
 import { computeCoreHash, computeProfileHash } from './hashing';
 import type { ContractIR, EmitOptions, EmitResult } from './types';
-import type { TargetFamilyHook } from './target-family';
-
-function canonicalizeStorageTypes(
-  ir: ContractIR,
-  hook: TargetFamilyHook,
-  packManifests: ReadonlyArray<{ types?: { canonicalScalarMap?: Record<string, string> } }>,
-): ContractIR {
-  if (!ir.storage || typeof ir.storage !== 'object') {
-    return ir;
-  }
-
-  const storage = ir.storage as Record<string, Record<string, { type?: string; nullable?: boolean }>>;
-
-  if (!storage.tables) {
-    return ir;
-  }
-
-  const canonicalizedStorage = { ...storage };
-  const canonicalizedTables: Record<string, Record<string, { type?: string; nullable?: boolean }>> = {};
-
-  for (const [tableName, table] of Object.entries(storage.tables)) {
-    if (!table.columns) {
-      canonicalizedTables[tableName] = table;
-      continue;
-    }
-
-    const canonicalizedColumns: Record<string, { type?: string; nullable?: boolean }> = {};
-    for (const [colName, col] of Object.entries(table.columns)) {
-      if (col.type) {
-        const canonicalizedType = hook.canonicalizeType(col.type, packManifests);
-        canonicalizedColumns[colName] = {
-          ...col,
-          type: canonicalizedType,
-        };
-      } else {
-        canonicalizedColumns[colName] = col;
-      }
-    }
-
-    canonicalizedTables[tableName] = {
-      ...table,
-      columns: canonicalizedColumns,
-    };
-  }
-
-  canonicalizedStorage.tables = canonicalizedTables;
-
-  return {
-    ...ir,
-    storage: canonicalizedStorage,
-  };
-}
 
 function validateCoreStructure(ir: ContractIR): void {
   if (!ir.targetFamily) {
@@ -66,13 +12,21 @@ function validateCoreStructure(ir: ContractIR): void {
   }
 }
 
+function validateExtensions(ir: ContractIR, adapterId: string | undefined): void {
+  const extensions = ir.extensions as Record<string, unknown> | undefined;
+  if (!extensions) {
+    return;
+  }
+
+  if (adapterId && !extensions[adapterId]) {
+    throw new Error(
+      `Adapter "${adapterId}" (identified by contract.target "${ir.target}") must appear as first extension in contract.extensions.${adapterId}`,
+    );
+  }
+}
+
 export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitResult> {
-  const {
-    outputDir,
-    adapterPath,
-    extensionPackPaths = [],
-    writeFiles = true,
-  } = options;
+  const { adapterPath, extensionPackPaths = [] } = options;
 
   const packs = loadExtensionPacks(adapterPath, extensionPackPaths);
   const packManifests = packs.map((p) => p.manifest);
@@ -81,21 +35,23 @@ export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitRe
 
   validateCoreStructure(ir);
 
-  const canonicalizedIr = canonicalizeStorageTypes(ir, hook, packManifests);
+  hook.validateTypes(ir, packManifests);
 
-  hook.validateStructure(canonicalizedIr);
+  hook.validateStructure(ir);
+
+  validateExtensions(ir, adapterPath ? packs[0]?.manifest.id : undefined);
 
   const contractJson = {
-    schemaVersion: canonicalizedIr.schemaVersion || '1',
-    targetFamily: canonicalizedIr.targetFamily,
-    target: canonicalizedIr.target,
-    models: canonicalizedIr.models || {},
-    relations: canonicalizedIr.relations || {},
-    storage: canonicalizedIr.storage || {},
-    extensions: canonicalizedIr.extensions || {},
-    capabilities: canonicalizedIr.capabilities || {},
-    meta: canonicalizedIr.meta || {},
-    sources: canonicalizedIr.sources || {},
+    schemaVersion: ir.schemaVersion || '1',
+    targetFamily: ir.targetFamily,
+    target: ir.target,
+    models: ir.models || {},
+    relations: ir.relations || {},
+    storage: ir.storage || {},
+    extensions: ir.extensions || {},
+    capabilities: ir.capabilities || {},
+    meta: ir.meta || {},
+    sources: ir.sources || {},
   } as const;
 
   const coreHash = computeCoreHash(contractJson);
@@ -107,22 +63,14 @@ export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitRe
     ...(profileHash ? { profileHash } : {}),
   };
 
-  const contractDts = hook.generateContractTypes(canonicalizedIr, packs);
+  const contractDts = hook.generateContractTypes(ir, packs);
 
-  if (writeFiles) {
-    await mkdir(outputDir, { recursive: true });
-    const contractJsonPath = join(outputDir, 'contract.json');
-    const contractDtsPath = join(outputDir, 'contract.d.ts');
-
-    await writeFile(contractJsonPath, JSON.stringify(contractWithHashes, null, 2) + '\n', 'utf-8');
-    await writeFile(contractDtsPath, contractDts, 'utf-8');
-  }
+  const contractJsonString = JSON.stringify(contractWithHashes, null, 2) + '\n';
 
   return {
-    contractJson: contractWithHashes,
+    contractJson: contractJsonString,
     contractDts,
     coreHash,
     profileHash,
   };
 }
-
