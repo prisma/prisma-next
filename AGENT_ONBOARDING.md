@@ -126,7 +126,7 @@ SqlContract<
 ### Query DSL Pattern
 
 ```typescript
-import { sql, schema, makeT } from '@prisma-next/sql-query/sql';
+import { sql, schema, makeT, param } from '@prisma-next/sql-query/sql';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import contractJson from './contract.json' assert { type: 'json' };
 import type { Contract, CodecTypes } from './contract.d';
@@ -135,16 +135,30 @@ const contract = validateContract<Contract>(contractJson);
 const t = makeT<Contract, CodecTypes>(contract);  // Table/column accessor: t.user.id
 const tables = schema<Contract, CodecTypes>(contract).tables;  // Table builders
 
-// Builder methods return new instances - chain them properly
+// Basic query with where clause
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
   .where(t.user.id.eq(param('userId')))
   .select({ id: t.user.id, email: t.user.email })
   .limit(10)
-  .build();  // Returns immutable Plan
+  .build({ params: { userId: 42 } });  // Returns immutable Plan
+
+// Query with join
+const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(tables.user)
+  .innerJoin(tables.post, (on) => on.eqCol(t.user.id, t.post.userId))
+  .where(t.user.active.eq(param('active')))
+  .select({
+    userId: t.user.id,
+    email: t.user.email,
+    postId: t.post.id,
+    title: t.post.title,
+  })
+  .build({ params: { active: true } });
 
 // Extract row type from plan
 type UserRow = ResultType<typeof plan>;
+type JoinedRow = ResultType<typeof joinedPlan>;
 ```
 
 **Key points:**
@@ -186,9 +200,11 @@ type UserRow = ResultType<typeof plan>;
   }
   ```
 - **Core is lane-agnostic** - Never use discriminated unions based on `lane` field. The `lane` field is metadata only, not for type narrowing. Use optional fields (`ast?`) to distinguish capabilities.
-- **Plans include metadata**: `{ ast?, params, meta: { refs?, projection?, target, coreHash, lane } }`
+- **Plans include metadata**: `{ ast?, params, meta: { refs?, projection?, projectionTypes?, target, targetFamily?, coreHash, profileHash?, lane, annotations?, paramDescriptors } }`
 - **Plans are hashable** - Enable verification and caching
 - **Extract row types**: Use `ResultType<typeof plan>` to get the inferred row type from a plan
+
+**Note**: ADR 011 may reference fields like `createdAt` in the Plan meta structure, but the current implementation's `PlanMeta` interface does not include this field. The actual `PlanMeta` structure matches the implementation in `packages/sql-query/src/types.ts`.
 
 ## 🛠️ Development Conventions
 
@@ -616,6 +632,111 @@ test('Type IDs are literal types', () => {
 - **Briefs**: `docs/briefs/` (implementation slices)
 - **Workspace Rules**: `.cursor/rules/` (Arktype usage, architecture guidance)
 
+## 📊 Current Projection System State
+
+This section describes the current state of the projection system, which is needed for implementing nested projection shaping (Slice 6).
+
+### Current Implementation
+
+**Type Inference:**
+- `InferProjectionRow<P extends Record<string, ColumnBuilder>>` only supports flat projections
+- Maps `Record<string, ColumnBuilder>` to `Record<string, JsType>` by extracting pre-computed `JsType` from each `ColumnBuilder`
+- Located in `packages/sql-query/src/types.ts`
+
+**Projection Building:**
+- `buildProjectionState()` function accepts `Record<string, ColumnBuilder>` (flat only)
+- Returns `ProjectionState` with flat `aliases: string[]` and `columns: ColumnBuilder[]` arrays
+- Located in `packages/sql-query/src/sql.ts`
+- Validates that all projection values are `ColumnBuilder` instances
+
+**Aliasing:**
+- Simple 1:1 mapping from projection key to SQL alias
+- No collision detection for nested paths
+- Aliases are used directly in AST `project` array: `{ alias: string; expr: ColumnRef }[]`
+
+**Plan Meta:**
+- `meta.projection`: `Record<string, string>` mapping alias → `table.column`
+- `meta.projectionTypes`: `Record<string, string>` mapping alias → type ID (fully qualified `ns/name@version`)
+- `meta.annotations.codecs`: `Record<string, string>` mapping alias → type ID
+- All built from flat projection aliases
+
+**Joins:**
+- Joins are already implemented (Slice 5 complete)
+- Supports `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()` with `on.eqCol(left, right)` pattern
+- Join columns are available for selection in projections
+- Result typing is derived solely from projection, unaffected by joins
+
+### What Needs to Change for Nested Projections
+
+**Type Inference:**
+- Extend `InferProjectionRow` to support recursive nested objects: `Record<string, ColumnBuilder | NestedProjection>`
+- `NestedProjection` would be `Record<string, ColumnBuilder | NestedProjection>` (recursive)
+- Leaf types use `ComputeColumnJsType` via `CodecTypes[typeId].output`, preserving nullability
+
+**Alias Generation:**
+- Implement deterministic alias generator for nested paths
+- Options: dotted paths (`post.title`) or flattened paths (`post_title`)
+- Must guard against collisions and throw `PLAN.INVALID` on collision
+- Need reversible map for meta (if using flattened paths)
+
+**Projection Building:**
+- Extend `buildProjectionState()` to accept nested objects
+- Flatten nested projection to flat `{ alias, expr: ColumnRef }[]` at AST generation time
+- Update `meta.projection`, `meta.projectionTypes`, and `meta.annotations.codecs` to use generated aliases
+
+**AST:**
+- `SelectAst.project` remains flat array: `ReadonlyArray<{ alias: string; expr: ColumnRef }>`
+- Builder flattens nested projection into this flat structure
+
+**Runtime:**
+- Runtime remains flat (no nested row materialization in MVP)
+- Returns flat JS objects keyed by aliases
+- Type system provides nested shape via `ResultType<typeof plan>`
+
+See `docs/briefs/06-SQL-Lane-Nested-Projection-Shaping.md` for the full implementation brief.
+
+## 🧪 Test Coverage
+
+### Coverage Goals
+
+- **Target**: 90-100% coverage for all packages
+- **Priority**: Focus on packages first, examples can be lower priority
+- **Strategy**: Use vitest with v8 provider for coverage collection
+
+### Coverage Commands
+
+**Check Coverage:**
+- `pnpm test:coverage:packages` - Run tests with coverage for all packages (excludes examples)
+- `pnpm --filter <package-name> test:coverage` - Run tests with coverage for a specific package
+- `pnpm test:coverage` - Run tests with coverage for all packages including examples
+
+**Examples:**
+```bash
+# Check coverage for all packages
+pnpm test:coverage:packages
+
+# Check coverage for a specific package
+pnpm --filter @prisma-next/sql-query test:coverage
+
+# Check coverage for all packages including examples
+pnpm test:coverage
+```
+
+### Coverage Configuration
+
+- **Provider**: Vitest with v8 provider (`@vitest/coverage-v8`)
+- **Exclusions**: `dist/**`, `test/**`, `**/*.test.ts`, `**/*.test-d.ts`, `**/*.config.ts`, `**/exports/**`
+- **Reporters**: text, json, html
+- **Configuration**: Per-package `vitest.config.ts` files
+
+### Coverage Strategy
+
+1. **Identify gaps**: Run coverage reports to find untested code paths
+2. **Prioritize critical paths**: Focus on core functionality first (contract validation, query building, runtime execution)
+3. **Add integration tests**: Ensure end-to-end flows are covered
+4. **Type tests**: Use `.test-d.ts` files for type-level testing (doesn't affect coverage but ensures type safety)
+5. **Edge cases**: Test error conditions, boundary cases, and invalid inputs
+
 ## 🎯 What to Work On Next
 
 ### Recent Implementation (Completed)
@@ -669,13 +790,29 @@ const contract = validateContract<Contract>(contractJson);
 
 **Create a query:**
 ```typescript
+import { sql, schema, param } from '@prisma-next/sql-query/sql';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
 const tables = schema<Contract, CodecTypes>(contract).tables;
+const t = makeT<Contract, CodecTypes>(contract);
+
+// Basic query
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .select({ id: tables.user.columns.id })
+  .select({ id: t.user.id, email: t.user.email })
   .build();
+
+// Query with join
+const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(tables.user)
+  .innerJoin(tables.post, (on) => on.eqCol(t.user.id, t.post.userId))
+  .where(t.user.active.eq(param('active')))
+  .select({
+    userId: t.user.id,
+    postId: t.post.id,
+    title: t.post.title,
+  })
+  .build({ params: { active: true } });
 ```
 
 **Emit a contract:**
@@ -712,10 +849,23 @@ import type { ResultType } from '@prisma-next/sql-query/types';
 
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
+  .select({ id: t.user.id, email: t.user.email })
   .build();
 
 type UserRow = ResultType<typeof plan>;  // Inferred type: { id: number; email: string }
+
+// With joins
+const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(tables.user)
+  .innerJoin(tables.post, (on) => on.eqCol(t.user.id, t.post.userId))
+  .select({
+    userId: t.user.id,
+    postId: t.post.id,
+    title: t.post.title,
+  })
+  .build();
+
+type JoinedRow = ResultType<typeof joinedPlan>;  // { userId: number; postId: number; title: string }
 ```
 
 **Contract column types:**
