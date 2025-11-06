@@ -407,6 +407,19 @@ pnpm typecheck
 
 Integration tests spin up PostgreSQL, create tables, execute type-safe queries, and verify return types and error handling.
 
+## CI/CD
+
+The repository uses GitHub Actions for continuous integration. The workflow runs on every push and pull request and includes:
+
+- **Type checking** - TypeScript type checking for all packages and examples
+- **Linting** - ESLint validation for all packages and examples
+- **Build** - Builds all packages
+- **Tests** - Runs unit and integration tests (requires Postgres)
+- **E2E Tests** - Runs end-to-end tests (requires Postgres)
+- **Coverage** - Generates and reports test coverage (requires Postgres)
+
+All jobs run in parallel where possible for faster feedback. See `.github/workflows/ci.yml` for the complete workflow configuration.
+
 ## Development
 
 ### Project Structure
