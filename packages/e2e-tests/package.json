@@ -6,6 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "eslint . --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage",
     "gen-contract": "node ./scripts/gen-contract.cjs"
   },
   "devDependencies": {
@@ -24,5 +25,3 @@
     "@prisma-next/driver-postgres": "workspace:*"
   }
 }
-
-

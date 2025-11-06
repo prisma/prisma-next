@@ -188,6 +188,47 @@ cd examples/todo-app
 pnpm generate && pnpm start
 ```
 
+## Common Commands
+
+### All Packages
+
+**Tests:**
+- `pnpm test` - Run all tests
+- `pnpm test:packages` - Test only packages (exclude examples)
+- `pnpm test:examples` - Test only examples
+- `pnpm test:coverage` - Run tests with coverage
+- `pnpm test:coverage:packages` - Coverage for packages only
+
+**Type Checking:**
+- `pnpm typecheck` - Type check all packages
+- `pnpm typecheck:packages` - Type check packages only
+- `pnpm typecheck:examples` - Type check examples only
+- `pnpm typecheck:all` - Alias for typecheck (includes examples)
+
+**Linting:**
+- `pnpm lint` - Lint all packages
+- `pnpm lint:packages` - Lint packages only
+- `pnpm lint:examples` - Lint examples only
+- `pnpm lint:all` - Alias for lint
+
+**Build:**
+- `pnpm build` - Build all packages
+
+### Specific Package
+
+Run commands for a specific package using pnpm's filter:
+
+- `pnpm --filter <package-name> test` - Test specific package
+- `pnpm --filter <package-name> typecheck` - Typecheck specific package
+- `pnpm --filter <package-name> lint` - Lint specific package
+
+**Examples:**
+```bash
+pnpm --filter @prisma-next/sql-query test
+pnpm --filter @prisma-next/sql-query typecheck
+pnpm --filter @prisma-next/sql-query lint
+```
+
 ## Usage Example
 
 ### 1. Define Schema (schema.psl)
@@ -382,6 +423,9 @@ prisma-next/
 
 ### Available Scripts
 
+See the [Common Commands](#common-commands) section above for a complete list of available commands for running tests, typechecks, and lints across all packages or specific packages.
+
+Key commands:
 - `pnpm build` - Build all packages
 - `pnpm test` - Run all tests
 - `pnpm typecheck` - Type check all packages

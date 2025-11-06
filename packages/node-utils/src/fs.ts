@@ -28,4 +28,3 @@ export function readTextFile(filePath: string): string {
     );
   }
 }
-

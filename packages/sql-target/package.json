@@ -8,7 +8,8 @@
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit"
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "eslint . --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage"
   },
   "dependencies": {
     "@prisma-next/emitter": "workspace:*"

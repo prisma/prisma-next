@@ -30,5 +30,3 @@ test('inferred row types are correct', () => {
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
 });
-
-
