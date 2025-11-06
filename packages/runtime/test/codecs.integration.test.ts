@@ -1,19 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import { Client } from 'pg';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { schema } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
 import { param } from '@prisma-next/sql-query/param';
+import { schema } from '@prisma-next/sql-query/schema';
 import { validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import {
+  collectAsync,
   createDevDatabase,
-  setupTestDatabase,
-  teardownTestDatabase,
   createTestRuntime,
   executePlanAndCollect,
+  setupTestDatabase,
+  teardownTestDatabase,
 } from './utils';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -78,7 +79,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   beforeEach(async () => {
-    await setupTestDatabase(client, fixtureContract, async (c) => {
+    await setupTestDatabase(client, fixtureContract, async (c: typeof client) => {
       await c.query('DROP TABLE IF EXISTS test_data');
       await c.query(`
         CREATE TABLE test_data (
@@ -111,25 +112,25 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     );
 
     // Query to verify the date was stored correctly
-    const testDataTable = tables['test_data']!;
+    const testDataTable = tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const selectPlan = builder
       .from(testDataTable)
       .select({
-        id: testDataColumns['id']!,
-        name: testDataColumns['name']!,
-        score: testDataColumns['score']!,
-        created_at: testDataColumns['created_at']!,
+        id: testDataColumns.id!,
+        name: testDataColumns.name!,
+        score: testDataColumns.score!,
+        created_at: testDataColumns.created_at!,
       })
       .build();
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
+    const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBeGreaterThan(0);
 
     const row = rows[0]!;
-    expect(row['created_at']).toBeDefined();
-    expect(typeof row['created_at']).toBe('string');
-    expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(row.created_at).toBeDefined();
+    expect(typeof row.created_at).toBe('string');
+    expect(row.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('decodes timestamptz to ISO string', async () => {
@@ -144,23 +145,23 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = tables['test_data']!;
+    const testDataTable = tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const selectPlan = builder
       .from(testDataTable)
       .select({
-        name: testDataColumns['name']!,
-        score: testDataColumns['score']!,
-        created_at: testDataColumns['created_at']!,
+        name: testDataColumns.name!,
+        score: testDataColumns.score!,
+        created_at: testDataColumns.created_at!,
       })
       .build();
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
+    const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
-    expect(row['created_at']).toBe('2024-01-15T10:30:00.000Z');
-    expect(typeof row['created_at']).toBe('string');
+    expect(row.created_at).toBe('2024-01-15T10:30:00.000Z');
+    expect(typeof row.created_at).toBe('string');
   });
 
   it('round-trips numbers correctly', async () => {
@@ -174,21 +175,21 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = tables['test_data']!;
+    const testDataTable = tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const selectPlan = builder
       .from(testDataTable)
       .select({
-        score: testDataColumns['score']!,
+        score: testDataColumns.score!,
       })
       .build();
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
+    const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
-    expect(typeof row['score']).toBe('number');
-    expect(row['score']).toBe(95.5);
+    expect(typeof row.score).toBe('number');
+    expect(row.score).toBe(95.5);
   });
 
   it('round-trips strings correctly', async () => {
@@ -202,21 +203,21 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = tables['test_data']!;
+    const testDataTable = tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const selectPlan = builder
       .from(testDataTable)
       .select({
-        name: testDataColumns['name']!,
+        name: testDataColumns.name!,
       })
       .build();
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
+    const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
-    expect(typeof row['name']).toBe('string');
-    expect(row['name']).toBe('Test User');
+    expect(typeof row.name).toBe('string');
+    expect(row.name).toBe('Test User');
   });
 
   it('uses codec override via annotations.codecs', async () => {
@@ -230,12 +231,12 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = tables['test_data']!;
+    const testDataTable = tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const basePlan = builder
       .from(testDataTable)
       .select({
-        created_at: testDataColumns['created_at']!,
+        created_at: testDataColumns.created_at!,
       })
       .build();
 
@@ -257,8 +258,8 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
-    expect(row['created_at']).toBeDefined();
-    expect(typeof row['created_at']).toBe('string');
+    expect(row.created_at).toBeDefined();
+    expect(typeof row.created_at).toBe('string');
   });
 
   it('handles null values correctly', async () => {
@@ -275,20 +276,20 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       null,
     ]);
 
-    const testDataTable = tables['test_data']!;
+    const testDataTable = tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const selectPlan = builder
       .from(testDataTable)
       .select({
-        created_at: testDataColumns['created_at']!,
+        created_at: testDataColumns.created_at!,
       })
       .build();
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
+    const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
-    expect(row['created_at']).toBeNull();
+    expect(row.created_at).toBeNull();
   });
 
   it('decodes multiple columns with different types', async () => {
@@ -302,27 +303,27 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = tables['test_data']!;
+    const testDataTable = tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const selectPlan = builder
       .from(testDataTable)
       .select({
-        name: testDataColumns['name']!,
-        score: testDataColumns['score']!,
-        created_at: testDataColumns['created_at']!,
+        name: testDataColumns.name!,
+        score: testDataColumns.score!,
+        created_at: testDataColumns.created_at!,
       })
       .build();
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
+    const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
-    expect(typeof row['name']).toBe('string');
-    expect(typeof row['score']).toBe('number');
-    expect(typeof row['created_at']).toBe('string');
-    expect(row['name']).toBe('Test User');
-    expect(row['score']).toBe(95.5);
-    expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(typeof row.name).toBe('string');
+    expect(typeof row.score).toBe('number');
+    expect(typeof row.created_at).toBe('string');
+    expect(row.name).toBe('Test User');
+    expect(row.score).toBe(95.5);
+    expect(row.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('uses codec assignments from contract column types', async () => {
@@ -336,14 +337,14 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = schema(fixtureContract).tables['test_data']!;
+    const testDataTable = schema(fixtureContract).tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const testBuilder = sql({ contract: fixtureContract, adapter });
     const selectPlan = testBuilder
       .from(testDataTable)
       .select({
-        name: testDataColumns['name']!,
-        created_at: testDataColumns['created_at']!,
+        name: testDataColumns.name!,
+        created_at: testDataColumns.created_at!,
       })
       .build();
 
@@ -353,14 +354,14 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       created_at: 'pg/timestamptz@1',
     });
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
+    const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
-    expect(typeof row['name']).toBe('string');
-    expect(typeof row['created_at']).toBe('string');
-    expect(row['name']).toBe('Test User');
-    expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(typeof row.name).toBe('string');
+    expect(typeof row.created_at).toBe('string');
+    expect(row.name).toBe('Test User');
+    expect(row.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('uses codec assignments from contract column types for WHERE clause parameters', async () => {
@@ -374,15 +375,15 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = schema(fixtureContract).tables['test_data']!;
+    const testDataTable = schema(fixtureContract).tables.test_data!;
     const testDataColumns = testDataTable.columns;
     const testBuilder = sql({ contract: fixtureContract, adapter });
     const selectPlan = testBuilder
       .from(testDataTable)
       .select({
-        name: testDataColumns['name']!,
+        name: testDataColumns.name!,
       })
-      .where(testDataColumns['id']!.eq(param('id')))
+      .where(testDataColumns.id?.eq(param('id')))
       .build({ params: { id: 1 } });
 
     expect(selectPlan.meta.annotations).toBeDefined();
@@ -391,8 +392,8 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       id: 'pg/int4@1',
     });
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
+    const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
-    expect(rows[0]!['name']).toBe('Test User');
+    expect(rows[0]?.name).toBe('Test User');
   });
 });

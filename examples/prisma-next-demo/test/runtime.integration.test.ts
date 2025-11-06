@@ -1,23 +1,23 @@
-import { describe, expect, it, beforeAll } from 'vitest';
-import { resolve, join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { Pool } from 'pg';
-import { createRuntime, budgets } from '@prisma-next/runtime';
-import { withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { schema } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
-import { param } from '@prisma-next/sql-query/param';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import type { ResultType } from '@prisma-next/sql-query/types';
 import { loadContractFromTs } from '@prisma-next/cli';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { budgets, createRuntime } from '@prisma-next/runtime';
+import { param } from '@prisma-next/sql-query/param';
+import { schema } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { ResultType } from '@prisma-next/sql-query/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { Pool } from 'pg';
 
-import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
+import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 
 let contract: ReturnType<typeof validateContract>;
 
@@ -96,12 +96,12 @@ describe('runtime execute integration', () => {
         expect(rowCount).toBe(1);
 
         const tables = schema(contract).tables;
-        const userTable = tables['user']!;
+        const userTable = tables.user!;
         const plan = sql({ contract, adapter })
-          .from(tables['user']!)
+          .from(tables.user!)
           .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
+            id: userTable.columns.id!,
+            email: userTable.columns.email!,
           })
           .limit(10)
           .build();
@@ -205,15 +205,15 @@ describe('runtime execute integration', () => {
         });
 
         const tables = schema(contract).tables;
-        const userTable = tables['user']!;
-        const postTable = tables['post']!;
+        const userTable = tables.user!;
+        const postTable = tables.post!;
 
         const userPlan = sql({ contract, adapter })
           .from(userTable)
           .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
-            createdAt: userTable.columns['createdAt']!,
+            id: userTable.columns.id!,
+            email: userTable.columns.email!,
+            createdAt: userTable.columns.createdAt!,
           })
           .limit(10)
           .build();
@@ -222,12 +222,12 @@ describe('runtime execute integration', () => {
 
         const postPlan = sql({ contract, adapter })
           .from(postTable)
-          .where(postTable.columns['userId']!.eq(param('userId')))
+          .where(postTable.columns.userId?.eq(param('userId')))
           .select({
-            id: postTable.columns['id']!,
-            title: postTable.columns['title']!,
-            userId: postTable.columns['userId']!,
-            createdAt: postTable.columns['createdAt']!,
+            id: postTable.columns.id!,
+            title: postTable.columns.title!,
+            userId: postTable.columns.userId!,
+            createdAt: postTable.columns.createdAt!,
           })
           .build({ params: { userId: 1 } });
 
@@ -294,12 +294,12 @@ describe('runtime execute integration', () => {
         });
 
         const tables = schema(contract).tables;
-        const userTable = tables['user']!;
+        const userTable = tables.user!;
         const unboundedPlan = sql({ contract, adapter })
-          .from(tables['user']!)
+          .from(tables.user!)
           .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
+            id: userTable.columns.id!,
+            email: userTable.columns.email!,
           })
           .build();
 
@@ -313,10 +313,10 @@ describe('runtime execute integration', () => {
         });
 
         const boundedPlan = sql({ contract, adapter })
-          .from(tables['user']!)
+          .from(tables.user!)
           .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
+            id: userTable.columns.id!,
+            email: userTable.columns.email!,
           })
           .limit(10)
           .build();
@@ -375,12 +375,12 @@ describe('runtime execute integration', () => {
         });
 
         const tables = schema(contract).tables;
-        const userTable = tables['user']!;
+        const userTable = tables.user!;
         const plan = sql({ contract, adapter })
-          .from(tables['user']!)
+          .from(tables.user!)
           .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
+            id: userTable.columns.id!,
+            email: userTable.columns.email!,
           })
           .limit(50)
           .build();

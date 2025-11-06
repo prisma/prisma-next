@@ -2,36 +2,36 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import { Client } from 'pg';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { schema } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
 import { validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
+import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import { budgets } from '../src/plugins/budgets';
 import { lints } from '../src/plugins/lints';
-import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import {
   createDevDatabase,
+  createTestRuntime,
+  drainPlanExecution,
+  executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
-  createTestRuntime,
-  executePlanAndCollect,
-  drainPlanExecution,
 } from './utils';
 
 const fixtureContract = loadContractFixture();
 const tables = schema(fixtureContract).tables;
 const adapter = createPostgresAdapter();
-const userTable = tables['user']!;
+const userTable = tables.user!;
 const userColumns = userTable.columns;
 const builder = sql({ contract: fixtureContract, adapter });
 const plan = builder
   .from(userTable)
-  .select({ id: userColumns['id']!, email: userColumns['email']! })
+  .select({ id: userColumns.id!, email: userColumns.email! })
   .limit(5)
   .build();
 
@@ -65,7 +65,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 
   beforeEach(async () => {
-    await setupTestDatabase(client, fixtureContract, async (c) => {
+    await setupTestDatabase(client, fixtureContract, async (c: typeof client) => {
       await c.query('drop table if exists "user"');
       await c.query('create table "user" (id serial primary key, email text not null)');
       await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
@@ -85,10 +85,10 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
+    const rows = await executePlanAndCollect(runtime, plan);
 
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows.map((r) => r['email'])).toContain('ada@example.com');
+    expect(rows.map((r: (typeof rows)[0]) => r.email)).toContain('ada@example.com');
   });
 
   it('throws when marker hash mismatches contract', async () => {
@@ -165,7 +165,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       },
     );
 
-    const rows = await executePlanAndCollect<{ id: number }>(runtime, rawPlan);
+    const rows = await executePlanAndCollect(runtime, rawPlan);
 
     expect(rows.length).toBeGreaterThan(0);
 

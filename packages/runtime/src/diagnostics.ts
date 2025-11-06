@@ -38,4 +38,3 @@ export function freezeDiagnostics(diag: {
 
   return Object.freeze({ lints: frozenLints, budgets: frozenBudgets });
 }
-

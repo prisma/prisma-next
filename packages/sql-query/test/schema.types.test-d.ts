@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
-import { schema } from '../src/schema';
 import { validateContract } from '../src/contract';
-import type { Contract, CodecTypes } from './fixtures/contract.d';
+import { schema } from '../src/schema';
+import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);

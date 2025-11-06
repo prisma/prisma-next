@@ -1,21 +1,19 @@
-import { describe, it, expect, expectTypeOf } from 'vitest';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { sql } from '@prisma-next/sql-query/sql';
 import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import type { ResultType } from '@prisma-next/sql-query/types';
+import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { emitAndVerifyContract, loadContractFromDisk } from './utils';
 import {
-  withDevDatabase,
-  withClient,
-  loadContractFromDisk,
-  emitAndVerifyContract,
-  setupE2EDatabase,
   createTestRuntimeFromClient,
   executePlanAndCollect,
-} from '@prisma-next/test-utils';
+  setupE2EDatabase,
+} from '@prisma-next/runtime/test/utils';
 import type { Contract } from './fixtures/generated/contract.d';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,9 +35,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
@@ -53,10 +51,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
+            const user = tables.user!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
-              .select({ id: user.columns['id']!, email: user.columns['email']! })
+              .select({ id: user.columns.id!, email: user.columns.email! })
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
@@ -64,8 +62,8 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows.length).toBeGreaterThan(1);
             expect(rows[0]).toHaveProperty('id');
             expect(rows[0]).toHaveProperty('email');
-            expect(typeof rows[0]!.id).toBe('number');
-            expect(typeof rows[0]!.email).toBe('string');
+            expect(typeof rows[0]?.id).toBe('number');
+            expect(typeof rows[0]?.email).toBe('string');
           } finally {
             await runtime.close();
           }
@@ -79,9 +77,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -104,16 +102,16 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
-            const post = tables['post']!;
+            const user = tables.user!;
+            const post = tables.post!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
-              .innerJoin(post, (on) => on.eqCol(user.columns['id']!, post.columns['userId']!))
+              .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
               .select({
-                userId: user.columns['id']!,
-                email: user.columns['email']!,
-                postId: post.columns['id']!,
-                title: post.columns['title']!,
+                userId: user.columns.id!,
+                email: user.columns.email!,
+                postId: post.columns.id!,
+                title: post.columns.title!,
               })
               .build();
 
@@ -124,10 +122,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('email');
             expect(rows[0]).toHaveProperty('postId');
             expect(rows[0]).toHaveProperty('title');
-            expect(typeof rows[0]!.userId).toBe('number');
-            expect(typeof rows[0]!.email).toBe('string');
-            expect(typeof rows[0]!.postId).toBe('number');
-            expect(typeof rows[0]!.title).toBe('string');
+            expect(typeof rows[0]?.userId).toBe('number');
+            expect(typeof rows[0]?.email).toBe('string');
+            expect(typeof rows[0]?.postId).toBe('number');
+            expect(typeof rows[0]?.title).toBe('string');
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -150,9 +148,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -175,37 +173,37 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
-            const post = tables['post']!;
+            const user = tables.user!;
+            const post = tables.post!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
-              .leftJoin(post, (on) => on.eqCol(user.columns['id']!, post.columns['userId']!))
+              .leftJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
               .select({
-                userId: user.columns['id']!,
-                email: user.columns['email']!,
-                postId: post.columns['id']!,
-                title: post.columns['title']!,
+                userId: user.columns.id!,
+                email: user.columns.email!,
+                postId: post.columns.id!,
+                title: post.columns.title!,
               })
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(3);
-            const adaRow = rows.find((r) => r.email === 'ada@example.com');
-            const tessRow = rows.find((r) => r.email === 'tess@example.com');
-            const mikeRow = rows.find((r) => r.email === 'mike@example.com');
+            const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
+            const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
+            const mikeRow = rows.find((r: (typeof rows)[0]) => r.email === 'mike@example.com');
 
             expect(adaRow).toBeDefined();
-            expect(adaRow!.postId).not.toBeNull();
-            expect(adaRow!.title).not.toBeNull();
+            expect(adaRow?.postId).not.toBeNull();
+            expect(adaRow?.title).not.toBeNull();
 
             expect(tessRow).toBeDefined();
-            expect(tessRow!.postId).toBeNull();
-            expect(tessRow!.title).toBeNull();
+            expect(tessRow?.postId).toBeNull();
+            expect(tessRow?.title).toBeNull();
 
             expect(mikeRow).toBeDefined();
-            expect(mikeRow!.postId).toBeNull();
-            expect(mikeRow!.title).toBeNull();
+            expect(mikeRow?.postId).toBeNull();
+            expect(mikeRow?.title).toBeNull();
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -222,9 +220,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -245,32 +243,32 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
-            const post = tables['post']!;
+            const user = tables.user!;
+            const post = tables.post!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
-              .rightJoin(post, (on) => on.eqCol(user.columns['id']!, post.columns['userId']!))
+              .rightJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
               .select({
-                userId: user.columns['id']!,
-                email: user.columns['email']!,
-                postId: post.columns['id']!,
-                title: post.columns['title']!,
+                userId: user.columns.id!,
+                email: user.columns.email!,
+                postId: post.columns.id!,
+                title: post.columns.title!,
               })
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(2);
-            const firstPostRow = rows.find((r) => r.title === 'First Post');
-            const orphanPostRow = rows.find((r) => r.title === 'Orphan Post');
+            const firstPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'First Post');
+            const orphanPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
 
             expect(firstPostRow).toBeDefined();
-            expect(firstPostRow!.userId).not.toBeNull();
-            expect(firstPostRow!.email).not.toBeNull();
+            expect(firstPostRow?.userId).not.toBeNull();
+            expect(firstPostRow?.email).not.toBeNull();
 
             expect(orphanPostRow).toBeDefined();
-            expect(orphanPostRow!.userId).toBeNull();
-            expect(orphanPostRow!.email).toBeNull();
+            expect(orphanPostRow?.userId).toBeNull();
+            expect(orphanPostRow?.email).toBeNull();
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -287,9 +285,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -313,35 +311,35 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
-            const post = tables['post']!;
+            const user = tables.user!;
+            const post = tables.post!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
-              .fullJoin(post, (on) => on.eqCol(user.columns['id']!, post.columns['userId']!))
+              .fullJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
               .select({
-                userId: user.columns['id']!,
-                email: user.columns['email']!,
-                postId: post.columns['id']!,
-                title: post.columns['title']!,
+                userId: user.columns.id!,
+                email: user.columns.email!,
+                postId: post.columns.id!,
+                title: post.columns.title!,
               })
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(3);
-            const adaRow = rows.find((r) => r.email === 'ada@example.com');
-            const tessRow = rows.find((r) => r.email === 'tess@example.com');
-            const orphanRow = rows.find((r) => r.title === 'Orphan Post');
+            const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
+            const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
+            const orphanRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
 
             expect(adaRow).toBeDefined();
-            expect(adaRow!.postId).not.toBeNull();
+            expect(adaRow?.postId).not.toBeNull();
 
             expect(tessRow).toBeDefined();
-            expect(tessRow!.postId).toBeNull();
+            expect(tessRow?.postId).toBeNull();
 
             expect(orphanRow).toBeDefined();
-            expect(orphanRow!.userId).toBeNull();
-            expect(orphanRow!.email).toBeNull();
+            expect(orphanRow?.userId).toBeNull();
+            expect(orphanRow?.email).toBeNull();
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -358,9 +356,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -391,20 +389,20 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
-            const post = tables['post']!;
-            const comment = tables['comment']!;
+            const user = tables.user!;
+            const post = tables.post!;
+            const comment = tables.comment!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
-              .innerJoin(post, (on) => on.eqCol(user.columns['id']!, post.columns['userId']!))
-              .leftJoin(comment, (on) => on.eqCol(post.columns['id']!, comment.columns['postId']!))
+              .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+              .leftJoin(comment, (on) => on.eqCol(post.columns.id!, comment.columns.postId!))
               .select({
-                userId: user.columns['id']!,
-                email: user.columns['email']!,
-                postId: post.columns['id']!,
-                title: post.columns['title']!,
-                commentId: comment.columns['id']!,
-                content: comment.columns['content']!,
+                userId: user.columns.id!,
+                email: user.columns.email!,
+                postId: post.columns.id!,
+                title: post.columns.title!,
+                commentId: comment.columns.id!,
+                content: comment.columns.content!,
               })
               .build();
 
@@ -418,16 +416,18 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(3);
-            const firstPostRow = rows.find((r) => r.title === 'First Post' && r.commentId !== null);
-            const secondPostRow = rows.find((r) => r.title === 'Second Post');
+            const firstPostRow = rows.find(
+              (r: (typeof rows)[0]) => r.title === 'First Post' && r.commentId !== null,
+            );
+            const secondPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Second Post');
 
             expect(firstPostRow).toBeDefined();
-            expect(firstPostRow!.commentId).not.toBeNull();
-            expect(firstPostRow!.content).not.toBeNull();
+            expect(firstPostRow?.commentId).not.toBeNull();
+            expect(firstPostRow?.content).not.toBeNull();
 
             expect(secondPostRow).toBeDefined();
-            expect(secondPostRow!.commentId).toBeNull();
-            expect(secondPostRow!.content).toBeNull();
+            expect(secondPostRow?.commentId).toBeNull();
+            expect(secondPostRow?.content).toBeNull();
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -453,9 +453,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
@@ -469,13 +469,13 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
+            const user = tables.user!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
               .select({
-                name: user.columns['email']!,
+                name: user.columns.email!,
                 post: {
-                  title: user.columns['id']!,
+                  title: user.columns.id!,
                 },
               })
               .build();
@@ -487,8 +487,8 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('post_title');
             expect(rows[0]).not.toHaveProperty('post');
 
-            expect(typeof rows[0]!.name).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('number');
+            expect(typeof rows[0]?.name).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>).post_title).toBe('number');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -500,9 +500,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
 
             const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0['name']).toBe('ada@example.com');
-            expect(flatRow0['post_title']).toBe(1);
-            expect({ name: flatRow0['name'], post: { title: flatRow0['post_title'] } }).toEqual({
+            expect(flatRow0.name).toBe('ada@example.com');
+            expect(flatRow0.post_title).toBe(1);
+            expect({ name: flatRow0.name, post: { title: flatRow0.post_title } }).toEqual({
               name: 'ada@example.com',
               post: { title: 1 },
             });
@@ -529,9 +529,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2)', [
@@ -544,13 +544,13 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
+            const user = tables.user!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
               .select({
                 a: {
                   b: {
-                    c: user.columns['id']!,
+                    c: user.columns.id!,
                   },
                 },
               })
@@ -562,7 +562,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('a_b_c');
             expect(rows[0]).not.toHaveProperty('a');
 
-            expect(typeof (rows[0] as Record<string, unknown>)['a_b_c']).toBe('number');
+            expect(typeof (rows[0] as Record<string, unknown>).a_b_c).toBe('number');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -573,14 +573,14 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
 
             const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0['a_b_c']).toBe(1);
-            expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
+            expect(flatRow0.a_b_c).toBe(1);
+            expect({ a: { b: { c: flatRow0.a_b_c } } }).toEqual({
               a: { b: { c: 1 } },
             });
 
             const flatRow1 = rows[1] as Record<string, unknown>;
-            expect(flatRow1['a_b_c']).toBe(2);
-            expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
+            expect(flatRow1.a_b_c).toBe(2);
+            expect({ a: { b: { c: flatRow1.a_b_c } } }).toEqual({
               a: { b: { c: 2 } },
             });
 
@@ -600,9 +600,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
@@ -624,16 +624,16 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
-            const post = tables['post']!;
+            const user = tables.user!;
+            const post = tables.post!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
-              .innerJoin(post, (on) => on.eqCol(user.columns['id']!, post.columns['userId']!))
+              .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
               .select({
-                name: user.columns['email']!,
+                name: user.columns.email!,
                 post: {
-                  title: post.columns['title']!,
-                  id: post.columns['id']!,
+                  title: post.columns.title!,
+                  id: post.columns.id!,
                 },
               })
               .build();
@@ -646,9 +646,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('post_id');
             expect(rows[0]).not.toHaveProperty('post');
 
-            expect(typeof rows[0]!.name).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_id']).toBe('number');
+            expect(typeof rows[0]?.name).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>).post_title).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>).post_id).toBe('number');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -661,12 +661,12 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
 
             const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0['name']).toBe('ada@example.com');
-            expect(flatRow0['post_title']).toBe('First Post');
-            expect(flatRow0['post_id']).toBe(1);
+            expect(flatRow0.name).toBe('ada@example.com');
+            expect(flatRow0.post_title).toBe('First Post');
+            expect(flatRow0.post_id).toBe(1);
             expect({
-              name: flatRow0['name'],
-              post: { title: flatRow0['post_title'], id: flatRow0['post_id'] },
+              name: flatRow0.name,
+              post: { title: flatRow0.post_title, id: flatRow0.post_id },
             }).toEqual({
               name: 'ada@example.com',
               post: { title: 'First Post', id: 1 },
@@ -693,9 +693,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2)', [
@@ -708,18 +708,18 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
             const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables['user']!;
+            const user = tables.user!;
             const plan = sql<Contract, CodecTypes>({ contract, adapter })
               .from(user)
               .select({
-                id: user.columns['id']!,
+                id: user.columns.id!,
                 post: {
-                  title: user.columns['email']!,
+                  title: user.columns.email!,
                   author: {
-                    name: user.columns['id']!,
+                    name: user.columns.id!,
                   },
                 },
-                email: user.columns['email']!,
+                email: user.columns.email!,
               })
               .build();
 
@@ -732,10 +732,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('email');
             expect(rows[0]).not.toHaveProperty('post');
 
-            expect(typeof rows[0]!.id).toBe('number');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_author_name']).toBe('number');
-            expect(typeof rows[0]!.email).toBe('string');
+            expect(typeof rows[0]?.id).toBe('number');
+            expect(typeof (rows[0] as Record<string, unknown>).post_title).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>).post_author_name).toBe('number');
+            expect(typeof rows[0]?.email).toBe('string');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -754,17 +754,17 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['email']>().toEqualTypeOf<string>();
 
             const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0['id']).toBe(1);
-            expect(flatRow0['post_title']).toBe('ada@example.com');
-            expect(flatRow0['post_author_name']).toBe(1);
-            expect(flatRow0['email']).toBe('ada@example.com');
+            expect(flatRow0.id).toBe(1);
+            expect(flatRow0.post_title).toBe('ada@example.com');
+            expect(flatRow0.post_author_name).toBe(1);
+            expect(flatRow0.email).toBe('ada@example.com');
             expect({
-              id: flatRow0['id'],
+              id: flatRow0.id,
               post: {
-                title: flatRow0['post_title'],
-                author: { name: flatRow0['post_author_name'] },
+                title: flatRow0.post_title,
+                author: { name: flatRow0.post_author_name },
               },
-              email: flatRow0['email'],
+              email: flatRow0.email,
             }).toEqual({
               id: 1,
               post: { title: 'ada@example.com', author: { name: 1 } },

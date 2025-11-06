@@ -1,8 +1,8 @@
-import { Command } from 'commander';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { Command } from 'commander';
 import { loadContractFromTs } from '../load-ts-contract';
 
 export function createEmitCommand(): Command {
@@ -37,7 +37,7 @@ export function createEmitCommand(): Command {
 
           const contract = await loadContractFromTs(contractPath);
 
-          let targetFamily;
+          let targetFamily: typeof sqlTargetFamilyHook | undefined;
           if (contract.targetFamily === 'sql') {
             targetFamily = sqlTargetFamilyHook;
           } else {

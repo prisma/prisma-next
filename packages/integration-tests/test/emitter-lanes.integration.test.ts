@@ -1,21 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach, expectTypeOf } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { emit } from '@prisma-next/emitter';
 import { loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
-import { sql } from '@prisma-next/sql-query/sql';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import type {
-  ResultType,
   Adapter,
-  SelectAst,
   LoweredStatement,
+  ResultType,
+  SelectAst,
 } from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { sqlTargetFamilyHook, createCodecRegistry } from '@prisma-next/sql-target';
-import { join } from 'node:path';
-import { writeFile, mkdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { createCodecRegistry, sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
@@ -95,9 +95,9 @@ describe('emitter → lanes integration', () => {
 
     const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
     const contract = validateContract(contractJson);
-    expect(contract['targetFamily']).toBe('sql');
-    expect(contract['target']).toBe('postgres');
-    expect(contract['storage']).toBeDefined();
+    expect(contract.targetFamily).toBe('sql');
+    expect(contract.target).toBe('postgres');
+    expect(contract.storage).toBeDefined();
 
     const contractDtsContent = result.contractDts;
 
@@ -106,7 +106,7 @@ describe('emitter → lanes integration', () => {
     expect(contractDtsContent).toContain('export type Contract');
 
     const tables = schema(contract).tables;
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
     const adapter = createStubAdapter();
@@ -114,8 +114,8 @@ describe('emitter → lanes integration', () => {
     const plan = sql({ contract, adapter })
       .from(userTable)
       .select({
-        id: userTable.columns['id']!,
-        email: userTable.columns['email']!,
+        id: userTable.columns.id!,
+        email: userTable.columns.email!,
       })
       .limit(10)
       .build();
@@ -172,7 +172,7 @@ describe('emitter → lanes integration', () => {
     const contract = validateContract(contractJson);
 
     const tables = schema(contract).tables;
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
     const adapter = createStubAdapter();
@@ -180,9 +180,9 @@ describe('emitter → lanes integration', () => {
     const plan = sql({ contract, adapter })
       .from(userTable)
       .select({
-        id: userTable.columns['id']!,
-        email: userTable.columns['email']!,
-        name: userTable.columns['name']!,
+        id: userTable.columns.id!,
+        email: userTable.columns.email!,
+        name: userTable.columns.name!,
       })
       .build();
 
@@ -234,28 +234,28 @@ describe('emitter → lanes integration', () => {
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
     const contract1 = validateContract(contractJson1);
 
-    expect(contractJson1['extensions']).toHaveProperty('postgres');
+    expect(contractJson1.extensions).toHaveProperty('postgres');
 
-    const extensions = ((contractJson1['extensions'] as Record<string, unknown>) || {}) as Record<
+    const extensions = ((contractJson1.extensions as Record<string, unknown>) || {}) as Record<
       string,
       unknown
     >;
-    const relations = contractJson1['relations'] as Record<string, unknown> | undefined;
+    const relations = contractJson1.relations as Record<string, unknown> | undefined;
     const ir2: ContractIR = {
-      schemaVersion: contractJson1['schemaVersion'] as string,
-      targetFamily: contractJson1['targetFamily'] as string,
-      target: contractJson1['target'] as string,
+      schemaVersion: contractJson1.schemaVersion as string,
+      targetFamily: contractJson1.targetFamily as string,
+      target: contractJson1.target as string,
       extensions: {
-        postgres: extensions['postgres'],
-        pg: extensions['pg'] || {},
+        postgres: extensions.postgres,
+        pg: extensions.pg || {},
       },
-      models: contractJson1['models'] as Record<string, unknown>,
-      storage: contractJson1['storage'] as Record<string, unknown>,
-      capabilities: contractJson1['capabilities'] as
+      models: contractJson1.models as Record<string, unknown>,
+      storage: contractJson1.storage as Record<string, unknown>,
+      capabilities: contractJson1.capabilities as
         | Record<string, Record<string, boolean>>
         | undefined,
-      meta: contractJson1['meta'] as Record<string, unknown> | undefined,
-      sources: (contractJson1['sources'] as Record<string, unknown>) || undefined,
+      meta: contractJson1.meta as Record<string, unknown> | undefined,
+      sources: (contractJson1.sources as Record<string, unknown>) || undefined,
       ...(relations ? { relations } : {}),
     } as ContractIR;
 
@@ -273,11 +273,11 @@ describe('emitter → lanes integration', () => {
     expect(result1.coreHash).toBe(result2.coreHash);
 
     const tables1 = schema(contract1).tables;
-    const userTable1 = tables1['user'];
+    const userTable1 = tables1.user;
     if (!userTable1) throw new Error('user table not found');
 
     const tables2 = schema(contract2).tables;
-    const userTable2 = tables2['user'];
+    const userTable2 = tables2.user;
     if (!userTable2) throw new Error('user table not found');
 
     const adapter = createStubAdapter();
@@ -285,16 +285,16 @@ describe('emitter → lanes integration', () => {
     const plan1 = sql({ contract: contract1, adapter })
       .from(userTable1)
       .select({
-        id: userTable1.columns['id']!,
-        email: userTable1.columns['email']!,
+        id: userTable1.columns.id!,
+        email: userTable1.columns.email!,
       })
       .build();
 
     const plan2 = sql({ contract: contract2, adapter })
       .from(userTable2)
       .select({
-        id: userTable2.columns['id']!,
-        email: userTable2.columns['email']!,
+        id: userTable2.columns.id!,
+        email: userTable2.columns.email!,
       })
       .build();
 

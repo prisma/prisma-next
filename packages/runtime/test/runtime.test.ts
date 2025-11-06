@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { describe, it, expect, vi } from 'vitest';
-import { createRuntime } from '../src/runtime';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { Plan } from '@prisma-next/sql-query/types';
-import type { SqlDriver } from '@prisma-next/sql-target';
-import type { Plugin } from '../src/plugins/types';
 import { validateContract } from '@prisma-next/sql-query/schema';
+import type { Plan } from '@prisma-next/sql-query/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlDriver } from '@prisma-next/sql-target';
+import { describe, expect, it, vi } from 'vitest';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import type { Plugin } from '../src/plugins/types';
+import { createRuntime } from '../src/runtime';
 import { drainPlanExecution, executePlanAndCollect } from './utils';
 
 describe('Runtime class', () => {
@@ -59,7 +58,6 @@ describe('Runtime class', () => {
     }),
     close: vi.fn().mockResolvedValue(undefined),
   });
-
 
   describe('constructor', () => {
     it('validates codec registry at startup when verify.mode is startup', () => {
@@ -137,7 +135,7 @@ describe('Runtime class', () => {
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
       // Should not throw with complete registry
-      await expect(executePlan(runtime, mockPlan)).resolves.not.toThrow();
+      await expect(drainPlanExecution(runtime, mockPlan)).resolves.not.toThrow();
     });
 
     it('throws when codec registry is incomplete on first execute', async () => {
@@ -176,7 +174,7 @@ describe('Runtime class', () => {
         },
       };
 
-      await expect(executePlan(runtime, planWithUnknownType)).rejects.toMatchObject({
+      await expect(drainPlanExecution(runtime, planWithUnknownType)).rejects.toMatchObject({
         code: 'RUNTIME.CODEC_MISSING',
       });
     });
@@ -202,7 +200,7 @@ describe('Runtime class', () => {
         },
       };
 
-      await expect(executePlan(runtime, mismatchedPlan)).rejects.toMatchObject({
+      await expect(drainPlanExecution(runtime, mismatchedPlan)).rejects.toMatchObject({
         code: 'PLAN.TARGET_MISMATCH',
         category: 'PLAN',
       });
@@ -229,7 +227,7 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
-      await expect(executePlan(runtime, mismatchedPlan)).rejects.toMatchObject({
+      await expect(drainPlanExecution(runtime, mismatchedPlan)).rejects.toMatchObject({
         code: 'PLAN.HASH_MISMATCH',
         category: 'PLAN',
       });
@@ -257,7 +255,7 @@ describe('Runtime class', () => {
         verify: { mode: 'startup', requireMarker: true },
       });
 
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       expect(mockDriver.query).toHaveBeenCalled();
     });
@@ -282,11 +280,11 @@ describe('Runtime class', () => {
         verify: { mode: 'always', requireMarker: true },
       });
 
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       const firstCallCount = (mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length;
 
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       expect((mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
         firstCallCount,
@@ -374,7 +372,7 @@ describe('Runtime class', () => {
       });
 
       // Should not throw when profileHash is null in contract
-      const promise = executePlan(runtime, mockPlan);
+      const promise = drainPlanExecution(runtime, mockPlan);
       await expect(promise).resolves.not.toThrow();
     });
   });
@@ -401,7 +399,7 @@ describe('Runtime class', () => {
         plugins: [plugin],
       });
 
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       expect(beforeExecute).toHaveBeenCalledWith(mockPlan, expect.any(Object));
     });
@@ -526,7 +524,7 @@ describe('Runtime class', () => {
       };
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
-      // eslint-disable-next-line require-yield
+      // biome-ignore lint: generator function without yield for test
       mockDriver.execute = vi.fn().mockImplementation(async function* () {
         throw new Error('Execution failed');
       });
@@ -621,7 +619,7 @@ describe('Runtime class', () => {
       const adapter = createPostgresAdapter();
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
-      // eslint-disable-next-line require-yield
+      // biome-ignore lint: generator function without yield for test
       mockDriver.execute = vi.fn().mockImplementation(async function* () {
         throw new Error('Driver error');
       });
@@ -720,7 +718,7 @@ describe('Runtime class', () => {
       });
 
       const rows: unknown[] = [];
-      const collectedRows = await executePlanAndCollect<Record<string, unknown>>(runtime, mockPlan);
+      const collectedRows = await executePlanAndCollect(runtime, mockPlan);
       rows.push(...collectedRows);
 
       expect(rows).toEqual([]);
@@ -754,7 +752,7 @@ describe('Runtime class', () => {
 
       await expect(
         (async () => {
-      await drainPlanExecution(runtime, mockPlan);
+          await drainPlanExecution(runtime, mockPlan);
         })(),
       ).rejects.toThrow('Plugin error');
     });

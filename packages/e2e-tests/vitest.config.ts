@@ -14,10 +14,8 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.test-d.ts',
         '**/*.config.ts',
-        '**/exports/**'
+        '**/exports/**',
       ],
     },
   },
 });
-
-

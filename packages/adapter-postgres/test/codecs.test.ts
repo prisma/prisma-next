@@ -1,30 +1,30 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../src/codecs';
 
 describe('adapter-postgres codecs', () => {
   describe('timestamp codec', () => {
-    const timestampCodec = codecDefinitions['timestamp'].codec as {
+    const timestampCodec = codecDefinitions.timestamp.codec as {
       encode: (value: string | Date) => string;
       decode: (wire: string | Date) => string;
     };
 
     it('encodes Date to ISO string', () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      const encoded = timestampCodec.encode!(date);
+      const encoded = timestampCodec.encode?.(date);
       expect(encoded).toBe('2024-01-15T10:30:00.000Z');
       expect(typeof encoded).toBe('string');
     });
 
     it('encodes string as-is', () => {
       const str = '2024-01-15T10:30:00Z';
-      const encoded = timestampCodec.encode!(str);
+      const encoded = timestampCodec.encode?.(str);
       expect(encoded).toBe(str);
     });
 
     it('encodes non-string non-Date to string', () => {
       const num = 12345;
       // @ts-expect-error - Testing invalid input
-      const encoded = timestampCodec.encode!(num);
+      const encoded = timestampCodec.encode?.(num);
       expect(typeof encoded).toBe('string');
     });
 
@@ -49,28 +49,28 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('timestamptz codec', () => {
-    const timestamptzCodec = codecDefinitions['timestamptz'].codec as {
+    const timestamptzCodec = codecDefinitions.timestamptz.codec as {
       encode: (value: string | Date) => string;
       decode: (wire: string | Date) => string;
     };
 
     it('encodes Date to ISO string', () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      const encoded = timestamptzCodec.encode!(date);
+      const encoded = timestamptzCodec.encode?.(date);
       expect(encoded).toBe('2024-01-15T10:30:00.000Z');
       expect(typeof encoded).toBe('string');
     });
 
     it('encodes string as-is', () => {
       const str = '2024-01-15T10:30:00Z';
-      const encoded = timestamptzCodec.encode!(str);
+      const encoded = timestamptzCodec.encode?.(str);
       expect(encoded).toBe(str);
     });
 
     it('encodes non-string non-Date to string', () => {
       const num = 12345;
       // @ts-expect-error - Testing invalid input
-      const encoded = timestamptzCodec.encode!(num);
+      const encoded = timestamptzCodec.encode?.(num);
       expect(typeof encoded).toBe('string');
     });
 

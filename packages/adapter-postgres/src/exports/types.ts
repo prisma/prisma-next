@@ -12,4 +12,3 @@ export type {
   Expr,
   Direction,
 } from '../types';
-

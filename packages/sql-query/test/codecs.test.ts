@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { sql } from '../src/sql';
-import { schema } from '../src/schema';
+import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { validateContract } from '../src/contract';
+import { schema } from '../src/schema';
+import { sql } from '../src/sql';
 import type { Plan } from '../src/types';
+import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
-import type { Contract, CodecTypes } from './fixtures/contract.d';
 
 describe('DSL Lane Codec Type Stamping', () => {
   const contract = validateContract<Contract>(contractJson);
@@ -14,13 +14,13 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps paramDescriptors.type from columnMeta.type', () => {
     const builder = sql<Contract, CodecTypes>({ contract, adapter });
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
     }
 
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
     if (!idColumn || !emailColumn) {
       throw new Error('columns not found');
     }
@@ -44,12 +44,12 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes mapping alias → scalar type', () => {
     const builder = sql<Contract, CodecTypes>({ contract, adapter });
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
     }
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
     if (!idColumn || !emailColumn) {
       throw new Error('columns not found');
     }
@@ -76,12 +76,12 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes for aliased columns', () => {
     const builder = sql<Contract, CodecTypes>({ contract, adapter });
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
     }
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
     if (!idColumn || !emailColumn) {
       throw new Error('columns not found');
     }
@@ -96,21 +96,21 @@ describe('DSL Lane Codec Type Stamping', () => {
     expect(plan.meta.projectionTypes).toBeDefined();
     const projectionTypes = plan.meta.projectionTypes!;
 
-    expect(projectionTypes['userId']).toBeDefined();
-    expect(projectionTypes['userEmail']).toBeDefined();
+    expect(projectionTypes.userId).toBeDefined();
+    expect(projectionTypes.userEmail).toBeDefined();
 
     // Verify types match the column types from contract
-    expect(typeof projectionTypes['userId']).toBe('string');
-    expect(typeof projectionTypes['userEmail']).toBe('string');
+    expect(typeof projectionTypes.userId).toBe('string');
+    expect(typeof projectionTypes.userEmail).toBe('string');
   });
 
   it('includes nullable in paramDescriptors', () => {
     const builder = sql<Contract, CodecTypes>({ contract, adapter });
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
     }
-    const idColumn = userTable.columns['id'];
+    const idColumn = userTable.columns.id;
     if (!idColumn) {
       throw new Error('id column not found');
     }
@@ -130,12 +130,12 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('Plan has Row generic type', () => {
     const builder = sql<Contract, CodecTypes>({ contract, adapter });
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
     }
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
     if (!idColumn || !emailColumn) {
       throw new Error('columns not found');
     }
@@ -154,12 +154,12 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('ResultType utility extracts row type', () => {
     const builder = sql<Contract, CodecTypes>({ contract, adapter });
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
     }
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
     if (!idColumn || !emailColumn) {
       throw new Error('columns not found');
     }
@@ -179,13 +179,13 @@ describe('DSL Lane Codec Type Stamping', () => {
 
   it('stamps projectionTypes for all selected columns', () => {
     const builder = sql<Contract, CodecTypes>({ contract, adapter });
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
     }
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
-    const createdAtColumn = userTable.columns['createdAt'];
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
+    const createdAtColumn = userTable.columns.createdAt;
     if (!idColumn || !emailColumn || !createdAtColumn) {
       throw new Error('columns not found');
     }
@@ -199,20 +199,20 @@ describe('DSL Lane Codec Type Stamping', () => {
       .build();
 
     const projectionTypes = plan.meta.projectionTypes!;
-    expect(projectionTypes['id']).toBeDefined();
-    expect(projectionTypes['email']).toBeDefined();
-    expect(projectionTypes['createdAt']).toBeDefined();
+    expect(projectionTypes.id).toBeDefined();
+    expect(projectionTypes.email).toBeDefined();
+    expect(projectionTypes.createdAt).toBeDefined();
   });
 
   it('maintains projectionTypes order matching projection', () => {
     const builder = sql<Contract, CodecTypes>({ contract, adapter });
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
     }
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
-    const createdAtColumn = userTable.columns['createdAt'];
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
+    const createdAtColumn = userTable.columns.createdAt;
     if (!idColumn || !emailColumn || !createdAtColumn) {
       throw new Error('columns not found');
     }

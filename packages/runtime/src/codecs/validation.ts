@@ -57,9 +57,7 @@ function runtimeError(
  * @param contract - The contract to extract typeIds from
  * @returns Map of table.column → typeId
  */
-function extractTypeIdsFromColumns(
-  contract: SqlContract<SqlStorage>,
-): Map<string, string> {
+function extractTypeIdsFromColumns(contract: SqlContract<SqlStorage>): Map<string, string> {
   const typeIds = new Map<string, string>();
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
@@ -132,4 +130,3 @@ export function validateCodecRegistryCompleteness(
   // Validate that all column typeIds have implementations
   validateContractCodecMappings(registry, contract);
 }
-

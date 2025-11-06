@@ -1,11 +1,11 @@
 import type {
-  SqlContract,
-  SqlStorage,
   ModelDefinition,
   ModelField,
+  SqlContract,
+  SqlMappings,
+  SqlStorage,
   StorageColumn,
   StorageTable,
-  SqlMappings,
 } from '@prisma-next/sql-target';
 import { computeMappings } from './contract';
 
@@ -17,7 +17,7 @@ export interface ColumnOptions<TType extends string = string> {
 type CanonicalizeType<
   Scalar extends string,
   Target extends string,
-> = Scalar extends `pg/${infer _}@${infer _}`
+> = Scalar extends `pg/${infer _Scalar}@${infer _Version}`
   ? Scalar
   : Target extends 'postgres'
     ? `pg/${Scalar}@1`
@@ -79,14 +79,13 @@ type ExtractPrimaryKey<
     Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
     readonly string[] | undefined
   >,
-> =
-  T extends TableBuilderState<
-    string,
-    Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
-    infer PK
-  >
-    ? PK
-    : never;
+> = T extends TableBuilderState<
+  string,
+  Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+  infer PK
+>
+  ? PK
+  : never;
 
 type NormalizeColumns<
   C extends Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
@@ -420,7 +419,7 @@ class ContractBuilder<
     >,
   >(
     name: TableName,
-    callback: (t: TableBuilder<TableName>) => T | void,
+    callback: (t: TableBuilder<TableName>) => T | undefined,
   ): ContractBuilder<
     CodecTypes,
     Target,
@@ -455,7 +454,7 @@ class ContractBuilder<
   >(
     name: ModelName,
     table: TableName,
-    callback: (m: ModelBuilder<ModelName, TableName>) => M | void,
+    callback: (m: ModelBuilder<ModelName, TableName>) => M | undefined,
   ): ContractBuilder<
     CodecTypes,
     Target,
@@ -637,7 +636,7 @@ class ContractBuilder<
       schemaVersion: '1' as const,
       target,
       targetFamily: 'sql' as const,
-      coreHash: this.state.coreHash || `sha256:ts-builder-placeholder`,
+      coreHash: this.state.coreHash || 'sha256:ts-builder-placeholder',
       models,
       relations: {},
       storage,

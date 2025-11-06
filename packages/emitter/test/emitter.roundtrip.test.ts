@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
-import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
 import type { TargetFamilyHook } from '../src/target-family';
-import { join } from 'node:path';
+import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
@@ -40,7 +40,7 @@ const mockSqlHook: TargetFamilyHook = {
         }
 
         const match = col.type.match(typeIdRegex);
-        if (match && match[1]) {
+        if (match?.[1]) {
           const namespace = match[1];
           if (!referencedNamespaces.has(namespace) && !packNamespaces.has(namespace)) {
             if (namespace === 'pg' && packNamespaces.has('postgres')) {
@@ -107,7 +107,9 @@ describe('emitter round-trip', () => {
       models: contractJson1.models as Record<string, unknown>,
       relations: contractJson1.relations as Record<string, unknown>,
       storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, unknown>,
+      ...(contractJson1.capabilities !== undefined && {
+        capabilities: contractJson1.capabilities as Record<string, Record<string, boolean>>,
+      }),
       meta: contractJson1.meta as Record<string, unknown>,
       sources: contractJson1.sources as Record<string, unknown>,
     };
@@ -191,7 +193,9 @@ describe('emitter round-trip', () => {
       models: contractJson1.models as Record<string, unknown>,
       relations: contractJson1.relations as Record<string, unknown>,
       storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, unknown>,
+      ...(contractJson1.capabilities !== undefined && {
+        capabilities: contractJson1.capabilities as Record<string, Record<string, boolean>>,
+      }),
       meta: contractJson1.meta as Record<string, unknown>,
       sources: contractJson1.sources as Record<string, unknown>,
     };
@@ -241,7 +245,9 @@ describe('emitter round-trip', () => {
       models: contractJson1.models as Record<string, unknown>,
       relations: contractJson1.relations as Record<string, unknown>,
       storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, unknown>,
+      ...(contractJson1.capabilities !== undefined && {
+        capabilities: contractJson1.capabilities as Record<string, Record<string, boolean>>,
+      }),
       meta: contractJson1.meta as Record<string, unknown>,
       sources: contractJson1.sources as Record<string, unknown>,
     };
@@ -307,7 +313,9 @@ describe('emitter round-trip', () => {
       models: contractJson1.models as Record<string, unknown>,
       relations: contractJson1.relations as Record<string, unknown>,
       storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, unknown>,
+      ...(contractJson1.capabilities !== undefined && {
+        capabilities: contractJson1.capabilities as Record<string, Record<string, boolean>>,
+      }),
       meta: contractJson1.meta as Record<string, unknown>,
       sources: contractJson1.sources as Record<string, unknown>,
     };

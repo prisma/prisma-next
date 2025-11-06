@@ -1,5 +1,6 @@
 import type { Adapter, AdapterProfile, LowererContext } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
+import { codecDefinitions } from './codecs';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -10,7 +11,6 @@ import type {
   PostgresLoweredStatement,
   SelectAst,
 } from './types';
-import { codecDefinitions } from './codecs';
 
 const defaultCapabilities = Object.freeze({
   postgres: {

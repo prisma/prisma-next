@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,9 +30,7 @@ describe('loadContractFromTs', () => {
   it('rejects disallowed imports', async () => {
     const contractPath = join(fixturesDir, 'disallowed-import.ts');
 
-    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
-      'Disallowed imports detected',
-    );
+    await expect(loadContractFromTs(contractPath)).rejects.toThrow('Disallowed imports detected');
   });
 
   it('rejects missing contract export', async () => {
@@ -59,4 +57,3 @@ describe('loadContractFromTs', () => {
     );
   });
 });
-

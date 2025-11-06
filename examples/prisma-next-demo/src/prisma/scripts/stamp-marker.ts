@@ -1,10 +1,10 @@
-import { Client } from 'pg';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
 } from '@prisma-next/runtime';
+import { Client } from 'pg';
 
 export interface StampMarkerOptions {
   readonly connectionString: string;
@@ -46,9 +46,9 @@ export async function stampMarker(options: StampMarkerOptions) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const connectionString = process.env['DATABASE_URL'];
-  const coreHash = process.env['CONTRACT_CORE_HASH'];
-  const profileHash = process.env['CONTRACT_PROFILE_HASH'];
+  const connectionString = process.env.DATABASE_URL;
+  const coreHash = process.env.CONTRACT_CORE_HASH;
+  const profileHash = process.env.CONTRACT_PROFILE_HASH;
 
   if (!connectionString || !coreHash || !profileHash) {
     console.error(

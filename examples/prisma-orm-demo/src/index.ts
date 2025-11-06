@@ -1,6 +1,6 @@
+import { getPrisma } from './prisma/client';
 import { createUser } from './queries/create-user';
 import { readUserById } from './queries/read-user';
-import { getPrisma } from './prisma/client';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
@@ -34,7 +34,11 @@ const [cmd, ...args] = argv;
   await prisma.$disconnect();
   // Close Prisma Next runtime if using compat layer
   // Note: runtime.close() is only available when using Prisma Next compat layer
-  if ('runtime' in prisma && prisma.runtime && typeof (prisma.runtime as { close?: () => Promise<void> }).close === 'function') {
+  if (
+    'runtime' in prisma &&
+    prisma.runtime &&
+    typeof (prisma.runtime as { close?: () => Promise<void> }).close === 'function'
+  ) {
     await (prisma.runtime as { close: () => Promise<void> }).close();
   }
 })().catch((error) => {

@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
-import { describe, expect, it } from 'vitest';
-import { createJoinOnBuilder } from '../src/sql';
-import { schema } from '../src/schema';
-import { validateContract } from '../src/contract';
 import type { SqlContract } from '@prisma-next/sql-target';
+import { describe, expect, it } from 'vitest';
+import { validateContract } from '../src/contract';
+import { schema } from '../src/schema';
+import { createJoinOnBuilder } from '../src/sql';
 import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type for this test
@@ -24,11 +23,11 @@ type ContractWithPosts = SqlContract<
         };
       };
     };
-    },
-    Record<string, never>,
-    Record<string, never>,
-    Record<string, never>
-  >;
+  },
+  Record<string, never>,
+  Record<string, never>,
+  Record<string, never>
+>;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',
@@ -78,10 +77,12 @@ describe('JoinOnBuilder', () => {
     const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const postColumns = tables.post.columns;
 
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     expect(() => on.eqCol(null as any, postColumns.userId)).toThrowError(
       /Join ON left operand must be a column/,
     );
 
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     expect(() => on.eqCol({} as any, postColumns.userId)).toThrowError(
       /Join ON left operand must be a column/,
     );
@@ -92,10 +93,12 @@ describe('JoinOnBuilder', () => {
     const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
 
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     expect(() => on.eqCol(userColumns.id, null as any)).toThrowError(
       /Join ON right operand must be a column/,
     );
 
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     expect(() => on.eqCol(userColumns.id, {} as any)).toThrowError(
       /Join ON right operand must be a column/,
     );

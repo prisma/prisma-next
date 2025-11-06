@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma-next/compat-prisma';
-import { getPrismaNextRuntime } from '../prisma-next/runtime';
-import contractJson from '../prisma-next/contract.json' assert { type: 'json' };
 import { validateContract } from '@prisma-next/sql-query/schema';
+import contractJson from '../prisma-next/contract.json' assert { type: 'json' };
+import { getPrismaNextRuntime } from '../prisma-next/runtime';
 
 let prisma: PrismaClient | undefined;
 

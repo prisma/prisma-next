@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { computeCoreHash, computeProfileHash } from '../src/hashing';
 
 describe('hashing', () => {
@@ -41,4 +41,3 @@ describe('hashing', () => {
     expect(hash1).toBe(hash2);
   });
 });
-

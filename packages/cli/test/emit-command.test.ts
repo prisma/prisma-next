@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -76,9 +76,12 @@ describe('emit command', () => {
     expect(existsSync(contractJsonPath)).toBe(true);
     expect(existsSync(contractDtsPath)).toBe(true);
 
-    const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as Record<string, unknown>;
-    expect(contractJson['targetFamily']).toBe('sql');
-    expect(contractJson['_generated']).toBeDefined();
+    const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as Record<
+      string,
+      unknown
+    >;
+    expect(contractJson.targetFamily).toBe('sql');
+    expect(contractJson._generated).toBeDefined();
 
     const contractDts = readFileSync(contractDtsPath, 'utf-8');
     expect(contractDts).toContain('export type Contract');
@@ -285,4 +288,3 @@ describe('emit command', () => {
     expect(exitCode).toBe(1);
   });
 });
-

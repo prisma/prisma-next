@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import { type } from 'arktype';
 import { readJsonFile } from '@prisma-next/node-utils';
+import { type } from 'arktype';
 import type { ExtensionPack, ExtensionPackManifest } from './types';
 
 const TypesImportSpecSchema = type({

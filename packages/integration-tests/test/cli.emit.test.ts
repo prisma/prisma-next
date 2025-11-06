@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { join } from 'node:path';
-import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 
@@ -83,14 +83,14 @@ export const contract = defineContract<CodecTypes>()
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
     const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const contractJson = JSON.parse(contractJsonContent);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    expect(contractJson.targetFamily).toBe('sql');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    expect(contractJson.target).toBe('postgres');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    expect(contractJson.storage.tables.user).toBeDefined();
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    expect(contractJson['targetFamily']).toBe('sql');
+    expect(contractJson['target']).toBe('postgres');
+    expect(
+      ((contractJson['storage'] as Record<string, unknown>)['tables'] as Record<string, unknown>)[
+        'user'
+      ],
+    ).toBeDefined();
 
     expect(contractDtsContent).toContain('export type Contract');
     expect(contractDtsContent).toContain('CodecTypes');
@@ -127,23 +127,24 @@ export const contract = defineContract<CodecTypes>()
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const contractJson = JSON.parse(contractJsonContent);
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
     const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson);
 
     expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
     expect(validatedContract.target).toBe(originalContract.target);
-    const tables = validatedContract.storage['tables'] as Record<string, unknown> | undefined;
-    const originalTables = originalContract.storage?.['tables'] as Record<string, unknown> | undefined;
-    const userTable = tables?.['user'] as Record<string, unknown> | undefined;
-    const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
+    const tables = validatedContract.storage.tables as Record<string, unknown> | undefined;
+    const originalTables = originalContract.storage?.tables as Record<string, unknown> | undefined;
+    const userTable = tables?.user as Record<string, unknown> | undefined;
+    const originalUserTable = originalTables?.user as Record<string, unknown> | undefined;
     if (userTable && originalUserTable) {
-      const columns = userTable['columns'] as Record<string, { type?: string }> | undefined;
-      const originalColumns = originalUserTable['columns'] as Record<string, { type?: string }> | undefined;
+      const columns = userTable.columns as Record<string, { type?: string }> | undefined;
+      const originalColumns = originalUserTable.columns as
+        | Record<string, { type?: string }>
+        | undefined;
       if (columns && originalColumns) {
-        expect(columns['id']?.['type']).toBe(originalColumns['id']?.['type']);
-        expect(columns['email']?.['type']).toBe(originalColumns['email']?.['type']);
+        expect(columns.id?.type).toBe(originalColumns.id?.type);
+        expect(columns.email?.type).toBe(originalColumns.email?.type);
       }
     }
   });

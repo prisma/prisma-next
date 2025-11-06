@@ -1,9 +1,9 @@
+import { unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { ContractIR } from '@prisma-next/emitter';
 import { build } from 'esbuild';
 import type { Plugin } from 'esbuild';
-import { writeFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import type { ContractIR } from '@prisma-next/emitter';
 
 export interface LoadTsContractOptions {
   readonly allowlist?: ReadonlyArray<string>;
@@ -15,7 +15,7 @@ function isAllowedImport(importPath: string, allowlist: ReadonlyArray<string>): 
   for (const pattern of allowlist) {
     if (pattern.endsWith('/*')) {
       const prefix = pattern.slice(0, -2);
-      if (importPath === prefix || importPath.startsWith(prefix + '/')) {
+      if (importPath === prefix || importPath.startsWith(`${prefix}/`)) {
         return true;
       }
     } else if (importPath === pattern) {
@@ -146,34 +146,28 @@ export async function loadContractFromTs(
 
     if (disallowedImports.length > 0) {
       throw new Error(
-        `Disallowed imports detected. Only imports matching the allowlist are permitted:\n` +
-          `  Allowlist: ${allowlist.join(', ')}\n` +
-          `  Disallowed imports: ${disallowedImports.join(', ')}\n` +
-          `\nOnly @prisma-next/* packages are allowed in contract files.`,
+        `Disallowed imports detected. Only imports matching the allowlist are permitted:\n  Allowlist: ${allowlist.join(', ')}\n  Disallowed imports: ${disallowedImports.join(', ')}\n\nOnly @prisma-next/* packages are allowed in contract files.`,
       );
     }
 
-    const bundleContent = result.outputFiles[0]!.text;
+    const bundleContent = result.outputFiles[0]?.text;
     writeFileSync(tempFile, bundleContent, 'utf-8');
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const module = await import(`file://${tempFile}`);
+    const module = (await import(`file://${tempFile}`)) as {
+      default?: unknown;
+      contract?: unknown;
+    };
     unlinkSync(tempFile);
 
     let contract: unknown;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (module.default !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       contract = module.default;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     } else if (module.contract !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       contract = module.contract;
     } else {
       throw new Error(
-        `Contract file must export a contract as default export or named export 'contract'. ` +
-          `Found exports: ${Object.keys(module as Record<string, unknown>).join(', ') || 'none'}`,
+        `Contract file must export a contract as default export or named export 'contract'. Found exports: ${Object.keys(module as Record<string, unknown>).join(', ') || 'none'}`,
       );
     }
 

@@ -1,22 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach, expectTypeOf } from 'vitest';
-import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { loadContractFromTs } from '../src/load-ts-contract';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR } from '@prisma-next/emitter';
-import { sql } from '@prisma-next/sql-query/sql';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import type {
-  ResultType,
   Adapter,
-  SelectAst,
   LoweredStatement,
+  ResultType,
+  SelectAst,
 } from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { sqlTargetFamilyHook, createCodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry, sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { loadContractFromTs } from '../src/load-ts-contract';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
@@ -88,12 +88,12 @@ describe('emit integration', () => {
     type CodecTypes = Record<string, { input: unknown; output: unknown }>;
 
     const tables = schema<Contract, CodecTypes>(validatedContract).tables;
-    const userTable = tables['user'];
+    const userTable = tables.user;
     if (!userTable) {
       throw new Error('User table not found');
     }
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
     if (!idColumn || !emailColumn) {
       throw new Error('Columns not found');
     }
@@ -131,12 +131,12 @@ describe('emit integration', () => {
 
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    if (!contractJson1['extensions']) {
-      contractJson1['extensions'] = {};
+    if (!contractJson1.extensions) {
+      contractJson1.extensions = {};
     }
-    const extensions = contractJson1['extensions'] as Record<string, unknown>;
-    if (!extensions['pg']) {
-      extensions['pg'] = {};
+    const extensions = contractJson1.extensions as Record<string, unknown>;
+    if (!extensions.pg) {
+      extensions.pg = {};
     }
 
     const contract2 = contractJson1 as unknown as ContractIR;

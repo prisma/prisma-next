@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
-import { describe, expect, it, expectTypeOf } from 'vitest';
-import { validateContract } from '../src/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import { validateContract } from '../src/contract';
 
 describe('validateContract structure validation', () => {
   const validContractInput = {
@@ -29,31 +28,37 @@ describe('validateContract structure validation', () => {
   });
 
   it('throws on missing targetFamily', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, targetFamily: undefined } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/targetFamily/);
   });
 
   it('throws on wrong targetFamily', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, targetFamily: 'document' } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/targetFamily/);
   });
 
   it('throws on missing target', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, target: undefined } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/target/);
   });
 
   it('throws on missing coreHash', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, coreHash: undefined } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/coreHash/);
   });
 
   it('throws on missing storage', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, storage: undefined } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/storage/);
   });
 
   it('throws on missing models', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, models: undefined } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/models/);
   });
@@ -70,6 +75,7 @@ describe('validateContract structure validation', () => {
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /Column.*validation failed|type.*must be.*string/,
@@ -88,6 +94,7 @@ describe('validateContract structure validation', () => {
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /Column.*validation failed|nullable.*must be.*boolean/,
@@ -155,11 +162,12 @@ describe('validateContract logic validation', () => {
       storage: {
         tables: {
           User: {
-            ...validContractInput.storage.tables['User'],
+            ...validContractInput.storage.tables.User,
             primaryKey: { columns: ['nonExistent'] },
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /primaryKey references non-existent column/,
@@ -172,11 +180,12 @@ describe('validateContract logic validation', () => {
       storage: {
         tables: {
           User: {
-            ...validContractInput.storage.tables['User'],
+            ...validContractInput.storage.tables.User,
             uniques: [{ columns: ['nonExistent'] }],
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /unique constraint references non-existent column/,
@@ -189,11 +198,12 @@ describe('validateContract logic validation', () => {
       storage: {
         tables: {
           User: {
-            ...validContractInput.storage.tables['User'],
+            ...validContractInput.storage.tables.User,
             indexes: [{ columns: ['nonExistent'] }],
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /index references non-existent column/,
@@ -206,7 +216,7 @@ describe('validateContract logic validation', () => {
       storage: {
         tables: {
           Post: {
-            ...validContractInput.storage.tables['Post'],
+            ...validContractInput.storage.tables.Post,
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -216,6 +226,7 @@ describe('validateContract logic validation', () => {
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /foreignKey references non-existent table/,
@@ -228,7 +239,7 @@ describe('validateContract logic validation', () => {
       storage: {
         tables: {
           Post: {
-            ...validContractInput.storage.tables['Post'],
+            ...validContractInput.storage.tables.Post,
             foreignKeys: [
               {
                 columns: ['nonExistent'],
@@ -238,6 +249,7 @@ describe('validateContract logic validation', () => {
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /foreignKey references non-existent column.*nonExistent/,
@@ -249,9 +261,9 @@ describe('validateContract logic validation', () => {
       ...validContractInput,
       storage: {
         tables: {
-          User: validContractInput.storage.tables['User'],
+          User: validContractInput.storage.tables.User,
           Post: {
-            ...validContractInput.storage.tables['Post'],
+            ...validContractInput.storage.tables.Post,
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -261,6 +273,7 @@ describe('validateContract logic validation', () => {
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /foreignKey references non-existent column.*nonExistent.*User/,
@@ -272,9 +285,9 @@ describe('validateContract logic validation', () => {
       ...validContractInput,
       storage: {
         tables: {
-          User: validContractInput.storage.tables['User'],
+          User: validContractInput.storage.tables.User,
           Post: {
-            ...validContractInput.storage.tables['Post'],
+            ...validContractInput.storage.tables.Post,
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -284,6 +297,7 @@ describe('validateContract logic validation', () => {
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /column count.*does not match/,
@@ -368,6 +382,7 @@ describe('validateContract', () => {
   });
 
   it('throws on structural validation failure', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContract, targetFamily: undefined } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /Invalid targetFamily|Contract header validation failed|structural validation failed/,
@@ -380,11 +395,12 @@ describe('validateContract', () => {
       storage: {
         tables: {
           User: {
-            ...validContract.storage.tables['User'],
+            ...validContract.storage.tables.User,
             primaryKey: { columns: ['nonExistent'] },
           },
         },
       },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /primaryKey references non-existent column/,
@@ -416,7 +432,7 @@ describe('validateContract', () => {
     expectTypeOf(result).toMatchTypeOf<SqlContract<SqlStorage>>();
     // Verify structure is validated at runtime
     expect(result.storage.tables).toHaveProperty('User');
-    expect(result.storage.tables['User']?.columns).toHaveProperty('id');
+    expect(result.storage.tables.User?.columns).toHaveProperty('id');
   });
 
   it('handles missing relations field', () => {

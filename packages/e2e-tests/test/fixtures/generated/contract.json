@@ -66,9 +66,7 @@
           }
         },
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "post": {
@@ -84,9 +82,7 @@
           }
         },
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "user": {
@@ -99,9 +95,7 @@
           }
         },
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       }
     }

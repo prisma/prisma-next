@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { lints } from '../src/plugins/lints';
 import type { Plan } from '@prisma-next/sql-query/types';
+import { describe, expect, it, vi } from 'vitest';
+import { lints } from '../src/plugins/lints';
 import type { PluginContext } from '../src/plugins/types';
 
 describe('lints plugin', () => {
@@ -238,4 +238,3 @@ describe('lints plugin', () => {
     });
   });
 });
-

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SelectAst, JoinAst, JoinOnExpr } from '../src/types';
+import type { JoinAst, JoinOnExpr, SelectAst } from '../src/types';
 
 describe('Join AST types', () => {
   it('defines JoinOnExpr with eqCol kind', () => {

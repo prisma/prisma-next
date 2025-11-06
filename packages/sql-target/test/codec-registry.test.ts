@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { createCodecRegistry, codec } from '../src/codecs';
+import { describe, expect, it } from 'vitest';
+import { codec, createCodecRegistry } from '../src/codecs';
 
 describe('CodecRegistry', () => {
   describe('createCodecRegistry', () => {
@@ -275,4 +275,3 @@ describe('CodecRegistry', () => {
     });
   });
 });
-

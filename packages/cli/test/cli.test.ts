@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
 
 describe('CLI entry point', () => {
@@ -61,4 +61,3 @@ describe('CLI entry point', () => {
     expect(program.version()).toBe('0.0.1');
   });
 });
-

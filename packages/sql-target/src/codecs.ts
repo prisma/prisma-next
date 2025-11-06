@@ -154,12 +154,11 @@ export function codec<Id extends string, TWire, TJs>(config: {
 /**
  * Type helpers to extract codec types.
  */
-export type CodecId<T> =
-  T extends Codec<infer Id, unknown, unknown>
+export type CodecId<T> = T extends Codec<infer Id, unknown, unknown>
+  ? Id
+  : T extends { readonly id: infer Id }
     ? Id
-    : T extends { readonly id: infer Id }
-      ? Id
-      : never;
+    : never;
 export type CodecInput<T> = T extends Codec<string, unknown, infer JsT> ? JsT : never;
 export type CodecOutput<T> = T extends Codec<string, unknown, infer JsT> ? JsT : never;
 
@@ -279,12 +278,11 @@ class CodecDefBuilderImpl<
     // Populate dataTypes from codecs - extract id property from each codec
     // Build object preserving keys from ScalarNames
     // Type assertion is safe because we know ScalarNames structure matches the return type
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic codec mapping requires any
     const dataTypes = {} as any;
     for (const key in this._codecs) {
       if (Object.prototype.hasOwnProperty.call(this._codecs, key)) {
         const codec = this._codecs[key] as Codec<string>;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         dataTypes[key] = codec.id;
       }
     }

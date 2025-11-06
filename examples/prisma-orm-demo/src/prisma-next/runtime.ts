@@ -1,16 +1,16 @@
-import { Client } from 'pg';
-import { createRuntime, budgets } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import contractJson from './contract.json' assert { type: 'json' };
+import { budgets, createRuntime } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-query/schema';
+import { Client } from 'pg';
+import contractJson from './contract.json' assert { type: 'json' };
 
 let runtime: ReturnType<typeof createRuntime> | undefined;
 let client: Client | undefined;
 
 export function getPrismaNextRuntime() {
   if (!runtime) {
-    const connectionString = process.env['DATABASE_URL'];
+    const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
       throw new Error('DATABASE_URL environment variable is required');
     }
