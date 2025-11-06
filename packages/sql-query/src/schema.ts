@@ -1,5 +1,5 @@
 import { planInvalid } from './errors';
-import type { SqlContract, SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-target';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 import type {
   BinaryBuilder,
   ColumnBuilder,
@@ -8,6 +8,21 @@ import type {
   ParamPlaceholder,
   TableRef,
 } from './types';
+
+type TableColumns<Table extends { columns: Record<string, StorageColumn> }> = Table['columns'];
+
+type ColumnBuilders<
+  Contract extends SqlContract<SqlStorage>,
+  TableName extends string,
+  Columns extends Record<string, StorageColumn>,
+  CodecTypes extends Record<string, { output: unknown }>,
+> = {
+  readonly [K in keyof Columns]: ColumnBuilderImpl<
+    K & string,
+    Columns[K],
+    ComputeColumnJsType<Contract, TableName, K & string, Columns[K], CodecTypes>
+  >;
+};
 
 class ColumnBuilderImpl<
   ColumnName extends string,
@@ -72,28 +87,15 @@ class TableBuilderImpl<
 > implements TableRef
 {
   readonly kind = 'table' as const;
-  readonly columns: {
-    readonly [K in keyof Columns]: ColumnBuilderImpl<
-      K & string,
-      Columns[K],
-      ComputeColumnJsType<Contract, TableName, K & string, Columns[K], CodecTypes>
-    >;
-  };
+  readonly columns: ColumnBuilders<Contract, TableName, Columns, CodecTypes>;
   private readonly _name: TableName;
 
   constructor(
     name: TableName,
     columns: Record<string, ColumnBuilderImpl<string, StorageColumn, unknown>>,
   ) {
-    // Store name in private property to prevent overwriting
     this._name = name;
-    this.columns = columns as {
-      readonly [K in keyof Columns]: ColumnBuilderImpl<
-        K & string,
-        Columns[K],
-        ComputeColumnJsType<Contract, TableName, K & string, Columns[K], CodecTypes>
-      >;
-    };
+    this.columns = columns as ColumnBuilders<Contract, TableName, Columns, CodecTypes>;
   }
 
   get name(): string {
@@ -110,38 +112,24 @@ function buildColumns<
   storage: SqlStorage,
   _contract: Contract,
   _codecTypes: CodecTypes,
-): {
-  readonly [K in keyof Contract['storage']['tables'][TableName]['columns']]: ColumnBuilderImpl<
-    K & string,
-    Contract['storage']['tables'][TableName]['columns'][K],
-    ComputeColumnJsType<
-      Contract,
-      TableName,
-      K & string,
-      Contract['storage']['tables'][TableName]['columns'][K],
-      CodecTypes
-    >
-  >;
-} {
+): ColumnBuilders<
+  Contract,
+  TableName,
+  Contract['storage']['tables'][TableName]['columns'],
+  CodecTypes
+> {
   const table = storage.tables[tableName];
 
   if (!table) {
     throw planInvalid(`Unknown table ${tableName}`);
   }
 
-  const result = {} as {
-    readonly [K in keyof Contract['storage']['tables'][TableName]['columns']]: ColumnBuilderImpl<
-      K & string,
-      Contract['storage']['tables'][TableName]['columns'][K],
-      ComputeColumnJsType<
-        Contract,
-        TableName,
-        K & string,
-        Contract['storage']['tables'][TableName]['columns'][K],
-        CodecTypes
-      >
-    >;
-  };
+  const result = {} as ColumnBuilders<
+    Contract,
+    TableName,
+    Contract['storage']['tables'][TableName]['columns'],
+    CodecTypes
+  >;
 
   for (const [columnName, columnDef] of Object.entries(table.columns)) {
     if (!columnDef) continue;
@@ -156,6 +144,18 @@ function buildColumns<
   return result;
 }
 
+/**
+ * Creates a Proxy that enables accessing table columns directly on the table object,
+ * in addition to the standard `table.columns.columnName` syntax.
+ *
+ * This allows both access patterns:
+ * - `tables.user.columns.id` (standard access)
+ * - `tables.user.id` (convenience access via proxy)
+ *
+ * The proxy intercepts property access and routes column name lookups to
+ * `table.columns[prop]`, while preserving direct access to table properties
+ * like `name`, `kind`, and `columns`.
+ */
 function createTableProxy<
   Contract extends SqlContract<SqlStorage>,
   TableName extends string,
@@ -166,11 +166,9 @@ function createTableProxy<
 ): TableBuilderImpl<Contract, TableName, Columns, CodecTypes> {
   return new Proxy(table, {
     get(target, prop) {
-      // If it's a built-in property (name, kind, columns), return it directly
       if (prop === 'name' || prop === 'kind' || prop === 'columns') {
         return Reflect.get(target, prop);
       }
-      // Otherwise, check if it's a column name and route to columns
       if (typeof prop === 'string' && prop in target.columns) {
         return target.columns[prop as keyof typeof target.columns];
       }
@@ -182,47 +180,15 @@ function createTableProxy<
 type ExtractSchemaTables<
   Contract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> = Contract['storage'] extends { tables: infer Tables }
-  ? Tables extends { readonly [K in keyof Tables]: StorageTable }
-    ? {
-        readonly [TableName in keyof Tables]: TableBuilderImpl<
-          Contract,
-          TableName & string,
-          Tables[TableName] extends { columns: infer C }
-            ? C extends Record<string, StorageColumn>
-              ? C
-              : never
-            : never,
-          CodecTypes
-        > &
-          TableRef;
-      }
-    : {
-        readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
-          Contract,
-          TableName & string,
-          Contract['storage']['tables'][TableName] extends { columns: infer C }
-            ? C extends Record<string, StorageColumn>
-              ? C
-              : never
-            : never,
-          CodecTypes
-        > &
-          TableRef;
-      }
-  : {
-      readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
-        Contract,
-        TableName & string,
-        Contract['storage']['tables'][TableName] extends { columns: infer C }
-          ? C extends Record<string, StorageColumn>
-            ? C
-            : never
-          : never,
-        CodecTypes
-      > &
-        TableRef;
-    };
+> = {
+  readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
+    Contract,
+    TableName & string,
+    TableColumns<Contract['storage']['tables'][TableName]>,
+    CodecTypes
+  > &
+    TableRef;
+};
 
 export type SchemaHandle<
   Contract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
@@ -236,7 +202,7 @@ export function schema<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 >(contract: Contract, codecTypes?: CodecTypes): SchemaHandle<Contract, CodecTypes> {
   const storage = contract.storage;
-
+  const codecTypesValue = (codecTypes ?? {}) as CodecTypes;
   const tables = {} as ExtractSchemaTables<Contract, CodecTypes>;
 
   for (const tableName in storage.tables) {
@@ -244,7 +210,7 @@ export function schema<
       tableName,
       storage,
       contract,
-      (codecTypes ?? {}) as CodecTypes,
+      codecTypesValue,
     );
     const table = new TableBuilderImpl<
       Contract,
@@ -260,13 +226,7 @@ export function schema<
     >(table);
     (tables as Record<string, unknown>)[tableName] = Object.freeze(
       proxiedTable,
-    ) as TableBuilderImpl<
-      Contract,
-      typeof tableName & string,
-      Contract['storage']['tables'][typeof tableName]['columns'],
-      CodecTypes
-    > &
-      TableRef;
+    ) as ExtractSchemaTables<Contract, CodecTypes>[typeof tableName];
   }
 
   return Object.freeze({ tables });

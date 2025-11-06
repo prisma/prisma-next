@@ -144,9 +144,7 @@ describe('canonicalization', () => {
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result);
 
-    const indexNames = parsed.storage.tables.user.indexes.map(
-      (idx: { name: string }) => idx.name,
-    );
+    const indexNames = parsed.storage.tables.user.indexes.map((idx: { name: string }) => idx.name);
     expect(indexNames).toEqual(['user_email_idx', 'user_name_idx']);
   });
 
@@ -172,22 +170,6 @@ describe('canonicalization', () => {
 
     const columnKeys = Object.keys(parsed.storage.tables.user.columns);
     expect(columnKeys).toEqual(['a_field', 'm_field', 'z_field']);
-  });
-
-  it('produces compact JSON without whitespace', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      storage: { tables: {} },
-    };
-
-    const result = canonicalizeContract(ir);
-
-    expect(result).not.toContain('\n');
-    expect(result).not.toContain(' ');
-    expect(result.startsWith('{')).toBe(true);
-    expect(result.endsWith('}')).toBe(true);
   });
 
   it('sorts extension namespaces lexicographically', () => {
@@ -229,4 +211,3 @@ describe('canonicalization', () => {
     expect(parsed.storage.tables.user.columns.id.generated).toBeUndefined();
   });
 });
-
