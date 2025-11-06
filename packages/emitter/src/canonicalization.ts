@@ -40,6 +40,11 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
   for (const [key, value] of Object.entries(obj)) {
     const currentPath = [...path, key];
 
+    // Exclude metadata fields from canonicalization
+    if (key === '_generated') {
+      continue;
+    }
+
     if (key === 'nullable' && value === false) {
       continue;
     }
@@ -50,9 +55,8 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
 
     if (isDefaultValue(value)) {
       const isRequiredModels = currentPath.length === 1 && currentPath[0] === 'models';
-      const isRequiredTables = currentPath.length === 2 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'tables';
+      const isRequiredTables =
+        currentPath.length === 2 && currentPath[0] === 'storage' && currentPath[1] === 'tables';
 
       if (!isRequiredModels && !isRequiredTables) {
         continue;
@@ -208,4 +212,3 @@ export function canonicalizeContract(
 
   return JSON.stringify(withOrderedTopLevel, null, 2);
 }
-
