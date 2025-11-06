@@ -59,7 +59,7 @@ export function createEmitCommand(): Command {
           const contractDtsPath = join(outputDir, 'contract.d.ts');
 
           // Add _generated metadata field to indicate this is a generated artifact
-          const contractJsonObj = JSON.parse(result.contractJson);
+          const contractJsonObj = JSON.parse(result.contractJson) as Record<string, unknown>;
           const contractJsonWithMeta = {
             ...contractJsonObj,
             _generated: {

@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, expectTypeOf } from 'vitest';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { loadContractFromTs } from '../src/load-ts-contract';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import type { ContractIR } from '@prisma-next/emitter';
 import { sql } from '@prisma-next/sql-query/sql';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import type {
@@ -16,6 +18,7 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { sqlTargetFamilyHook, createCodecRegistry } from '@prisma-next/sql-target';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
@@ -76,7 +79,7 @@ describe('emit integration', () => {
     writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
     writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
 
-    const contractJson = JSON.parse(result.contractJson);
+    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
     const validatedContract = validateContract(contractJson);
 
     const adapter = createStubAdapter();
@@ -126,17 +129,23 @@ describe('emit integration', () => {
       sqlTargetFamilyHook,
     );
 
-    const contractJson1 = JSON.parse(result1.contractJson);
+    const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (!contractJson1.extensions) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       contractJson1.extensions = {};
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (!contractJson1.extensions.pg) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       contractJson1.extensions.pg = {};
     }
 
-    const contract2 = contractJson1;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const contract2 = contractJson1 as ContractIR;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const result2 = await emit(
       contract2,
       {

@@ -26,7 +26,7 @@ interface FindManyArgs {
   readonly skip?: number;
 }
 
-interface FindFirstArgs extends FindManyArgs {}
+type FindFirstArgs = FindManyArgs;
 
 // NOTE: we can rely on the Prisma ORM's complex type definitions for the method return values, we only need to ensure the compatibility layer behaves correctly at runtime
 class ModelDelegate {
@@ -299,7 +299,9 @@ class ModelDelegate {
     throw this.unsupportedError('update() mutations are not supported in MVP compatibility layer');
   }
 
-  async delete(_args: { where: Record<string, unknown> }): Promise<Record<string, unknown>> {
+  async delete(_args: {
+    where: Record<string, unknown>;
+  }): Promise<Record<string, unknown>> {
     throw this.unsupportedError('delete() mutations are not supported in MVP compatibility layer');
   }
 

@@ -16,11 +16,13 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('streams rows using buffered fallback when cursor disabled', async () => {
     const db = newDb();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as typeof Pool },
+      connect: { pool: pool as unknown as import('pg').Pool },
       cursor: { disabled: true },
     });
 

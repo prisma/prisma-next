@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadContractFromTs } from '../src/load-ts-contract';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
 
 describe('loadContractFromTs', () => {

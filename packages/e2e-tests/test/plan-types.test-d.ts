@@ -15,7 +15,7 @@ const __dirname = dirname(__filename);
 
 test('inferred row types are correct', () => {
   const outputDir = resolve(__dirname, 'fixtures/generated');
-  const contractJson = JSON.parse(readFileSync(join(outputDir, 'contract.json'), 'utf-8'));
+  const contractJson = JSON.parse(readFileSync(join(outputDir, 'contract.json'), 'utf-8')) as Record<string, unknown>;
   const contract = validateContract<Contract>(contractJson);
 
   const adapter = createPostgresAdapter();
@@ -29,4 +29,5 @@ test('inferred row types are correct', () => {
   type Row = ResultType<typeof plan>;
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+  void plan; // Used as a type in ResultType<typeof plan>
 });

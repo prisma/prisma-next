@@ -48,7 +48,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    const contractJson = JSON.parse(contractJsonContent);
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
     const contract = validateContract<Contract>(contractJson);
 
     // 2) Start dev DB and prepare schema/data
@@ -135,7 +135,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    const contractJson = JSON.parse(contractJsonContent);
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
     const contract = validateContract<Contract>(contractJson);
 
     await withDevDatabase(
@@ -247,7 +247,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    const contractJson = JSON.parse(contractJsonContent);
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
     const contract = validateContract<Contract>(contractJson);
 
     await withDevDatabase(
@@ -360,7 +360,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    const contractJson = JSON.parse(contractJsonContent);
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
     const contract = validateContract<Contract>(contractJson);
 
     await withDevDatabase(
@@ -466,7 +466,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    const contractJson = JSON.parse(contractJsonContent);
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
     const contract = validateContract<Contract>(contractJson);
 
     await withDevDatabase(
@@ -578,7 +578,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    const contractJson = JSON.parse(contractJsonContent);
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
     const contract = validateContract<Contract>(contractJson);
 
     await withDevDatabase(

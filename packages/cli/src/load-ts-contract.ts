@@ -147,19 +147,24 @@ export async function loadContractFromTs(
     const bundleContent = result.outputFiles[0]!.text;
     writeFileSync(tempFile, bundleContent, 'utf-8');
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const module = await import(`file://${tempFile}`);
     unlinkSync(tempFile);
 
     let contract: unknown;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (module.default !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       contract = module.default;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     } else if (module.contract !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       contract = module.contract;
     } else {
       throw new Error(
         `Contract file must export a contract as default export or named export 'contract'. ` +
-          `Found exports: ${Object.keys(module).join(', ') || 'none'}`,
+          `Found exports: ${Object.keys(module as Record<string, unknown>).join(', ') || 'none'}`,
       );
     }
 

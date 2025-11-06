@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { loadContractFromTs } from '../src/load-ts-contract';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
 
 describe('emit command functionality', () => {
@@ -50,10 +52,12 @@ describe('emit command functionality', () => {
     expect(existsSync(contractJsonPath)).toBe(true);
     expect(existsSync(contractDtsPath)).toBe(true);
 
-    const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
-    expect(contractJson.targetFamily).toBe('sql');
-    expect(contractJson.target).toBe('postgres');
-    expect(contractJson.storage.tables.user).toBeDefined();
+    const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as Record<string, unknown>;
+    expect(contractJson['targetFamily']).toBe('sql');
+    expect(contractJson['target']).toBe('postgres');
+    const storage = contractJson['storage'] as Record<string, unknown> | undefined;
+    const tables = storage?.['tables'] as Record<string, unknown> | undefined;
+    expect(tables?.['user']).toBeDefined();
 
     const contractDts = readFileSync(contractDtsPath, 'utf-8');
     expect(contractDts).toContain('export type Contract');

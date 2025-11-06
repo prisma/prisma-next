@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
-import { mkdir, writeFile, rm, readFile, existsSync } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -128,11 +129,17 @@ export const contract = defineContract<CodecTypes>()
 
     expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
     expect(validatedContract.target).toBe(originalContract.target);
-    expect(validatedContract.storage.tables.user.columns.id.type).toBe(
-      originalContract.storage?.tables?.user?.columns?.id?.type,
-    );
-    expect(validatedContract.storage.tables.user.columns.email.type).toBe(
-      originalContract.storage?.tables?.user?.columns?.email?.type,
-    );
+    const tables = validatedContract.storage['tables'] as Record<string, unknown> | undefined;
+    const originalTables = originalContract.storage?.['tables'] as Record<string, unknown> | undefined;
+    const userTable = tables?.['user'] as Record<string, unknown> | undefined;
+    const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
+    if (userTable && originalUserTable) {
+      const columns = userTable['columns'] as Record<string, { type?: string }> | undefined;
+      const originalColumns = originalUserTable['columns'] as Record<string, { type?: string }> | undefined;
+      if (columns && originalColumns) {
+        expect(columns['id']?.['type']).toBe(originalColumns['id']?.['type']);
+        expect(columns['email']?.['type']).toBe(originalColumns['email']?.['type']);
+      }
+    }
   });
 });

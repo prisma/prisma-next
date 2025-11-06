@@ -1,6 +1,7 @@
 import { defineContract } from '@prisma-next/sql-query/contract-builder';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 // @ts-expect-error - This import is intentionally disallowed for testing
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { something } from 'some-other-package';
 
 export const contract = defineContract<CodecTypes>()

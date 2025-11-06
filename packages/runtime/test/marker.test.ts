@@ -29,7 +29,9 @@ describe('marker helpers', { timeout: 100 }, () => {
     try {
       await client.end();
       await database.close();
-    } catch (error) {}
+    } catch {
+      // Ignore errors closing the client or database since it probably means it's already closed
+    }
   });
 
   beforeEach(async () => {
