@@ -292,18 +292,18 @@ class ModelDelegate {
     return result;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async update(_args: {
     where: Record<string, unknown>;
     data: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
+    void _args;
     throw this.unsupportedError('update() mutations are not supported in MVP compatibility layer');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async delete(_args: {
     where: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
+    void _args;
     throw this.unsupportedError('delete() mutations are not supported in MVP compatibility layer');
   }
 

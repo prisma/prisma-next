@@ -68,8 +68,9 @@ export function decodeRow(
     const wireValue = row[alias];
 
     // Check if this is an include alias (marked with "include:alias" in meta.projection)
-    const projectionValue = plan.meta.projection && typeof plan.meta.projection === 'object' && !Array.isArray(plan.meta.projection)
-      ? plan.meta.projection[alias]
+    const projection = plan.meta.projection;
+    const projectionValue = projection && typeof projection === 'object' && !Array.isArray(projection)
+      ? (projection as Record<string, string>)[alias]
       : undefined;
 
     if (typeof projectionValue === 'string' && projectionValue.startsWith('include:')) {

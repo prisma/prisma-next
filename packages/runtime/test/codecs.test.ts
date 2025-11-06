@@ -495,6 +495,11 @@ describe('Row Decoding', () => {
       sql: 'SELECT * FROM test',
       params: [],
       meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
         projection: {
           id: 'test.id',
           posts: 'include:posts',
@@ -509,17 +514,7 @@ describe('Row Decoding', () => {
         from: { kind: 'table', name: 'test' },
         project: [],
       },
-      contract: validateContract<SqlContract<SqlStorage>>({
-        target: 'postgres',
-        targetFamily: 'sql',
-        coreHash: 'sha256:test',
-        profileHash: 'sha256:test',
-        storage: { tables: {} },
-        models: {},
-        relations: {},
-        mappings: {},
-      }),
-    };
+    } as Plan;
     const row = { id: 42, posts: '[{"id":1,"title":"Post 1"},{"id":2,"title":"Post 2"}]' };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['id']).toBe(42);
@@ -533,6 +528,11 @@ describe('Row Decoding', () => {
       sql: 'SELECT * FROM test',
       params: [],
       meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
         projection: {
           id: 'test.id',
           posts: 'include:posts',
@@ -547,17 +547,7 @@ describe('Row Decoding', () => {
         from: { kind: 'table', name: 'test' },
         project: [],
       },
-      contract: validateContract<SqlContract<SqlStorage>>({
-        target: 'postgres',
-        targetFamily: 'sql',
-        coreHash: 'sha256:test',
-        profileHash: 'sha256:test',
-        storage: { tables: {} },
-        models: {},
-        relations: {},
-        mappings: {},
-      }),
-    };
+    } as Plan;
     const row = { id: 42, posts: null };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['id']).toBe(42);
@@ -570,6 +560,11 @@ describe('Row Decoding', () => {
       sql: 'SELECT * FROM test',
       params: [],
       meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
         projection: {
           id: 'test.id',
           posts: 'include:posts',
@@ -584,17 +579,7 @@ describe('Row Decoding', () => {
         from: { kind: 'table', name: 'test' },
         project: [],
       },
-      contract: validateContract<SqlContract<SqlStorage>>({
-        target: 'postgres',
-        targetFamily: 'sql',
-        coreHash: 'sha256:test',
-        profileHash: 'sha256:test',
-        storage: { tables: {} },
-        models: {},
-        relations: {},
-        mappings: {},
-      }),
-    };
+    } as Plan;
     const row = { id: 42, posts: [{ id: 1, title: 'Post 1' }] };
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['id']).toBe(42);
@@ -608,6 +593,11 @@ describe('Row Decoding', () => {
       sql: 'SELECT * FROM test',
       params: [],
       meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
         projection: {
           id: 'test.id',
           posts: 'include:posts',
@@ -622,17 +612,7 @@ describe('Row Decoding', () => {
         from: { kind: 'table', name: 'test' },
         project: [],
       },
-      contract: validateContract<SqlContract<SqlStorage>>({
-        target: 'postgres',
-        targetFamily: 'sql',
-        coreHash: 'sha256:test',
-        profileHash: 'sha256:test',
-        storage: { tables: {} },
-        models: {},
-        relations: {},
-        mappings: {},
-      }),
-    };
+    } as Plan;
     const row = { id: 42, posts: 'invalid json' };
     expect(() => decodeRow(row, plan, registry)).toThrow();
   });

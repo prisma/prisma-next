@@ -436,7 +436,7 @@ describe('SQL builder includeMany', () => {
 
     const projection = plan.meta.projection;
     if (projection && typeof projection === 'object' && !Array.isArray(projection)) {
-      expect(projection['posts']).toBe('include:posts');
+      expect((projection as Record<string, string>)['posts']).toBe('include:posts');
     }
   });
 
