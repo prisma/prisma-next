@@ -6,6 +6,8 @@ import type { ResultType, Plan, TableKey, TablesOf } from '../src/types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 import { validateContract } from '../src/contract';
 import type { Contract, CodecTypes, ScalarToJs } from './fixtures/contract.d';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { CodecTypes as PgCodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
 // Helper to simulate execute signature
 function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
@@ -430,4 +432,71 @@ test('representative contract resolves types correctly end-to-end', () => {
     email: string; // pg/text@1 → string
     createdAt: string; // pg/timestamptz@1 → string
   }>();
+});
+
+test('result typing is derived solely from projection, unaffected by joins', () => {
+  const contractWithPosts = validateContract<SqlContract<SqlStorage>>({
+    target: 'postgres',
+    targetFamily: 'sql' as const,
+    coreHash: 'sha256:test-core',
+    profileHash: 'sha256:test-profile',
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { type: 'pg/int4@1', nullable: false },
+            email: { type: 'pg/text@1', nullable: false },
+          },
+        },
+        post: {
+          columns: {
+            id: { type: 'pg/int4@1', nullable: false },
+            userId: { type: 'pg/int4@1', nullable: false },
+            title: { type: 'pg/text@1', nullable: false },
+          },
+        },
+      },
+    },
+    models: {},
+    relations: {},
+    mappings: {},
+  });
+
+  const adapter = createPostgresAdapter();
+  const tables = schema<typeof contractWithPosts, PgCodecTypes>(contractWithPosts).tables;
+  const userTable = tables['user'];
+  const postTable = tables['post'];
+  if (!userTable || !postTable) throw new Error('tables not found');
+  const userColumns = userTable.columns;
+  const postColumns = postTable.columns;
+
+  const plan = sql<typeof contractWithPosts, PgCodecTypes>({ contract: contractWithPosts, adapter })
+    .from(userTable)
+    .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
+    .select({
+      userId: userColumns['id']!,
+      postId: postColumns['id']!,
+      title: postColumns['title']!,
+    })
+    .build();
+
+  type Row = ResultType<typeof plan>;
+
+  // Row type should only include projected columns, not all available columns
+  expectTypeOf<Row['userId']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['postId']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['title']>().toEqualTypeOf<string>();
+
+  // Row should NOT have email (not in projection, even though it's available from user table)
+  expectTypeOf<Row>().not.toHaveProperty('email');
+
+  // Verify the overall structure
+  expectTypeOf<Row>().toExtend<{
+    userId: number;
+    postId: number;
+    title: string;
+  }>();
+
+  // Verify plan structure
+  expectTypeOf(plan).toExtend<Plan<Row>>();
 });

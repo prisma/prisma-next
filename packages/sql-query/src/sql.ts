@@ -8,6 +8,8 @@ import type {
   ColumnRef,
   Direction,
   InferProjectionRow,
+  JoinOnBuilder,
+  JoinOnPredicate,
   LoweredStatement,
   ParamDescriptor,
   Plan,
@@ -18,8 +20,15 @@ import type {
   TableRef,
 } from './types';
 
+interface JoinState {
+  readonly joinType: 'inner' | 'left' | 'right' | 'full';
+  readonly table: TableRef;
+  readonly on: JoinOnPredicate;
+}
+
 interface BuilderState {
   from?: TableRef;
+  joins?: ReadonlyArray<JoinState>;
   projection?: ProjectionState;
   where?: BinaryBuilder;
   orderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
@@ -29,6 +38,35 @@ interface BuilderState {
 interface ProjectionState {
   readonly aliases: string[];
   readonly columns: ColumnBuilder[];
+}
+
+class JoinOnBuilderImpl implements JoinOnBuilder {
+  eqCol(
+    left: ColumnBuilder<string, StorageColumn, unknown>,
+    right: ColumnBuilder<string, StorageColumn, unknown>,
+  ): JoinOnPredicate {
+    if (!left || left.kind !== 'column') {
+      throw planInvalid('Join ON left operand must be a column');
+    }
+
+    if (!right || right.kind !== 'column') {
+      throw planInvalid('Join ON right operand must be a column');
+    }
+
+    if (left.table === right.table) {
+      throw planInvalid('Self-joins are not supported in MVP');
+    }
+
+    return {
+      kind: 'join-on',
+      left,
+      right,
+    };
+  }
+}
+
+export function createJoinOnBuilder(): JoinOnBuilder {
+  return new JoinOnBuilderImpl();
 }
 
 class SelectBuilderImpl<
@@ -58,6 +96,71 @@ class SelectBuilderImpl<
         codecTypes: this.codecTypes,
       },
       { ...this.state, from: table },
+    );
+  }
+
+  innerJoin(
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+    return this._addJoin('inner', table, on);
+  }
+
+  leftJoin(
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+    return this._addJoin('left', table, on);
+  }
+
+  rightJoin(
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+    return this._addJoin('right', table, on);
+  }
+
+  fullJoin(
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+    return this._addJoin('full', table, on);
+  }
+
+  private _addJoin(
+    joinType: 'inner' | 'left' | 'right' | 'full',
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+    const fromTable = this.ensureFrom();
+
+    if (!this.contract.storage.tables[table.name]) {
+      throw planInvalid(`Unknown table ${table.name}`);
+    }
+
+    if (table.name === fromTable.name) {
+      throw planInvalid('Self-joins are not supported in MVP');
+    }
+
+    const joinOnBuilder = createJoinOnBuilder();
+    const onPredicate = on(joinOnBuilder);
+
+    const joinState: JoinState = {
+      joinType,
+      table,
+      on: onPredicate,
+    };
+
+    const existingJoins = this.state.joins ?? [];
+    const newJoins = [...existingJoins, joinState];
+
+    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+        codecTypes: this.codecTypes,
+      },
+      { ...this.state, joins: newJoins },
     );
   }
 
@@ -151,9 +254,29 @@ class SelectBuilderImpl<
         ] as ReadonlyArray<{ expr: ColumnRef; dir: Direction }>)
       : undefined;
 
+    const joins = this.state.joins?.map((join) => ({
+      kind: 'join' as const,
+      joinType: join.joinType,
+      table: { kind: 'table' as const, name: join.table.name },
+      on: {
+        kind: 'eqCol' as const,
+        left: {
+          kind: 'col' as const,
+          table: join.on.left.table,
+          column: join.on.left.column,
+        },
+        right: {
+          kind: 'col' as const,
+          table: join.on.right.table,
+          column: join.on.right.column,
+        },
+      },
+    }));
+
     const ast: SelectAst = {
       kind: 'select',
       from: { kind: 'table', name: table.name },
+      ...(joins && joins.length > 0 ? { joins } : {}),
       project: projection.aliases.map((alias, idx) => {
         const column = projection.columns[idx];
         if (!column) {
@@ -183,6 +306,7 @@ class SelectBuilderImpl<
       contract: this.contract,
       table,
       projection,
+      ...(this.state.joins ? { joins: this.state.joins } : {}),
       paramDescriptors,
       ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
       ...(this.state.where ? { where: this.state.where } : {}),
@@ -276,7 +400,6 @@ class SelectBuilderImpl<
   }
 }
 
-
 function buildProjectionState(
   _table: TableRef,
   projection: Record<string, ColumnBuilder>,
@@ -303,6 +426,7 @@ interface MetaBuildArgs {
   readonly contract: SqlContract<SqlStorage>;
   readonly table: TableRef;
   readonly projection: ProjectionState;
+  readonly joins?: ReadonlyArray<JoinState>;
   readonly where?: BinaryBuilder;
   readonly orderBy?: ReturnType<ColumnBuilder['asc']>;
   readonly paramDescriptors: ParamDescriptor[];
@@ -311,6 +435,7 @@ interface MetaBuildArgs {
 
 function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();
+  const refsTables = new Set<string>([args.table.name]);
 
   args.projection.columns.forEach((column) => {
     refsColumns.set(`${column.table}.${column.column}`, {
@@ -318,6 +443,20 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
       column: column.column,
     });
   });
+
+  if (args.joins) {
+    args.joins.forEach((join) => {
+      refsTables.add(join.table.name);
+      refsColumns.set(`${join.on.left.table}.${join.on.left.column}`, {
+        table: join.on.left.table,
+        column: join.on.left.column,
+      });
+      refsColumns.set(`${join.on.right.table}.${join.on.right.column}`, {
+        table: join.on.right.table,
+        column: join.on.right.column,
+      });
+    });
+  }
 
   if (args.where) {
     refsColumns.set(`${args.where.left.table}.${args.where.left.column}`, {
@@ -384,7 +523,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     coreHash: args.contract.coreHash,
     lane: 'dsl',
     refs: {
-      tables: [args.table.name],
+      tables: Array.from(refsTables),
       columns: Array.from(refsColumns.values()),
     },
     projection: projectionMap,
@@ -408,7 +547,9 @@ export type SelectBuilder<
 export function sql<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(options: SqlBuilderOptions<TContract, CodecTypes>): SelectBuilder<TContract, unknown, CodecTypes> {
+>(
+  options: SqlBuilderOptions<TContract, CodecTypes>,
+): SelectBuilder<TContract, unknown, CodecTypes> {
   const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes>(options) as SelectBuilder<
     TContract,
     unknown,

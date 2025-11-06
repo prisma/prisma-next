@@ -3,6 +3,7 @@ import { createCodecRegistry } from '@prisma-next/sql-target';
 import type {
   BinaryExpr,
   ColumnRef,
+  JoinAst,
   ParamRef,
   PostgresAdapterOptions,
   PostgresContract,
@@ -54,6 +55,8 @@ function renderSelect(ast: SelectAst): string {
   const selectClause = `SELECT ${renderProjection(ast)}`;
   const fromClause = `FROM ${quoteIdentifier(ast.from.name)}`;
 
+  const joinsClause = ast.joins?.length ? ast.joins.map((join) => renderJoin(join)).join(' ') : '';
+
   const whereClause = ast.where ? ` WHERE ${renderBinary(ast.where)}` : '';
   const orderClause = ast.orderBy?.length
     ? ` ORDER BY ${ast.orderBy
@@ -62,7 +65,7 @@ function renderSelect(ast: SelectAst): string {
     : '';
   const limitClause = typeof ast.limit === 'number' ? ` LIMIT ${ast.limit}` : '';
 
-  return `${selectClause} ${fromClause}${whereClause}${orderClause}${limitClause}`.trim();
+  return `${selectClause} ${fromClause}${joinsClause ? ` ${joinsClause}` : ''}${whereClause}${orderClause}${limitClause}`.trim();
 }
 
 function renderProjection(ast: SelectAst): string {
@@ -89,6 +92,22 @@ function renderParam(ref: ParamRef): string {
   return `$${ref.index}`;
 }
 
+function renderJoin(join: JoinAst): string {
+  const joinType = join.joinType.toUpperCase();
+  const table = quoteIdentifier(join.table.name);
+  const onClause = renderJoinOn(join.on);
+  return `${joinType} JOIN ${table} ON ${onClause}`;
+}
+
+function renderJoinOn(on: JoinAst['on']): string {
+  if (on.kind === 'eqCol') {
+    const left = renderColumn(on.left);
+    const right = renderColumn(on.right);
+    return `${left} = ${right}`;
+  }
+  throw new Error(`Unsupported join ON expression kind: ${on.kind}`);
+}
+
 function quoteIdentifier(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`;
 }
@@ -96,4 +115,3 @@ function quoteIdentifier(identifier: string): string {
 export function createPostgresAdapter(options?: PostgresAdapterOptions) {
   return Object.freeze(new PostgresAdapterImpl(options));
 }
-

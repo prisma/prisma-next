@@ -73,6 +73,7 @@ flowchart TD
 ### Adapter (`adapter.ts`)
 - Main adapter implementation
 - Lowers SQL ASTs to PostgreSQL SQL
+- Renders joins (INNER, LEFT, RIGHT, FULL) with ON conditions
 - Advertises PostgreSQL capabilities
 - Maps PostgreSQL errors to `RuntimeError`
 

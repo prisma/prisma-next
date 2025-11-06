@@ -48,6 +48,12 @@ Tests automatically depend on builds of target packages via Turborepo.
 - **Real consumer behavior**: Tests simulate how real consumers would use the packages
 - **End-to-end flows**: Tests verify complete flows (emit → lanes → runtime)
 
+## Related Packages
+
+- `@prisma-next/sql-query`: SQL query builder and plan types
+- `@prisma-next/runtime`: Runtime execution engine that consumes contracts
+- `@prisma-next/e2e-tests`: End-to-end tests using the CLI to emit contracts and execute queries
+
 ## Architecture
 
 ```mermaid

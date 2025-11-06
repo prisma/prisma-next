@@ -18,12 +18,7 @@ export type {
   ModelField,
   ModelStorage,
 } from '@prisma-next/sql-target';
-import type {
-  Adapter,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-} from '@prisma-next/sql-target';
+import type { Adapter, SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 
 export type Direction = 'asc' | 'desc';
 
@@ -67,6 +62,19 @@ export interface BinaryBuilder<
   readonly right: ParamPlaceholder;
 }
 
+export interface JoinOnBuilder {
+  eqCol(
+    left: ColumnBuilder<string, StorageColumn, unknown>,
+    right: ColumnBuilder<string, StorageColumn, unknown>,
+  ): JoinOnPredicate;
+}
+
+export interface JoinOnPredicate {
+  readonly kind: 'join-on';
+  readonly left: ColumnBuilder<string, StorageColumn, unknown>;
+  readonly right: ColumnBuilder<string, StorageColumn, unknown>;
+}
+
 export interface TableRef {
   readonly kind: 'table';
   readonly name: string;
@@ -93,9 +101,23 @@ export interface BinaryExpr {
   readonly right: ParamRef;
 }
 
+export type JoinOnExpr = {
+  readonly kind: 'eqCol';
+  readonly left: ColumnRef;
+  readonly right: ColumnRef;
+};
+
+export interface JoinAst {
+  readonly kind: 'join';
+  readonly joinType: 'inner' | 'left' | 'right' | 'full';
+  readonly table: TableRef;
+  readonly on: JoinOnExpr;
+}
+
 export interface SelectAst {
   readonly kind: 'select';
   readonly from: TableRef;
+  readonly joins?: ReadonlyArray<JoinAst>;
   readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
   readonly where?: BinaryExpr;
   readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;

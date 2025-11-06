@@ -67,6 +67,9 @@ flowchart TD
 - Relational DSL for building SQL queries
 - Compiles to Plans with AST, SQL, and metadata
 - Supports projections, filters, joins, ordering, limits
+- Join methods: `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`
+- Join ON conditions use `on.eqCol(left, right)` callback pattern
+- Self-joins are not supported in MVP
 
 ### Raw SQL (`raw.ts`)
 - Raw SQL escape hatch with template tags and function form
@@ -137,6 +140,28 @@ const plan = sql()
   .select({ id: t.user.id, email: t.user.email })
   .limit(100)
   .build();
+```
+
+### SQL DSL with Joins
+
+```typescript
+import { sql, schema } from '@prisma-next/sql-query/sql';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import contract from './contract.json';
+
+const t = schema(contract);
+
+const plan = sql()
+  .from(t.user)
+  .innerJoin(t.post, (on) => on.eqCol(t.user.id, t.post.userId))
+  .where(t.user.active.eq(param('active')))
+  .select({
+    userId: t.user.id,
+    email: t.user.email,
+    postId: t.post.id,
+    title: t.post.title,
+  })
+  .build({ params: { active: true } });
 ```
 
 ### Raw SQL

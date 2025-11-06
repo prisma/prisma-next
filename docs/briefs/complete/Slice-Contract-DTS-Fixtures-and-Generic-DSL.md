@@ -27,7 +27,7 @@ Two viable patterns; pick one (B by default):
   - Declaration:
     ```ts
     declare module 'prisma-contract:demoA' {
-      import type { SqlContract } from '@prisma-next/contract/types';
+      import type { SqlContract } from '@prisma-next/sql-target';
       const contract: Readonly<SqlContract>;
       export default contract;
     }
@@ -44,7 +44,7 @@ Two viable patterns; pick one (B by default):
     ```ts
     // contract.d.ts
     declare module './contract' {
-      import type { SqlContract } from '@prisma-next/contract/types';
+      import type { SqlContract } from '@prisma-next/sql-target';
       const contract: Readonly<SqlContract>;
       export default contract;
     }
@@ -58,7 +58,7 @@ Update the `@prisma-next/sql` surface to accept a typed contract and propagate i
 
 ```ts
 // packages/sql/src/exports/schema.ts
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/sql-target';
 
 export type AnySqlContract = SqlContract;
 

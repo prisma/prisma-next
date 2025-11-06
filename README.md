@@ -157,6 +157,11 @@ Key difference: Prisma Next emits types and a contract rather than generating an
 - **`@prisma/runtime`** - Database connection, query execution, contract verification, and plugin hooks
 - **`@prisma/orm`** - Optional ORM layer with relations and higher-level abstractions
 
+### Test Packages
+
+- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages
+- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database
+
 ## Quick Start
 
 **First time here?** Start with the Quick Demo above, then explore the example app.

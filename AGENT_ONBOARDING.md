@@ -55,6 +55,8 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
 - **`@prisma-next/compat-prisma`** - Compatibility layer for Prisma ORM import-swap
 - **`@prisma-next/node-utils`** - Node.js file I/O utilities (readJsonFile, readTextFile)
+- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages
+- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database
 
 ### Package Organization Principles
 
@@ -149,6 +151,26 @@ type UserRow = ResultType<typeof plan>;
 - Builder methods (`from()`, `where()`, `select()`, etc.) return new builder instances - always chain them
 - Access columns via `table.columns[fieldName]` or `table['columns'][fieldName]` to avoid conflicts with table properties like `name`
 - Use `ResultType<typeof plan>` to extract the inferred row type
+
+**Joins:**
+- Explicit join methods: `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`
+- Join ON conditions use `on.eqCol(left, right)` callback pattern
+- Self-joins are not supported in MVP (will error at build time)
+- Result typing is derived solely from projection, unaffected by joins
+- Example:
+  ```typescript
+  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+    .from(tables.user)
+    .innerJoin(tables.post, (on) => on.eqCol(t.user.id, t.post.userId))
+    .where(t.user.active.eq(param('active')))
+    .select({
+      userId: t.user.id,
+      email: t.user.email,
+      postId: t.post.id,
+      title: t.post.title,
+    })
+    .build({ params: { active: true } });
+  ```
 
 ### Plan Model
 
@@ -543,6 +565,7 @@ test('Type IDs are literal types', () => {
 22. **Package Naming** - The SQL query package was renamed from `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose.
 23. **No Target Branches** - **CRITICAL**: Never branch on `target` (e.g., `if (target === 'postgres')`) in core packages. Target-specific logic belongs in adapters or extension packs. See `.cursor/rules/no-target-branches.mdc` for details.
 24. **No Global Registry Pattern** - The emitter accepts `targetFamily: TargetFamilyHook` as a direct parameter to `emit()`. Authoring surfaces determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry, auto-registration, or hidden state. Dependencies are explicit and passed as parameters.
+25. **SQL Types Import Path** - **CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) must be imported from `@prisma-next/sql-target`, **not** from `@prisma-next/contract/types`. See `.cursor/rules/sql-types-imports.mdc` for details.
 
 ## 📖 Documentation Location
 
@@ -570,6 +593,8 @@ test('Type IDs are literal types', () => {
 13. **Interface-Based Design** - Refactored codec system to export interfaces and factory functions (`createCodecRegistry()`, `defineCodecs()`) instead of classes. Implementation classes are private.
 14. **Type Preservation** - Fixed generic type system to preserve literal string types (e.g., `'pg/text@1'`) through mapped types and careful constraints. Removed index signatures from generic parameters.
 15. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
+16. **E2E Tests Package** - Created `@prisma-next/e2e-tests` package that tests the full flow: CLI emission → contract validation → runtime execution → type verification. Tests emit contracts via CLI, spin up dev Postgres DB, execute queries, and verify both runtime results and compile-time types.
+17. **SQL Types Import Correction** - Fixed incorrect imports of SQL types from `@prisma-next/contract/types` to use `@prisma-next/sql-target` instead. SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`) must be imported from `@prisma-next/sql-target`. See `.cursor/rules/sql-types-imports.mdc` for details.
 
 ### Future Work
 

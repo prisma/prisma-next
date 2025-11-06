@@ -1,13 +1,9 @@
-import type {
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-target';
+import type { SqlContract, SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-target';
 import type {
   BinaryExpr,
   ColumnRef,
   Direction,
+  JoinAst,
   LoweredStatement,
   ParamRef,
   SelectAst,
@@ -28,4 +24,13 @@ export interface OrderClause {
 
 export type PostgresLoweredStatement = LoweredStatement;
 
-export type { BinaryExpr, ColumnRef, Direction, ParamRef, SelectAst, StorageColumn, StorageTable };
+export type {
+  BinaryExpr,
+  ColumnRef,
+  Direction,
+  JoinAst,
+  ParamRef,
+  SelectAst,
+  StorageColumn,
+  StorageTable,
+};

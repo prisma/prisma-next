@@ -1,0 +1,36 @@
+# SQL Types Import Path
+
+**CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) must be imported from `@prisma-next/sql-target`, **not** from `@prisma-next/contract/types`.
+
+## Correct Import
+
+```typescript
+// ✅ CORRECT: Import SQL types from sql-target
+import type { SqlContract, SqlStorage, SqlMappings } from '@prisma-next/sql-target';
+```
+
+## Incorrect Import
+
+```typescript
+// ❌ WRONG: Don't import SQL types from contract/types
+import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
+```
+
+## Why?
+
+- **`@prisma-next/contract`** contains only core contract types (`ContractBase`, `Source`) and document family types (`DocumentContract`)
+- **`@prisma-next/sql-target`** contains all SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`, `ModelDefinition`, etc.)
+- This separation maintains clear package boundaries and avoids circular dependencies
+
+## When to Use Each Package
+
+- **`@prisma-next/contract/types`**: Use for core contract types (`ContractBase`, `Source`) or document family types (`DocumentContract`)
+- **`@prisma-next/sql-target`**: Use for all SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`, `ModelDefinition`, `StorageTable`, `StorageColumn`, etc.)
+
+## Common Mistakes
+
+If you see TypeScript errors like:
+- `"@prisma-next/contract/types" has no exported member named 'SqlContract'`
+- `Module '"@prisma-next/contract/types"' has no exported member 'SqlStorage'`
+
+This means you're importing SQL types from the wrong package. Change the import to use `@prisma-next/sql-target` instead.
