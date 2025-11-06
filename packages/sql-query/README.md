@@ -92,6 +92,7 @@ flowchart TD
 ### Contract Validation (`contract.ts`)
 - Structural validation for SQL contracts using Arktype
 - Type guards and validation schemas
+- `validateContract<TContract>()` requires a fully-typed contract type `TContract` (from `contract.d.ts`), NOT a generic `SqlContract<SqlStorage>`. Using a generic type will cause all subsequent type inference to fail. See function documentation for details.
 
 ### Contract Builder (`contract-builder.ts`)
 - TypeScript builder for creating SQL contracts programmatically
@@ -129,7 +130,6 @@ flowchart TD
 
 ```typescript
 import { sql, schema } from '@prisma-next/sql-query/sql';
-import { validateContract } from '@prisma-next/sql-query/schema';
 import contract from './contract.json';
 
 const t = schema(contract);
@@ -146,7 +146,6 @@ const plan = sql()
 
 ```typescript
 import { sql, schema } from '@prisma-next/sql-query/sql';
-import { validateContract } from '@prisma-next/sql-query/schema';
 import contract from './contract.json';
 
 const t = schema(contract);
@@ -162,6 +161,21 @@ const plan = sql()
     title: t.post.title,
   })
   .build({ params: { active: true } });
+```
+
+### Contract Validation
+
+```typescript
+import { validateContract } from '@prisma-next/sql-query/schema';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' assert { type: 'json' };
+
+// ✅ CORRECT: Use fully-typed contract type from contract.d.ts
+const contract = validateContract<Contract>(contractJson);
+
+// ❌ WRONG: Don't use generic SqlContract<SqlStorage>
+// const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
+// This will cause all types to be inferred as 'unknown'
 ```
 
 ### Raw SQL

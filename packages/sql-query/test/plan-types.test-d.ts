@@ -6,7 +6,7 @@ import type { ResultType, Plan, TableKey, TablesOf } from '../src/types';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 import { validateContract } from '../src/contract';
 import type { Contract, CodecTypes, ScalarToJs } from './fixtures/contract.d';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract } from '@prisma-next/sql-target';
 import type { CodecTypes as PgCodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
 // Helper to simulate execute signature
@@ -435,7 +435,31 @@ test('representative contract resolves types correctly end-to-end', () => {
 });
 
 test('result typing is derived solely from projection, unaffected by joins', () => {
-  const contractWithPosts = validateContract<SqlContract<SqlStorage>>({
+  // Define a fully-typed contract type for this test
+  type ContractWithPosts = SqlContract<
+    {
+      readonly tables: {
+        readonly user: {
+          readonly columns: {
+            readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+            readonly email: { readonly type: 'pg/text@1'; nullable: false };
+          };
+        };
+        readonly post: {
+          readonly columns: {
+            readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+            readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
+            readonly title: { readonly type: 'pg/text@1'; nullable: false };
+          };
+        };
+      };
+    },
+    {},
+    {},
+    {}
+  >;
+
+  const contractWithPosts = validateContract<ContractWithPosts>({
     target: 'postgres',
     targetFamily: 'sql' as const,
     coreHash: 'sha256:test-core',
@@ -463,14 +487,14 @@ test('result typing is derived solely from projection, unaffected by joins', () 
   });
 
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof contractWithPosts, PgCodecTypes>(contractWithPosts).tables;
+  const tables = schema<ContractWithPosts, PgCodecTypes>(contractWithPosts).tables;
   const userTable = tables['user'];
   const postTable = tables['post'];
   if (!userTable || !postTable) throw new Error('tables not found');
   const userColumns = userTable.columns;
   const postColumns = postTable.columns;
 
-  const plan = sql<typeof contractWithPosts, PgCodecTypes>({ contract: contractWithPosts, adapter })
+  const plan = sql<ContractWithPosts, PgCodecTypes>({ contract: contractWithPosts, adapter })
     .from(userTable)
     .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
     .select({

@@ -351,9 +351,26 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
  * Performs both structural validation (using Arktype) and logical validation
  * (ensuring all references are valid).
  *
- * The type parameter `TContract` should be the strict contract type from contract.d.ts.
- * This function validates the runtime structure but does not infer types from JSON,
- * as JSON imports lose literal type information.
+ *
+ * The type parameter `TContract` must be a fully-typed contract type (e.g., from `contract.d.ts`),
+ * NOT a generic `SqlContract<SqlStorage>`.
+ *
+ * **Correct:**
+ * ```typescript
+ * import type { Contract } from './contract.d';
+ * const contract = validateContract<Contract>(contractJson);
+ * ```
+ *
+ * **Incorrect:**
+ * ```typescript
+ * import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+ * const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
+ * // ❌ Types will be inferred as 'unknown' - this won't work!
+ * ```
+ *
+ * The type parameter provides the specific table structure, column types, and model definitions.
+ * This function validates the runtime structure matches the type, but does not infer types
+ * from JSON (as JSON imports lose literal type information).
  *
  * @param value - The contract value to validate (must be from a JSON import, not a builder)
  * @returns A validated contract matching the TContract type

@@ -449,10 +449,22 @@ const testContract: SqlContract<SqlStorage> = {
 ```
 
 ```typescript
-// ✅ CORRECT: Use fully qualified type IDs
+// ✅ CORRECT: Use fully qualified type IDs and fully-typed contract type
 import { validateContract } from '@prisma-next/sql-query/schema';
+import type { SqlContract } from '@prisma-next/sql-target';
 
-const testContract = validateContract<SqlContract<SqlStorage>>({
+// Define a fully-typed contract type (or import from contract.d.ts)
+type TestContract = SqlContract<{
+  readonly tables: {
+    readonly user: {
+      readonly columns: {
+        readonly id: { readonly type: 'pg/text@1'; nullable: false };
+      };
+    };
+  };
+}>;
+
+const testContract = validateContract<TestContract>({
   storage: {
     tables: {
       user: {
@@ -462,6 +474,9 @@ const testContract = validateContract<SqlContract<SqlStorage>>({
       },
     },
   },
+  models: {},
+  relations: {},
+  mappings: {},
 });
 
 // Now contract is validated and ready to use
@@ -552,7 +567,7 @@ test('Type IDs are literal types', () => {
 9. **Core is lane-agnostic** - Never create discriminated unions based on `lane` field. The core should not be aware of specific lane implementations.
 10. **Unified Type Identifiers** - Every column `type` must be a fully qualified type ID (`ns/name@version`). Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation. No codec decorations or scalar fallbacks.
 11. **CodecTypes Generic** - Always provide `CodecTypes` as a generic parameter to `sql()` and `schema()` functions. Import from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
-12. **Contract Validation** - Always validate contracts with `validateContract<Contract>(contractJson)` before use. **Important**: `validateContract()` does not perform canonicalization - it expects all types to already be fully qualified type IDs (`pg/int4@1`, not `int4`). Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation. The contract JSON must contain only fully qualified type IDs.
+12. **Contract Validation** - Always validate contracts with `validateContract<Contract>(contractJson)` before use. **CRITICAL**: The type parameter `TContract` must be a fully-typed contract type (from `contract.d.ts`), NOT a generic `SqlContract<SqlStorage>`. Using a generic type will cause all subsequent type inference to fail (types will be `unknown`). **Important**: `validateContract()` does not perform canonicalization - it expects all types to already be fully qualified type IDs (`pg/int4@1`, not `int4`). Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation. The contract JSON must contain only fully qualified type IDs. See `.cursor/rules/validate-contract-usage.mdc` for details.
 13. **No Backward Compatibility** - Never add backward compatibility code, migration paths, or deprecation warnings. This project has no external consumers - change implementations directly.
 14. **Runtime Agnostic** - The runtime must not contain target-specific logic (e.g., special-case Date handling for specific codec IDs). Use generic codec resolution only.
 15. **Interface-Based APIs** - Export interfaces and factory functions, not classes. Keep implementation classes private. Use `createX()` factory functions instead of `new X()` constructors.
@@ -620,6 +635,8 @@ import contractJson from './contract.json' assert { type: 'json' };
 // Always validate - ensures structure and type safety
 // IMPORTANT: validateContract() does not canonicalize types - it expects all types to already be fully qualified (e.g., 'pg/int4@1', not 'int4')
 // Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation
+// CRITICAL: validateContract<TContract>() requires a fully-typed contract type TContract (from contract.d.ts), NOT a generic SqlContract<SqlStorage>
+// Using a generic type will cause all subsequent type inference to fail (types will be 'unknown')
 const contract = validateContract<Contract>(contractJson);
 ```
 
