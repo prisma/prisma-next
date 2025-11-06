@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
 
 import { param } from '../src/param';
@@ -9,20 +5,42 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import { validateContract } from '../src/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { ParamDescriptor, Adapter, LoweredStatement, SelectAst } from '../src/types';
+import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import type { CodecTypes } from './fixtures/contract.d';
 
-const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+// Define a fully-typed contract type for this test
+type ContractWithPosts = SqlContract<
+  {
+    readonly tables: {
+      readonly user: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+          readonly email: { readonly type: 'pg/text@1'; nullable: false };
+        };
+      };
+      readonly post: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+          readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
+          readonly title: { readonly type: 'pg/text@1'; nullable: false };
+        };
+      };
+      readonly comment: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+          readonly postId: { readonly type: 'pg/int4@1'; nullable: false };
+          readonly content: { readonly type: 'pg/text@1'; nullable: false };
+        };
+      };
+    };
+  },
+  {},
+  {},
+  {}
+>;
 
-function loadContract(name: string) {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract<SqlContract<SqlStorage>>(contractJson);
-}
-
-const contractWithPosts = validateContract<SqlContract<SqlStorage>>({
+const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',
   targetFamily: 'sql' as const,
   coreHash: 'sha256:test-core',
@@ -80,11 +98,11 @@ describe('SQL builder joins', () => {
   const adapter = createStubAdapter();
 
   it('builds a plan with a single inner join', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<typeof contractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .select({
@@ -107,12 +125,12 @@ describe('SQL builder joins', () => {
   });
 
   it('builds a plan with chained joins', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
     const commentColumns = tables.comment.columns;
 
-    const plan = sql<typeof contractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .leftJoin(tables.comment, (on) => on.eqCol(postColumns.id, commentColumns.postId))
@@ -132,12 +150,12 @@ describe('SQL builder joins', () => {
   });
 
   it('preserves join order across multiple chained joins', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
     const commentColumns = tables.comment.columns;
 
-    const plan = sql<typeof contractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .leftJoin(tables.comment, (on) => on.eqCol(postColumns.id, commentColumns.postId))
@@ -156,11 +174,11 @@ describe('SQL builder joins', () => {
   });
 
   it('works with where clause alongside joins', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<typeof contractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .where(userColumns.id.eq(param('userId')))
@@ -177,10 +195,10 @@ describe('SQL builder joins', () => {
   });
 
   it('throws PLAN.INVALID when joining unknown table', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
 
-    const builder = sql<typeof contractWithPosts, CodecTypes>({
+    const builder = sql<ContractWithPosts, CodecTypes>({
       contract: contractWithPosts,
       adapter,
     }).from(tables.user);
@@ -193,10 +211,10 @@ describe('SQL builder joins', () => {
   });
 
   it('throws PLAN.INVALID when attempting self-join', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
 
-    const builder = sql<typeof contractWithPosts, CodecTypes>({
+    const builder = sql<ContractWithPosts, CodecTypes>({
       contract: contractWithPosts,
       adapter,
     }).from(tables.user);
@@ -207,14 +225,14 @@ describe('SQL builder joins', () => {
   });
 
   it('supports all join types', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     const joinTypes = ['inner', 'left', 'right', 'full'] as const;
 
     for (const joinType of joinTypes) {
-      const builder = sql<typeof contractWithPosts, CodecTypes>({
+      const builder = sql<ContractWithPosts, CodecTypes>({
         contract: contractWithPosts,
         adapter,
       }).from(tables.user);
@@ -235,11 +253,11 @@ describe('SQL builder joins', () => {
   });
 
   it('includes joined tables in meta refs', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<typeof contractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .select({
@@ -254,11 +272,11 @@ describe('SQL builder joins', () => {
   });
 
   it('includes ON columns in meta refs', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<typeof contractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .select({
@@ -275,11 +293,11 @@ describe('SQL builder joins', () => {
   });
 
   it('includes all referenced columns in meta refs (projection, where, orderBy, joins)', () => {
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<typeof contractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .where(userColumns.email.eq(param('email')))

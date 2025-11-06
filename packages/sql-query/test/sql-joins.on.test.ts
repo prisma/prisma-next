@@ -2,10 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { createJoinOnBuilder } from '../src/sql';
 import { schema } from '../src/schema';
 import { validateContract } from '../src/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract } from '@prisma-next/sql-target';
 import type { CodecTypes } from './fixtures/contract.d';
 
-const contractWithPosts = validateContract<SqlContract<SqlStorage>>({
+// Define a fully-typed contract type for this test
+type ContractWithPosts = SqlContract<
+  {
+    readonly tables: {
+      readonly user: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+          readonly email: { readonly type: 'pg/text@1'; nullable: false };
+        };
+      };
+      readonly post: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+          readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
+          readonly title: { readonly type: 'pg/text@1'; nullable: false };
+        };
+      };
+    };
+  },
+  {},
+  {},
+  {}
+>;
+
+const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',
   targetFamily: 'sql' as const,
   coreHash: 'sha256:test-core',
@@ -35,7 +59,7 @@ const contractWithPosts = validateContract<SqlContract<SqlStorage>>({
 describe('JoinOnBuilder', () => {
   it('creates a join ON predicate from two columns', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -50,7 +74,7 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when left operand is not a column', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const postColumns = tables.post.columns;
 
     expect(() => on.eqCol(null as any, postColumns.userId)).toThrowError(
@@ -64,7 +88,7 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when right operand is not a column', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
 
     expect(() => on.eqCol(userColumns.id, null as any)).toThrowError(
@@ -78,7 +102,7 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when both columns are from the same table (self-join)', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<typeof contractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
     const userColumns = tables.user.columns;
 
     expect(() => on.eqCol(userColumns.id, userColumns.id)).toThrowError(
