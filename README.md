@@ -219,12 +219,14 @@ pnpm generate && pnpm start
 Run commands for a specific package using pnpm's filter:
 
 - `pnpm --filter <package-name> test` - Test specific package
+- `pnpm --filter <package-name> test:coverage` - Run tests with coverage for specific package
 - `pnpm --filter <package-name> typecheck` - Typecheck specific package
 - `pnpm --filter <package-name> lint` - Lint specific package
 
 **Examples:**
 ```bash
 pnpm --filter @prisma-next/sql-query test
+pnpm --filter @prisma-next/sql-query test:coverage
 pnpm --filter @prisma-next/sql-query typecheck
 pnpm --filter @prisma-next/sql-query lint
 ```
