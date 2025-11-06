@@ -35,8 +35,12 @@ This package depends on all packages under test via workspace protocol:
 # Run all integration tests
 pnpm -F integration-tests test
 
+# Run tests with coverage
+pnpm -F integration-tests test:coverage
+
 # Or via turbo
 turbo run test --filter=integration-tests
+turbo run test:coverage --filter=integration-tests
 ```
 
 Tests automatically depend on builds of target packages via Turborepo.

@@ -523,6 +523,33 @@ database = await createDevDatabase({
 - **Type assertions**: Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 - **Type tests**: Use `expectTypeOf` helpers, not manual type checks with conditional types - see `.cursor/rules/vitest-expect-typeof.mdc`
 
+### Running Tests and Coverage
+
+**Test Commands:**
+- `pnpm test` - Run all tests (packages + examples)
+- `pnpm test:packages` - Test only packages (exclude examples)
+- `pnpm test:examples` - Test only examples
+
+**Coverage Commands:**
+- `pnpm test:coverage` - Run tests with coverage for all packages (including examples)
+- `pnpm test:coverage:packages` - Run tests with coverage for packages only (excludes example apps)
+- `pnpm --filter <package-name> test:coverage` - Run tests with coverage for a specific package
+
+**Examples:**
+```bash
+# Run all tests
+pnpm test
+
+# Run tests for packages only
+pnpm test:packages
+
+# Run coverage for all packages (excluding examples)
+pnpm test:coverage:packages
+
+# Run coverage for a specific package
+pnpm --filter @prisma-next/sql-query test:coverage
+```
+
 Example type test:
 ```typescript
 import { expectTypeOf, test } from 'vitest';

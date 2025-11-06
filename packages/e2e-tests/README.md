@@ -10,6 +10,7 @@ End-to-end tests that verify the full flow using the built CLI, emitted contract
 
 ## Scripts
 - `pnpm -F e2e-tests test` — run the test suite (requires repo build first)
+- `pnpm -F e2e-tests test:coverage` — run tests with coverage (requires repo build first)
 - `pnpm -F e2e-tests gen-contract` — regenerate committed fixture artifacts from `test/fixtures/contract.ts`
 
 ## Notes
