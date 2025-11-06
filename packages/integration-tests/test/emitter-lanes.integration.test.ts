@@ -1,10 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach, expectTypeOf, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, expectTypeOf } from 'vitest';
 import { emit } from '@prisma-next/emitter';
-import { loadExtensionPacks, targetFamilyRegistry } from '@prisma-next/emitter';
+import { loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
 import { sql } from '@prisma-next/sql-query/sql';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import type { ResultType, Adapter, SelectAst, LoweredStatement } from '@prisma-next/sql-query/types';
+import type {
+  ResultType,
+  Adapter,
+  SelectAst,
+  LoweredStatement,
+} from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { sqlTargetFamilyHook, createCodecRegistry } from '@prisma-next/sql-target';
 import { join } from 'node:path';
@@ -31,12 +36,6 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
     },
   };
 }
-
-beforeAll(() => {
-  if (!targetFamilyRegistry.has('sql')) {
-    targetFamilyRegistry.register(sqlTargetFamilyHook);
-  }
-});
 
 describe('emitter → lanes integration', () => {
   let testDir: string;
@@ -86,7 +85,7 @@ describe('emitter → lanes integration', () => {
       packs,
     };
 
-    const result = await emit(ir, options);
+    const result = await emit(ir, options, sqlTargetFamilyHook);
 
     const contractJsonPath = join(testDir, 'contract.json');
     const contractDtsPath = join(testDir, 'contract.d.ts');
@@ -165,7 +164,7 @@ describe('emitter → lanes integration', () => {
       packs,
     };
 
-    const result = await emit(ir, options);
+    const result = await emit(ir, options, sqlTargetFamilyHook);
     const contractJson = JSON.parse(result.contractJson);
     const contract = validateContract(contractJson);
 
@@ -228,7 +227,7 @@ describe('emitter → lanes integration', () => {
       packs,
     };
 
-    const result1 = await emit(ir, options);
+    const result1 = await emit(ir, options, sqlTargetFamilyHook);
     const contractJson1 = JSON.parse(result1.contractJson);
     const contract1 = validateContract(contractJson1);
 
@@ -246,7 +245,9 @@ describe('emitter → lanes integration', () => {
       models: contractJson1.models as Record<string, unknown>,
       relations: contractJson1.relations as Record<string, unknown> | undefined,
       storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, Record<string, boolean>> | undefined,
+      capabilities: contractJson1.capabilities as
+        | Record<string, Record<string, boolean>>
+        | undefined,
       meta: contractJson1.meta as Record<string, unknown> | undefined,
       sources: contractJson1.sources as Record<string, unknown> | undefined,
     };
@@ -257,7 +258,7 @@ describe('emitter → lanes integration', () => {
       packs: packs2,
     };
 
-    const result2 = await emit(ir2, options2);
+    const result2 = await emit(ir2, options2, sqlTargetFamilyHook);
     const contractJson2 = JSON.parse(result2.contractJson);
     const contract2 = validateContract(contractJson2);
 
@@ -295,4 +296,3 @@ describe('emitter → lanes integration', () => {
     expect(plan1.meta.coreHash).toBe(result1.coreHash);
   });
 });
-

@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
 import type { TargetFamilyHook } from '../src/target-family';
-import { targetFamilyRegistry } from '../src/target-family-registry';
 import { join } from 'node:path';
 
 const mockSqlHook: TargetFamilyHook = {
@@ -71,12 +70,6 @@ export type Contract = unknown;
 };
 
 describe('emitter round-trip', () => {
-  beforeEach(() => {
-    if (!targetFamilyRegistry.has('sql')) {
-      targetFamilyRegistry.register(mockSqlHook);
-    }
-  });
-
   it('round-trip with minimal IR', async () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
@@ -103,7 +96,7 @@ describe('emitter round-trip', () => {
       packs,
     };
 
-    const result1 = await emit(ir, options);
+    const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson);
 
     const ir2: ContractIR = {
@@ -119,7 +112,7 @@ describe('emitter round-trip', () => {
       sources: contractJson1.sources,
     };
 
-    const result2 = await emit(ir2, options);
+    const result2 = await emit(ir2, options, mockSqlHook);
 
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);
@@ -187,7 +180,7 @@ describe('emitter round-trip', () => {
       packs,
     };
 
-    const result1 = await emit(ir, options);
+    const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson);
 
     const ir2: ContractIR = {
@@ -203,7 +196,7 @@ describe('emitter round-trip', () => {
       sources: contractJson1.sources,
     };
 
-    const result2 = await emit(ir2, options);
+    const result2 = await emit(ir2, options, mockSqlHook);
 
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);
@@ -237,7 +230,7 @@ describe('emitter round-trip', () => {
       packs,
     };
 
-    const result1 = await emit(ir, options);
+    const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson);
 
     const ir2: ContractIR = {
@@ -253,7 +246,7 @@ describe('emitter round-trip', () => {
       sources: contractJson1.sources,
     };
 
-    const result2 = await emit(ir2, options);
+    const result2 = await emit(ir2, options, mockSqlHook);
 
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);
@@ -296,7 +289,7 @@ describe('emitter round-trip', () => {
       packs,
     };
 
-    const result1 = await emit(ir, options);
+    const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson);
 
     const ir2: ContractIR = {
@@ -312,7 +305,7 @@ describe('emitter round-trip', () => {
       sources: contractJson1.sources,
     };
 
-    const result2 = await emit(ir2, options);
+    const result2 = await emit(ir2, options, mockSqlHook);
 
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);

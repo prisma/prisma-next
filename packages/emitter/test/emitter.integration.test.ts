@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { emit } from '../src/emitter';
-import { targetFamilyRegistry } from '../src/target-family-registry';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
 import type { TargetFamilyHook } from '../src/target-family';
@@ -9,7 +8,9 @@ import { join } from 'node:path';
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
   validateTypes: (ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>) => {
-    const storage = ir.storage as { tables?: Record<string, { columns?: Record<string, { type?: string }> }> } | undefined;
+    const storage = ir.storage as
+      | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
+      | undefined;
     if (!storage?.tables) {
       return;
     }
@@ -69,12 +70,6 @@ export type Contract = unknown;
 };
 
 describe('emitter integration', () => {
-  beforeEach(() => {
-    if (!targetFamilyRegistry.has('sql')) {
-      targetFamilyRegistry.register(mockSqlHook);
-    }
-  });
-
   it('emits complete contract from IR to artifacts', async () => {
     const ir: ContractIR = {
       schemaVersion: '1',
@@ -114,7 +109,7 @@ describe('emitter integration', () => {
       packs,
     };
 
-    const result = await emit(ir, options);
+    const result = await emit(ir, options, mockSqlHook);
 
     expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(result.contractDts).toContain('export type Contract');
@@ -167,8 +162,8 @@ describe('emitter integration', () => {
       packs,
     };
 
-    const result1 = await emit(ir, options);
-    const result2 = await emit(ir, options);
+    const result1 = await emit(ir, options, mockSqlHook);
+    const result2 = await emit(ir, options, mockSqlHook);
 
     expect(result1.coreHash).toBe(result2.coreHash);
     expect(result1.contractDts).toBe(result2.contractDts);
@@ -214,7 +209,7 @@ describe('emitter integration', () => {
       packs,
     };
 
-    const result1 = await emit(ir, options);
+    const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson);
 
     const ir2: ContractIR = {
@@ -230,10 +225,9 @@ describe('emitter integration', () => {
       sources: contractJson1.sources,
     };
 
-    const result2 = await emit(ir2, options);
+    const result2 = await emit(ir2, options, mockSqlHook);
 
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);
   });
 });
-

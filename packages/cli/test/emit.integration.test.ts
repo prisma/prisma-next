@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, expectTypeOf, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, expectTypeOf } from 'vitest';
 import { join, resolve } from 'node:path';
 import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { loadContractFromTs } from '../src/load-ts-contract';
-import { emit, loadExtensionPacks, targetFamilyRegistry } from '@prisma-next/emitter';
+import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { sql } from '@prisma-next/sql-query/sql';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import type {
@@ -38,12 +38,6 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
   };
 }
 
-beforeAll(() => {
-  if (!targetFamilyRegistry.has('sql')) {
-    targetFamilyRegistry.register(sqlTargetFamilyHook);
-  }
-});
-
 describe('emit integration', () => {
   let testDir: string;
   let outputDir: string;
@@ -67,10 +61,14 @@ describe('emit integration', () => {
     const contract = await loadContractFromTs(contractPath);
     const packs = loadExtensionPacks(adapterPath, []);
 
-    const result = await emit(contract, {
-      outputDir,
-      packs,
-    });
+    const result = await emit(
+      contract,
+      {
+        outputDir,
+        packs,
+      },
+      sqlTargetFamilyHook,
+    );
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractDtsPath = join(outputDir, 'contract.d.ts');
@@ -119,10 +117,14 @@ describe('emit integration', () => {
     const contract1 = await loadContractFromTs(contractPath);
     const packs = loadExtensionPacks(adapterPath, []);
 
-    const result1 = await emit(contract1, {
-      outputDir,
-      packs,
-    });
+    const result1 = await emit(
+      contract1,
+      {
+        outputDir,
+        packs,
+      },
+      sqlTargetFamilyHook,
+    );
 
     const contractJson1 = JSON.parse(result1.contractJson);
 
@@ -135,10 +137,14 @@ describe('emit integration', () => {
 
     const contract2 = contractJson1;
 
-    const result2 = await emit(contract2, {
-      outputDir,
-      packs,
-    });
+    const result2 = await emit(
+      contract2,
+      {
+        outputDir,
+        packs,
+      },
+      sqlTargetFamilyHook,
+    );
 
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);

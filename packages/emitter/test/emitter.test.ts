@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { emit } from '../src/emitter';
-import { targetFamilyRegistry } from '../src/target-family-registry';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
 import type { TargetFamilyHook } from '../src/target-family';
@@ -9,7 +8,9 @@ import { join } from 'node:path';
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
   validateTypes: (ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>) => {
-    const storage = ir.storage as { tables?: Record<string, { columns?: Record<string, { type?: string }> }> } | undefined;
+    const storage = ir.storage as
+      | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
+      | undefined;
     if (!storage?.tables) {
       return;
     }
@@ -66,12 +67,6 @@ export type Contract = unknown;
 };
 
 describe('emitter', () => {
-  beforeEach(() => {
-    if (!targetFamilyRegistry.has('sql')) {
-      targetFamilyRegistry.register(mockSqlHook);
-    }
-  });
-
   it('emits contract.json and contract.d.ts', async () => {
     const ir: ContractIR = {
       schemaVersion: '1',
@@ -111,7 +106,7 @@ describe('emitter', () => {
       packs,
     };
 
-    const result = await emit(ir, options);
+    const result = await emit(ir, options, mockSqlHook);
     expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(result.contractDts).toContain('export type Contract');
     expect(result.contractDts).toContain('CodecTypes');
@@ -144,7 +139,7 @@ describe('emitter', () => {
       packs,
     };
 
-    await expect(emit(ir, options)).rejects.toThrow();
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
   });
 
   it('validates type ID format', async () => {
@@ -170,7 +165,6 @@ describe('emitter', () => {
       packs,
     };
 
-    await expect(emit(ir, options)).rejects.toThrow('invalid type ID format');
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('invalid type ID format');
   });
 });
-

@@ -13,7 +13,7 @@ import { param } from '@prisma-next/sql-query/param';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { ResultType } from '@prisma-next/sql-query/types';
 import { loadContractFromTs } from '@prisma-next/cli';
-import { emit, loadExtensionPacks, targetFamilyRegistry } from '@prisma-next/emitter';
+import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
@@ -22,10 +22,6 @@ import type { Contract } from '../src/prisma/contract.d';
 let contract: ReturnType<typeof validateContract>;
 
 beforeAll(async () => {
-  if (!targetFamilyRegistry.has('sql')) {
-    targetFamilyRegistry.register(sqlTargetFamilyHook);
-  }
-
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
   const adapterPath = resolve(__dirname, '../../../packages/adapter-postgres');
@@ -33,10 +29,14 @@ beforeAll(async () => {
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, []);
 
-  const result = await emit(contractIR, {
-    outputDir,
-    packs,
-  });
+  const result = await emit(
+    contractIR,
+    {
+      outputDir,
+      packs,
+    },
+    sqlTargetFamilyHook,
+  );
 
   mkdirSync(outputDir, { recursive: true });
   writeFileSync(join(outputDir, 'contract.json'), result.contractJson, 'utf-8');
@@ -51,7 +51,10 @@ describe('runtime execute integration', () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
-      const driver = createPostgresDriverFromOptions({ connect: { pool }, cursor: { disabled: true } });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool },
+        cursor: { disabled: true },
+      });
       const runtime = createRuntime({
         contract,
         adapter,
@@ -159,7 +162,10 @@ describe('runtime execute integration', () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
-      const driver = createPostgresDriverFromOptions({ connect: { pool }, cursor: { disabled: true } });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool },
+        cursor: { disabled: true },
+      });
       const runtime = createRuntime({
         contract,
         adapter,
@@ -250,7 +256,10 @@ describe('runtime execute integration', () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
-      const driver = createPostgresDriverFromOptions({ connect: { pool }, cursor: { disabled: true } });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool },
+        cursor: { disabled: true },
+      });
       const runtime = createRuntime({
         contract,
         adapter,
@@ -328,7 +337,10 @@ describe('runtime execute integration', () => {
     await withDevDatabase(async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
-      const driver = createPostgresDriverFromOptions({ connect: { pool }, cursor: { disabled: true } });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool },
+        cursor: { disabled: true },
+      });
       const runtime = createRuntime({
         contract,
         adapter,

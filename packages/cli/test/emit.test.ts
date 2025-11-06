@@ -1,16 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadContractFromTs } from '../src/load-ts-contract';
-import { emit, loadExtensionPacks, targetFamilyRegistry } from '@prisma-next/emitter';
+import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
-
-beforeAll(() => {
-  if (!targetFamilyRegistry.has('sql')) {
-    targetFamilyRegistry.register(sqlTargetFamilyHook);
-  }
-});
 
 const fixturesDir = join(__dirname, 'fixtures');
 
@@ -18,7 +12,10 @@ describe('emit command functionality', () => {
   let outputDir: string;
 
   beforeEach(() => {
-    outputDir = join(tmpdir(), `prisma-next-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    outputDir = join(
+      tmpdir(),
+      `prisma-next-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
     mkdirSync(outputDir, { recursive: true });
   });
 
@@ -35,10 +32,14 @@ describe('emit command functionality', () => {
     const contract = await loadContractFromTs(contractPath);
     const packs = loadExtensionPacks(adapterPath, []);
 
-    const result = await emit(contract, {
-      outputDir,
-      packs,
-    });
+    const result = await emit(
+      contract,
+      {
+        outputDir,
+        packs,
+      },
+      sqlTargetFamilyHook,
+    );
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractDtsPath = join(outputDir, 'contract.d.ts');
@@ -66,10 +67,14 @@ describe('emit command functionality', () => {
     const contract = await loadContractFromTs(contractPath);
     const packs = loadExtensionPacks(adapterPath, []);
 
-    const result = await emit(contract, {
-      outputDir,
-      packs,
-    });
+    const result = await emit(
+      contract,
+      {
+        outputDir,
+        packs,
+      },
+      sqlTargetFamilyHook,
+    );
 
     expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
@@ -82,10 +87,14 @@ describe('emit command functionality', () => {
     const contract = await loadContractFromTs(contractPath);
     const packs = loadExtensionPacks(adapterPath, []);
 
-    const result = await emit(contract, {
-      outputDir: newOutputDir,
-      packs,
-    });
+    const result = await emit(
+      contract,
+      {
+        outputDir: newOutputDir,
+        packs,
+      },
+      sqlTargetFamilyHook,
+    );
 
     mkdirSync(newOutputDir, { recursive: true });
 
@@ -103,4 +112,3 @@ describe('emit command functionality', () => {
     }
   });
 });
-

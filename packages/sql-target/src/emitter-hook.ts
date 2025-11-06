@@ -215,7 +215,7 @@ export const sqlTargetFamilyHook = {
     return `// Generated contract types
 ${importLines.join('\n')}
 
-import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from './contract-types';
+import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-target';
 
 export type CodecTypes = ${codecTypes || 'Record<string, never>'};
 export type LaneCodecTypes = CodecTypes;

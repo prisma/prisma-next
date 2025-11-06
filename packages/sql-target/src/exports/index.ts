@@ -1,5 +1,3 @@
-import '../emitter-hook-init';
-
 export {
   Adapter,
   AdapterProfile,

@@ -245,8 +245,8 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
 
 **Implementation:**
 - Core emitter: `packages/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
-- Target family registry: `packages/emitter/src/target-family-registry.ts` - manages hook registration
-- SQL hook: `packages/sql-target/src/emitter-hook.ts` - implements SQL-specific validation and type generation
+- Target family SPI: The `emit()` function accepts a `targetFamily: TargetFamilyHook` parameter directly. Authoring surfaces (CLI, tests) determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry or auto-registration.
+- SQL target family SPI: `packages/sql-target/src/emitter-hook.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook`
 - Extension pack loading: `packages/emitter/src/extension-pack.ts` - loads manifests (uses `@prisma-next/node-utils` for file I/O)
 
 **Outputs:**
@@ -542,6 +542,7 @@ test('Type IDs are literal types', () => {
 21. **Type Canonicalization Timing** - Type canonicalization happens at authoring time (PSL parser or TS builder), not during emission or validation. The emitter only validates that all type IDs come from referenced extensions.
 22. **Package Naming** - The SQL query package was renamed from `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose.
 23. **No Target Branches** - **CRITICAL**: Never branch on `target` (e.g., `if (target === 'postgres')`) in core packages. Target-specific logic belongs in adapters or extension packs. See `.cursor/rules/no-target-branches.mdc` for details.
+24. **No Global Registry Pattern** - The emitter accepts `targetFamily: TargetFamilyHook` as a direct parameter to `emit()`. Authoring surfaces determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry, auto-registration, or hidden state. Dependencies are explicit and passed as parameters.
 
 ## 📖 Documentation Location
 
@@ -554,7 +555,7 @@ test('Type IDs are literal types', () => {
 
 ### Recent Implementation (Completed)
 
-1. **Emitter Hook-Based Architecture** - Refactored emitter to use pluggable `TargetFamilyHook` system. SQL hook lives in `sql-target` package. Adapters treated identically to extension packs.
+1. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL target family SPI (`sqlTargetFamilyHook`) lives in `sql-target` package. Adapters treated identically to extension packs.
 2. **Type Canonicalization at Authoring Time** - Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission or validation. Emitter only validates type IDs come from referenced extensions.
 3. **Removed Canonicalization from validateContract** - `validateContract()` no longer performs canonicalization. Contracts must always have fully qualified type IDs (`pg/int4@1`, not `int4`). This enforces the design principle that canonicalization happens at authoring time, not during validation.
 4. **Removed canonicalScalarMap** - Extension pack manifests no longer include `canonicalScalarMap`. Type canonicalization happens at authoring time using extension manifests, not via a scalar map. This keeps manifests focused on type imports for code generation.
@@ -613,6 +614,7 @@ const plan = sql<Contract, CodecTypes>({ contract, adapter })
 import { emit } from '@prisma-next/emitter';
 import { loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 
 // Load extension packs (adapter + extensions)
 const packs = loadExtensionPacks(
@@ -620,11 +622,15 @@ const packs = loadExtensionPacks(
   ['./packages/extension-pack']
 );
 
+// Determine target family SPI based on contract's targetFamily
+// For SQL contracts, use sqlTargetFamilyHook
+const targetFamily = sqlTargetFamilyHook;
+
 // Emit contract (returns strings, caller handles file I/O)
 const result = await emit(ir, {
   outputDir: './dist',
   packs,
-});
+}, targetFamily);
 
 // Write files (caller responsibility)
 await writeFile('./contract.json', result.contractJson);

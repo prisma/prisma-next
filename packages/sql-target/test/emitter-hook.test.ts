@@ -194,6 +194,35 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('CodecTypes');
   });
 
+  it('generates contract types with correct import path', () => {
+    const ir: ContractIR = {
+      targetFamily: 'sql',
+      target: 'test-db',
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: {
+            id: { column: 'id' },
+          },
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'sql/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+          },
+        },
+      },
+    };
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
+    expect(types).toContain("import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-target';");
+    expect(types).not.toContain("from './contract-types'");
+  });
+
   it('gets types imports', () => {
     const packs = [
       {

@@ -1,7 +1,7 @@
-import { targetFamilyRegistry } from './target-family-registry';
 import { computeCoreHash, computeProfileHash } from './hashing';
 import { canonicalizeContract } from './canonicalization';
 import type { ContractIR, EmitOptions, EmitResult, ExtensionPack } from './types';
+import type { TargetFamilyHook } from './target-family';
 import { format } from 'prettier';
 
 function validateCoreStructure(ir: ContractIR): void {
@@ -29,18 +29,20 @@ function validateExtensions(ir: ContractIR, packs: ReadonlyArray<ExtensionPack>)
   }
 }
 
-export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitResult> {
+export async function emit(
+  ir: ContractIR,
+  options: EmitOptions,
+  targetFamily: TargetFamilyHook,
+): Promise<EmitResult> {
   const { packs } = options;
 
   const packManifests = packs.map((p) => p.manifest);
 
-  const hook = targetFamilyRegistry.require(ir.targetFamily);
-
   validateCoreStructure(ir);
 
-  hook.validateTypes(ir, packManifests);
+  targetFamily.validateTypes(ir, packManifests);
 
-  hook.validateStructure(ir);
+  targetFamily.validateStructure(ir);
 
   validateExtensions(ir, packs);
 
@@ -69,7 +71,7 @@ export async function emit(ir: ContractIR, options: EmitOptions): Promise<EmitRe
 
   const contractJsonString = canonicalizeContract(contractWithHashes);
 
-  const contractDtsRaw = hook.generateContractTypes(ir, packs);
+  const contractDtsRaw = targetFamily.generateContractTypes(ir, packs);
   const contractDts = await format(contractDtsRaw, {
     parser: 'typescript',
     singleQuote: true,

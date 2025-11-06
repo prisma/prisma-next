@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import { mkdir, writeFile, rm, readFile, existsSync } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,17 +8,9 @@ import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { targetFamilyRegistry } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { resolve } from 'node:path';
 
 const execFileAsync = promisify(execFile);
-
-beforeAll(() => {
-  if (!targetFamilyRegistry.has('sql')) {
-    targetFamilyRegistry.register(sqlTargetFamilyHook);
-  }
-});
 
 describe('CLI emit command', () => {
   let testDir: string;
@@ -144,4 +136,3 @@ export const contract = defineContract<CodecTypes>()
     );
   });
 });
-

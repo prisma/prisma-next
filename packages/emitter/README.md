@@ -75,17 +75,16 @@ flowchart TD
 - Orchestrates validation, hashing, and type generation
 - Returns contract JSON and TypeScript definitions as strings (no file I/O)
 - Pure transformation function
-
-### Target Family Registry (`target-family-registry.ts`)
-- Registry pattern for managing `TargetFamilyHook` implementations
-- Allows dynamic registration of family-specific hooks
+- Accepts `targetFamily: TargetFamilyHook` as a required parameter (no global registry)
 
 ### Target Family Hook (`target-family.ts`)
-- SPI interface for extending emission with family-specific logic:
+- SPI interface (`TargetFamilyHook`) for extending emission with family-specific logic:
   - `validateTypes`: Validate type IDs against extensions and packs
   - `validateStructure`: Family-specific structural validation
   - `generateContractTypes`: Generate `contract.d.ts` content
   - `getTypesImports`: Determine required type imports from packs
+- Authoring surfaces determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly to `emit()`
+- No global registry or auto-registration - dependencies are explicit and passed directly
 
 ### Hashing (`hashing.ts`)
 - `computeCoreHash`: SHA-256 of schema structure (models, storage, relations)
@@ -126,6 +125,9 @@ const packs = loadExtensionPacks(
   ['./packages/extension-pack']
 );
 
+// Determine target family SPI based on target family
+import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+
 // Emit contract
 const ir: ContractIR = {
   schemaVersion: '1',
@@ -134,10 +136,11 @@ const ir: ContractIR = {
   // ... contract structure
 };
 
+// Pass target family SPI directly to emit()
 const result = await emit(ir, {
   outputDir: './dist',
   packs,
-});
+}, sqlTargetFamilyHook);
 
 // result.contractJson: string (JSON)
 // result.contractDts: string (TypeScript definitions)
