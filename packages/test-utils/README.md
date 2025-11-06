@@ -84,19 +84,36 @@ flowchart TD
 - `emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, expectedContractJsonPath)`: Emits contract via CLI and verifies it matches on-disk artifacts
 - `setupE2EDatabase(client, contract, setupFn)`: Sets up E2E test database
 
+## Architecture: Dependency Injection Pattern
+
+The `@prisma-next/test-utils` package has **no dependencies** on other `@prisma-next` packages. Instead, it uses a dependency injection pattern where functions accept their dependencies as parameters (e.g., `validateContractFn`, `markerStatements`, `createRuntimeFn`).
+
+**Why?** This prevents cyclic dependencies and keeps test utilities lightweight and reusable across packages.
+
+**How it works:**
+- Base functions in `test-utils` accept dependencies as parameters
+- Consuming packages (e.g., `packages/runtime/test/utils.ts`, `packages/e2e-tests/test/utils.ts`) create wrapper files that inject dependencies
+- Wrappers provide type-safe interfaces specific to each package's needs
+
 ## Dependencies
 
-- `@prisma-next/runtime`: Runtime creation and contract marker functions
-- `@prisma-next/sql-query`: Contract validation
-- `@prisma-next/sql-target`: SQL types
-- `@prisma/dev`: Dev database server
+**Direct dependencies:**
+- `@prisma/dev`: Dev database server (marked as external in tsup config to prevent bundling issues)
 - `pg`: PostgreSQL client
 
+**Injected dependencies (via wrapper files):**
+- `@prisma-next/runtime`: Runtime creation and contract marker functions
+- `@prisma-next/sql-query`: Contract validation and Plan types
+- `@prisma-next/sql-target`: SQL types
+
 ## Usage
+
+**Note**: The base functions in `@prisma-next/test-utils` use dependency injection. For most use cases, you should import from package-specific wrapper files (e.g., `packages/runtime/test/utils.ts`, `packages/e2e-tests/test/utils.ts`) which inject the required dependencies.
 
 ### Integration Tests
 
 ```typescript
+// Import from package-specific wrapper (injects dependencies)
 import {
   withDevDatabase,
   withClient,
@@ -104,7 +121,7 @@ import {
   teardownTestDatabase,
   executePlanAndCollect,
   createTestRuntime,
-} from '@prisma-next/test-utils';
+} from '@prisma-next/runtime/test/utils';
 
 // Use with dev database
 await withDevDatabase(async ({ connectionString }) => {
@@ -125,6 +142,7 @@ await withDevDatabase(async ({ connectionString }) => {
 ### E2E Tests
 
 ```typescript
+// Import from package-specific wrapper (injects dependencies)
 import {
   withDevDatabase,
   withClient,
@@ -132,7 +150,7 @@ import {
   setupE2EDatabase,
   createTestRuntimeFromClient,
   executePlanAndCollect,
-} from '@prisma-next/test-utils';
+} from '@prisma-next/e2e-tests/test/utils';
 
 // Load contract from committed fixtures
 const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -156,7 +174,9 @@ await withDevDatabase(
           .select({ id: tables.user.columns.id })
           .build();
 
+        // Return type is automatically inferred from plan
         const rows = await executePlanAndCollect(runtime, plan);
+        type Row = ResultType<typeof plan>;  // Optional: for type tests
         expect(rows.length).toBeGreaterThan(0);
       } finally {
         await runtime.close();
@@ -165,6 +185,31 @@ await withDevDatabase(
   },
   { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
 );
+```
+
+### Creating Wrapper Files
+
+If you need to use test utilities in a new package, create a wrapper file that injects dependencies:
+
+```typescript
+// packages/your-package/test/utils.ts
+import {
+  executePlanAndCollect as executePlanAndCollectBase,
+  // ... other base functions
+} from '@prisma-next/test-utils';
+import type { Plan, ResultType } from '@prisma-next/sql-query/types';
+import { validateContract } from '@prisma-next/sql-query/schema';
+// ... other dependencies
+
+// Wrap with proper types
+export async function executePlanAndCollect<P extends Plan>(
+  runtime: { execute<Row = Record<string, unknown>>(plan: unknown): AsyncIterable<Row> },
+  plan: P,
+): Promise<ResultType<P>[]> {
+  return executePlanAndCollectBase(runtime, plan) as Promise<ResultType<P>[]>;
+}
+
+// ... other wrapped functions
 ```
 
 ## Exports

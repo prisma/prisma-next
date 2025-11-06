@@ -47,24 +47,36 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - `withClient(connectionString, fn)`: Executes a function with a database client, auto-cleanup
 - `collectAsync(iterable)`: Collects all values from an async iterable
 - `drainAsyncIterable(iterable)`: Drains an async iterable without collecting
-- `executePlanAndCollect<Row>(runtime, plan)`: Executes a plan and collects all results
+- `executePlanAndCollect(runtime, plan)`: Executes a plan and collects all results (return type automatically inferred from plan)
 - `setupE2EDatabase(client, contract, setupFn)`: Sets up E2E test database with schema, data, and contract marker
 - `createTestRuntimeFromClient(contract, client, adapter)`: Creates a runtime with standard test configuration
 - `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk
 - `emitAndVerifyContract(...)`: Emits contract via CLI and verifies it matches on-disk artifacts
 
-**Import from shared package:**
+**Import from package-specific wrapper files** (injects dependencies):
 ```typescript
+// For runtime tests:
 import {
   withDevDatabase,
   withClient,
   collectAsync,
   executePlanAndCollect,
+  setupTestDatabase,
+  createTestRuntime,
+} from '@prisma-next/runtime/test/utils';
+
+// For e2e tests:
+import {
+  withDevDatabase,
+  withClient,
+  executePlanAndCollect,
   setupE2EDatabase,
   createTestRuntimeFromClient,
   loadContractFromDisk,
-} from '@prisma-next/test-utils';
+} from './utils';  // packages/e2e-tests/test/utils.ts
 ```
+
+**Note**: The `@prisma-next/test-utils` package uses dependency injection with no dependencies on other `@prisma-next` packages. Wrapper files inject dependencies to prevent cyclic dependencies.
 
 ### Database Helpers
 
@@ -83,8 +95,9 @@ await withDevDatabase(async ({ connectionString }) => {
 // Collect all results
 const results = await collectAsync(runtime.execute(plan));
 
-// Or use the plan-specific helper
-const rows = await executePlanAndCollect<Row>(runtime, plan);
+// Or use the plan-specific helper - return type is automatically inferred
+const rows = await executePlanAndCollect(runtime, plan);
+type Row = ResultType<typeof plan>;  // Optional: for type tests
 
 // Drain iterator without collecting
 await drainAsyncIterable(runtime.execute(plan));
@@ -92,9 +105,10 @@ await drainAsyncIterable(runtime.execute(plan));
 
 ### E2E Test Pattern
 
-**✅ CORRECT: Use shared utilities and load contracts from fixtures**
+**✅ CORRECT: Use shared utilities via wrapper files and load contracts from fixtures**
 
 ```typescript
+// Import from package-specific wrapper (injects dependencies)
 import {
   withDevDatabase,
   withClient,
@@ -102,7 +116,7 @@ import {
   setupE2EDatabase,
   createTestRuntimeFromClient,
   executePlanAndCollect,
-} from '@prisma-next/test-utils';
+} from './utils';  // Wrapper around @prisma-next/test-utils
 
 it('test description', async () => {
   // Load contract from committed fixtures (not emit on every test)
@@ -170,6 +184,82 @@ it('test', async () => {
 - ✅ If a pattern is used across multiple test suites, add it to `@prisma-next/test-utils`
 - ✅ Check `@prisma-next/test-utils` first before creating a new helper
 - ❌ Don't duplicate helpers that already exist in the shared package
+
+## Common Mistakes and Corrections
+
+### Importing from `@prisma-next/test-utils` directly
+
+**❌ WRONG:**
+```typescript
+import { executePlanAndCollect } from '@prisma-next/test-utils';
+```
+
+**✅ CORRECT: Import from package-specific wrapper files**
+```typescript
+// For runtime tests
+import { executePlanAndCollect } from '@prisma-next/runtime/test/utils';
+
+// For e2e tests
+import { executePlanAndCollect } from './utils';
+```
+
+**Why?** The `@prisma-next/test-utils` package uses dependency injection with no dependencies on other `@prisma-next` packages. Wrapper files inject dependencies to prevent cyclic dependencies and enable proper type inference.
+
+### Type inference in `executePlanAndCollect`
+
+**❌ WRONG:**
+```typescript
+const rows = await executePlanAndCollect<Row>(runtime, plan);
+```
+
+**✅ CORRECT: Let TypeScript infer the return type**
+```typescript
+const rows = await executePlanAndCollect(runtime, plan);
+type Row = ResultType<typeof plan>;  // Optional: for type tests
+```
+
+**Why?** The wrapper functions use `ResultType<P>` from `@prisma-next/sql-query/types` to automatically infer the return type from the plan. Manual type parameters are unnecessary and can cause type inference issues.
+
+### Bundling external dependencies
+
+**Issue:** When bundling packages that use dependencies with native modules or data files (e.g., `@prisma/dev` with pglite), bundling can cause runtime errors.
+
+**Solution:** Mark dependencies as external in `tsup.config.ts`:
+```typescript
+export default defineConfig({
+  external: ['@prisma/dev'],
+});
+```
+
+### Test timeout configuration
+
+**Issue:** Database setup in tests can take time, causing timeout errors.
+
+**Solution:** Set appropriate timeouts for `describe` blocks and `beforeAll` hooks:
+```typescript
+describe('test suite', { timeout: 30000 }, () => {
+  beforeAll(async () => { /* ... */ }, 30000);
+});
+```
+
+### SQL table name quoting
+
+**Issue:** Some table names are PostgreSQL reserved keywords (e.g., `user`), causing SQL syntax errors.
+
+**Solution:** Always quote table names in SQL statements:
+```typescript
+// ❌ WRONG
+await client.query(`drop table if exists ${table}`);
+
+// ✅ CORRECT
+await client.query(`drop table if exists "${table}"`);
+```
+
+### Literal type preservation tests
+
+**Issue:** Type-level tests that verify literal type preservation may fail due to TypeScript limitations.
+
+**Solution:** These tests can be commented out with a note explaining the limitation, as the runtime behavior is still correct.
 
 ## Testing Anti-Patterns
 

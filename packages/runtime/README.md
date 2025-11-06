@@ -153,5 +153,5 @@ for await (const row of runtime.execute(plan)) {
 ## Exports
 
 - `.`: Main runtime API (`createRuntime`, types)
-- `./test/utils`: Test utilities
+- `./test/utils`: Test utilities (wrapper around `@prisma-next/test-utils` with dependencies injected)
 

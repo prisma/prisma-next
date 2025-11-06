@@ -38,9 +38,10 @@ flowchart TD
 
 ## Test Patterns
 
-Tests use shared utilities from `@prisma-next/test-utils` to reduce duplication:
+Tests use shared utilities from `@prisma-next/test-utils` via a wrapper file that injects dependencies:
 
 ```typescript
+// Import from package-specific wrapper (injects dependencies)
 import {
   withDevDatabase,
   withClient,
@@ -48,7 +49,7 @@ import {
   setupE2EDatabase,
   createTestRuntimeFromClient,
   executePlanAndCollect,
-} from '@prisma-next/test-utils';
+} from './utils';  // Wrapper around @prisma-next/test-utils
 
 // Load contract from committed fixtures (not emit on every test)
 const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -85,5 +86,6 @@ await withDevDatabase(
 - Build the repo first: `pnpm -w build`
 - Uses unique ports for the dev DB to avoid conflicts (54020-54112 range)
 - Type tests import the committed `test/fixtures/generated/contract.d.ts`
-- Tests use shared utilities from `@prisma-next/test-utils` for consistency
+- Tests use shared utilities from `@prisma-next/test-utils` via `test/utils.ts` wrapper (injects dependencies)
+- The `executePlanAndCollect` function properly infers return types using `ResultType<P>` from `@prisma-next/sql-query/types`
 

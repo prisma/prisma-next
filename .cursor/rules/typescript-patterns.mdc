@@ -554,9 +554,10 @@ async function emitAndLoadContract(...) { /* ... */ }
 async function setupDatabase(...) { /* ... */ }
 ```
 
-**✅ CORRECT: Use shared utilities from `@prisma-next/test-utils`**
+**✅ CORRECT: Use shared utilities via package-specific wrapper files**
 
 ```typescript
+// Import from package-specific wrapper (injects dependencies)
 import {
   withDevDatabase,
   withClient,
@@ -564,10 +565,11 @@ import {
   setupE2EDatabase,
   createTestRuntimeFromClient,
   loadContractFromDisk,
-} from '@prisma-next/test-utils';
+} from './utils';  // Wrapper around @prisma-next/test-utils
 
-// Use shared helpers
-const rows = await executePlanAndCollect<Row>(runtime, plan);
+// Use shared helpers - return type is automatically inferred from plan
+const rows = await executePlanAndCollect(runtime, plan);
+type Row = ResultType<typeof plan>;  // Optional: for type tests
 const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 await setupE2EDatabase(client, contract, async (c) => { /* ... */ });
 ```
