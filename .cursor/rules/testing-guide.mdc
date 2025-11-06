@@ -40,31 +40,59 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 
 ### Shared Test Utilities
 
-**Use `@prisma-next/test-utils` for common test patterns** - Don't create helpers in individual test files when they're used across multiple test suites.
+**Test utilities are organized across multiple locations to avoid circular dependencies:**
+- **`@prisma-next/test-utils`**: Generic database and async iterable utilities with zero dependencies on other `@prisma-next/*` packages
+- **`@prisma-next/runtime/test/utils`**: Runtime-specific test utilities (plan execution, runtime creation, contract markers)
+- **`e2e-tests/test/utils.ts`**: Contract-related utilities for E2E tests (contract loading, emission verification)
 
-**Available Helpers:**
+**Available Helpers in `@prisma-next/test-utils`:**
 - `withDevDatabase(fn, options?)`: Executes a function with a dev database, auto-cleanup
 - `withClient(connectionString, fn)`: Executes a function with a database client, auto-cleanup
 - `collectAsync(iterable)`: Collects all values from an async iterable
 - `drainAsyncIterable(iterable)`: Drains an async iterable without collecting
-- `executePlanAndCollect<Row>(runtime, plan)`: Executes a plan and collects all results
-- `setupE2EDatabase(client, contract, setupFn)`: Sets up E2E test database with schema, data, and contract marker
-- `createTestRuntimeFromClient(contract, client, adapter)`: Creates a runtime with standard test configuration
+- `teardownTestDatabase(client, tables?)`: Tears down test database
+
+**Available Helpers in `@prisma-next/runtime/test/utils`:**
+- `executePlanAndCollect<P extends Plan>(runtime, plan)`: Executes a plan and collects all results
+- `drainPlanExecution(runtime, plan)`: Drains plan execution without collecting
+- `setupTestDatabase(client, contract, setupFn)`: Sets up database schema and writes contract marker
+- `writeTestContractMarker(client, contract)`: Writes a contract marker to the database
+- `createTestRuntime(contract, adapter, driver, options?)`: Creates a runtime with standard test configuration
+- `createTestRuntimeFromClient(contract, client, adapter, options?)`: Creates a runtime with the given contract and database client
+- `setupE2EDatabase(client, contract, setupFn)`: Sets up E2E test database (wrapper around `setupTestDatabase`)
+
+**Available Helpers in `e2e-tests/test/utils.ts` (local to e2e-tests):**
 - `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk
 - `emitAndVerifyContract(...)`: Emits contract via CLI and verifies it matches on-disk artifacts
 
-**Import from shared package:**
+**Import from generic utilities:**
 ```typescript
 import {
   withDevDatabase,
   withClient,
   collectAsync,
-  executePlanAndCollect,
-  setupE2EDatabase,
-  createTestRuntimeFromClient,
-  loadContractFromDisk,
+  drainAsyncIterable,
+  teardownTestDatabase,
 } from '@prisma-next/test-utils';
 ```
+
+**Import from runtime-specific utilities:**
+```typescript
+import {
+  executePlanAndCollect,
+  drainPlanExecution,
+  setupTestDatabase,
+  createTestRuntime,
+  createTestRuntimeFromClient,
+} from '@prisma-next/runtime/test/utils';
+```
+
+**Import from contract utilities (in e2e-tests only):**
+```typescript
+import { loadContractFromDisk, emitAndVerifyContract } from './utils';
+```
+
+**Note**: `@prisma-next/test-utils` has zero dependencies on other `@prisma-next/*` packages, allowing it to be used by all packages without circular dependencies.
 
 ### Database Helpers
 
@@ -80,14 +108,17 @@ await withDevDatabase(async ({ connectionString }) => {
 ### Iterator Helpers
 
 ```typescript
-// Collect all results
-const results = await collectAsync(runtime.execute(plan));
+import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
+import { executePlanAndCollect } from '@prisma-next/runtime/test/utils';
 
-// Or use the plan-specific helper
-const rows = await executePlanAndCollect<Row>(runtime, plan);
+// Collect all results (generic)
+const results = await collectAsync(someAsyncIterable);
 
-// Drain iterator without collecting
-await drainAsyncIterable(runtime.execute(plan));
+// Or use the plan-specific helper (runtime-specific)
+const rows = await executePlanAndCollect(runtime, plan);
+
+// Drain iterator without collecting (generic)
+await drainAsyncIterable(someAsyncIterable);
 ```
 
 ### E2E Test Pattern
@@ -95,14 +126,13 @@ await drainAsyncIterable(runtime.execute(plan));
 **✅ CORRECT: Use shared utilities and load contracts from fixtures**
 
 ```typescript
+import { withDevDatabase, withClient } from '@prisma-next/test-utils';
 import {
-  withDevDatabase,
-  withClient,
-  loadContractFromDisk,
   setupE2EDatabase,
   createTestRuntimeFromClient,
   executePlanAndCollect,
-} from '@prisma-next/test-utils';
+} from '@prisma-next/runtime/test/utils';
+import { loadContractFromDisk } from './utils';
 
 it('test description', async () => {
   // Load contract from committed fixtures (not emit on every test)
@@ -167,9 +197,12 @@ it('test', async () => {
 - ❌ Pattern is specific to a single test
 
 **Use shared package for cross-suite patterns:**
-- ✅ If a pattern is used across multiple test suites, add it to `@prisma-next/test-utils`
+- ✅ If a pattern is used across multiple test suites and is generic (no dependencies on other `@prisma-next/*` packages), add it to `@prisma-next/test-utils`
+- ✅ If a pattern is runtime-specific, add it to `@prisma-next/runtime/test/utils`
+- ✅ If a pattern is contract-related and only used in e2e-tests, add it to `e2e-tests/test/utils.ts`
 - ✅ Check `@prisma-next/test-utils` first before creating a new helper
-- ❌ Don't duplicate helpers that already exist in the shared package
+- ❌ Don't duplicate helpers that already exist in the shared packages
+- ❌ Don't add dependencies to `@prisma-next/test-utils` on other `@prisma-next/*` packages (it must remain dependency-free)
 
 ## Testing Anti-Patterns
 

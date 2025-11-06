@@ -390,7 +390,7 @@ const codec = codecDefinitions['timestamp'].codec as {
 4. **Use `@ts-expect-error` for invalid inputs**: When testing error cases, use `@ts-expect-error` with a comment explaining why
 5. **Remove unnecessary `| undefined`**: If a value is guaranteed to exist, don't include `| undefined` in type assertions
 
-## ESLint Configuration
+## Biome Configuration
 
 ### Disable Comments
 
@@ -399,11 +399,11 @@ const codec = codecDefinitions['timestamp'].codec as {
 **❌ WRONG: Many inline disable comments**
 
 ```typescript
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: <reason>
 const invalid = { ...validContractInput, targetFamily: undefined } as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: <reason>
 const invalid2 = { ...validContractInput, target: undefined } as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: <reason>
 const invalid3 = { ...validContractInput, coreHash: undefined } as any;
 // ... many more
 ```
@@ -411,7 +411,7 @@ const invalid3 = { ...validContractInput, coreHash: undefined } as any;
 **✅ CORRECT: File-level disable comment**
 
 ```typescript
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+// biome-ignore lint: test file with type assertions
 import { describe, expect, it } from 'vitest';
 
 // Now all as any usages in the file are allowed
@@ -455,11 +455,8 @@ const _plan = sql<Contract, CodecTypes>({ contract, adapter })
 type Row = ResultType<typeof _plan>;  // _plan indicates it's intentionally unused
 ```
 
-**ESLint Configuration:**
-The `@typescript-eslint/no-unused-vars` rule is configured to ignore variables starting with `_`:
-- `argsIgnorePattern: '^_'` - Function arguments starting with `_`
-- `varsIgnorePattern: '^_'` - Variables starting with `_`
-- `caughtErrorsIgnorePattern: '^_'` - Caught errors starting with `_`
+**Biome Configuration:**
+The `noUnusedVariables` rule is configured to ignore variables starting with `_` via the `ignorePattern: '^_'` option.
 
 ### Empty Object Types
 
@@ -504,7 +501,6 @@ type BuildStorage<
 **Why this matters:**
 - `{}` allows any non-nullish value, which is too permissive
 - `Record<string, never>` is an explicit empty object type with no index signature
-- Satisfies ESLint's `@typescript-eslint/no-empty-object-type` rule
 - Provides better type safety
 
 ### JSON Imports
@@ -515,7 +511,7 @@ type BuildStorage<
 
 ```typescript
 const fixtureContract = validateContract<Contract>(
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // biome-ignore lint: CommonJS require in test context
   require('./fixtures/contract.json'),
 );
 ```
@@ -531,14 +527,14 @@ const fixtureContract = validateContract<Contract>(contractJson);
 **Why this matters:**
 - `require()` is CommonJS and doesn't work well with ESM
 - `import` with `assert { type: 'json' }` is the ESM way to import JSON
-- Avoids ESLint errors about `require()` and `no-undef`
+- Avoids linting errors about `require()` and undefined globals
 - Better type safety and module resolution
 
 ## DRY Test Patterns
 
 **Pattern**: Common patterns in test files should be extracted into helper functions with JSDoc comments explaining their purpose.
 
-**Use `@prisma-next/test-utils` for shared helpers** - Check the shared package first before creating new helpers.
+**Use `@prisma-next/test-utils` for generic shared helpers** - Check the shared package first before creating new helpers. Note that `@prisma-next/test-utils` has zero dependencies on other `@prisma-next/*` packages to avoid circular dependencies. For runtime-specific utilities, use `@prisma-next/runtime/test/utils`. For contract-related utilities in E2E tests, use `e2e-tests/test/utils.ts`.
 
 **❌ WRONG: Repeated pattern throughout test file or creating helpers that already exist**
 
@@ -554,17 +550,16 @@ async function emitAndLoadContract(...) { /* ... */ }
 async function setupDatabase(...) { /* ... */ }
 ```
 
-**✅ CORRECT: Use shared utilities from `@prisma-next/test-utils`**
+**✅ CORRECT: Use shared utilities from appropriate locations**
 
 ```typescript
+import { withDevDatabase, withClient } from '@prisma-next/test-utils';
 import {
-  withDevDatabase,
-  withClient,
   executePlanAndCollect,
   setupE2EDatabase,
   createTestRuntimeFromClient,
-  loadContractFromDisk,
-} from '@prisma-next/test-utils';
+} from '@prisma-next/runtime/test/utils';
+import { loadContractFromDisk } from './utils';
 
 // Use shared helpers
 const rows = await executePlanAndCollect<Row>(runtime, plan);

@@ -153,5 +153,42 @@ for await (const row of runtime.execute(plan)) {
 ## Exports
 
 - `.`: Main runtime API (`createRuntime`, types)
-- `./test/utils`: Test utilities
+- `./test/utils`: Runtime-specific test utilities
+
+### Test Utilities
+
+Runtime-specific test utilities are located in `runtime/test/utils.ts`. These utilities import generic helpers from `@prisma-next/test-utils` and provide runtime-specific functionality:
+
+**Available Utilities:**
+- `executePlanAndCollect<P extends Plan>(runtime, plan)`: Executes a plan and collects all results into an array. The return type is automatically inferred from the plan's type parameter using `ResultType<P>[]`.
+- `drainPlanExecution(runtime, plan)`: Drains a plan execution, consuming all results without collecting them.
+- `executeStatement(client, statement)`: Executes a SQL statement on a database client.
+- `setupTestDatabase(client, contract, setupFn)`: Sets up database schema and data, then writes the contract marker.
+- `writeTestContractMarker(client, contract)`: Writes a contract marker to the database.
+- `createTestRuntime(contract, adapter, driver, options?)`: Creates a runtime with standard test configuration.
+- `createTestRuntimeFromClient(contract, client, adapter, options?)`: Creates a runtime with the given contract and database client.
+- `setupE2EDatabase(client, contract, setupFn)`: Sets up E2E test database (wrapper around `setupTestDatabase`).
+
+**Usage:**
+```typescript
+import {
+  executePlanAndCollect,
+  drainPlanExecution,
+  setupTestDatabase,
+  createTestRuntime,
+  createTestRuntimeFromClient,
+} from '@prisma-next/runtime/test/utils';
+import { withClient } from '@prisma-next/test-utils';
+
+await withClient(connectionString, async (client) => {
+  await setupTestDatabase(client, contract, async (c) => {
+    await c.query('create table "user" ...');
+  });
+
+  const runtime = createTestRuntime(contract, adapter, driver);
+  const rows = await executePlanAndCollect(runtime, plan);
+});
+```
+
+**Note**: These utilities import generic helpers (`drainAsyncIterable`, `collectAsync`, `createDevDatabase`, `withClient`) from `@prisma-next/test-utils` to avoid circular dependencies.
 
