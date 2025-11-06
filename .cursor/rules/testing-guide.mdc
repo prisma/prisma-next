@@ -1,0 +1,101 @@
+---
+description: Testing guide and best practices for Prisma Next
+alwaysApply: false
+---
+
+# Testing Guide
+
+Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing practices.
+
+## Quick Reference
+
+**Testing Philosophy:**
+1. **Conciseness without obscurity** - Shorter code that's still clear
+2. **Separation of concerns** - Test logic separate from infrastructure
+3. **Maintainability** - Easy to update when requirements change
+4. **Readability** - Tests should tell a story of what they verify
+
+**Testing Pyramid:**
+- **70% Unit Tests** - Fast feedback on individual components
+- **20% Integration Tests** - Verify component interactions
+- **10% E2E Tests** - Verify complete execution paths
+
+**DRY Patterns:**
+- Extract helpers when pattern appears 3+ times
+- Helpers should hide implementation details
+- Helpers should express intent clearly
+- Helpers should reduce line count significantly
+
+**Test Descriptions:**
+- Omit "should" - `it('returns correct value')` not `it('should return correct value')`
+- Be direct and action-oriented
+- See `.cursor/rules/omit-should-in-tests.mdc` for details
+
+**Type Testing:**
+- Use `expectTypeOf` from Vitest
+- Located in `**/*.test-d.ts` files
+- See `.cursor/rules/vitest-expect-typeof.mdc` for details
+
+## Common Patterns
+
+### Execute Plan Helper
+
+```typescript
+/**
+ * Executes a plan and consumes the first row from the result iterator.
+ * This helper DRYs up the common test pattern of executing a plan and breaking
+ * after the first row to trigger execution without consuming all results.
+ */
+const executePlan = async (runtime: ReturnType<typeof createRuntime>, plan: Plan): Promise<void> => {
+  for await (const _row of runtime.execute(plan)) {
+    void _row;
+    break;
+  }
+};
+```
+
+### Database Helpers
+
+```typescript
+// Use withDevDatabase for automatic cleanup
+await withDevDatabase(async (database) => {
+  // ... test code
+});
+
+// Use withClient for client lifecycle
+await withClient(connectionString, async (client) => {
+  // ... test code
+});
+```
+
+### Iterator Helpers
+
+```typescript
+// Collect all results
+const results = await collectAsync(runtime.execute(plan));
+
+// Drain iterator without collecting
+await drainAsyncIterable(runtime.execute(plan));
+```
+
+## When to Create Helpers
+
+**Create a helper when:**
+- ✅ Same pattern appears 3+ times in a test file
+- ✅ Pattern involves multiple steps (setup, execution, cleanup)
+- ✅ Pattern obscures test intent with boilerplate
+- ✅ Pattern is likely to change (encapsulate change in one place)
+
+**Don't create a helper when:**
+- ❌ Pattern appears only 1-2 times
+- ❌ Helper would be more complex than the pattern itself
+- ❌ Pattern is specific to a single test
+
+## Testing Anti-Patterns
+
+**❌ Copy-Paste Cascade:** Same code block appears 5+ times
+**❌ Implementation Detail Exposure:** Tests directly manipulate internal state
+**❌ Pyramid of Setup:** More lines of setup than actual test verification
+**❌ Error Handling Everywhere:** Error checking dominates the test
+
+See `docs/Testing Guide.md` for detailed examples and solutions.

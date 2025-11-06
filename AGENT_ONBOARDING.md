@@ -215,6 +215,8 @@ type JoinedRow = ResultType<typeof joinedPlan>;
 - **Typecheck**: Use `pnpm typecheck` scripts, not raw `tsc`
 - **No file extensions in imports** - `import { x } from './file'` not `'./file.ts'`
 - **ESM only** - All packages use `"type": "module"`
+- **ESLint config**: ESLint config file is `eslint.config.mjs` at the root. All package lint scripts explicitly specify the config file using `--config ../../eslint.config.mjs` to avoid Node.js module type warnings.
+- **Type constraints**: When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements. For example, `TableBuilderState<unknown, unknown, unknown>` won't work - use the actual constraint types like `TableBuilderState<string, Record<string, ColumnBuilderState<...>>, readonly string[] | undefined>`.
 
 ### Code Style
 
@@ -225,6 +227,12 @@ type JoinedRow = ResultType<typeof joinedPlan>;
 - **Node.js globals restriction**: `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`), `packages/node-utils/**/*.ts`, and `packages/cli/**/*.ts`. Other packages should not use these globals directly.
 - **Index signature property access**: When TypeScript requires it (e.g., `TS4111` error), use bracket notation: `contract['targetFamily']` instead of `contract.targetFamily`. This is required when accessing properties from index signatures.
 - **Unsafe assignments in tests**: When working with `JSON.parse()` results or dynamic imports in tests, use type assertions and eslint-disable comments as needed: `const json = JSON.parse(content) as Record<string, unknown>;`
+- **Avoid unnecessary type casts**: Always check the actual type signature before adding type casts. If a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`.
+- **Use dot notation for guaranteed values**: When accessing values that are guaranteed to exist (e.g., in test fixtures), use dot notation (`.`) instead of optional chaining (`?.`). Don't include `| undefined` in type assertions when values are guaranteed to exist.
+- **ESLint disable comments**: If you need to disable a rule for more than a couple of lines in a file, use a file-level disable comment at the top of the file instead of many inline comments. Example: `/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */`
+- **Unused variables**: Variables that are only used as types should be prefixed with `_` to indicate they're intentionally unused. Example: `const _plan = sql(...).build(); type Row = ResultType<typeof _plan>;`
+- **Empty object types**: Use `Record<string, never>` instead of `{}` for empty object types in type definitions. This provides better type safety and satisfies ESLint's `@typescript-eslint/no-empty-object-type` rule.
+- **JSON imports**: Use `import` statements with `assert { type: 'json' }` instead of `require()` for JSON files. Example: `import contractJson from './fixtures/contract.json' assert { type: 'json' };`
 
 ### Validation Pattern
 
@@ -446,6 +454,39 @@ type CodecDefBuilder<
 
 **Key insight**: When extracting literal types from codecs, use mapped types that extract keys (which preserve literals) rather than inferring values (which widen to `string`).
 
+**Type Constraint Errors**: When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements. For example:
+
+```typescript
+// ❌ WRONG: unknown doesn't satisfy string constraint
+type ExtractColumns<T extends TableBuilderState<unknown, unknown, unknown>> =
+  T extends TableBuilderState<unknown, infer C, unknown> ? C : never;
+
+// ✅ CORRECT: Use actual constraint types from the interface
+type ExtractColumns<
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+    readonly string[] | undefined
+  >,
+> = T extends TableBuilderState<string, infer C, readonly string[] | undefined> ? C : never;
+```
+
+**DRY Test Patterns**: Common patterns in test files should be extracted into helper functions with JSDoc comments:
+
+```typescript
+/**
+ * Executes a plan and consumes the first row from the result iterator.
+ * This helper DRYs up the common test pattern of executing a plan and breaking
+ * after the first row to trigger execution without consuming all results.
+ */
+const executePlan = async (runtime: ReturnType<typeof createRuntime>, plan: Plan): Promise<void> => {
+  for await (const _row of runtime.execute(plan)) {
+    void _row;
+    break;
+  }
+};
+```
+
 ### Contract Validation in Tests
 
 **Always validate contracts in tests** - contracts must have fully qualified type IDs:
@@ -535,12 +576,19 @@ database = await createDevDatabase({
 
 ## 🧪 Testing
 
+**See `docs/Testing Guide.md` for comprehensive testing practices and philosophy.**
+
 - **Vitest** for all tests
+- **Testing Pyramid**: 70% Unit Tests, 20% Integration Tests, 10% E2E Tests
+- **Testing Philosophy**: Conciseness without obscurity, separation of concerns, maintainability, readability
+- **DRY Patterns**: Extract helpers when patterns appear 3+ times - see `docs/Testing Guide.md` for examples
 - **Type-level tests**: Use `plan-types.test-d.ts` pattern (`.test-d.ts` extension)
 - **Integration tests**: Spin up Postgres, create tables, execute queries
+- **E2E tests**: Test complete execution paths from CLI to database and back
 - **Test fixtures**: `test/fixtures/contract.json` + `contract.d.ts`
 - **Type assertions**: Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 - **Type tests**: Use `expectTypeOf` helpers, not manual type checks with conditional types - see `.cursor/rules/vitest-expect-typeof.mdc`
+- **Test descriptions**: Omit "should" - see `.cursor/rules/omit-should-in-tests.mdc`
 
 ### Running Tests and Coverage
 
@@ -629,6 +677,15 @@ test('Type IDs are literal types', () => {
 25. **SQL Types Import Path** - **CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) must be imported from `@prisma-next/sql-target`, **not** from `@prisma-next/contract/types`. See `.cursor/rules/sql-types-imports.mdc` for details.
 26. **Node.js Globals Restriction** - `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files, `packages/node-utils`, and `packages/cli`. Other packages should not use these globals directly. If needed, use `eslint-disable-next-line no-undef` with a comment explaining why.
 27. **Generated File Metadata** - `contract.json` files include a `_generated` metadata field to indicate they're generated artifacts. This field is excluded from canonicalization/hashing. `contract.d.ts` files include warning header comments. Both are generated by `prisma-next emit` and should not be edited manually.
+28. **Avoid Unnecessary Type Casts** - **CRITICAL**: Always check the actual type signature before adding type casts (`as unknown as T`) or optional chaining (`?.`). Unnecessary casts are a code smell that indicates the actual type already supports what you're trying to do. For example, if a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
+29. **Use Dot Notation for Guaranteed Values** - When accessing values that are guaranteed to exist (e.g., in test fixtures, constants), use dot notation (`.`) instead of optional chaining (`?.`). Optional chaining should only be used for values that might not exist (e.g., user input, API responses). Similarly, don't include `| undefined` in type assertions when values are guaranteed to exist. See `.cursor/rules/typescript-patterns.mdc` for details.
+30. **ESLint Disable Comments** - If you need to disable a rule for more than a couple of lines in a file, use a file-level disable comment at the top of the file instead of many inline comments. Example: `/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */`
+31. **Unused Variables Pattern** - Variables that are only used as types should be prefixed with `_` to indicate they're intentionally unused. The ESLint rule `@typescript-eslint/no-unused-vars` is configured to ignore variables starting with `_`. Example: `const _plan = sql(...).build(); type Row = ResultType<typeof _plan>;`
+32. **Empty Object Types** - Use `Record<string, never>` instead of `{}` for empty object types in type definitions. This provides better type safety and satisfies ESLint's `@typescript-eslint/no-empty-object-type` rule.
+33. **JSON Imports** - Use `import` statements with `assert { type: 'json' }` instead of `require()` for JSON files. Example: `import contractJson from './fixtures/contract.json' assert { type: 'json' };`
+34. **Type Constraint Fixes** - When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements. Don't use `unknown` for type parameters that have specific constraints (e.g., `string`, `Record<...>`). Use the actual constraint types from the interface definition.
+35. **DRY Test Patterns** - Common patterns in test files (like executing plans) should be extracted into helper functions with JSDoc comments explaining their purpose. This reduces code duplication and makes tests more maintainable.
+36. **ESLint Config File** - ESLint config file is `eslint.config.mjs` at the root. All package lint scripts explicitly specify the config file using `--config ../../eslint.config.mjs` to avoid Node.js module type warnings.
 
 ## 📖 Documentation Location
 
@@ -850,6 +907,7 @@ pnpm test:coverage:packages
 18. **GitHub Actions CI Workflow** - Set up comprehensive CI workflow with separate jobs for typecheck, lint, build, test, e2e tests, and coverage. Workflow includes concurrency control, Postgres service configuration, coverage artifact uploads, and optional Codecov integration. All jobs run in parallel where possible for faster feedback.
 19. **Generated File Metadata** - Added `_generated` metadata field to `contract.json` files to indicate they're generated artifacts. This field is excluded from canonicalization/hashing to ensure determinism. Added warning header comments to `contract.d.ts` files. Both prevent accidental manual edits and guide users to regenerate using `prisma-next emit`.
 20. **Node.js Globals Restriction** - Restricted Node.js globals (`console`, `process`, `__dirname`, `__filename`, `URL`) to only be permitted in test files, `packages/node-utils`, and `packages/cli` via ESLint configuration. This enforces better separation of concerns and prevents accidental use of Node.js-specific APIs in core packages.
+21. **Avoiding Unnecessary Type Casts and Optional Chaining** - Added guidance on avoiding unnecessary type casts and optional chaining. Always check the actual type signature before adding casts. Use dot notation (`.`) instead of optional chaining (`?.`) when values are guaranteed to exist. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
 
 ### Future Work
 

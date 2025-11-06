@@ -171,6 +171,37 @@ type ExtractDataTypes<
 };
 ```
 
+### Type Constraint Errors
+
+**CRITICAL**: When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements.
+
+**❌ WRONG: Using `unknown` for type parameters with specific constraints**
+
+```typescript
+// This will fail because unknown doesn't satisfy string constraint
+type ExtractColumns<T extends TableBuilderState<unknown, unknown, unknown>> =
+  T extends TableBuilderState<unknown, infer C, unknown> ? C : never;
+```
+
+**✅ CORRECT: Use actual constraint types from the interface**
+
+```typescript
+// Use the actual constraint types from TableBuilderState interface
+type ExtractColumns<
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+    readonly string[] | undefined
+  >,
+> = T extends TableBuilderState<string, infer C, readonly string[] | undefined> ? C : never;
+```
+
+**Why this matters:**
+- TypeScript requires that generic type parameters satisfy their constraints
+- `unknown` doesn't satisfy constraints like `string` or `Record<...>`
+- You must use the actual constraint types from the interface definition
+- Check the interface definition to see what the actual constraints are
+
 ## Contract Validation in Tests
 
 **Always validate contracts in tests** - contracts must have fully qualified type IDs.
@@ -267,3 +298,282 @@ database = await createDevDatabase({
 2. **Leave gaps**: Leave gaps between ranges to avoid conflicts
 3. **Document**: Update port assignments in this file when adding new test suites
 4. **Consistency**: Use the same port range for all ports in a test suite (e.g., 54000-54002)
+
+## Avoiding Unnecessary Type Casts and Optional Chaining
+
+**Always check the actual type signature before adding type casts or optional chaining.**
+
+### The Problem
+
+It's easy to add unnecessary type casts (`as unknown as T`) or optional chaining (`?.`) when TypeScript complains, but this is often a code smell that indicates:
+1. The actual type already supports what you're trying to do
+2. You're working around a type inference issue that should be fixed properly
+3. You're adding defensive code for values that are guaranteed to exist
+
+### Type Casts
+
+**❌ WRONG: Adding unnecessary type casts without checking the actual type**
+
+```typescript
+// Codec accepts string | Date, but we cast Date to string
+const codec = codecDefinitions['timestamp']?.codec;
+const encoded = codec.encode!(date as unknown as string);  // Unnecessary cast!
+```
+
+**✅ CORRECT: Check the actual type signature first**
+
+```typescript
+// Codec interface: encode?(value: string | Date): string
+const codec = codecDefinitions['timestamp'].codec;
+const encoded = codec.encode!(date);  // Date is already accepted!
+```
+
+**When to use type casts:**
+- Only when testing invalid inputs: `// @ts-expect-error - Testing invalid input`
+- When you've verified the type system genuinely can't infer the correct type
+- Never cast valid inputs to work around type errors - fix the type definition instead
+
+### Optional Chaining
+
+**❌ WRONG: Using optional chaining when values are guaranteed to exist**
+
+```typescript
+// codecDefinitions['timestamp'] is guaranteed to exist in tests
+const codec = codecDefinitions['timestamp']?.codec as
+  | { encode: (value: string | Date) => string }
+  | undefined;
+if (!codec) {
+  throw new Error('codec not found');
+}
+```
+
+**✅ CORRECT: Use dot notation when values are guaranteed**
+
+```typescript
+// In test context, codecDefinitions['timestamp'] is guaranteed to exist
+const codec = codecDefinitions['timestamp'].codec as {
+  encode: (value: string | Date) => string;
+  decode: (wire: string | Date) => string;
+};
+```
+
+**When to use optional chaining:**
+- When accessing values that might not exist (e.g., user input, API responses)
+- When working with optional properties that are truly optional
+- Never use `?.` for values that are guaranteed to exist (e.g., in test fixtures, constants)
+
+### Type Assertions
+
+**❌ WRONG: Adding `| undefined` to type assertions when values are guaranteed**
+
+```typescript
+const codec = codecDefinitions['timestamp']?.codec as
+  | { encode: (value: string | Date) => string }
+  | undefined;  // Unnecessary - value is guaranteed to exist
+```
+
+**✅ CORRECT: Only include `| undefined` if the value might actually be undefined**
+
+```typescript
+const codec = codecDefinitions['timestamp'].codec as {
+  encode: (value: string | Date) => string;
+  decode: (wire: string | Date) => string;
+};
+```
+
+### Best Practices
+
+1. **Check the actual type first**: Read the interface/type definition before adding casts
+2. **Use dot notation for guaranteed values**: If a value is guaranteed to exist (e.g., in tests), use `.` not `?.`
+3. **Avoid defensive casts**: Don't cast valid inputs - fix the type definition if needed
+4. **Use `@ts-expect-error` for invalid inputs**: When testing error cases, use `@ts-expect-error` with a comment explaining why
+5. **Remove unnecessary `| undefined`**: If a value is guaranteed to exist, don't include `| undefined` in type assertions
+
+## ESLint Configuration
+
+### Disable Comments
+
+**Pattern**: If you need to disable a rule for more than a couple of lines in a file, use a file-level disable comment at the top of the file instead of many inline comments.
+
+**❌ WRONG: Many inline disable comments**
+
+```typescript
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const invalid = { ...validContractInput, targetFamily: undefined } as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const invalid2 = { ...validContractInput, target: undefined } as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const invalid3 = { ...validContractInput, coreHash: undefined } as any;
+// ... many more
+```
+
+**✅ CORRECT: File-level disable comment**
+
+```typescript
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+import { describe, expect, it } from 'vitest';
+
+// Now all as any usages in the file are allowed
+const invalid = { ...validContractInput, targetFamily: undefined } as any;
+const invalid2 = { ...validContractInput, target: undefined } as any;
+const invalid3 = { ...validContractInput, coreHash: undefined } as any;
+```
+
+**When to use file-level disables:**
+- When you have more than 2-3 occurrences of the same rule violation
+- When the violations are intentional (e.g., testing invalid inputs)
+- When the violations are throughout the file, not isolated to a few lines
+
+**When to use inline disables:**
+- When you have 1-2 isolated violations
+- When the violation is specific to a single line or small block
+
+### Unused Variables
+
+**Pattern**: Variables that are only used as types should be prefixed with `_` to indicate they're intentionally unused.
+
+**❌ WRONG: Variable only used as type without prefix**
+
+```typescript
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(userTable)
+  .select({ id: userTable.columns.id })
+  .build();
+
+type Row = ResultType<typeof plan>;  // plan is only used as a type
+```
+
+**✅ CORRECT: Prefix with `_` to indicate intentional unused variable**
+
+```typescript
+const _plan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(userTable)
+  .select({ id: userTable.columns.id })
+  .build();
+
+type Row = ResultType<typeof _plan>;  // _plan indicates it's intentionally unused
+```
+
+**ESLint Configuration:**
+The `@typescript-eslint/no-unused-vars` rule is configured to ignore variables starting with `_`:
+- `argsIgnorePattern: '^_'` - Function arguments starting with `_`
+- `varsIgnorePattern: '^_'` - Variables starting with `_`
+- `caughtErrorsIgnorePattern: '^_'` - Caught errors starting with `_`
+
+### Empty Object Types
+
+**Pattern**: Use `Record<string, never>` instead of `{}` for empty object types in type definitions.
+
+**❌ WRONG: Using `{}` for empty object types**
+
+```typescript
+type BuildStorage<
+  Tables extends Record<string, TableBuilderState<string, unknown, unknown>>,
+  Target extends string,
+> = {
+  readonly tables: {
+    readonly [K in keyof Tables]: BuildStorageTable<
+      K & string,
+      NormalizeColumns<ExtractColumns<Tables[K]>>,
+      ExtractPrimaryKey<Tables[K]>,
+      Target
+    >;
+  };
+} & (PK extends readonly string[] ? { readonly primaryKey: { readonly columns: PK } } : {});
+```
+
+**✅ CORRECT: Use `Record<string, never>` for empty object types**
+
+```typescript
+type BuildStorage<
+  Tables extends Record<string, TableBuilderState<string, unknown, unknown>>,
+  Target extends string,
+> = {
+  readonly tables: {
+    readonly [K in keyof Tables]: BuildStorageTable<
+      K & string,
+      NormalizeColumns<ExtractColumns<Tables[K]>>,
+      ExtractPrimaryKey<Tables[K]>,
+      Target
+    >;
+  };
+} & (PK extends readonly string[] ? { readonly primaryKey: { readonly columns: PK } } : Record<string, never>);
+```
+
+**Why this matters:**
+- `{}` allows any non-nullish value, which is too permissive
+- `Record<string, never>` is an explicit empty object type with no index signature
+- Satisfies ESLint's `@typescript-eslint/no-empty-object-type` rule
+- Provides better type safety
+
+### JSON Imports
+
+**Pattern**: Use `import` statements with `assert { type: 'json' }` instead of `require()` for JSON files.
+
+**❌ WRONG: Using `require()` for JSON files**
+
+```typescript
+const fixtureContract = validateContract<Contract>(
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('./fixtures/contract.json'),
+);
+```
+
+**✅ CORRECT: Use `import` with `assert { type: 'json' }`**
+
+```typescript
+import contractJson from './fixtures/contract.json' assert { type: 'json' };
+
+const fixtureContract = validateContract<Contract>(contractJson);
+```
+
+**Why this matters:**
+- `require()` is CommonJS and doesn't work well with ESM
+- `import` with `assert { type: 'json' }` is the ESM way to import JSON
+- Avoids ESLint errors about `require()` and `no-undef`
+- Better type safety and module resolution
+
+## DRY Test Patterns
+
+**Pattern**: Common patterns in test files should be extracted into helper functions with JSDoc comments explaining their purpose.
+
+**❌ WRONG: Repeated pattern throughout test file**
+
+```typescript
+// Repeated 20+ times throughout the file
+for await (const _row of runtime.execute(mockPlan)) {
+  void _row;
+  break;
+}
+```
+
+**✅ CORRECT: Extract to helper function with documentation**
+
+```typescript
+/**
+ * Executes a plan and consumes the first row from the result iterator.
+ * This helper DRYs up the common test pattern of executing a plan and breaking
+ * after the first row to trigger execution without consuming all results.
+ */
+const executePlan = async (runtime: ReturnType<typeof createRuntime>, plan: Plan): Promise<void> => {
+  for await (const _row of runtime.execute(plan)) {
+    void _row;
+    break;
+  }
+};
+
+// Use the helper throughout tests
+await executePlan(runtime, mockPlan);
+```
+
+**Why this matters:**
+- Reduces code duplication
+- Makes tests more maintainable
+- JSDoc comments explain the purpose and usage
+- Easier to update the pattern in one place
+
+**See `docs/Testing Guide.md` for comprehensive testing practices, including:**
+- When to create helpers (3+ occurrences, multiple steps, obscures intent)
+- Helper characteristics (hide implementation, express intent, reduce lines)
+- Common helper patterns from the codebase
+- Testing anti-patterns and solutions
