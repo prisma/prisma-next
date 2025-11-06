@@ -101,6 +101,7 @@ Assume no FILTER and no DISTINCT unless specified:
 - **JSON_AGG(T)** yields `unknown[] | null` by default
   - With a typed child projection and `jsonAggTypedChildren` capability, adapters may refine to `ChildRow[] | null`
   - Adapters may coalesce to `ChildRow[]` if they lower with `COALESCE(json_agg(...), '[]'::json)` and declare `jsonAggCoalescesEmpty`
+- **includeMany**: The SQL DSL's `includeMany` feature uses `json_agg` to return nested arrays. The runtime converts `NULL` json_agg results to empty arrays `[]` for consistency, ensuring the result type is always `Array<ChildShape>` rather than `Array<ChildShape> | null`. Include aliases are marked in plan meta with `include:alias` to enable special JSON array decoding. The builder tracks includes at the type level, maintaining a map of include aliases to their child projection types, allowing `InferNestedProjectionRow` to infer `Array<ChildShape>` instead of `Array<unknown>`.
 
 ### Grouping
 
@@ -167,6 +168,14 @@ select({ s: fn.sum(t.order.amount) })
 // { id: number, posts: Array<{ id: number, title: string }> | null }
 
 // With adapter coalescing
+// { id: number, posts: Array<{ id: number, title: string }> }
+```
+
+### SQL DSL includeMany
+
+```typescript
+// SQL DSL includeMany always returns Array (runtime converts NULL to [])
+// Type inference tracks includes at the type level to infer ChildShape
 // { id: number, posts: Array<{ id: number, title: string }> }
 ```
 

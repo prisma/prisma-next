@@ -29,7 +29,7 @@
 ### Allowed lowerings in the DSL
 
 - Relation traversal must compile to one statement
-  - e.g., 1:N includes via LEFT JOIN LATERAL + json_agg, N:1 via LEFT JOIN with aliased projection
+  - e.g., 1:N includes via LEFT JOIN LATERAL + json_agg (see `includeMany` in SQL DSL), N:1 via LEFT JOIN with aliased projection
 - Derived projections must be computed in the statement
   - e.g., SELECT …, count(*) OVER (…) AS total_count
 

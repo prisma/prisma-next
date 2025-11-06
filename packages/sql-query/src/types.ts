@@ -243,19 +243,22 @@ export type NestedProjection = Record<string, ColumnBuilder | Record<string, Col
  * Recursively maps Record<string, ColumnBuilder | boolean | NestedProjection> to nested object types.
  *
  * Extracts the pre-computed JsType from each ColumnBuilder at leaves.
- * When a value is `true`, it represents an include reference and infers `Array<unknown>`.
- * TODO: Improve to infer `Array<ChildShape>` by tracking includes at the type level.
+ * When a value is `true`, it represents an include reference and infers `Array<ChildShape>`
+ * by looking up the include alias in the Includes type map.
  */
 export type InferNestedProjectionRow<
   P extends Record<string, ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Includes extends Record<string, any> = Record<string, never>,
 > = {
   [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
     ? JsType
     : P[K] extends true
-      ? Array<unknown> // Include reference - infers array type
+      ? K extends keyof Includes
+        ? Array<Includes[K]> // Include reference - infers Array<ChildShape> from Includes map
+        : Array<unknown> // Fallback if include not found in map
       : P[K] extends Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>
-        ? InferNestedProjectionRow<P[K], CodecTypes>
+        ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
         : never;
 };
 

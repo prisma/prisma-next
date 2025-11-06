@@ -118,6 +118,7 @@ export function createJoinOnBuilder(): JoinOnBuilder {
 class IncludeChildBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  ChildRow = unknown,
 > {
   private readonly contract: TContract;
   private readonly codecTypes: CodecTypes;
@@ -144,9 +145,9 @@ class IncludeChildBuilderImpl<
     >,
   >(
     projection: P,
-  ): IncludeChildBuilderImpl<TContract, CodecTypes> {
+  ): IncludeChildBuilderImpl<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>> {
     const projectionState = buildProjectionState(this.table, projection);
-    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes>(
+    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>>(
       this.contract,
       this.codecTypes,
       this.table,
@@ -164,8 +165,8 @@ class IncludeChildBuilderImpl<
     return builder;
   }
 
-  where(expr: BinaryBuilder): IncludeChildBuilderImpl<TContract, CodecTypes> {
-    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes>(
+  where(expr: BinaryBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
+    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
       this.table,
@@ -183,8 +184,8 @@ class IncludeChildBuilderImpl<
     return builder;
   }
 
-  orderBy(order: ReturnType<ColumnBuilder['asc']>): IncludeChildBuilderImpl<TContract, CodecTypes> {
-    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes>(
+  orderBy(order: ReturnType<ColumnBuilder['asc']>): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
+    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
       this.table,
@@ -202,12 +203,12 @@ class IncludeChildBuilderImpl<
     return builder;
   }
 
-  limit(count: number): IncludeChildBuilderImpl<TContract, CodecTypes> {
+  limit(count: number): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     if (!Number.isInteger(count) || count < 0) {
       throw planInvalid('Limit must be a non-negative integer');
     }
 
-    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes>(
+    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
       this.table,
@@ -258,6 +259,7 @@ class IncludeChildBuilderImpl<
 export interface IncludeChildBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  ChildRow = unknown,
 > {
   select<
     P extends Record<
@@ -266,16 +268,17 @@ export interface IncludeChildBuilder<
     >,
   >(
     projection: P,
-  ): IncludeChildBuilder<TContract, CodecTypes>;
-  where(expr: BinaryBuilder): IncludeChildBuilder<TContract, CodecTypes>;
-  orderBy(order: ReturnType<ColumnBuilder['asc']>): IncludeChildBuilder<TContract, CodecTypes>;
-  limit(count: number): IncludeChildBuilder<TContract, CodecTypes>;
+  ): IncludeChildBuilder<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>>;
+  where(expr: BinaryBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
+  orderBy(order: ReturnType<ColumnBuilder['asc']>): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
+  limit(count: number): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
 }
 
 class SelectBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Includes extends Record<string, any> = Record<string, never>,
 > {
   private readonly contract: TContract;
   private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
@@ -291,8 +294,8 @@ class SelectBuilderImpl<
     }
   }
 
-  from(table: TableRef): SelectBuilderImpl<TContract, unknown, CodecTypes> {
-    return new SelectBuilderImpl<TContract, unknown, CodecTypes>(
+  from(table: TableRef): SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>> {
+    return new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -305,37 +308,48 @@ class SelectBuilderImpl<
   innerJoin(
     table: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
-  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return this._addJoin('inner', table, on);
   }
 
   leftJoin(
     table: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
-  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return this._addJoin('left', table, on);
   }
 
   rightJoin(
     table: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
-  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return this._addJoin('right', table, on);
   }
 
   fullJoin(
     table: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
-  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return this._addJoin('full', table, on);
   }
 
-  includeMany(
+  includeMany<
+    ChildProjection extends Record<
+      string,
+      ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+    >,
+    ChildRow = InferNestedProjectionRow<ChildProjection, CodecTypes>,
+  >(
     childTable: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
-    childBuilder: (child: IncludeChildBuilder<TContract, CodecTypes>) => IncludeChildBuilder<TContract, CodecTypes>,
+    childBuilder: (child: IncludeChildBuilder<TContract, CodecTypes, unknown>) => IncludeChildBuilder<TContract, CodecTypes, ChildRow>,
     options?: { alias?: string },
-  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+  ): SelectBuilderImpl<
+    TContract,
+    Row,
+    CodecTypes,
+    Includes & { [K in typeof options extends { alias: infer A } ? A extends string ? A : typeof childTable extends { name: infer N } ? N extends string ? N : never : never : typeof childTable extends { name: infer N } ? N extends string ? N : never : never]: ChildRow }
+  > {
     // Runtime capability check
     const target = this.contract.target;
     const capabilities = this.contract.capabilities;
@@ -360,13 +374,13 @@ class SelectBuilderImpl<
     }
 
     // Build child builder
-    const childBuilderImpl = new IncludeChildBuilderImpl<TContract, CodecTypes>(
+    const childBuilderImpl = new IncludeChildBuilderImpl<TContract, CodecTypes, unknown>(
       this.contract,
       this.codecTypes,
       childTable,
     );
-    const builtChild = childBuilder(childBuilderImpl as IncludeChildBuilder<TContract, CodecTypes>);
-    const childState = (builtChild as IncludeChildBuilderImpl<TContract, CodecTypes>).getState();
+    const builtChild = childBuilder(childBuilderImpl as IncludeChildBuilder<TContract, CodecTypes, unknown>);
+    const childState = (builtChild as IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>).getState();
 
     // Validate child projection is non-empty
     if (childState.childProjection.aliases.length === 0) {
@@ -401,7 +415,25 @@ class SelectBuilderImpl<
 
     const newIncludes = [...existingIncludes, includeState];
 
-    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
+    // Type-level: Update Includes map with new include
+    // Compute alias at type level
+    type AliasName = typeof options extends { alias: infer A }
+      ? A extends string
+        ? A
+        : typeof childTable extends { name: infer N }
+          ? N extends string
+            ? N
+            : never
+          : never
+      : typeof childTable extends { name: infer N }
+        ? N extends string
+          ? N
+          : never
+        : never;
+    
+    type NewIncludes = Includes & { [K in AliasName]: ChildRow };
+    
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, NewIncludes>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -415,7 +447,7 @@ class SelectBuilderImpl<
     joinType: 'inner' | 'left' | 'right' | 'full',
     table: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
-  ): SelectBuilderImpl<TContract, Row, CodecTypes> {
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     const fromTable = this.ensureFrom();
 
     if (!this.contract.storage.tables[table.name]) {
@@ -438,7 +470,7 @@ class SelectBuilderImpl<
     const existingJoins = this.state.joins ?? [];
     const newJoins = [...existingJoins, joinState];
 
-    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -448,8 +480,8 @@ class SelectBuilderImpl<
     );
   }
 
-  where(expr: BinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes> {
-    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
+  where(expr: BinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -466,11 +498,11 @@ class SelectBuilderImpl<
     >,
   >(
     projection: P,
-  ): SelectBuilderImpl<TContract, InferNestedProjectionRow<P, CodecTypes>, CodecTypes> {
+  ): SelectBuilderImpl<TContract, InferNestedProjectionRow<P, CodecTypes, Includes>, CodecTypes, Includes> {
     const table = this.ensureFrom();
     const projectionState = buildProjectionState(table, projection, this.state.includes);
 
-    return new SelectBuilderImpl<TContract, InferNestedProjectionRow<P, CodecTypes>, CodecTypes>(
+    return new SelectBuilderImpl<TContract, InferNestedProjectionRow<P, CodecTypes, Includes>, CodecTypes, Includes>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -480,8 +512,8 @@ class SelectBuilderImpl<
     );
   }
 
-  orderBy(order: ReturnType<ColumnBuilder['asc']>): SelectBuilderImpl<TContract, Row, CodecTypes> {
-    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
+  orderBy(order: ReturnType<ColumnBuilder['asc']>): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -491,12 +523,12 @@ class SelectBuilderImpl<
     );
   }
 
-  limit(count: number): SelectBuilderImpl<TContract, Row, CodecTypes> {
+  limit(count: number): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     if (!Number.isInteger(count) || count < 0) {
       throw planInvalid('Limit must be a non-negative integer');
     }
 
-    return new SelectBuilderImpl<TContract, Row, CodecTypes>(
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -1054,7 +1086,8 @@ export type SelectBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> = SelectBuilderImpl<TContract, Row, CodecTypes> & {
+  Includes extends Record<string, any> = Record<string, never>,
+> = SelectBuilderImpl<TContract, Row, CodecTypes, Includes> & {
   readonly raw: RawFactory;
 };
 
@@ -1063,11 +1096,12 @@ export function sql<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 >(
   options: SqlBuilderOptions<TContract, CodecTypes>,
-): SelectBuilder<TContract, unknown, CodecTypes> {
-  const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes>(options) as SelectBuilder<
+): SelectBuilder<TContract, unknown, CodecTypes, Record<string, never>> {
+  const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(options) as SelectBuilder<
     TContract,
     unknown,
-    CodecTypes
+    CodecTypes,
+    Record<string, never>
   >;
   const rawFactory = createRawFactory(options.contract);
 
