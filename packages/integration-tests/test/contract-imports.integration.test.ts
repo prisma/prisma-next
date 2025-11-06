@@ -101,8 +101,11 @@ describe('contract.d.ts imports resolution', () => {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 // Verify we can use the Contract type
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const _contract: Contract = {} as any;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 const _storage: Contract['storage'] = _contract.storage;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 const _tables: Contract['storage']['tables'] = _storage.tables;
 
 // Verify we can access CodecTypes
@@ -262,6 +265,7 @@ type UserIdColumn = UserColumns['id'];
 type UserIdType = UserIdColumn['type'];
 
 // Verify CodecTypes is available
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const _codecTypes: CodecTypes = {} as any;
 type CodecTextType = CodecTypes['pg/text@1'];
 type CodecIntType = CodecTypes['pg/int4@1'];

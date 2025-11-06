@@ -6,7 +6,6 @@ describe('CLI entry point', () => {
   let originalExit: typeof process.exit;
   let originalConsoleLog: typeof console.log;
   let originalConsoleError: typeof console.error;
-  let exitCode: number | null = null;
   let consoleOutput: string[] = [];
   let consoleErrors: string[] = [];
 
@@ -14,12 +13,10 @@ describe('CLI entry point', () => {
     originalExit = process.exit;
     originalConsoleLog = console.log;
     originalConsoleError = console.error;
-    exitCode = null;
     consoleOutput = [];
     consoleErrors = [];
 
-    process.exit = vi.fn((code?: number) => {
-      exitCode = code ?? 0;
+    process.exit = vi.fn(() => {
       throw new Error('process.exit called');
     }) as typeof process.exit;
 

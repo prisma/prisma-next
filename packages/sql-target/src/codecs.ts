@@ -87,8 +87,8 @@ class CodecRegistryImpl implements CodecRegistry {
    * Returns undefined if no codec handles this scalar type.
    */
   getDefaultCodec(scalar: string): Codec<string> | undefined {
-    const codecs = this._byScalar.get(scalar);
-    return codecs?.[0];
+    const _codecs = this._byScalar.get(scalar);
+    return _codecs?.[0];
   }
 
   /**
@@ -155,17 +155,21 @@ export function codec<Id extends string, TWire, TJs>(config: {
  * Type helpers to extract codec types.
  */
 export type CodecId<T> =
-  T extends Codec<infer Id, any, any> ? Id : T extends { readonly id: infer Id } ? Id : never;
-export type CodecInput<T> = T extends Codec<infer _Id, infer _WireT, infer JsT> ? JsT : never;
-export type CodecOutput<T> = T extends Codec<infer _Id, infer _WireT, infer JsT> ? JsT : never;
+  T extends Codec<infer Id, unknown, unknown>
+    ? Id
+    : T extends { readonly id: infer Id }
+      ? Id
+      : never;
+export type CodecInput<T> = T extends Codec<unknown, unknown, infer JsT> ? JsT : never;
+export type CodecOutput<T> = T extends Codec<unknown, unknown, infer JsT> ? JsT : never;
 
 /**
  * Type helper to extract codec types from builder instance.
  */
 export type ExtractCodecTypes<
-  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = {},
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
 > = {
-  readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id, any, any>
+  readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id, unknown, unknown>
     ? Id
     : never]: {
     readonly input: CodecInput<ScalarNames[K]>;
@@ -201,7 +205,7 @@ export type ExtractDataTypes<
  * Builder interface for declaring codecs.
  */
 export interface CodecDefBuilder<
-  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = {},
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
 > {
   readonly CodecTypes: ExtractCodecTypes<ScalarNames>;
   readonly ScalarToJs: ExtractScalarToJs<ScalarNames>;
@@ -215,7 +219,9 @@ export interface CodecDefBuilder<
 
   readonly codecDefinitions: {
     readonly [K in keyof ScalarNames]: {
-      readonly typeId: ScalarNames[K] extends Codec<infer Id extends string, any, any> ? Id : never;
+      readonly typeId: ScalarNames[K] extends Codec<infer Id extends string, unknown, unknown>
+        ? Id
+        : never;
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
@@ -235,7 +241,7 @@ export interface CodecDefBuilder<
  * Implementation of CodecDefBuilder.
  */
 class CodecDefBuilderImpl<
-  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = {},
+  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
 > implements CodecDefBuilder<ScalarNames>
 {
   private readonly _codecs: ScalarNames;
@@ -254,10 +260,10 @@ class CodecDefBuilderImpl<
     // Populate CodecTypes from codecs
     const codecTypes: Record<string, { readonly input: unknown; readonly output: unknown }> = {};
     for (const [, codecImpl] of Object.entries(this._codecs)) {
-      const codec = codecImpl as Codec<string>;
-      codecTypes[codec.id] = {
-        input: undefined as unknown as CodecInput<typeof codec>,
-        output: undefined as unknown as CodecOutput<typeof codec>,
+      const codecImplTyped = codecImpl as Codec<string>;
+      codecTypes[codecImplTyped.id] = {
+        input: undefined as unknown as CodecInput<typeof codecImplTyped>,
+        output: undefined as unknown as CodecOutput<typeof codecImplTyped>,
       };
     }
     this.CodecTypes = codecTypes as ExtractCodecTypes<ScalarNames>;
@@ -265,18 +271,21 @@ class CodecDefBuilderImpl<
     // Populate ScalarToJs from codecs
     const scalarToJs: Record<string, unknown> = {};
     for (const [scalarName, codecImpl] of Object.entries(this._codecs)) {
-      const codec = codecImpl as Codec<string>;
-      scalarToJs[scalarName] = undefined as unknown as CodecOutput<typeof codec>;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _codecImplTyped = codecImpl as Codec<string>;
+      scalarToJs[scalarName] = undefined as unknown as CodecOutput<typeof _codecImplTyped>;
     }
     this.ScalarToJs = scalarToJs as ExtractScalarToJs<ScalarNames>;
 
     // Populate dataTypes from codecs - extract id property from each codec
     // Build object preserving keys from ScalarNames
     // Type assertion is safe because we know ScalarNames structure matches the return type
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
     const dataTypes = {} as any;
     for (const key in this._codecs) {
       if (Object.prototype.hasOwnProperty.call(this._codecs, key)) {
         const codec = this._codecs[key] as Codec<string>;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         dataTypes[key] = codec.id;
       }
     }
@@ -304,7 +313,7 @@ class CodecDefBuilderImpl<
    */
   get codecDefinitions(): {
     readonly [K in keyof ScalarNames]: {
-      readonly typeId: ScalarNames[K] extends Codec<infer Id, any, any> ? Id : never;
+      readonly typeId: ScalarNames[K] extends Codec<infer Id, unknown, unknown> ? Id : never;
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
@@ -338,7 +347,7 @@ class CodecDefBuilderImpl<
 
     return result as {
       readonly [K in keyof ScalarNames]: {
-        readonly typeId: ScalarNames[K] extends Codec<infer Id extends string, any, any>
+        readonly typeId: ScalarNames[K] extends Codec<infer Id extends string, unknown, unknown>
           ? Id
           : never;
         readonly scalar: K;
@@ -361,6 +370,6 @@ export function createCodecRegistry(): CodecRegistry {
 /**
  * Create a new codec definition builder.
  */
-export function defineCodecs(): CodecDefBuilder<{}> {
+export function defineCodecs(): CodecDefBuilder<Record<never, never>> {
   return new CodecDefBuilderImpl({});
 }

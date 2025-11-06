@@ -521,6 +521,7 @@ describe('Param Encoding Error Handling', () => {
       encode: () => {
         throw new Error('Encode failed');
       },
+      decode: (value: string) => value,
     };
 
     const testRegistry = createCodecRegistry();
@@ -548,6 +549,7 @@ describe('Param Encoding Error Handling', () => {
       encode: () => {
         throw new Error('Encode failed');
       },
+      decode: (value: string) => value,
     };
 
     const testRegistry = createCodecRegistry();

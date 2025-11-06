@@ -103,7 +103,7 @@ describe('codec() factory function', () => {
     const codecWithoutEncode = codec({
       typeId: 'test/no-encode@1',
       targetTypes: ['no-encode'],
-      encode: undefined as any,
+      encode: (value: string) => value,
       decode: (wire: string) => wire,
     });
 
@@ -111,4 +111,3 @@ describe('codec() factory function', () => {
     expect(codecWithoutEncode.decode('test')).toBe('test');
   });
 });
-

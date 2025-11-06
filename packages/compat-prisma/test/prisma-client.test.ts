@@ -280,7 +280,7 @@ describe(
     describe('Proxy edge cases', () => {
       it('handles non-string property access', () => {
         const prop = Symbol('test');
-        const value = (prismaPN as Record<symbol, unknown>)[prop];
+        const value = (prismaPN as unknown as Record<symbol, unknown>)[prop];
         expect(value).toBeUndefined();
       });
 
@@ -290,7 +290,7 @@ describe(
       });
 
       it('returns undefined for non-model properties', () => {
-        const value = (prismaPN as Record<string, unknown>).nonexistent;
+        const value = (prismaPN as Record<string, unknown>)['nonexistent'];
         expect(value).toBeUndefined();
       });
 

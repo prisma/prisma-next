@@ -355,6 +355,7 @@ describe('sql-target-family-hook', () => {
   it('validates structure with missing targetFamily', () => {
     const ir: ContractIR = {
       target: 'test-db',
+      targetFamily: undefined as unknown as string,
       storage: {
         tables: {},
       },

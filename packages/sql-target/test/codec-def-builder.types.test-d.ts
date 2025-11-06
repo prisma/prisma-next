@@ -23,20 +23,21 @@ test('CodecTypes structure matches expected types with correct literal IDs', () 
     decode: (wire: boolean) => wire,
   });
 
-  const codecs = defineCodecs().add('text', textCodec).add('int4', intCodec).add('bool', boolCodec);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _codecs = defineCodecs().add('text', textCodec).add('int4', intCodec).add('bool', boolCodec);
 
   // Verify literal IDs are preserved as keys
-  expectTypeOf<keyof typeof codecs.CodecTypes>().toEqualTypeOf<
+  expectTypeOf<keyof typeof _codecs.CodecTypes>().toEqualTypeOf<
     'pg/text@1' | 'pg/int4@1' | 'pg/bool@1'
   >();
 
   // Verify input and output types are correctly aggregated
-  expectTypeOf<(typeof codecs.CodecTypes)['pg/text@1']['input']>().toEqualTypeOf<string>();
-  expectTypeOf<(typeof codecs.CodecTypes)['pg/text@1']['output']>().toEqualTypeOf<string>();
-  expectTypeOf<(typeof codecs.CodecTypes)['pg/int4@1']['input']>().toEqualTypeOf<number>();
-  expectTypeOf<(typeof codecs.CodecTypes)['pg/int4@1']['output']>().toEqualTypeOf<number>();
-  expectTypeOf<(typeof codecs.CodecTypes)['pg/bool@1']['input']>().toEqualTypeOf<boolean>();
-  expectTypeOf<(typeof codecs.CodecTypes)['pg/bool@1']['output']>().toEqualTypeOf<boolean>();
+  expectTypeOf<(typeof _codecs.CodecTypes)['pg/text@1']['input']>().toEqualTypeOf<string>();
+  expectTypeOf<(typeof _codecs.CodecTypes)['pg/text@1']['output']>().toEqualTypeOf<string>();
+  expectTypeOf<(typeof _codecs.CodecTypes)['pg/int4@1']['input']>().toEqualTypeOf<number>();
+  expectTypeOf<(typeof _codecs.CodecTypes)['pg/int4@1']['output']>().toEqualTypeOf<number>();
+  expectTypeOf<(typeof _codecs.CodecTypes)['pg/bool@1']['input']>().toEqualTypeOf<boolean>();
+  expectTypeOf<(typeof _codecs.CodecTypes)['pg/bool@1']['output']>().toEqualTypeOf<boolean>();
 });
 
 test('ScalarToJs structure matches expected types with correct JS types', () => {
@@ -61,15 +62,16 @@ test('ScalarToJs structure matches expected types with correct JS types', () => 
     decode: (wire: string): Date => new Date(wire),
   });
 
-  const codecs = defineCodecs().add('text', textCodec).add('int4', intCodec).add('date', dateCodec);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _codecs = defineCodecs().add('text', textCodec).add('int4', intCodec).add('date', dateCodec);
 
   // Verify literal scalar names are preserved as keys
-  expectTypeOf<keyof typeof codecs.ScalarToJs>().toEqualTypeOf<'text' | 'int4' | 'date'>();
+  expectTypeOf<keyof typeof _codecs.ScalarToJs>().toEqualTypeOf<'text' | 'int4' | 'date'>();
 
   // Verify JS types are correctly aggregated
-  expectTypeOf<(typeof codecs.ScalarToJs)['text']>().toEqualTypeOf<string>();
-  expectTypeOf<(typeof codecs.ScalarToJs)['int4']>().toEqualTypeOf<number>();
-  expectTypeOf<(typeof codecs.ScalarToJs)['date']>().toEqualTypeOf<Date>();
+  expectTypeOf<(typeof _codecs.ScalarToJs)['text']>().toEqualTypeOf<string>();
+  expectTypeOf<(typeof _codecs.ScalarToJs)['int4']>().toEqualTypeOf<number>();
+  expectTypeOf<(typeof _codecs.ScalarToJs)['date']>().toEqualTypeOf<Date>();
 });
 
 test('literal types are preserved (not widened to string)', () => {
@@ -80,10 +82,11 @@ test('literal types are preserved (not widened to string)', () => {
     decode: (wire: string) => wire,
   });
 
-  const codecs = defineCodecs().add('text', textCodec);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _codecs = defineCodecs().add('text', textCodec);
 
-  type CodecTypes = typeof codecs.CodecTypes;
-  type DataTypes = typeof codecs.dataTypes;
+  type CodecTypes = typeof _codecs.CodecTypes;
+  type DataTypes = typeof _codecs.dataTypes;
 
   // Type check: verify literal types are preserved
   expectTypeOf<CodecTypes>().toHaveProperty('pg/text@1');
@@ -98,14 +101,15 @@ test('ExtractCodecTypes extracts correct types from builder', () => {
     decode: (wire: string) => wire,
   });
 
-  const codecs = defineCodecs().add('text', textCodec);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _codecs = defineCodecs().add('text', textCodec);
 
   // Verify literal ID is preserved as key
-  expectTypeOf<keyof typeof codecs.CodecTypes>().toEqualTypeOf<'pg/text@1'>();
+  expectTypeOf<keyof typeof _codecs.CodecTypes>().toEqualTypeOf<'pg/text@1'>();
 
   // Verify input and output types are correctly extracted
-  expectTypeOf<(typeof codecs.CodecTypes)['pg/text@1']['input']>().toEqualTypeOf<string>();
-  expectTypeOf<(typeof codecs.CodecTypes)['pg/text@1']['output']>().toEqualTypeOf<string>();
+  expectTypeOf<(typeof _codecs.CodecTypes)['pg/text@1']['input']>().toEqualTypeOf<string>();
+  expectTypeOf<(typeof _codecs.CodecTypes)['pg/text@1']['output']>().toEqualTypeOf<string>();
 });
 
 test('ExtractScalarToJs extracts correct types from builder', () => {
@@ -116,9 +120,10 @@ test('ExtractScalarToJs extracts correct types from builder', () => {
     decode: (wire: string) => wire,
   });
 
-  const codecs = defineCodecs().add('text', textCodec);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _codecs = defineCodecs().add('text', textCodec);
 
-  type ScalarToJs = typeof codecs.ScalarToJs;
+  type ScalarToJs = typeof _codecs.ScalarToJs;
 
   expectTypeOf<ScalarToJs>().toHaveProperty('text');
 });
@@ -139,12 +144,13 @@ test('builder chain preserves literal types and aggregates correctly', () => {
   });
 
   const builder1 = defineCodecs().add('text', textCodec);
-  const builder2 = builder1.add('int4', intCodec);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _builder2 = builder1.add('int4', intCodec);
 
   type Builder1Types = typeof builder1.CodecTypes;
-  type Builder2Types = typeof builder2.CodecTypes;
+  type Builder2Types = typeof _builder2.CodecTypes;
   type Builder1ScalarToJs = typeof builder1.ScalarToJs;
-  type Builder2ScalarToJs = typeof builder2.ScalarToJs;
+  type Builder2ScalarToJs = typeof _builder2.ScalarToJs;
 
   // Verify literal IDs are preserved through chain
   type Builder1Keys = keyof Builder1Types;
@@ -201,9 +207,10 @@ test('dataTypes preserves literal type IDs', () => {
     decode: (wire: number) => wire,
   });
 
-  const codecs = defineCodecs().add('text', textCodec).add('int4', intCodec);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _codecs = defineCodecs().add('text', textCodec).add('int4', intCodec);
 
-  type DataTypes = typeof codecs.dataTypes;
+  type DataTypes = typeof _codecs.dataTypes;
 
   // Verify literal scalar names are preserved as keys
   type DataTypesKeys = keyof DataTypes;

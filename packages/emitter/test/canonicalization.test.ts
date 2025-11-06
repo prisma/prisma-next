@@ -15,7 +15,7 @@ describe('canonicalization', () => {
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
 
     const keys = Object.keys(parsed);
     const schemaVersionIndex = keys.indexOf('schemaVersion');
@@ -51,10 +51,15 @@ describe('canonicalization', () => {
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result);
-
-    expect(parsed.storage.tables.user.columns.id.nullable).toBeUndefined();
-    expect(parsed.storage.tables.user.columns.email.nullable).toBe(true);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed.storage as Record<string, unknown>;
+    const tables = storage.tables as Record<string, unknown>;
+    const user = tables.user as Record<string, unknown>;
+    const columns = user.columns as Record<string, unknown>;
+    const id = columns.id as Record<string, unknown>;
+    const email = columns.email as Record<string, unknown>;
+    expect(id.nullable).toBeUndefined();
+    expect(email.nullable).toBe(true);
   });
 
   it('omits empty arrays and objects except required ones', () => {
@@ -69,10 +74,9 @@ describe('canonicalization', () => {
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result);
-
+    const parsed = JSON.parse(result) as Record<string, unknown>;
     expect(parsed.models).toBeDefined();
-    expect(parsed.storage.tables).toBeDefined();
+    expect((parsed.storage as Record<string, unknown>).tables).toBeDefined();
     expect(parsed.capabilities).toBeUndefined();
     expect(parsed.extensions).toBeUndefined();
     expect(parsed.meta).toBeUndefined();
@@ -142,9 +146,12 @@ describe('canonicalization', () => {
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result);
-
-    const indexNames = parsed.storage.tables.user.indexes.map((idx: { name: string }) => idx.name);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed.storage as Record<string, unknown>;
+    const tables = storage.tables as Record<string, unknown>;
+    const user = tables.user as Record<string, unknown>;
+    const indexes = user.indexes as Array<{ name: string }>;
+    const indexNames = indexes.map((idx) => idx.name);
     expect(indexNames).toEqual(['user_email_idx', 'user_name_idx']);
   });
 
@@ -166,9 +173,12 @@ describe('canonicalization', () => {
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result);
-
-    const columnKeys = Object.keys(parsed.storage.tables.user.columns);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed.storage as Record<string, unknown>;
+    const tables = storage.tables as Record<string, unknown>;
+    const user = tables.user as Record<string, unknown>;
+    const columns = user.columns as Record<string, unknown>;
+    const columnKeys = Object.keys(columns);
     expect(columnKeys).toEqual(['a_field', 'm_field', 'z_field']);
   });
 
@@ -184,9 +194,9 @@ describe('canonicalization', () => {
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result);
-
-    const extensionKeys = Object.keys(parsed.extensions);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const extensions = parsed.extensions as Record<string, unknown>;
+    const extensionKeys = Object.keys(extensions);
     expect(extensionKeys).toEqual(['another', 'pgvector', 'postgres']);
   });
 
@@ -206,8 +216,12 @@ describe('canonicalization', () => {
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result);
-
-    expect(parsed.storage.tables.user.columns.id.generated).toBeUndefined();
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed.storage as Record<string, unknown>;
+    const tables = storage.tables as Record<string, unknown>;
+    const user = tables.user as Record<string, unknown>;
+    const columns = user.columns as Record<string, unknown>;
+    const id = columns.id as Record<string, unknown>;
+    expect(id.generated).toBeUndefined();
   });
 });

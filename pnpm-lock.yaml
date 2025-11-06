@@ -392,6 +392,9 @@ importers:
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
+      arktype:
+        specifier: ^2.1.25
+        version: 2.1.25
     devDependencies:
       '@prisma/dev':
         specifier: ^0.1.1

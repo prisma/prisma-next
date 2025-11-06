@@ -3,7 +3,6 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { Command } from 'commander';
 import { createEmitCommand } from '../src/commands/emit';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,7 +33,7 @@ describe('emit command', () => {
 
     process.exit = vi.fn((code?: number) => {
       exitCode = code ?? 0;
-    }) as typeof process.exit;
+    }) as unknown as typeof process.exit;
 
     console.log = vi.fn((...args: unknown[]) => {
       consoleOutput.push(args.map(String).join(' '));
@@ -163,7 +162,6 @@ describe('emit command', () => {
 
   it('handles unsupported target family', async () => {
     const command = createEmitCommand();
-    const contractPath = join(fixturesDir, 'valid-contract.ts');
     const adapterPath = resolve(__dirname, '../../adapter-postgres');
 
     const invalidContractPath = join(outputDir, 'invalid-contract.ts');

@@ -302,7 +302,8 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       contract: fixtureContract,
       adapter: createPostgresAdapter(),
       driver: sharedDriver,
-      verify: { mode: 'strict', requireMarker: false },
+      verify: { mode: 'startup', requireMarker: false },
+      mode: 'strict',
       plugins: [
         budgets({
           maxRows: 10_000,

@@ -99,7 +99,12 @@ describe('@prisma-next/driver-postgres', () => {
 
     await driver.connect();
     await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1), ($2), ($3), ($4)', ['a', 'b', 'c', 'd']);
+    await driver.query('insert into items(name) values ($1), ($2), ($3), ($4)', [
+      'a',
+      'b',
+      'c',
+      'd',
+    ]);
 
     const rows: Array<{ id: number; name: string }> = [];
     for await (const row of driver.execute<{ id: number; name: string }>({
@@ -242,11 +247,8 @@ describe('@prisma-next/driver-postgres', () => {
 
     await driver.connect();
 
-    await expect(
-      driver.query('select * from nonexistent_table'),
-    ).rejects.toThrow();
+    await expect(driver.query('select * from nonexistent_table')).rejects.toThrow();
   });
-
 
   it('closes pool connection', async () => {
     const db = newDb();
@@ -303,7 +305,8 @@ describe('@prisma-next/driver-postgres', () => {
 
     // Mock the Pool constructor to use our pg-mem pool
     const MockPool = class extends Pool {
-      constructor(options?: unknown) {
+      constructor() {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         super();
         // Use the pg-mem pool instance
         Object.assign(this, pool);
@@ -336,7 +339,8 @@ describe('@prisma-next/driver-postgres', () => {
 
     let customPoolFactoryCalled = false;
     const CustomPool = class extends Pool {
-      constructor(options?: unknown) {
+      constructor() {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         super();
         customPoolFactoryCalled = true;
         Object.assign(this, pool);
@@ -361,7 +365,8 @@ describe('@prisma-next/driver-postgres', () => {
   it('throws error when neither pool nor client provided', () => {
     expect(() => {
       createPostgresDriverFromOptions({
-        connect: {} as { client?: import('pg').Client; pool?: import('pg').Pool },
+        // @ts-expect-error - Testing invalid input
+        connect: {},
       });
     }).toThrow('PostgresDriver requires a pool or client');
   });
@@ -447,7 +452,9 @@ describe('@prisma-next/driver-postgres', () => {
 
     // Mock client.connect to throw a non-"already connected" error
     // connect() is a no-op, so we test acquireClient indirectly through query()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     const originalConnect = client.connect.bind(client);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     client.connect = async () => {
       const error = new Error('Connection failed: network error');
       throw error;
@@ -456,6 +463,7 @@ describe('@prisma-next/driver-postgres', () => {
     await expect(driver.query('select 1')).rejects.toThrow('Connection failed');
 
     // Restore original connect for cleanup
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     client.connect = originalConnect;
   });
 
@@ -476,7 +484,9 @@ describe('@prisma-next/driver-postgres', () => {
 
     // Mock client.connect to throw a non-Error exception
     // connect() is a no-op, so we test acquireClient indirectly through query()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     const originalConnect = client.connect.bind(client);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     client.connect = async () => {
       throw 'string error';
     };
@@ -484,6 +494,7 @@ describe('@prisma-next/driver-postgres', () => {
     await expect(driver.query('select 1')).rejects.toBe('string error');
 
     // Restore original connect for cleanup
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     client.connect = originalConnect;
   });
 

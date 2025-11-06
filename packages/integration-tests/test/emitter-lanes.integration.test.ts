@@ -79,15 +79,12 @@ describe('emitter → lanes integration', () => {
       },
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: testDir,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       packs,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result = await emit(ir, options, sqlTargetFamilyHook);
 
     const contractJsonPath = join(testDir, 'contract.json');
@@ -96,14 +93,10 @@ describe('emitter → lanes integration', () => {
     await writeFile(contractJsonPath, result.contractJson);
     await writeFile(contractDtsPath, result.contractDts);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
     const contract = validateContract(contractJson);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(contract['targetFamily']).toBe('sql');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(contract['target']).toBe('postgres');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(contract['storage']).toBeDefined();
 
     const contractDtsContent = result.contractDts;
@@ -128,9 +121,7 @@ describe('emitter → lanes integration', () => {
       .build();
 
     expect(plan.sql).toBeTruthy();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(plan.meta.coreHash).toBe(result.coreHash);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(plan.meta.lane).toBe('dsl');
 
     type UserRow = ResultType<typeof plan>;
@@ -173,13 +164,10 @@ describe('emitter → lanes integration', () => {
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: testDir,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       packs,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result = await emit(ir, options, sqlTargetFamilyHook);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
     const contract = validateContract(contractJson);
 
@@ -239,26 +227,24 @@ describe('emitter → lanes integration', () => {
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: testDir,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       packs,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result1 = await emit(ir, options, sqlTargetFamilyHook);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
     const contract1 = validateContract(contractJson1);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(contractJson1['extensions']).toHaveProperty('postgres');
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const extensions = ((contractJson1['extensions'] as Record<string, unknown>) || {}) as Record<string, unknown>;
+    const extensions = ((contractJson1['extensions'] as Record<string, unknown>) || {}) as Record<
+      string,
+      unknown
+    >;
     const relations = contractJson1['relations'] as Record<string, unknown> | undefined;
     const ir2: ContractIR = {
-      schemaVersion: contractJson1['schemaVersion'],
-      targetFamily: contractJson1['targetFamily'],
-      target: contractJson1['target'],
+      schemaVersion: contractJson1['schemaVersion'] as string,
+      targetFamily: contractJson1['targetFamily'] as string,
+      target: contractJson1['target'] as string,
       extensions: {
         postgres: extensions['postgres'],
         pg: extensions['pg'] || {},
@@ -269,7 +255,6 @@ describe('emitter → lanes integration', () => {
         | Record<string, Record<string, boolean>>
         | undefined,
       meta: contractJson1['meta'] as Record<string, unknown> | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       sources: (contractJson1['sources'] as Record<string, unknown>) || undefined,
       ...(relations ? { relations } : {}),
     } as ContractIR;
@@ -281,7 +266,6 @@ describe('emitter → lanes integration', () => {
     };
 
     const result2 = await emit(ir2, options2, sqlTargetFamilyHook);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const contractJson2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
     const contract2 = validateContract(contractJson2);
 

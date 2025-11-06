@@ -1,3 +1,5 @@
+import { type } from 'arktype';
+
 export interface SqlStatement {
   readonly sql: string;
   readonly params: readonly unknown[];
@@ -122,14 +124,102 @@ export function writeContractMarker(input: WriteMarkerInput): WriteContractMarke
   return { insert, update };
 }
 
-export function mapContractMarkerRow(row: ContractMarkerRow): ContractMarkerRecord {
+/**
+ * Schema for validating the meta field as a Record<string, unknown>.
+ */
+const MetaSchema = type({ '[string]': 'unknown' });
+
+/**
+ * Parses and validates the meta field from a database row.
+ * Handles JSON strings, objects, and null/undefined values.
+ *
+ * @param meta - The meta value from the database (string, object, or null)
+ * @returns A validated Record<string, unknown> or empty object
+ */
+function parseMeta(meta: unknown): Record<string, unknown> {
+  if (meta === null || meta === undefined) {
+    return {};
+  }
+
+  let parsed: unknown;
+  if (typeof meta === 'string') {
+    try {
+      parsed = JSON.parse(meta);
+    } catch {
+      return {};
+    }
+  } else {
+    parsed = meta;
+  }
+
+  const result = MetaSchema(parsed);
+  if (result instanceof type.errors) {
+    return {};
+  }
+
+  return result as Record<string, unknown>;
+}
+
+/**
+ * Schema for validating a ContractMarkerRow from the database.
+ * Validates the snake_case column structure returned by Postgres.
+ * Note: updated_at can be a Date object or a string (which will be converted to Date).
+ * Optional fields can be null or missing.
+ */
+const ContractMarkerRowSchema = type({
+  core_hash: 'string',
+  profile_hash: 'string',
+  'contract_json?': 'unknown | null',
+  'canonical_version?': 'number | null',
+  'updated_at?': 'Date | string',
+  'app_tag?': 'string | null',
+  'meta?': 'unknown | null',
+});
+
+/**
+ * Parses and validates a database row (snake_case) into an application record (camelCase).
+ *
+ * Validates the entire row structure using Arktype, then maps database column names
+ * to application property names and normalizes the `meta` field:
+ * - If `meta` is a JSON string, parses and validates it as a Record<string, unknown>
+ * - If `meta` is already an object, validates it as a Record<string, unknown>
+ * - If `meta` is null/undefined or validation fails, defaults to an empty object
+ *
+ * @param row - The unverified database row data (unknown)
+ * @returns The validated application record with camelCase property names
+ * @throws Error if the row structure is invalid
+ */
+export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
+  const result = ContractMarkerRowSchema(row);
+  if (result instanceof type.errors) {
+    const messages = result.map((p: { message: string }) => p.message).join('; ');
+    throw new Error(`Invalid contract marker row: ${messages}`);
+  }
+
+  const validatedRow = result as {
+    core_hash: string;
+    profile_hash: string;
+    contract_json?: unknown | null;
+    canonical_version?: number | null;
+    updated_at?: Date | string;
+    app_tag?: string | null;
+    meta?: unknown | null;
+  };
+
+  // Convert updated_at to Date if it's a string, or use current date if missing
+  const updatedAt = validatedRow.updated_at
+    ? validatedRow.updated_at instanceof Date
+      ? validatedRow.updated_at
+      : new Date(validatedRow.updated_at)
+    : new Date();
+
   return {
-    coreHash: row.core_hash,
-    profileHash: row.profile_hash,
-    contractJson: row.contract_json,
-    canonicalVersion: row.canonical_version,
-    updatedAt: row.updated_at,
-    appTag: row.app_tag,
-    meta: (typeof row.meta === 'string' ? JSON.parse(row.meta) : row.meta) ?? {},
+    coreHash: validatedRow.core_hash,
+    profileHash: validatedRow.profile_hash,
+    contractJson: validatedRow.contract_json ?? null,
+    canonicalVersion: validatedRow.canonical_version ?? null,
+    updatedAt,
+    appTag: validatedRow.app_tag ?? null,
+    meta: parseMeta(validatedRow.meta),
   };
 }

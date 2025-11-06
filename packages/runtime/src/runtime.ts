@@ -1,4 +1,4 @@
-import { mapContractMarkerRow, readContractMarker, type ContractMarkerRow } from './marker';
+import { parseContractMarkerRow, readContractMarker } from './marker';
 import { computeSqlFingerprint } from './fingerprint';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { Adapter, LoweredStatement, SelectAst, Plan } from '@prisma-next/sql-query/types';
@@ -146,7 +146,7 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
       return;
     }
 
-    const marker = mapContractMarkerRow(result.rows[0] as unknown as ContractMarkerRow);
+    const marker = parseContractMarkerRow(result.rows[0]);
 
     if (marker.coreHash !== this.contract.coreHash) {
       throw runtimeError('CONTRACT.MARKER_MISMATCH', 'Database core hash does not match contract', {

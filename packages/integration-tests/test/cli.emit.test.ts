@@ -83,9 +83,13 @@ export const contract = defineContract<CodecTypes>()
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
     const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const contractJson = JSON.parse(contractJsonContent);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(contractJson.targetFamily).toBe('sql');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(contractJson.target).toBe('postgres');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(contractJson.storage.tables.user).toBeDefined();
 
     expect(contractDtsContent).toContain('export type Contract');
@@ -123,6 +127,7 @@ export const contract = defineContract<CodecTypes>()
 
     const contractJsonPath = join(outputDir, 'contract.json');
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const contractJson = JSON.parse(contractJsonContent);
 
     const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson);

@@ -14,7 +14,8 @@
   "dependencies": {
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/sql-query": "workspace:*",
-    "@prisma-next/sql-target": "workspace:*"
+    "@prisma-next/sql-target": "workspace:*",
+    "arktype": "^2.1.25"
   },
   "devDependencies": {
     "@prisma/dev": "^0.1.1",
