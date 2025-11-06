@@ -9,7 +9,7 @@
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "eslint . --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage"
+    "lint": "eslint . --config ../../eslint.config.mjs --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage"
   },
   "dependencies": {
     "@prisma-next/emitter": "workspace:*"

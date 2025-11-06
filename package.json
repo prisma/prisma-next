@@ -1,6 +1,7 @@
 {
   "name": "prisma-next",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "build": "turbo run build",

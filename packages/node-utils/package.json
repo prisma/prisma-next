@@ -8,7 +8,7 @@
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "eslint . --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage"
+    "lint": "eslint . --config ../../eslint.config.mjs --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
