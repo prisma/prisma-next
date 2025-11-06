@@ -15,7 +15,9 @@ import {
   setupE2EDatabase,
   createTestRuntimeFromClient,
   executePlanAndCollect,
-} from '@prisma-next/test-utils';
+} from './utils';
+import type { DevDatabase } from '@prisma-next/test-utils';
+import { Client } from 'pg';
 import type { Contract } from './fixtures/generated/contract.d';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,9 +39,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
@@ -79,9 +81,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -150,9 +152,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -189,11 +191,12 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
+            type Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(3);
-            const adaRow = rows.find((r) => r.email === 'ada@example.com');
-            const tessRow = rows.find((r) => r.email === 'tess@example.com');
-            const mikeRow = rows.find((r) => r.email === 'mike@example.com');
+            const adaRow = rows.find((r: Row) => r.email === 'ada@example.com');
+            const tessRow = rows.find((r: Row) => r.email === 'tess@example.com');
+            const mikeRow = rows.find((r: Row) => r.email === 'mike@example.com');
 
             expect(adaRow).toBeDefined();
             expect(adaRow!.postId).not.toBeNull();
@@ -222,9 +225,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -259,10 +262,11 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
+            type Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(2);
-            const firstPostRow = rows.find((r) => r.title === 'First Post');
-            const orphanPostRow = rows.find((r) => r.title === 'Orphan Post');
+            const firstPostRow = rows.find((r: Row) => r.title === 'First Post');
+            const orphanPostRow = rows.find((r: Row) => r.title === 'Orphan Post');
 
             expect(firstPostRow).toBeDefined();
             expect(firstPostRow!.userId).not.toBeNull();
@@ -287,9 +291,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -327,11 +331,12 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
+            type Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(3);
-            const adaRow = rows.find((r) => r.email === 'ada@example.com');
-            const tessRow = rows.find((r) => r.email === 'tess@example.com');
-            const orphanRow = rows.find((r) => r.title === 'Orphan Post');
+            const adaRow = rows.find((r: Row) => r.email === 'ada@example.com');
+            const tessRow = rows.find((r: Row) => r.email === 'tess@example.com');
+            const orphanRow = rows.find((r: Row) => r.title === 'Orphan Post');
 
             expect(adaRow).toBeDefined();
             expect(adaRow!.postId).not.toBeNull();
@@ -358,9 +363,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -416,10 +421,13 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(plan.ast?.joins?.[1]?.table.name).toBe('comment');
 
             const rows = await executePlanAndCollect(runtime, plan);
+            type Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(3);
-            const firstPostRow = rows.find((r) => r.title === 'First Post' && r.commentId !== null);
-            const secondPostRow = rows.find((r) => r.title === 'Second Post');
+            const firstPostRow = rows.find(
+              (r: Row) => r.title === 'First Post' && r.commentId !== null,
+            );
+            const secondPostRow = rows.find((r: Row) => r.title === 'Second Post');
 
             expect(firstPostRow).toBeDefined();
             expect(firstPostRow!.commentId).not.toBeNull();
@@ -453,9 +461,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
@@ -529,9 +537,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2)', [
@@ -600,9 +608,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
@@ -693,9 +701,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(
-      async ({ connectionString }) => {
-        await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
+      async ({ connectionString }: DevDatabase) => {
+        await withClient(connectionString, async (client: Client) => {
+          await setupE2EDatabase(client, contract, async (c: Client) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2)', [

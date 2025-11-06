@@ -137,7 +137,7 @@ describe('Runtime class', () => {
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
       // Should not throw with complete registry
-      await expect(executePlan(runtime, mockPlan)).resolves.not.toThrow();
+      await expect(drainPlanExecution(runtime, mockPlan)).resolves.not.toThrow();
     });
 
     it('throws when codec registry is incomplete on first execute', async () => {
@@ -176,7 +176,7 @@ describe('Runtime class', () => {
         },
       };
 
-      await expect(executePlan(runtime, planWithUnknownType)).rejects.toMatchObject({
+      await expect(drainPlanExecution(runtime, planWithUnknownType)).rejects.toMatchObject({
         code: 'RUNTIME.CODEC_MISSING',
       });
     });
@@ -202,7 +202,7 @@ describe('Runtime class', () => {
         },
       };
 
-      await expect(executePlan(runtime, mismatchedPlan)).rejects.toMatchObject({
+      await expect(drainPlanExecution(runtime, mismatchedPlan)).rejects.toMatchObject({
         code: 'PLAN.TARGET_MISMATCH',
         category: 'PLAN',
       });
@@ -229,7 +229,7 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
-      await expect(executePlan(runtime, mismatchedPlan)).rejects.toMatchObject({
+      await expect(drainPlanExecution(runtime, mismatchedPlan)).rejects.toMatchObject({
         code: 'PLAN.HASH_MISMATCH',
         category: 'PLAN',
       });
@@ -257,7 +257,7 @@ describe('Runtime class', () => {
         verify: { mode: 'startup', requireMarker: true },
       });
 
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       expect(mockDriver.query).toHaveBeenCalled();
     });
@@ -282,11 +282,11 @@ describe('Runtime class', () => {
         verify: { mode: 'always', requireMarker: true },
       });
 
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       const firstCallCount = (mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length;
 
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       expect((mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
         firstCallCount,
@@ -374,7 +374,7 @@ describe('Runtime class', () => {
       });
 
       // Should not throw when profileHash is null in contract
-      const promise = executePlan(runtime, mockPlan);
+      const promise = drainPlanExecution(runtime, mockPlan);
       await expect(promise).resolves.not.toThrow();
     });
   });
@@ -401,7 +401,7 @@ describe('Runtime class', () => {
         plugins: [plugin],
       });
 
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       expect(beforeExecute).toHaveBeenCalledWith(mockPlan, expect.any(Object));
     });

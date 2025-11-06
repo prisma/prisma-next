@@ -253,7 +253,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       },
     };
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(planWithOverride));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, planWithOverride);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;

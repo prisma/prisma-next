@@ -11,7 +11,6 @@ import type {
   JoinOnBuilder,
   JoinOnPredicate,
   LoweredStatement,
-  NestedProjection,
   ParamDescriptor,
   Plan,
   PlanMeta,
