@@ -99,6 +99,12 @@ describe('emitter → lanes integration', () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
     const contract = validateContract(contractJson);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    expect(contract['targetFamily']).toBe('sql');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    expect(contract['target']).toBe('postgres');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    expect(contract['storage']).toBeDefined();
 
     const contractDtsContent = result.contractDts;
 
@@ -122,7 +128,9 @@ describe('emitter → lanes integration', () => {
       .build();
 
     expect(plan.sql).toBeTruthy();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(plan.meta.coreHash).toBe(result.coreHash);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(plan.meta.lane).toBe('dsl');
 
     type UserRow = ResultType<typeof plan>;
@@ -171,7 +179,8 @@ describe('emitter → lanes integration', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result = await emit(ir, options, sqlTargetFamilyHook);
-    const contractJson = JSON.parse(result.contractJson);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
     const contract = validateContract(contractJson);
 
     const tables = schema(contract).tables;

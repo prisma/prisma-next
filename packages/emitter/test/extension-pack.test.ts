@@ -24,5 +24,26 @@ describe('extension-pack', () => {
       loadExtensionPackManifest('/nonexistent/path');
     }).toThrow();
   });
+
+  it('loads extension packs with multiple extensions', () => {
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../adapter-postgres'),
+      [join(__dirname, '../../adapter-postgres')],
+    );
+    expect(packs.length).toBe(2);
+    expect(packs[0]?.manifest.id).toBe('postgres');
+    expect(packs[1]?.manifest.id).toBe('postgres');
+  });
+
+  it('loads extension packs without adapter', () => {
+    const packs = loadExtensionPacks(undefined, []);
+    expect(packs.length).toBe(0);
+  });
+
+  it('handles extension pack loading errors', () => {
+    expect(() => {
+      loadExtensionPacks(undefined, ['/nonexistent/path']);
+    }).toThrow();
+  });
 });
 

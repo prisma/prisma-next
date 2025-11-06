@@ -347,16 +347,251 @@ describe('Row Decoding', () => {
   });
 
   it('throws RUNTIME.DECODE_FAILED on decode error', () => {
-    const plan = createMockDslPlan({ id: 'pg/int4@1' });
-    // Create a row with invalid data that would cause decode to fail
-    // For number codec, passing a non-number string might cause issues
-    // But our current codec just passes through, so let's test with a codec that might fail
-    const row = { id: 'not-a-number' };
+    const failingCodec: Codec<string, string, string> = {
+      id: 'test/failing@1',
+      targetTypes: ['failing'],
+      decode: () => {
+        throw new Error('Decode failed');
+      },
+    };
 
-    // Since our number codec just passes through, this won't fail
-    // But if we had validation, it would throw
+    const testRegistry = createCodecRegistry();
+    testRegistry.register(failingCodec);
+
+    const plan = {
+      ...createMockDslPlan({ id: 'test/failing@1' }),
+      meta: {
+        ...createMockDslPlan({ id: 'test/failing@1' }).meta,
+        annotations: {
+          codecs: { id: 'test/failing@1' },
+        },
+      },
+    };
+    const row = { id: 'test-value' };
+
+    expect(() => {
+      decodeRow(row, plan, testRegistry);
+    }).toThrow('RUNTIME.DECODE_FAILED');
+  });
+
+  it('handles decode error with error details', () => {
+    const failingCodec: Codec<string, string, string> = {
+      id: 'test/failing@1',
+      targetTypes: ['failing'],
+      decode: () => {
+        throw new Error('Decode failed');
+      },
+    };
+
+    const testRegistry = createCodecRegistry();
+    testRegistry.register(failingCodec);
+
+    const plan = {
+      ...createMockDslPlan({ id: 'test/failing@1' }),
+      meta: {
+        ...createMockDslPlan({ id: 'test/failing@1' }).meta,
+        annotations: {
+          codecs: { id: 'test/failing@1' },
+        },
+      },
+    };
+    const row = { id: 'test-value' };
+
+    try {
+      decodeRow(row, plan, testRegistry);
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      const runtimeError = error as Error & { code: string; details?: Record<string, unknown> };
+      expect(runtimeError.code).toBe('RUNTIME.DECODE_FAILED');
+      expect(runtimeError.details).toBeDefined();
+      expect(runtimeError.details?.['alias']).toBe('id');
+      expect(runtimeError.details?.['codec']).toBe('test/failing@1');
+    }
+  });
+
+  it('handles decode error with long wire value', () => {
+    const failingCodec: Codec<string, string, string> = {
+      id: 'test/failing@1',
+      targetTypes: ['failing'],
+      decode: () => {
+        throw new Error('Decode failed');
+      },
+    };
+
+    const testRegistry = createCodecRegistry();
+    testRegistry.register(failingCodec);
+
+    const longValue = 'a'.repeat(200);
+    const plan = {
+      ...createMockDslPlan({ id: 'test/failing@1' }),
+      meta: {
+        ...createMockDslPlan({ id: 'test/failing@1' }).meta,
+        annotations: {
+          codecs: { id: 'test/failing@1' },
+        },
+      },
+    };
+    const row = { id: longValue };
+
+    try {
+      decodeRow(row, plan, testRegistry);
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      const runtimeError = error as Error & { code: string; details?: Record<string, unknown> };
+      expect(runtimeError.code).toBe('RUNTIME.DECODE_FAILED');
+      expect(runtimeError.details?.['wirePreview']).toBeDefined();
+      const preview = runtimeError.details?.['wirePreview'] as string;
+      expect(preview.length).toBeLessThanOrEqual(103);
+      expect(preview.endsWith('...')).toBe(true);
+    }
+  });
+
+  it('handles raw plan with projection array', () => {
+    const plan: Plan = {
+      sql: 'SELECT id, email FROM test',
+      params: [],
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        lane: 'raw',
+        paramDescriptors: [],
+        projection: ['id', 'email'],
+        projectionTypes: { id: 'pg/int4@1', email: 'pg/text@1' },
+      },
+    };
+    const row = { id: 42, email: 'test@example.com' };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['id']).toBe('not-a-number'); // Current behavior: pass through
+    expect(decoded['id']).toBe(42);
+    expect(decoded['email']).toBe('test@example.com');
+  });
+
+  it('handles plan without projection', () => {
+    const plan: Plan = {
+      sql: 'SELECT * FROM test',
+      params: [],
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        lane: 'raw',
+        paramDescriptors: [],
+      },
+    };
+    const row = { id: 42, email: 'test@example.com' };
+    const decoded = decodeRow(row, plan, registry);
+    expect(decoded['id']).toBe(42);
+    expect(decoded['email']).toBe('test@example.com');
+  });
+});
+
+describe('Param Encoding Error Handling', () => {
+  const registry = createRegistry();
+
+  const createMockPlan = (paramDescriptors: ParamDescriptor[]): Plan => {
+    return {
+      sql: 'SELECT * FROM test',
+      params: [],
+      ast: {
+        kind: 'select',
+        from: { kind: 'table', name: 'test' },
+        project: [],
+      },
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors,
+        refs: { tables: [], columns: [] },
+        projection: {},
+      },
+    } as Plan;
+  };
+
+  it('handles encode error with error details', () => {
+    const failingCodec: Codec<string, string, string> = {
+      id: 'test/failing@1',
+      targetTypes: ['failing'],
+      encode: () => {
+        throw new Error('Encode failed');
+      },
+    };
+
+    const testRegistry = createCodecRegistry();
+    testRegistry.register(failingCodec);
+
+    const plan = {
+      ...createMockPlan([{ name: 'param1', type: 'test/failing@1', source: 'dsl' }]),
+      meta: {
+        ...createMockPlan([{ name: 'param1', type: 'test/failing@1', source: 'dsl' }]).meta,
+        annotations: {
+          codecs: { param1: 'test/failing@1' },
+        },
+      },
+    };
+
+    expect(() => {
+      encodeParam('test-value', plan.meta.paramDescriptors[0]!, plan, testRegistry);
+    }).toThrow('Failed to encode parameter');
+  });
+
+  it('handles encode error with index descriptor', () => {
+    const failingCodec: Codec<string, string, string> = {
+      id: 'test/failing@1',
+      targetTypes: ['failing'],
+      encode: () => {
+        throw new Error('Encode failed');
+      },
+    };
+
+    const testRegistry = createCodecRegistry();
+    testRegistry.register(failingCodec);
+
+    const plan = {
+      ...createMockPlan([{ index: 0, type: 'test/failing@1', source: 'dsl' }]),
+      meta: {
+        ...createMockPlan([{ index: 0, type: 'test/failing@1', source: 'dsl' }]).meta,
+        annotations: {
+          codecs: { '0': 'test/failing@1' },
+        },
+      },
+    };
+
+    expect(() => {
+      encodeParam('test-value', plan.meta.paramDescriptors[0]!, plan, testRegistry);
+    }).toThrow('Failed to encode parameter');
+  });
+
+  it('passes through value when no encode function', () => {
+    const noEncodeCodec: Codec<string, string, string> = {
+      id: 'test/no-encode@1',
+      targetTypes: ['no-encode'],
+      decode: (wire: string) => wire,
+    };
+
+    const testRegistry = createCodecRegistry();
+    testRegistry.register(noEncodeCodec);
+
+    const plan = createMockPlan([{ name: 'param1', type: 'test/no-encode@1', source: 'dsl' }]);
+    const encoded = encodeParam('test-value', plan.meta.paramDescriptors[0]!, plan, testRegistry);
+    expect(encoded).toBe('test-value');
+  });
+
+  it('encodes params with missing descriptor', () => {
+    const plan = createMockPlan([]);
+    const planWithParams = {
+      ...plan,
+      params: ['test-value'],
+    };
+    const encoded = encodeParams(planWithParams, registry);
+    expect(encoded).toEqual(['test-value']);
+  });
+
+  it('handles empty params array', () => {
+    const plan = createMockPlan([]);
+    const encoded = encodeParams(plan, registry);
+    expect(encoded).toEqual([]);
   });
 });
 

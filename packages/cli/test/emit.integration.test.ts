@@ -131,21 +131,16 @@ describe('emit integration', () => {
 
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (!contractJson1.extensions) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      contractJson1.extensions = {};
+    if (!contractJson1['extensions']) {
+      contractJson1['extensions'] = {};
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (!contractJson1.extensions.pg) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      contractJson1.extensions.pg = {};
+    const extensions = contractJson1['extensions'] as Record<string, unknown>;
+    if (!extensions['pg']) {
+      extensions['pg'] = {};
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const contract2 = contractJson1 as ContractIR;
+    const contract2 = contractJson1 as unknown as ContractIR;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const result2 = await emit(
       contract2,
       {

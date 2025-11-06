@@ -127,4 +127,33 @@ describe('raw lane', () => {
     expect(plan.sql).toBe('select 1');
     expect(exportedRawOptions({ refs: { tables: [] } })).toBeDefined();
   });
+
+  it('handles raw with empty params', () => {
+    const plan = root.raw('select 1', { params: [] });
+    expect(plan.sql).toBe('select 1');
+    expect(plan.params).toEqual([]);
+  });
+
+  it('handles raw with multiple params', () => {
+    const plan = root.raw('select * from "user" where id = $1 and email = $2', {
+      params: ['test-id', 'test@example.com'],
+    });
+    expect(plan.sql).toBe('select * from "user" where id = $1 and email = $2');
+    expect(plan.params).toEqual(['test-id', 'test@example.com']);
+  });
+
+  it('handles raw with with() method', () => {
+    const plan = root.raw.with({ annotations: { limit: 10 } })`select * from "user"`;
+    expect(plan.meta.annotations).toEqual({ limit: 10 });
+  });
+
+  it('handles raw with with() and template literal', () => {
+    const userId = 42;
+    const plan = root.raw.with({ annotations: { limit: 10 } })`
+      select * from "user" where id = ${userId}
+    `;
+    expect(plan.sql).toContain('where id = $1');
+    expect(plan.params).toEqual([userId]);
+    expect(plan.meta.annotations).toEqual({ limit: 10 });
+  });
 });

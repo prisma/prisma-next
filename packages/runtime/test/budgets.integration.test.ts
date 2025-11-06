@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { Client } from 'pg';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { createRuntime } from '../src/runtime';
@@ -248,5 +248,172 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       results.push(row);
     }
     expect(results.length).toBeLessThanOrEqual(5);
+  });
+
+  it('logs warning when latency exceeds budget in non-strict mode', async () => {
+    const logWarn = vi.fn();
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter: createPostgresAdapter(),
+      driver: sharedDriver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      plugins: [
+        budgets({
+          maxRows: 10_000,
+          maxLatencyMs: 0,
+          latencySeverity: 'warn',
+        }),
+      ],
+      log: {
+        info: vi.fn(),
+        warn: logWarn,
+        error: vi.fn(),
+      },
+    });
+
+    const tables = schema(fixtureContract).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const plan = builder
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .limit(1)
+      .build();
+
+    const results: Record<string, unknown>[] = [];
+    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
+      results.push(row);
+    }
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(logWarn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'BUDGET.TIME_EXCEEDED',
+      }),
+    );
+  });
+
+  it('throws error when latency exceeds budget in strict mode with error severity', async () => {
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter: createPostgresAdapter(),
+      driver: sharedDriver,
+      verify: { mode: 'strict', requireMarker: false },
+      plugins: [
+        budgets({
+          maxRows: 10_000,
+          maxLatencyMs: 0,
+          latencySeverity: 'error',
+        }),
+      ],
+    });
+
+    const tables = schema(fixtureContract).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const plan = builder
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .limit(1)
+      .build();
+
+    await expect(async () => {
+      for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
+        // Should throw during execution
+      }
+    }).rejects.toMatchObject({
+      code: 'BUDGET.TIME_EXCEEDED',
+      category: 'BUDGET',
+    });
+  });
+
+  it('does not throw when latency exceeds budget in non-strict mode with error severity', async () => {
+    const logWarn = vi.fn();
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter: createPostgresAdapter(),
+      driver: sharedDriver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      plugins: [
+        budgets({
+          maxRows: 10_000,
+          maxLatencyMs: 0,
+          latencySeverity: 'error',
+        }),
+      ],
+      log: {
+        info: vi.fn(),
+        warn: logWarn,
+        error: vi.fn(),
+      },
+    });
+
+    const tables = schema(fixtureContract).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const plan = builder
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .limit(1)
+      .build();
+
+    const results: Record<string, unknown>[] = [];
+    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
+      results.push(row);
+    }
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(logWarn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'BUDGET.TIME_EXCEEDED',
+      }),
+    );
+  });
+
+  it('does not log warning when latency is within budget', async () => {
+    const logWarn = vi.fn();
+    const runtime = createRuntime({
+      contract: fixtureContract,
+      adapter: createPostgresAdapter(),
+      driver: sharedDriver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      plugins: [
+        budgets({
+          maxRows: 10_000,
+          maxLatencyMs: 100_000,
+          latencySeverity: 'warn',
+        }),
+      ],
+      log: {
+        info: vi.fn(),
+        warn: logWarn,
+        error: vi.fn(),
+      },
+    });
+
+    const tables = schema(fixtureContract).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const plan = builder
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .limit(1)
+      .build();
+
+    const results: Record<string, unknown>[] = [];
+    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
+      results.push(row);
+    }
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(logWarn).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'BUDGET.TIME_EXCEEDED',
+      }),
+    );
   });
 });

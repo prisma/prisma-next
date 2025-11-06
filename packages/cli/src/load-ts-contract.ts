@@ -97,7 +97,10 @@ export async function loadContractFromTs(
 ): Promise<ContractIR> {
   const allowlist = options?.allowlist ?? DEFAULT_ALLOWLIST;
 
-  const tempFile = join(tmpdir(), `prisma-next-contract-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
+  const tempFile = join(
+    tmpdir(),
+    `prisma-next-contract-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`,
+  );
 
   try {
     const result = await build({
@@ -126,9 +129,15 @@ export async function loadContractFromTs(
     if (result.metafile) {
       const inputs = result.metafile.inputs;
       for (const [, inputData] of Object.entries(inputs)) {
-        const imports = (inputData as { imports?: Array<{ path: string; external?: boolean }> }).imports || [];
+        const imports =
+          (inputData as { imports?: Array<{ path: string; external?: boolean }> }).imports || [];
         for (const imp of imports) {
-          if (imp.external && !imp.path.startsWith('.') && !imp.path.startsWith('/') && !isAllowedImport(imp.path, allowlist)) {
+          if (
+            imp.external &&
+            !imp.path.startsWith('.') &&
+            !imp.path.startsWith('/') &&
+            !isAllowedImport(imp.path, allowlist)
+          ) {
             disallowedImports.push(imp.path);
           }
         }
@@ -190,4 +199,3 @@ export async function loadContractFromTs(
     throw new Error(`Failed to load contract from ${entryPath}: ${String(error)}`);
   }
 }
-

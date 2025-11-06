@@ -292,6 +292,7 @@ class ModelDelegate {
     return result;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async update(_args: {
     where: Record<string, unknown>;
     data: Record<string, unknown>;
@@ -299,6 +300,7 @@ class ModelDelegate {
     throw this.unsupportedError('update() mutations are not supported in MVP compatibility layer');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async delete(_args: {
     where: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
@@ -353,6 +355,7 @@ class PrismaClientImpl {
       this.runtime = options.runtime;
     } else {
       const adapter = createPostgresAdapter();
+      // eslint-disable-next-line no-undef
       const connectionString = options.connectionString ?? process.env['DATABASE_URL'];
 
       if (!connectionString) {

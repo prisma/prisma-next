@@ -142,7 +142,7 @@ describe(
         await client.query('DROP TABLE IF EXISTS "user"');
         await client.end();
         await database.close();
-      } catch (error) {
+      } catch {
         // Ignore cleanup errors
       }
     });
@@ -274,6 +274,30 @@ describe(
         const result = await readUserById(prismaPN, 'non-existent');
         expect(result).toBeNull();
         // If contract mismatch occurred, we would have thrown CONTRACT.MARKER_MISMATCH
+      });
+    });
+
+    describe('Proxy edge cases', () => {
+      it('handles non-string property access', () => {
+        const prop = Symbol('test');
+        const value = (prismaPN as Record<symbol, unknown>)[prop];
+        expect(value).toBeUndefined();
+      });
+
+      it('handles numeric property access', () => {
+        const value = (prismaPN as Record<number, unknown>)[0];
+        expect(value).toBeUndefined();
+      });
+
+      it('returns undefined for non-model properties', () => {
+        const value = (prismaPN as Record<string, unknown>).nonexistent;
+        expect(value).toBeUndefined();
+      });
+
+      it('handles property access on proxy', () => {
+        const userModel = prismaPN.user;
+        expect(userModel).toBeDefined();
+        expect(typeof userModel.findUnique).toBe('function');
       });
     });
   },

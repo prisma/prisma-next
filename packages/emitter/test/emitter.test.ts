@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
-import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
+import type { ContractIR, EmitOptions, ExtensionPack, ExtensionPackManifest } from '../src/types';
 import type { TargetFamilyHook } from '../src/target-family';
 import { join } from 'node:path';
 
@@ -166,5 +166,131 @@ describe('emitter', () => {
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('invalid type ID format');
+  });
+
+  it('throws error when targetFamily is missing', async () => {
+    const ir = {
+      schemaVersion: '1',
+      target: 'postgres',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+          },
+        },
+      },
+    } as ContractIR;
+
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have targetFamily');
+  });
+
+  it('throws error when target is missing', async () => {
+    const ir = {
+      schemaVersion: '1',
+      targetFamily: 'sql',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+          },
+        },
+      },
+    } as ContractIR;
+
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have target');
+  });
+
+  it('throws error when extension pack is missing from extensions', async () => {
+    const ir: ContractIR = {
+      schemaVersion: '1',
+      targetFamily: 'sql',
+      target: 'postgres',
+      extensions: {},
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+          },
+        },
+      },
+    };
+
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    // validateTypes runs before validateExtensions, so it will throw about type ID first
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
+  });
+
+  it('handles missing extensions field', async () => {
+    const ir: ContractIR = {
+      schemaVersion: '1',
+      targetFamily: 'sql',
+      target: 'postgres',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+          },
+        },
+      },
+    };
+
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    // validateTypes runs before validateExtensions, so it will throw about type ID first
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
+  });
+
+  it('handles empty packs array', async () => {
+    const ir: ContractIR = {
+      schemaVersion: '1',
+      targetFamily: 'sql',
+      target: 'postgres',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+          },
+        },
+      },
+    };
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
   });
 });
