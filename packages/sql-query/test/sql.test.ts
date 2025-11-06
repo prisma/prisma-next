@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, expect, it } from 'vitest';
 
 import { param } from '../src/param';

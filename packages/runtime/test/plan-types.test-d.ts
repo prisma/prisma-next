@@ -17,7 +17,7 @@ const fixtureDir = join(__dirname, '../../sql/test/fixtures');
 function loadContract(name: string): Contract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
+  const contractJson = JSON.parse(contents) as unknown;
   return validateContract<Contract>(contractJson);
 }
 
@@ -87,6 +87,7 @@ test('execute() signature matches Plan Row type', () => {
 
   const runtime: Runtime = {
     execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
+      void _plan;
       return (async function* () {})();
     },
   };

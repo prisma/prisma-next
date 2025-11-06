@@ -30,8 +30,8 @@ test('builder without select() has unknown Row type', () => {
   const builderAfterFrom = builder.from(userTable);
 
   // Before select(), Row type should be unknown
-  const plan = builderAfterFrom.build();
-  expectTypeOf<ResultType<typeof plan>>().toEqualTypeOf<unknown>();
+  const _plan = builderAfterFrom.build();
+  expectTypeOf<ResultType<typeof _plan>>().toEqualTypeOf<unknown>();
 });
 
 test('select() with object projection infers Row type', () => {
@@ -42,7 +42,7 @@ test('select() with object projection infers Row type', () => {
   if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: userColumns['id']!,
@@ -51,12 +51,12 @@ test('select() with object projection infers Row type', () => {
     .build();
 
   // Row type should be inferred from projection
-  type Row = ResultType<typeof plan>;
+  type Row = ResultType<typeof _plan>;
 
   // Should have id and email properties
   // Note: exact types depend on columnMeta, but structure should be correct
   // Verify plan structure
-  expectTypeOf(plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
 });
 
 test('build() returns Plan<Row> with inferred Row type', () => {
@@ -70,7 +70,7 @@ test('build() returns Plan<Row> with inferred Row type', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -78,13 +78,13 @@ test('build() returns Plan<Row> with inferred Row type', () => {
     })
     .build();
 
-  type Row = ResultType<typeof plan>;
+  type Row = ResultType<typeof _plan>;
 
   // Strict checks: verify fields have correct types (will fail if never)
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
 
-  expectTypeOf(plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
 });
 
 test('ResultType utility extracts Row type from Plan', () => {
@@ -98,7 +98,7 @@ test('ResultType utility extracts Row type from Plan', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -106,7 +106,7 @@ test('ResultType utility extracts Row type from Plan', () => {
     })
     .build();
 
-  type ExtractedRow = ResultType<typeof plan>;
+  type ExtractedRow = ResultType<typeof _plan>;
   // Contract fixture has column types as pg/*@1 IDs, so types come from CodecTypes
   // id has typeId 'pg/int4@1' → number, email has 'pg/text@1' → string
 
@@ -129,7 +129,7 @@ test('execute() preserves Row type through execution', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -137,8 +137,8 @@ test('execute() preserves Row type through execution', () => {
     })
     .build();
 
-  type Row = ResultType<typeof plan>;
-  const result = execute(plan);
+  type Row = ResultType<typeof _plan>;
+  const result = execute(_plan);
 
   expectTypeOf(result).toExtend<AsyncIterable<Row>>();
 });
@@ -167,17 +167,17 @@ test('builder chain preserves Row type through methods', () => {
   const builderWithOrder = builderWithSelect.orderBy(idColumn.asc());
   const builderWithLimit = builderWithSelect.limit(10);
 
-  const plan = builderWithSelect.build();
-  type Row = ResultType<typeof plan>;
+  const _plan = builderWithSelect.build();
+  type Row = ResultType<typeof _plan>;
 
   // Methods that don't change projection should preserve Row type
-  const planFromWhere = builderWithWhere.build();
-  const planFromOrder = builderWithOrder.build();
-  const planFromLimit = builderWithLimit.build();
+  const _planFromWhere = builderWithWhere.build();
+  const _planFromOrder = builderWithOrder.build();
+  const _planFromLimit = builderWithLimit.build();
 
-  expectTypeOf<ResultType<typeof planFromWhere>>().toEqualTypeOf<Row>();
-  expectTypeOf<ResultType<typeof planFromOrder>>().toEqualTypeOf<Row>();
-  expectTypeOf<ResultType<typeof planFromLimit>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<typeof _planFromWhere>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<typeof _planFromOrder>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<typeof _planFromLimit>>().toEqualTypeOf<Row>();
 });
 
 test('wrong Row type assignments fail type check', () => {
@@ -191,7 +191,7 @@ test('wrong Row type assignments fail type check', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -200,8 +200,8 @@ test('wrong Row type assignments fail type check', () => {
     .build();
 
   // This should compile - correct type
-  type Row = ResultType<typeof plan>;
-  const correct: Plan<Row> = plan;
+  type Row = ResultType<typeof _plan>;
+  const correct: Plan<Row> = _plan;
   expectTypeOf(correct).toExtend<Plan<Row>>();
 
   // Type system should preserve Row type through the chain
@@ -210,7 +210,7 @@ test('wrong Row type assignments fail type check', () => {
   // but the important thing is that Row is correctly inferred from the projection
   // This assignment would fail if Row was a specific type (not unknown)
   // For now, we verify that Row is inferred (even if as unknown) by checking the plan structure
-  expectTypeOf(plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
 });
 
 test('nullable columns are handled correctly', () => {
@@ -224,7 +224,7 @@ test('nullable columns are handled correctly', () => {
   const emailColumn = userColumns['email'];
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -232,9 +232,9 @@ test('nullable columns are handled correctly', () => {
     })
     .build();
 
-  type Row = ResultType<typeof plan>;
+  type Row = ResultType<typeof _plan>;
   // Row should have the projection properties
-  expectTypeOf(plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
 });
 
 test('different column types map correctly', () => {
@@ -249,7 +249,7 @@ test('different column types map correctly', () => {
   const createdAtColumn = userColumns['createdAt'];
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -258,8 +258,8 @@ test('different column types map correctly', () => {
     })
     .build();
 
-  type Row = ResultType<typeof plan>;
-  expectTypeOf(plan).toExtend<Plan<Row>>();
+  type Row = ResultType<typeof _plan>;
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
 });
 
 test('generic contract types are preserved', () => {
@@ -363,7 +363,7 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
   const createdAtColumn = userColumns['createdAt']; // timestamptz
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -372,7 +372,7 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
     })
     .build();
 
-  type Row = ResultType<typeof plan>;
+  type Row = ResultType<typeof _plan>;
 
   // Verify ScalarToJs mapping: int4 → number, text → string, timestamptz → string
   // Strict checks: verify fields are NOT never
@@ -409,7 +409,7 @@ test('representative contract resolves types correctly end-to-end', () => {
   const createdAtColumn = userColumns['createdAt'];
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
       id: idColumn,
@@ -418,7 +418,7 @@ test('representative contract resolves types correctly end-to-end', () => {
     })
     .build();
 
-  type Row = ResultType<typeof plan>;
+  type Row = ResultType<typeof _plan>;
 
   // All types should resolve correctly via CodecTypes[typeId].output
   // Strict checks: verify fields are NOT never
@@ -454,9 +454,9 @@ test('result typing is derived solely from projection, unaffected by joins', () 
         };
       };
     },
-    {},
-    {},
-    {}
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
   >;
 
   const contractWithPosts = validateContract<ContractWithPosts>({
@@ -494,7 +494,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
   const userColumns = userTable.columns;
   const postColumns = postTable.columns;
 
-  const plan = sql<ContractWithPosts, PgCodecTypes>({ contract: contractWithPosts, adapter })
+  const _plan = sql<ContractWithPosts, PgCodecTypes>({ contract: contractWithPosts, adapter })
     .from(userTable)
     .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
     .select({
@@ -504,7 +504,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
     })
     .build();
 
-  type Row = ResultType<typeof plan>;
+  type Row = ResultType<typeof _plan>;
 
   // Row type should only include projected columns, not all available columns
   expectTypeOf<Row['userId']>().toEqualTypeOf<number>();
@@ -522,5 +522,5 @@ test('result typing is derived solely from projection, unaffected by joins', () 
   }>();
 
   // Verify plan structure
-  expectTypeOf(plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
 });

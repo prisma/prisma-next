@@ -34,11 +34,11 @@ type ContractWithPosts = SqlContract<
         };
       };
     };
-  },
-  {},
-  {},
-  {}
->;
+    },
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',

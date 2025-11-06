@@ -160,8 +160,8 @@ export type CodecId<T> =
     : T extends { readonly id: infer Id }
       ? Id
       : never;
-export type CodecInput<T> = T extends Codec<unknown, unknown, infer JsT> ? JsT : never;
-export type CodecOutput<T> = T extends Codec<unknown, unknown, infer JsT> ? JsT : never;
+export type CodecInput<T> = T extends Codec<string, unknown, infer JsT> ? JsT : never;
+export type CodecOutput<T> = T extends Codec<string, unknown, infer JsT> ? JsT : never;
 
 /**
  * Type helper to extract codec types from builder instance.
@@ -271,7 +271,6 @@ class CodecDefBuilderImpl<
     // Populate ScalarToJs from codecs
     const scalarToJs: Record<string, unknown> = {};
     for (const [scalarName, codecImpl] of Object.entries(this._codecs)) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const _codecImplTyped = codecImpl as Codec<string>;
       scalarToJs[scalarName] = undefined as unknown as CodecOutput<typeof _codecImplTyped>;
     }

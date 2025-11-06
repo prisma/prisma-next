@@ -56,7 +56,9 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     try {
       await client.end();
       await database.close();
-    } catch (error) {}
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   beforeEach(async () => {
@@ -116,6 +118,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     // Unbounded SELECT should be blocked pre-exec (estimated 10_000 > maxRows 50)
     await expect(async () => {
       for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
+        void _row;
         // Should not reach here
       }
     }).rejects.toMatchObject({
@@ -187,6 +190,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     await expect(async () => {
       let count = 0;
       for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
+        void _row;
         count++;
         if (count > 20) {
           // Should have thrown by now
@@ -218,6 +222,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     // Unbounded raw SELECT should be blocked pre-exec
     await expect(async () => {
       for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
+        void _row;
         // Should not reach here
       }
     }).rejects.toMatchObject({
@@ -327,6 +332,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
     await expect(async () => {
       for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
+        void _row;
         // Should throw during execution
       }
     }).rejects.toMatchObject({

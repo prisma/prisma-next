@@ -54,7 +54,9 @@ describe('runtime execute integration', { timeout: 100 }, () => {
     try {
       await client.end();
       await database.close();
-    } catch (error) {}
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   beforeEach(async () => {
@@ -303,6 +305,6 @@ function loadContractFixture(): SqlContract<SqlStorage> {
   const fixtureDir = dirname(fileURLToPath(import.meta.url));
   const contractPath = join(fixtureDir, '../../sql-query/test/fixtures/contract.json');
   const json = readFileSync(contractPath, 'utf8');
-  const contractJson = JSON.parse(json);
+  const contractJson = JSON.parse(json) as unknown;
   return validateContract<SqlContract<SqlStorage>>(contractJson);
 }

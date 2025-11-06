@@ -188,7 +188,7 @@ describe('builder integration', () => {
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
 
-    const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
+    const _plan = sql<typeof contract, CodecTypes>({ contract, adapter })
       .from(userTable)
       .select({
         id: userTable.columns['id']!,
@@ -197,17 +197,17 @@ describe('builder integration', () => {
       .build();
 
     // Runtime checks
-    expect(plan.ast).toBeDefined();
-    expect(plan.ast?.kind).toBe('select');
-    expect(plan.meta.coreHash).toBe('sha256:test-core');
+    expect(_plan.ast).toBeDefined();
+    expect(_plan.ast?.kind).toBe('select');
+    expect(_plan.meta.coreHash).toBe('sha256:test-core');
 
     // Type checks - verify plan types are specific
-    expectTypeOf(plan.meta.coreHash).toEqualTypeOf<string>();
+    expectTypeOf(_plan.meta.coreHash).toEqualTypeOf<string>();
     // Note: plan.ast type checking is complex due to plan structure
     // We verify it exists at runtime above
 
     // Verify ResultType inference works with specific types
-    type Row = ResultType<typeof plan>;
+    type Row = ResultType<typeof _plan>;
     expectTypeOf<Row['id']>().toEqualTypeOf<number>();
     expectTypeOf<Row['email']>().toEqualTypeOf<string>();
   });
@@ -233,7 +233,7 @@ describe('builder integration', () => {
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
 
-    const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
+    const _plan = sql<typeof contract, CodecTypes>({ contract, adapter })
       .from(userTable)
       .select({
         id: userTable.columns['id']!,
@@ -242,7 +242,7 @@ describe('builder integration', () => {
       })
       .build();
 
-    type Row = ResultType<typeof plan>;
+    type Row = ResultType<typeof _plan>;
 
     // Runtime check
     const row: Row = {

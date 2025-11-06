@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect, vi } from 'vitest';
 import { createRuntime } from '../src/runtime';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
@@ -57,6 +58,21 @@ describe('Runtime class', () => {
     }),
     close: vi.fn().mockResolvedValue(undefined),
   });
+
+  /**
+   * Executes a plan and consumes the first row from the result iterator.
+   * This helper DRYs up the common test pattern of executing a plan and breaking
+   * after the first row to trigger execution without consuming all results.
+   */
+  const executePlan = async (
+    runtime: ReturnType<typeof createRuntime>,
+    plan: Plan,
+  ): Promise<void> => {
+    for await (const _row of runtime.execute(plan)) {
+      void _row;
+      break;
+    }
+  };
 
   describe('constructor', () => {
     it('validates codec registry at startup when verify.mode is startup', () => {
@@ -134,13 +150,7 @@ describe('Runtime class', () => {
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
       // Should not throw with complete registry
-      await expect(
-        (async () => {
-          for await (const _row of runtime.execute(mockPlan)) {
-            break;
-          }
-        })(),
-      ).resolves.not.toThrow();
+      await expect(executePlan(runtime, mockPlan)).resolves.not.toThrow();
     });
 
     it('throws when codec registry is incomplete on first execute', async () => {
@@ -179,13 +189,7 @@ describe('Runtime class', () => {
         },
       };
 
-      await expect(
-        (async () => {
-          for await (const _row of runtime.execute(planWithUnknownType)) {
-            break;
-          }
-        })(),
-      ).rejects.toMatchObject({
+      await expect(executePlan(runtime, planWithUnknownType)).rejects.toMatchObject({
         code: 'RUNTIME.CODEC_MISSING',
       });
     });
@@ -211,11 +215,7 @@ describe('Runtime class', () => {
         },
       };
 
-      await expect(async () => {
-        for await (const _row of runtime.execute(mismatchedPlan)) {
-          break;
-        }
-      }).rejects.toMatchObject({
+      await expect(executePlan(runtime, mismatchedPlan)).rejects.toMatchObject({
         code: 'PLAN.TARGET_MISMATCH',
         category: 'PLAN',
       });
@@ -242,11 +242,7 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
-      await expect(async () => {
-        for await (const _row of runtime.execute(mismatchedPlan)) {
-          break;
-        }
-      }).rejects.toMatchObject({
+      await expect(executePlan(runtime, mismatchedPlan)).rejects.toMatchObject({
         code: 'PLAN.HASH_MISMATCH',
         category: 'PLAN',
       });
@@ -274,9 +270,7 @@ describe('Runtime class', () => {
         verify: { mode: 'startup', requireMarker: true },
       });
 
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
+      await executePlan(runtime, mockPlan);
 
       expect(mockDriver.query).toHaveBeenCalled();
     });
@@ -301,15 +295,11 @@ describe('Runtime class', () => {
         verify: { mode: 'always', requireMarker: true },
       });
 
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
+      await executePlan(runtime, mockPlan);
 
       const firstCallCount = (mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length;
 
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
+      await executePlan(runtime, mockPlan);
 
       expect((mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
         firstCallCount,
@@ -331,6 +321,7 @@ describe('Runtime class', () => {
 
       await expect(async () => {
         for await (const _row of runtime.execute(mockPlan)) {
+          void _row;
           break;
         }
       }).rejects.toMatchObject({
@@ -361,6 +352,7 @@ describe('Runtime class', () => {
 
       await expect(async () => {
         for await (const _row of runtime.execute(mockPlan)) {
+          void _row;
           break;
         }
       }).rejects.toMatchObject({
@@ -401,15 +393,10 @@ describe('Runtime class', () => {
       });
 
       // Should not throw when profileHash is null in contract
-      const promise = (async () => {
-        for await (const _row of runtime.execute(mockPlan)) {
-          break;
-        }
-      })();
+      const promise = executePlan(runtime, mockPlan);
       await expect(promise).resolves.not.toThrow();
     });
   });
-
 
   describe('plugin hooks', () => {
     it('invokes beforeExecute hook', async () => {
@@ -433,9 +420,7 @@ describe('Runtime class', () => {
         plugins: [plugin],
       });
 
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
+      await executePlan(runtime, mockPlan);
 
       expect(beforeExecute).toHaveBeenCalledWith(mockPlan, expect.any(Object));
     });
@@ -466,6 +451,7 @@ describe('Runtime class', () => {
       });
 
       for await (const _row of runtime.execute(mockPlan)) {
+        void _row;
         // Consume rows
       }
 
@@ -495,6 +481,7 @@ describe('Runtime class', () => {
 
       // Consume all rows to ensure afterExecute is called
       for await (const _row of runtime.execute(mockPlan)) {
+        void _row;
         // Consume iterator
       }
 
@@ -536,6 +523,7 @@ describe('Runtime class', () => {
 
       await expect(async () => {
         for await (const _row of runtime.execute(mockPlan)) {
+          void _row;
           // Consume first row before error
         }
       }).rejects.toThrow();
@@ -563,6 +551,7 @@ describe('Runtime class', () => {
       };
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
+      // eslint-disable-next-line require-yield
       mockDriver.execute = vi.fn().mockImplementation(async function* () {
         throw new Error('Execution failed');
       });
@@ -577,6 +566,7 @@ describe('Runtime class', () => {
 
       await expect(async () => {
         for await (const _row of runtime.execute(mockPlan)) {
+          void _row;
           break;
         }
       }).rejects.toThrow('Execution failed');
@@ -622,6 +612,7 @@ describe('Runtime class', () => {
 
       // Consume all rows to ensure afterExecute is called
       for await (const _row of runtime.execute(mockPlan)) {
+        void _row;
         // Consume iterator
       }
 
@@ -645,6 +636,7 @@ describe('Runtime class', () => {
 
       // Consume all rows to ensure telemetry is recorded
       for await (const _row of runtime.execute(mockPlan)) {
+        void _row;
         // Consume iterator
       }
 
@@ -663,6 +655,7 @@ describe('Runtime class', () => {
       const adapter = createPostgresAdapter();
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
+      // eslint-disable-next-line require-yield
       mockDriver.execute = vi.fn().mockImplementation(async function* () {
         throw new Error('Driver error');
       });
@@ -674,11 +667,7 @@ describe('Runtime class', () => {
         verify: { mode: 'onFirstUse', requireMarker: false },
       });
 
-      await expect(async () => {
-        for await (const _row of runtime.execute(mockPlan)) {
-          break;
-        }
-      }).rejects.toThrow();
+      await expect(executePlan(runtime, mockPlan)).rejects.toThrow();
 
       const telemetry = runtime.telemetry();
       expect(telemetry).toMatchObject({
@@ -702,6 +691,7 @@ describe('Runtime class', () => {
 
       // Consume all rows
       for await (const _row of runtime.execute(mockPlan)) {
+        void _row;
         // Consume iterator
       }
 
@@ -710,6 +700,7 @@ describe('Runtime class', () => {
 
       // Consume all rows again
       for await (const _row of runtime.execute(mockPlan)) {
+        void _row;
         // Consume iterator
       }
 
@@ -805,6 +796,7 @@ describe('Runtime class', () => {
       await expect(
         (async () => {
           for await (const _row of runtime.execute(mockPlan)) {
+            void _row;
             break;
           }
         })(),
@@ -833,6 +825,7 @@ describe('Runtime class', () => {
       await expect(
         (async () => {
           for await (const _row of runtime.execute(mockPlan)) {
+            void _row;
             // Consume row
           }
         })(),
@@ -860,16 +853,12 @@ describe('Runtime class', () => {
       });
 
       // First execute - verifies
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
+      await executePlan(runtime, mockPlan);
 
       const firstCallCount = (mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length;
 
       // Second execute - should skip verification
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
+      await executePlan(runtime, mockPlan);
 
       // Should not call query again for verification
       expect((mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length).toBe(firstCallCount);
@@ -896,16 +885,12 @@ describe('Runtime class', () => {
       });
 
       // First execute
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
+      await executePlan(runtime, mockPlan);
 
       const firstCallCount = (mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length;
 
       // Second execute - should verify again
-      for await (const _row of runtime.execute(mockPlan)) {
-        break;
-      }
+      await executePlan(runtime, mockPlan);
 
       // Should call query again for verification
       expect((mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(

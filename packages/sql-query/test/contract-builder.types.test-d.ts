@@ -7,6 +7,7 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import type { ResultType, Plan } from '../src/types';
 import type { Contract, CodecTypes } from './fixtures/contract.d';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
+import contractJson from './fixtures/contract.json' assert { type: 'json' };
 
 test('builder contract types match fixture contract types', () => {
   const builderContract = defineContract<CodecTypes>()
@@ -24,14 +25,11 @@ test('builder contract types match fixture contract types', () => {
     .coreHash('sha256:test-core')
     .build();
 
-  const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
-  const fixtureContract = validateContract<Contract>(
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    require('./fixtures/contract.json'),
-  );
+  const _validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
+  const _fixtureContract = validateContract<Contract>(contractJson);
 
-  type BuilderUserTable = NonNullable<typeof validatedBuilderContract.storage.tables['user']>;
-  type FixtureUserTable = NonNullable<typeof fixtureContract.storage.tables['user']>;
+  type BuilderUserTable = NonNullable<typeof _validatedBuilderContract.storage.tables['user']>;
+  type FixtureUserTable = NonNullable<typeof _fixtureContract.storage.tables['user']>;
 
   expectTypeOf<BuilderUserTable>().toHaveProperty('columns');
   expectTypeOf<FixtureUserTable>().toHaveProperty('columns');
@@ -59,7 +57,7 @@ test('ResultType inference works identically to fixture contract', () => {
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
 
-  const plan = sql<typeof validatedBuilderContract, CodecTypes>({
+  const _plan = sql<typeof validatedBuilderContract, CodecTypes>({
     contract: validatedBuilderContract,
     adapter,
   })
@@ -71,16 +69,13 @@ test('ResultType inference works identically to fixture contract', () => {
     })
     .build();
 
-  type BuilderRow = ResultType<typeof plan>;
+  type BuilderRow = ResultType<typeof _plan>;
 
-  const fixtureContract = validateContract<Contract>(
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    require('./fixtures/contract.json'),
-  );
-  const fixtureTables = schema<Contract, CodecTypes>(fixtureContract).tables;
+  const _fixtureContract = validateContract<Contract>(contractJson);
+  const fixtureTables = schema<Contract, CodecTypes>(_fixtureContract).tables;
   const fixtureUserTable = fixtureTables['user'];
   if (!fixtureUserTable) throw new Error('fixture user table not found');
-  const fixturePlan = sql<Contract, CodecTypes>({ contract: fixtureContract, adapter })
+  const _fixturePlan = sql<Contract, CodecTypes>({ contract: _fixtureContract, adapter })
     .from(fixtureUserTable)
     .select({
       id: fixtureUserTable.columns['id']!,
@@ -89,7 +84,7 @@ test('ResultType inference works identically to fixture contract', () => {
     })
     .build();
 
-  type FixtureRow = ResultType<typeof fixturePlan>;
+  type FixtureRow = ResultType<typeof _fixturePlan>;
 
   expectTypeOf<BuilderRow>().toHaveProperty('id');
   expectTypeOf<BuilderRow>().toHaveProperty('email');
@@ -97,7 +92,7 @@ test('ResultType inference works identically to fixture contract', () => {
   expectTypeOf<FixtureRow>().toHaveProperty('id');
   expectTypeOf<FixtureRow>().toHaveProperty('email');
   expectTypeOf<FixtureRow>().toHaveProperty('createdAt');
-  expectTypeOf(plan).toExtend<Plan<BuilderRow>>();
+  expectTypeOf(_plan).toExtend<Plan<BuilderRow>>();
 });
 
 test('codec type inference via type option', () => {
@@ -120,7 +115,7 @@ test('codec type inference via type option', () => {
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
 
-  const plan = sql<typeof validated, CodecTypes>({ contract: validated, adapter })
+  const _plan = sql<typeof validated, CodecTypes>({ contract: validated, adapter })
     .from(userTable)
     .select({
       id: userTable.columns['id']!,
@@ -129,7 +124,7 @@ test('codec type inference via type option', () => {
     })
     .build();
 
-  type Row = ResultType<typeof plan>;
+  type Row = ResultType<typeof _plan>;
 
   expectTypeOf<Row>().toHaveProperty('id');
   expectTypeOf<Row>().toHaveProperty('email');

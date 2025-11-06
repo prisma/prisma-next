@@ -100,13 +100,13 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
       mode: this.mode,
       now: () => Date.now(),
       log: options.log ?? {
-        info: (_event) => {
+        info: () => {
           // No-op in MVP - diagnostics stay out of runtime core
         },
-        warn: (_event) => {
+        warn: () => {
           // No-op in MVP - diagnostics stay out of runtime core
         },
-        error: (_event) => {
+        error: () => {
           // No-op in MVP - diagnostics stay out of runtime core
         },
       },
@@ -126,6 +126,7 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
   }
 
   private async verifyPlanIfNeeded(_plan: Plan): Promise<void> {
+    void _plan; // Parameter required by interface but not used in this implementation
     if (this.verify.mode === 'always') {
       this.verified = false;
     }

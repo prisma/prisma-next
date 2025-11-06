@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 import { describe, expect, it } from 'vitest';
 import { createJoinOnBuilder } from '../src/sql';
 import { schema } from '../src/schema';
@@ -23,11 +24,11 @@ type ContractWithPosts = SqlContract<
         };
       };
     };
-  },
-  {},
-  {},
-  {}
->;
+    },
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',

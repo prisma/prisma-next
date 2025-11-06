@@ -123,9 +123,15 @@ describe('marker helpers', { timeout: 100 }, () => {
     expect(seeded.rowCount).toBe(1);
 
     // Simulate string date from driver
+    const firstRow = seeded.rows[0] as {
+      core_hash: string;
+      profile_hash: string;
+      updated_at: Date;
+      [key: string]: unknown;
+    };
     const rowWithStringDate = {
-      ...seeded.rows[0],
-      updated_at: seeded.rows[0].updated_at.toISOString(),
+      ...firstRow,
+      updated_at: firstRow.updated_at.toISOString(),
     };
 
     const record = parseContractMarkerRow(rowWithStringDate);

@@ -68,7 +68,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     try {
       await client.end();
       await database.close();
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
 import { describe, expect, it, expectTypeOf } from 'vitest';
 import { validateContract } from '../src/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
@@ -564,4 +565,3 @@ describe('validateContract', () => {
     );
   });
 });
-

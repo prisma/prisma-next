@@ -61,22 +61,50 @@ type BuildStorageTable<
           Target
         >;
   };
-} & (PK extends readonly string[] ? { readonly primaryKey: { readonly columns: PK } } : {});
+} & (PK extends readonly string[]
+  ? { readonly primaryKey: { readonly columns: PK } }
+  : Record<string, never>);
 
-type ExtractColumns<T extends TableBuilderState<any, any, any>> =
-  T extends TableBuilderState<any, infer C, any> ? C : never;
+type ExtractColumns<
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+    readonly string[] | undefined
+  >,
+> = T extends TableBuilderState<string, infer C, readonly string[] | undefined> ? C : never;
 
-type ExtractPrimaryKey<T extends TableBuilderState<any, any, any>> =
-  T extends TableBuilderState<any, any, infer PK> ? PK : never;
+type ExtractPrimaryKey<
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+    readonly string[] | undefined
+  >,
+> =
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+    infer PK
+  >
+    ? PK
+    : never;
 
-type NormalizeColumns<C extends Record<string, ColumnBuilderState<any, any, any, any>>> = {
-  [K in keyof C]: C[K] extends ColumnBuilderState<any, infer S, infer Null, infer TType>
+type NormalizeColumns<
+  C extends Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+> = {
+  [K in keyof C]: C[K] extends ColumnBuilderState<string, infer S, infer Null, infer TType>
     ? { scalar: S & string; nullable: Null & boolean; type: TType }
     : never;
 };
 
 type BuildStorage<
-  Tables extends Record<string, TableBuilderState<string, any, any>>,
+  Tables extends Record<
+    string,
+    TableBuilderState<
+      string,
+      Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+      readonly string[] | undefined
+    >
+  >,
   Target extends string,
 > = {
   readonly tables: {
@@ -93,8 +121,8 @@ type BuildModelFields<Fields extends Record<string, string>> = {
   readonly [K in keyof Fields]: { readonly column: Fields[K] };
 };
 
-type ExtractModelFields<T extends ModelBuilderState<any, any, any>> =
-  T extends ModelBuilderState<any, any, infer F> ? F : never;
+type ExtractModelFields<T extends ModelBuilderState<string, string, Record<string, string>>> =
+  T extends ModelBuilderState<string, string, infer F> ? F : never;
 
 type BuildModels<
   Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>>,
@@ -156,7 +184,7 @@ class TableBuilder<
   Columns extends Record<
     string,
     ColumnBuilderState<string, string, boolean, string | undefined>
-  > = {},
+  > = Record<string, never>,
   PrimaryKey extends readonly string[] | undefined = undefined,
 > {
   private readonly _name: Name;
@@ -274,7 +302,7 @@ class TableBuilder<
 class ModelBuilder<
   Name extends string,
   Table extends string,
-  Fields extends Record<string, string> = {},
+  Fields extends Record<string, string> = Record<string, never>,
 > {
   private readonly _name: Name;
   private readonly _table: Table;
@@ -346,8 +374,11 @@ class ContractBuilder<
       Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
       readonly string[] | undefined
     >
-  > = {},
-  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>> = {},
+  > = Record<string, never>,
+  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>> = Record<
+    string,
+    never
+  >,
   CoreHash extends string | undefined = undefined,
   Extensions extends Record<string, unknown> | undefined = undefined,
 > {
@@ -380,7 +411,14 @@ class ContractBuilder<
     });
   }
 
-  table<TableName extends string, T extends TableBuilder<TableName, any, any>>(
+  table<
+    TableName extends string,
+    T extends TableBuilder<
+      TableName,
+      Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+      readonly string[] | undefined
+    >,
+  >(
     name: TableName,
     callback: (t: TableBuilder<TableName>) => T | void,
   ): ContractBuilder<
@@ -413,7 +451,7 @@ class ContractBuilder<
   model<
     ModelName extends string,
     TableName extends string,
-    M extends ModelBuilder<ModelName, TableName, any>,
+    M extends ModelBuilder<ModelName, TableName, Record<string, string>>,
   >(
     name: ModelName,
     table: TableName,
@@ -455,21 +493,35 @@ class ContractBuilder<
   }
 
   build(): Target extends string
-    ? SqlContract<BuildStorage<Tables, Target & string>, BuildModels<Models>, {}, SqlMappings> & {
+    ? SqlContract<
+        BuildStorage<Tables, Target & string>,
+        BuildModels<Models>,
+        Record<string, never>,
+        SqlMappings
+      > & {
         readonly schemaVersion: '1';
         readonly target: Target;
         readonly targetFamily: 'sql';
         readonly coreHash: CoreHash extends string ? CoreHash : string;
-      } & (Extensions extends Record<string, unknown> ? { readonly extensions: Extensions } : {})
+      } & (Extensions extends Record<string, unknown>
+          ? { readonly extensions: Extensions }
+          : Record<string, never>)
     : never {
     // Type helper to ensure literal types are preserved in return type
     type BuiltContract = Target extends string
-      ? SqlContract<BuildStorage<Tables, Target & string>, BuildModels<Models>, {}, SqlMappings> & {
+      ? SqlContract<
+          BuildStorage<Tables, Target & string>,
+          BuildModels<Models>,
+          Record<string, never>,
+          SqlMappings
+        > & {
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';
           readonly coreHash: CoreHash extends string ? CoreHash : string;
-        } & (Extensions extends Record<string, unknown> ? { readonly extensions: Extensions } : {})
+        } & (Extensions extends Record<string, unknown>
+            ? { readonly extensions: Extensions }
+            : Record<string, never>)
       : never;
     if (!this.state.target) {
       throw new Error('target is required. Call .target() before .build()');
