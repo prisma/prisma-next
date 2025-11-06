@@ -38,34 +38,43 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 
 ## Common Patterns
 
-### Execute Plan Helper
+### Shared Test Utilities
 
+**Use `@prisma-next/test-utils` for common test patterns** - Don't create helpers in individual test files when they're used across multiple test suites.
+
+**Available Helpers:**
+- `withDevDatabase(fn, options?)`: Executes a function with a dev database, auto-cleanup
+- `withClient(connectionString, fn)`: Executes a function with a database client, auto-cleanup
+- `collectAsync(iterable)`: Collects all values from an async iterable
+- `drainAsyncIterable(iterable)`: Drains an async iterable without collecting
+- `executePlanAndCollect<Row>(runtime, plan)`: Executes a plan and collects all results
+- `setupE2EDatabase(client, contract, setupFn)`: Sets up E2E test database with schema, data, and contract marker
+- `createTestRuntimeFromClient(contract, client, adapter)`: Creates a runtime with standard test configuration
+- `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk
+- `emitAndVerifyContract(...)`: Emits contract via CLI and verifies it matches on-disk artifacts
+
+**Import from shared package:**
 ```typescript
-/**
- * Executes a plan and consumes the first row from the result iterator.
- * This helper DRYs up the common test pattern of executing a plan and breaking
- * after the first row to trigger execution without consuming all results.
- */
-const executePlan = async (runtime: ReturnType<typeof createRuntime>, plan: Plan): Promise<void> => {
-  for await (const _row of runtime.execute(plan)) {
-    void _row;
-    break;
-  }
-};
+import {
+  withDevDatabase,
+  withClient,
+  collectAsync,
+  executePlanAndCollect,
+  setupE2EDatabase,
+  createTestRuntimeFromClient,
+  loadContractFromDisk,
+} from '@prisma-next/test-utils';
 ```
 
 ### Database Helpers
 
 ```typescript
 // Use withDevDatabase for automatic cleanup
-await withDevDatabase(async (database) => {
-  // ... test code
-});
-
-// Use withClient for client lifecycle
-await withClient(connectionString, async (client) => {
-  // ... test code
-});
+await withDevDatabase(async ({ connectionString }) => {
+  await withClient(connectionString, async (client) => {
+    // ... test code
+  });
+}, { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 });
 ```
 
 ### Iterator Helpers
@@ -74,8 +83,74 @@ await withClient(connectionString, async (client) => {
 // Collect all results
 const results = await collectAsync(runtime.execute(plan));
 
+// Or use the plan-specific helper
+const rows = await executePlanAndCollect<Row>(runtime, plan);
+
 // Drain iterator without collecting
 await drainAsyncIterable(runtime.execute(plan));
+```
+
+### E2E Test Pattern
+
+**✅ CORRECT: Use shared utilities and load contracts from fixtures**
+
+```typescript
+import {
+  withDevDatabase,
+  withClient,
+  loadContractFromDisk,
+  setupE2EDatabase,
+  createTestRuntimeFromClient,
+  executePlanAndCollect,
+} from '@prisma-next/test-utils';
+
+it('test description', async () => {
+  // Load contract from committed fixtures (not emit on every test)
+  const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+
+  await withDevDatabase(
+    async ({ connectionString }) => {
+      await withClient(connectionString, async (client) => {
+        // Setup database with test-specific schema/data
+        await setupE2EDatabase(client, contract, async (c) => {
+          await c.query('create table "user" ...');
+          await c.query('insert into "user" ...');
+        });
+
+        // Create runtime and execute plan
+        const adapter = createPostgresAdapter();
+        const runtime = createTestRuntimeFromClient(contract, client, adapter);
+        try {
+          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            .from(tables.user)
+            .select({ id: tables.user.columns.id })
+            .build();
+
+          const rows = await executePlanAndCollect(runtime, plan);
+          expect(rows.length).toBeGreaterThan(0);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
+  );
+});
+```
+
+**❌ WRONG: Creating helpers in test files or emitting contracts on every test**
+
+```typescript
+// ❌ WRONG: Don't create helpers in test files when they're used across suites
+async function emitAndLoadContract(...) { /* ... */ }
+async function setupDatabase(...) { /* ... */ }
+
+// ❌ WRONG: Don't emit contracts on every test run
+it('test', async () => {
+  await execFileAsync('node', [cliPath, 'emit', ...]); // Slow, unnecessary
+  const contract = await loadContract(...);
+});
 ```
 
 ## When to Create Helpers
@@ -90,6 +165,11 @@ await drainAsyncIterable(runtime.execute(plan));
 - ❌ Pattern appears only 1-2 times
 - ❌ Helper would be more complex than the pattern itself
 - ❌ Pattern is specific to a single test
+
+**Use shared package for cross-suite patterns:**
+- ✅ If a pattern is used across multiple test suites, add it to `@prisma-next/test-utils`
+- ✅ Check `@prisma-next/test-utils` first before creating a new helper
+- ❌ Don't duplicate helpers that already exist in the shared package
 
 ## Testing Anti-Patterns
 

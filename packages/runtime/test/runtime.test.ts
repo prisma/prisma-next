@@ -7,6 +7,7 @@ import type { Plan } from '@prisma-next/sql-query/types';
 import type { SqlDriver } from '@prisma-next/sql-target';
 import type { Plugin } from '../src/plugins/types';
 import { validateContract } from '@prisma-next/sql-query/schema';
+import { drainPlanExecution, executePlanAndCollect } from './utils';
 
 describe('Runtime class', () => {
   const mockContractRaw: SqlContract<SqlStorage> = {
@@ -59,20 +60,6 @@ describe('Runtime class', () => {
     close: vi.fn().mockResolvedValue(undefined),
   });
 
-  /**
-   * Executes a plan and consumes the first row from the result iterator.
-   * This helper DRYs up the common test pattern of executing a plan and breaking
-   * after the first row to trigger execution without consuming all results.
-   */
-  const executePlan = async (
-    runtime: ReturnType<typeof createRuntime>,
-    plan: Plan,
-  ): Promise<void> => {
-    for await (const _row of runtime.execute(plan)) {
-      void _row;
-      break;
-    }
-  };
 
   describe('constructor', () => {
     it('validates codec registry at startup when verify.mode is startup', () => {
@@ -320,10 +307,7 @@ describe('Runtime class', () => {
       });
 
       await expect(async () => {
-        for await (const _row of runtime.execute(mockPlan)) {
-          void _row;
-          break;
-        }
+        await drainPlanExecution(runtime, mockPlan);
       }).rejects.toMatchObject({
         code: 'CONTRACT.MARKER_MISSING',
         category: 'CONTRACT',
@@ -351,10 +335,7 @@ describe('Runtime class', () => {
       });
 
       await expect(async () => {
-        for await (const _row of runtime.execute(mockPlan)) {
-          void _row;
-          break;
-        }
+        await drainPlanExecution(runtime, mockPlan);
       }).rejects.toMatchObject({
         code: 'CONTRACT.MARKER_MISMATCH',
         category: 'CONTRACT',
@@ -450,10 +431,7 @@ describe('Runtime class', () => {
         plugins: [plugin],
       });
 
-      for await (const _row of runtime.execute(mockPlan)) {
-        void _row;
-        // Consume rows
-      }
+      await drainPlanExecution(runtime, mockPlan);
 
       expect(onRow).toHaveBeenCalledTimes(2);
     });
@@ -480,10 +458,7 @@ describe('Runtime class', () => {
       });
 
       // Consume all rows to ensure afterExecute is called
-      for await (const _row of runtime.execute(mockPlan)) {
-        void _row;
-        // Consume iterator
-      }
+      await drainPlanExecution(runtime, mockPlan);
 
       expect(afterExecute).toHaveBeenCalledWith(
         mockPlan,
@@ -565,10 +540,7 @@ describe('Runtime class', () => {
       });
 
       await expect(async () => {
-        for await (const _row of runtime.execute(mockPlan)) {
-          void _row;
-          break;
-        }
+        await drainPlanExecution(runtime, mockPlan);
       }).rejects.toThrow('Execution failed');
 
       expect(afterExecute).toHaveBeenCalled();
@@ -611,10 +583,7 @@ describe('Runtime class', () => {
       });
 
       // Consume all rows to ensure afterExecute is called
-      for await (const _row of runtime.execute(mockPlan)) {
-        void _row;
-        // Consume iterator
-      }
+      await drainPlanExecution(runtime, mockPlan);
 
       expect(callOrder).toEqual(['before-1', 'before-2', 'after-1', 'after-2']);
     });
@@ -635,10 +604,7 @@ describe('Runtime class', () => {
       });
 
       // Consume all rows to ensure telemetry is recorded
-      for await (const _row of runtime.execute(mockPlan)) {
-        void _row;
-        // Consume iterator
-      }
+      await drainPlanExecution(runtime, mockPlan);
 
       const telemetry = runtime.telemetry();
       expect(telemetry).toMatchObject({
@@ -667,7 +633,7 @@ describe('Runtime class', () => {
         verify: { mode: 'onFirstUse', requireMarker: false },
       });
 
-      await expect(executePlan(runtime, mockPlan)).rejects.toThrow();
+      await expect(drainPlanExecution(runtime, mockPlan)).rejects.toThrow();
 
       const telemetry = runtime.telemetry();
       expect(telemetry).toMatchObject({
@@ -690,19 +656,13 @@ describe('Runtime class', () => {
       });
 
       // Consume all rows
-      for await (const _row of runtime.execute(mockPlan)) {
-        void _row;
-        // Consume iterator
-      }
+      await drainPlanExecution(runtime, mockPlan);
 
       const firstTelemetry = runtime.telemetry();
       expect(firstTelemetry).not.toBeNull();
 
       // Consume all rows again
-      for await (const _row of runtime.execute(mockPlan)) {
-        void _row;
-        // Consume iterator
-      }
+      await drainPlanExecution(runtime, mockPlan);
 
       const secondTelemetry = runtime.telemetry();
       expect(secondTelemetry).not.toBeNull();
@@ -760,9 +720,8 @@ describe('Runtime class', () => {
       });
 
       const rows: unknown[] = [];
-      for await (const row of runtime.execute(mockPlan)) {
-        rows.push(row);
-      }
+      const collectedRows = await executePlanAndCollect<Record<string, unknown>>(runtime, mockPlan);
+      rows.push(...collectedRows);
 
       expect(rows).toEqual([]);
 
@@ -795,10 +754,7 @@ describe('Runtime class', () => {
 
       await expect(
         (async () => {
-          for await (const _row of runtime.execute(mockPlan)) {
-            void _row;
-            break;
-          }
+      await drainPlanExecution(runtime, mockPlan);
         })(),
       ).rejects.toThrow('Plugin error');
     });
@@ -853,12 +809,12 @@ describe('Runtime class', () => {
       });
 
       // First execute - verifies
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       const firstCallCount = (mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length;
 
       // Second execute - should skip verification
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       // Should not call query again for verification
       expect((mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length).toBe(firstCallCount);
@@ -885,12 +841,12 @@ describe('Runtime class', () => {
       });
 
       // First execute
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       const firstCallCount = (mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length;
 
       // Second execute - should verify again
-      await executePlan(runtime, mockPlan);
+      await drainPlanExecution(runtime, mockPlan);
 
       // Should call query again for verification
       expect((mockDriver.query as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(

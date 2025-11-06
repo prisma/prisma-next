@@ -1,25 +1,23 @@
 {
-  "name": "@prisma-next/runtime",
+  "name": "@prisma-next/test-utils",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "eslint . --config ../../eslint.config.mjs --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage --max-warnings 0"
   },
   "dependencies": {
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/runtime": "workspace:*",
     "@prisma-next/sql-query": "workspace:*",
-    "@prisma-next/sql-target": "workspace:*",
-    "arktype": "^2.1.25"
+    "@prisma-next/sql-target": "workspace:*"
   },
   "devDependencies": {
     "@prisma/dev": "^0.1.1",
-    "@prisma-next/test-utils": "workspace:*",
     "pg": "^8.11.5",
     "@types/pg": "^8.11.10",
     "tsup": "^8.3.0",
@@ -33,3 +31,4 @@
     }
   }
 }
+

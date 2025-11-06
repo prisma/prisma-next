@@ -78,25 +78,62 @@ it('emits contract and executes query', async () => {
 
 **Why they matter:** E2E tests verify the entire system works together, catching integration issues that unit and integration tests might miss.
 
+**Contract Loading Strategy:**
+- **Load from committed fixtures** - E2E tests load contracts from `test/fixtures/generated/contract.json` rather than emitting on every test run
+- **Single emission test** - One test (`emitAndVerifyContract`) verifies that contract emission produces the expected artifacts
+- **Benefits:** Faster test execution, stable contract artifacts, reduced duplication
+
 **Example:**
 ```typescript
-// packages/e2e-tests/test/emit-and-query.test.ts
-it('emits contract via CLI and executes query against real database', async () => {
-  // 1. Emit contract via CLI
-  await exec('pnpm --filter @prisma-next/cli emit --contract ./schema.ts --out ./contracts');
+// packages/e2e-tests/test/runtime.e2e.test.ts
+import {
+  withDevDatabase,
+  withClient,
+  loadContractFromDisk,
+  setupE2EDatabase,
+  createTestRuntimeFromClient,
+  executePlanAndCollect,
+} from '@prisma-next/test-utils';
 
-  // 2. Load and validate contract
-  const contract = validateContract<Contract>(contractJson);
+it('returns multiple rows with correct types', async () => {
+  // Load contract from committed fixtures (not emit on every test)
+  const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-  // 3. Create runtime with real database
-  const runtime = createRuntime({ contract, adapter });
+  await withDevDatabase(
+    async ({ connectionString }) => {
+      await withClient(connectionString, async (client) => {
+        // Setup database with test-specific schema/data
+        await setupE2EDatabase(client, contract, async (c) => {
+          await c.query('create table "user" ...');
+          await c.query('insert into "user" ...');
+        });
 
-  // 4. Build and execute query
-  const plan = sql({ contract, adapter }).from(tables.user).select({ id: t.user.id }).build();
-  const results = await collectAsync(runtime.execute(plan));
+        // Create runtime and execute plan
+        const adapter = createPostgresAdapter();
+        const runtime = createTestRuntimeFromClient(contract, client, adapter);
+        try {
+          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            .from(tables.user)
+            .select({ id: tables.user.columns.id, email: tables.user.columns.email })
+            .build();
 
-  // 5. Verify results match database state
-  expect(results[0].id).toBeGreaterThan(0);
+          const rows = await executePlanAndCollect(runtime, plan);
+          expect(rows.length).toBeGreaterThan(0);
+          expect(rows[0]).toHaveProperty('id');
+          expect(rows[0]).toHaveProperty('email');
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
+  );
+});
+
+// Single test to verify contract emission
+it('emits contract and verifies it matches on-disk artifacts', async () => {
+  await emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, contractJsonPath);
 });
 ```
 
@@ -192,100 +229,51 @@ Good test helpers:
 
 ### Helper Examples from Codebase
 
-#### Database Helpers
+**Use `@prisma-next/test-utils` for shared helpers** - Common test patterns are centralized in the shared test utilities package. Check `@prisma-next/test-utils` before creating new helpers.
+
+#### Shared Test Utilities
 
 ```typescript
-// packages/runtime/test/utils.ts
+// Import from shared package
+import {
+  withDevDatabase,
+  withClient,
+  collectAsync,
+  executePlanAndCollect,
+  setupE2EDatabase,
+  createTestRuntimeFromClient,
+  loadContractFromDisk,
+} from '@prisma-next/test-utils';
 
-/**
- * Creates a dev database instance for testing.
- * Automatically handles connection string normalization and cleanup.
- */
-export async function createDevDatabase(options?: StartServerOptions): Promise<DevDatabase> {
-  const server = await unstable_startServer(options);
-  return {
-    connectionString: normalizeConnectionString(server.database.connectionString),
-    async close() {
-      await server.close();
-    },
-  };
-}
+// Database helpers
+await withDevDatabase(async ({ connectionString }) => {
+  await withClient(connectionString, async (client) => {
+    // ... test code
+  });
+}, { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 });
 
-/**
- * Executes a function with a dev database, automatically cleaning up afterward.
- */
-export async function withDevDatabase<T>(
-  fn: (ctx: DevDatabase) => Promise<T>,
-  options?: StartServerOptions,
-): Promise<T> {
-  const database = await createDevDatabase(options);
-  try {
-    return await fn(database);
-  } finally {
-    await database.close();
-  }
-}
+// Iterator helpers
+const rows = await executePlanAndCollect<Row>(runtime, plan);
+const results = await collectAsync(runtime.execute(plan));
 
-/**
- * Executes a function with a database client, automatically cleaning up afterward.
- */
-export async function withClient<T>(
-  connectionString: string,
-  fn: (client: Client) => Promise<T>,
-): Promise<T> {
-  const client = new Client({ connectionString });
-  await client.connect();
-  try {
-    return await fn(client);
-  } finally {
-    await client.end();
-  }
-}
+// E2E helpers
+const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+await setupE2EDatabase(client, contract, async (c) => {
+  // Test-specific schema/data setup
+});
+const runtime = createTestRuntimeFromClient(contract, client, adapter);
 ```
 
-#### Iterator Helpers
+#### Package-Specific Helpers
 
-```typescript
-/**
- * Drains an async iterable, consuming all values without collecting them.
- * Useful for testing side effects without memory overhead.
- */
-export async function drainAsyncIterable<T>(iterable: AsyncIterable<T>): Promise<void> {
-  for await (const _ of iterable) {
-    // exhaust iterator
-  }
-}
-
-/**
- * Collects all values from an async iterable into an array.
- * Useful for testing query results.
- */
-export async function collectAsync<T>(iterable: AsyncIterable<T>): Promise<T[]> {
-  const out: T[] = [];
-  for await (const item of iterable) {
-    out.push(item);
-  }
-  return out;
-}
-```
-
-#### Contract Helpers
+**Only create helpers in test files when they're specific to that package:**
 
 ```typescript
 // packages/sql-query/test/sql.test.ts
 
 /**
- * Loads a contract from test fixtures and validates it.
- * Ensures contracts have fully qualified type IDs.
- */
-function loadContract(name: string): Contract {
-  const json = require(`./fixtures/${name}.json`);
-  return validateContract<Contract>(json);
-}
-
-/**
  * Creates a stub adapter for testing query building.
- * Provides minimal adapter interface without full implementation.
+ * Package-specific helper - not used elsewhere.
  */
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
@@ -299,6 +287,16 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
   };
 }
 ```
+
+**When to add to shared package:**
+- ✅ Pattern is used across multiple test suites
+- ✅ Pattern involves common infrastructure (database, contracts, runtime)
+- ✅ Pattern would benefit from centralized maintenance
+
+**When to keep in test file:**
+- ✅ Pattern is specific to one package's tests
+- ✅ Pattern involves package-specific mocks or stubs
+- ✅ Pattern is unlikely to be reused elsewhere
 
 ---
 
@@ -434,6 +432,7 @@ database = await createDevDatabase({
 - `budgets.integration.test.ts`: 54010-54012
 - `runtime.integration.test.ts`: 53213-53215
 - `marker.test.ts`: 54216-54218
+- `e2e-tests/runtime.e2e.test.ts`: 54020-54112 (multiple tests, each with unique range)
 
 **When adding new test suites:** Assign a new port range and document it here.
 

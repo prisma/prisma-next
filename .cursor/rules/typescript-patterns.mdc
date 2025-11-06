@@ -291,6 +291,7 @@ database = await createDevDatabase({
 - `budgets.integration.test.ts`: 54010-54012
 - `runtime.integration.test.ts`: 53213-53215
 - `marker.test.ts`: 54216-54218
+- `e2e-tests/runtime.e2e.test.ts`: 54020-54112 (multiple tests, each with unique range)
 
 ### Best Practices
 
@@ -537,40 +538,67 @@ const fixtureContract = validateContract<Contract>(contractJson);
 
 **Pattern**: Common patterns in test files should be extracted into helper functions with JSDoc comments explaining their purpose.
 
-**❌ WRONG: Repeated pattern throughout test file**
+**Use `@prisma-next/test-utils` for shared helpers** - Check the shared package first before creating new helpers.
+
+**❌ WRONG: Repeated pattern throughout test file or creating helpers that already exist**
 
 ```typescript
-// Repeated 20+ times throughout the file
+// ❌ WRONG: Repeated 20+ times throughout the file
 for await (const _row of runtime.execute(mockPlan)) {
   void _row;
   break;
 }
+
+// ❌ WRONG: Creating helpers in test files when they're used across suites
+async function emitAndLoadContract(...) { /* ... */ }
+async function setupDatabase(...) { /* ... */ }
 ```
 
-**✅ CORRECT: Extract to helper function with documentation**
+**✅ CORRECT: Use shared utilities from `@prisma-next/test-utils`**
+
+```typescript
+import {
+  withDevDatabase,
+  withClient,
+  executePlanAndCollect,
+  setupE2EDatabase,
+  createTestRuntimeFromClient,
+  loadContractFromDisk,
+} from '@prisma-next/test-utils';
+
+// Use shared helpers
+const rows = await executePlanAndCollect<Row>(runtime, plan);
+const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+await setupE2EDatabase(client, contract, async (c) => { /* ... */ });
+```
+
+**✅ CORRECT: Extract to helper function only when pattern is package-specific**
 
 ```typescript
 /**
- * Executes a plan and consumes the first row from the result iterator.
- * This helper DRYs up the common test pattern of executing a plan and breaking
- * after the first row to trigger execution without consuming all results.
+ * Creates a stub adapter for testing query building.
+ * Package-specific helper - not used elsewhere.
  */
-const executePlan = async (runtime: ReturnType<typeof createRuntime>, plan: Plan): Promise<void> => {
-  for await (const _row of runtime.execute(plan)) {
-    void _row;
-    break;
-  }
-};
-
-// Use the helper throughout tests
-await executePlan(runtime, mockPlan);
+function createStubAdapter(): Adapter<...> {
+  // ... package-specific implementation
+}
 ```
 
+**When to use shared package:**
+- ✅ Pattern is used across multiple test suites
+- ✅ Pattern involves common infrastructure (database, contracts, runtime)
+- ✅ Pattern would benefit from centralized maintenance
+
+**When to create package-specific helper:**
+- ✅ Pattern is specific to one package's tests
+- ✅ Pattern involves package-specific mocks or stubs
+- ✅ Pattern is unlikely to be reused elsewhere
+
 **Why this matters:**
-- Reduces code duplication
+- Reduces code duplication across test suites
 - Makes tests more maintainable
-- JSDoc comments explain the purpose and usage
-- Easier to update the pattern in one place
+- Centralizes common patterns in one place
+- Easier to update patterns across all tests
 
 **See `docs/Testing Guide.md` for comprehensive testing practices, including:**
 - When to create helpers (3+ occurrences, multiple steps, obscures intent)

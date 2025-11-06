@@ -6,6 +6,7 @@ export {
   readContractMarker,
   writeContractMarker,
 } from '../marker';
+export type { SqlStatement } from '../marker';
 export type {
   RuntimeOptions,
   RuntimeVerifyOptions,

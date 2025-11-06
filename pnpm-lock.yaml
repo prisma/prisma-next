@@ -290,6 +290,9 @@ importers:
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
     devDependencies:
       '@types/node':
         specifier: ^20.11.30
@@ -359,6 +362,9 @@ importers:
         specifier: workspace:*
         version: link:../sql-target
     devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -396,6 +402,9 @@ importers:
         specifier: ^2.1.25
         version: 2.1.25
     devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@prisma/dev':
         specifier: ^0.1.1
         version: 0.1.1(typescript@5.9.3)
@@ -427,6 +436,9 @@ importers:
         specifier: ^2.1.25
         version: 2.1.25
     devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0
@@ -449,6 +461,40 @@ importers:
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
+
+  packages/test-utils:
+    dependencies:
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../driver-postgres
+      '@prisma-next/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@prisma-next/sql-query':
+        specifier: workspace:*
+        version: link:../sql-query
+      '@prisma-next/sql-target':
+        specifier: workspace:*
+        version: link:../sql-target
+    devDependencies:
+      '@prisma/dev':
+        specifier: ^0.1.1
+        version: 0.1.1(typescript@5.9.3)
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.15.6
+      pg:
+        specifier: ^8.11.5
+        version: 8.16.3
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)

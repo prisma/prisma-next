@@ -11,12 +11,17 @@ import { validateContract } from '@prisma-next/sql-query/schema';
 
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
-import { createRuntime } from '../src/runtime';
 import { budgets } from '../src/plugins/budgets';
 import { lints } from '../src/plugins/lints';
-import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
-import { createDevDatabase, drainAsyncIterable, executeStatement, collectAsync } from './utils';
+import {
+  createDevDatabase,
+  setupTestDatabase,
+  teardownTestDatabase,
+  createTestRuntime,
+  executePlanAndCollect,
+  drainPlanExecution,
+} from './utils';
 
 const fixtureContract = loadContractFixture();
 const tables = schema(fixtureContract).tables;
@@ -60,42 +65,27 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 
   beforeEach(async () => {
-    await client.query('drop schema if exists prisma_contract cascade');
-    await client.query('create schema if not exists public');
-    await client.query('drop table if exists "user"');
-    await client.query('create table "user" (id serial primary key, email text not null)');
-    await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
-      'ada@example.com',
-      'tess@example.com',
-      'mike@example.com',
-    ]);
-
-    await executeStatement(client, ensureSchemaStatement);
-    await executeStatement(client, ensureTableStatement);
-
-    const write = writeContractMarker({
-      coreHash: fixtureContract.coreHash,
-      profileHash: fixtureContract.profileHash ?? 'sha256:test-profile',
-      contractJson: fixtureContract,
-      canonicalVersion: 1,
+    await setupTestDatabase(client, fixtureContract, async (c) => {
+      await c.query('drop table if exists "user"');
+      await c.query('create table "user" (id serial primary key, email text not null)');
+      await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
+        'ada@example.com',
+        'tess@example.com',
+        'mike@example.com',
+      ]);
     });
-    await executeStatement(client, write.insert);
   });
 
   afterEach(async () => {
-    await client.query('drop schema if exists prisma_contract cascade');
-    await client.query('drop table if exists "user"');
+    await teardownTestDatabase(client, ['user']);
   });
 
   it('executes a plan after onFirstUse verification', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(plan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
 
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.map((r) => r['email'])).toContain('ada@example.com');
@@ -107,23 +97,17 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       coreHash: 'sha256:mismatch',
     };
 
-    const runtime = createRuntime({
-      contract: mismatchedContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(mismatchedContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
     await expect(async () => {
-      await drainAsyncIterable(runtime.execute(plan));
+      await drainPlanExecution(runtime, plan);
     }).rejects.toMatchObject({ code: 'PLAN.HASH_MISMATCH' });
   });
 
   it('blocks raw select star with lint error', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
       plugins: [lints()],
     });
@@ -133,7 +117,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
     `;
 
     await expect(async () => {
-      await drainAsyncIterable(runtime.execute(rawPlan));
+      await drainPlanExecution(runtime, rawPlan);
     }).rejects.toMatchObject({ code: 'LINT.SELECT_STAR' });
 
     const telemetry = runtime.telemetry();
@@ -146,10 +130,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 
   it('warns on missing limit and blocks via budget heuristic', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
       plugins: [lints(), budgets()],
     });
@@ -159,7 +140,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
     `;
 
     await expect(async () => {
-      await drainAsyncIterable(runtime.execute(rawPlan));
+      await drainPlanExecution(runtime, rawPlan);
     }).rejects.toMatchObject({ code: 'BUDGET.ROWS_EXCEEDED' });
 
     const telemetry = runtime.telemetry();
@@ -167,10 +148,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 
   it('records unindexed predicate warning when refs lack indexes', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
       plugins: [lints()],
     });
@@ -187,9 +165,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       },
     );
 
-    const rows = await collectAsync<{ id: number }>(
-      runtime.execute(rawPlan) as AsyncIterable<{ id: number }>,
-    );
+    const rows = await executePlanAndCollect<{ id: number }>(runtime, rawPlan);
 
     expect(rows.length).toBeGreaterThan(0);
 
@@ -198,10 +174,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 
   it('prevents read-only mutation when annotations intent is report', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
       plugins: [lints()],
     });
@@ -215,7 +188,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
     );
 
     await expect(async () => {
-      await drainAsyncIterable(runtime.execute(rawPlan));
+      await drainPlanExecution(runtime, rawPlan);
     }).rejects.toMatchObject({ code: 'LINT.READ_ONLY_MUTATION' });
 
     const telemetry = runtime.telemetry();
@@ -223,10 +196,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 
   it('respects unbounded select severity override', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
       plugins: [
         budgets({
@@ -240,17 +210,14 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       select id from "user"
     `;
 
-    await drainAsyncIterable(runtime.execute(rawPlan));
+    await drainPlanExecution(runtime, rawPlan);
 
     const telemetry = runtime.telemetry();
     expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
   });
 
   it('attaches explain estimates when enabled', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
       plugins: [
         budgets({
@@ -265,7 +232,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       select id from "user"
     `;
 
-    await drainAsyncIterable(runtime.execute(rawPlan));
+    await drainPlanExecution(runtime, rawPlan);
 
     const telemetry = runtime.telemetry();
     expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
@@ -273,10 +240,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
   });
 
   it('emits stable fingerprint for literal-only differences', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
@@ -285,7 +249,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       { params: [] },
     );
 
-    await drainAsyncIterable(runtime.execute(planOne));
+    await drainPlanExecution(runtime, planOne);
     const fingerprintOne = runtime.telemetry()?.fingerprint;
 
     const planTwo = sql({ contract: fixtureContract, adapter }).raw(
@@ -293,7 +257,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       { params: [] },
     );
 
-    await drainAsyncIterable(runtime.execute(planTwo));
+    await drainPlanExecution(runtime, planTwo);
     const fingerprintTwo = runtime.telemetry()?.fingerprint;
 
     expect(fingerprintOne).toBeTypeOf('string');

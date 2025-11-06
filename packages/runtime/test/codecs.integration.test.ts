@@ -5,10 +5,14 @@ import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import { param } from '@prisma-next/sql-query/param';
 import { validateContract } from '@prisma-next/sql-query/schema';
-import { createRuntime } from '../src/runtime';
-import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
-import { createDevDatabase, executeStatement, collectAsync } from './utils';
+import {
+  createDevDatabase,
+  setupTestDatabase,
+  teardownTestDatabase,
+  createTestRuntime,
+  executePlanAndCollect,
+} from './utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
@@ -74,40 +78,25 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   beforeEach(async () => {
-    await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
-    await client.query('CREATE SCHEMA IF NOT EXISTS public');
-    await client.query('DROP TABLE IF EXISTS test_data');
-    await client.query(`
-      CREATE TABLE test_data (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        score FLOAT8 NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL
-      )
-    `);
-
-    await executeStatement(client, ensureSchemaStatement);
-    await executeStatement(client, ensureTableStatement);
-
-    const write = writeContractMarker({
-      coreHash: fixtureContract.coreHash,
-      profileHash: fixtureContract.profileHash ?? 'sha256:test-profile',
-      contractJson: fixtureContract,
-      canonicalVersion: 1,
+    await setupTestDatabase(client, fixtureContract, async (c) => {
+      await c.query('DROP TABLE IF EXISTS test_data');
+      await c.query(`
+        CREATE TABLE test_data (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          score FLOAT8 NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL
+        )
+      `);
     });
-    await executeStatement(client, write.insert);
   });
 
   afterEach(async () => {
-    await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
-    await client.query('DROP TABLE IF EXISTS test_data');
+    await teardownTestDatabase(client, ['test_data']);
   });
 
   it('encodes JS Date parameter to ISO string', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -134,7 +123,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       })
       .build();
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
     expect(rows.length).toBeGreaterThan(0);
 
     const row = rows[0]!;
@@ -144,10 +133,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   it('decodes timestamptz to ISO string', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -169,7 +155,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       })
       .build();
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
@@ -178,10 +164,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   it('round-trips numbers correctly', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -200,7 +183,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       })
       .build();
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
@@ -209,10 +192,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   it('round-trips strings correctly', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -231,7 +211,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       })
       .build();
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
@@ -240,10 +220,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   it('uses codec override via annotations.codecs', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -288,10 +265,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     // First, alter table to allow nullable created_at for this test
     await client.query('ALTER TABLE test_data ALTER COLUMN created_at DROP NOT NULL');
 
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -310,7 +284,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       })
       .build();
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
@@ -318,10 +292,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   it('decodes multiple columns with different types', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -342,7 +313,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       })
       .build();
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
@@ -355,10 +326,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   it('uses codec assignments from contract column types', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -385,7 +353,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       created_at: 'pg/timestamptz@1',
     });
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
@@ -396,10 +364,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
   });
 
   it('uses codec assignments from contract column types for WHERE clause parameters', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter,
-      driver: sharedDriver,
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -426,7 +391,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       id: 'pg/int4@1',
     });
 
-    const rows = await collectAsync(runtime.execute<Record<string, unknown>>(selectPlan));
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, selectPlan);
     expect(rows.length).toBe(1);
     expect(rows[0]!['name']).toBe('Test User');
   });

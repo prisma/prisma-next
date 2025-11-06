@@ -1,11 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { Client } from 'pg';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { createRuntime } from '../src/runtime';
 import { budgets } from '../src/plugins/budgets';
-import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { createDevDatabase } from './utils';
+import {
+  createDevDatabase,
+  setupTestDatabase,
+  teardownTestDatabase,
+  createTestRuntime,
+  executePlanAndCollect,
+  drainPlanExecution,
+} from './utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { sql } from '@prisma-next/sql-query/sql';
 import { schema } from '@prisma-next/sql-query/schema';
@@ -62,40 +67,26 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
   });
 
   beforeEach(async () => {
-    await client.query('drop schema if exists prisma_contract cascade');
-    await client.query('create schema if not exists public');
-    await client.query('drop table if exists "user"');
-    await client.query('create table "user" (id text primary key, email text not null)');
+    await setupTestDatabase(client, fixtureContract, async (c) => {
+      await c.query('drop table if exists "user"');
+      await c.query('create table "user" (id text primary key, email text not null)');
 
-    // Insert rows for budget testing (enough to test streaming but not overwhelm DB)
-    const values: string[] = [];
-    for (let i = 0; i < 100; i++) {
-      values.push(`('id-${i}', 'user${i}@example.com')`);
-    }
-    await client.query(`insert into "user" (id, email) values ${values.join(', ')}`);
-
-    await client.query(ensureSchemaStatement.sql);
-    await client.query(ensureTableStatement.sql);
-
-    const write = writeContractMarker({
-      coreHash: fixtureContract.coreHash,
-      profileHash: fixtureContract.profileHash ?? 'sha256:test-profile',
-      contractJson: fixtureContract,
-      canonicalVersion: 1,
+      // Insert rows for budget testing (enough to test streaming but not overwhelm DB)
+      const values: string[] = [];
+      for (let i = 0; i < 100; i++) {
+        values.push(`('id-${i}', 'user${i}@example.com')`);
+      }
+      await c.query(`insert into "user" (id, email) values ${values.join(', ')}`);
     });
-    await client.query(write.insert.sql, [...write.insert.params]);
   });
 
   afterEach(async () => {
-    await client.query('drop schema if exists prisma_contract cascade');
-    await client.query('drop table if exists "user"');
+    await teardownTestDatabase(client, ['user']);
   });
 
   it('blocks unbounded DSL SELECT exceeding budget', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
       plugins: [
         budgets({
@@ -109,7 +100,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -117,10 +108,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
     // Unbounded SELECT should be blocked pre-exec (estimated 10_000 > maxRows 50)
     await expect(async () => {
-      for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
-        void _row;
-        // Should not reach here
-      }
+      await drainPlanExecution(runtime, plan);
     }).rejects.toMatchObject({
       code: 'BUDGET.ROWS_EXCEEDED',
       category: 'BUDGET',
@@ -128,10 +116,8 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
   });
 
   it('allows bounded DSL SELECT within budget', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
       plugins: [
         budgets({
@@ -145,7 +131,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -153,18 +139,13 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       .build();
 
     // Bounded SELECT with LIMIT 5 should pass
-    const results: Record<string, unknown>[] = [];
-    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
-      results.push(row);
-    }
+    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
     expect(results.length).toBe(5);
   });
 
   it('blocks streaming when observed rows exceed budget', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
       plugins: [
         budgets({
@@ -178,7 +159,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const builder = sql({ contract: fixtureContract, adapter });
     // Use LIMIT that's within heuristic but exceeds streaming budget
     const plan = builder
       .from(userTable)
@@ -188,15 +169,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
     // Should throw during streaming when observed rows > maxRows
     await expect(async () => {
-      let count = 0;
-      for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
-        void _row;
-        count++;
-        if (count > 20) {
-          // Should have thrown by now
-          break;
-        }
-      }
+      await drainPlanExecution(runtime, plan);
     }).rejects.toMatchObject({
       code: 'BUDGET.ROWS_EXCEEDED',
       category: 'BUDGET',
@@ -204,10 +177,8 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
   });
 
   it('blocks unbounded raw SELECT without detectable LIMIT', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
       plugins: [
         budgets({
@@ -216,15 +187,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       ],
     });
 
-    const { raw } = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const { raw } = sql({ contract: fixtureContract, adapter });
     const plan = raw`SELECT id, email FROM "user"`;
 
     // Unbounded raw SELECT should be blocked pre-exec
     await expect(async () => {
-      for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
-        void _row;
-        // Should not reach here
-      }
+      await drainPlanExecution(runtime, plan);
     }).rejects.toMatchObject({
       code: 'BUDGET.ROWS_EXCEEDED',
       category: 'BUDGET',
@@ -232,10 +200,8 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
   });
 
   it('allows raw SELECT with detectable LIMIT via annotations', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
       plugins: [
         budgets({
@@ -244,23 +210,18 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       ],
     });
 
-    const { raw } = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const { raw } = sql({ contract: fixtureContract, adapter });
     const plan = raw.with({ annotations: { limit: 5 } })`SELECT id, email FROM "user" LIMIT 5`;
 
     // Raw SELECT with limit annotation should pass
-    const results: Record<string, unknown>[] = [];
-    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
-      results.push(row);
-    }
+    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
     expect(results.length).toBeLessThanOrEqual(5);
   });
 
   it('logs warning when latency exceeds budget in non-strict mode', async () => {
     const logWarn = vi.fn();
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
       mode: 'permissive',
       plugins: [
@@ -282,17 +243,14 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(1)
       .build();
 
-    const results: Record<string, unknown>[] = [];
-    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
-      results.push(row);
-    }
+    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
 
     expect(results.length).toBeGreaterThan(0);
     expect(logWarn).toHaveBeenCalledWith(
@@ -303,10 +261,8 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
   });
 
   it('throws error when latency exceeds budget in strict mode with error severity', async () => {
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'startup', requireMarker: false },
       mode: 'strict',
       plugins: [
@@ -323,7 +279,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -331,10 +287,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       .build();
 
     await expect(async () => {
-      for await (const _row of runtime.execute<Record<string, unknown>>(plan)) {
-        void _row;
-        // Should throw during execution
-      }
+      await drainPlanExecution(runtime, plan);
     }).rejects.toMatchObject({
       code: 'BUDGET.TIME_EXCEEDED',
       category: 'BUDGET',
@@ -343,10 +296,8 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
   it('does not throw when latency exceeds budget in non-strict mode with error severity', async () => {
     const logWarn = vi.fn();
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
       mode: 'permissive',
       plugins: [
@@ -368,17 +319,14 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(1)
       .build();
 
-    const results: Record<string, unknown>[] = [];
-    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
-      results.push(row);
-    }
+    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
 
     expect(results.length).toBeGreaterThan(0);
     expect(logWarn).toHaveBeenCalledWith(
@@ -390,10 +338,8 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
 
   it('does not log warning when latency is within budget', async () => {
     const logWarn = vi.fn();
-    const runtime = createRuntime({
-      contract: fixtureContract,
-      adapter: createPostgresAdapter(),
-      driver: sharedDriver,
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
       verify: { mode: 'onFirstUse', requireMarker: false },
       plugins: [
         budgets({
@@ -414,17 +360,14 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const tables = schema(fixtureContract).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter: createPostgresAdapter() });
+    const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(1)
       .build();
 
-    const results: Record<string, unknown>[] = [];
-    for await (const row of runtime.execute<Record<string, unknown>>(plan)) {
-      results.push(row);
-    }
+    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
 
     expect(results.length).toBeGreaterThan(0);
     expect(logWarn).not.toHaveBeenCalledWith(

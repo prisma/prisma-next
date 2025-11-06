@@ -22,6 +22,7 @@
     "@prisma-next/contract": "workspace:*"
   },
   "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
     "vitest": "^2.1.1",
     "typescript": "^5.9.3"
   }
