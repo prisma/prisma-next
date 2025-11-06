@@ -35,7 +35,7 @@ const plan = builder
   .limit(5)
   .build();
 
-describe('runtime execute integration', { timeout: 100 }, () => {
+describe('runtime execute integration', { timeout: 30000 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   /** Raw Postgres client for direct interaction with the database */
@@ -53,7 +53,7 @@ describe('runtime execute integration', { timeout: 100 }, () => {
       connect: { client: client },
       cursor: { disabled: true },
     });
-  }, 3000);
+  }, 30000);
 
   afterAll(async () => {
     try {

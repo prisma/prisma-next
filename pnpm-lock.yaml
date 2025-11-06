@@ -63,6 +63,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../packages/test-utils
       '@prisma/dev':
         specifier: ^0.1.1
         version: 0.1.1(typescript@5.9.3)
@@ -472,19 +475,6 @@ importers:
         version: 2.1.9(@types/node@20.19.24)
 
   packages/test-utils:
-    dependencies:
-      '@prisma-next/driver-postgres':
-        specifier: workspace:*
-        version: link:../driver-postgres
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../runtime
-      '@prisma-next/sql-query':
-        specifier: workspace:*
-        version: link:../sql-query
-      '@prisma-next/sql-target':
-        specifier: workspace:*
-        version: link:../sql-target
     devDependencies:
       '@prisma/dev':
         specifier: ^0.1.1

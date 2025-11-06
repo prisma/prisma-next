@@ -114,8 +114,8 @@ describe('emitter', () => {
     expect(result.contractDts).toContain('CodecTypes');
 
     const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
-    const storage = contractJson.storage as Record<string, unknown>;
-    const tables = storage.tables as Record<string, unknown>;
+    const storage = contractJson['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
     expect(tables).toBeDefined();
   });
 

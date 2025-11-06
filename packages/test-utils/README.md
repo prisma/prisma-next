@@ -72,6 +72,7 @@ flowchart TD
 ### Runtime Creation Helpers
 
 - `createTestRuntime(contract, adapter, driver, options?)`: Creates a runtime with standard test configuration
+- `createTestRuntimeFromClient(contract, client, adapter)`: Creates a runtime from a database client (for E2E tests)
 
 ### Contract Helpers
 
@@ -93,9 +94,10 @@ flowchart TD
 
 ## Usage
 
+### Integration Tests
+
 ```typescript
 import {
-  createDevDatabase,
   withDevDatabase,
   withClient,
   setupTestDatabase,
@@ -118,6 +120,51 @@ await withDevDatabase(async ({ connectionString }) => {
     await teardownTestDatabase(client);
   });
 });
+```
+
+### E2E Tests
+
+```typescript
+import {
+  withDevDatabase,
+  withClient,
+  loadContractFromDisk,
+  setupE2EDatabase,
+  createTestRuntimeFromClient,
+  executePlanAndCollect,
+} from '@prisma-next/test-utils';
+
+// Load contract from committed fixtures
+const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+
+await withDevDatabase(
+  async ({ connectionString }) => {
+    await withClient(connectionString, async (client) => {
+      // Setup database with test-specific schema/data
+      await setupE2EDatabase(client, contract, async (c) => {
+        await c.query('create table "user" ...');
+        await c.query('insert into "user" ...');
+      });
+
+      // Create runtime and execute plan
+      const adapter = createPostgresAdapter();
+      const runtime = createTestRuntimeFromClient(contract, client, adapter);
+      try {
+        const tables = schema<Contract, CodecTypes>(contract).tables;
+        const plan = sql<Contract, CodecTypes>({ contract, adapter })
+          .from(tables.user)
+          .select({ id: tables.user.columns.id })
+          .build();
+
+        const rows = await executePlanAndCollect(runtime, plan);
+        expect(rows.length).toBeGreaterThan(0);
+      } finally {
+        await runtime.close();
+      }
+    });
+  },
+  { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
+);
 ```
 
 ## Exports

@@ -1,7 +1,7 @@
 import {
   withDevDatabase,
   withClient,
-  executePlanAndCollect,
+  executePlanAndCollect as executePlanAndCollectBase,
   loadContractFromDisk as loadContractFromDiskBase,
   emitAndVerifyContract as emitAndVerifyContractBase,
   setupE2EDatabase as setupE2EDatabaseBase,
@@ -11,13 +11,20 @@ import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { Client } from 'pg';
-import type { Adapter, SelectAst, LoweredStatement } from '@prisma-next/sql-query/types';
+import type { Adapter, SelectAst, LoweredStatement, Plan, ResultType } from '@prisma-next/sql-query/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { createRuntime } from '@prisma-next/runtime';
 import type { Plugin, Log } from '@prisma-next/runtime';
 import type { SqlDriver } from '@prisma-next/sql-target';
 
-export { withDevDatabase, withClient, executePlanAndCollect };
+export { withDevDatabase, withClient };
+
+export async function executePlanAndCollect<P extends Plan>(
+  runtime: { execute<Row = Record<string, unknown>>(plan: unknown): AsyncIterable<Row> },
+  plan: P,
+): Promise<ResultType<P>[]> {
+  return executePlanAndCollectBase(runtime, plan) as Promise<ResultType<P>[]>;
+}
 
 export interface CreateTestRuntimeOptions {
   readonly verify?: { mode: 'onFirstUse' | 'startup' | 'always'; requireMarker?: boolean };

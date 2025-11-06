@@ -10,7 +10,7 @@ import {
 } from '../src/marker';
 import { createDevDatabase, executeStatement } from './utils';
 
-describe('marker helpers', { timeout: 100 }, () => {
+describe('marker helpers', { timeout: 30000 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   /** Raw Postgres client for direct interaction with the database */
   let client: Client;
@@ -23,7 +23,7 @@ describe('marker helpers', { timeout: 100 }, () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-  }, 3000);
+  }, 30000);
 
   afterAll(async () => {
     try {

@@ -5,7 +5,7 @@ import {
   executeStatement,
   drainAsyncIterable,
   collectAsync,
-  executePlanAndCollect,
+  executePlanAndCollect as executePlanAndCollectBase,
   drainPlanExecution,
   setupTestDatabase as setupTestDatabaseBase,
   teardownTestDatabase,
@@ -16,6 +16,7 @@ import {
   type DevDatabase,
   type ContractMarkerStatements,
 } from '@prisma-next/test-utils';
+import type { Plan, ResultType } from '@prisma-next/sql-query/types';
 import {
   createRuntime,
   ensureSchemaStatement,
@@ -37,11 +38,19 @@ export {
   executeStatement,
   drainAsyncIterable,
   collectAsync,
-  executePlanAndCollect,
   drainPlanExecution,
   teardownTestDatabase,
   type DevDatabase,
 };
+
+export async function executePlanAndCollect<P extends Plan | Record<string, unknown>>(
+  runtime: { execute<Row = Record<string, unknown>>(plan: unknown): AsyncIterable<Row> },
+  plan: P | Plan,
+): Promise<P extends Plan ? ResultType<P>[] : P[]> {
+  return executePlanAndCollectBase(runtime, plan) as unknown as P extends Plan
+    ? ResultType<P>[]
+    : P[];
+}
 
 export interface CreateTestRuntimeOptions {
   readonly verify?: { mode: 'onFirstUse' | 'startup' | 'always'; requireMarker?: boolean };

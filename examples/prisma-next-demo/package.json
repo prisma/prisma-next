@@ -18,6 +18,7 @@
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
     "@prisma/dev": "^0.1.1",
     "esbuild-runner": "^2.2.2",
     "vite-tsconfig-paths": "^5.1.4",

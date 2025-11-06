@@ -200,7 +200,7 @@ export async function setupTestDatabase(
 export async function teardownTestDatabase(client: Client, tables?: string[]): Promise<void> {
   if (tables && tables.length > 0) {
     for (const table of tables) {
-      await client.query(`drop table if exists ${table}`);
+      await client.query(`drop table if exists "${table}"`);
     }
   }
   await client.query('drop schema if exists prisma_contract cascade');

@@ -67,6 +67,7 @@ flowchart TD
 - Relational DSL for building SQL queries
 - Compiles to Plans with AST, SQL, and metadata
 - Supports projections, filters, joins, ordering, limits
+- **Nested Projection Shaping**: Express nested object literals in `.select()` for compile-time type inference, while runtime produces flat SQL with flattened aliases (e.g., `post.title` → `post_title`)
 - Join methods: `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`
 - Join ON conditions use `on.eqCol(left, right)` callback pattern
 - Self-joins are not supported in MVP
@@ -161,6 +162,31 @@ const plan = sql()
     title: t.post.title,
   })
   .build({ params: { active: true } });
+```
+
+### SQL DSL with Nested Projections
+
+```typescript
+import { sql, schema } from '@prisma-next/sql-query/sql';
+import contract from './contract.json';
+
+const t = schema(contract);
+
+// Nested projection shape for compile-time type inference
+const plan = sql()
+  .from(t.user)
+  .innerJoin(t.post, (on) => on.eqCol(t.user.id, t.post.userId))
+  .select({
+    name: t.user.name,
+    post: {
+      title: t.post.title,
+      content: t.post.content,
+    },
+  })
+  .build();
+
+// ResultType<typeof plan> infers: { name: string, post: { title: string, content: string } }
+// Runtime returns flat rows with flattened aliases: { name: string, post_title: string, post_content: string }
 ```
 
 ### Contract Validation

@@ -100,16 +100,16 @@ describe('emitter round-trip', () => {
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
     const ir2: ContractIR = {
-      schemaVersion: contractJson1.schemaVersion as string,
-      targetFamily: contractJson1.targetFamily as string,
-      target: contractJson1.target as string,
-      extensions: contractJson1.extensions as Record<string, unknown>,
-      models: contractJson1.models as Record<string, unknown>,
-      relations: contractJson1.relations as Record<string, unknown>,
-      storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, unknown>,
-      meta: contractJson1.meta as Record<string, unknown>,
-      sources: contractJson1.sources as Record<string, unknown>,
+      schemaVersion: contractJson1['schemaVersion'] as string,
+      targetFamily: contractJson1['targetFamily'] as string,
+      target: contractJson1['target'] as string,
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      models: contractJson1['models'] as Record<string, unknown>,
+      relations: contractJson1['relations'] as Record<string, unknown>,
+      storage: contractJson1['storage'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) ?? {},
+      meta: contractJson1['meta'] as Record<string, unknown>,
+      sources: contractJson1['sources'] as Record<string, unknown>,
     };
 
     const result2 = await emit(ir2, options, mockSqlHook);
@@ -184,16 +184,16 @@ describe('emitter round-trip', () => {
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
     const ir2: ContractIR = {
-      schemaVersion: contractJson1.schemaVersion as string,
-      targetFamily: contractJson1.targetFamily as string,
-      target: contractJson1.target as string,
-      extensions: contractJson1.extensions as Record<string, unknown>,
-      models: contractJson1.models as Record<string, unknown>,
-      relations: contractJson1.relations as Record<string, unknown>,
-      storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, unknown>,
-      meta: contractJson1.meta as Record<string, unknown>,
-      sources: contractJson1.sources as Record<string, unknown>,
+      schemaVersion: contractJson1['schemaVersion'] as string,
+      targetFamily: contractJson1['targetFamily'] as string,
+      target: contractJson1['target'] as string,
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      models: contractJson1['models'] as Record<string, unknown>,
+      relations: contractJson1['relations'] as Record<string, unknown>,
+      storage: contractJson1['storage'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) ?? {},
+      meta: contractJson1['meta'] as Record<string, unknown>,
+      sources: contractJson1['sources'] as Record<string, unknown>,
     };
 
     const result2 = await emit(ir2, options, mockSqlHook);
@@ -234,16 +234,16 @@ describe('emitter round-trip', () => {
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
     const ir2: ContractIR = {
-      schemaVersion: contractJson1.schemaVersion as string,
-      targetFamily: contractJson1.targetFamily as string,
-      target: contractJson1.target as string,
-      extensions: contractJson1.extensions as Record<string, unknown>,
-      models: contractJson1.models as Record<string, unknown>,
-      relations: contractJson1.relations as Record<string, unknown>,
-      storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, unknown>,
-      meta: contractJson1.meta as Record<string, unknown>,
-      sources: contractJson1.sources as Record<string, unknown>,
+      schemaVersion: contractJson1['schemaVersion'] as string,
+      targetFamily: contractJson1['targetFamily'] as string,
+      target: contractJson1['target'] as string,
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      models: contractJson1['models'] as Record<string, unknown>,
+      relations: contractJson1['relations'] as Record<string, unknown>,
+      storage: contractJson1['storage'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) ?? {},
+      meta: contractJson1['meta'] as Record<string, unknown>,
+      sources: contractJson1['sources'] as Record<string, unknown>,
     };
 
     const result2 = await emit(ir2, options, mockSqlHook);
@@ -252,16 +252,16 @@ describe('emitter round-trip', () => {
     expect(result1.coreHash).toBe(result2.coreHash);
 
     const parsed2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
-    const storage = parsed2.storage as Record<string, unknown>;
-    const tables = storage.tables as Record<string, unknown>;
-    const user = tables.user as Record<string, unknown>;
-    const columns = user.columns as Record<string, unknown>;
-    const id = columns.id as Record<string, unknown>;
-    const email = columns.email as Record<string, unknown>;
-    const name = columns.name as Record<string, unknown>;
-    expect(id.nullable).toBeUndefined();
-    expect(email.nullable).toBe(true);
-    expect(name.nullable).toBeUndefined();
+    const storage = parsed2['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const id = columns['id'] as Record<string, unknown>;
+    const email = columns['email'] as Record<string, unknown>;
+    const name = columns['name'] as Record<string, unknown>;
+    expect(id['nullable']).toBeUndefined();
+    expect(email['nullable']).toBe(true);
+    expect(name['nullable']).toBeUndefined();
   });
 
   it('round-trip with capabilities', async () => {
@@ -300,16 +300,16 @@ describe('emitter round-trip', () => {
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
     const ir2: ContractIR = {
-      schemaVersion: contractJson1.schemaVersion as string,
-      targetFamily: contractJson1.targetFamily as string,
-      target: contractJson1.target as string,
-      extensions: contractJson1.extensions as Record<string, unknown>,
-      models: contractJson1.models as Record<string, unknown>,
-      relations: contractJson1.relations as Record<string, unknown>,
-      storage: contractJson1.storage as Record<string, unknown>,
-      capabilities: contractJson1.capabilities as Record<string, unknown>,
-      meta: contractJson1.meta as Record<string, unknown>,
-      sources: contractJson1.sources as Record<string, unknown>,
+      schemaVersion: contractJson1['schemaVersion'] as string,
+      targetFamily: contractJson1['targetFamily'] as string,
+      target: contractJson1['target'] as string,
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      models: contractJson1['models'] as Record<string, unknown>,
+      relations: contractJson1['relations'] as Record<string, unknown>,
+      storage: contractJson1['storage'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) ?? {},
+      meta: contractJson1['meta'] as Record<string, unknown>,
+      sources: contractJson1['sources'] as Record<string, unknown>,
     };
 
     const result2 = await emit(ir2, options, mockSqlHook);
