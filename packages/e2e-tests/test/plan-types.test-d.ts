@@ -6,11 +6,15 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { Contract } from './fixtures/generated/contract.d';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { readFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-query/schema';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 test('inferred row types are correct', () => {
-  const outputDir = resolve('packages/e2e-tests/test/fixtures/generated');
+  const outputDir = resolve(__dirname, 'fixtures/generated');
   const contractJson = JSON.parse(readFileSync(join(outputDir, 'contract.json'), 'utf-8'));
   const contract = validateContract<Contract>(contractJson);
 

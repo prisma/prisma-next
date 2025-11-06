@@ -6,7 +6,7 @@ import { budgets } from '../src/plugins/budgets';
 import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '../src/marker';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createDevDatabase } from './utils';
-import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { sql } from '@prisma-next/sql-query/sql';
 import { schema } from '@prisma-next/sql-query/schema';
 import { validateContract } from '@prisma-next/sql-query/schema';

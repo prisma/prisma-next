@@ -12,6 +12,7 @@
     "vitest": "^2.1.1",
     "typescript": "^5.9.3",
     "@types/node": "^20.11.30",
+    "@types/pg": "^8.11.10",
     "pg": "^8.11.5"
   },
   "dependencies": {

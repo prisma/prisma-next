@@ -7,7 +7,7 @@ import {
 } from '@prisma-next/runtime';
 import contract from './contract.json' assert { type: 'json' };
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { SqlContract } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/sql-target';
 
 const contractData = validateContract<SqlContract>(contract);
 

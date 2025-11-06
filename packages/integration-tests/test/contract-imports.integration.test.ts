@@ -14,6 +14,7 @@ const execFileAsync = promisify(execFile);
 
 describe('contract.d.ts imports resolution', () => {
   let testDir: string;
+  const workspaceRoot = join(__dirname, '../../..');
 
   beforeEach(async () => {
     testDir = join(tmpdir(), `prisma-next-imports-test-${randomUUID()}`);
@@ -96,7 +97,7 @@ describe('contract.d.ts imports resolution', () => {
     expect(contractDtsContent).not.toContain("from './contract-types'");
 
     // Create a test TypeScript file that imports the generated contract.d.ts
-    const testFileContent = `import type { Contract, CodecTypes } from './contract.d';
+    const testFileContent = `import type { Contract, CodecTypes } from './contract.d.ts';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 // Verify we can use the Contract type
@@ -118,13 +119,12 @@ type UserIdColumn = UserColumns['id'];
 
     // Create a tsconfig.json for the test directory
     // Use path mappings to resolve workspace packages from their dist directories
-    const workspaceRoot = join(__dirname, '../../..');
     const relativeToWorkspace = relative(testDir, workspaceRoot).replace(/\\/g, '/');
     const tsconfigContent = JSON.stringify({
       compilerOptions: {
         target: 'ES2022',
-        module: 'ESNext',
-        moduleResolution: 'node16',
+        module: 'nodenext',
+        moduleResolution: 'nodenext',
         strict: true,
         esModuleInterop: true,
         skipLibCheck: true,
@@ -136,27 +136,32 @@ type UserIdColumn = UserColumns['id'];
             `${relativeToWorkspace}/packages/sql-target/dist/exports/index.d.ts`,
           ],
           '@prisma-next/sql-target/*': [
-            `${relativeToWorkspace}/packages/sql-target/dist/exports/*.d.ts`,
+            `${relativeToWorkspace}/packages/sql-target/dist/exports/*`,
           ],
           '@prisma-next/adapter-postgres/*': [
-            `${relativeToWorkspace}/packages/adapter-postgres/dist/exports/*.d.ts`,
+            `${relativeToWorkspace}/packages/adapter-postgres/dist/exports/*`,
           ],
         },
       },
       include: ['*.ts', '*.d.ts'],
     });
 
+    // Create a package.json to mark the directory as ESM
+    const packageJsonContent = JSON.stringify({ type: 'module' });
+    const packageJsonPath = join(testDir, 'package.json');
+    await writeFile(packageJsonPath, packageJsonContent, 'utf-8');
+
     const tsconfigPath = join(testDir, 'tsconfig.json');
     await writeFile(tsconfigPath, tsconfigContent, 'utf-8');
 
     // Use TypeScript compiler to verify all imports resolve
-    // Use pnpm to run TypeScript from the workspace
+    // Use pnpm to run TypeScript from the workspace root so path mappings work
     try {
       const { stdout, stderr } = await execFileAsync(
         'pnpm',
         ['exec', 'tsc', '--noEmit', '--project', tsconfigPath],
         {
-          cwd: testDir,
+          cwd: workspaceRoot,
         },
       );
 
@@ -167,11 +172,20 @@ type UserIdColumn = UserColumns['id'];
       // If we get here, all imports resolved successfully
       expect(stdout).toBeDefined();
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'stderr' in error) {
-        const stderr = error.stderr as string;
-        if (stderr.includes('Cannot find module') || stderr.includes('Cannot resolve')) {
+      if (error && typeof error === 'object') {
+        const errorObj = error as { stderr?: string; stdout?: string; message?: string };
+        const stderr = errorObj.stderr || '';
+        const stdout = errorObj.stdout || '';
+        const message = errorObj.message || '';
+        const fullError = stderr || stdout || message;
+
+        if (
+          fullError.includes('Cannot find module') ||
+          fullError.includes('Cannot resolve') ||
+          fullError.includes('error TS')
+        ) {
           throw new Error(
-            `Import resolution failed in generated contract.d.ts:\n${stderr}\n\nGenerated contract.d.ts:\n${contractDtsContent}`,
+            `Import resolution failed in generated contract.d.ts:\n${fullError}\n\nGenerated contract.d.ts:\n${contractDtsContent}`,
           );
         }
       }
@@ -229,7 +243,7 @@ type UserIdColumn = UserColumns['id'];
     expect(contractDtsContent).toContain("from '@prisma-next/adapter-postgres/codec-types'");
 
     // Create a comprehensive test file that uses all exported types
-    const testFileContent = `import type { Contract, CodecTypes, Tables, Models, Relations } from './contract.d';
+    const testFileContent = `import type { Contract, CodecTypes, Tables, Models, Relations } from './contract.d.ts';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -258,13 +272,12 @@ type CodecIntType = CodecTypes['pg/int4@1'];
 
     // Create a tsconfig.json that includes node_modules resolution
     // Use path mappings to resolve workspace packages from their dist directories
-    const workspaceRoot = join(__dirname, '../../..');
     const relativeToWorkspace = relative(testDir, workspaceRoot).replace(/\\/g, '/');
     const tsconfigContent = JSON.stringify({
       compilerOptions: {
         target: 'ES2022',
-        module: 'ESNext',
-        moduleResolution: 'node16',
+        module: 'nodenext',
+        moduleResolution: 'nodenext',
         strict: true,
         esModuleInterop: true,
         skipLibCheck: true,
@@ -276,10 +289,10 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             `${relativeToWorkspace}/packages/sql-target/dist/exports/index.d.ts`,
           ],
           '@prisma-next/sql-target/*': [
-            `${relativeToWorkspace}/packages/sql-target/dist/exports/*.d.ts`,
+            `${relativeToWorkspace}/packages/sql-target/dist/exports/*`,
           ],
           '@prisma-next/adapter-postgres/*': [
-            `${relativeToWorkspace}/packages/adapter-postgres/dist/exports/*.d.ts`,
+            `${relativeToWorkspace}/packages/adapter-postgres/dist/exports/*`,
           ],
           '@prisma-next/sql-query/*': [
             `${relativeToWorkspace}/packages/sql-query/dist/exports/*.d.ts`,
@@ -289,17 +302,22 @@ type CodecIntType = CodecTypes['pg/int4@1'];
       include: ['*.ts', '*.d.ts'],
     });
 
+    // Create a package.json to mark the directory as ESM
+    const packageJsonContent = JSON.stringify({ type: 'module' });
+    const packageJsonPath = join(testDir, 'package.json');
+    await writeFile(packageJsonPath, packageJsonContent, 'utf-8');
+
     const tsconfigPath = join(testDir, 'tsconfig.json');
     await writeFile(tsconfigPath, tsconfigContent, 'utf-8');
 
     // Use TypeScript compiler to verify all imports resolve
-    // Use pnpm to run TypeScript from the workspace
+    // Use pnpm to run TypeScript from the workspace root so path mappings work
     try {
       const { stdout, stderr } = await execFileAsync(
         'pnpm',
         ['exec', 'tsc', '--noEmit', '--project', tsconfigPath],
         {
-          cwd: testDir,
+          cwd: workspaceRoot,
         },
       );
 
@@ -309,13 +327,17 @@ type CodecIntType = CodecTypes['pg/int4@1'];
 
       expect(stdout).toBeDefined();
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'stderr' in error) {
-        const stderr = error.stderr as string;
-        if (stderr.includes('Cannot find module') || stderr.includes('Cannot resolve')) {
-          throw new Error(
-            `Import resolution failed:\n${stderr}\n\nGenerated contract.d.ts:\n${contractDtsContent.substring(0, 500)}...`,
-          );
-        }
+      if (error && typeof error === 'object') {
+        const errorObj = error as { stderr?: string; stdout?: string; message?: string };
+        const stderr = errorObj.stderr || '';
+        const stdout = errorObj.stdout || '';
+        const message = errorObj.message || '';
+        const fullError = stderr || stdout || message;
+
+        // Always show the error for debugging
+        throw new Error(
+          `TypeScript compilation failed:\n${fullError}\n\nGenerated contract.d.ts:\n${contractDtsContent}`,
+        );
       }
       throw error;
     }

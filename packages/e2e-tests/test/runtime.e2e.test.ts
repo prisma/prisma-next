@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import { resolve, join } from 'node:path';
+import { describe, it, expect } from 'vitest';
+import { resolve, join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { Client } from 'pg';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { createRuntime, ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '@prisma-next/runtime';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { sql } from '@prisma-next/sql-query/sql';
@@ -13,29 +15,20 @@ import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import type { ResultType } from '@prisma-next/sql-query/types';
 import { withDevDatabase, executeStatement } from '@prisma-next/runtime/test/utils';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '../../..');
+
 const execFileAsync = promisify(execFile);
 
 describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
-  const adapterPath = resolve('packages/adapter-postgres');
-  const cliPath = resolve('packages/cli/dist/cli.js');
-  const contractTsPath = resolve('packages/e2e-tests/test/fixtures/contract.ts');
-
-  let client: Client;
-
-  beforeAll(async () => {
-    // Ensure CLI is built before running (developer responsibility in CI/local)
-  });
-
-  afterAll(async () => {
-    // no-op
-  });
-
-  beforeEach(async () => {});
-  afterEach(async () => {});
+  const adapterPath = resolve(repoRoot, 'packages/adapter-postgres');
+  const cliPath = resolve(repoRoot, 'packages/cli/dist/cli.js');
+  const contractTsPath = resolve(__dirname, 'fixtures/contract.ts');
 
   it('returns multiple rows with correct types', async () => {
     // 1) Emit contract via CLI to temp output folder under package
-    const outputDir = resolve('packages/e2e-tests/.tmp-output');
+    const outputDir = resolve(__dirname, '../.tmp-output');
     await execFileAsync('node', [
       cliPath,
       'emit',
@@ -54,7 +47,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
 
     // 2) Start dev DB and prepare schema/data
     await withDevDatabase(async ({ connectionString }) => {
-      client = new Client({ connectionString });
+      const client = new Client({ connectionString });
       await client.connect();
       try {
         await client.query('drop schema if exists prisma_contract cascade');
@@ -87,9 +80,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 
-        const tables = schema(contract).tables;
+        const tables = schema<typeof contract, CodecTypes>(contract).tables;
         const user = tables['user']!;
-        const plan = sql({ contract, adapter })
+        const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
           .from(user)
           .select({ id: user.columns['id']!, email: user.columns['email']! })
           .build();

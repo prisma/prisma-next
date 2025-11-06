@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';
-import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import { Client } from 'pg';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';

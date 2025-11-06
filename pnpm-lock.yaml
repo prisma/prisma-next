@@ -270,6 +270,43 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
+  packages/e2e-tests:
+    dependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../adapter-postgres
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../driver-postgres
+      '@prisma-next/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@prisma-next/sql-query':
+        specifier: workspace:*
+        version: link:../sql-query
+      '@prisma-next/sql-target':
+        specifier: workspace:*
+        version: link:../sql-target
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.30
+        version: 20.19.24
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.15.6
+      pg:
+        specifier: ^8.11.5
+        version: 8.16.3
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
+
   packages/emitter:
     dependencies:
       '@prisma-next/node-utils':

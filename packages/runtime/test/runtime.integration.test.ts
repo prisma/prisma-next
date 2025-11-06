@@ -9,7 +9,7 @@ import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import { validateContract } from '@prisma-next/sql-query/schema';
 
-import type { SqlContract, SqlStorage } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 import { createRuntime } from '../src/runtime';
 import { budgets } from '../src/plugins/budgets';
