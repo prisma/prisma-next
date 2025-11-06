@@ -14,6 +14,7 @@ const base = defineContract<CodecTypes>()
       .column('id', 'int4', { nullable: false })
       .column('userId', 'int4', { nullable: false })
       .column('title', 'text', { nullable: false })
+      .column('published', 'bool', { nullable: false })
       .primaryKey(['id']),
   )
   .table('comment', (t) =>
@@ -34,6 +35,12 @@ const base = defineContract<CodecTypes>()
 
 export const contract = {
   ...base,
+  capabilities: {
+    postgres: {
+      lateral: true,
+      jsonAgg: true,
+    },
+  },
   extensions: {
     postgres: { version: '15.0.0' },
     pg: {},
