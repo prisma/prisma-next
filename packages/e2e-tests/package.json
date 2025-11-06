@@ -1,0 +1,27 @@
+{
+  "name": "@prisma-next/e2e-tests",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "gen-contract": "node ./scripts/gen-contract.cjs"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.1",
+    "typescript": "^5.9.3",
+    "@types/node": "^20.11.30",
+    "pg": "^8.11.5"
+  },
+  "dependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/sql-query": "workspace:*",
+    "@prisma-next/sql-target": "workspace:*",
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*"
+  }
+}
+
+
