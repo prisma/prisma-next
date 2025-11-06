@@ -34,11 +34,11 @@ type ContractWithPosts = SqlContract<
         };
       };
     };
-    },
-    Record<string, never>,
-    Record<string, never>,
-    Record<string, never>
-  >;
+  },
+  Record<string, never>,
+  Record<string, never>,
+  Record<string, never>
+>;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',
@@ -316,5 +316,105 @@ describe('SQL builder joins', () => {
         { table: 'post', column: 'userId' },
       ]),
     );
+  });
+
+  describe('nested projections with joins', () => {
+    it('flattens nested projection over joined columns', () => {
+      const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+      const userColumns = tables.user.columns;
+      const postColumns = tables.post.columns;
+
+      const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+        .from(tables.user)
+        .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
+        .select({
+          name: userColumns.email,
+          post: {
+            title: postColumns.title,
+            id: postColumns.id,
+          },
+        })
+        .build();
+
+      expect(plan.ast?.joins).toBeDefined();
+      expect(plan.ast?.joins?.length).toBe(1);
+      expect(plan.ast?.project).toEqual([
+        { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
+        { alias: 'post_title', expr: { kind: 'col', table: 'post', column: 'title' } },
+        { alias: 'post_id', expr: { kind: 'col', table: 'post', column: 'id' } },
+      ]);
+
+      expect(plan.meta.projection).toEqual({
+        name: 'user.email',
+        post_title: 'post.title',
+        post_id: 'post.id',
+      });
+    });
+
+    it('includes all referenced columns in meta refs for nested projections with joins', () => {
+      const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+      const userColumns = tables.user.columns;
+      const postColumns = tables.post.columns;
+
+      const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+        .from(tables.user)
+        .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
+        .select({
+          userId: userColumns.id,
+          post: {
+            title: postColumns.title,
+            id: postColumns.id,
+          },
+        })
+        .build();
+
+      expect(plan.meta.refs?.tables).toContain('user');
+      expect(plan.meta.refs?.tables).toContain('post');
+      expect(plan.meta.refs?.columns).toEqual(
+        expect.arrayContaining([
+          { table: 'user', column: 'id' },
+          { table: 'post', column: 'title' },
+          { table: 'post', column: 'id' },
+          { table: 'post', column: 'userId' },
+        ]),
+      );
+    });
+
+    it('handles multi-level nested projection with joins', () => {
+      const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+      const userColumns = tables.user.columns;
+      const postColumns = tables.post.columns;
+
+      const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+        .from(tables.user)
+        .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
+        .select({
+          user: {
+            id: userColumns.id,
+            email: userColumns.email,
+          },
+          post: {
+            info: {
+              title: postColumns.title,
+              id: postColumns.id,
+            },
+          },
+        })
+        .build();
+
+      expect(plan.ast?.project).toEqual([
+        { alias: 'user_id', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'user_email', expr: { kind: 'col', table: 'user', column: 'email' } },
+        { alias: 'post_info_title', expr: { kind: 'col', table: 'post', column: 'title' } },
+        { alias: 'post_info_id', expr: { kind: 'col', table: 'post', column: 'id' } },
+      ]);
+
+      expect(plan.meta.projection).toEqual({
+        user_id: 'user.id',
+        user_email: 'user.email',
+        post_info_title: 'post.title',
+        post_info_id: 'post.id',
+      });
+    });
   });
 });

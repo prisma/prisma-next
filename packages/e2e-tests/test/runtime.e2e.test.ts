@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
@@ -695,6 +695,524 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
         }
       },
       { acceleratePort: 54070, databasePort: 54071, shadowDatabasePort: 54072 },
+    );
+  });
+
+  it('nested projection returns flat rows with correct aliases', async () => {
+    const outputDir = resolve(__dirname, '../.tmp-output');
+    await execFileAsync('node', [
+      cliPath,
+      'emit',
+      '--contract',
+      contractTsPath,
+      '--out',
+      outputDir,
+      '--adapter',
+      adapterPath,
+    ]);
+
+    const contractJsonPath = join(outputDir, 'contract.json');
+    const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    const contract = validateContract<Contract>(contractJson);
+
+    await withDevDatabase(
+      async ({ connectionString }) => {
+        const client = new Client({ connectionString });
+        await client.connect();
+        try {
+          await client.query('drop schema if exists prisma_contract cascade');
+          await client.query('create schema if not exists public');
+          await client.query('drop table if exists "user"');
+          await client.query('create table "user" (id serial primary key, email text not null)');
+          await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
+            'ada@example.com',
+            'tess@example.com',
+            'mike@example.com',
+          ]);
+
+          await executeStatement(client, ensureSchemaStatement);
+          await executeStatement(client, ensureTableStatement);
+          const write = writeContractMarker({
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+            contractJson: contract,
+            canonicalVersion: 1,
+          });
+          await executeStatement(client, write.insert);
+
+          const adapter = createPostgresAdapter();
+          const driver = createPostgresDriverFromOptions({
+            connect: { client },
+            cursor: { disabled: true },
+          });
+          const runtime = createRuntime({
+            contract,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          });
+
+          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const user = tables['user']!;
+          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            .from(user)
+            .select({
+              name: user.columns['email']!,
+              post: {
+                title: user.columns['id']!,
+              },
+            })
+            .build();
+
+          type Row = ResultType<typeof plan>;
+          const rows: Row[] = [];
+          for await (const row of runtime.execute(plan)) {
+            rows.push(row);
+          }
+
+          expect(rows.length).toBe(3);
+          // Runtime returns flat rows with flattened aliases
+          expect(rows[0]).toHaveProperty('name');
+          expect(rows[0]).toHaveProperty('post_title');
+          expect(rows[0]).not.toHaveProperty('post');
+
+          // Verify types at runtime
+          expect(typeof rows[0]!.name).toBe('string');
+          expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('number');
+
+          // Verify type inference: Row should have nested structure
+          expectTypeOf<Row>().toExtend<{
+            name: string;
+            post: { title: number };
+          }>();
+          expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
+          expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
+
+          // Verify values match expected nested structure
+          const flatRow0 = rows[0] as Record<string, unknown>;
+          expect(flatRow0['name']).toBe('ada@example.com');
+          expect(flatRow0['post_title']).toBe(1);
+          // Reconstruct nested structure from flat values
+          expect({ name: flatRow0['name'], post: { title: flatRow0['post_title'] } }).toEqual({
+            name: 'ada@example.com',
+            post: { title: 1 },
+          });
+
+          // Verify plan meta has flattened aliases
+          expect(plan.meta.projection).toEqual({
+            name: 'user.email',
+            post_title: 'user.id',
+          });
+
+          expect(plan.meta.projectionTypes).toEqual({
+            name: 'pg/text@1',
+            post_title: 'pg/int4@1',
+          });
+
+          await runtime.close();
+        } finally {
+          await client.end();
+        }
+      },
+      { acceleratePort: 54080, databasePort: 54081, shadowDatabasePort: 54082 },
+    );
+  });
+
+  it('multi-level nested projection returns flat rows with correct aliases', async () => {
+    const outputDir = resolve(__dirname, '../.tmp-output');
+    await execFileAsync('node', [
+      cliPath,
+      'emit',
+      '--contract',
+      contractTsPath,
+      '--out',
+      outputDir,
+      '--adapter',
+      adapterPath,
+    ]);
+
+    const contractJsonPath = join(outputDir, 'contract.json');
+    const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    const contract = validateContract<Contract>(contractJson);
+
+    await withDevDatabase(
+      async ({ connectionString }) => {
+        const client = new Client({ connectionString });
+        await client.connect();
+        try {
+          await client.query('drop schema if exists prisma_contract cascade');
+          await client.query('create schema if not exists public');
+          await client.query('drop table if exists "user"');
+          await client.query('create table "user" (id serial primary key, email text not null)');
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
+
+          await executeStatement(client, ensureSchemaStatement);
+          await executeStatement(client, ensureTableStatement);
+          const write = writeContractMarker({
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+            contractJson: contract,
+            canonicalVersion: 1,
+          });
+          await executeStatement(client, write.insert);
+
+          const adapter = createPostgresAdapter();
+          const driver = createPostgresDriverFromOptions({
+            connect: { client },
+            cursor: { disabled: true },
+          });
+          const runtime = createRuntime({
+            contract,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          });
+
+          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const user = tables['user']!;
+          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            .from(user)
+            .select({
+              a: {
+                b: {
+                  c: user.columns['id']!,
+                },
+              },
+            })
+            .build();
+
+          type Row = ResultType<typeof plan>;
+          const rows: Row[] = [];
+          for await (const row of runtime.execute(plan)) {
+            rows.push(row);
+          }
+
+          expect(rows.length).toBe(2);
+          // Runtime returns flat rows with flattened aliases
+          expect(rows[0]).toHaveProperty('a_b_c');
+          expect(rows[0]).not.toHaveProperty('a');
+
+          // Verify types at runtime
+          expect(typeof (rows[0] as Record<string, unknown>)['a_b_c']).toBe('number');
+
+          // Verify type inference: Row should have nested structure
+          expectTypeOf<Row>().toExtend<{
+            a: { b: { c: number } };
+          }>();
+          expectTypeOf<Row['a']>().toEqualTypeOf<{ b: { c: number } }>();
+          expectTypeOf<Row['a']['b']>().toEqualTypeOf<{ c: number }>();
+          expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
+
+          // Verify values match expected nested structure
+          const flatRow0 = rows[0] as Record<string, unknown>;
+          expect(flatRow0['a_b_c']).toBe(1);
+          // Reconstruct nested structure from flat values
+          expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
+            a: { b: { c: 1 } },
+          });
+
+          const flatRow1 = rows[1] as Record<string, unknown>;
+          expect(flatRow1['a_b_c']).toBe(2);
+          expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
+            a: { b: { c: 2 } },
+          });
+
+          // Verify plan meta has flattened aliases
+          expect(plan.meta.projection).toEqual({
+            a_b_c: 'user.id',
+          });
+
+          await runtime.close();
+        } finally {
+          await client.end();
+        }
+      },
+      { acceleratePort: 54090, databasePort: 54091, shadowDatabasePort: 54092 },
+    );
+  });
+
+  it('nested projection with joins returns flat rows with correct aliases', async () => {
+    const outputDir = resolve(__dirname, '../.tmp-output');
+    await execFileAsync('node', [
+      cliPath,
+      'emit',
+      '--contract',
+      contractTsPath,
+      '--out',
+      outputDir,
+      '--adapter',
+      adapterPath,
+    ]);
+
+    const contractJsonPath = join(outputDir, 'contract.json');
+    const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    const contract = validateContract<Contract>(contractJson);
+
+    await withDevDatabase(
+      async ({ connectionString }) => {
+        const client = new Client({ connectionString });
+        await client.connect();
+        try {
+          await client.query('drop schema if exists prisma_contract cascade');
+          await client.query('create schema if not exists public');
+          await client.query('drop table if exists "post"');
+          await client.query('drop table if exists "user"');
+          await client.query('create table "user" (id serial primary key, email text not null)');
+          await client.query(
+            'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+          );
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
+          await client.query('insert into "post" ("userId", title) values ($1, $2), ($1, $3)', [
+            1,
+            'First Post',
+            'Second Post',
+          ]);
+
+          await executeStatement(client, ensureSchemaStatement);
+          await executeStatement(client, ensureTableStatement);
+          const write = writeContractMarker({
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+            contractJson: contract,
+            canonicalVersion: 1,
+          });
+          await executeStatement(client, write.insert);
+
+          const adapter = createPostgresAdapter();
+          const driver = createPostgresDriverFromOptions({
+            connect: { client },
+            cursor: { disabled: true },
+          });
+          const runtime = createRuntime({
+            contract,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          });
+
+          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const user = tables['user']!;
+          const post = tables['post']!;
+          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            .from(user)
+            .innerJoin(post, (on) => on.eqCol(user.columns['id']!, post.columns['userId']!))
+            .select({
+              name: user.columns['email']!,
+              post: {
+                title: post.columns['title']!,
+                id: post.columns['id']!,
+              },
+            })
+            .build();
+
+          type Row = ResultType<typeof plan>;
+          const rows: Row[] = [];
+          for await (const row of runtime.execute(plan)) {
+            rows.push(row);
+          }
+
+          expect(rows.length).toBe(2);
+          // Runtime returns flat rows with flattened aliases
+          expect(rows[0]).toHaveProperty('name');
+          expect(rows[0]).toHaveProperty('post_title');
+          expect(rows[0]).toHaveProperty('post_id');
+          expect(rows[0]).not.toHaveProperty('post');
+
+          // Verify types at runtime
+          expect(typeof rows[0]!.name).toBe('string');
+          expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
+          expect(typeof (rows[0] as Record<string, unknown>)['post_id']).toBe('number');
+
+          // Verify type inference: Row should have nested structure
+          expectTypeOf<Row>().toExtend<{
+            name: string;
+            post: { title: string; id: number };
+          }>();
+          expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['post']>().toEqualTypeOf<{ title: string; id: number }>();
+          expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
+
+          // Verify values match expected nested structure
+          const flatRow0 = rows[0] as Record<string, unknown>;
+          expect(flatRow0['name']).toBe('ada@example.com');
+          expect(flatRow0['post_title']).toBe('First Post');
+          expect(flatRow0['post_id']).toBe(1);
+          // Reconstruct nested structure from flat values
+          expect({
+            name: flatRow0['name'],
+            post: { title: flatRow0['post_title'], id: flatRow0['post_id'] },
+          }).toEqual({
+            name: 'ada@example.com',
+            post: { title: 'First Post', id: 1 },
+          });
+
+          // Verify plan meta has flattened aliases
+          expect(plan.meta.projection).toEqual({
+            name: 'user.email',
+            post_title: 'post.title',
+            post_id: 'post.id',
+          });
+
+          expect(plan.meta.refs?.tables).toContain('user');
+          expect(plan.meta.refs?.tables).toContain('post');
+
+          await runtime.close();
+        } finally {
+          await client.end();
+        }
+      },
+      { acceleratePort: 54100, databasePort: 54101, shadowDatabasePort: 54102 },
+    );
+  });
+
+  it('mixed leaves and nested objects in projection returns flat rows', async () => {
+    const outputDir = resolve(__dirname, '../.tmp-output');
+    await execFileAsync('node', [
+      cliPath,
+      'emit',
+      '--contract',
+      contractTsPath,
+      '--out',
+      outputDir,
+      '--adapter',
+      adapterPath,
+    ]);
+
+    const contractJsonPath = join(outputDir, 'contract.json');
+    const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    const contract = validateContract<Contract>(contractJson);
+
+    await withDevDatabase(
+      async ({ connectionString }) => {
+        const client = new Client({ connectionString });
+        await client.connect();
+        try {
+          await client.query('drop schema if exists prisma_contract cascade');
+          await client.query('create schema if not exists public');
+          await client.query('drop table if exists "user"');
+          await client.query('create table "user" (id serial primary key, email text not null)');
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
+
+          await executeStatement(client, ensureSchemaStatement);
+          await executeStatement(client, ensureTableStatement);
+          const write = writeContractMarker({
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+            contractJson: contract,
+            canonicalVersion: 1,
+          });
+          await executeStatement(client, write.insert);
+
+          const adapter = createPostgresAdapter();
+          const driver = createPostgresDriverFromOptions({
+            connect: { client },
+            cursor: { disabled: true },
+          });
+          const runtime = createRuntime({
+            contract,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          });
+
+          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const user = tables['user']!;
+          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            .from(user)
+            .select({
+              id: user.columns['id']!,
+              post: {
+                title: user.columns['email']!,
+                author: {
+                  name: user.columns['id']!,
+                },
+              },
+              email: user.columns['email']!,
+            })
+            .build();
+
+          type Row = ResultType<typeof plan>;
+          const rows: Row[] = [];
+          for await (const row of runtime.execute(plan)) {
+            rows.push(row);
+          }
+
+          expect(rows.length).toBe(2);
+          // Runtime returns flat rows with flattened aliases
+          expect(rows[0]).toHaveProperty('id');
+          expect(rows[0]).toHaveProperty('post_title');
+          expect(rows[0]).toHaveProperty('post_author_name');
+          expect(rows[0]).toHaveProperty('email');
+          expect(rows[0]).not.toHaveProperty('post');
+
+          // Verify types at runtime
+          expect(typeof rows[0]!.id).toBe('number');
+          expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
+          expect(typeof (rows[0] as Record<string, unknown>)['post_author_name']).toBe('number');
+          expect(typeof rows[0]!.email).toBe('string');
+
+          // Verify type inference: Row should have nested structure
+          expectTypeOf<Row>().toExtend<{
+            id: number;
+            post: { title: string; author: { name: number } };
+            email: string;
+          }>();
+          expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+          expectTypeOf<Row['post']>().toEqualTypeOf<{ title: string; author: { name: number } }>();
+          expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['post']['author']>().toEqualTypeOf<{ name: number }>();
+          expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
+          expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+          // Verify values match expected nested structure
+          const flatRow0 = rows[0] as Record<string, unknown>;
+          expect(flatRow0['id']).toBe(1);
+          expect(flatRow0['post_title']).toBe('ada@example.com');
+          expect(flatRow0['post_author_name']).toBe(1);
+          expect(flatRow0['email']).toBe('ada@example.com');
+          // Reconstruct nested structure from flat values
+          expect({
+            id: flatRow0['id'],
+            post: {
+              title: flatRow0['post_title'],
+              author: { name: flatRow0['post_author_name'] },
+            },
+            email: flatRow0['email'],
+          }).toEqual({
+            id: 1,
+            post: { title: 'ada@example.com', author: { name: 1 } },
+            email: 'ada@example.com',
+          });
+
+          // Verify plan meta has flattened aliases
+          expect(plan.meta.projection).toEqual({
+            id: 'user.id',
+            post_title: 'user.email',
+            post_author_name: 'user.id',
+            email: 'user.email',
+          });
+
+          await runtime.close();
+        } finally {
+          await client.end();
+        }
+      },
+      { acceleratePort: 54110, databasePort: 54111, shadowDatabasePort: 54112 },
     );
   });
 });

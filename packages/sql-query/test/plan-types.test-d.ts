@@ -524,3 +524,201 @@ test('result typing is derived solely from projection, unaffected by joins', () 
   // Verify plan structure
   expectTypeOf(_plan).toExtend<Plan<Row>>();
 });
+
+test('nested projection infers nested Row type', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const tables = schema<Contract, CodecTypes>(contract).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = userTable.columns;
+
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
+    .from(userTable)
+    .select({
+      name: userColumns['email']!,
+      post: {
+        title: userColumns['id']!,
+      },
+    })
+    .build();
+
+  type Row = ResultType<typeof _plan>;
+
+  // Row type should have nested structure
+  expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
+
+  // Verify the overall structure
+  expectTypeOf<Row>().toExtend<{
+    name: string;
+    post: { title: number };
+  }>();
+
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
+});
+
+test('multi-level nested projection infers deeply nested Row type', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const tables = schema<Contract, CodecTypes>(contract).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = userTable.columns;
+
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
+    .from(userTable)
+    .select({
+      a: {
+        b: {
+          c: userColumns['id']!,
+        },
+      },
+    })
+    .build();
+
+  type Row = ResultType<typeof _plan>;
+
+  // Row type should have deeply nested structure
+  expectTypeOf<Row['a']>().toEqualTypeOf<{ b: { c: number } }>();
+  expectTypeOf<Row['a']['b']>().toEqualTypeOf<{ c: number }>();
+  expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
+
+  // Verify the overall structure
+  expectTypeOf<Row>().toExtend<{
+    a: { b: { c: number } };
+  }>();
+
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
+});
+
+test('mixed leaves and nested objects in projection', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const tables = schema<Contract, CodecTypes>(contract).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = userTable.columns;
+
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
+    .from(userTable)
+    .select({
+      id: userColumns['id']!,
+      post: {
+        title: userColumns['email']!,
+        author: {
+          name: userColumns['id']!,
+        },
+      },
+      email: userColumns['email']!,
+    })
+    .build();
+
+  type Row = ResultType<typeof _plan>;
+
+  // Row type should have mixed structure
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['post']>().toEqualTypeOf<{ title: string; author: { name: number } }>();
+  expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['post']['author']>().toEqualTypeOf<{ name: number }>();
+  expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+  // Verify the overall structure
+  expectTypeOf<Row>().toExtend<{
+    id: number;
+    post: { title: string; author: { name: number } };
+    email: string;
+  }>();
+
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
+});
+
+test('nested projection with joins infers nested Row type', () => {
+  // Define a fully-typed contract type for this test
+  type ContractWithPosts = SqlContract<
+    {
+      readonly tables: {
+        readonly user: {
+          readonly columns: {
+            readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+            readonly email: { readonly type: 'pg/text@1'; nullable: false };
+          };
+        };
+        readonly post: {
+          readonly columns: {
+            readonly id: { readonly type: 'pg/int4@1'; nullable: false };
+            readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
+            readonly title: { readonly type: 'pg/text@1'; nullable: false };
+          };
+        };
+      };
+    },
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >;
+
+  const contractWithPosts = validateContract<ContractWithPosts>({
+    target: 'postgres',
+    targetFamily: 'sql' as const,
+    coreHash: 'sha256:test-core',
+    profileHash: 'sha256:test-profile',
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { type: 'pg/int4@1', nullable: false },
+            email: { type: 'pg/text@1', nullable: false },
+          },
+        },
+        post: {
+          columns: {
+            id: { type: 'pg/int4@1', nullable: false },
+            userId: { type: 'pg/int4@1', nullable: false },
+            title: { type: 'pg/text@1', nullable: false },
+          },
+        },
+      },
+    },
+    models: {},
+    relations: {},
+    mappings: {},
+  });
+
+  const adapter = createPostgresAdapter();
+  const tables = schema<ContractWithPosts, PgCodecTypes>(contractWithPosts).tables;
+  const userTable = tables['user'];
+  const postTable = tables['post'];
+  if (!userTable || !postTable) throw new Error('tables not found');
+  const userColumns = userTable.columns;
+  const postColumns = postTable.columns;
+
+  const _plan = sql<ContractWithPosts, PgCodecTypes>({ contract: contractWithPosts, adapter })
+    .from(userTable)
+    .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
+    .select({
+      name: userColumns['email']!,
+      post: {
+        title: postColumns['title']!,
+        id: postColumns['id']!,
+      },
+    })
+    .build();
+
+  type Row = ResultType<typeof _plan>;
+
+  // Row type should have nested structure with joined columns
+  expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['post']>().toEqualTypeOf<{ title: string; id: number }>();
+  expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
+
+  // Verify the overall structure
+  expectTypeOf<Row>().toExtend<{
+    name: string;
+    post: { title: string; id: number };
+  }>();
+
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
+});

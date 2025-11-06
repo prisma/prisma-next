@@ -7,10 +7,11 @@ import type {
   ColumnBuilder,
   ColumnRef,
   Direction,
-  InferProjectionRow,
+  InferNestedProjectionRow,
   JoinOnBuilder,
   JoinOnPredicate,
   LoweredStatement,
+  NestedProjection,
   ParamDescriptor,
   Plan,
   PlanMeta,
@@ -38,6 +39,39 @@ interface BuilderState {
 interface ProjectionState {
   readonly aliases: string[];
   readonly columns: ColumnBuilder[];
+}
+
+function generateAlias(path: string[]): string {
+  if (path.length === 0) {
+    throw planInvalid('Alias path cannot be empty');
+  }
+  return path.join('_');
+}
+
+class AliasTracker {
+  private readonly aliases = new Set<string>();
+  private readonly aliasToPath = new Map<string, string[]>();
+
+  register(path: string[]): string {
+    const alias = generateAlias(path);
+    if (this.aliases.has(alias)) {
+      const existingPath = this.aliasToPath.get(alias);
+      throw planInvalid(
+        `Alias collision: path ${path.join('.')} would generate alias "${alias}" which conflicts with path ${existingPath?.join('.') ?? 'unknown'}`,
+      );
+    }
+    this.aliases.add(alias);
+    this.aliasToPath.set(alias, path);
+    return alias;
+  }
+
+  getPath(alias: string): string[] | undefined {
+    return this.aliasToPath.get(alias);
+  }
+
+  has(alias: string): boolean {
+    return this.aliases.has(alias);
+  }
 }
 
 class JoinOnBuilderImpl implements JoinOnBuilder {
@@ -175,13 +209,18 @@ class SelectBuilderImpl<
     );
   }
 
-  select<P extends Record<string, ColumnBuilder>>(
+  select<
+    P extends Record<
+      string,
+      ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+    >,
+  >(
     projection: P,
-  ): SelectBuilderImpl<TContract, InferProjectionRow<P>, CodecTypes> {
+  ): SelectBuilderImpl<TContract, InferNestedProjectionRow<P, CodecTypes>, CodecTypes> {
     const table = this.ensureFrom();
     const projectionState = buildProjectionState(table, projection);
 
-    return new SelectBuilderImpl<TContract, InferProjectionRow<P>, CodecTypes>(
+    return new SelectBuilderImpl<TContract, InferNestedProjectionRow<P, CodecTypes>, CodecTypes>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -400,20 +439,62 @@ class SelectBuilderImpl<
   }
 }
 
-function buildProjectionState(
-  _table: TableRef,
-  projection: Record<string, ColumnBuilder>,
-): ProjectionState {
+
+function isColumnBuilder(value: unknown): value is ColumnBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'column'
+  );
+}
+
+function flattenProjection(
+  projection: Record<
+    string,
+    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+  >,
+  tracker: AliasTracker,
+  currentPath: string[] = [],
+): { aliases: string[]; columns: ColumnBuilder[] } {
   const aliases: string[] = [];
   const columns: ColumnBuilder[] = [];
 
-  for (const [alias, column] of Object.entries(projection)) {
-    if (!column || column.kind !== 'column') {
-      throw planInvalid(`Invalid column projection for alias ${alias}`);
+  for (const [key, value] of Object.entries(projection)) {
+    const path = [...currentPath, key];
+
+    if (isColumnBuilder(value)) {
+      const alias = tracker.register(path);
+      aliases.push(alias);
+      columns.push(value);
+    } else if (typeof value === 'object' && value !== null) {
+      const nested = flattenProjection(
+        value as Record<
+          string,
+          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+        >,
+        tracker,
+        path,
+      );
+      aliases.push(...nested.aliases);
+      columns.push(...nested.columns);
+    } else {
+      throw planInvalid(`Invalid projection value at path ${path.join('.')}: expected ColumnBuilder or nested object`);
     }
-    aliases.push(alias);
-    columns.push(column);
   }
+
+  return { aliases, columns };
+}
+
+function buildProjectionState(
+  _table: TableRef,
+  projection: Record<
+    string,
+    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+  >,
+): ProjectionState {
+  const tracker = new AliasTracker();
+  const { aliases, columns } = flattenProjection(projection, tracker);
 
   if (aliases.length === 0) {
     throw planInvalid('select() requires at least one column');

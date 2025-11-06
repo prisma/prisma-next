@@ -125,9 +125,9 @@ describe('sql DSL builder', () => {
       codecTypes: {} as CodecTypes,
     }).from(tables.user);
 
-    // Invalid: passing something that's not a ColumnBuilder
-    expect(() => builder.select({ invalid: {} as unknown as ColumnBuilder })).toThrowError(
-      /Invalid column projection/,
+    // Invalid: passing something that's not a ColumnBuilder or nested object
+    expect(() => builder.select({ invalid: null as unknown as ColumnBuilder })).toThrowError(
+      /Invalid projection value/,
     );
   });
 
@@ -256,6 +256,140 @@ describe('sql DSL builder', () => {
       expect(plan.meta.annotations?.codecs).toEqual({
         id: 'pg/int4@1',
         email: 'pg/text@1',
+      });
+    });
+  });
+
+  describe('nested projections', () => {
+    it('flattens single-level nested projection', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+        .from(tables.user)
+        .select({
+          name: userColumns.email,
+          post: {
+            title: userColumns.id,
+          },
+        })
+        .build();
+
+      expect(plan.ast?.project).toEqual([
+        { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
+        { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'id' } },
+      ]);
+
+      expect(plan.meta.projection).toEqual({
+        name: 'user.email',
+        post_title: 'user.id',
+      });
+    });
+
+    it('flattens multi-level nested projection', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+        .from(tables.user)
+        .select({
+          a: {
+            b: {
+              c: userColumns.id,
+            },
+          },
+        })
+        .build();
+
+      expect(plan.ast?.project).toEqual([
+        { alias: 'a_b_c', expr: { kind: 'col', table: 'user', column: 'id' } },
+      ]);
+
+      expect(plan.meta.projection).toEqual({
+        a_b_c: 'user.id',
+      });
+    });
+
+    it('handles mixed leaves and nested objects', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          post: {
+            title: userColumns.email,
+            author: {
+              name: userColumns.id,
+            },
+          },
+          email: userColumns.email,
+        })
+        .build();
+
+      expect(plan.ast?.project).toEqual([
+        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'email' } },
+        { alias: 'post_author_name', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'email', expr: { kind: 'col', table: 'user', column: 'email' } },
+      ]);
+
+      expect(plan.meta.projection).toEqual({
+        id: 'user.id',
+        post_title: 'user.email',
+        post_author_name: 'user.id',
+        email: 'user.email',
+      });
+    });
+
+    it('throws PLAN.INVALID on alias collision', () => {
+      const userColumns = tables.user.columns;
+
+      const builder = sql<Contract, CodecTypes>({ contract, adapter }).from(tables.user);
+
+      expect(() =>
+        builder.select({
+          a_b: userColumns.id,
+          a: {
+            b: userColumns.email,
+          },
+        }),
+      ).toThrowError(/Alias collision/);
+    });
+
+    it('includes projectionTypes for nested projections', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+        .from(tables.user)
+        .select({
+          name: userColumns.email,
+          post: {
+            title: userColumns.id,
+          },
+        })
+        .build();
+
+      expect(plan.meta.projectionTypes).toEqual({
+        name: 'pg/text@1',
+        post_title: 'pg/int4@1',
+      });
+    });
+
+    it('includes codec annotations for nested projections', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+        .from(tables.user)
+        .select({
+          name: userColumns.email,
+          post: {
+            title: userColumns.id,
+          },
+        })
+        .build();
+
+      expect(plan.meta.annotations?.codecs).toEqual({
+        name: 'pg/text@1',
+        post_title: 'pg/int4@1',
       });
     });
   });
