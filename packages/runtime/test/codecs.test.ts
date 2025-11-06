@@ -488,6 +488,154 @@ describe('Row Decoding', () => {
     expect(decoded['id']).toBe(42);
     expect(decoded['email']).toBe('test@example.com');
   });
+
+  it('parses JSON array from include alias', () => {
+    const registry = createRegistry();
+    const plan: Plan = {
+      sql: 'SELECT * FROM test',
+      params: [],
+      meta: {
+        projection: {
+          id: 'test.id',
+          posts: 'include:posts',
+        },
+        refs: {
+          tables: ['test'],
+          columns: [{ table: 'test', column: 'id' }],
+        },
+      },
+      ast: {
+        kind: 'select',
+        from: { kind: 'table', name: 'test' },
+        project: [],
+      },
+      contract: validateContract<SqlContract<SqlStorage>>({
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        profileHash: 'sha256:test',
+        storage: { tables: {} },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    };
+    const row = { id: 42, posts: '[{"id":1,"title":"Post 1"},{"id":2,"title":"Post 2"}]' };
+    const decoded = decodeRow(row, plan, registry);
+    expect(decoded['id']).toBe(42);
+    expect(Array.isArray(decoded['posts'])).toBe(true);
+    expect(decoded['posts']).toEqual([{ id: 1, title: 'Post 1' }, { id: 2, title: 'Post 2' }]);
+  });
+
+  it('handles null include alias as empty array', () => {
+    const registry = createRegistry();
+    const plan: Plan = {
+      sql: 'SELECT * FROM test',
+      params: [],
+      meta: {
+        projection: {
+          id: 'test.id',
+          posts: 'include:posts',
+        },
+        refs: {
+          tables: ['test'],
+          columns: [{ table: 'test', column: 'id' }],
+        },
+      },
+      ast: {
+        kind: 'select',
+        from: { kind: 'table', name: 'test' },
+        project: [],
+      },
+      contract: validateContract<SqlContract<SqlStorage>>({
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        profileHash: 'sha256:test',
+        storage: { tables: {} },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    };
+    const row = { id: 42, posts: null };
+    const decoded = decodeRow(row, plan, registry);
+    expect(decoded['id']).toBe(42);
+    expect(decoded['posts']).toEqual([]);
+  });
+
+  it('handles already-parsed array from driver', () => {
+    const registry = createRegistry();
+    const plan: Plan = {
+      sql: 'SELECT * FROM test',
+      params: [],
+      meta: {
+        projection: {
+          id: 'test.id',
+          posts: 'include:posts',
+        },
+        refs: {
+          tables: ['test'],
+          columns: [{ table: 'test', column: 'id' }],
+        },
+      },
+      ast: {
+        kind: 'select',
+        from: { kind: 'table', name: 'test' },
+        project: [],
+      },
+      contract: validateContract<SqlContract<SqlStorage>>({
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        profileHash: 'sha256:test',
+        storage: { tables: {} },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    };
+    const row = { id: 42, posts: [{ id: 1, title: 'Post 1' }] };
+    const decoded = decodeRow(row, plan, registry);
+    expect(decoded['id']).toBe(42);
+    expect(Array.isArray(decoded['posts'])).toBe(true);
+    expect(decoded['posts']).toEqual([{ id: 1, title: 'Post 1' }]);
+  });
+
+  it('throws error for invalid JSON in include alias', () => {
+    const registry = createRegistry();
+    const plan: Plan = {
+      sql: 'SELECT * FROM test',
+      params: [],
+      meta: {
+        projection: {
+          id: 'test.id',
+          posts: 'include:posts',
+        },
+        refs: {
+          tables: ['test'],
+          columns: [{ table: 'test', column: 'id' }],
+        },
+      },
+      ast: {
+        kind: 'select',
+        from: { kind: 'table', name: 'test' },
+        project: [],
+      },
+      contract: validateContract<SqlContract<SqlStorage>>({
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        profileHash: 'sha256:test',
+        storage: { tables: {} },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    };
+    const row = { id: 42, posts: 'invalid json' };
+    expect(() => decodeRow(row, plan, registry)).toThrow();
+  });
 });
 
 describe('Param Encoding Error Handling', () => {

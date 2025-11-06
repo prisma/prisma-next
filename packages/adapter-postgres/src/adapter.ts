@@ -56,6 +56,7 @@ function renderSelect(ast: SelectAst): string {
   const fromClause = `FROM ${quoteIdentifier(ast.from.name)}`;
 
   const joinsClause = ast.joins?.length ? ast.joins.map((join) => renderJoin(join)).join(' ') : '';
+  const includesClause = ast.includes?.length ? ast.includes.map((include) => renderInclude(include)).join(' ') : '';
 
   const whereClause = ast.where ? ` WHERE ${renderBinary(ast.where)}` : '';
   const orderClause = ast.orderBy?.length
@@ -65,12 +66,17 @@ function renderSelect(ast: SelectAst): string {
     : '';
   const limitClause = typeof ast.limit === 'number' ? ` LIMIT ${ast.limit}` : '';
 
-  return `${selectClause} ${fromClause}${joinsClause ? ` ${joinsClause}` : ''}${whereClause}${orderClause}${limitClause}`.trim();
+  const clauses = [joinsClause, includesClause].filter(Boolean).join(' ');
+  return `${selectClause} ${fromClause}${clauses ? ` ${clauses}` : ''}${whereClause}${orderClause}${limitClause}`.trim();
 }
 
 function renderProjection(ast: SelectAst): string {
   return ast.project
     .map((item) => {
+      if (item.expr.kind === 'includeRef') {
+        // For include references, just reference the alias from the LATERAL join
+        return `${quoteIdentifier(item.expr.alias)} AS ${quoteIdentifier(item.alias)}`;
+      }
       const column = renderColumn(item.expr);
       const alias = quoteIdentifier(item.alias);
       return `${column} AS ${alias}`;
@@ -106,6 +112,46 @@ function renderJoinOn(on: JoinAst['on']): string {
     return `${left} = ${right}`;
   }
   throw new Error(`Unsupported join ON expression kind: ${on.kind}`);
+}
+
+function renderInclude(include: NonNullable<SelectAst['includes']>[number]): string {
+  const alias = quoteIdentifier(include.alias);
+
+  // Build the lateral subquery
+  const childProjection = include.child.project
+    .map((item: { alias: string; expr: ColumnRef }) => {
+      const column = renderColumn(item.expr);
+      return `'${item.alias}', ${column}`;
+    })
+    .join(', ');
+
+  const jsonBuildObject = `json_build_object(${childProjection})`;
+
+  // Build the ON condition from the include's ON clause - this goes in the WHERE clause
+  const onCondition = renderJoinOn(include.child.on);
+
+  // Build WHERE clause: combine ON condition with any additional WHERE clauses
+  let whereClause = ` WHERE ${onCondition}`;
+  if (include.child.where) {
+    whereClause += ` AND ${renderBinary(include.child.where)}`;
+  }
+
+  // Add ORDER BY if present
+  const childOrderBy = include.child.orderBy?.length
+    ? ` ORDER BY ${include.child.orderBy
+        .map((order: { expr: ColumnRef; dir: string }) => `${renderColumn(order.expr)} ${order.dir.toUpperCase()}`)
+        .join(', ')}`
+    : '';
+
+  // Add LIMIT if present
+  const childLimit = typeof include.child.limit === 'number' ? ` LIMIT ${include.child.limit}` : '';
+
+  // Build the lateral subquery
+  const childTable = quoteIdentifier(include.child.table.name);
+  const subquery = `(SELECT json_agg(${jsonBuildObject}) FROM ${childTable}${whereClause}${childOrderBy}${childLimit})`;
+
+  // Return the LATERAL join with ON true (the condition is in the WHERE clause)
+  return `LEFT JOIN LATERAL ${subquery} AS ${alias} ON true`;
 }
 
 function quoteIdentifier(identifier: string): string {

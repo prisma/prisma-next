@@ -114,11 +114,30 @@ export interface JoinAst {
   readonly on: JoinOnExpr;
 }
 
+export interface IncludeRef {
+  readonly kind: 'includeRef';
+  readonly alias: string;
+}
+
+export interface IncludeAst {
+  readonly kind: 'includeMany';
+  readonly alias: string;
+  readonly child: {
+    readonly table: TableRef;
+    readonly on: JoinOnExpr;
+    readonly where?: BinaryExpr;
+    readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
+    readonly limit?: number;
+    readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
+  };
+}
+
 export interface SelectAst {
   readonly kind: 'select';
   readonly from: TableRef;
   readonly joins?: ReadonlyArray<JoinAst>;
-  readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
+  readonly includes?: ReadonlyArray<IncludeAst>;
+  readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef }>;
   readonly where?: BinaryExpr;
   readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
   readonly limit?: number;
@@ -221,20 +240,42 @@ export type NestedProjection = Record<string, ColumnBuilder | Record<string, Col
 
 /**
  * Infers Row type from a nested projection object.
- * Recursively maps Record<string, ColumnBuilder | NestedProjection> to nested object types.
+ * Recursively maps Record<string, ColumnBuilder | boolean | NestedProjection> to nested object types.
  *
  * Extracts the pre-computed JsType from each ColumnBuilder at leaves.
+ * When a value is `true`, it represents an include reference and infers `Array<unknown>`.
+ * TODO: Improve to infer `Array<ChildShape>` by tracking includes at the type level.
  */
 export type InferNestedProjectionRow<
-  P extends Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>,
+  P extends Record<string, ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > = {
   [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
     ? JsType
-    : P[K] extends Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>
-      ? InferNestedProjectionRow<P[K], CodecTypes>
-      : never;
+    : P[K] extends true
+      ? Array<unknown> // Include reference - infers array type
+      : P[K] extends Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>
+        ? InferNestedProjectionRow<P[K], CodecTypes>
+        : never;
 };
+
+/**
+ * Utility type to check if a contract has the required capabilities for includeMany.
+ * Requires both `lateral` and `jsonAgg` to be `true` in the contract's capabilities for the target.
+ * Capabilities are nested by target: `{ [target]: { lateral: true, jsonAgg: true } }`
+ */
+export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>> =
+  TContract extends { capabilities: infer C; target: infer T }
+    ? T extends string
+      ? C extends Record<string, Record<string, boolean>>
+        ? C extends { [K in T]: infer TargetCaps }
+          ? TargetCaps extends { lateral: true; jsonAgg: true }
+            ? true
+            : false
+          : false
+        : false
+      : false
+    : false;
 
 /**
  * Utility type to extract the Row type from a Plan.
