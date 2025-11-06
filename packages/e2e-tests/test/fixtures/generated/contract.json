@@ -2,9 +2,41 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:5e7ba339f42f042ef00879aaa63bb4b5a1a5bae96c03e406dedd084d8036de0a",
+  "coreHash": "sha256:4768be240743140e08d53bd1e8ae733cfc6adc6e8607a305320bd1ea45222bfe",
   "profileHash": "sha256:28ccf0c9c2899807cc8791c378d6bd821b9d3d3996443984949d4f6ce2b3728d",
   "models": {
+    "Comment": {
+      "fields": {
+        "content": {
+          "column": "content"
+        },
+        "id": {
+          "column": "id"
+        },
+        "postId": {
+          "column": "postId"
+        }
+      },
+      "storage": {
+        "table": "comment"
+      }
+    },
+    "Post": {
+      "fields": {
+        "id": {
+          "column": "id"
+        },
+        "title": {
+          "column": "title"
+        },
+        "userId": {
+          "column": "userId"
+        }
+      },
+      "storage": {
+        "table": "post"
+      }
+    },
     "User": {
       "fields": {
         "email": {
@@ -21,6 +53,42 @@
   },
   "storage": {
     "tables": {
+      "comment": {
+        "columns": {
+          "content": {
+            "type": "pg/text@1"
+          },
+          "id": {
+            "type": "pg/int4@1"
+          },
+          "postId": {
+            "type": "pg/int4@1"
+          }
+        },
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "post": {
+        "columns": {
+          "id": {
+            "type": "pg/int4@1"
+          },
+          "title": {
+            "type": "pg/text@1"
+          },
+          "userId": {
+            "type": "pg/int4@1"
+          }
+        },
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        }
+      },
       "user": {
         "columns": {
           "email": {
