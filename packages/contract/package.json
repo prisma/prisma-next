@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "eslint . --config ../../eslint.config.mjs --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage"
+    "lint": "eslint . --config ../../eslint.config.mjs --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage --max-warnings 0"
   },
   "devDependencies": {
     "tsup": "^8.3.0",
