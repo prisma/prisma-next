@@ -369,9 +369,14 @@ describe('Row Decoding', () => {
     };
     const row = { id: 'test-value' };
 
-    expect(() => {
+    try {
       decodeRow(row, plan, testRegistry);
-    }).toThrow('RUNTIME.DECODE_FAILED');
+      expect.fail('Expected decodeRow to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      const runtimeError = error as Error & { code: string };
+      expect(runtimeError.code).toBe('RUNTIME.DECODE_FAILED');
+    }
   });
 
   it('handles decode error with error details', () => {

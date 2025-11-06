@@ -257,11 +257,14 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       adapter: createPostgresAdapter(),
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: false },
+      mode: 'permissive',
       plugins: [
         budgets({
           maxRows: 10_000,
-          maxLatencyMs: 0,
-          latencySeverity: 'warn',
+          maxLatencyMs: -1,
+          severities: {
+            latency: 'warn',
+          },
         }),
       ],
       log: {
@@ -303,8 +306,10 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       plugins: [
         budgets({
           maxRows: 10_000,
-          maxLatencyMs: 0,
-          latencySeverity: 'error',
+          maxLatencyMs: -1,
+          severities: {
+            latency: 'error',
+          },
         }),
       ],
     });
@@ -336,11 +341,14 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       adapter: createPostgresAdapter(),
       driver: sharedDriver,
       verify: { mode: 'onFirstUse', requireMarker: false },
+      mode: 'permissive',
       plugins: [
         budgets({
           maxRows: 10_000,
-          maxLatencyMs: 0,
-          latencySeverity: 'error',
+          maxLatencyMs: -1,
+          severities: {
+            latency: 'error',
+          },
         }),
       ],
       log: {
@@ -384,7 +392,9 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
         budgets({
           maxRows: 10_000,
           maxLatencyMs: 100_000,
-          latencySeverity: 'warn',
+          severities: {
+            latency: 'warn',
+          },
         }),
       ],
       log: {

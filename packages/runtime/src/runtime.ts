@@ -35,6 +35,7 @@ export interface RuntimeOptions<
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
+  readonly log?: import('./plugins/types').Log;
 }
 
 export interface Runtime {
@@ -98,7 +99,7 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
       driver: this.driver,
       mode: this.mode,
       now: () => Date.now(),
-      log: {
+      log: options.log ?? {
         info: (_event) => {
           // No-op in MVP - diagnostics stay out of runtime core
         },
