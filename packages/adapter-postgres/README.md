@@ -76,7 +76,8 @@ flowchart TD
 - Lowers SQL ASTs to PostgreSQL SQL
 - Renders joins (INNER, LEFT, RIGHT, FULL) with ON conditions
 - Renders `includeMany` as `LEFT JOIN LATERAL` with `json_agg` for nested array includes
-- Advertises PostgreSQL capabilities (`lateral`, `jsonAgg`)
+- Renders DML operations (INSERT, UPDATE, DELETE) with RETURNING clauses
+- Advertises PostgreSQL capabilities (`lateral`, `jsonAgg`, `returning`)
 - Maps PostgreSQL errors to `RuntimeError`
 
 ### Codecs (`codecs.ts`)
@@ -131,6 +132,16 @@ const runtime = createRuntime({
 });
 ```
 
+## Capabilities
+
+The adapter declares the following PostgreSQL capabilities:
+
+- **`lateral: true`** - Supports LATERAL joins for `includeMany` nested array includes
+- **`jsonAgg: true`** - Supports JSON aggregation functions (`json_agg`) for `includeMany`
+- **`returning: true`** - Supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE)
+
+These capabilities are declared in the adapter's `defaultCapabilities` and must be present in the contract's capabilities for the corresponding features to work.
+
 ## includeMany Support
 
 The adapter supports `includeMany` for nested array includes using PostgreSQL's `LATERAL` joins and `json_agg`:
@@ -155,6 +166,32 @@ LEFT JOIN LATERAL (
   WHERE "user"."id" = "post"."userId"
 ) AS "posts_lateral" ON true
 ```
+
+## DML Operations with RETURNING
+
+The adapter supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE), allowing you to return affected rows:
+
+**Lowering Strategy:**
+- Renders `RETURNING` clause after INSERT, UPDATE, or DELETE statements
+- Returns specified columns from affected rows
+- Supports returning multiple columns
+
+**Capability Required:**
+- `returning: true` - Enables RETURNING clause support
+
+**Example SQL Output:**
+```sql
+-- INSERT with RETURNING
+INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2) RETURNING "user"."id", "user"."email"
+
+-- UPDATE with RETURNING
+UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."id", "user"."email"
+
+-- DELETE with RETURNING
+DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id", "user"."email"
+```
+
+**Note:** MySQL does not support RETURNING clauses. A future MySQL adapter would declare `returning: false` and either reject plans with RETURNING or provide an alternative implementation.
 
 ## Exports
 

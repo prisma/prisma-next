@@ -69,6 +69,7 @@ flowchart TD
 - Supports projections, filters, joins, ordering, limits
 - **Nested Projection Shaping**: Express nested object literals in `.select()` for compile-time type inference, while runtime produces flat SQL with flattened aliases (e.g., `post.title` → `post_title`)
 - **Nested Array Includes (`includeMany`)**: Express 1:N relationships that return one row per parent with a nested array field for children, built in a single statement using `LATERAL` + `json_agg` when supported. Requires both `lateral` and `jsonAgg` capabilities to be `true` in the contract.
+- **DML Operations**: Supports INSERT, UPDATE, DELETE operations with `returning()` method for returning affected rows. The `returning()` method is capability-gated and requires `returning: true` in contract capabilities.
 - Join methods: `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`
 - Join ON conditions use `on.eqCol(left, right)` callback pattern
 - Self-joins are not supported in MVP
@@ -223,6 +224,51 @@ const plan = sql()
 ```
 
 **Note**: `includeMany` is capability-gated and requires both `lateral: true` and `jsonAgg: true` in the contract's capabilities. It's a separate feature from nested projection shaping (which flattens nested objects into flat rows).
+
+### SQL DSL with DML Operations
+
+```typescript
+import { sql, schema, param } from '@prisma-next/sql-query/sql';
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import contract from './contract.json';
+import type { Contract } from './contract.d';
+
+const contract = validateContract<Contract>(contractJson);
+const tables = schema<Contract, CodecTypes>(contract).tables;
+const t = makeT<Contract, CodecTypes>(contract);
+
+// INSERT with returning
+const insertPlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .insert(tables.user, {
+    email: param('email'),
+    createdAt: param('createdAt'),
+  })
+  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .build({ params: { email: 'test@example.com', createdAt: new Date() } });
+
+// UPDATE with returning
+const updatePlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .update(tables.user, {
+    email: param('newEmail'),
+  })
+  .where(t.user.id.eq(param('userId')))
+  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .build({ params: { newEmail: 'updated@example.com', userId: 1 } });
+
+// DELETE with returning
+const deletePlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .delete(tables.user)
+  .where(t.user.id.eq(param('userId')))
+  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .build({ params: { userId: 1 } });
+
+// Extract row types from DML plans
+type InsertRow = ResultType<typeof insertPlan>;  // { id: number; email: string }
+type UpdateRow = ResultType<typeof updatePlan>;  // { id: number; email: string }
+type DeleteRow = ResultType<typeof deletePlan>;  // { id: number; email: string }
+```
+
+**Note**: The `returning()` method on DML operations is capability-gated and requires `returning: true` in the contract's capabilities. PostgreSQL supports RETURNING clauses; MySQL does not. Calling `returning()` without the capability will throw an error at runtime.
 
 ### Contract Validation
 
