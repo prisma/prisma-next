@@ -1,5 +1,4 @@
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { Plan } from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
 import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
@@ -27,25 +26,6 @@ describe('Runtime class', () => {
     mappings: {},
   };
   const mockContract = validateContract(mockContractRaw);
-
-  const mockPlan: Plan = {
-    sql: 'SELECT id, email FROM "user" LIMIT 1',
-    params: [],
-    meta: {
-      target: 'postgres',
-      coreHash: 'sha256:test-core',
-      lane: 'dsl',
-      paramDescriptors: [],
-      refs: { tables: ['user'], columns: [] },
-      projection: { id: 'user.id', email: 'user.email' },
-    },
-    ast: {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [],
-      limit: 1,
-    },
-  } as Plan;
 
   const createMockDriver = (): SqlDriver => ({
     connect: vi.fn(),
