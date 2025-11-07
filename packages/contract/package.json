@@ -8,13 +8,16 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../biome.json"
+    "lint": "biome check . --config-path ../../biome.json --error-on-warnings"
   },
   "devDependencies": {
     "tsup": "^8.3.0",
     "typescript": "^5.9.3"
   },
-  "files": ["dist", "schemas"],
+  "files": [
+    "dist",
+    "schemas"
+  ],
   "exports": {
     "./types": {
       "types": "./dist/exports/types.d.ts",

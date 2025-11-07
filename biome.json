@@ -1,18 +1,19 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": [
-      "dist/**",
-      "coverage/**",
-      "node_modules/**",
-      ".prisma/**",
-      "**/*.d.ts",
-      "**/contract.json"
+    "includes": [
+      "**",
+      "!**/dist/**",
+      "!**/coverage/**",
+      "!**/node_modules/**",
+      "!**/.prisma/**",
+      "!**/*.d.ts",
+      "!**/contract.json"
     ]
   },
   "formatter": {
@@ -22,9 +23,7 @@
     "lineWidth": 100,
     "lineEnding": "lf"
   },
-  "organizeImports": {
-    "enabled": true
-  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
@@ -36,7 +35,20 @@
         "noExplicitAny": "error"
       },
       "style": {
-        "useImportType": "error"
+        "useImportType": "error",
+        "noParameterAssign": "error",
+        "useAsConstAssertion": "error",
+        "useDefaultParameterLast": "error",
+        "useEnumInitializers": "error",
+        "useSelfClosingElements": "error",
+        "useSingleVarDeclarator": "error",
+        "noUnusedTemplateLiteral": "error",
+        "useNumberNamespace": "error",
+        "noInferrableTypes": "error",
+        "noUselessElse": "error"
+      },
+      "complexity": {
+        "useLiteralKeys": "off"
       }
     }
   },
@@ -50,13 +62,13 @@
   },
   "overrides": [
     {
-      "include": [
+      "includes": [
         "**/*.test.ts",
         "**/*.test-d.ts",
         "**/test/**/*.ts",
         "**/tests/**/*.ts",
-        "packages/node-utils/**/*.ts",
-        "packages/cli/**/*.ts"
+        "**/packages/node-utils/**/*.ts",
+        "**/packages/cli/**/*.ts"
       ],
       "javascript": {
         "globals": ["console", "process", "__dirname", "__filename", "URL"]
@@ -73,7 +85,7 @@
       }
     },
     {
-      "include": ["**/*.config.ts", "**/vitest.config.ts", "**/tsup.config.ts"],
+      "includes": ["**/*.config.ts", "**/vitest.config.ts", "**/tsup.config.ts"],
       "linter": {
         "rules": {
           "suspicious": {
