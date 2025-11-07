@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef, SelectAst } from '../src/types';
-import type { LoweringSpec, ReturnSpec } from '@prisma-next/sql-target';
+import type { OperationExpr, SelectAst } from '../src/types';
 
 describe('OperationExpr', () => {
   it('defines OperationExpr with infix strategy', () => {

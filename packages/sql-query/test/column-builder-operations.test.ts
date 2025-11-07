@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import {
   createCodecRegistry,
   createOperationRegistry,
   type OperationSignature,
 } from '@prisma-next/sql-target';
-import { schema } from '../src/schema';
+import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { schema } from '../src/schema';
 
 describe('ColumnBuilder operations', () => {
   const contract = validateContract<SqlContract<SqlStorage>>({

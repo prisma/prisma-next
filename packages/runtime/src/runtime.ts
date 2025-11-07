@@ -18,11 +18,11 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-import type { RuntimeContext } from './context';
+import type { CodecRegistry, OperationRegistry } from '@prisma-next/sql-target';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
-import type { CodecRegistry, OperationRegistry } from '@prisma-next/sql-target';
+import type { RuntimeContext } from './context';
 import type { Plugin } from './plugins/types';
 
 export interface RuntimeOptions<

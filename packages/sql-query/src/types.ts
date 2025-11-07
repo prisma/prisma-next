@@ -19,8 +19,14 @@ export type {
   StorageTable,
 } from '@prisma-next/sql-target';
 
-import type { Adapter, SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
-import type { LoweringSpec, ReturnSpec } from '@prisma-next/sql-target';
+import type {
+  Adapter,
+  LoweringSpec,
+  ReturnSpec,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+} from '@prisma-next/sql-target';
 
 export type Direction = 'asc' | 'desc';
 

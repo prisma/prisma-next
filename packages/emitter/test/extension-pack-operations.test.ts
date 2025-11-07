@@ -1,8 +1,8 @@
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadExtensionPackManifest } from '../src/extension-pack';
-import { join } from 'node:path';
-import { writeFile, mkdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 
 describe('ExtensionPackManifest with operations', () => {
   let tempDir: string;

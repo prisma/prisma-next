@@ -1,15 +1,8 @@
+import { validateContract } from '@prisma-next/sql-query/schema';
+import type { OperationExpr, SelectAst } from '@prisma-next/sql-query/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/adapter';
-import type {
-  ColumnRef,
-  LiteralExpr,
-  OperationExpr,
-  ParamRef,
-  SelectAst,
-} from '@prisma-next/sql-query/types';
-import type { LoweringSpec, ReturnSpec } from '@prisma-next/sql-target';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 const contract = validateContract<SqlContract<SqlStorage>>({
   target: 'postgres',

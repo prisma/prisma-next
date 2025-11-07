@@ -136,7 +136,7 @@ function renderLiteral(expr: LiteralExpr): string {
 
 function renderOperation(expr: OperationExpr): string {
   const self = renderColumn(expr.self);
-  const args = expr.args.map((arg, index) => {
+  const args = expr.args.map((arg, _index) => {
     if (arg.kind === 'col') {
       return renderColumn(arg);
     }

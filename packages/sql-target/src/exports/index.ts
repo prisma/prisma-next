@@ -1,14 +1,6 @@
 export type { Codec, CodecDefBuilder, CodecInput, CodecOutput, CodecRegistry } from '../codecs';
 export { codec, createCodecRegistry, defineCodecs } from '../codecs';
 export type {
-  ArgSpec,
-  LoweringSpec,
-  OperationRegistry,
-  OperationSignature,
-  ReturnSpec,
-} from '../operations-registry';
-export { assembleOperationRegistry, createOperationRegistry } from '../operations-registry';
-export type {
   ForeignKey,
   ForeignKeyReferences,
   Index,
@@ -24,6 +16,14 @@ export type {
   UniqueConstraint,
 } from '../contract-types';
 export { sqlTargetFamilyHook } from '../emitter-hook';
+export type {
+  ArgSpec,
+  LoweringSpec,
+  OperationRegistry,
+  OperationSignature,
+  ReturnSpec,
+} from '../operations-registry';
+export { assembleOperationRegistry, createOperationRegistry } from '../operations-registry';
 export {
   Adapter,
   AdapterProfile,

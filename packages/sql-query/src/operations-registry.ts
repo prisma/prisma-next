@@ -1,4 +1,4 @@
-import type { StorageColumn, OperationRegistry } from '@prisma-next/sql-target';
+import type { OperationRegistry, StorageColumn } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import type {
   ColumnBuilder,

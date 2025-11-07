@@ -1,6 +1,12 @@
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 import type { RuntimeContext } from '@prisma-next/runtime';
+import type {
+  OperationRegistry,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+} from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
+import { attachOperationsToColumnBuilder } from './operations-registry';
 import type {
   BinaryBuilder,
   ColumnBuilder,
@@ -9,8 +15,6 @@ import type {
   ParamPlaceholder,
   TableRef,
 } from './types';
-import type { OperationRegistry } from '@prisma-next/sql-target';
-import { attachOperationsToColumnBuilder } from './operations-registry';
 
 type TableColumns<Table extends { columns: Record<string, StorageColumn> }> = Table['columns'];
 

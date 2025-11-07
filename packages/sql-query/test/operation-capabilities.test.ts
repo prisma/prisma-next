@@ -1,12 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import {
   createCodecRegistry,
   createOperationRegistry,
   type OperationSignature,
 } from '@prisma-next/sql-target';
-import { schema } from '../src/schema';
+import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { schema } from '../src/schema';
 
 describe('Operation capability gating', () => {
   it('exposes operation with required capability when capability is present', () => {

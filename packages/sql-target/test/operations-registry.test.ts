@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createOperationRegistry,
-  type ArgSpec,
-  type LoweringSpec,
-  type OperationSignature,
-  type ReturnSpec,
-} from '../src/operations-registry';
+import { createOperationRegistry, type OperationSignature } from '../src/operations-registry';
 
 describe('OperationRegistry', () => {
   it('creates empty registry', () => {
