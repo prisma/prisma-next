@@ -1,6 +1,6 @@
-import type { ResultType } from '@prisma-next/sql-query/types';
 import { schema, sql } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
+import { collect } from './utils';
 
 export async function getUsersWithPosts(limit = 10) {
   const runtime = getRuntime();
@@ -31,12 +31,5 @@ export async function getUsersWithPosts(limit = 10) {
     .limit(limit)
     .build();
 
-  type Row = ResultType<typeof plan>;
-  const rows: Row[] = [];
-
-  for await (const row of runtime.execute(plan)) {
-    rows.push(row);
-  }
-
-  return rows;
+  return collect(runtime.execute(plan));
 }
