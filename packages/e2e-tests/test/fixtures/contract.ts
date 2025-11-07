@@ -1,7 +1,7 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { defineContract } from '@prisma-next/sql-query/contract-builder';
 
-const base = defineContract<CodecTypes>()
+export const contract = defineContract<CodecTypes>()
   .target('postgres')
   .table('user', (t) =>
     t
@@ -31,18 +31,14 @@ const base = defineContract<CodecTypes>()
   .model('Comment', 'comment', (m) =>
     m.field('id', 'id').field('postId', 'postId').field('content', 'content'),
   )
-  .build();
-
-export const contract = {
-  ...base,
-  capabilities: {
+  .extensions({
+    postgres: { version: '15.0.0' },
+    pg: {},
+  })
+  .capabilities({
     postgres: {
       lateral: true,
       jsonAgg: true,
     },
-  },
-  extensions: {
-    postgres: { version: '15.0.0' },
-    pg: {},
-  },
-};
+  })
+  .build();

@@ -355,12 +355,14 @@ interface ContractBuilderState<
   >,
   CoreHash extends string | undefined = string | undefined,
   Extensions extends Record<string, unknown> | undefined = undefined,
+  Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > {
   readonly target?: Target;
   readonly tables: Tables;
   readonly models: Models;
   readonly coreHash?: CoreHash;
   readonly extensions?: Extensions;
+  readonly capabilities?: Capabilities;
 }
 
 class ContractBuilder<
@@ -380,22 +382,32 @@ class ContractBuilder<
   >,
   CoreHash extends string | undefined = undefined,
   Extensions extends Record<string, unknown> | undefined = undefined,
+  Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > {
-  private readonly state: ContractBuilderState<Target, Tables, Models, CoreHash, Extensions>;
+  private readonly state: ContractBuilderState<
+    Target,
+    Tables,
+    Models,
+    CoreHash,
+    Extensions,
+    Capabilities
+  >;
 
-  constructor(state?: ContractBuilderState<Target, Tables, Models, CoreHash, Extensions>) {
+  constructor(
+    state?: ContractBuilderState<Target, Tables, Models, CoreHash, Extensions, Capabilities>,
+  ) {
     this.state =
       state ??
       ({
         tables: {},
         models: {},
-      } as ContractBuilderState<Target, Tables, Models, CoreHash, Extensions>);
+      } as ContractBuilderState<Target, Tables, Models, CoreHash, Extensions, Capabilities>);
   }
 
   target<T extends string>(
     target: T,
-  ): ContractBuilder<CodecTypes, T, Tables, Models, CoreHash, Extensions> {
-    return new ContractBuilder<CodecTypes, T, Tables, Models, CoreHash, Extensions>({
+  ): ContractBuilder<CodecTypes, T, Tables, Models, CoreHash, Extensions, Capabilities> {
+    return new ContractBuilder<CodecTypes, T, Tables, Models, CoreHash, Extensions, Capabilities>({
       ...this.state,
       target,
     });
@@ -403,10 +415,19 @@ class ContractBuilder<
 
   extensions<E extends Record<string, unknown>>(
     extensions: E,
-  ): ContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E> {
-    return new ContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E>({
+  ): ContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E, Capabilities> {
+    return new ContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E, Capabilities>({
       ...this.state,
       extensions,
+    });
+  }
+
+  capabilities<C extends Record<string, Record<string, boolean>>>(
+    capabilities: C,
+  ): ContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, Extensions, C> {
+    return new ContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, Extensions, C>({
+      ...this.state,
+      capabilities,
     });
   }
 
@@ -426,7 +447,8 @@ class ContractBuilder<
     Tables & Record<TableName, ReturnType<T['build']>>,
     Models,
     CoreHash,
-    Extensions
+    Extensions,
+    Capabilities
   > {
     const tableBuilder = new TableBuilder<TableName>(name);
     const result = callback(tableBuilder);
@@ -439,7 +461,8 @@ class ContractBuilder<
       Tables & Record<TableName, ReturnType<T['build']>>,
       Models,
       CoreHash,
-      Extensions
+      Extensions,
+      Capabilities
     >({
       ...this.state,
       tables: { ...this.state.tables, [name]: tableState } as Tables &
@@ -461,7 +484,8 @@ class ContractBuilder<
     Tables,
     Models & Record<ModelName, ReturnType<M['build']>>,
     CoreHash,
-    Extensions
+    Extensions,
+    Capabilities
   > {
     const modelBuilder = new ModelBuilder<ModelName, TableName>(name, table);
     const result = callback(modelBuilder);
@@ -474,7 +498,8 @@ class ContractBuilder<
       Tables,
       Models & Record<ModelName, ReturnType<M['build']>>,
       CoreHash,
-      Extensions
+      Extensions,
+      Capabilities
     >({
       ...this.state,
       models: { ...this.state.models, [name]: modelState } as Models &
@@ -484,8 +509,8 @@ class ContractBuilder<
 
   coreHash<H extends string>(
     hash: H,
-  ): ContractBuilder<CodecTypes, Target, Tables, Models, H, Extensions> {
-    return new ContractBuilder<CodecTypes, Target, Tables, Models, H, Extensions>({
+  ): ContractBuilder<CodecTypes, Target, Tables, Models, H, Extensions, Capabilities> {
+    return new ContractBuilder<CodecTypes, Target, Tables, Models, H, Extensions, Capabilities>({
       ...this.state,
       coreHash: hash,
     });
@@ -504,6 +529,9 @@ class ContractBuilder<
         readonly coreHash: CoreHash extends string ? CoreHash : string;
       } & (Extensions extends Record<string, unknown>
           ? { readonly extensions: Extensions }
+          : Record<string, never>) &
+        (Capabilities extends Record<string, Record<string, boolean>>
+          ? { readonly capabilities: Capabilities }
           : Record<string, never>)
     : never {
     // Type helper to ensure literal types are preserved in return type
@@ -520,6 +548,9 @@ class ContractBuilder<
           readonly coreHash: CoreHash extends string ? CoreHash : string;
         } & (Extensions extends Record<string, unknown>
             ? { readonly extensions: Extensions }
+            : Record<string, never>) &
+          (Capabilities extends Record<string, Record<string, boolean>>
+            ? { readonly capabilities: Capabilities }
             : Record<string, never>)
       : never;
     if (!this.state.target) {
@@ -642,6 +673,7 @@ class ContractBuilder<
       storage,
       mappings,
       ...(this.state.extensions ? { extensions: this.state.extensions } : {}),
+      ...(this.state.capabilities ? { capabilities: this.state.capabilities } : {}),
     } as unknown as BuiltContract;
 
     return contract as BuiltContract;

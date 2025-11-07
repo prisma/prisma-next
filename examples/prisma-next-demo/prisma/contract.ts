@@ -35,4 +35,10 @@ export const contract = defineContract<CodecTypes>()
     },
     pg: {},
   })
+  .capabilities({
+    postgres: {
+      lateral: true,
+      jsonAgg: true,
+    },
+  })
   .build();

@@ -3,7 +3,7 @@
   "targetFamily": "sql",
   "target": "postgres",
   "coreHash": "sha256:84bfb187760304609f1f5de730012912f965af5ebf052275a256678bb5095625",
-  "profileHash": "sha256:28ccf0c9c2899807cc8791c378d6bd821b9d3d3996443984949d4f6ce2b3728d",
+  "profileHash": "sha256:68910bb2d84a7097a239982d21995ededbf540f12044b0da051b272ce9b32b80",
   "models": {
     "Post": {
       "fields": {
@@ -59,7 +59,9 @@
           }
         },
         "primaryKey": {
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "user": {
@@ -75,15 +77,17 @@
           }
         },
         "primaryKey": {
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       }
     }
   },
   "capabilities": {
     "postgres": {
-      "lateral": true,
-      "jsonAgg": true
+      "jsonAgg": true,
+      "lateral": true
     }
   },
   "extensions": {
