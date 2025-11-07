@@ -519,7 +519,10 @@ describe('Row Decoding', () => {
     const decoded = decodeRow(row, plan, registry);
     expect(decoded['id']).toBe(42);
     expect(Array.isArray(decoded['posts'])).toBe(true);
-    expect(decoded['posts']).toEqual([{ id: 1, title: 'Post 1' }, { id: 2, title: 'Post 2' }]);
+    expect(decoded['posts']).toEqual([
+      { id: 1, title: 'Post 1' },
+      { id: 2, title: 'Post 2' },
+    ]);
   });
 
   it('handles null include alias as empty array', () => {

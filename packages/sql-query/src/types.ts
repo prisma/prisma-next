@@ -17,18 +17,13 @@ export type {
   ModelDefinition,
   ModelField,
   ModelStorage,
-} from "@prisma-next/sql-target";
-import type {
-  Adapter,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-} from "@prisma-next/sql-target";
+} from '@prisma-next/sql-target';
+import type { Adapter, SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 
-export type Direction = "asc" | "desc";
+export type Direction = 'asc' | 'desc';
 
 export interface ParamPlaceholder {
-  readonly kind: "param-placeholder";
+  readonly kind: 'param-placeholder';
   readonly name: string;
 }
 
@@ -37,7 +32,7 @@ export interface OrderBuilder<
   ColumnMeta extends StorageColumn = StorageColumn,
   JsType = unknown,
 > {
-  readonly kind: "order";
+  readonly kind: 'order';
   readonly expr: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
   readonly dir: Direction;
 }
@@ -47,7 +42,7 @@ export interface ColumnBuilder<
   ColumnMeta extends StorageColumn = StorageColumn,
   JsType = unknown,
 > {
-  readonly kind: "column";
+  readonly kind: 'column';
   readonly table: string;
   readonly column: ColumnName;
   readonly columnMeta: ColumnMeta;
@@ -61,8 +56,8 @@ export interface BinaryBuilder<
   ColumnMeta extends StorageColumn = StorageColumn,
   JsType = unknown,
 > {
-  readonly kind: "binary";
-  readonly op: "eq";
+  readonly kind: 'binary';
+  readonly op: 'eq';
   readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
   readonly right: ParamPlaceholder;
 }
@@ -70,29 +65,29 @@ export interface BinaryBuilder<
 export interface JoinOnBuilder {
   eqCol(
     left: ColumnBuilder<string, StorageColumn, unknown>,
-    right: ColumnBuilder<string, StorageColumn, unknown>
+    right: ColumnBuilder<string, StorageColumn, unknown>,
   ): JoinOnPredicate;
 }
 
 export interface JoinOnPredicate {
-  readonly kind: "join-on";
+  readonly kind: 'join-on';
   readonly left: ColumnBuilder<string, StorageColumn, unknown>;
   readonly right: ColumnBuilder<string, StorageColumn, unknown>;
 }
 
 export interface TableRef {
-  readonly kind: "table";
+  readonly kind: 'table';
   readonly name: string;
 }
 
 export interface ColumnRef {
-  readonly kind: "col";
+  readonly kind: 'col';
   readonly table: string;
   readonly column: string;
 }
 
 export interface ParamRef {
-  readonly kind: "param";
+  readonly kind: 'param';
   readonly index: number;
   readonly name?: string;
 }
@@ -100,32 +95,32 @@ export interface ParamRef {
 export type Expr = ColumnRef | ParamRef;
 
 export interface BinaryExpr {
-  readonly kind: "bin";
-  readonly op: "eq";
+  readonly kind: 'bin';
+  readonly op: 'eq';
   readonly left: ColumnRef;
   readonly right: ParamRef;
 }
 
 export type JoinOnExpr = {
-  readonly kind: "eqCol";
+  readonly kind: 'eqCol';
   readonly left: ColumnRef;
   readonly right: ColumnRef;
 };
 
 export interface JoinAst {
-  readonly kind: "join";
-  readonly joinType: "inner" | "left" | "right" | "full";
+  readonly kind: 'join';
+  readonly joinType: 'inner' | 'left' | 'right' | 'full';
   readonly table: TableRef;
   readonly on: JoinOnExpr;
 }
 
 export interface IncludeRef {
-  readonly kind: "includeRef";
+  readonly kind: 'includeRef';
   readonly alias: string;
 }
 
 export interface IncludeAst {
-  readonly kind: "includeMany";
+  readonly kind: 'includeMany';
   readonly alias: string;
   readonly child: {
     readonly table: TableRef;
@@ -138,7 +133,7 @@ export interface IncludeAst {
 }
 
 export interface SelectAst {
-  readonly kind: "select";
+  readonly kind: 'select';
   readonly from: TableRef;
   readonly joins?: ReadonlyArray<JoinAst>;
   readonly includes?: ReadonlyArray<IncludeAst>;
@@ -156,7 +151,7 @@ export interface ParamDescriptor {
   readonly name?: string;
   readonly type?: string;
   readonly nullable?: boolean;
-  readonly source: "dsl" | "raw";
+  readonly source: 'dsl' | 'raw';
   readonly refs?: { table: string; column: string };
 }
 
@@ -216,10 +211,7 @@ export type ComputeColumnJsType<
   _TableName extends string,
   _ColumnName extends string,
   ColumnMeta extends StorageColumn,
-  CodecTypes extends Record<string, { output: unknown }> = Record<
-    string,
-    never
-  >,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > = ColumnMeta extends { type: infer T; nullable: infer N }
   ? T extends string
     ? ExtractCodecOutputType<T, CodecTypes> extends infer CodecOutput
@@ -239,11 +231,7 @@ export type ComputeColumnJsType<
  * Extracts the pre-computed JsType from each ColumnBuilder in the projection.
  */
 export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
-  [K in keyof P]: P[K] extends ColumnBuilder<
-    infer _Name,
-    infer _Meta,
-    infer JsType
-  >
+  [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
     ? JsType
     : never;
 };
@@ -259,8 +247,7 @@ export type NestedProjection = Record<
       | ColumnBuilder
       | Record<
           string,
-          | ColumnBuilder
-          | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
         >
     >
 >;
@@ -292,22 +279,14 @@ export type InferNestedProjectionRow<
         | ColumnBuilder
         | Record<
             string,
-            | ColumnBuilder
-            | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
           >
       >
   >,
-  CodecTypes extends Record<string, { output: unknown }> = Record<
-    string,
-    never
-  >,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   Includes extends Record<string, any> = Record<string, never>,
 > = {
-  [K in keyof P]: P[K] extends ColumnBuilder<
-    infer _Name,
-    infer _Meta,
-    infer JsType
-  >
+  [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
     ? JsType
     : P[K] extends true
       ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
@@ -319,11 +298,7 @@ export type InferNestedProjectionRow<
                 | ColumnBuilder
                 | Record<
                     string,
-                    | ColumnBuilder
-                    | Record<
-                        string,
-                        ColumnBuilder | Record<string, ColumnBuilder>
-                      >
+                    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
                   >
               >
           >
@@ -336,19 +311,18 @@ export type InferNestedProjectionRow<
  * Requires both `lateral` and `jsonAgg` to be `true` in the contract's capabilities for the target.
  * Capabilities are nested by target: `{ [target]: { lateral: true, jsonAgg: true } }`
  */
-export type HasIncludeManyCapabilities<
-  TContract extends SqlContract<SqlStorage>,
-> = TContract extends { capabilities: infer C; target: infer T }
-  ? T extends string
-    ? C extends Record<string, Record<string, boolean>>
-      ? C extends { [K in T]: infer TargetCaps }
-        ? TargetCaps extends { lateral: true; jsonAgg: true }
-          ? true
+export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>> =
+  TContract extends { capabilities: infer C; target: infer T }
+    ? T extends string
+      ? C extends Record<string, Record<string, boolean>>
+        ? C extends { [K in T]: infer TargetCaps }
+          ? TargetCaps extends { lateral: true; jsonAgg: true }
+            ? true
+            : false
           : false
         : false
       : false
-    : false
-  : false;
+    : false;
 
 /**
  * Utility type to extract the Row type from a Plan.
@@ -454,8 +428,8 @@ export interface LoweredStatement {
 
 export interface RuntimeError extends Error {
   readonly code: string;
-  readonly category: "PLAN";
-  readonly severity: "error";
+  readonly category: 'PLAN';
+  readonly severity: 'error';
   readonly message: string;
   readonly details?: Record<string, unknown>;
   readonly hints?: readonly string[];
@@ -472,16 +446,9 @@ export interface BuildOptions {
 
 export interface SqlBuilderOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<
-    string,
-    never
-  >,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > {
   readonly contract: TContract;
-  readonly adapter: Adapter<
-    SelectAst,
-    SqlContract<SqlStorage>,
-    LoweredStatement
-  >;
+  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly codecTypes?: CodecTypes;
 }

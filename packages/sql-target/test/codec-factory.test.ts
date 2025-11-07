@@ -67,7 +67,11 @@ describe('codec() factory function', () => {
     expect(typeof encoded).toBe('string');
 
     if (encoded === undefined) {
+<<<<<<< HEAD
       throw new Error('encoded should not be undefined');
+=======
+      throw new Error('encoded should be defined');
+>>>>>>> 67fe366 (Fix a lot of type errors)
     }
 
     const decoded = dateCodec.decode(encoded);

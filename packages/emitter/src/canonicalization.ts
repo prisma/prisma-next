@@ -155,12 +155,18 @@ export function canonicalizeContract(
 ): string {
   const normalized: Record<string, unknown> = {};
 
+<<<<<<< HEAD
   if (ir.schemaVersion !== undefined) {
     normalized['schemaVersion'] = ir.schemaVersion;
+=======
+  if (ir['schemaVersion'] !== undefined) {
+    normalized['schemaVersion'] = ir['schemaVersion'];
+>>>>>>> 67fe366 (Fix a lot of type errors)
   } else {
     normalized['schemaVersion'] = '1';
   }
 
+<<<<<<< HEAD
   normalized['targetFamily'] = ir.targetFamily;
   normalized['target'] = ir.target;
 
@@ -174,20 +180,45 @@ export function canonicalizeContract(
 
   if (ir.models !== undefined) {
     normalized['models'] = ir.models;
+=======
+  normalized['targetFamily'] = ir['targetFamily'];
+  normalized['target'] = ir['target'];
+
+  if (ir['coreHash'] !== undefined) {
+    normalized['coreHash'] = ir['coreHash'];
+  }
+
+  if (ir['profileHash'] !== undefined) {
+    normalized['profileHash'] = ir['profileHash'];
+  }
+
+  if (ir['models'] !== undefined) {
+    normalized['models'] = ir['models'];
+>>>>>>> 67fe366 (Fix a lot of type errors)
   } else {
     normalized['models'] = {};
   }
 
+<<<<<<< HEAD
   if (ir.relations !== undefined && !isDefaultValue(ir.relations)) {
     normalized['relations'] = ir.relations;
   }
 
   if (ir.storage !== undefined) {
     normalized['storage'] = ir.storage;
+=======
+  if (ir['relations'] !== undefined && !isDefaultValue(ir['relations'])) {
+    normalized['relations'] = ir['relations'];
+  }
+
+  if (ir['storage'] !== undefined) {
+    normalized['storage'] = ir['storage'];
+>>>>>>> 67fe366 (Fix a lot of type errors)
   } else {
     normalized['storage'] = { tables: {} };
   }
 
+<<<<<<< HEAD
   if (ir.extensions !== undefined && !isDefaultValue(ir.extensions)) {
     normalized['extensions'] = ir.extensions;
   }
@@ -202,6 +233,22 @@ export function canonicalizeContract(
 
   if (ir.sources !== undefined && !isDefaultValue(ir.sources)) {
     normalized['sources'] = ir.sources;
+=======
+  if (ir['extensions'] !== undefined && !isDefaultValue(ir['extensions'])) {
+    normalized['extensions'] = ir['extensions'];
+  }
+
+  if (ir['capabilities'] !== undefined && !isDefaultValue(ir['capabilities'])) {
+    normalized['capabilities'] = ir['capabilities'];
+  }
+
+  if (ir['meta'] !== undefined && !isDefaultValue(ir['meta'])) {
+    normalized['meta'] = ir['meta'];
+  }
+
+  if (ir['sources'] !== undefined && !isDefaultValue(ir['sources'])) {
+    normalized['sources'] = ir['sources'];
+>>>>>>> 67fe366 (Fix a lot of type errors)
   }
 
   const withDefaultsOmitted = omitDefaults(normalized, []) as Record<string, unknown>;

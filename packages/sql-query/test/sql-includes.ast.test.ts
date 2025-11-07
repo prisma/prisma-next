@@ -159,4 +159,3 @@ describe('Include AST types', () => {
     }
   });
 });
-

@@ -446,7 +446,9 @@ class SelectBuilderImpl<
     const newIncludes = [...existingIncludes, includeState];
 
     // Type-level: Update Includes map with new include
-    // Use the AliasName generic parameter which TypeScript will infer from the options.alias value
+    // The AliasName generic parameter is inferred from options.alias, allowing TypeScript
+    // to track include definitions across multiple includeMany() calls and infer correct
+    // array types when select() includes boolean true for include references
     type NewIncludes = Includes & { [K in AliasName]: ChildRow };
 
     return new SelectBuilderImpl<TContract, Row, CodecTypes, NewIncludes>(

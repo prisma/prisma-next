@@ -126,9 +126,7 @@ describe('createPostgresAdapter', () => {
                   dir: 'desc',
                 },
               ],
-              project: [
-                { alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } },
-              ],
+              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
             },
           },
         ],
@@ -163,9 +161,7 @@ describe('createPostgresAdapter', () => {
                 right: { kind: 'col', table: 'post', column: 'userId' },
               },
               limit: 10,
-              project: [
-                { alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } },
-              ],
+              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
             },
           },
         ],
@@ -204,9 +200,7 @@ describe('createPostgresAdapter', () => {
                 left: { kind: 'col', table: 'post', column: 'published' },
                 right: { kind: 'param', index: 1, name: 'published' },
               },
-              project: [
-                { alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } },
-              ],
+              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
             },
           },
         ],
@@ -240,9 +234,7 @@ describe('createPostgresAdapter', () => {
                 left: { kind: 'col', table: 'user', column: 'id' },
                 right: { kind: 'col', table: 'post', column: 'userId' },
               },
-              project: [
-                { alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } },
-              ],
+              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
             },
           },
         ],

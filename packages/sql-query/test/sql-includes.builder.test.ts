@@ -162,7 +162,10 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -189,7 +192,10 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -214,12 +220,18 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
         (on) => on.eqCol(userColumns.id, postColumns.userId),
-        (child) => child.select({ id: postColumns.id, title: postColumns.title }).where(postColumns.title.eq(param('title'))),
+        (child) =>
+          child
+            .select({ id: postColumns.id, title: postColumns.title })
+            .where(postColumns.title.eq(param('title'))),
         { alias: 'posts' },
       )
       .select({
@@ -237,12 +249,18 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
         (on) => on.eqCol(userColumns.id, postColumns.userId),
-        (child) => child.select({ id: postColumns.id, title: postColumns.title }).orderBy(postColumns.createdAt.desc()),
+        (child) =>
+          child
+            .select({ id: postColumns.id, title: postColumns.title })
+            .orderBy(postColumns.createdAt.desc()),
         { alias: 'posts' },
       )
       .select({
@@ -261,7 +279,10 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -314,10 +335,10 @@ describe('SQL builder includeMany', () => {
           (child) => child.select({ id: postColumns.id }),
           { alias: 'id' },
         )
-          .select({
-            id: userColumns.id,
-            posts: true,
-          })
+        .select({
+          id: userColumns.id,
+          posts: true,
+        })
         .build();
     }).toThrow();
   });
@@ -345,12 +366,17 @@ describe('SQL builder includeMany', () => {
   });
 
   it('throws error when capabilities are missing at runtime', () => {
-    const tables = schema<ContractWithoutCapabilities, CodecTypes>(contractWithoutCapabilities).tables;
+    const tables = schema<ContractWithoutCapabilities, CodecTypes>(
+      contractWithoutCapabilities,
+    ).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithoutCapabilities, CodecTypes>({ contract: contractWithoutCapabilities, adapter })
+      sql<ContractWithoutCapabilities, CodecTypes>({
+        contract: contractWithoutCapabilities,
+        adapter,
+      })
         .from(tables.user)
         .includeMany(
           tables.post,
@@ -371,7 +397,10 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -394,7 +423,10 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -420,7 +452,10 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -445,7 +480,10 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({
+      contract: contractWithCapabilities,
+      adapter,
+    })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -466,4 +504,3 @@ describe('SQL builder includeMany', () => {
     }
   });
 });
-

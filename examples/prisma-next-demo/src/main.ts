@@ -36,7 +36,9 @@ const [cmd, ...args] = argv;
       const users = await getUsersWithPosts(limit);
       console.log(JSON.stringify(users, null, 2));
     } else {
-      console.log('Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | users-with-posts [limit]]');
+      console.log(
+        'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | users-with-posts [limit]]',
+      );
       process.exit(1);
     }
   } catch (error) {

@@ -40,4 +40,3 @@ export async function getUsersWithPosts(limit: number = 10) {
 
   return rows;
 }
-

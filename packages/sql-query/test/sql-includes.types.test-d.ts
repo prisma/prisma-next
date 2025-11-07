@@ -1,6 +1,10 @@
 import { expectTypeOf, test } from 'vitest';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { HasIncludeManyCapabilities, ResultType, InferNestedProjectionRow } from '../src/types';
+import type {
+  HasIncludeManyCapabilities,
+  ResultType,
+  InferNestedProjectionRow,
+} from '../src/types';
 import { sql } from '../src/sql';
 import { schema } from '../src/schema';
 import { validateContract } from '../src/contract';
@@ -196,7 +200,9 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 // Type tests for includeMany result types
 test('ResultType yields Array<ChildShape> for includeMany', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(testContractWithCapabilities).tables;
+  const tables = schema<TestContractWithCapabilities, CodecTypes>(
+    testContractWithCapabilities,
+  ).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -235,7 +241,9 @@ test('ResultType yields Array<ChildShape> for includeMany', () => {
 
 test('Array element types match child projection types', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(testContractWithCapabilities).tables;
+  const tables = schema<TestContractWithCapabilities, CodecTypes>(
+    testContractWithCapabilities,
+  ).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -272,7 +280,9 @@ test('Array element types match child projection types', () => {
 
 test('Empty array type when no children', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(testContractWithCapabilities).tables;
+  const tables = schema<TestContractWithCapabilities, CodecTypes>(
+    testContractWithCapabilities,
+  ).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -306,7 +316,9 @@ test('Empty array type when no children', () => {
 
 test('includeMany with default alias uses table name', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(testContractWithCapabilities).tables;
+  const tables = schema<TestContractWithCapabilities, CodecTypes>(
+    testContractWithCapabilities,
+  ).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -344,7 +356,9 @@ test('includeMany with default alias uses table name', () => {
 
 test('includeMany preserves parent column types alongside includes', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(testContractWithCapabilities).tables;
+  const tables = schema<TestContractWithCapabilities, CodecTypes>(
+    testContractWithCapabilities,
+  ).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -483,7 +497,11 @@ test('includeMany with multiple includes preserves all types', () => {
     .includeMany(
       commentTable,
       (on) => on.eqCol(postTable.columns['id']!, commentTable.columns['postId']!),
-      (child) => child.select({ id: commentTable.columns['id']!, content: commentTable.columns['content']! }),
+      (child) =>
+        child.select({
+          id: commentTable.columns['id']!,
+          content: commentTable.columns['content']!,
+        }),
       { alias: 'comments' },
     )
     .select({
@@ -515,7 +533,9 @@ test('includeMany with multiple includes preserves all types', () => {
 
 test('includeMany with nested child projection infers nested array element types', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(testContractWithCapabilities).tables;
+  const tables = schema<TestContractWithCapabilities, CodecTypes>(
+    testContractWithCapabilities,
+  ).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -593,4 +613,3 @@ test('InferNestedProjectionRow correctly infers include types from Includes map'
     comments: Array<{ id: number; content: string }>;
   }>();
 });
-

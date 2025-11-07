@@ -56,7 +56,9 @@ function renderSelect(ast: SelectAst): string {
   const fromClause = `FROM ${quoteIdentifier(ast.from.name)}`;
 
   const joinsClause = ast.joins?.length ? ast.joins.map((join) => renderJoin(join)).join(' ') : '';
-  const includesClause = ast.includes?.length ? ast.includes.map((include) => renderInclude(include)).join(' ') : '';
+  const includesClause = ast.includes?.length
+    ? ast.includes.map((include) => renderInclude(include)).join(' ')
+    : '';
 
   const whereClause = ast.where ? ` WHERE ${renderBinary(ast.where)}` : '';
   const orderClause = ast.orderBy?.length
@@ -143,7 +145,10 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
   // Add ORDER BY if present - it goes inside json_agg() call
   const childOrderBy = include.child.orderBy?.length
     ? ` ORDER BY ${include.child.orderBy
-        .map((order: { expr: ColumnRef; dir: string }) => `${renderColumn(order.expr)} ${order.dir.toUpperCase()}`)
+        .map(
+          (order: { expr: ColumnRef; dir: string }) =>
+            `${renderColumn(order.expr)} ${order.dir.toUpperCase()}`,
+        )
         .join(', ')}`
     : '';
 

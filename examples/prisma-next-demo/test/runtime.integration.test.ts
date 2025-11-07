@@ -436,10 +436,10 @@ describe('runtime execute integration', () => {
             'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
           );
           await client.query('truncate table "post", "user" restart identity cascade');
-          await client.query('insert into "user" (email, "createdAt") values ($1, now()), ($2, now())', [
-            'alice@example.com',
-            'bob@example.com',
-          ]);
+          await client.query(
+            'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
+            ['alice@example.com', 'bob@example.com'],
+          );
           await client.query(
             'insert into "post" (title, "userId", "createdAt") values ($1, $2, now()), ($3, $2, now()), ($4, $5, now())',
             ['First Post', 1, 'Second Post', 'Third Post', 2],

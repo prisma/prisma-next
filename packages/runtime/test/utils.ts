@@ -98,7 +98,10 @@ export async function writeTestContractMarker(
 }
 
 export interface CreateTestRuntimeOptions {
-  readonly verify?: { mode: 'onFirstUse' | 'startup' | 'always'; requireMarker?: boolean };
+  readonly verify?: {
+    mode: 'onFirstUse' | 'startup' | 'always';
+    requireMarker?: boolean;
+  };
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -114,15 +117,23 @@ export function createTestRuntime(
   driver: SqlDriver,
   options?: CreateTestRuntimeOptions,
 ): ReturnType<typeof createRuntime> {
-  const verify: { mode: 'onFirstUse' | 'startup' | 'always'; requireMarker: boolean } =
-    options?.verify
-      ? { ...options.verify, requireMarker: options.verify.requireMarker ?? false }
-      : { mode: 'onFirstUse', requireMarker: false };
+  const verify: {
+    mode: 'onFirstUse' | 'startup' | 'always';
+    requireMarker: boolean;
+  } = options?.verify
+    ? {
+        ...options.verify,
+        requireMarker: options.verify.requireMarker ?? false,
+      }
+    : { mode: 'onFirstUse', requireMarker: false };
   const runtimeOptions: {
     contract: SqlContract<SqlStorage>;
     adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
     driver: SqlDriver;
-    verify: { mode: 'onFirstUse' | 'startup' | 'always'; requireMarker: boolean };
+    verify: {
+      mode: 'onFirstUse' | 'startup' | 'always';
+      requireMarker: boolean;
+    };
     plugins?: readonly Plugin[];
     mode?: 'strict' | 'permissive';
     log?: Log;
@@ -174,6 +185,18 @@ export async function setupE2EDatabase(
   setupFn: (client: Client) => Promise<void>,
 ): Promise<void> {
   await setupTestDatabase(client, contract, setupFn);
+}
+
+/**
+ * Tears down test database by dropping specified tables.
+ */
+export async function teardownTestDatabase(
+  client: Client,
+  tableNames: readonly string[],
+): Promise<void> {
+  for (const tableName of tableNames) {
+    await client.query(`drop table if exists "${tableName}" cascade`);
+  }
 }
 
 // Re-export generic utilities from test-utils

@@ -69,9 +69,10 @@ export function decodeRow(
 
     // Check if this is an include alias (marked with "include:alias" in meta.projection)
     const projection = plan.meta.projection;
-    const projectionValue = projection && typeof projection === 'object' && !Array.isArray(projection)
-      ? (projection as Record<string, string>)[alias]
-      : undefined;
+    const projectionValue =
+      projection && typeof projection === 'object' && !Array.isArray(projection)
+        ? (projection as Record<string, string>)[alias]
+        : undefined;
 
     if (typeof projectionValue === 'string' && projectionValue.startsWith('include:')) {
       // This is an include alias - parse JSON array
