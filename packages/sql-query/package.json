@@ -44,6 +44,10 @@
       "types": "./dist/exports/param.d.ts",
       "import": "./dist/exports/param.js"
     },
+    "./orm": {
+      "types": "./dist/exports/orm.d.ts",
+      "import": "./dist/exports/orm.js"
+    },
     "./types": {
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
