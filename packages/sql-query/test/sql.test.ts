@@ -2,23 +2,22 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, expect, it } from 'vitest';
 
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
+import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import { validateContract } from '../src/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type {
-  ParamDescriptor,
   Adapter,
-  LoweredStatement,
-  SelectAst,
   ColumnBuilder,
+  LoweredStatement,
+  ParamDescriptor,
+  SelectAst,
 } from '../src/types';
-import { createCodecRegistry } from '@prisma-next/sql-target';
-import type { Contract, CodecTypes } from './fixtures/contract.d';
+import type { CodecTypes, Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

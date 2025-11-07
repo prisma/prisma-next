@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
-import type { ContractIR, EmitOptions, ExtensionPack, ExtensionPackManifest } from '../src/types';
 import type { TargetFamilyHook } from '../src/target-family';
-import { join } from 'node:path';
+import type { ContractIR, EmitOptions, ExtensionPack, ExtensionPackManifest } from '../src/types';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
@@ -40,7 +40,7 @@ const mockSqlHook: TargetFamilyHook = {
         }
 
         const match = col.type.match(typeIdRegex);
-        if (match && match[1]) {
+        if (match?.[1]) {
           const namespace = match[1];
           if (!referencedNamespaces.has(namespace) && !packNamespaces.has(namespace)) {
             throw new Error(
@@ -193,7 +193,9 @@ describe('emitter', () => {
       packs,
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have targetFamily');
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR must have targetFamily',
+    );
   });
 
   it('throws error when target is missing', async () => {

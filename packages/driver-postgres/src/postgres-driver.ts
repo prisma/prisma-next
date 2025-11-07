@@ -1,18 +1,18 @@
 import { Pool } from 'pg';
 import type {
-  Pool as PoolType,
-  PoolClient,
-  QueryResult as PgQueryResult,
-  QueryResultRow,
   Client,
+  QueryResult as PgQueryResult,
+  PoolClient,
+  Pool as PoolType,
+  QueryResultRow,
 } from 'pg';
 import Cursor from 'pg-cursor';
 
 import type {
   SqlDriver,
   SqlExecuteRequest,
-  SqlQueryResult,
   SqlExplainResult,
+  SqlQueryResult,
 } from '@prisma-next/sql-target';
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;

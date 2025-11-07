@@ -1,0 +1,77 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignore": ["dist/**", "coverage/**", "node_modules/**", ".prisma/**", "**/*.d.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "error"
+      },
+      "style": {
+        "useImportType": "error"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    },
+    "globals": []
+  },
+  "overrides": [
+    {
+      "include": [
+        "**/*.test.ts",
+        "**/*.test-d.ts",
+        "**/test/**/*.ts",
+        "**/tests/**/*.ts",
+        "packages/node-utils/**/*.ts",
+        "packages/cli/**/*.ts"
+      ],
+      "javascript": {
+        "globals": ["console", "process", "__dirname", "__filename", "URL"]
+      },
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off",
+            "useLiteralKeys": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["**/*.config.ts", "**/vitest.config.ts", "**/tsup.config.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "warn"
+          }
+        }
+      }
+    }
+  ]
+}

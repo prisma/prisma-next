@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 
 describe('param', () => {
@@ -20,4 +20,3 @@ describe('param', () => {
     }).toThrow('Parameter name must be a non-empty string');
   });
 });
-

@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "eslint . --config ../../eslint.config.mjs --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage --max-warnings 0",
+    "lint": "biome check . --config-path ../../biome.json",
     "gen-contract": "node ./scripts/gen-contract.cjs"
   },
   "devDependencies": {

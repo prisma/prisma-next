@@ -1,11 +1,11 @@
-import { createRuntime, type Runtime } from '@prisma-next/runtime';
-import { sql } from '@prisma-next/sql-query/sql';
-import { schema } from '@prisma-next/sql-query/schema';
-import { param } from '@prisma-next/sql-query/param';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { TableRef, ColumnBuilder } from '@prisma-next/sql-query/types';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
+import { type Runtime, createRuntime } from '@prisma-next/runtime';
+import { param } from '@prisma-next/sql-query/param';
+import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { ColumnBuilder, TableRef } from '@prisma-next/sql-query/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 interface PrismaClientOptions {
   readonly contract: SqlContract<SqlStorage>;
@@ -85,7 +85,7 @@ class ModelDelegate {
           throw this.unsupportedError(`Unknown field '${field}' in where clause`);
         }
         // Access column via columns property to avoid conflicts with table properties
-        const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+        const columns = this.table.columns as Record<string, ColumnBuilder> | undefined;
         const column = columns?.[field];
         if (
           !column ||
@@ -121,7 +121,7 @@ class ModelDelegate {
           if (!tableDef || !tableDef.columns[field]) {
             throw this.unsupportedError(`Unknown field '${field}' in select clause`);
           }
-          const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+          const columns = this.table.columns as Record<string, ColumnBuilder> | undefined;
           const column = columns?.[field];
           if (
             !column ||
@@ -137,7 +137,7 @@ class ModelDelegate {
     } else {
       // Default: select all columns from contract definition
       const tableDef = this.contract.storage.tables[tableName];
-      const tableColumns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+      const tableColumns = this.table.columns as Record<string, ColumnBuilder> | undefined;
       if (tableDef && tableColumns) {
         for (const columnName of Object.keys(tableDef.columns)) {
           // Access column via columns property to avoid conflicts with table properties like 'name'
@@ -186,7 +186,7 @@ class ModelDelegate {
       if (!tableDef || !tableDef.columns[field]) {
         throw this.unsupportedError(`Unknown field '${field}' in orderBy clause`);
       }
-      const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+      const columns = this.table.columns as Record<string, ColumnBuilder> | undefined;
       const column = columns?.[field];
       if (
         !column ||
@@ -292,7 +292,6 @@ class ModelDelegate {
     return result;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async update(_args: {
     where: Record<string, unknown>;
     data: Record<string, unknown>;
@@ -300,7 +299,6 @@ class ModelDelegate {
     throw this.unsupportedError('update() mutations are not supported in MVP compatibility layer');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async delete(_args: {
     where: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
@@ -311,7 +309,7 @@ class ModelDelegate {
     // MVP: only simple equality is supported
     for (const [field, value] of Object.entries(where)) {
       if (value === null || value === undefined) {
-        throw this.unsupportedError(`Null/undefined values in where clause not supported in MVP`);
+        throw this.unsupportedError('Null/undefined values in where clause not supported in MVP');
       }
       if (typeof value === 'object' && !Array.isArray(value)) {
         throw this.unsupportedError(
@@ -319,7 +317,7 @@ class ModelDelegate {
         );
       }
       if (Array.isArray(value)) {
-        throw this.unsupportedError(`IN/NOT IN predicates not supported in MVP`);
+        throw this.unsupportedError('IN/NOT IN predicates not supported in MVP');
       }
     }
   }
@@ -355,7 +353,7 @@ class PrismaClientImpl {
       this.runtime = options.runtime;
     } else {
       const adapter = createPostgresAdapter();
-      // eslint-disable-next-line no-undef
+      // biome-ignore lint: Node.js global in CLI context
       const connectionString = options.connectionString ?? process.env['DATABASE_URL'];
 
       if (!connectionString) {
@@ -427,6 +425,7 @@ export class PrismaClient extends PrismaClientImpl {
       (proxy as Record<string, unknown>)[modelName] = delegate;
     }
 
+    // biome-ignore lint/correctness/noConstructorReturn: Proxy pattern requires returning the proxy
     return proxy;
   }
 }

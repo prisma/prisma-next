@@ -8,16 +8,13 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "eslint . --config ../../eslint.config.mjs --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage --max-warnings 0"
+    "lint": "biome check . --config-path ../../biome.json"
   },
   "devDependencies": {
     "tsup": "^8.3.0",
     "typescript": "^5.9.3"
   },
-  "files": [
-    "dist",
-    "schemas"
-  ],
+  "files": ["dist", "schemas"],
   "exports": {
     "./types": {
       "types": "./dist/exports/types.d.ts",

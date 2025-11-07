@@ -13,4 +13,3 @@ export default defineConfig({
   minify: false,
   external: ['@prisma/dev'],
 });
-

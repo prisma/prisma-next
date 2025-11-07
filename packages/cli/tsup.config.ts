@@ -28,4 +28,3 @@ export default defineConfig([
     minify: false,
   },
 ]);
-

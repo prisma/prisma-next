@@ -1,7 +1,7 @@
-import { getUsers } from './queries/get-users';
+import { closeRuntime } from './prisma/runtime';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
-import { closeRuntime } from './prisma/runtime';
+import { getUsers } from './queries/get-users';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
@@ -9,7 +9,7 @@ const [cmd, ...args] = argv;
 (async () => {
   try {
     if (cmd === 'users') {
-      const limit = args[0] ? parseInt(args[0], 10) : 10;
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await getUsers(limit);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'user') {
@@ -18,7 +18,7 @@ const [cmd, ...args] = argv;
         console.error('Usage: pnpm start -- user <userId>');
         process.exit(1);
       }
-      const userId = parseInt(userIdStr, 10);
+      const userId = Number.parseInt(userIdStr, 10);
       const user = await getUserById(userId);
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'posts') {
@@ -27,7 +27,7 @@ const [cmd, ...args] = argv;
         console.error('Usage: pnpm start -- posts <userId>');
         process.exit(1);
       }
-      const userId = parseInt(userIdStr, 10);
+      const userId = Number.parseInt(userIdStr, 10);
       const posts = await getUserPosts(userId);
       console.log(JSON.stringify(posts, null, 2));
     } else {
@@ -41,4 +41,3 @@ const [cmd, ...args] = argv;
     await closeRuntime();
   }
 })();
-

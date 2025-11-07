@@ -1,13 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
-import { codecDefinitions } from '../../adapter-postgres/src/codecs';
-import { encodeParam, encodeParams } from '../src/codecs/encoding';
-import { decodeRow } from '../src/codecs/decoding';
-import { extractTypeIds, validateCodecRegistryCompleteness } from '../src/codecs/validation';
-import type { Plan, ParamDescriptor } from '@prisma-next/sql-query/types';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import type { ParamDescriptor, Plan } from '@prisma-next/sql-query/types';
+import { type CodecRegistry, createCodecRegistry } from '@prisma-next/sql-target';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { Codec } from '@prisma-next/sql-target';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { describe, expect, it } from 'vitest';
+import { codecDefinitions } from '../../adapter-postgres/src/codecs';
+import { decodeRow } from '../src/codecs/decoding';
+import { encodeParam, encodeParams } from '../src/codecs/encoding';
+import { extractTypeIds, validateCodecRegistryCompleteness } from '../src/codecs/validation';
 
 function createRegistry(): CodecRegistry {
   const registry = createCodecRegistry();
@@ -247,29 +247,29 @@ describe('Row Decoding', () => {
     const plan = createMockDslPlan({ email: 'pg/text@1' });
     const row = { email: 'test@example.com' };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['email']).toBe('test@example.com');
+    expect(decoded.email).toBe('test@example.com');
   });
 
   it('decodes number value', () => {
     const plan = createMockDslPlan({ id: 'pg/int4@1' });
     const row = { id: 42 };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['id']).toBe(42);
+    expect(decoded.id).toBe(42);
   });
 
   it('decodes timestamptz to ISO string', () => {
     const plan = createMockDslPlan({ createdAt: 'pg/timestamptz@1' });
     const row = { createdAt: '2024-01-15T10:30:00.000Z' };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['createdAt']).toBe('2024-01-15T10:30:00.000Z');
-    expect(typeof decoded['createdAt']).toBe('string');
+    expect(decoded.createdAt).toBe('2024-01-15T10:30:00.000Z');
+    expect(typeof decoded.createdAt).toBe('string');
   });
 
   it('decodes timestamp to ISO string', () => {
     const plan = createMockDslPlan({ createdAt: 'pg/timestamp@1' });
     const row = { createdAt: '2024-01-15T10:30:00.000Z' };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['createdAt']).toBe('2024-01-15T10:30:00.000Z');
+    expect(decoded.createdAt).toBe('2024-01-15T10:30:00.000Z');
   });
 
   it('handles Date object from driver', () => {
@@ -277,21 +277,21 @@ describe('Row Decoding', () => {
     const date = new Date('2024-01-15T10:30:00Z');
     const row = { createdAt: date };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['createdAt']).toBe('2024-01-15T10:30:00.000Z');
+    expect(decoded.createdAt).toBe('2024-01-15T10:30:00.000Z');
   });
 
   it('passes through null without decoding', () => {
     const plan = createMockDslPlan({ email: 'pg/text@1' });
     const row = { email: null };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['email']).toBeNull();
+    expect(decoded.email).toBeNull();
   });
 
   it('passes through undefined without decoding', () => {
     const plan = createMockDslPlan({ email: 'pg/text@1' });
     const row = { email: undefined };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['email']).toBeUndefined();
+    expect(decoded.email).toBeUndefined();
   });
 
   it('uses plan annotation codec override', () => {
@@ -306,7 +306,7 @@ describe('Row Decoding', () => {
     };
     const row = { email: 'test@example.com' };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['email']).toBe('test@example.com');
+    expect(decoded.email).toBe('test@example.com');
   });
 
   it('falls back to driver value when no codec found', () => {
@@ -326,7 +326,7 @@ describe('Row Decoding', () => {
     };
     const row = { unknownField: 'some-value' };
     const decoded = decodeRow(row, planWithProjection, registry);
-    expect(decoded['unknownField']).toBe('some-value');
+    expect(decoded.unknownField).toBe('some-value');
   });
 
   it('decodes multiple fields', () => {
@@ -341,9 +341,9 @@ describe('Row Decoding', () => {
       createdAt: '2024-01-15T10:30:00.000Z',
     };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['id']).toBe(42);
-    expect(decoded['email']).toBe('test@example.com');
-    expect(decoded['createdAt']).toBe('2024-01-15T10:30:00.000Z');
+    expect(decoded.id).toBe(42);
+    expect(decoded.email).toBe('test@example.com');
+    expect(decoded.createdAt).toBe('2024-01-15T10:30:00.000Z');
   });
 
   it('throws RUNTIME.DECODE_FAILED on decode error', () => {
@@ -409,8 +409,8 @@ describe('Row Decoding', () => {
       const runtimeError = error as Error & { code: string; details?: Record<string, unknown> };
       expect(runtimeError.code).toBe('RUNTIME.DECODE_FAILED');
       expect(runtimeError.details).toBeDefined();
-      expect(runtimeError.details?.['alias']).toBe('id');
-      expect(runtimeError.details?.['codec']).toBe('test/failing@1');
+      expect(runtimeError.details?.alias).toBe('id');
+      expect(runtimeError.details?.codec).toBe('test/failing@1');
     }
   });
 
@@ -444,8 +444,8 @@ describe('Row Decoding', () => {
       expect(error).toBeInstanceOf(Error);
       const runtimeError = error as Error & { code: string; details?: Record<string, unknown> };
       expect(runtimeError.code).toBe('RUNTIME.DECODE_FAILED');
-      expect(runtimeError.details?.['wirePreview']).toBeDefined();
-      const preview = runtimeError.details?.['wirePreview'] as string;
+      expect(runtimeError.details?.wirePreview).toBeDefined();
+      const preview = runtimeError.details?.wirePreview as string;
       expect(preview.length).toBeLessThanOrEqual(103);
       expect(preview.endsWith('...')).toBe(true);
     }
@@ -467,8 +467,8 @@ describe('Row Decoding', () => {
     };
     const row = { id: 42, email: 'test@example.com' };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['id']).toBe(42);
-    expect(decoded['email']).toBe('test@example.com');
+    expect(decoded.id).toBe(42);
+    expect(decoded.email).toBe('test@example.com');
   });
 
   it('handles plan without projection', () => {
@@ -485,8 +485,8 @@ describe('Row Decoding', () => {
     };
     const row = { id: 42, email: 'test@example.com' };
     const decoded = decodeRow(row, plan, registry);
-    expect(decoded['id']).toBe(42);
-    expect(decoded['email']).toBe('test@example.com');
+    expect(decoded.id).toBe(42);
+    expect(decoded.email).toBe('test@example.com');
   });
 });
 
@@ -743,10 +743,12 @@ describe('Codec Registry Validation', () => {
       const runtimeError = error as Error & { code: string; details?: Record<string, unknown> };
       expect(runtimeError.code).toBe('RUNTIME.CODEC_MISSING');
       expect(runtimeError.details).toBeDefined();
-      const invalidCodecs = runtimeError.details?.['invalidCodecs'] as Array<{ table: string; column: string; typeId: string }> | undefined;
+      const invalidCodecs = runtimeError.details?.invalidCodecs as
+        | Array<{ table: string; column: string; typeId: string }>
+        | undefined;
       expect(invalidCodecs).toBeDefined();
-      expect(invalidCodecs?.some(c => c.typeId === 'unknown/type@1')).toBe(true);
-      expect(runtimeError.details?.['contractTarget']).toBe('postgres');
+      expect(invalidCodecs?.some((c) => c.typeId === 'unknown/type@1')).toBe(true);
+      expect(runtimeError.details?.contractTarget).toBe('postgres');
     }
   });
 

@@ -1,19 +1,19 @@
-import { type } from 'arktype';
 import type {
-  SqlContract,
-  SqlStorage,
-  SqlMappings,
+  ForeignKey,
+  ForeignKeyReferences,
+  Index,
   ModelDefinition,
   ModelField,
   ModelStorage,
+  PrimaryKey,
+  SqlContract,
+  SqlMappings,
+  SqlStorage,
   StorageColumn,
   StorageTable,
-  PrimaryKey,
   UniqueConstraint,
-  Index,
-  ForeignKeyReferences,
-  ForeignKey,
 } from '@prisma-next/sql-target';
+import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
 /**
@@ -235,11 +235,11 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
             // Check that there's a foreign key matching this relation
             const hasMatchingFk = table.foreignKeys?.some((fk) => {
               return (
-                fk.columns.length === on.childCols!.length &&
-                fk.columns.every((col, i) => col === on.childCols![i]) &&
+                fk.columns.length === on.childCols?.length &&
+                fk.columns.every((col, i) => col === on.childCols?.[i]) &&
                 fk.references.table &&
-                fk.references.columns.length === on.parentCols!.length &&
-                fk.references.columns.every((col, i) => col === on.parentCols![i])
+                fk.references.columns.length === on.parentCols?.length &&
+                fk.references.columns.every((col, i) => col === on.parentCols?.[i])
               );
             });
 

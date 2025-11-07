@@ -1,20 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { Client } from 'pg';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { budgets } from '../src/plugins/budgets';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import {
-  createDevDatabase,
-  setupTestDatabase,
-  teardownTestDatabase,
-  createTestRuntime,
-  executePlanAndCollect,
-  drainPlanExecution,
-} from './utils';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { sql } from '@prisma-next/sql-query/sql';
 import { schema } from '@prisma-next/sql-query/schema';
 import { validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import { budgets } from '../src/plugins/budgets';
+import {
+  createDevDatabase,
+  createTestRuntime,
+  drainPlanExecution,
+  executePlanAndCollect,
+  setupTestDatabase,
+  teardownTestDatabase,
+} from './utils';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -67,7 +67,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
   });
 
   beforeEach(async () => {
-    await setupTestDatabase(client, fixtureContract, async (c) => {
+    await setupTestDatabase(client, fixtureContract, async (c: typeof client) => {
       await c.query('drop table if exists "user"');
       await c.query('create table "user" (id text primary key, email text not null)');
 
@@ -98,12 +98,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables['user']!;
+    const userTable = tables.user!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .select({ id: userColumns.id!, email: userColumns.email! })
       .build();
 
     // Unbounded SELECT should be blocked pre-exec (estimated 10_000 > maxRows 50)
@@ -129,17 +129,17 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables['user']!;
+    const userTable = tables.user!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .select({ id: userColumns.id!, email: userColumns.email! })
       .limit(5)
       .build();
 
     // Bounded SELECT with LIMIT 5 should pass
-    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
+    const results = await executePlanAndCollect(runtime, plan);
     expect(results.length).toBe(5);
   });
 
@@ -157,13 +157,13 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables['user']!;
+    const userTable = tables.user!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     // Use LIMIT that's within heuristic but exceeds streaming budget
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .select({ id: userColumns.id!, email: userColumns.email! })
       .limit(100)
       .build();
 
@@ -214,7 +214,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     const plan = raw.with({ annotations: { limit: 5 } })`SELECT id, email FROM "user" LIMIT 5`;
 
     // Raw SELECT with limit annotation should pass
-    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
+    const results = await executePlanAndCollect(runtime, plan);
     expect(results.length).toBeLessThanOrEqual(5);
   });
 
@@ -241,16 +241,16 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables['user']!;
+    const userTable = tables.user!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .select({ id: userColumns.id!, email: userColumns.email! })
       .limit(1)
       .build();
 
-    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
+    const results = await executePlanAndCollect(runtime, plan);
 
     expect(results.length).toBeGreaterThan(0);
     expect(logWarn).toHaveBeenCalledWith(
@@ -277,12 +277,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables['user']!;
+    const userTable = tables.user!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .select({ id: userColumns.id!, email: userColumns.email! })
       .limit(1)
       .build();
 
@@ -317,16 +317,16 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables['user']!;
+    const userTable = tables.user!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .select({ id: userColumns.id!, email: userColumns.email! })
       .limit(1)
       .build();
 
-    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
+    const results = await executePlanAndCollect(runtime, plan);
 
     expect(results.length).toBeGreaterThan(0);
     expect(logWarn).toHaveBeenCalledWith(
@@ -358,16 +358,16 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables['user']!;
+    const userTable = tables.user!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .select({ id: userColumns.id!, email: userColumns.email! })
       .limit(1)
       .build();
 
-    const results = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
+    const results = await executePlanAndCollect(runtime, plan);
 
     expect(results.length).toBeGreaterThan(0);
     expect(logWarn).not.toHaveBeenCalledWith(

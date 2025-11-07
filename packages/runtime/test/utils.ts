@@ -1,55 +1,100 @@
-import {
-  createDevDatabase,
-  withDevDatabase,
-  withClient,
-  executeStatement,
-  drainAsyncIterable,
-  collectAsync,
-  executePlanAndCollect as executePlanAndCollectBase,
-  drainPlanExecution,
-  setupTestDatabase as setupTestDatabaseBase,
-  teardownTestDatabase,
-  writeTestContractMarker as writeTestContractMarkerBase,
-  loadContractFromDisk as loadContractFromDiskBase,
-  emitAndVerifyContract as emitAndVerifyContractBase,
-  setupE2EDatabase as setupE2EDatabaseBase,
-  type DevDatabase,
-  type ContractMarkerStatements,
-} from '@prisma-next/test-utils';
-import type { Plan, ResultType } from '@prisma-next/sql-query/types';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
   createRuntime,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
-} from '@prisma-next/runtime';
-import type { Plugin, Log } from '@prisma-next/runtime';
+} from '../src/exports';
+import type { Log, Plugin } from '../src/exports';
+import type { SqlStatement } from '../src/exports';
+import { drainAsyncIterable, collectAsync } from '@prisma-next/test-utils';
+import type {
+  Adapter,
+  LoweredStatement,
+  Plan,
+  ResultType,
+  SelectAst,
+} from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { SqlDriver } from '@prisma-next/sql-target';
-import type { Adapter, SelectAst, LoweredStatement } from '@prisma-next/sql-query/types';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { Client } from 'pg';
 
-export {
-  createDevDatabase,
-  withDevDatabase,
-  withClient,
-  executeStatement,
-  drainAsyncIterable,
-  collectAsync,
-  drainPlanExecution,
-  teardownTestDatabase,
-  type DevDatabase,
-};
+/**
+ * Executes a plan and collects all results into an array.
+ * This helper DRYs up the common pattern of executing plans in tests.
+ * The return type is inferred from the plan's type parameter.
+ */
+export async function executePlanAndCollect<P extends Plan>(
+  runtime: ReturnType<typeof createRuntime>,
+  plan: P,
+): Promise<ResultType<P>[]> {
+  type Row = ResultType<P>;
+  return collectAsync<Row>(runtime.execute<Row>(plan));
+}
 
-export async function executePlanAndCollect<P extends Plan | Record<string, unknown>>(
-  runtime: { execute<Row = Record<string, unknown>>(plan: unknown): AsyncIterable<Row> },
-  plan: P | Plan,
-): Promise<P extends Plan ? ResultType<P>[] : P[]> {
-  return executePlanAndCollectBase(runtime, plan) as unknown as P extends Plan
-    ? ResultType<P>[]
-    : P[];
+/**
+ * Drains a plan execution, consuming all results without collecting them.
+ * Useful for testing side effects without memory overhead.
+ */
+export async function drainPlanExecution(
+  runtime: ReturnType<typeof createRuntime>,
+  plan: Plan,
+): Promise<void> {
+  return drainAsyncIterable(runtime.execute(plan));
+}
+
+/**
+ * Executes a SQL statement on a database client.
+ */
+export async function executeStatement(client: Client, statement: SqlStatement): Promise<void> {
+  if (statement.params.length > 0) {
+    await client.query(statement.sql, [...statement.params]);
+    return;
+  }
+
+  await client.query(statement.sql);
+}
+
+/**
+ * Sets up database schema and data, then writes the contract marker.
+ * This helper DRYs up the common pattern of database setup in tests.
+ */
+export async function setupTestDatabase(
+  client: Client,
+  contract: SqlContract<SqlStorage>,
+  setupFn: (client: Client) => Promise<void>,
+): Promise<void> {
+  await client.query('drop schema if exists prisma_contract cascade');
+  await client.query('create schema if not exists public');
+
+  await setupFn(client);
+
+  await executeStatement(client, ensureSchemaStatement);
+  await executeStatement(client, ensureTableStatement);
+  const write = writeContractMarker({
+    coreHash: contract.coreHash,
+    profileHash: contract.profileHash ?? contract.coreHash,
+    contractJson: contract,
+    canonicalVersion: 1,
+  });
+  await executeStatement(client, write.insert);
+}
+
+/**
+ * Writes a contract marker to the database.
+ * This helper DRYs up the common pattern of writing contract markers in tests.
+ */
+export async function writeTestContractMarker(
+  client: Client,
+  contract: SqlContract<SqlStorage>,
+): Promise<void> {
+  const write = writeContractMarker({
+    coreHash: contract.coreHash,
+    profileHash: contract.profileHash ?? contract.coreHash,
+    contractJson: contract,
+    canonicalVersion: 1,
+  });
+  await executeStatement(client, write.insert);
 }
 
 export interface CreateTestRuntimeOptions {
@@ -59,27 +104,10 @@ export interface CreateTestRuntimeOptions {
   readonly log?: Log;
 }
 
-const markerStatements: ContractMarkerStatements = {
-  ensureSchema: ensureSchemaStatement,
-  ensureTable: ensureTableStatement,
-  writeMarker: writeContractMarker,
-};
-
-export async function setupTestDatabase(
-  client: Client,
-  contract: SqlContract<SqlStorage>,
-  setupFn: (client: Client) => Promise<void>,
-): Promise<void> {
-  return setupTestDatabaseBase(client, contract, setupFn, markerStatements);
-}
-
-export async function writeTestContractMarker(
-  client: Client,
-  contract: SqlContract<SqlStorage>,
-): Promise<void> {
-  return writeTestContractMarkerBase(client, contract, markerStatements);
-}
-
+/**
+ * Creates a runtime with standard test configuration.
+ * This helper DRYs up the common pattern of runtime creation in tests.
+ */
 export function createTestRuntime(
   contract: SqlContract<SqlStorage>,
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
@@ -116,6 +144,10 @@ export function createTestRuntime(
   return createRuntime(runtimeOptions);
 }
 
+/**
+ * Creates a runtime with the given contract and database client.
+ * This helper DRYs up the common pattern of runtime creation in e2e tests.
+ */
 export function createTestRuntimeFromClient(
   contract: SqlContract<SqlStorage>,
   client: Client,
@@ -132,33 +164,21 @@ export function createTestRuntimeFromClient(
   });
 }
 
-export async function loadContractFromDisk<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
->(contractJsonPath: string): Promise<TContract> {
-  return loadContractFromDiskBase<TContract>(contractJsonPath, validateContract);
-}
-
-export async function emitAndVerifyContract(
-  cliPath: string,
-  contractTsPath: string,
-  adapterPath: string,
-  outputDir: string,
-  expectedContractJsonPath: string,
-): Promise<SqlContract<SqlStorage>> {
-  return emitAndVerifyContractBase(
-    cliPath,
-    contractTsPath,
-    adapterPath,
-    outputDir,
-    expectedContractJsonPath,
-    validateContract,
-  ) as Promise<SqlContract<SqlStorage>>;
-}
-
+/**
+ * Sets up database schema and data, then writes the contract marker.
+ * This helper DRYs up the common pattern of database setup in e2e tests.
+ */
 export async function setupE2EDatabase(
   client: Client,
   contract: SqlContract<SqlStorage>,
   setupFn: (client: Client) => Promise<void>,
 ): Promise<void> {
-  return setupE2EDatabaseBase(client, contract, setupFn, markerStatements);
+  await setupTestDatabase(client, contract, setupFn);
 }
+
+// Re-export generic utilities from test-utils
+export {
+  createDevDatabase,
+  withClient,
+  type DevDatabase,
+} from '@prisma-next/test-utils';

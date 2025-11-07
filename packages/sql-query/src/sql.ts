@@ -1,6 +1,6 @@
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 import type {
   BinaryBuilder,
   BuildOptions,
@@ -211,7 +211,15 @@ class SelectBuilderImpl<
   select<
     P extends Record<
       string,
-      ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+      | ColumnBuilder
+      | Record<
+          string,
+          | ColumnBuilder
+          | Record<
+              string,
+              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+            >
+        >
     >,
   >(
     projection: P,
@@ -438,7 +446,6 @@ class SelectBuilderImpl<
   }
 }
 
-
 function isColumnBuilder(value: unknown): value is ColumnBuilder {
   return (
     typeof value === 'object' &&
@@ -451,7 +458,15 @@ function isColumnBuilder(value: unknown): value is ColumnBuilder {
 function flattenProjection(
   projection: Record<
     string,
-    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+    | ColumnBuilder
+    | Record<
+        string,
+        | ColumnBuilder
+        | Record<
+            string,
+            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          >
+      >
   >,
   tracker: AliasTracker,
   currentPath: string[] = [],
@@ -470,7 +485,15 @@ function flattenProjection(
       const nested = flattenProjection(
         value as Record<
           string,
-          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+          | ColumnBuilder
+          | Record<
+              string,
+              | ColumnBuilder
+              | Record<
+                  string,
+                  ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+                >
+            >
         >,
         tracker,
         path,
@@ -478,7 +501,9 @@ function flattenProjection(
       aliases.push(...nested.aliases);
       columns.push(...nested.columns);
     } else {
-      throw planInvalid(`Invalid projection value at path ${path.join('.')}: expected ColumnBuilder or nested object`);
+      throw planInvalid(
+        `Invalid projection value at path ${path.join('.')}: expected ColumnBuilder or nested object`,
+      );
     }
   }
 
@@ -489,7 +514,15 @@ function buildProjectionState(
   _table: TableRef,
   projection: Record<
     string,
-    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+    | ColumnBuilder
+    | Record<
+        string,
+        | ColumnBuilder
+        | Record<
+            string,
+            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          >
+      >
   >,
 ): ProjectionState {
   const tracker = new AliasTracker();
@@ -517,15 +550,15 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();
   const refsTables = new Set<string>([args.table.name]);
 
-  args.projection.columns.forEach((column) => {
+  for (const column of args.projection.columns) {
     refsColumns.set(`${column.table}.${column.column}`, {
       table: column.table,
       column: column.column,
     });
-  });
+  }
 
   if (args.joins) {
-    args.joins.forEach((join) => {
+    for (const join of args.joins) {
       refsTables.add(join.table.name);
       refsColumns.set(`${join.on.left.table}.${join.on.left.column}`, {
         table: join.on.left.table,
@@ -535,7 +568,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
         table: join.on.right.table,
         column: join.on.right.column,
       });
-    });
+    }
   }
 
   if (args.where) {

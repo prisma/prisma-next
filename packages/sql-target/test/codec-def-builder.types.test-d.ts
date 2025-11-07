@@ -23,8 +23,11 @@ test('CodecTypes structure matches expected types with correct literal IDs', () 
     decode: (wire: boolean) => wire,
   });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _codecs = defineCodecs().add('text', textCodec).add('int4', intCodec).add('bool', boolCodec);
+  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
+  const _codecs = defineCodecs()
+    .add('text', textCodec)
+    .add('int4', intCodec)
+    .add('bool', boolCodec);
 
   // Verify literal IDs are preserved as keys
   expectTypeOf<keyof typeof _codecs.CodecTypes>().toEqualTypeOf<
@@ -62,8 +65,11 @@ test('ScalarToJs structure matches expected types with correct JS types', () => 
     decode: (wire: string): Date => new Date(wire),
   });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _codecs = defineCodecs().add('text', textCodec).add('int4', intCodec).add('date', dateCodec);
+  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
+  const _codecs = defineCodecs()
+    .add('text', textCodec)
+    .add('int4', intCodec)
+    .add('date', dateCodec);
 
   // Verify literal scalar names are preserved as keys
   expectTypeOf<keyof typeof _codecs.ScalarToJs>().toEqualTypeOf<'text' | 'int4' | 'date'>();
@@ -82,8 +88,8 @@ test('literal types are preserved (not widened to string)', () => {
     decode: (wire: string) => wire,
   });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _codecs = defineCodecs().add('text', textCodec);
+  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
+  const _codecs = defineCodecs().add('text', textCodec);
 
   type CodecTypes = typeof _codecs.CodecTypes;
   type DataTypes = typeof _codecs.dataTypes;
@@ -101,8 +107,8 @@ test('ExtractCodecTypes extracts correct types from builder', () => {
     decode: (wire: string) => wire,
   });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _codecs = defineCodecs().add('text', textCodec);
+  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
+  const _codecs = defineCodecs().add('text', textCodec);
 
   // Verify literal ID is preserved as key
   expectTypeOf<keyof typeof _codecs.CodecTypes>().toEqualTypeOf<'pg/text@1'>();
@@ -120,8 +126,8 @@ test('ExtractScalarToJs extracts correct types from builder', () => {
     decode: (wire: string) => wire,
   });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _codecs = defineCodecs().add('text', textCodec);
+  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
+  const _codecs = defineCodecs().add('text', textCodec);
 
   type ScalarToJs = typeof _codecs.ScalarToJs;
 
@@ -144,7 +150,7 @@ test('builder chain preserves literal types and aggregates correctly', () => {
   });
 
   const builder1 = defineCodecs().add('text', textCodec);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _builder2 = builder1.add('int4', intCodec);
 
   type Builder1Types = typeof builder1.CodecTypes;
@@ -207,8 +213,8 @@ test('dataTypes preserves literal type IDs', () => {
     decode: (wire: number) => wire,
   });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _codecs = defineCodecs().add('text', textCodec).add('int4', intCodec);
+  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
+  const _codecs = defineCodecs().add('text', textCodec).add('int4', intCodec);
 
   type DataTypes = typeof _codecs.dataTypes;
 

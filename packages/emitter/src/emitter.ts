@@ -1,8 +1,8 @@
-import { computeCoreHash, computeProfileHash } from './hashing';
-import { canonicalizeContract } from './canonicalization';
-import type { ContractIR, EmitOptions, EmitResult, ExtensionPack } from './types';
-import type { TargetFamilyHook } from './target-family';
 import { format } from 'prettier';
+import { canonicalizeContract } from './canonicalization';
+import { computeCoreHash, computeProfileHash } from './hashing';
+import type { TargetFamilyHook } from './target-family';
+import type { ContractIR, EmitOptions, EmitResult, ExtensionPack } from './types';
 
 function validateCoreStructure(ir: ContractIR): void {
   if (!ir.targetFamily) {

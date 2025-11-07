@@ -1,12 +1,12 @@
 import { expectTypeOf, test } from 'vitest';
-import { defineContract } from '../src/contract-builder';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
 import { validateContract } from '../src/contract';
+import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { ResultType, Plan } from '../src/types';
-import type { Contract, CodecTypes } from './fixtures/contract.d';
-import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
+import type { Plan, ResultType } from '../src/types';
+import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' assert { type: 'json' };
 
 test('builder contract types match fixture contract types', () => {
@@ -28,8 +28,8 @@ test('builder contract types match fixture contract types', () => {
   const _validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
   const _fixtureContract = validateContract<Contract>(contractJson);
 
-  type BuilderUserTable = NonNullable<typeof _validatedBuilderContract.storage.tables['user']>;
-  type FixtureUserTable = NonNullable<typeof _fixtureContract.storage.tables['user']>;
+  type BuilderUserTable = NonNullable<(typeof _validatedBuilderContract.storage.tables)['user']>;
+  type FixtureUserTable = NonNullable<(typeof _fixtureContract.storage.tables)['user']>;
 
   expectTypeOf<BuilderUserTable>().toHaveProperty('columns');
   expectTypeOf<FixtureUserTable>().toHaveProperty('columns');
@@ -53,8 +53,10 @@ test('ResultType inference works identically to fixture contract', () => {
 
   const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof validatedBuilderContract, CodecTypes>(validatedBuilderContract).tables;
-  const userTable = tables['user'];
+  const tables = schema<typeof validatedBuilderContract, CodecTypes>(
+    validatedBuilderContract,
+  ).tables;
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
 
   const _plan = sql<typeof validatedBuilderContract, CodecTypes>({
@@ -63,9 +65,9 @@ test('ResultType inference works identically to fixture contract', () => {
   })
     .from(userTable)
     .select({
-      id: userTable.columns['id']!,
-      email: userTable.columns['email']!,
-      createdAt: userTable.columns['createdAt']!,
+      id: userTable.columns.id!,
+      email: userTable.columns.email!,
+      createdAt: userTable.columns.createdAt!,
     })
     .build();
 
@@ -73,14 +75,14 @@ test('ResultType inference works identically to fixture contract', () => {
 
   const _fixtureContract = validateContract<Contract>(contractJson);
   const fixtureTables = schema<Contract, CodecTypes>(_fixtureContract).tables;
-  const fixtureUserTable = fixtureTables['user'];
+  const fixtureUserTable = fixtureTables.user;
   if (!fixtureUserTable) throw new Error('fixture user table not found');
   const _fixturePlan = sql<Contract, CodecTypes>({ contract: _fixtureContract, adapter })
     .from(fixtureUserTable)
     .select({
-      id: fixtureUserTable.columns['id']!,
-      email: fixtureUserTable.columns['email']!,
-      createdAt: fixtureUserTable.columns['createdAt']!,
+      id: fixtureUserTable.columns.id!,
+      email: fixtureUserTable.columns.email!,
+      createdAt: fixtureUserTable.columns.createdAt!,
     })
     .build();
 
@@ -112,15 +114,15 @@ test('codec type inference via type option', () => {
   const validated = validateContract<typeof contract>(contract);
   const adapter = createPostgresAdapter();
   const tables = schema<typeof validated, CodecTypes>(validated).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
 
   const _plan = sql<typeof validated, CodecTypes>({ contract: validated, adapter })
     .from(userTable)
     .select({
-      id: userTable.columns['id']!,
-      email: userTable.columns['email']!,
-      createdAt: userTable.columns['createdAt']!,
+      id: userTable.columns.id!,
+      email: userTable.columns.email!,
+      createdAt: userTable.columns.createdAt!,
     })
     .build();
 
@@ -143,9 +145,7 @@ test('contract structure type matches SqlContract', () => {
   const contract = defineContract<CodecTypes>()
     .target('postgres')
     .table('user', (t) =>
-      t
-        .column('id', 'int4', { nullable: false })
-        .column('email', 'text', { nullable: false }),
+      t.column('id', 'int4', { nullable: false }).column('email', 'text', { nullable: false }),
     )
     .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
     .build();
@@ -158,4 +158,3 @@ test('contract structure type matches SqlContract', () => {
   expectTypeOf(contract).toHaveProperty('storage');
   expectTypeOf(contract).toHaveProperty('mappings');
 });
-

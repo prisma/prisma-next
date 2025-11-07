@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { codec, defineCodecs } from '../src/codecs';
 
 describe('defineCodecs() function', () => {
@@ -36,10 +36,10 @@ describe('CodecDefBuilder interface', () => {
 
       const builder = defineCodecs().add('init', testCodec);
       const definitions = builder.codecDefinitions;
-      expect(definitions['init']).toBeDefined();
-      expect(definitions['init']?.typeId).toBe('test/init@1');
-      expect(definitions['init']?.scalar).toBe('init');
-      expect(definitions['init']?.codec).toBe(testCodec);
+      expect(definitions.init).toBeDefined();
+      expect(definitions.init?.typeId).toBe('test/init@1');
+      expect(definitions.init?.scalar).toBe('init');
+      expect(definitions.init?.codec).toBe(testCodec);
     });
 
     it('populates CodecTypes property correctly', () => {
@@ -84,8 +84,8 @@ describe('CodecDefBuilder interface', () => {
       const builder = defineCodecs().add('add', testCodec);
       expect(builder).toBeDefined();
       expect(builder.codecDefinitions).toBeDefined();
-      expect(builder.codecDefinitions['add']).toBeDefined();
-      expect(builder.codecDefinitions['add']!.typeId).toBe('test/add@1');
+      expect(builder.codecDefinitions.add).toBeDefined();
+      expect(builder.codecDefinitions.add?.typeId).toBe('test/add@1');
     });
 
     it('preserves existing codecs when adding new one', () => {
@@ -105,10 +105,10 @@ describe('CodecDefBuilder interface', () => {
 
       const builder = defineCodecs().add('preserve1', codec1).add('preserve2', codec2);
 
-      expect(builder.codecDefinitions['preserve1']).toBeDefined();
-      expect(builder.codecDefinitions['preserve2']).toBeDefined();
-      expect(builder.codecDefinitions['preserve1']!.typeId).toBe('test/preserve1@1');
-      expect(builder.codecDefinitions['preserve2']!.typeId).toBe('test/preserve2@1');
+      expect(builder.codecDefinitions.preserve1).toBeDefined();
+      expect(builder.codecDefinitions.preserve2).toBeDefined();
+      expect(builder.codecDefinitions.preserve1?.typeId).toBe('test/preserve1@1');
+      expect(builder.codecDefinitions.preserve2?.typeId).toBe('test/preserve2@1');
     });
 
     it('overwrites existing scalar name if same name used twice', () => {
@@ -128,9 +128,9 @@ describe('CodecDefBuilder interface', () => {
 
       const builder = defineCodecs().add('overwrite', codec1).add('overwrite', codec2);
 
-      expect(builder.codecDefinitions['overwrite']).toBeDefined();
-      expect(builder.codecDefinitions['overwrite']!.typeId).toBe('test/overwrite2@1');
-      expect(builder.codecDefinitions['overwrite']!.codec).toBe(codec2);
+      expect(builder.codecDefinitions.overwrite).toBeDefined();
+      expect(builder.codecDefinitions.overwrite?.typeId).toBe('test/overwrite2@1');
+      expect(builder.codecDefinitions.overwrite?.codec).toBe(codec2);
     });
 
     it('is chainable - can add multiple codecs in sequence', () => {
@@ -160,9 +160,9 @@ describe('CodecDefBuilder interface', () => {
         .add('chain2', codec2)
         .add('chain3', codec3);
 
-      expect(builder.codecDefinitions['chain1']).toBeDefined();
-      expect(builder.codecDefinitions['chain2']).toBeDefined();
-      expect(builder.codecDefinitions['chain3']).toBeDefined();
+      expect(builder.codecDefinitions.chain1).toBeDefined();
+      expect(builder.codecDefinitions.chain2).toBeDefined();
+      expect(builder.codecDefinitions.chain3).toBeDefined();
       expect(Object.keys(builder.codecDefinitions).length).toBe(3);
     });
 
@@ -180,10 +180,10 @@ describe('CodecDefBuilder interface', () => {
       expect(builder1).not.toBe(builder2);
       expect(
         'immutable1' in builder1.codecDefinitions
-          ? builder1.codecDefinitions['immutable1']
+          ? builder1.codecDefinitions.immutable1
           : undefined,
       ).toBeUndefined();
-      expect(builder2.codecDefinitions['immutable1']).toBeDefined();
+      expect(builder2.codecDefinitions.immutable1).toBeDefined();
     });
   });
 
@@ -199,13 +199,13 @@ describe('CodecDefBuilder interface', () => {
       const builder = defineCodecs().add('structure', testCodec);
       const definitions = builder.codecDefinitions;
 
-      expect(definitions['structure']).toBeDefined();
-      expect(definitions['structure']).toHaveProperty('typeId');
-      expect(definitions['structure']).toHaveProperty('scalar');
-      expect(definitions['structure']).toHaveProperty('codec');
-      expect(definitions['structure']).toHaveProperty('input');
-      expect(definitions['structure']).toHaveProperty('output');
-      expect(definitions['structure']).toHaveProperty('jsType');
+      expect(definitions.structure).toBeDefined();
+      expect(definitions.structure).toHaveProperty('typeId');
+      expect(definitions.structure).toHaveProperty('scalar');
+      expect(definitions.structure).toHaveProperty('codec');
+      expect(definitions.structure).toHaveProperty('input');
+      expect(definitions.structure).toHaveProperty('output');
+      expect(definitions.structure).toHaveProperty('jsType');
     });
 
     it('includes all codecs', () => {
@@ -233,9 +233,9 @@ describe('CodecDefBuilder interface', () => {
       const builder = defineCodecs().add('all1', codec1).add('all2', codec2).add('all3', codec3);
 
       const definitions = builder.codecDefinitions;
-      expect(definitions['all1']).toBeDefined();
-      expect(definitions['all2']).toBeDefined();
-      expect(definitions['all3']).toBeDefined();
+      expect(definitions.all1).toBeDefined();
+      expect(definitions.all2).toBeDefined();
+      expect(definitions.all3).toBeDefined();
       expect(Object.keys(definitions).length).toBe(3);
     });
 
@@ -248,7 +248,7 @@ describe('CodecDefBuilder interface', () => {
       });
 
       const builder = defineCodecs().add('typeid', testCodec);
-      expect(builder.codecDefinitions['typeid']!.typeId).toBe('test/typeid@1');
+      expect(builder.codecDefinitions.typeid?.typeId).toBe('test/typeid@1');
     });
 
     it('preserves correct scalar names', () => {
@@ -260,7 +260,7 @@ describe('CodecDefBuilder interface', () => {
       });
 
       const builder = defineCodecs().add('scalar', testCodec);
-      expect(builder.codecDefinitions['scalar']!.scalar).toBe('scalar');
+      expect(builder.codecDefinitions.scalar?.scalar).toBe('scalar');
     });
   });
 
@@ -274,7 +274,7 @@ describe('CodecDefBuilder interface', () => {
       });
 
       const builder = defineCodecs().add('datatypes', testCodec);
-      expect(builder.dataTypes['datatypes']).toBe('test/datatypes@1');
+      expect(builder.dataTypes.datatypes).toBe('test/datatypes@1');
     });
 
     it('includes all codecs', () => {
@@ -294,8 +294,8 @@ describe('CodecDefBuilder interface', () => {
 
       const builder = defineCodecs().add('data1', codec1).add('data2', codec2);
 
-      expect(builder.dataTypes['data1']).toBe('test/data1@1');
-      expect(builder.dataTypes['data2']).toBe('test/data2@1');
+      expect(builder.dataTypes.data1).toBe('test/data1@1');
+      expect(builder.dataTypes.data2).toBe('test/data2@1');
       expect(Object.keys(builder.dataTypes).length).toBe(2);
     });
 
@@ -308,7 +308,7 @@ describe('CodecDefBuilder interface', () => {
       });
 
       const builder = defineCodecs().add('literal', testCodec);
-      const typeId = builder.dataTypes['literal'];
+      const typeId = builder.dataTypes.literal;
       expect(typeId).toBe('test/literal@1');
       expect(typeof typeId).toBe('string');
     });

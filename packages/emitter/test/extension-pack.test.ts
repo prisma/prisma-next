@@ -1,20 +1,19 @@
-import { describe, it, expect } from 'vitest';
-import { loadExtensionPackManifest, loadExtensionPacks } from '../src/extension-pack';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { loadExtensionPackManifest, loadExtensionPacks } from '../src/extension-pack';
 
 describe('extension-pack', () => {
   it('loads valid manifest', () => {
     const manifest = loadExtensionPackManifest(join(__dirname, '../../adapter-postgres'));
     expect(manifest.id).toBe('postgres');
     expect(manifest.version).toBe('15.0.0');
-    expect(manifest.types?.codecTypes?.import.package).toBe('@prisma-next/adapter-postgres/codec-types');
+    expect(manifest.types?.codecTypes?.import.package).toBe(
+      '@prisma-next/adapter-postgres/codec-types',
+    );
   });
 
   it('loads extension packs with adapter first', () => {
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../adapter-postgres'),
-      [],
-    );
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
     expect(packs.length).toBe(1);
     expect(packs[0]?.manifest.id).toBe('postgres');
   });
@@ -26,10 +25,9 @@ describe('extension-pack', () => {
   });
 
   it('loads extension packs with multiple extensions', () => {
-    const packs = loadExtensionPacks(
+    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), [
       join(__dirname, '../../adapter-postgres'),
-      [join(__dirname, '../../adapter-postgres')],
-    );
+    ]);
     expect(packs.length).toBe(2);
     expect(packs[0]?.manifest.id).toBe('postgres');
     expect(packs[1]?.manifest.id).toBe('postgres');
@@ -46,4 +44,3 @@ describe('extension-pack', () => {
     }).toThrow();
   });
 });
-

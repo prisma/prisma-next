@@ -1,7 +1,7 @@
 import { param } from '@prisma-next/sql-query/param';
-import { getRuntime } from '../prisma/runtime';
 import type { ResultType } from '@prisma-next/sql-query/types';
 import { schema, sql } from '../prisma/query';
+import { getRuntime } from '../prisma/runtime';
 
 export async function getUserById(userId: number) {
   const runtime = getRuntime();

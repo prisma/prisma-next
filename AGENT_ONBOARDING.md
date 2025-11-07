@@ -215,7 +215,7 @@ type JoinedRow = ResultType<typeof joinedPlan>;
 - **Typecheck**: Use `pnpm typecheck` scripts, not raw `tsc`
 - **No file extensions in imports** - `import { x } from './file'` not `'./file.ts'`
 - **ESM only** - All packages use `"type": "module"`
-- **ESLint config**: ESLint config file is `eslint.config.mjs` at the root. All package lint scripts explicitly specify the config file using `--config ../../eslint.config.mjs` to avoid Node.js module type warnings.
+- **Biome config**: Biome config file is `biome.json` at the root. All package lint scripts explicitly specify the config file using `--config-path ../../biome.json`.
 - **Type constraints**: When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements. For example, `TableBuilderState<unknown, unknown, unknown>` won't work - use the actual constraint types like `TableBuilderState<string, Record<string, ColumnBuilderState<...>>, readonly string[] | undefined>`.
 
 ### Code Style
@@ -226,12 +226,12 @@ type JoinedRow = ResultType<typeof joinedPlan>;
 - **Test descriptions**: Omit "should" - `it("returns correct value")` not `it("should return correct value")`
 - **Node.js globals restriction**: `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`), `packages/node-utils/**/*.ts`, and `packages/cli/**/*.ts`. Other packages should not use these globals directly.
 - **Index signature property access**: When TypeScript requires it (e.g., `TS4111` error), use bracket notation: `contract['targetFamily']` instead of `contract.targetFamily`. This is required when accessing properties from index signatures.
-- **Unsafe assignments in tests**: When working with `JSON.parse()` results or dynamic imports in tests, use type assertions and eslint-disable comments as needed: `const json = JSON.parse(content) as Record<string, unknown>;`
+- **Unsafe assignments in tests**: When working with `JSON.parse()` results or dynamic imports in tests, use type assertions and biome-ignore comments as needed: `const json = JSON.parse(content) as Record<string, unknown>;`
 - **Avoid unnecessary type casts**: Always check the actual type signature before adding type casts. If a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`.
 - **Use dot notation for guaranteed values**: When accessing values that are guaranteed to exist (e.g., in test fixtures), use dot notation (`.`) instead of optional chaining (`?.`). Don't include `| undefined` in type assertions when values are guaranteed to exist.
-- **ESLint disable comments**: If you need to disable a rule for more than a couple of lines in a file, use a file-level disable comment at the top of the file instead of many inline comments. Example: `/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */`
+- **Biome ignore comments**: If you need to disable a rule for more than a couple of lines in a file, use a file-level ignore comment at the top of the file instead of many inline comments. Example: `// biome-ignore lint: test file with type assertions`
 - **Unused variables**: Variables that are only used as types should be prefixed with `_` to indicate they're intentionally unused. Example: `const _plan = sql(...).build(); type Row = ResultType<typeof _plan>;`
-- **Empty object types**: Use `Record<string, never>` instead of `{}` for empty object types in type definitions. This provides better type safety and satisfies ESLint's `@typescript-eslint/no-empty-object-type` rule.
+- **Empty object types**: Use `Record<string, never>` instead of `{}` for empty object types in type definitions. This provides better type safety.
 - **JSON imports**: Use `import` statements with `assert { type: 'json' }` instead of `require()` for JSON files. Example: `import contractJson from './fixtures/contract.json' assert { type: 'json' };`
 
 ### Validation Pattern
@@ -589,30 +589,31 @@ database = await createDevDatabase({
 - **Type assertions**: Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 - **Type tests**: Use `expectTypeOf` helpers, not manual type checks with conditional types - see `.cursor/rules/vitest-expect-typeof.mdc`
 - **Test descriptions**: Omit "should" - see `.cursor/rules/omit-should-in-tests.mdc`
-- **Shared Test Utilities**: Use `@prisma-next/test-utils` for common test patterns - see "E2E Test Patterns" below
+- **Shared Test Utilities**: Use `@prisma-next/test-utils` for generic test patterns, `@prisma-next/runtime/test/utils` for runtime-specific utilities, and `e2e-tests/test/utils.ts` for contract-related E2E utilities - see "E2E Test Patterns" below
 
 ### E2E Test Patterns
 
-**Shared Test Utilities Package**: `@prisma-next/test-utils` provides reusable helpers for e2e tests to reduce duplication and ensure consistency.
+**Test Utilities Organization**: Test utilities are organized across multiple locations to avoid circular dependencies:
+- **`@prisma-next/test-utils`**: Generic database and async iterable utilities with zero dependencies on other `@prisma-next/*` packages
+- **`@prisma-next/runtime/test/utils`**: Runtime-specific test utilities (plan execution, runtime creation, contract markers)
+- **`e2e-tests/test/utils.ts`**: Contract-related utilities for E2E tests (contract loading, emission verification)
 
 **Key Helpers:**
-- `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk. The generic type parameter should be specified from the emitted `contract.d.ts` file (e.g., `loadContractFromDisk<Contract>(contractJsonPath)`).
-- `emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, expectedContractJsonPath)`: Emits contract via CLI and verifies it matches on-disk artifacts. Used in a single test to verify contract emission correctness.
-- `setupE2EDatabase(client, contract, setupFn)`: Sets up database schema, data, and writes contract marker
-- `createTestRuntimeFromClient(contract, client, adapter)`: Creates a runtime with standard test configuration
-- `executePlanAndCollect<P extends Plan>(runtime, plan)`: Executes a plan and collects all results into an array. The return type is automatically inferred from the plan's type parameter using `ResultType<P>[]`.
+- `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk (in `e2e-tests/test/utils.ts`). The generic type parameter should be specified from the emitted `contract.d.ts` file (e.g., `loadContractFromDisk<Contract>(contractJsonPath)`).
+- `emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, expectedContractJsonPath)`: Emits contract via CLI and verifies it matches on-disk artifacts (in `e2e-tests/test/utils.ts`). Used in a single test to verify contract emission correctness.
+- `setupE2EDatabase(client, contract, setupFn)`: Sets up database schema, data, and writes contract marker (in `@prisma-next/runtime/test/utils`)
+- `createTestRuntimeFromClient(contract, client, adapter)`: Creates a runtime with standard test configuration (in `@prisma-next/runtime/test/utils`)
+- `executePlanAndCollect<P extends Plan>(runtime, plan)`: Executes a plan and collects all results into an array (in `@prisma-next/runtime/test/utils`). The return type is automatically inferred from the plan's type parameter using `ResultType<P>[]`.
 
 **E2E Test Structure:**
 ```typescript
+import { withDevDatabase, withClient } from '@prisma-next/test-utils';
 import {
-  withDevDatabase,
-  withClient,
-  loadContractFromDisk,
-  emitAndVerifyContract,
   setupE2EDatabase,
   createTestRuntimeFromClient,
   executePlanAndCollect,
-} from '@prisma-next/test-utils';
+} from '@prisma-next/runtime/test/utils';
+import { loadContractFromDisk, emitAndVerifyContract } from './utils';
 import type { Contract } from './fixtures/generated/contract.d';
 
 describe('end-to-end tests', () => {
@@ -680,13 +681,7 @@ describe('end-to-end tests', () => {
 - **Developer responsibility**: Developers are responsible for keeping the on-disk contract artifacts up-to-date when they change the contract source. The verification test will fail if artifacts are out of sync.
 - **Benefits**: Reduces test execution time, ensures contract artifacts are stable, and enables compile-time type checking using the emitted contract types.
 
-**Test Utilities Architecture:**
-- **Dependency Injection Pattern**: The `@prisma-next/test-utils` package has **no dependencies** on other `@prisma-next` packages. Instead, it uses a dependency injection pattern where functions accept their dependencies as parameters (e.g., `validateContractFn`, `markerStatements`, `createRuntimeFn`).
-- **Wrapper Files**: Consuming packages (e.g., `packages/runtime/test/utils.ts`, `packages/e2e-tests/test/utils.ts`) import from `test-utils` and inject the required dependencies from `@prisma-next` packages. This breaks cyclic dependencies and keeps `test-utils` lightweight.
-- **Type Inference**: The `executePlanAndCollect` function in wrapper files uses `ResultType<P>` from `@prisma-next/sql-query/types` to properly infer return types. The base function in `test-utils` is generic and accepts any plan-like type, while wrappers constrain to `Plan` types for better type inference.
-- **Benefits**: Prevents cyclic dependencies, keeps test utilities reusable across packages, and enables proper type inference in consuming packages.
-
-See `packages/test-utils/README.md` for full documentation of available helpers.
+See `packages/test-utils/README.md` for full documentation of generic helpers, `packages/runtime/README.md` for runtime-specific test utilities, and `packages/e2e-tests/README.md` for contract-related E2E test utilities.
 
 ### Running Tests and Coverage
 
@@ -773,23 +768,17 @@ test('Type IDs are literal types', () => {
 23. **No Target Branches** - **CRITICAL**: Never branch on `target` (e.g., `if (target === 'postgres')`) in core packages. Target-specific logic belongs in adapters or extension packs. See `.cursor/rules/no-target-branches.mdc` for details.
 24. **No Global Registry Pattern** - The emitter accepts `targetFamily: TargetFamilyHook` as a direct parameter to `emit()`. Authoring surfaces determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry, auto-registration, or hidden state. Dependencies are explicit and passed as parameters.
 25. **SQL Types Import Path** - **CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) must be imported from `@prisma-next/sql-target`, **not** from `@prisma-next/contract/types`. See `.cursor/rules/sql-types-imports.mdc` for details.
-26. **Node.js Globals Restriction** - `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files, `packages/node-utils`, and `packages/cli`. Other packages should not use these globals directly. If needed, use `eslint-disable-next-line no-undef` with a comment explaining why.
+26. **Node.js Globals Restriction** - `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files, `packages/node-utils`, and `packages/cli`. Other packages should not use these globals directly. If needed, use `// biome-ignore lint: <reason>` with a comment explaining why.
 27. **Generated File Metadata** - `contract.json` files include a `_generated` metadata field to indicate they're generated artifacts. This field is excluded from canonicalization/hashing. `contract.d.ts` files include warning header comments. Both are generated by `prisma-next emit` and should not be edited manually.
 28. **Avoid Unnecessary Type Casts** - **CRITICAL**: Always check the actual type signature before adding type casts (`as unknown as T`) or optional chaining (`?.`). Unnecessary casts are a code smell that indicates the actual type already supports what you're trying to do. For example, if a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
 29. **Use Dot Notation for Guaranteed Values** - When accessing values that are guaranteed to exist (e.g., in test fixtures, constants), use dot notation (`.`) instead of optional chaining (`?.`). Optional chaining should only be used for values that might not exist (e.g., user input, API responses). Similarly, don't include `| undefined` in type assertions when values are guaranteed to exist. See `.cursor/rules/typescript-patterns.mdc` for details.
-30. **ESLint Disable Comments** - If you need to disable a rule for more than a couple of lines in a file, use a file-level disable comment at the top of the file instead of many inline comments. Example: `/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */`
-31. **Unused Variables Pattern** - Variables that are only used as types should be prefixed with `_` to indicate they're intentionally unused. The ESLint rule `@typescript-eslint/no-unused-vars` is configured to ignore variables starting with `_`. Example: `const _plan = sql(...).build(); type Row = ResultType<typeof _plan>;`
-32. **Empty Object Types** - Use `Record<string, never>` instead of `{}` for empty object types in type definitions. This provides better type safety and satisfies ESLint's `@typescript-eslint/no-empty-object-type` rule.
+30. **Biome Ignore Comments** - If you need to disable a rule for more than a couple of lines in a file, use a file-level ignore comment at the top of the file instead of many inline comments. Example: `// biome-ignore lint: test file with type assertions`
+31. **Unused Variables Pattern** - Variables that are only used as types should be prefixed with `_` to indicate they're intentionally unused. Biome's `noUnusedVariables` rule is configured to ignore variables starting with `_`. Example: `const _plan = sql(...).build(); type Row = ResultType<typeof _plan>;`
+32. **Empty Object Types** - Use `Record<string, never>` instead of `{}` for empty object types in type definitions. This provides better type safety.
 33. **JSON Imports** - Use `import` statements with `assert { type: 'json' }` instead of `require()` for JSON files. Example: `import contractJson from './fixtures/contract.json' assert { type: 'json' };`
 34. **Type Constraint Fixes** - When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements. Don't use `unknown` for type parameters that have specific constraints (e.g., `string`, `Record<...>`). Use the actual constraint types from the interface definition.
 35. **DRY Test Patterns** - Common patterns in test files (like executing plans) should be extracted into helper functions with JSDoc comments explaining their purpose. This reduces code duplication and makes tests more maintainable.
-36. **ESLint Config File** - ESLint config file is `eslint.config.mjs` at the root. All package lint scripts explicitly specify the config file using `--config ../../eslint.config.mjs` to avoid Node.js module type warnings.
-37. **Test Utilities Dependency Injection** - The `@prisma-next/test-utils` package has no dependencies on other `@prisma-next` packages. Functions accept dependencies as parameters (e.g., `validateContractFn`, `markerStatements`). Consuming packages create wrapper files that inject dependencies. This prevents cyclic dependencies and keeps test utilities lightweight.
-38. **Type Inference in Test Utilities** - When creating wrapper functions for `executePlanAndCollect`, use `ResultType<P>` from `@prisma-next/sql-query/types` and constrain the generic parameter to `P extends Plan` for proper type inference. The base function in `test-utils` is intentionally generic to avoid dependencies.
-39. **Bundling External Dependencies** - When bundling packages that use dependencies with native modules or data files (e.g., `@prisma/dev` with pglite), mark them as `external` in `tsup.config.ts` to prevent bundling issues. Example: `external: ['@prisma/dev']`.
-40. **Test Timeout Configuration** - Database setup in tests can take time. Set appropriate timeouts for `describe` blocks (e.g., `{ timeout: 30000 }`) and `beforeAll` hooks (e.g., `30000` as second parameter) to prevent timeout errors during parallel test execution.
-41. **SQL Table Name Quoting** - When dropping tables in `teardownTestDatabase`, always quote table names (e.g., `"user"`) because some table names are PostgreSQL reserved keywords. Use: `drop table if exists "${table}"` instead of `drop table if exists ${table}`.
-42. **Literal Type Preservation Tests** - Type-level tests that verify literal type preservation (e.g., `TableKeys extends 'user' ? true : false`) may fail due to TypeScript limitations in preserving literal types through complex generic manipulations. These tests can be commented out with a note explaining the limitation, as the runtime behavior is still correct.
+36. **Biome Config File** - Biome config file is `biome.json` at the root. All package lint scripts explicitly specify the config file using `--config-path ../../biome.json`.
 
 ## 📖 Documentation Location
 
@@ -917,7 +906,7 @@ The workflow consists of separate jobs that run in parallel where possible:
    - No dependencies, runs independently
    - Uses `pnpm typecheck:packages` and `pnpm typecheck:examples`
 
-2. **lint** - Runs ESLint for packages and examples
+2. **lint** - Runs Biome for packages and examples
    - No dependencies, runs independently
    - Uses `pnpm lint:packages` and `pnpm lint:examples`
 
@@ -1007,12 +996,13 @@ pnpm test:coverage:packages
 14. **Type Preservation** - Fixed generic type system to preserve literal string types (e.g., `'pg/text@1'`) through mapped types and careful constraints. Removed index signatures from generic parameters.
 15. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
 16. **E2E Tests Package** - Created `@prisma-next/e2e-tests` package that tests the full flow: CLI emission → contract validation → runtime execution → type verification. Tests emit contracts via CLI, spin up dev Postgres DB, execute queries, and verify both runtime results and compile-time types.
-17. **Shared Test Utilities Package** - Created `@prisma-next/test-utils` package to centralize common test patterns across all test suites. Provides helpers for database management, plan execution, runtime creation, contract management, and E2E testing. Refactored e2e tests to use shared utilities, reducing duplication by 28% (1219 → 882 lines). E2E tests now load contracts from committed fixtures rather than emitting on every test run, with a single test verifying contract emission correctness. The `executePlanAndCollect` function now properly infers return types from plans using `ResultType<P>[]`, preserving full type information. Contract loading uses a generic type parameter pattern (`loadContractFromDisk<Contract>`) to enable compile-time type checking with emitted contract types. The package uses a dependency injection pattern with no dependencies on other `@prisma-next` packages, preventing cyclic dependencies. Consuming packages create wrapper files that inject dependencies. Fixed bundling issues with `@prisma/dev` by marking it as external in tsup config. Fixed test timeouts and SQL syntax issues in database teardown helpers. See "E2E Test Patterns" section above for usage examples.
-18. **SQL Types Import Correction** - Fixed incorrect imports of SQL types from `@prisma-next/contract/types` to use `@prisma-next/sql-target` instead. SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`) must be imported from `@prisma-next/sql-target`. See `.cursor/rules/sql-types-imports.mdc` for details.
-19. **GitHub Actions CI Workflow** - Set up comprehensive CI workflow with separate jobs for typecheck, lint, build, test, e2e tests, and coverage. Workflow includes concurrency control, Postgres service configuration, coverage artifact uploads, and optional Codecov integration. All jobs run in parallel where possible for faster feedback.
-20. **Generated File Metadata** - Added `_generated` metadata field to `contract.json` files to indicate they're generated artifacts. This field is excluded from canonicalization/hashing to ensure determinism. Added warning header comments to `contract.d.ts` files. Both prevent accidental manual edits and guide users to regenerate using `prisma-next emit`.
-21. **Node.js Globals Restriction** - Restricted Node.js globals (`console`, `process`, `__dirname`, `__filename`, `URL`) to only be permitted in test files, `packages/node-utils`, and `packages/cli` via ESLint configuration. This enforces better separation of concerns and prevents accidental use of Node.js-specific APIs in core packages.
-22. **Avoiding Unnecessary Type Casts and Optional Chaining** - Added guidance on avoiding unnecessary type casts and optional chaining. Always check the actual type signature before adding casts. Use dot notation (`.`) instead of optional chaining (`?.`) when values are guaranteed to exist. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
+17. **Shared Test Utilities Package** - Created `@prisma-next/test-utils` package to centralize common test patterns across all test suites. Provides helpers for database management, plan execution, runtime creation, contract management, and E2E testing. Refactored e2e tests to use shared utilities, reducing duplication by 28% (1219 → 882 lines). E2E tests now load contracts from committed fixtures rather than emitting on every test run, with a single test verifying contract emission correctness. The `executePlanAndCollect` function now properly infers return types from plans using `ResultType<P>[]`, preserving full type information. Contract loading uses a generic type parameter pattern (`loadContractFromDisk<Contract>`) to enable compile-time type checking with emitted contract types. See "E2E Test Patterns" section above for usage examples.
+18. **Test Utilities Dependency Refactoring** - Broke circular dependency between `test-utils` and `runtime` by moving runtime-specific utilities (`executePlanAndCollect`, `drainPlanExecution`, `setupTestDatabase`, `writeTestContractMarker`, `createTestRuntime`, `createTestRuntimeFromClient`, `setupE2EDatabase`) to `runtime/test/utils.ts`. Removed all dependencies from `test-utils` on other `@prisma-next/*` packages by moving contract-related functions (`loadContractFromDisk`, `emitAndVerifyContract`) to `e2e-tests/test/utils.ts`. `test-utils` now has zero dependencies on other `@prisma-next/*` packages, allowing it to be used by all packages without circular dependencies. Runtime-specific utilities are in `@prisma-next/runtime/test/utils`, and contract helpers are in `e2e-tests/test/utils.ts` (local to e2e-tests).
+19. **SQL Types Import Correction** - Fixed incorrect imports of SQL types from `@prisma-next/contract/types` to use `@prisma-next/sql-target` instead. SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`) must be imported from `@prisma-next/sql-target`. See `.cursor/rules/sql-types-imports.mdc` for details.
+20. **GitHub Actions CI Workflow** - Set up comprehensive CI workflow with separate jobs for typecheck, lint, build, test, e2e tests, and coverage. Workflow includes concurrency control, Postgres service configuration, coverage artifact uploads, and optional Codecov integration. All jobs run in parallel where possible for faster feedback.
+21. **Generated File Metadata** - Added `_generated` metadata field to `contract.json` files to indicate they're generated artifacts. This field is excluded from canonicalization/hashing to ensure determinism. Added warning header comments to `contract.d.ts` files. Both prevent accidental manual edits and guide users to regenerate using `prisma-next emit`.
+22. **Node.js Globals Restriction** - Restricted Node.js globals (`console`, `process`, `__dirname`, `__filename`, `URL`) to only be permitted in test files, `packages/node-utils`, and `packages/cli` via Biome configuration. This enforces better separation of concerns and prevents accidental use of Node.js-specific APIs in core packages.
+23. **Avoiding Unnecessary Type Casts and Optional Chaining** - Added guidance on avoiding unnecessary type casts and optional chaining. Always check the actual type signature before adding casts. Use dot notation (`.`) instead of optional chaining (`?.`) when values are guaranteed to exist. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
 
 ### Future Work
 
@@ -1043,7 +1033,8 @@ import contractJson from './contract.json' assert { type: 'json' };
 const contract = validateContract<Contract>(contractJson);
 
 // In E2E tests, use loadContractFromDisk to load from committed fixtures
-import { loadContractFromDisk } from '@prisma-next/test-utils';
+// Note: loadContractFromDisk is in e2e-tests/test/utils.ts, not test-utils
+import { loadContractFromDisk } from './utils';
 
 const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 // Type parameter comes from emitted contract.d.ts, enabling compile-time type checking

@@ -1,2 +1,1 @@
 export { param } from '../param';
-

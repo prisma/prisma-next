@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { freezeDiagnostics, emptyDiagnostics } from '../src/diagnostics';
-import type { LintFinding, BudgetFinding } from '../src/diagnostics';
+import { describe, expect, it } from 'vitest';
+import { emptyDiagnostics, freezeDiagnostics } from '../src/diagnostics';
+import type { BudgetFinding, LintFinding } from '../src/diagnostics';
 
 describe('diagnostics', () => {
   describe('emptyDiagnostics', () => {
@@ -130,4 +130,3 @@ describe('diagnostics', () => {
     });
   });
 });
-

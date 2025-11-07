@@ -1,18 +1,18 @@
-import { Client } from 'pg';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
 } from '@prisma-next/runtime';
-import contract from './contract.json' assert { type: 'json' };
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract } from '@prisma-next/sql-target';
+import { Client } from 'pg';
+import contract from './contract.json' assert { type: 'json' };
 
 const contractData = validateContract<SqlContract>(contract);
 
 export async function stampMarker() {
-  const connectionString = process.env['DATABASE_URL'];
+  const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error('DATABASE_URL environment variable is required');
   }
@@ -52,4 +52,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   });
 }
-

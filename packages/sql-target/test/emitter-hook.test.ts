@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { sqlTargetFamilyHook } from '../src/emitter-hook';
 import type { ContractIR, ExtensionPackManifest } from '@prisma-next/emitter';
+import { describe, expect, it } from 'vitest';
+import { sqlTargetFamilyHook } from '../src/emitter-hook';
 
 describe('sql-target-family-hook', () => {
   it('validates types from referenced extensions', () => {
@@ -219,7 +219,9 @@ describe('sql-target-family-hook', () => {
     };
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
-    expect(types).toContain("import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-target';");
+    expect(types).toContain(
+      "import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-target';",
+    );
     expect(types).not.toContain("from './contract-types'");
   });
 
@@ -892,7 +894,9 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain('relations: {');
-    expect(types).toContain("readonly posts: { readonly on: { readonly parentCols: readonly ['id']; readonly childCols: readonly ['userId'] } }");
+    expect(types).toContain(
+      "readonly posts: { readonly on: { readonly parentCols: readonly ['id']; readonly childCols: readonly ['userId'] } }",
+    );
   });
 
   it('generates relations type from models', () => {
@@ -949,8 +953,8 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain('export type Relations');
-    expect(types).toContain("readonly User.posts: unknown");
-    expect(types).toContain("readonly User.comments: unknown");
+    expect(types).toContain('readonly User.posts: unknown');
+    expect(types).toContain('readonly User.comments: unknown');
   });
 
   it('generates relations type as empty when no relations', () => {
@@ -1013,8 +1017,12 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('export type Contract');
     expect(types).toContain("modelToTable: { readonly User: 'user' }");
     expect(types).toContain("tableToModel: { readonly user: 'User' }");
-    expect(types).toContain("fieldToColumn: { readonly User: { readonly id: 'id'; readonly email: 'email'; readonly name: 'name' } }");
-    expect(types).toContain("columnToField: { readonly user: { readonly id: 'id'; readonly email: 'email'; readonly name: 'name' } }");
+    expect(types).toContain(
+      "fieldToColumn: { readonly User: { readonly id: 'id'; readonly email: 'email'; readonly name: 'name' } }",
+    );
+    expect(types).toContain(
+      "columnToField: { readonly user: { readonly id: 'id'; readonly email: 'email'; readonly name: 'name' } }",
+    );
   });
 
   it('generates mappings type with multiple models', () => {

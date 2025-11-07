@@ -7,9 +7,9 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "eslint . --config ../../eslint.config.mjs --ext .ts,.tsx --ignore-pattern dist --ignore-pattern coverage --max-warnings 0"
+    "lint": "biome check . --config-path ../../biome.json"
   },
+  "dependencies": {},
   "devDependencies": {
     "@prisma/dev": "^0.1.1",
     "pg": "^8.11.5",
@@ -25,4 +25,3 @@
     }
   }
 }
-

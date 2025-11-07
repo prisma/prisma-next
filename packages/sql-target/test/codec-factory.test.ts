@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { codec } from '../src/codecs';
 
 describe('codec() factory function', () => {
@@ -37,7 +37,7 @@ describe('codec() factory function', () => {
       decode: (wire: string) => wire,
     });
 
-    expect(textCodec.encode!('hello')).toBe('hello');
+    expect(textCodec.encode?.('hello')).toBe('hello');
     expect(textCodec.decode('world')).toBe('world');
   });
 
@@ -49,7 +49,7 @@ describe('codec() factory function', () => {
       decode: (wire: number) => wire,
     });
 
-    expect(intCodec.encode!(42)).toBe(42);
+    expect(intCodec.encode?.(42)).toBe(42);
     expect(intCodec.decode(100)).toBe(100);
   });
 
@@ -62,7 +62,7 @@ describe('codec() factory function', () => {
     });
 
     const testDate = new Date('2024-01-15T10:30:00Z');
-    const encoded = dateCodec.encode!(testDate);
+    const encoded = dateCodec.encode?.(testDate);
     expect(encoded).toBe('2024-01-15T10:30:00.000Z');
     expect(typeof encoded).toBe('string');
 

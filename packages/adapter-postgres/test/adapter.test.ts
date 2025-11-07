@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { createPostgresAdapter } from '../src/adapter';
 import { validateContract } from '@prisma-next/sql-query/schema';
-import { PostgresContract } from '../src/types';
+import { createPostgresAdapter } from '../src/adapter';
+import type { PostgresContract } from '../src/types';
 
 const contract = Object.freeze(
   validateContract<PostgresContract>({

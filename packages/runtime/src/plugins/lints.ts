@@ -1,6 +1,6 @@
-import type { Plugin, PluginContext } from './types';
 import type { Plan } from '@prisma-next/sql-query/types';
 import { evaluateRawGuardrails } from '../guardrails/raw';
+import type { Plugin, PluginContext } from './types';
 
 export interface LintsOptions {
   readonly severities?: {
@@ -48,7 +48,8 @@ export function lints(options?: LintsOptions): Plugin {
 
         if (effectiveSeverity === 'error') {
           throw lintError(lint.code, lint.message, lint.details);
-        } else if (effectiveSeverity === 'warn') {
+        }
+        if (effectiveSeverity === 'warn') {
           ctx.log.warn({
             code: lint.code,
             message: lint.message,
@@ -60,10 +61,7 @@ export function lints(options?: LintsOptions): Plugin {
   });
 }
 
-function getConfiguredSeverity(
-  code: string,
-  options?: LintsOptions,
-): 'warn' | 'error' | undefined {
+function getConfiguredSeverity(code: string, options?: LintsOptions): 'warn' | 'error' | undefined {
   const severities = options?.severities;
   if (!severities) {
     return undefined;
@@ -84,4 +82,3 @@ function getConfiguredSeverity(
 
   return undefined;
 }
-

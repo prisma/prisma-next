@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
+import { promisify } from 'node:util';
 import { emit } from '@prisma-next/emitter';
 import { loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
-import { join, relative } from 'node:path';
-import { writeFile, mkdir, rm, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 
@@ -101,11 +101,9 @@ describe('contract.d.ts imports resolution', () => {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 // Verify we can use the Contract type
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+// biome-ignore lint/suspicious/noExplicitAny: test code with type assertions
 const _contract: Contract = {} as any;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 const _storage: Contract['storage'] = _contract.storage;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 const _tables: Contract['storage']['tables'] = _storage.tables;
 
 // Verify we can access CodecTypes
@@ -168,7 +166,7 @@ type UserIdColumn = UserColumns['id'];
         },
       );
 
-      if (stderr && stderr.trim()) {
+      if (stderr?.trim()) {
         throw new Error(`TypeScript compilation failed:\n${stderr}`);
       }
 
@@ -265,7 +263,7 @@ type UserIdColumn = UserColumns['id'];
 type UserIdType = UserIdColumn['type'];
 
 // Verify CodecTypes is available
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+// biome-ignore lint/suspicious/noExplicitAny: test code with type assertions
 const _codecTypes: CodecTypes = {} as any;
 type CodecTextType = CodecTypes['pg/text@1'];
 type CodecIntType = CodecTypes['pg/int4@1'];
@@ -325,7 +323,7 @@ type CodecIntType = CodecTypes['pg/int4@1'];
         },
       );
 
-      if (stderr && stderr.trim() && !stderr.includes('Found 0 errors')) {
+      if (stderr?.trim() && !stderr.includes('Found 0 errors')) {
         throw new Error(`TypeScript compilation failed:\n${stderr}`);
       }
 

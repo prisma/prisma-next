@@ -1,5 +1,5 @@
-import { planInvalid } from './errors';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { planInvalid } from './errors';
 import type {
   ParamDescriptor,
   Plan,
@@ -164,7 +164,9 @@ function buildRawMeta(args: RawMetaBuildArgs): PlanMeta {
 function freezeRefs(refs: PlanRefs): PlanRefs {
   return Object.freeze({
     ...(refs.tables ? { tables: Object.freeze([...refs.tables]) } : {}),
-    ...(refs.columns ? { columns: Object.freeze(refs.columns.map((col) => Object.freeze({ ...col }))) } : {}),
+    ...(refs.columns
+      ? { columns: Object.freeze(refs.columns.map((col) => Object.freeze({ ...col }))) }
+      : {}),
     ...(refs.indexes
       ? {
           indexes: Object.freeze(
@@ -228,4 +230,3 @@ function splitTemplateValues(values: readonly unknown[]): {
 function isOptionsSentinel(value: unknown): value is RawTemplateOptionsSentinel {
   return typeof value === 'object' && value !== null && RAW_OPTIONS_SENTINEL in value;
 }
-

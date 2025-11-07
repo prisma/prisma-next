@@ -1,8 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { PrismaClient } from '../src/prisma-client';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { Client } from 'pg';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
   createRuntime,
@@ -10,9 +6,13 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/runtime';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { unstable_startServer } from '@prisma/dev';
 import type { StartServerOptions } from '@prisma/dev';
+import { Client } from 'pg';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PrismaClient } from '../src/prisma-client';
 
 function normalizeConnectionString(raw: string): string {
   const url = new URL(raw);
@@ -181,10 +181,10 @@ describe(
         });
 
         expect(result).toBeDefined();
-        expect(result['id']).toBe('test-1');
-        expect(result['email']).toBe('test@example.com');
-        expect(result['name']).toBe('Test User');
-        expect(result['createdAt']).toBeDefined();
+        expect(result.id).toBe('test-1');
+        expect(result.email).toBe('test@example.com');
+        expect(result.name).toBe('Test User');
+        expect(result.createdAt).toBeDefined();
       });
 
       it('finds a unique user by id', async () => {
@@ -198,9 +198,9 @@ describe(
         const result = await readUserById(prismaPN, 'test-1');
 
         expect(result).toBeDefined();
-        expect(result?.['id']).toBe('test-1');
-        expect(result?.['email']).toBe('test@example.com');
-        expect(result?.['name']).toBe('Test User');
+        expect(result?.id).toBe('test-1');
+        expect(result?.email).toBe('test@example.com');
+        expect(result?.name).toBe('Test User');
       });
 
       it('returns null for findUnique when not found', async () => {
@@ -225,8 +225,8 @@ describe(
         const results = await prismaPN.user.findMany();
 
         expect(results.length).toBe(2);
-        expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-1')).toBe(true);
-        expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-2')).toBe(true);
+        expect(results.some((u: Record<string, unknown>) => u.id === 'test-1')).toBe(true);
+        expect(results.some((u: Record<string, unknown>) => u.id === 'test-2')).toBe(true);
       });
 
       it('finds first user with where clause', async () => {
@@ -241,7 +241,7 @@ describe(
         });
 
         expect(result).toBeDefined();
-        expect(result?.['email']).toBe('test@example.com');
+        expect(result?.email).toBe('test@example.com');
       });
     });
 
@@ -290,7 +290,7 @@ describe(
       });
 
       it('returns undefined for non-model properties', () => {
-        const value = (prismaPN as Record<string, unknown>)['nonexistent'];
+        const value = (prismaPN as Record<string, unknown>).nonexistent;
         expect(value).toBeUndefined();
       });
 

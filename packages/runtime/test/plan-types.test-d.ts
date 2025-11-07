@@ -1,14 +1,14 @@
-import { expectTypeOf, test } from 'vitest';
-import { createRuntime } from '../src/runtime';
-import type { Plan, ResultType } from '@prisma-next/sql-query/types';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { Contract, CodecTypes } from '../../sql-query/test/fixtures/contract.d';
-import { sql } from '@prisma-next/sql-query/sql';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { schema } from '@prisma-next/sql-query/schema';
 import { validateContract } from '@prisma-next/sql-query/schema';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { Plan, ResultType } from '@prisma-next/sql-query/types';
+import { expectTypeOf, test } from 'vitest';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import type { CodecTypes, Contract } from '../../sql-query/test/fixtures/contract.d';
+import { createRuntime } from '../src/runtime';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,14 +25,14 @@ test('execute() preserves Row type from Plan', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema<typeof contract, CodecTypes>(contract).tables;
-  const userTable = tables['user']!;
+  const userTable = tables.user!;
   const userColumns = userTable.columns;
 
   const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
-      id: userColumns['id']!,
-      email: userColumns['email']!,
+      id: userColumns.id!,
+      email: userColumns.email!,
     })
     .build();
 
@@ -63,14 +63,14 @@ test('execute() signature matches Plan Row type', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
   const tables = schema<typeof contract, CodecTypes>(contract).tables;
-  const userTable = tables['user']!;
+  const userTable = tables.user!;
   const userColumns = userTable.columns;
 
   const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
-      id: userColumns['id']!,
-      email: userColumns['email']!,
+      id: userColumns.id!,
+      email: userColumns.email!,
     })
     .build();
 

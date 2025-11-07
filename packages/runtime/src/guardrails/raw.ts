@@ -30,16 +30,20 @@ export function evaluateRawGuardrails(plan: Plan, config?: RawGuardrailConfig): 
 
   if (statementType === 'select') {
     if (SELECT_STAR_REGEX.test(normalized)) {
-      lints.push(createLint('LINT.SELECT_STAR', 'error', 'Raw SQL plan selects all columns via *', {
-        sql: snippet(plan.sql),
-      }));
+      lints.push(
+        createLint('LINT.SELECT_STAR', 'error', 'Raw SQL plan selects all columns via *', {
+          sql: snippet(plan.sql),
+        }),
+      );
     }
 
     if (!LIMIT_REGEX.test(normalized)) {
       const severity = config?.budgets?.unboundedSelectSeverity ?? 'error';
-      lints.push(createLint('LINT.NO_LIMIT', 'warn', 'Raw SQL plan omits LIMIT clause', {
-        sql: snippet(plan.sql),
-      }));
+      lints.push(
+        createLint('LINT.NO_LIMIT', 'warn', 'Raw SQL plan omits LIMIT clause', {
+          sql: snippet(plan.sql),
+        }),
+      );
 
       budgets.push(
         createBudget(
@@ -59,10 +63,15 @@ export function evaluateRawGuardrails(plan: Plan, config?: RawGuardrailConfig): 
 
   if (isMutationStatement(statementType) && isReadOnlyIntent(plan.meta)) {
     lints.push(
-      createLint('LINT.READ_ONLY_MUTATION', 'error', 'Raw SQL plan mutates data despite read-only intent', {
-        sql: snippet(plan.sql),
-        intent: plan.meta.annotations?.['intent'],
-      }),
+      createLint(
+        'LINT.READ_ONLY_MUTATION',
+        'error',
+        'Raw SQL plan mutates data despite read-only intent',
+        {
+          sql: snippet(plan.sql),
+          intent: plan.meta.annotations?.intent,
+        },
+      ),
     );
   }
 
@@ -91,9 +100,14 @@ function evaluateIndexCoverage(refs: PlanRefs, lints: LintFinding[]) {
 
   if (!hasSupportingIndex) {
     lints.push(
-      createLint('LINT.UNINDEXED_PREDICATE', 'warn', 'Raw SQL plan predicates lack supporting indexes', {
-        predicates: predicateColumns,
-      }),
+      createLint(
+        'LINT.UNINDEXED_PREDICATE',
+        'warn',
+        'Raw SQL plan predicates lack supporting indexes',
+        {
+          predicates: predicateColumns,
+        },
+      ),
     );
   }
 }
@@ -124,7 +138,10 @@ function isMutationStatement(statement: 'select' | 'mutation' | 'other'): boolea
 }
 
 function isReadOnlyIntent(meta: PlanMeta): boolean {
-  const intent = typeof meta.annotations?.['intent'] === 'string' ? meta.annotations['intent'].toLowerCase() : undefined;
+  const intent =
+    typeof meta.annotations?.intent === 'string'
+      ? meta.annotations.intent.toLowerCase()
+      : undefined;
   return intent !== undefined && READ_ONLY_INTENTS.has(intent);
 }
 
@@ -153,4 +170,3 @@ function createBudget(
 ): BudgetFinding {
   return { code, severity, message, ...(details ? { details } : {}) };
 }
-

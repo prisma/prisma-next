@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable */
 const { resolve } = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
@@ -29,5 +28,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
-

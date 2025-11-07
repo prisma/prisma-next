@@ -1,7 +1,7 @@
-import { parseContractMarkerRow, readContractMarker } from './marker';
-import { computeSqlFingerprint } from './fingerprint';
+import type { Adapter, LoweredStatement, Plan, SelectAst } from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { Adapter, LoweredStatement, SelectAst, Plan } from '@prisma-next/sql-query/types';
+import { computeSqlFingerprint } from './fingerprint';
+import { parseContractMarkerRow, readContractMarker } from './marker';
 
 import type { SqlDriver } from '@prisma-next/sql-target';
 
@@ -20,11 +20,11 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-import type { Plugin } from './plugins/types';
-import { createCodecRegistry, type CodecRegistry } from '@prisma-next/sql-target';
-import { encodeParams } from './codecs/encoding';
+import { type CodecRegistry, createCodecRegistry } from '@prisma-next/sql-target';
 import { decodeRow } from './codecs/decoding';
+import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
+import type { Plugin } from './plugins/types';
 
 export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,

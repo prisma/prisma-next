@@ -83,4 +83,3 @@ export type SqlContract<
   readonly relations: R;
   readonly mappings: Map;
 };
-

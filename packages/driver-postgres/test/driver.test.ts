@@ -16,9 +16,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('streams rows using buffered fallback when cursor disabled', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -49,9 +47,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('streams rows using cursor mode when enabled', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -83,9 +79,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('uses custom cursor batch size', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -120,9 +114,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('executes explain query', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -155,9 +147,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('executes query with params', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -183,9 +173,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('handles direct client connection', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Client } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const client = new Client();
 
     const driver = createPostgresDriverFromOptions({
@@ -208,9 +196,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('handles already connected client', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Client } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const client = new Client();
 
     const driver = createPostgresDriverFromOptions({
@@ -232,9 +218,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('handles query errors', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -252,9 +236,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('closes pool connection', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -270,9 +252,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('handles empty result set', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -298,15 +278,12 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('creates driver from connection string', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     // Mock the Pool constructor to use our pg-mem pool
     const MockPool = class extends Pool {
       constructor() {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         super();
         // Use the pg-mem pool instance
         Object.assign(this, pool);
@@ -332,15 +309,12 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('creates driver with custom poolFactory', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     let customPoolFactoryCalled = false;
     const CustomPool = class extends Pool {
       constructor() {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         super();
         customPoolFactoryCalled = true;
         Object.assign(this, pool);
@@ -373,9 +347,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('falls back to buffered mode when cursor execution fails', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -406,9 +378,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('handles non-Error exceptions in cursor path', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -437,9 +407,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('throws error when client connection fails with non-already-connected error', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Client } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const client = new Client();
 
     const driver = createPostgresDriverFromOptions({
@@ -452,9 +420,7 @@ describe('@prisma-next/driver-postgres', () => {
 
     // Mock client.connect to throw a non-"already connected" error
     // connect() is a no-op, so we test acquireClient indirectly through query()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     const originalConnect = client.connect.bind(client);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     client.connect = async () => {
       const error = new Error('Connection failed: network error');
       throw error;
@@ -463,15 +429,12 @@ describe('@prisma-next/driver-postgres', () => {
     await expect(driver.query('select 1')).rejects.toThrow('Connection failed');
 
     // Restore original connect for cleanup
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     client.connect = originalConnect;
   });
 
   it('handles non-Error exceptions in acquireClient', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Client } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const client = new Client();
 
     const driver = createPostgresDriverFromOptions({
@@ -484,9 +447,7 @@ describe('@prisma-next/driver-postgres', () => {
 
     // Mock client.connect to throw a non-Error exception
     // connect() is a no-op, so we test acquireClient indirectly through query()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     const originalConnect = client.connect.bind(client);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     client.connect = async () => {
       throw 'string error';
     };
@@ -494,15 +455,12 @@ describe('@prisma-next/driver-postgres', () => {
     await expect(driver.query('select 1')).rejects.toBe('string error');
 
     // Restore original connect for cleanup
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     client.connect = originalConnect;
   });
 
   it('handles cursor read errors', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({
@@ -533,9 +491,7 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('handles cursor close errors', async () => {
     const db = newDb();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { Pool } = db.adapters.createPg();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const pool = new Pool();
 
     const driver = createPostgresDriverFromOptions({

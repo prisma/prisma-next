@@ -1,5 +1,5 @@
-import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
 import type { Plan } from '@prisma-next/sql-query/types';
+import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
 
 /**
  * Resolves a codec for row decoding using precedence rules.
@@ -104,7 +104,7 @@ export function decodeRow(
         codec: codec.id,
         wirePreview:
           typeof wireValue === 'string' && wireValue.length > 100
-            ? wireValue.substring(0, 100) + '...'
+            ? `${wireValue.substring(0, 100)}...`
             : String(wireValue).substring(0, 100),
       };
       throw decodeError;

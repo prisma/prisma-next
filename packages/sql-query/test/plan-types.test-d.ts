@@ -1,13 +1,13 @@
-import { expectTypeOf, test } from 'vitest';
-import { sql } from '../src/sql';
-import { schema, makeT } from '../src/schema';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { ResultType, Plan, TableKey, TablesOf } from '../src/types';
-import contractJson from './fixtures/contract.json' assert { type: 'json' };
-import { validateContract } from '../src/contract';
-import type { Contract, CodecTypes, ScalarToJs } from './fixtures/contract.d';
-import type { SqlContract } from '@prisma-next/sql-target';
 import type { CodecTypes as PgCodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import type { SqlContract } from '@prisma-next/sql-target';
+import { expectTypeOf, test } from 'vitest';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import { validateContract } from '../src/contract';
+import { makeT, schema } from '../src/schema';
+import { sql } from '../src/sql';
+import type { Plan, ResultType, TableKey, TablesOf } from '../src/types';
+import type { CodecTypes, Contract, ScalarToJs } from './fixtures/contract.d';
+import contractJson from './fixtures/contract.json' assert { type: 'json' };
 
 // Helper to simulate execute signature
 function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
@@ -25,7 +25,7 @@ test('builder without select() has unknown Row type', () => {
   const tables = schema<Contract, CodecTypes>(contract).tables;
 
   const builder = sql<Contract, CodecTypes>({ contract, adapter });
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const builderAfterFrom = builder.from(userTable);
 
@@ -38,15 +38,15 @@ test('select() with object projection infers Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
-      id: userColumns['id']!,
-      email: userColumns['email']!,
+      id: userColumns.id!,
+      email: userColumns.email!,
     })
     .build();
 
@@ -63,11 +63,11 @@ test('build() returns Plan<Row> with inferred Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -91,11 +91,11 @@ test('ResultType utility extracts Row type from Plan', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -122,11 +122,11 @@ test('execute() preserves Row type through execution', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -147,11 +147,11 @@ test('builder chain preserves Row type through methods', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const builderAfterFrom = sql({ contract, adapter }).from(userTable);
@@ -184,11 +184,11 @@ test('wrong Row type assignments fail type check', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -217,11 +217,11 @@ test('nullable columns are handled correctly', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -241,12 +241,12 @@ test('different column types map correctly', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
-  const createdAtColumn = userColumns['createdAt'];
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  const createdAtColumn = userColumns.createdAt;
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -280,7 +280,7 @@ test('generic contract types are preserved', () => {
   expectTypeOf(schemaHandle.tables).toHaveProperty('user');
 
   // Verify we can access with literal key
-  const userTable = schemaHandle.tables['user'];
+  const userTable = schemaHandle.tables.user;
   expectTypeOf(userTable).not.toBeUndefined();
 });
 
@@ -319,7 +319,7 @@ test('makeT() returns tables graph', () => {
 
   // makeT should return the same as schema().tables
   expectTypeOf(t).toHaveProperty('user');
-  const userTable = t['user'];
+  const userTable = t.user;
   if (userTable) {
     expectTypeOf(userTable).toHaveProperty('columns');
     const columns = userTable.columns;
@@ -333,7 +333,7 @@ test('sql() preserves contract generic through builder chain', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
 
   const builder = sql<Contract, CodecTypes>({ contract, adapter });
@@ -355,12 +355,12 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
   const contract = validateContract<Contract>(contractWithoutCodecs);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id']; // int4
-  const emailColumn = userColumns['email']; // text
-  const createdAtColumn = userColumns['createdAt']; // timestamptz
+  const idColumn = userColumns.id; // int4
+  const emailColumn = userColumns.email; // text
+  const createdAtColumn = userColumns.createdAt; // timestamptz
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -401,12 +401,12 @@ test('representative contract resolves types correctly end-to-end', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns['id'];
-  const emailColumn = userColumns['email'];
-  const createdAtColumn = userColumns['createdAt'];
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  const createdAtColumn = userColumns.createdAt;
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -488,19 +488,19 @@ test('result typing is derived solely from projection, unaffected by joins', () 
 
   const adapter = createPostgresAdapter();
   const tables = schema<ContractWithPosts, PgCodecTypes>(contractWithPosts).tables;
-  const userTable = tables['user'];
-  const postTable = tables['post'];
+  const userTable = tables.user;
+  const postTable = tables.post;
   if (!userTable || !postTable) throw new Error('tables not found');
   const userColumns = userTable.columns;
   const postColumns = postTable.columns;
 
   const _plan = sql<ContractWithPosts, PgCodecTypes>({ contract: contractWithPosts, adapter })
     .from(userTable)
-    .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
+    .innerJoin(postTable, (on) => on.eqCol(userColumns.id!, postColumns.userId!))
     .select({
-      userId: userColumns['id']!,
-      postId: postColumns['id']!,
-      title: postColumns['title']!,
+      userId: userColumns.id!,
+      postId: postColumns.id!,
+      title: postColumns.title!,
     })
     .build();
 
@@ -529,16 +529,16 @@ test('nested projection infers nested Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
-      name: userColumns['email']!,
+      name: userColumns.email!,
       post: {
-        title: userColumns['id']!,
+        title: userColumns.id!,
       },
     })
     .build();
@@ -562,7 +562,7 @@ test('multi-level nested projection infers deeply nested Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
 
@@ -571,7 +571,7 @@ test('multi-level nested projection infers deeply nested Row type', () => {
     .select({
       a: {
         b: {
-          c: userColumns['id']!,
+          c: userColumns.id!,
         },
       },
     })
@@ -596,21 +596,21 @@ test('mixed leaves and nested objects in projection', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const tables = schema<Contract, CodecTypes>(contract).tables;
-  const userTable = tables['user'];
+  const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
 
   const _plan = sql<Contract, CodecTypes>({ contract, adapter })
     .from(userTable)
     .select({
-      id: userColumns['id']!,
+      id: userColumns.id!,
       post: {
-        title: userColumns['email']!,
+        title: userColumns.email!,
         author: {
-          name: userColumns['id']!,
+          name: userColumns.id!,
         },
       },
-      email: userColumns['email']!,
+      email: userColumns.email!,
     })
     .build();
 
@@ -688,20 +688,20 @@ test('nested projection with joins infers nested Row type', () => {
 
   const adapter = createPostgresAdapter();
   const tables = schema<ContractWithPosts, PgCodecTypes>(contractWithPosts).tables;
-  const userTable = tables['user'];
-  const postTable = tables['post'];
+  const userTable = tables.user;
+  const postTable = tables.post;
   if (!userTable || !postTable) throw new Error('tables not found');
   const userColumns = userTable.columns;
   const postColumns = postTable.columns;
 
   const _plan = sql<ContractWithPosts, PgCodecTypes>({ contract: contractWithPosts, adapter })
     .from(userTable)
-    .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
+    .innerJoin(postTable, (on) => on.eqCol(userColumns.id!, postColumns.userId!))
     .select({
-      name: userColumns['email']!,
+      name: userColumns.email!,
       post: {
-        title: postColumns['title']!,
-        id: postColumns['id']!,
+        title: postColumns.title!,
+        id: postColumns.id!,
       },
     })
     .build();

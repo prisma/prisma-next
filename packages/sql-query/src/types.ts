@@ -217,7 +217,18 @@ export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
 /**
  * Nested projection type - allows recursive nesting of ColumnBuilder or nested objects.
  */
-export type NestedProjection = Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>;
+export type NestedProjection = Record<
+  string,
+  | ColumnBuilder
+  | Record<
+      string,
+      | ColumnBuilder
+      | Record<
+          string,
+          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+        >
+    >
+>;
 
 /**
  * Infers Row type from a nested projection object.
@@ -226,12 +237,34 @@ export type NestedProjection = Record<string, ColumnBuilder | Record<string, Col
  * Extracts the pre-computed JsType from each ColumnBuilder at leaves.
  */
 export type InferNestedProjectionRow<
-  P extends Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>,
+  P extends Record<
+    string,
+    | ColumnBuilder
+    | Record<
+        string,
+        | ColumnBuilder
+        | Record<
+            string,
+            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          >
+      >
+  >,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > = {
   [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
     ? JsType
-    : P[K] extends Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>
+    : P[K] extends Record<
+          string,
+          | ColumnBuilder
+          | Record<
+              string,
+              | ColumnBuilder
+              | Record<
+                  string,
+                  ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+                >
+            >
+        >
       ? InferNestedProjectionRow<P[K], CodecTypes>
       : never;
 };
@@ -318,9 +351,10 @@ export interface RawFunctionOptions extends RawTemplateOptions {
   readonly params: ReadonlyArray<unknown>;
 }
 
-export interface RawTemplateFactory {
-  (strings: TemplateStringsArray, ...values: readonly unknown[]): Plan;
-}
+export type RawTemplateFactory = (
+  strings: TemplateStringsArray,
+  ...values: readonly unknown[]
+) => Plan;
 
 export interface RawFactory extends RawTemplateFactory {
   (text: string, options: RawFunctionOptions): Plan;
