@@ -20,6 +20,7 @@ const defaultCapabilities = Object.freeze({
   postgres: {
     orderBy: true,
     limit: true,
+    returning: true,
   },
 });
 

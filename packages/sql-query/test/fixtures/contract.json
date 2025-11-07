@@ -29,5 +29,10 @@
       }
     }
   },
-  "extensions": {}
+  "extensions": {},
+  "capabilities": {
+    "postgres": {
+      "returning": true
+    }
+  }
 }

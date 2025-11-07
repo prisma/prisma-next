@@ -277,5 +277,118 @@ describe('DML builders', () => {
       }).toThrow('where() must be called before building a DELETE query');
     });
   });
+
+  describe('returning() capability gating', () => {
+    const userColumns = tables.user.columns;
+
+    it('throws error when returning capability is missing', () => {
+      const contractWithoutReturning = {
+        ...contract,
+        capabilities: {
+          postgres: {
+            orderBy: true,
+            limit: true,
+          },
+        },
+      };
+
+      expect(() => {
+        sql<Contract, CodecTypes>({ contract: contractWithoutReturning as Contract, adapter })
+          .insert(tables.user, {
+            email: param('email'),
+          })
+          .returning(userColumns.id, userColumns.email);
+      }).toThrow('returning() requires returning capability');
+    });
+
+    it('throws error when returning capability is false', () => {
+      const contractWithReturningFalse = {
+        ...contract,
+        capabilities: {
+          postgres: {
+            orderBy: true,
+            limit: true,
+            returning: false,
+          },
+        },
+      };
+
+      expect(() => {
+        sql<Contract, CodecTypes>({ contract: contractWithReturningFalse as Contract, adapter })
+          .insert(tables.user, {
+            email: param('email'),
+          })
+          .returning(userColumns.id, userColumns.email);
+      }).toThrow('returning() requires returning capability to be true');
+    });
+
+    it('works when returning capability is true', () => {
+      const contractWithReturning = {
+        ...contract,
+        capabilities: {
+          postgres: {
+            orderBy: true,
+            limit: true,
+            returning: true,
+          },
+        },
+      };
+
+      const plan = sql<Contract, CodecTypes>({ contract: contractWithReturning as Contract, adapter })
+        .insert(tables.user, {
+          email: param('email'),
+        })
+        .returning(userColumns.id, userColumns.email)
+        .build({ params: { email: 'test@example.com' } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'insert',
+        returning: [
+          { kind: 'col', table: 'user', column: 'id' },
+          { kind: 'col', table: 'user', column: 'email' },
+        ],
+      });
+    });
+
+    it('throws error for update when returning capability is missing', () => {
+      const contractWithoutReturning = {
+        ...contract,
+        capabilities: {
+          postgres: {
+            orderBy: true,
+            limit: true,
+          },
+        },
+      };
+
+      expect(() => {
+        sql<Contract, CodecTypes>({ contract: contractWithoutReturning as Contract, adapter })
+          .update(tables.user, {
+            email: param('newEmail'),
+          })
+          .where(userColumns.id.eq(param('userId')))
+          .returning(userColumns.id, userColumns.email);
+      }).toThrow('returning() requires returning capability');
+    });
+
+    it('throws error for delete when returning capability is missing', () => {
+      const contractWithoutReturning = {
+        ...contract,
+        capabilities: {
+          postgres: {
+            orderBy: true,
+            limit: true,
+          },
+        },
+      };
+
+      expect(() => {
+        sql<Contract, CodecTypes>({ contract: contractWithoutReturning as Contract, adapter })
+          .delete(tables.user)
+          .where(userColumns.id.eq(param('userId')))
+          .returning(userColumns.id, userColumns.email);
+      }).toThrow('returning() requires returning capability');
+    });
+  });
 });
 

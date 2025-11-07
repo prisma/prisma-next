@@ -1251,6 +1251,17 @@ class InsertBuilderImpl<
   returning<const Columns extends readonly ColumnBuilder[]>(
     ...columns: Columns
   ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
     const builder = new InsertBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
       {
         contract: this.contract,
@@ -1405,6 +1416,17 @@ class UpdateBuilderImpl<
   returning<const Columns extends readonly ColumnBuilder[]>(
     ...columns: Columns
   ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
     const builder = new UpdateBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
       {
         contract: this.contract,
@@ -1631,6 +1653,17 @@ class DeleteBuilderImpl<
   returning<const Columns extends readonly ColumnBuilder[]>(
     ...columns: Columns
   ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
     const builder = new DeleteBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
       {
         contract: this.contract,

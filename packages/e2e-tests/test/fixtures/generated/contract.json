@@ -106,7 +106,8 @@
   "capabilities": {
     "postgres": {
       "jsonAgg": true,
-      "lateral": true
+      "lateral": true,
+      "returning": true
     }
   },
   "extensions": {
