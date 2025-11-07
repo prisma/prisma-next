@@ -21,6 +21,16 @@ import type { DevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import type { Contract } from './fixtures/generated/contract.d';
 
+// Extend Contract type with capabilities for includeMany support
+type ContractWithCapabilities = Contract & {
+  readonly capabilities: {
+    readonly postgres: {
+      readonly lateral: true;
+      readonly jsonAgg: true;
+    };
+  };
+};
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '../../..');
@@ -796,7 +806,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
   });
 
   it('includeMany returns one row per parent with nested array of children', async () => {
-    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+    const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);
 
     await withDevDatabase(
       async ({ connectionString }: DevDatabase) => {
@@ -823,10 +833,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const tables = schema<ContractWithCapabilities, CodecTypes>(contract).tables;
             const user = tables['user']!;
             const post = tables['post']!;
-            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            const plan = sql<ContractWithCapabilities, CodecTypes>({ contract, adapter })
               .from(user)
               .includeMany(
                 post,
@@ -883,7 +893,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
   });
 
   it('includeMany with child where, orderBy, and limit filters children', async () => {
-    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+    const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);
 
     await withDevDatabase(
       async ({ connectionString }: DevDatabase) => {
@@ -906,10 +916,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const tables = schema<ContractWithCapabilities, CodecTypes>(contract).tables;
             const user = tables['user']!;
             const post = tables['post']!;
-            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            const plan = sql<ContractWithCapabilities, CodecTypes>({ contract, adapter })
               .from(user)
               .includeMany(
                 post,
@@ -930,7 +940,6 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               .build({ params: { published: true } });
 
             const rows = await executePlanAndCollect(runtime, plan);
-            type Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(1);
             expect(rows[0]!.posts.length).toBe(1);

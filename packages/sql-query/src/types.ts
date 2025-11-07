@@ -236,7 +236,27 @@ export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
 /**
  * Nested projection type - allows recursive nesting of ColumnBuilder or nested objects.
  */
-export type NestedProjection = Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>;
+export type NestedProjection = Record<
+  string,
+  | ColumnBuilder
+  | Record<
+      string,
+      | ColumnBuilder
+      | Record<
+          string,
+          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+        >
+    >
+>;
+
+/**
+ * Helper type to extract include type from Includes map.
+ * Returns the value type if K is a key of Includes, otherwise returns unknown.
+ */
+type ExtractIncludeType<
+  K extends string,
+  Includes extends Record<string, any>,
+> = K extends keyof Includes ? Includes[K] : unknown;
 
 /**
  * Infers Row type from a nested projection object.
@@ -247,17 +267,38 @@ export type NestedProjection = Record<string, ColumnBuilder | Record<string, Col
  * by looking up the include alias in the Includes type map.
  */
 export type InferNestedProjectionRow<
-  P extends Record<string, ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>,
+  P extends Record<
+    string,
+    | ColumnBuilder
+    | boolean
+    | Record<
+        string,
+        | ColumnBuilder
+        | Record<
+            string,
+            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          >
+      >
+  >,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   Includes extends Record<string, any> = Record<string, never>,
 > = {
   [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
     ? JsType
     : P[K] extends true
-      ? K extends keyof Includes
-        ? Array<Includes[K]> // Include reference - infers Array<ChildShape> from Includes map
-        : Array<unknown> // Fallback if include not found in map
-      : P[K] extends Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>>
+      ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
+      : P[K] extends Record<
+            string,
+            | ColumnBuilder
+            | Record<
+                string,
+                | ColumnBuilder
+                | Record<
+                    string,
+                    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+                  >
+              >
+          >
         ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
         : never;
 };

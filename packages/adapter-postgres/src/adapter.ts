@@ -75,14 +75,11 @@ function renderProjection(ast: SelectAst): string {
     .map((item) => {
       if (item.expr.kind === 'includeRef') {
         // For include references, select the column from the LATERAL join alias
-        // The LATERAL subquery returns a single column (the JSON array)
-        // Since the subquery returns a single unnamed column, we need to select it using the alias
-        // PostgreSQL allows selecting from a table alias directly when there's only one column
-        // We use the alias directly since the subquery returns a single column
-        // The subquery result is available as a column, so we select it using the alias
-        // We need to select the column from the subquery result, which is the first (and only) column
-        // The subquery result is available as a column, so we select it using the alias directly
-        return `${quoteIdentifier(item.expr.alias)} AS ${quoteIdentifier(item.alias)}`;
+        // The LATERAL subquery returns a single column (the JSON array) with the alias
+        // The table is aliased as {alias}_lateral, and the column inside is aliased as the include alias
+        // We select it using table_alias.column_alias
+        const tableAlias = `${item.expr.alias}_lateral`;
+        return `${quoteIdentifier(tableAlias)}.${quoteIdentifier(item.expr.alias)} AS ${quoteIdentifier(item.alias)}`;
       }
       const column = renderColumn(item.expr);
       const alias = quoteIdentifier(item.alias);
@@ -122,7 +119,7 @@ function renderJoinOn(on: JoinAst['on']): string {
 }
 
 function renderInclude(include: NonNullable<SelectAst['includes']>[number]): string {
-  const alias = quoteIdentifier(include.alias);
+  const alias = include.alias;
 
   // Build the lateral subquery
   const childProjection = include.child.project
@@ -190,19 +187,20 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
       : '';
 
     const innerSelect = `SELECT ${innerColumns} FROM ${childTable}${whereClause}${childOrderByWithAliases}${childLimit}`;
-    subquery = `(SELECT json_agg(row_to_json(sub.*)) FROM (${innerSelect}) sub)`;
+    subquery = `(SELECT json_agg(row_to_json(sub.*)) AS ${quoteIdentifier(alias)} FROM (${innerSelect}) sub)`;
   } else if (childOrderBy) {
     // With ORDER BY but no LIMIT, ORDER BY goes inside json_agg()
-    subquery = `(SELECT json_agg(${jsonBuildObject}${childOrderBy}) FROM ${childTable}${whereClause})`;
+    subquery = `(SELECT json_agg(${jsonBuildObject}${childOrderBy}) AS ${quoteIdentifier(alias)} FROM ${childTable}${whereClause})`;
   } else {
     // No ORDER BY or LIMIT
-    subquery = `(SELECT json_agg(${jsonBuildObject}) FROM ${childTable}${whereClause})`;
+    subquery = `(SELECT json_agg(${jsonBuildObject}) AS ${quoteIdentifier(alias)} FROM ${childTable}${whereClause})`;
   }
 
   // Return the LATERAL join with ON true (the condition is in the WHERE clause)
-  // The subquery returns a single column (the JSON array)
-  // We alias the subquery result as the include alias so we can select it in the projection
-  return `LEFT JOIN LATERAL ${subquery} AS ${quoteIdentifier(alias)} ON true`;
+  // The subquery returns a single column (the JSON array) with the alias
+  // We use a different alias for the table to avoid ambiguity when selecting the column
+  const tableAlias = `${alias}_lateral`;
+  return `LEFT JOIN LATERAL ${subquery} AS ${quoteIdentifier(tableAlias)} ON true`;
 }
 
 function quoteIdentifier(identifier: string): string {

@@ -339,17 +339,13 @@ class SelectBuilderImpl<
       ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
     >,
     ChildRow = InferNestedProjectionRow<ChildProjection, CodecTypes>,
+    AliasName extends string = string,
   >(
     childTable: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
     childBuilder: (child: IncludeChildBuilder<TContract, CodecTypes, unknown>) => IncludeChildBuilder<TContract, CodecTypes, ChildRow>,
-    options?: { alias?: string },
-  ): SelectBuilderImpl<
-    TContract,
-    Row,
-    CodecTypes,
-    Includes & { [K in typeof options extends { alias: infer A } ? A extends string ? A : typeof childTable extends { name: infer N } ? N extends string ? N : never : never : typeof childTable extends { name: infer N } ? N extends string ? N : never : never]: ChildRow }
-  > {
+    options?: { alias?: AliasName },
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes & { [K in AliasName]: ChildRow }> {
     // Runtime capability check
     const target = this.contract.target;
     const capabilities = this.contract.capabilities;
@@ -416,23 +412,9 @@ class SelectBuilderImpl<
     const newIncludes = [...existingIncludes, includeState];
 
     // Type-level: Update Includes map with new include
-    // Compute alias at type level
-    type AliasName = typeof options extends { alias: infer A }
-      ? A extends string
-        ? A
-        : typeof childTable extends { name: infer N }
-          ? N extends string
-            ? N
-            : never
-          : never
-      : typeof childTable extends { name: infer N }
-        ? N extends string
-          ? N
-          : never
-        : never;
-    
+    // Use the AliasName generic parameter which TypeScript will infer from the options.alias value
     type NewIncludes = Includes & { [K in AliasName]: ChildRow };
-    
+
     return new SelectBuilderImpl<TContract, Row, CodecTypes, NewIncludes>(
       {
         contract: this.contract,
