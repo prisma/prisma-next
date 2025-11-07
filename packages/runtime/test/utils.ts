@@ -203,7 +203,6 @@ export async function teardownTestDatabase(
 export {
   collectAsync,
   createDevDatabase,
-  teardownTestDatabase,
   withClient,
   type DevDatabase,
 } from '@prisma-next/test-utils';

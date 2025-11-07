@@ -4,12 +4,16 @@ import { codecDefinitions } from './codecs';
 import type {
   BinaryExpr,
   ColumnRef,
+  DeleteAst,
+  InsertAst,
   JoinAst,
   ParamRef,
   PostgresAdapterOptions,
   PostgresContract,
   PostgresLoweredStatement,
+  QueryAst,
   SelectAst,
+  UpdateAst,
 } from './types';
 
 const defaultCapabilities = Object.freeze({
@@ -20,7 +24,7 @@ const defaultCapabilities = Object.freeze({
 });
 
 class PostgresAdapterImpl
-  implements Adapter<SelectAst, PostgresContract, PostgresLoweredStatement>
+  implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement>
 {
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecRegistry = (() => {
@@ -40,9 +44,21 @@ class PostgresAdapterImpl
     });
   }
 
-  lower(ast: SelectAst, context: LowererContext<PostgresContract>) {
-    const sql = renderSelect(ast);
+  lower(ast: QueryAst, context: LowererContext<PostgresContract>) {
+    let sql: string;
     const params = context.params ? [...context.params] : [];
+
+    if (ast.kind === 'select') {
+      sql = renderSelect(ast);
+    } else if (ast.kind === 'insert') {
+      sql = renderInsert(ast);
+    } else if (ast.kind === 'update') {
+      sql = renderUpdate(ast);
+    } else if (ast.kind === 'delete') {
+      sql = renderDelete(ast);
+    } else {
+      throw new Error(`Unsupported AST kind: ${(ast as { kind: string }).kind}`);
+    }
 
     return Object.freeze({
       profileId: this.profile.id,
@@ -210,6 +226,60 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
 
 function quoteIdentifier(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function renderInsert(ast: InsertAst): string {
+  const table = quoteIdentifier(ast.table.name);
+  const columns = Object.keys(ast.values).map((col) => quoteIdentifier(col));
+  const values = Object.values(ast.values).map((val) => {
+    if (val.kind === 'param') {
+      return `$${val.index}`;
+    }
+    if (val.kind === 'col') {
+      return `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
+    }
+    throw new Error(`Unsupported value kind in INSERT: ${(val as { kind: string }).kind}`);
+  });
+
+  const insertClause = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')})`;
+  const returningClause = ast.returning?.length
+    ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
+    : '';
+
+  return `${insertClause}${returningClause}`;
+}
+
+function renderUpdate(ast: UpdateAst): string {
+  const table = quoteIdentifier(ast.table.name);
+  const setClauses = Object.entries(ast.set).map(([col, val]) => {
+    const column = quoteIdentifier(col);
+    let value: string;
+    if (val.kind === 'param') {
+      value = `$${val.index}`;
+    } else if (val.kind === 'col') {
+      value = `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
+    } else {
+      throw new Error(`Unsupported value kind in UPDATE: ${(val as { kind: string }).kind}`);
+    }
+    return `${column} = ${value}`;
+  });
+
+  const whereClause = ` WHERE ${renderBinary(ast.where)}`;
+  const returningClause = ast.returning?.length
+    ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
+    : '';
+
+  return `UPDATE ${table} SET ${setClauses.join(', ')}${whereClause}${returningClause}`;
+}
+
+function renderDelete(ast: DeleteAst): string {
+  const table = quoteIdentifier(ast.table.name);
+  const whereClause = ` WHERE ${renderBinary(ast.where)}`;
+  const returningClause = ast.returning?.length
+    ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
+    : '';
+
+  return `DELETE FROM ${table}${whereClause}${returningClause}`;
 }
 
 export function createPostgresAdapter(options?: PostgresAdapterOptions) {

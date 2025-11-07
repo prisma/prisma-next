@@ -1,11 +1,15 @@
 import type {
   BinaryExpr,
   ColumnRef,
+  DeleteAst,
   Direction,
+  InsertAst,
   JoinAst,
   LoweredStatement,
   ParamRef,
+  QueryAst,
   SelectAst,
+  UpdateAst,
 } from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-target';
 
@@ -27,10 +31,14 @@ export type PostgresLoweredStatement = LoweredStatement;
 export type {
   BinaryExpr,
   ColumnRef,
+  DeleteAst,
   Direction,
+  InsertAst,
   JoinAst,
   ParamRef,
+  QueryAst,
   SelectAst,
   StorageColumn,
   StorageTable,
+  UpdateAst,
 };

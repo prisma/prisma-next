@@ -131,8 +131,8 @@ export function budgets(options?: BudgetsOptions): Plugin {
 
     const tableEstimate = tableRows[table] ?? defaultTableRows;
 
-    // Check if there's a LIMIT in the AST
-    if (typeof plan.ast.limit === 'number') {
+    // Check if there's a LIMIT in the AST (only SELECT has limit)
+    if (plan.ast?.kind === 'select' && typeof plan.ast.limit === 'number') {
       // Bounded: use min of LIMIT and table estimate
       return Math.min(plan.ast.limit, tableEstimate);
     }
@@ -147,8 +147,8 @@ export function budgets(options?: BudgetsOptions): Plugin {
    * For raw lane: check meta.annotations or refs hints (if provided)
    */
   function hasDetectableLimit(plan: Plan): boolean {
-    // Check AST limit if available
-    if (plan.ast && typeof plan.ast.limit === 'number') {
+    // Check AST limit if available (only SELECT has limit)
+    if (plan.ast?.kind === 'select' && typeof plan.ast.limit === 'number') {
       return true;
     }
 

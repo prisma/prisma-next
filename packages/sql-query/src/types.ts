@@ -146,6 +146,30 @@ export interface SelectAst {
   readonly limit?: number;
 }
 
+export interface InsertAst {
+  readonly kind: 'insert';
+  readonly table: TableRef;
+  readonly values: Record<string, ColumnRef | ParamRef>;
+  readonly returning?: ReadonlyArray<ColumnRef>;
+}
+
+export interface UpdateAst {
+  readonly kind: 'update';
+  readonly table: TableRef;
+  readonly set: Record<string, ColumnRef | ParamRef>;
+  readonly where: BinaryExpr;
+  readonly returning?: ReadonlyArray<ColumnRef>;
+}
+
+export interface DeleteAst {
+  readonly kind: 'delete';
+  readonly table: TableRef;
+  readonly where: BinaryExpr;
+  readonly returning?: ReadonlyArray<ColumnRef>;
+}
+
+export type QueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst;
+
 export interface ParamDescriptor {
   readonly index?: number;
   readonly name?: string;
@@ -396,7 +420,7 @@ export type ColumnsOf<
 export interface Plan<_Row = unknown> {
   readonly sql: string;
   readonly params: readonly unknown[];
-  readonly ast?: SelectAst;
+  readonly ast?: QueryAst;
   readonly meta: PlanMeta;
 }
 
@@ -449,6 +473,6 @@ export interface SqlBuilderOptions<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > {
   readonly contract: TContract;
-  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
+  readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly codecTypes?: CodecTypes;
 }
