@@ -200,7 +200,6 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
-            type _Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(3);
             const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
@@ -271,7 +270,6 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
-            type _Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(2);
             const firstPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'First Post');
@@ -340,7 +338,6 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               .build();
 
             const rows = await executePlanAndCollect(runtime, plan);
-            type _Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(3);
             const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
@@ -430,7 +427,6 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(plan.ast?.joins?.[1]?.table.name).toBe('comment');
 
             const rows = await executePlanAndCollect(runtime, plan);
-            type _Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(3);
             const firstPostRow = rows.find(
@@ -1084,7 +1080,6 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               .build({ params: { email: 'ada@example.com' } });
 
             const rows = await executePlanAndCollect(runtime, plan);
-            type Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(2);
             expect(rows[0]).toHaveProperty('postId');
