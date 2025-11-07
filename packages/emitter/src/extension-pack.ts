@@ -57,7 +57,7 @@ export function loadExtensionPackManifest(packPath: string): ExtensionPackManife
     throw new Error(`Invalid manifest structure at ${manifestPath}: ${messages}`);
   }
 
-  return result;
+  return result as ExtensionPackManifest;
 }
 
 export function loadExtensionPacks(

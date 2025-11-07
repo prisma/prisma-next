@@ -22,6 +22,7 @@ Provide SQL target family abstraction, emitter hook implementation, and SQL-spec
 - **Contract Types**: Define SQL-specific contract types (`SqlContract`, `SqlStorage`, etc.)
 - **Adapter SPI**: Define adapter interfaces for SQL lowering and execution
 - **Codec Infrastructure**: Define codec interfaces and registry types
+- **Operations Registry**: Define operation registry for extension pack operations on value types
 
 **Non-goals:**
 - Query compilation or execution (sql-query, runtime)
@@ -94,6 +95,12 @@ flowchart TD
 - Codec registry types
 - Codec factory functions
 
+### Operations Registry (`operations-registry.ts`)
+- Operation registry interface and implementation
+- Operation signature types (`ArgSpec`, `ReturnSpec`, `LoweringSpec`)
+- `createOperationRegistry()`: Create a new operation registry
+- `assembleOperationRegistry()`: Assemble registry from extension pack manifests
+
 ## Dependencies
 
 - **`@prisma-next/emitter`**: Core emitter types and hook interface
@@ -131,5 +138,5 @@ const result = await emit(ir, options, sqlTargetFamilyHook);
 
 ## Exports
 
-- `.`: SQL target types, adapter SPI, codec infrastructure, and emitter hook
+- `.`: SQL target types, adapter SPI, codec infrastructure, operations registry, and emitter hook
 

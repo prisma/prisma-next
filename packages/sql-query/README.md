@@ -82,6 +82,7 @@ flowchart TD
 - Type-safe table and column builders
 - Infers JavaScript types from contract types
 - Supports column builders with metadata
+- Attaches operations from operation registry to column builders based on column typeId
 
 ### Parameter Builder (`param.ts`)
 - Parameter placeholder factory
@@ -106,6 +107,10 @@ flowchart TD
 
 ### Errors (`errors.ts`)
 - SQL-specific error types and factories
+
+### Operations Registry (`operations-registry.ts`)
+- `attachOperationsToColumnBuilder()`: Attach registered operations as methods on `ColumnBuilder` instances
+- Dynamically exposes operations based on column `typeId` and contract capabilities
 
 ## Dependencies
 

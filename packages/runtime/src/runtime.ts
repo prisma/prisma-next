@@ -18,7 +18,13 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-import { type CodecRegistry, createCodecRegistry } from '@prisma-next/sql-target';
+import type { ExtensionPack } from '@prisma-next/emitter';
+import {
+  assembleOperationRegistry,
+  type CodecRegistry,
+  createCodecRegistry,
+  type OperationRegistry,
+} from '@prisma-next/sql-target';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
@@ -34,12 +40,14 @@ export interface RuntimeOptions<
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: import('./plugins/types').Log;
+  readonly extensions?: ReadonlyArray<ExtensionPack>;
 }
 
 export interface Runtime {
   execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
+  operations(): OperationRegistry;
 }
 
 interface RuntimeErrorEnvelope extends Error {
@@ -59,6 +67,7 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
   private readonly codecRegistry: CodecRegistry;
+  private readonly operationRegistry: OperationRegistry;
   private readonly pluginContext: import('./plugins/types').PluginContext;
 
   private verified: boolean;
@@ -67,7 +76,7 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { driver, contract, adapter } = options;
+    const { driver, contract, adapter, extensions } = options;
     this.contract = contract;
     this.adapter = adapter;
     this.driver = driver;
@@ -90,6 +99,9 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
     }
 
     this.codecRegistry = registry;
+
+    // Compose operations registry from extension packs
+    this.operationRegistry = assembleOperationRegistry(extensions ?? []);
 
     this.pluginContext = {
       contract: this.contract,
@@ -289,6 +301,10 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
 
   telemetry(): RuntimeTelemetryEvent | null {
     return this._telemetry;
+  }
+
+  operations(): OperationRegistry {
+    return this.operationRegistry;
   }
 
   close(): Promise<void> {

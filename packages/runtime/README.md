@@ -18,6 +18,7 @@ Execute query Plans with deterministic verification, guardrails, and feedback. P
 - **Plan Execution**: Execute Plans through adapters and drivers
 - **Plugin Pipeline**: Apply guardrails (lints, budgets, telemetry) before and during execution
 - **Codec Composition**: Compose codec registries from adapters and extension packs
+- **Operations Registry**: Assemble operations registry from extension packs for query building
 - **Result Streaming**: Stream results as `AsyncIterable<Row>` for efficient processing
 - **Error Mapping**: Map driver errors to stable `RuntimeError` envelope
 
@@ -77,7 +78,8 @@ flowchart TD
 ### Runtime (`runtime.ts`)
 - Main orchestrator for query execution
 - Manages contract verification, plugin lifecycle, and result streaming
-- Coordinates adapters, drivers, and codecs
+- Coordinates adapters, drivers, codecs, and operations registry
+- Assembles operations registry from extension packs
 
 ### Codecs (`codecs/`)
 - **Encoding**: Encode JavaScript values to wire format for parameters
@@ -134,16 +136,32 @@ flowchart TD
 import { createRuntime } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
+import { loadExtensionPacks } from '@prisma-next/emitter';
+import { schema } from '@prisma-next/sql-query/schema';
 import contract from './contract.json';
 
+// Load extension packs
+const adapterPath = './packages/adapter-postgres';
+const packPaths = ['./packages/pack-pgvector'];
+const extensions = loadExtensionPacks(adapterPath, packPaths);
+
+// Create runtime with extensions
 const runtime = createRuntime({
   contract,
   adapter: createPostgresAdapter(),
   driver: createPostgresDriver({ connectionString: process.env.DATABASE_URL }),
+  verify: { mode: 'onFirstUse', requireMarker: false },
+  extensions,  // Pass extensions to runtime
   plugins: [
     // Add lints, budgets, telemetry plugins
   ],
 });
+
+// Get operations registry from runtime
+const operationRegistry = runtime.operations();
+
+// Use operations registry in schema
+const tables = schema(contract, undefined, operationRegistry, contract.capabilities);
 
 // Execute a plan
 for await (const row of runtime.execute(plan)) {
