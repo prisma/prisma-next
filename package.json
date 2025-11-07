@@ -12,7 +12,7 @@
     "test:coverage": "turbo run test:coverage",
     "test:coverage:packages": "turbo run test:coverage --filter='!./examples/**' --filter='!./packages/integration-tests' --filter='!./packages/e2e-tests'",
     "lint": "turbo run lint",
-    "lint:all": "turbo run lint",
+    "lint:fix": "pnpm biome check --write .",
     "lint:packages": "turbo run lint --filter='!./examples/**'",
     "lint:examples": "turbo run lint --filter='./examples/**'",
     "typecheck": "turbo run typecheck",
