@@ -1,6 +1,5 @@
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { schema } from '@prisma-next/sql-query/schema';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { Client } from 'pg';

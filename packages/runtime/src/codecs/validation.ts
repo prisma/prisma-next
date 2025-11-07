@@ -1,5 +1,4 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { CodecRegistry } from '@prisma-next/sql-target';
+import type { CodecRegistry, SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 /**
  * Extracts all unique type IDs from a contract's storage tables.

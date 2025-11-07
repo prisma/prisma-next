@@ -9,9 +9,9 @@ import type {
   ColumnRef,
   DeleteAst,
   Direction,
+  IncludeRef,
   InferNestedProjectionRow,
   InferReturningRow,
-  IncludeRef,
   InsertAst,
   JoinOnBuilder,
   JoinOnPredicate,
@@ -300,7 +300,7 @@ class SelectBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-  Includes extends Record<string, any> = Record<string, never>,
+  Includes extends Record<string, unknown> = Record<string, never>,
 > {
   private readonly contract: TContract;
   private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
@@ -385,7 +385,7 @@ class SelectBuilderImpl<
       throw planInvalid('includeMany requires lateral and jsonAgg capabilities');
     }
     const targetCapabilities = capabilities[target];
-    if (targetCapabilities['lateral'] !== true || targetCapabilities['jsonAgg'] !== true) {
+    if (capabilities[target]['lateral'] !== true || targetCapabilities['jsonAgg'] !== true) {
       throw planInvalid('includeMany requires lateral and jsonAgg capabilities to be true');
     }
 
@@ -814,7 +814,7 @@ class SelectBuilderImpl<
     const placeholder = where.right;
     const paramName = placeholder.name;
 
-    if (!Object.prototype.hasOwnProperty.call(paramsMap, paramName)) {
+    if (!Object.hasOwn(paramsMap, paramName)) {
       throw planInvalid(`Missing value for parameter ${paramName}`);
     }
 
@@ -1037,7 +1037,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.includes) {
-    args.includes.forEach((include) => {
+    for (const include of args.includes) {
       refsTables.add(include.table.name);
       // Add ON condition columns
       refsColumns.set(`${include.on.left.table}.${include.on.left.column}`, {
@@ -1049,14 +1049,14 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
         column: include.on.right.column,
       });
       // Add child projection columns
-      include.childProjection.columns.forEach((column) => {
+      for (const column of include.childProjection.columns) {
         if (column.table && column.column) {
           refsColumns.set(`${column.table}.${column.column}`, {
             table: column.table,
             column: column.column,
           });
         }
-      });
+      }
       // Add child WHERE columns if present
       if (include.childWhere) {
         refsColumns.set(`${include.childWhere.left.table}.${include.childWhere.left.column}`, {
@@ -1071,7 +1071,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
           column: include.childOrderBy.expr.column,
         });
       }
-    });
+    }
   }
 
   if (args.where) {
@@ -1174,7 +1174,7 @@ export type SelectBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-  Includes extends Record<string, any> = Record<string, never>,
+  Includes extends Record<string, unknown> = Record<string, never>,
 > = SelectBuilderImpl<TContract, Row, CodecTypes, Includes> & {
   readonly raw: RawFactory;
   insert(

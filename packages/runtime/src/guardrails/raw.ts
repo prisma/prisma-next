@@ -138,10 +138,9 @@ function isMutationStatement(statement: 'select' | 'mutation' | 'other'): boolea
 }
 
 function isReadOnlyIntent(meta: PlanMeta): boolean {
+  const annotations = meta.annotations as { intent?: string } | undefined;
   const intent =
-    typeof meta.annotations?.['intent'] === 'string'
-      ? meta.annotations['intent'].toLowerCase()
-      : undefined;
+    typeof annotations?.intent === 'string' ? annotations.intent.toLowerCase() : undefined;
   return intent !== undefined && READ_ONLY_INTENTS.has(intent);
 }
 

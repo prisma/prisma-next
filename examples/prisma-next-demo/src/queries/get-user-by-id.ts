@@ -1,7 +1,7 @@
 import { param } from '@prisma-next/sql-query/param';
-import type { ResultType } from '@prisma-next/sql-query/types';
 import { sql, tables } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
+import { collect } from './utils';
 
 export async function getUserById(userId: number) {
   const runtime = getRuntime();
@@ -18,12 +18,6 @@ export async function getUserById(userId: number) {
     .limit(1)
     .build({ params: { userId } });
 
-  type Row = ResultType<typeof plan>;
-  const rows: Row[] = [];
-
-  for await (const row of runtime.execute(plan)) {
-    rows.push(row);
-  }
-
+  const rows = await collect(runtime.execute(plan));
   return rows[0] ?? null;
 }

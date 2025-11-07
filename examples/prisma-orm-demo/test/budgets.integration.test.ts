@@ -1,3 +1,5 @@
+import type { StartServerOptions } from '@prisma/dev';
+import { unstable_startServer } from '@prisma/dev';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
@@ -7,15 +9,12 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/runtime';
-import { schema } from '@prisma-next/sql-query/schema';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import { unstable_startServer } from '@prisma/dev';
-import type { StartServerOptions } from '@prisma/dev';
 import { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
 import type { CodecTypes, Contract } from '../src/prisma-next/contract.d';
-import contractJson from '../src/prisma-next/contract.json' assert { type: 'json' };
+import contractJson from '../src/prisma-next/contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
 

@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
-    "lint": "biome check . --config-path ../../biome.json"
+    "lint": "biome check . --config-path ../../biome.json --error-on-warnings"
   },
   "dependencies": {},
   "devDependencies": {

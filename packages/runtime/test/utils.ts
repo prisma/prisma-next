@@ -6,18 +6,16 @@ import type {
   ResultType,
   SelectAst,
 } from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { SqlDriver } from '@prisma-next/sql-target';
+import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
+import type { Log, Plugin, SqlStatement } from '../src/exports';
 import {
   createRuntime,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
 } from '../src/exports';
-import type { Log, Plugin } from '../src/exports';
-import type { SqlStatement } from '../src/exports';
 
 /**
  * Executes a plan and collects all results into an array.
@@ -187,22 +185,11 @@ export async function setupE2EDatabase(
   await setupTestDatabase(client, contract, setupFn);
 }
 
-/**
- * Tears down test database by dropping specified tables.
- */
-export async function teardownTestDatabase(
-  client: Client,
-  tableNames: readonly string[],
-): Promise<void> {
-  for (const tableName of tableNames) {
-    await client.query(`drop table if exists "${tableName}" cascade`);
-  }
-}
-
 // Re-export generic utilities from test-utils
 export {
   collectAsync,
   createDevDatabase,
-  withClient,
   type DevDatabase,
+  teardownTestDatabase,
+  withClient,
 } from '@prisma-next/test-utils';

@@ -5,19 +5,20 @@ export type {
   LoweredPayload,
   Lowerer,
   LowererContext,
-  SqlDriver,
-  SqlExecuteRequest,
-  SqlExplainResult,
-  SqlQueryResult,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  SqlMappings,
-  StorageTable,
   ModelDefinition,
   ModelField,
   ModelStorage,
+  SqlContract,
+  SqlDriver,
+  SqlExecuteRequest,
+  SqlExplainResult,
+  SqlMappings,
+  SqlQueryResult,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
 } from '@prisma-next/sql-target';
+
 import type { Adapter, SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 
 export type Direction = 'asc' | 'desc';
@@ -282,7 +283,7 @@ export type NestedProjection = Record<
  */
 type ExtractIncludeType<
   K extends string,
-  Includes extends Record<string, any>,
+  Includes extends Record<string, unknown>,
 > = K extends keyof Includes ? Includes[K] : unknown;
 
 /**
@@ -308,7 +309,7 @@ export type InferNestedProjectionRow<
       >
   >,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-  Includes extends Record<string, any> = Record<string, never>,
+  Includes extends Record<string, unknown> = Record<string, never>,
 > = {
   [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
     ? JsType

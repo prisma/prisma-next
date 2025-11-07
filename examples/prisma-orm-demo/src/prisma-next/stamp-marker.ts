@@ -7,7 +7,7 @@ import {
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract } from '@prisma-next/sql-target';
 import { Client } from 'pg';
-import contract from './contract.json' assert { type: 'json' };
+import contract from './contract.json' with { type: 'json' };
 
 const contractData = validateContract<SqlContract>(contract);
 

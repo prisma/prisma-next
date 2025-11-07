@@ -1,11 +1,11 @@
-export { sql, SelectBuilder } from '../sql';
 export { rawOptions } from '../raw';
+export { SelectBuilder, sql } from '../sql';
 export type {
-  SqlBuilderOptions,
+  ColumnsOf,
   RawFactory,
   RawFunctionOptions,
   RawTemplateOptions,
-  TablesOf,
+  SqlBuilderOptions,
   TableKey,
-  ColumnsOf,
+  TablesOf,
 } from '../types';

@@ -1,5 +1,5 @@
-import { unstable_startServer } from '@prisma/dev';
 import type { StartServerOptions } from '@prisma/dev';
+import { unstable_startServer } from '@prisma/dev';
 import { Client } from 'pg';
 
 function normalizeConnectionString(raw: string): string {

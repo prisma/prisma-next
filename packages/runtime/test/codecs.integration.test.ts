@@ -1,6 +1,5 @@
 import { param } from '@prisma-next/sql-query/param';
-import { schema } from '@prisma-next/sql-query/schema';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { Plan } from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
@@ -257,7 +256,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const rows = await executePlanAndCollect(runtime, planWithOverride);
     expect(rows.length).toBe(1);
 
-    const row = rows[0]!;
+    const row = rows[0]! as Record<string, unknown>;
     expect(row['created_at']).toBeDefined();
     expect(typeof row['created_at']).toBe('string');
   });
@@ -394,6 +393,6 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
 
     const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
-    expect(rows[0]?.name).toBe('Test User');
+    expect(rows[0]).toEqual({ name: 'Test User' });
   });
 });

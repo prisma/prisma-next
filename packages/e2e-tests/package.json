@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../biome.json",
+    "lint": "biome check . --config-path ../../biome.json --error-on-warnings",
     "gen-contract": "node ./scripts/gen-contract.cjs"
   },
   "devDependencies": {

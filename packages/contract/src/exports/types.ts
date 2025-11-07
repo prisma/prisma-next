@@ -1,10 +1,17 @@
 import type { DocumentContract } from '../types';
 
 // Shared types
-export type { FieldType, Source, ContractBase } from '../types';
-
 // Document family types
-export type { DocCollection, DocIndex, Expr, DocumentStorage, DocumentContract } from '../types';
+export type {
+  ContractBase,
+  DocCollection,
+  DocIndex,
+  DocumentContract,
+  DocumentStorage,
+  Expr,
+  FieldType,
+  Source,
+} from '../types';
 
 /**
  * Type guard to check if a contract is a SQL contract

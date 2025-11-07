@@ -1,9 +1,7 @@
 import type { Adapter, LoweredStatement, Plan, SelectAst } from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow, readContractMarker } from './marker';
-
-import type { SqlDriver } from '@prisma-next/sql-target';
 
 export interface RuntimeVerifyOptions {
   readonly mode: 'onFirstUse' | 'startup' | 'always';

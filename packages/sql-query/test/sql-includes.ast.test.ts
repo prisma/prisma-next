@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SelectAst, IncludeAst, BinaryExpr, ColumnRef, Direction } from '../src/types';
+import type { BinaryExpr, ColumnRef, Direction, IncludeAst, SelectAst } from '../src/types';
 
 describe('Include AST types', () => {
   it('defines IncludeAst with includeMany kind', () => {

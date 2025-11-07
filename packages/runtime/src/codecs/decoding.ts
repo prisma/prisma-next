@@ -117,7 +117,7 @@ export function decodeRow(
           alias,
           wirePreview:
             typeof wireValue === 'string' && wireValue.length > 100
-              ? wireValue.substring(0, 100) + '...'
+              ? `${wireValue.substring(0, 100)}...`
               : String(wireValue).substring(0, 100),
         };
         throw decodeError;
