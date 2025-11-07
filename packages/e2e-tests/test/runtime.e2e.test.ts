@@ -1,7 +1,5 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, expectTypeOf, it } from 'vitest';
-
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
@@ -15,9 +13,9 @@ import { sql } from '@prisma-next/sql-query/sql';
 import type { ResultType } from '@prisma-next/sql-query/types';
 import { type DevDatabase, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
-import { emitAndVerifyContract, loadContractFromDisk } from './utils';
-
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
+import { emitAndVerifyContract, loadContractFromDisk } from './utils';
 
 // Extend Contract type with capabilities for includeMany support
 type ContractWithCapabilities = Contract & {

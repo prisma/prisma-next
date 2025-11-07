@@ -5,19 +5,20 @@ export type {
   LoweredPayload,
   Lowerer,
   LowererContext,
-  SqlDriver,
-  SqlExecuteRequest,
-  SqlExplainResult,
-  SqlQueryResult,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  SqlMappings,
-  StorageTable,
   ModelDefinition,
   ModelField,
   ModelStorage,
+  SqlContract,
+  SqlDriver,
+  SqlExecuteRequest,
+  SqlExplainResult,
+  SqlMappings,
+  SqlQueryResult,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
 } from '@prisma-next/sql-target';
+
 import type { Adapter, SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
 
 export type Direction = 'asc' | 'desc';

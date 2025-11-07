@@ -1,2 +1,2 @@
+export type { ColumnBuilder, ColumnOptions } from '../contract-builder';
 export { defineContract } from '../contract-builder';
-export type { ColumnOptions, ColumnBuilder } from '../contract-builder';

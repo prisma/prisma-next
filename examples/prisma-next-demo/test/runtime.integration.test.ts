@@ -1,20 +1,18 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
-
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { budgets, createRuntime } from '@prisma-next/runtime';
 import { param } from '@prisma-next/sql-query/param';
-import { schema } from '@prisma-next/sql-query/schema';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { ResultType } from '@prisma-next/sql-query/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { Contract } from '../src/prisma/contract.d';
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';

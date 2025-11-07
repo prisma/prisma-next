@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest';
-
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
+import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';

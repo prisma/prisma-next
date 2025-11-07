@@ -1,8 +1,8 @@
-import { getRuntime } from '../prisma/runtime';
 import type { ResultType } from '@prisma-next/sql-query/types';
 import { schema, sql } from '../prisma/query';
+import { getRuntime } from '../prisma/runtime';
 
-export async function getUsersWithPosts(limit: number = 10) {
+export async function getUsersWithPosts(limit = 10) {
   const runtime = getRuntime();
   const userTable = schema.tables.user;
   const postTable = schema.tables.post;

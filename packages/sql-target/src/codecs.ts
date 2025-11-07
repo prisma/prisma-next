@@ -281,7 +281,7 @@ class CodecDefBuilderImpl<
     // biome-ignore lint/suspicious/noExplicitAny: dynamic codec mapping requires any
     const dataTypes = {} as any;
     for (const key in this._codecs) {
-      if (Object.prototype.hasOwnProperty.call(this._codecs, key)) {
+      if (Object.hasOwn(this._codecs, key)) {
         const codec = this._codecs[key] as Codec<string>;
         dataTypes[key] = codec.id;
       }

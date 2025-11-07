@@ -6,18 +6,16 @@ import type {
   ResultType,
   SelectAst,
 } from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { SqlDriver } from '@prisma-next/sql-target';
+import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
+import type { Log, Plugin, SqlStatement } from '../src/exports';
 import {
   createRuntime,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
 } from '../src/exports';
-import type { Log, Plugin } from '../src/exports';
-import type { SqlStatement } from '../src/exports';
 
 /**
  * Executes a plan and collects all results into an array.
@@ -203,7 +201,7 @@ export async function teardownTestDatabase(
 export {
   collectAsync,
   createDevDatabase,
+  type DevDatabase,
   teardownTestDatabase,
   withClient,
-  type DevDatabase,
 } from '@prisma-next/test-utils';

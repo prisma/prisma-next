@@ -193,7 +193,7 @@ function buildSequentialDescriptors(count: number): ReadonlyArray<ParamDescripto
 }
 
 function isTemplateInvocation(value: unknown): value is TemplateStringsArray {
-  return Array.isArray(value) && Object.prototype.hasOwnProperty.call(value, 'raw');
+  return Array.isArray(value) && Object.hasOwn(value, 'raw');
 }
 
 interface RawTemplateOptionsSentinel {

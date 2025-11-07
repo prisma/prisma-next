@@ -2,9 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { emit } from '@prisma-next/emitter';
-import { loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
+import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type {

@@ -7,9 +7,8 @@ import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Adapter, LoweredStatement, ResultType, SelectAst } from '../src/types';
-import type { CodecTypes } from './fixtures/contract.d';
-import type { Contract } from './fixtures/contract.d';
-import contractJson from './fixtures/contract.json' assert { type: 'json' };
+import type { CodecTypes, Contract } from './fixtures/contract.d';
+import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {

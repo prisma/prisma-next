@@ -7,7 +7,7 @@ import { makeT, schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Plan, ResultType, TableKey, TablesOf } from '../src/types';
 import type { CodecTypes, Contract, ScalarToJs } from './fixtures/contract.d';
-import contractJson from './fixtures/contract.json' assert { type: 'json' };
+import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 // Helper to simulate execute signature
 function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {

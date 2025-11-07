@@ -1,7 +1,6 @@
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { Plan } from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { SqlDriver } from '@prisma-next/sql-target';
+import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
 import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { Plugin } from '../src/plugins/types';

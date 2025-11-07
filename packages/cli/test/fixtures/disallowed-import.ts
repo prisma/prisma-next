@@ -1,6 +1,7 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { defineContract } from '@prisma-next/sql-query/contract-builder';
 // @ts-expect-error - This import is intentionally disallowed for testing
+// biome-ignore lint/correctness/noUnusedImports: Intentionally unused for testing disallowed imports
 import { something } from 'some-other-package';
 
 export const contract = defineContract<CodecTypes>()

@@ -1,8 +1,7 @@
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { ParamDescriptor, Plan } from '@prisma-next/sql-query/types';
+import type { Codec, SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { type CodecRegistry, createCodecRegistry } from '@prisma-next/sql-target';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type { Codec } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../../adapter-postgres/src/codecs';
 import { decodeRow } from '../src/codecs/decoding';

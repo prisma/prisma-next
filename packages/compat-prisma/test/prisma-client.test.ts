@@ -1,3 +1,5 @@
+import type { StartServerOptions } from '@prisma/dev';
+import { unstable_startServer } from '@prisma/dev';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
@@ -8,8 +10,6 @@ import {
 } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { unstable_startServer } from '@prisma/dev';
-import type { StartServerOptions } from '@prisma/dev';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';

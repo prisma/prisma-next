@@ -1,6 +1,8 @@
 export type {
   BinaryExpr,
   ColumnRef,
+  Direction,
+  Expr,
   OrderClause,
   ParamRef,
   PostgresAdapterOptions,
@@ -9,6 +11,4 @@ export type {
   SelectAst,
   StorageColumn,
   StorageTable,
-  Expr,
-  Direction,
 } from '../types';

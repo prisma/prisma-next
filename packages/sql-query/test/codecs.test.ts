@@ -5,7 +5,7 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Plan } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
-import contractJson from './fixtures/contract.json' assert { type: 'json' };
+import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 describe('DSL Lane Codec Type Stamping', () => {
   const contract = validateContract<Contract>(contractJson);

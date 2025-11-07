@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-
 import { newDb } from 'pg-mem';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { createPostgresDriver, createPostgresDriverFromOptions } from '../src/postgres-driver';
 

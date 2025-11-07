@@ -7,7 +7,7 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Plan, ResultType } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
-import contractJson from './fixtures/contract.json' assert { type: 'json' };
+import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 test('builder contract types match fixture contract types', () => {
   const builderContract = defineContract<CodecTypes>()

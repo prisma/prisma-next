@@ -1,6 +1,6 @@
-export { createPostgresDriver, createPostgresDriverFromOptions } from '../postgres-driver';
 export type {
+  CreatePostgresDriverOptions,
   PostgresDriverOptions,
   QueryResult,
-  CreatePostgresDriverOptions,
 } from '../postgres-driver';
+export { createPostgresDriver, createPostgresDriverFromOptions } from '../postgres-driver';

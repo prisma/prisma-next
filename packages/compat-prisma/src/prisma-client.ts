@@ -1,6 +1,6 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
-import { type Runtime, createRuntime } from '@prisma-next/runtime';
+import { createRuntime, type Runtime } from '@prisma-next/runtime';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
@@ -300,9 +300,7 @@ class ModelDelegate {
     throw this.unsupportedError('update() mutations are not supported in MVP compatibility layer');
   }
 
-  async delete(_args: {
-    where: Record<string, unknown>;
-  }): Promise<Record<string, unknown>> {
+  async delete(_args: { where: Record<string, unknown> }): Promise<Record<string, unknown>> {
     void _args;
     throw this.unsupportedError('delete() mutations are not supported in MVP compatibility layer');
   }
@@ -355,7 +353,6 @@ class PrismaClientImpl {
       this.runtime = options.runtime;
     } else {
       const adapter = createPostgresAdapter();
-      // biome-ignore lint: Node.js global in CLI context
       const connectionString = options.connectionString ?? process.env['DATABASE_URL'];
 
       if (!connectionString) {

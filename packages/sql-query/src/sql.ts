@@ -808,7 +808,7 @@ class SelectBuilderImpl<
     const placeholder = where.right;
     const paramName = placeholder.name;
 
-    if (!Object.prototype.hasOwnProperty.call(paramsMap, paramName)) {
+    if (!Object.hasOwn(paramsMap, paramName)) {
       throw planInvalid(`Missing value for parameter ${paramName}`);
     }
 

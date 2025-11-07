@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { describe, expect, it } from 'vitest';
-
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
+import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { rawOptions as exportedRawOptions, sql as exportedSql } from '../src/exports/sql';
 import { rawOptions } from '../src/raw';

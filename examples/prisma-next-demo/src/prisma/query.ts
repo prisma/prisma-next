@@ -1,5 +1,4 @@
-import { schema as schemaBuilder } from '@prisma-next/sql-query/schema';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { schema as schemaBuilder, validateContract } from '@prisma-next/sql-query/schema';
 import { sql as sqlBuilder } from '@prisma-next/sql-query/sql';
 import { adapter } from './adapter';
 import type { CodecTypes, Contract } from './contract.d';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { emptyDiagnostics, freezeDiagnostics } from '../src/diagnostics';
 import type { BudgetFinding, LintFinding } from '../src/diagnostics';
+import { emptyDiagnostics, freezeDiagnostics } from '../src/diagnostics';
 
 describe('diagnostics', () => {
   describe('emptyDiagnostics', () => {

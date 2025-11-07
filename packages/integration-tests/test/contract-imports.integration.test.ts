@@ -4,9 +4,8 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import { emit } from '@prisma-next/emitter';
-import { loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
+import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
