@@ -146,7 +146,8 @@ function renderOperation(expr: OperationExpr): string {
     if (arg.kind === 'literal') {
       return renderLiteral(arg);
     }
-    throw new Error(`Unsupported argument kind: ${arg.kind}`);
+    const _exhaustive: never = arg;
+    throw new Error(`Unsupported argument kind: ${(_exhaustive as { kind: string }).kind}`);
   });
 
   let result = expr.lowering.template;

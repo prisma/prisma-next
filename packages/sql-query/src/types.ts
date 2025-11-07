@@ -21,6 +21,7 @@ export type {
 
 import type {
   Adapter,
+  ArgSpec,
   LoweringSpec,
   ReturnSpec,
   SqlContract,
@@ -45,7 +46,7 @@ export interface OrderBuilder<
   readonly dir: Direction;
 }
 
-export interface ColumnBuilder<
+export interface ColumnBuilderBase<
   ColumnName extends string = string,
   ColumnMeta extends StorageColumn = StorageColumn,
   JsType = unknown,
@@ -58,6 +59,29 @@ export interface ColumnBuilder<
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
 }
+
+/**
+ * ColumnBuilder with optional operation methods based on the column's typeId.
+ * When Operations is provided and the column's typeId matches, operation methods are included.
+ */
+export type ColumnBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
+  Operations extends OperationTypes = Record<string, never>,
+> = ColumnBuilderBase<ColumnName, ColumnMeta, JsType> &
+  (ColumnMeta extends { type: infer TypeId }
+    ? TypeId extends string
+      ? TypeId extends keyof Operations
+        ? OperationMethods<
+            OperationsForTypeId<TypeId, Operations>,
+            ColumnName,
+            StorageColumn,
+            JsType
+          >
+        : Record<string, never>
+      : Record<string, never>
+    : Record<string, never>);
 
 export interface BinaryBuilder<
   ColumnName extends string = string,
@@ -220,6 +244,114 @@ type ExtractCodecOutputType<
     ? Output
     : never
   : never;
+
+/**
+ * Type-level operation signature.
+ * Represents an operation at the type level, similar to OperationSignature at runtime.
+ */
+export type OperationTypeSignature = {
+  readonly args: ReadonlyArray<ArgSpec>;
+  readonly returns: ReturnSpec;
+  readonly lowering: LoweringSpec;
+  readonly capabilities?: ReadonlyArray<string>;
+};
+
+/**
+ * Type-level operation registry.
+ * Maps typeId → operations, where operations is a record of method name → operation signature.
+ *
+ * Example:
+ * ```typescript
+ * type MyOperations: OperationTypes = {
+ *   'pgvector/vector@1': {
+ *     cosineDistance: {
+ *       args: [{ kind: 'typeId'; type: 'pgvector/vector@1' }];
+ *       returns: { kind: 'builtin'; type: 'number' };
+ *       lowering: { targetFamily: 'sql'; strategy: 'function'; template: '...' };
+ *     };
+ *   };
+ * };
+ * ```
+ */
+export type OperationTypes = Record<string, Record<string, OperationTypeSignature>>;
+
+/**
+ * Extracts operations for a given typeId from the operation registry.
+ * Returns an empty record if the typeId is not found.
+ *
+ * @example
+ * ```typescript
+ * type Ops = OperationsForTypeId<'pgvector/vector@1', MyOperations>;
+ * // Ops = { cosineDistance: { ... }, l2Distance: { ... } }
+ * ```
+ */
+export type OperationsForTypeId<
+  TypeId extends string,
+  Operations extends OperationTypes,
+> = TypeId extends keyof Operations ? Operations[TypeId] : Record<string, never>;
+
+/**
+ * Maps operation signatures to method signatures on ColumnBuilder.
+ * Each operation becomes a method that returns a ColumnBuilder or BinaryBuilder
+ * based on the return type.
+ */
+type OperationMethods<
+  Ops extends Record<string, OperationTypeSignature>,
+  ColumnName extends string,
+  ColumnMeta extends StorageColumn,
+  JsType,
+> = {
+  [K in keyof Ops]: Ops[K] extends OperationTypeSignature
+    ? (
+        ...args: OperationArgs<Ops[K]['args']>
+      ) => OperationReturn<Ops[K]['returns'], ColumnName, ColumnMeta, JsType>
+    : never;
+};
+
+/**
+ * Maps operation argument specs to TypeScript argument types.
+ * - typeId args: ParamPlaceholder (for now, could be ColumnBuilder in future)
+ * - param args: ParamPlaceholder
+ * - literal args: unknown (could be more specific in future)
+ */
+type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly [
+  infer First,
+  ...infer Rest,
+]
+  ? First extends ArgSpec
+    ? [ArgToType<First>, ...(Rest extends ReadonlyArray<ArgSpec> ? OperationArgs<Rest> : [])]
+    : []
+  : [];
+
+type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
+  ? ParamPlaceholder
+  : Arg extends { kind: 'param' }
+    ? ParamPlaceholder
+    : Arg extends { kind: 'literal' }
+      ? unknown
+      : never;
+
+/**
+ * Maps operation return spec to return type.
+ * - builtin types: BinaryBuilder with appropriate return type
+ * - typeId types: ColumnBuilder (for now, could be more specific in future)
+ */
+type OperationReturn<
+  Returns extends ReturnSpec,
+  ColumnName extends string,
+  ColumnMeta extends StorageColumn,
+  _JsType,
+> = Returns extends { kind: 'builtin'; type: infer T }
+  ? T extends 'number'
+    ? BinaryBuilder<ColumnName, ColumnMeta, number>
+    : T extends 'boolean'
+      ? BinaryBuilder<ColumnName, ColumnMeta, boolean>
+      : T extends 'string'
+        ? BinaryBuilder<ColumnName, ColumnMeta, string>
+        : BinaryBuilder<ColumnName, ColumnMeta, unknown>
+  : Returns extends { kind: 'typeId' }
+    ? ColumnBuilder<string, StorageColumn, unknown>
+    : BinaryBuilder<ColumnName, ColumnMeta, unknown>;
 
 /**
  * Computes JavaScript type for a column at column creation time.

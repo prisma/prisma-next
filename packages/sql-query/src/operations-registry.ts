@@ -2,9 +2,11 @@ import type { OperationRegistry, StorageColumn } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import type {
   ColumnBuilder,
+  ColumnBuilderBase,
   ColumnRef,
   LiteralExpr,
   OperationExpr,
+  OperationTypes,
   ParamPlaceholder,
   ParamRef,
 } from './types';
@@ -13,27 +15,33 @@ export function attachOperationsToColumnBuilder<
   ColumnName extends string,
   ColumnMeta extends StorageColumn,
   JsType = unknown,
+  Operations extends OperationTypes = Record<string, never>,
 >(
-  columnBuilder: ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+  columnBuilder: ColumnBuilderBase<ColumnName, ColumnMeta, JsType>,
   columnMeta: ColumnMeta,
   registry: OperationRegistry | undefined,
   contractCapabilities?: Record<string, Record<string, boolean>>,
-): ColumnBuilder<ColumnName, ColumnMeta, JsType> {
+): ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations> {
   if (!registry) {
-    return columnBuilder;
+    return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
 
   const typeId = columnMeta.type;
   if (!typeId) {
-    return columnBuilder;
+    return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
 
   const operations = registry.byType(typeId);
   if (operations.length === 0) {
-    return columnBuilder;
+    return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
 
-  const builderWithOps = columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType> & {
+  const builderWithOps = columnBuilder as unknown as ColumnBuilder<
+    ColumnName,
+    ColumnMeta,
+    JsType,
+    Operations
+  > & {
     [method: string]: (...args: unknown[]) => ColumnBuilder<string, StorageColumn, unknown>;
   };
 
@@ -54,8 +62,8 @@ export function attachOperationsToColumnBuilder<
         continue;
       }
     }
-    builderWithOps[operation.method] = function (
-      this: ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+    (builderWithOps as Record<string, unknown>)[operation.method] = function (
+      this: ColumnBuilderBase<ColumnName, ColumnMeta, JsType>,
       ...args: unknown[]
     ) {
       if (args.length !== operation.args.length) {
@@ -159,7 +167,7 @@ export function attachOperationsToColumnBuilder<
           });
         },
         _operationExpr: operationExpr,
-      }) as ColumnBuilder<string, StorageColumn, unknown> & {
+      }) as unknown as ColumnBuilder<string, StorageColumn, unknown> & {
         _operationExpr?: OperationExpr;
       };
       return result;

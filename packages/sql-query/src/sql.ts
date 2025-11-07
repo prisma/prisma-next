@@ -641,11 +641,21 @@ class SelectBuilderImpl<
       const childOrderBy = include.childOrderBy
         ? ([
             {
-              expr: {
-                kind: 'col' as const,
-                table: include.childOrderBy.expr.table,
-                column: include.childOrderBy.expr.column,
-              },
+              expr: (() => {
+                const expr = include.childOrderBy.expr;
+                if ('kind' in expr && expr.kind === 'operation') {
+                  return {
+                    kind: 'col' as const,
+                    table: expr.self.table,
+                    column: expr.self.column,
+                  };
+                }
+                return {
+                  kind: 'col' as const,
+                  table: expr.table,
+                  column: expr.column,
+                };
+              })(),
               dir: include.childOrderBy.dir,
             },
           ] as ReadonlyArray<{ expr: ColumnRef; dir: Direction }>)
@@ -1086,16 +1096,22 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
-        refsColumns.set(`${include.childWhere.left.table}.${include.childWhere.left.column}`, {
-          table: include.childWhere.left.table,
-          column: include.childWhere.left.column,
+        const left = include.childWhere.left;
+        const table = 'kind' in left && left.kind === 'operation' ? left.self.table : left.table;
+        const column = 'kind' in left && left.kind === 'operation' ? left.self.column : left.column;
+        refsColumns.set(`${table}.${column}`, {
+          table,
+          column,
         });
       }
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
-        refsColumns.set(`${include.childOrderBy.expr.table}.${include.childOrderBy.expr.column}`, {
-          table: include.childOrderBy.expr.table,
-          column: include.childOrderBy.expr.column,
+        const expr = include.childOrderBy.expr;
+        const table = 'kind' in expr && expr.kind === 'operation' ? expr.self.table : expr.table;
+        const column = 'kind' in expr && expr.kind === 'operation' ? expr.self.column : expr.column;
+        refsColumns.set(`${table}.${column}`, {
+          table,
+          column,
         });
       }
     }

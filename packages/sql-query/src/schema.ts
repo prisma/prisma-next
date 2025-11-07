@@ -10,6 +10,7 @@ import { attachOperationsToColumnBuilder } from './operations-registry';
 import type {
   BinaryBuilder,
   ColumnBuilder,
+  ColumnBuilderBase,
   ComputeColumnJsType,
   OrderBuilder,
   ParamPlaceholder,
@@ -24,7 +25,7 @@ type ColumnBuilders<
   Columns extends Record<string, StorageColumn>,
   CodecTypes extends Record<string, { output: unknown }>,
 > = {
-  readonly [K in keyof Columns]: ColumnBuilderImpl<
+  readonly [K in keyof Columns]: ColumnBuilder<
     K & string,
     Columns[K],
     ComputeColumnJsType<Contract, TableName, K & string, Columns[K], CodecTypes>
@@ -35,7 +36,7 @@ class ColumnBuilderImpl<
   ColumnName extends string,
   ColumnMeta extends StorageColumn,
   JsType = unknown,
-> implements ColumnBuilder<ColumnName, ColumnMeta, JsType>
+> implements ColumnBuilderBase<ColumnName, ColumnMeta, JsType>
 {
   readonly kind = 'column' as const;
 
@@ -60,9 +61,9 @@ class ColumnBuilderImpl<
     return Object.freeze({
       kind: 'binary' as const,
       op: 'eq' as const,
-      left: this,
+      left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       right: value,
-    });
+    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   }
 
   asc(
@@ -70,9 +71,9 @@ class ColumnBuilderImpl<
   ): OrderBuilder<ColumnName, ColumnMeta, JsType> {
     return Object.freeze({
       kind: 'order' as const,
-      expr: this,
+      expr: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       dir: 'asc' as const,
-    });
+    }) as OrderBuilder<ColumnName, ColumnMeta, JsType>;
   }
 
   desc(
@@ -80,9 +81,9 @@ class ColumnBuilderImpl<
   ): OrderBuilder<ColumnName, ColumnMeta, JsType> {
     return Object.freeze({
       kind: 'order' as const,
-      expr: this,
+      expr: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       dir: 'desc' as const,
-    });
+    }) as OrderBuilder<ColumnName, ColumnMeta, JsType>;
   }
 }
 
@@ -99,7 +100,7 @@ class TableBuilderImpl<
 
   constructor(
     name: TableName,
-    columns: Record<string, ColumnBuilderImpl<string, StorageColumn, unknown>>,
+    columns: Record<string, ColumnBuilder<string, StorageColumn, unknown>>,
   ) {
     this._name = name;
     this.columns = columns as ColumnBuilders<Contract, TableName, Columns, CodecTypes>;
@@ -152,8 +153,8 @@ function buildColumns<
       operationRegistry,
       contractCapabilities,
     );
-    (result as Record<string, ColumnBuilderImpl<string, StorageColumn, unknown>>)[columnName] =
-      builderWithOps as ColumnBuilderImpl<string, StorageColumn, unknown>;
+    (result as Record<string, ColumnBuilder<string, StorageColumn, unknown>>)[columnName] =
+      builderWithOps;
   }
 
   return result;
