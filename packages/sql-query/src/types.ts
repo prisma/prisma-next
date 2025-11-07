@@ -258,7 +258,7 @@ export type NestedProjection = Record<
  */
 type ExtractIncludeType<
   K extends string,
-  Includes extends Record<string, any>,
+  Includes extends Record<string, unknown>,
 > = K extends keyof Includes ? Includes[K] : unknown;
 
 /**
@@ -284,7 +284,7 @@ export type InferNestedProjectionRow<
       >
   >,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-  Includes extends Record<string, any> = Record<string, never>,
+  Includes extends Record<string, unknown> = Record<string, never>,
 > = {
   [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
     ? JsType

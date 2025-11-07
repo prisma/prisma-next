@@ -1,12 +1,11 @@
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
-
+import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import { validateContract } from '../src/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type with capabilities

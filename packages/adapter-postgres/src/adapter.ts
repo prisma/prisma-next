@@ -165,10 +165,10 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
     // Select individual columns in inner query, then aggregate
     // Create a map of column references to their aliases for ORDER BY
     const columnAliasMap = new Map<string, string>();
-    include.child.project.forEach((item: { alias: string; expr: ColumnRef }) => {
+    for (const item of include.child.project) {
       const columnKey = `${item.expr.table}.${item.expr.column}`;
       columnAliasMap.set(columnKey, item.alias);
-    });
+    }
 
     const innerColumns = include.child.project
       .map((item: { alias: string; expr: ColumnRef }) => {

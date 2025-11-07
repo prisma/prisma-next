@@ -1,16 +1,18 @@
-import { expectTypeOf, test } from 'vitest';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import type {
-  HasIncludeManyCapabilities,
-  ResultType,
-  InferNestedProjectionRow,
-} from '../src/types';
-import { sql } from '../src/sql';
-import { schema } from '../src/schema';
-import { validateContract } from '../src/contract';
-import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
+import { expectTypeOf, test } from 'vitest';
+import { validateContract } from '../src/contract';
+import { schema } from '../src/schema';
+import { sql } from '../src/sql';
+import type {
+  Adapter,
+  HasIncludeManyCapabilities,
+  InferNestedProjectionRow,
+  LoweredStatement,
+  ResultType,
+  SelectAst,
+} from '../src/types';
 
 // Test contracts with different capability configurations
 type ContractWithCapabilities = SqlContract<SqlStorage> & {

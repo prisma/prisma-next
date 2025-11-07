@@ -13,7 +13,7 @@ import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { ResultType } from '@prisma-next/sql-query/types';
-import { withClient, withDevDatabase, type DevDatabase } from '@prisma-next/test-utils';
+import { type DevDatabase, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { emitAndVerifyContract, loadContractFromDisk } from './utils';
 

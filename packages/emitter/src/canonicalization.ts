@@ -1,5 +1,20 @@
 import type { ContractIR } from './types';
 
+type NormalizedContract = {
+  schemaVersion: string;
+  targetFamily: string;
+  target: string;
+  coreHash?: string;
+  profileHash?: string;
+  models: Record<string, unknown>;
+  relations?: Record<string, unknown>;
+  storage: Record<string, unknown>;
+  extensions?: Record<string, unknown>;
+  capabilities?: Record<string, Record<string, boolean>>;
+  meta?: Record<string, unknown>;
+  sources?: Record<string, unknown>;
+};
+
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
   'canonicalVersion',
@@ -87,46 +102,57 @@ function sortObjectKeys(obj: unknown): unknown {
   return sorted;
 }
 
+type StorageObject = {
+  tables?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+type TableObject = {
+  indexes?: unknown[];
+  uniques?: unknown[];
+  [key: string]: unknown;
+};
+
 function sortIndexesAndUniques(storage: unknown): unknown {
   if (!storage || typeof storage !== 'object') {
     return storage;
   }
 
-  const storageObj = storage as Record<string, unknown>;
-  if (!storageObj['tables'] || typeof storageObj['tables'] !== 'object') {
+  const storageObj = storage as StorageObject;
+  if (!storageObj.tables || typeof storageObj.tables !== 'object') {
     return storage;
   }
 
-  const tables = storageObj['tables'] as Record<string, unknown>;
-  const result: Record<string, unknown> = { ...storageObj };
+  const tables = storageObj.tables;
+  const result: StorageObject = { ...storageObj };
 
-  result['tables'] = {};
+  result.tables = {};
   for (const [tableName, table] of Object.entries(tables)) {
     if (!table || typeof table !== 'object') {
-      (result['tables'] as Record<string, unknown>)[tableName] = table;
+      result.tables[tableName] = table;
       continue;
     }
 
-    const tableObj = table as Record<string, unknown>;
-    const sortedTable: Record<string, unknown> = { ...tableObj };
+    const tableObj = table as TableObject;
+    const sortedTable: TableObject = { ...tableObj };
 
-    if (Array.isArray(tableObj['indexes'])) {
-      sortedTable['indexes'] = [...(tableObj['indexes'] as unknown[])].sort((a, b) => {
+    if (Array.isArray(tableObj.indexes)) {
+      sortedTable.indexes = [...tableObj.indexes].sort((a, b) => {
         const nameA = (a as { name?: string })?.name || '';
         const nameB = (b as { name?: string })?.name || '';
         return nameA.localeCompare(nameB);
       });
     }
 
-    if (Array.isArray(tableObj['uniques'])) {
-      sortedTable['uniques'] = [...(tableObj['uniques'] as unknown[])].sort((a, b) => {
+    if (Array.isArray(tableObj.uniques)) {
+      sortedTable.uniques = [...tableObj.uniques].sort((a, b) => {
         const nameA = (a as { name?: string })?.name || '';
         const nameB = (b as { name?: string })?.name || '';
         return nameA.localeCompare(nameB);
       });
     }
 
-    (result['tables'] as Record<string, unknown>)[tableName] = sortedTable;
+    result.tables[tableName] = sortedTable;
   }
 
   return result;
@@ -153,59 +179,44 @@ function orderTopLevel(obj: Record<string, unknown>): Record<string, unknown> {
 export function canonicalizeContract(
   ir: ContractIR & { coreHash?: string; profileHash?: string },
 ): string {
-  const normalized: Record<string, unknown> = {};
+  const normalized: NormalizedContract = {
+    schemaVersion: ir.schemaVersion ?? '1',
+    targetFamily: ir.targetFamily,
+    target: ir.target,
+    models: ir.models ?? {},
+    storage: ir.storage ?? { tables: {} },
+  };
 
-  if (ir['schemaVersion'] !== undefined) {
-    normalized['schemaVersion'] = ir['schemaVersion'];
-  } else {
-    normalized['schemaVersion'] = '1';
+  if (ir.coreHash !== undefined) {
+    normalized.coreHash = ir.coreHash;
   }
 
-  normalized['targetFamily'] = ir['targetFamily'];
-  normalized['target'] = ir['target'];
-
-  if (ir['coreHash'] !== undefined) {
-    normalized['coreHash'] = ir['coreHash'];
+  if (ir.profileHash !== undefined) {
+    normalized.profileHash = ir.profileHash;
   }
 
-  if (ir['profileHash'] !== undefined) {
-    normalized['profileHash'] = ir['profileHash'];
+  if (ir.relations !== undefined && !isDefaultValue(ir.relations)) {
+    normalized.relations = ir.relations;
   }
 
-  if (ir['models'] !== undefined) {
-    normalized['models'] = ir['models'];
-  } else {
-    normalized['models'] = {};
+  if (ir.extensions !== undefined && !isDefaultValue(ir.extensions)) {
+    normalized.extensions = ir.extensions;
   }
 
-  if (ir['relations'] !== undefined && !isDefaultValue(ir['relations'])) {
-    normalized['relations'] = ir['relations'];
+  if (ir.capabilities !== undefined && !isDefaultValue(ir.capabilities)) {
+    normalized.capabilities = ir.capabilities;
   }
 
-  if (ir['storage'] !== undefined) {
-    normalized['storage'] = ir['storage'];
-  } else {
-    normalized['storage'] = { tables: {} };
+  if (ir.meta !== undefined && !isDefaultValue(ir.meta)) {
+    normalized.meta = ir.meta;
   }
 
-  if (ir['extensions'] !== undefined && !isDefaultValue(ir['extensions'])) {
-    normalized['extensions'] = ir['extensions'];
+  if (ir.sources !== undefined && !isDefaultValue(ir.sources)) {
+    normalized.sources = ir.sources;
   }
 
-  if (ir['capabilities'] !== undefined && !isDefaultValue(ir['capabilities'])) {
-    normalized['capabilities'] = ir['capabilities'];
-  }
-
-  if (ir['meta'] !== undefined && !isDefaultValue(ir['meta'])) {
-    normalized['meta'] = ir['meta'];
-  }
-
-  if (ir['sources'] !== undefined && !isDefaultValue(ir['sources'])) {
-    normalized['sources'] = ir['sources'];
-  }
-
-  const withDefaultsOmitted = omitDefaults(normalized, []) as Record<string, unknown>;
-  const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted['storage']);
+  const withDefaultsOmitted = omitDefaults(normalized, []) as NormalizedContract;
+  const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted.storage);
   const withSortedStorage = { ...withDefaultsOmitted, storage: withSortedIndexes };
   const withSortedKeys = sortObjectKeys(withSortedStorage) as Record<string, unknown>;
   const withOrderedTopLevel = orderTopLevel(withSortedKeys);
