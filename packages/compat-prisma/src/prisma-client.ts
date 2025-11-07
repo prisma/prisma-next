@@ -4,7 +4,8 @@ import { createRuntime, type Runtime } from '@prisma-next/runtime';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { ColumnBuilder, TableRef } from '@prisma-next/sql-query/types';
+import type { ColumnBuilder } from '@prisma-next/sql-query/types';
+import type { TableRef } from '@prisma-next/sql-target';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 interface PrismaClientOptions {

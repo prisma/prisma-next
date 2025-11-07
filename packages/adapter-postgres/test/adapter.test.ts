@@ -1,5 +1,5 @@
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { DeleteAst, InsertAst, SelectAst, UpdateAst } from '@prisma-next/sql-query/types';
+import type { DeleteAst, InsertAst, SelectAst, UpdateAst } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '../src/adapter';

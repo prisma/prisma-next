@@ -1,19 +1,23 @@
-import type { Adapter, AdapterProfile, LowererContext } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
-import { codecDefinitions } from './codecs';
 import type {
+  Adapter,
+  AdapterProfile,
   BinaryExpr,
   ColumnRef,
   DeleteAst,
   InsertAst,
   JoinAst,
+  LowererContext,
   ParamRef,
-  PostgresAdapterOptions,
-  PostgresContract,
-  PostgresLoweredStatement,
   QueryAst,
   SelectAst,
   UpdateAst,
+} from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
+import { codecDefinitions } from './codecs';
+import type {
+  PostgresAdapterOptions,
+  PostgresContract,
+  PostgresLoweredStatement,
 } from './types';
 
 const defaultCapabilities = Object.freeze({

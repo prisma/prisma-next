@@ -1,4 +1,4 @@
-import type { Plan, PlanMeta, PlanRefs } from '@prisma-next/sql-query/types';
+import type { Plan, PlanMeta, PlanRefs } from '@prisma-next/contract/types';
 
 import type { BudgetFinding, BudgetSeverity, LintFinding } from '../diagnostics';
 

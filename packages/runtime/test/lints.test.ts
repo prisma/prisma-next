@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/sql-query/types';
+import type { Plan } from '@prisma-next/contract/types';
 import { describe, expect, it, vi } from 'vitest';
 import { lints } from '../src/plugins/lints';
 import type { PluginContext } from '../src/plugins/types';

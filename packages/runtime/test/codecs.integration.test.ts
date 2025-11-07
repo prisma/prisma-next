@@ -1,7 +1,7 @@
 import { param } from '@prisma-next/sql-query/param';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { Plan } from '@prisma-next/sql-query/types';
+import type { Plan } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';

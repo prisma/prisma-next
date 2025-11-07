@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/sql-query/types';
+import type { Plan } from '@prisma-next/contract/types';
 import { evaluateRawGuardrails } from '../guardrails/raw';
 import type { Plugin, PluginContext } from './types';
 

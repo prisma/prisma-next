@@ -1,11 +1,6 @@
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import type {
-  Adapter,
-  LoweredStatement,
-  Plan,
-  ResultType,
-  SelectAst,
-} from '@prisma-next/sql-query/types';
+import type { Plan, ResultType } from '@prisma-next/contract/types';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
 import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';

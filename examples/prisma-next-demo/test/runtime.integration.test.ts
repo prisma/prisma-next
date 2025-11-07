@@ -8,7 +8,7 @@ import { budgets, createRuntime } from '@prisma-next/runtime';
 import { param } from '@prisma-next/sql-query/param';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { ResultType } from '@prisma-next/sql-query/types';
+import type { ResultType } from '@prisma-next/contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';

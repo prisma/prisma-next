@@ -9,7 +9,7 @@ import {
 } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { ResultType } from '@prisma-next/sql-query/types';
+import type { ResultType } from '@prisma-next/contract/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';

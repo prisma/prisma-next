@@ -15,6 +15,7 @@ import type {
   ParamDescriptor,
   SelectAst,
 } from '../src/types';
+import type { SelectAst as SelectAstType } from '@prisma-next/sql-target';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -271,7 +272,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'id' } },
       ]);
@@ -296,7 +297,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'a_b_c', expr: { kind: 'col', table: 'user', column: 'id' } },
       ]);
 
@@ -322,7 +323,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
         { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_author_name', expr: { kind: 'col', table: 'user', column: 'id' } },

@@ -1,4 +1,5 @@
-import type { Plan } from '@prisma-next/sql-query/types';
+import type { Plan } from '@prisma-next/contract/types';
+import type { SelectAst } from '@prisma-next/sql-target';
 import type { Plugin, PluginContext } from './types';
 
 export interface BudgetsOptions {
@@ -140,9 +141,12 @@ export function budgets(options?: BudgetsOptions): Plugin {
     const tableEstimate = tableRows[table] ?? defaultTableRows;
 
     // Check if there's a LIMIT in the AST (only SELECT has limit)
-    if (plan.ast?.kind === 'select' && typeof plan.ast.limit === 'number') {
-      // Bounded: use min of LIMIT and table estimate
-      return Math.min(plan.ast.limit, tableEstimate);
+    if (plan.ast && typeof plan.ast === 'object' && 'kind' in plan.ast && plan.ast.kind === 'select') {
+      const selectAst = plan.ast as SelectAst;
+      if (typeof selectAst.limit === 'number') {
+        // Bounded: use min of LIMIT and table estimate
+        return Math.min(selectAst.limit, tableEstimate);
+      }
     }
 
     // Unbounded SELECT - treat as full table estimate
@@ -156,8 +160,11 @@ export function budgets(options?: BudgetsOptions): Plugin {
    */
   function hasDetectableLimit(plan: Plan): boolean {
     // Check AST limit if available (only SELECT has limit)
-    if (plan.ast?.kind === 'select' && typeof plan.ast.limit === 'number') {
-      return true;
+    if (plan.ast && typeof plan.ast === 'object' && 'kind' in plan.ast && plan.ast.kind === 'select') {
+      const selectAst = plan.ast as SelectAst;
+      if (typeof selectAst.limit === 'number') {
+        return true;
+      }
     }
 
     // Check if annotations provide limit hint
