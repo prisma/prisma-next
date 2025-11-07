@@ -563,6 +563,87 @@ const plan = sql
 
 See `.cursor/rules/query-patterns.mdc` for full details on query patterns, type inference, and common usage patterns.
 
+## Type Assertions in Test Files
+
+**Pattern**: Use `@ts-expect-error` comments for intentional type assertions in test files when working with dynamic proxy objects or complex type scenarios.
+
+**❌ WRONG: Adding type assertions without explanation**
+
+```typescript
+const builderWithInclude: unknown = (
+  builder as {
+    include: {
+      posts: (child: unknown) => unknown;
+    };
+  }
+).include.posts((child) => { /* ... */ });
+```
+
+**✅ CORRECT: Use `@ts-expect-error` with explanation**
+
+```typescript
+// @ts-expect-error - intentionally using type assertions in test
+const builderWithInclude: unknown = (
+  builder as {
+    include: {
+      posts: (child: unknown) => unknown;
+    };
+  }
+).include.posts((child) => { /* ... */ });
+```
+
+**When to use `@ts-expect-error`:**
+- When working with dynamic proxy objects (e.g., ORM model registry)
+- When intentionally using type assertions for test purposes
+- When TypeScript can't infer complex dynamic types correctly
+- Always include a comment explaining why the assertion is needed
+
+**Handling Implicit `any` in Test Callbacks:**
+
+**❌ WRONG: Implicit `any` in callback parameters**
+
+```typescript
+const plan = o.user().include.posts((child) => {
+  // child is implicitly any
+  return child.select((p) => { /* ... */ });
+});
+```
+
+**✅ CORRECT: Explicit `unknown` annotations**
+
+```typescript
+const plan = o.user().include.posts((child: unknown) => {
+  const childBuilder = child as {
+    select: (fn: (model: unknown) => unknown) => unknown;
+  };
+  return childBuilder.select((p: unknown) => {
+    const model = p as { id: unknown; title: unknown };
+    return { id: model.id, title: model.title };
+  });
+});
+```
+
+**Type Assertions for Dynamic Proxy Objects:**
+
+**Pattern**: When working with dynamic proxy objects (e.g., ORM model registry), cast to `unknown` first, then to the specific shape.
+
+**❌ WRONG: Direct type assertion**
+
+```typescript
+const builder = (o as { user: () => unknown }).user();
+```
+
+**✅ CORRECT: Cast to `unknown` first**
+
+```typescript
+const builder = (o as unknown as { user: () => unknown }).user();
+```
+
+**Why?**
+- Dynamic proxy objects have complex types that TypeScript can't always infer correctly
+- Casting to `unknown` first allows TypeScript to accept the subsequent type assertion
+- This pattern is common when working with Proxy-based APIs
+
 ## DRY Test Patterns
 
 **Pattern**: Common patterns in test files should be extracted into helper functions with JSDoc comments explaining their purpose.

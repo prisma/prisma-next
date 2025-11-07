@@ -189,6 +189,130 @@ const plan = sql
 type UserWithPosts = ResultType<typeof plan>;
 ```
 
+## ORM Lane Patterns
+
+**Pattern**: Use ORM lane for model-centric queries with relation traversal and base-model writes.
+
+**✅ CORRECT: ORM entrypoint with model registry**
+
+```typescript
+import { orm } from '@prisma-next/sql-query/orm';
+import type { Contract, CodecTypes } from './contract.d';
+
+const contract = validateContract<Contract>(contractJson);
+const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+
+// Model registry proxy: orm.user(), orm.post(), etc.
+const builder = o.user();
+```
+
+**✅ CORRECT: Read operations with chained methods**
+
+```typescript
+const plan = o.user()
+  .where((u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  })
+  .orderBy((u) => {
+    const model = u as { createdAt: { desc: () => unknown } };
+    return model.createdAt.desc();
+  })
+  .take(10)
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown };
+    return { id: model.id, email: model.email };
+  })
+  .findMany();
+```
+
+**✅ CORRECT: Relation filters**
+
+```typescript
+// Find users who have at least one published post
+const plan = o.user()
+  .where((u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return o.user().where.related.posts.some((p) => {
+      const postModel = p as { published: { eq: (v: boolean) => unknown } };
+      return postModel.published.eq(true);
+    });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown };
+    return { id: model.id, email: model.email };
+  })
+  .findMany();
+```
+
+**✅ CORRECT: Includes with child builder**
+
+```typescript
+const plan = o.user()
+  .include.posts((child) => {
+    const childBuilder = child as {
+      where: (fn: (model: unknown) => unknown) => unknown;
+      orderBy: (fn: (model: unknown) => unknown) => unknown;
+      select: (fn: (model: unknown) => unknown) => unknown;
+    };
+    return childBuilder
+      .where((p) => {
+        const model = p as { published: { eq: (v: boolean) => unknown } };
+        return model.published.eq(true);
+      })
+      .orderBy((p) => {
+        const model = p as { createdAt: { desc: () => unknown } };
+        return model.createdAt.desc();
+      })
+      .select((p) => {
+        const model = p as { id: unknown; title: unknown };
+        return { id: model.id, title: model.title };
+      });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown; posts: boolean };
+    return { id: model.id, email: model.email, posts: true };
+  })
+  .findMany();
+```
+
+**✅ CORRECT: Write operations**
+
+```typescript
+// Create
+const createPlan = o.user().create({
+  email: 'alice@example.com',
+  name: 'Alice',
+});
+
+// Update
+const updatePlan = o.user().update(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { email: 'newemail@example.com' },
+  { params: { userId: 1 } },
+);
+
+// Delete
+const deletePlan = o.user().delete(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { params: { userId: 1 } },
+);
+```
+
+**Key Points:**
+- ORM lane compiles to SQL lane primitives (EXISTS subqueries, includeMany, DML operations)
+- Model registry proxy provides discoverable entrypoint (`orm.user()`, `orm.post()`)
+- Relation filters compile to EXISTS/NOT EXISTS subqueries
+- Includes compile to SQL lane `includeMany()` (capability-gated: requires `lateral: true` and `jsonAgg: true`)
+- Writes use model-to-column mapping from contract mappings
+- All ORM plans have `meta.lane = 'orm'` and appropriate annotations
+
 ## Anti-Patterns
 
 **❌ WRONG: Don't import schema and access tables through it**
@@ -233,3 +357,8 @@ const plan = sql
 3. **Extract variables** when tables/columns are reused multiple times
 4. **Use `ResultType<typeof plan>`** to extract row types from plans
 5. **Use direct access** for single-use queries to keep code concise
+6. **Use ORM lane** for model-centric queries with relation traversal and base-model writes
+7. **ORM entrypoint** uses model registry proxy (`orm.<model>()`) for discoverability
+8. **Relation filters** use `where.related.<relation>.some/none/every(predicate)` pattern
+9. **Includes** use `include.<relation>(child => ...)` pattern with capability gating
+10. **Writes** use `create(data)`, `update(where, data)`, `delete(where)` with model-to-column mapping

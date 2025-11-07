@@ -268,6 +268,135 @@ type DeleteRow = ResultType<typeof deletePlan>;  // { id: number; email: string 
     .build({ params: { active: true } });
   ```
 
+### ORM Lane Pattern
+
+The ORM lane provides a model-centric API that compiles to SQL lane primitives. It optimizes for discoverability and relationship traversal.
+
+**Entrypoint**: Use `orm()` factory function to create a model registry proxy:
+
+```typescript
+import { orm } from '@prisma-next/sql-query/orm';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import type { Contract, CodecTypes } from './contract.d';
+import contractJson from './contract.json' assert { type: 'json' };
+
+const contract = validateContract<Contract>(contractJson);
+const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+
+// Model registry proxy: orm.user(), orm.post(), etc.
+const builder = o.user();
+```
+
+**Read Operations**:
+- `findMany()`: Returns multiple rows
+- `findFirst()`: Returns first row (equivalent to `where(...).take(1).findMany()`)
+- `findUnique()`: Returns single row by unique constraint (not yet implemented)
+
+**Chained Methods**:
+- `.where(predicate)`: Filter rows using model column accessor
+- `.orderBy(column)`: Sort results
+- `.take(n)`: Limit number of rows
+- `.skip(n)`: Skip number of rows
+- `.select(projection)`: Project specific fields
+
+**Relation Filters**:
+- `where.related.<relation>.some(predicate)`: EXISTS subquery - at least one related row matches
+- `where.related.<relation>.none(predicate)`: NOT EXISTS subquery - no related rows match
+- `where.related.<relation>.every(predicate)`: NOT EXISTS subquery with negated predicate - all related rows match
+
+```typescript
+// Find users who have at least one published post
+const plan = o.user()
+  .where((u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return o.user().where.related.posts.some((p) => {
+      const postModel = p as { published: { eq: (v: boolean) => unknown } };
+      return postModel.published.eq(true);
+    });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown };
+    return { id: model.id, email: model.email };
+  })
+  .findMany();
+```
+
+**Includes**:
+- `include.<relation>(child => ...)`: Include related data as nested arrays
+- Capability-gated: Requires both `lateral: true` and `jsonAgg: true` in contract capabilities
+- Child builder supports: `where()`, `orderBy()`, `take()`, `select()`
+
+```typescript
+// Include posts with filtering and ordering
+const plan = o.user()
+  .include.posts((child) => {
+    const childBuilder = child as {
+      where: (fn: (model: unknown) => unknown) => unknown;
+      orderBy: (fn: (model: unknown) => unknown) => unknown;
+      select: (fn: (model: unknown) => unknown) => unknown;
+    };
+    return childBuilder
+      .where((p) => {
+        const model = p as { published: { eq: (v: boolean) => unknown } };
+        return model.published.eq(true);
+      })
+      .orderBy((p) => {
+        const model = p as { createdAt: { desc: () => unknown } };
+        return model.createdAt.desc();
+      })
+      .select((p) => {
+        const model = p as { id: unknown; title: unknown };
+        return { id: model.id, title: model.title };
+      });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown; posts: boolean };
+    return { id: model.id, email: model.email, posts: true };
+  })
+  .findMany();
+```
+
+**Base-Model Writes**:
+- `create(data)`: Insert a new row, returns affected row count
+- `update(where, data)`: Update rows matching predicate, returns affected row count
+- `delete(where)`: Delete rows matching predicate, returns affected row count
+- Model field names are automatically mapped to column names using contract mappings
+
+```typescript
+// Create a new user
+const createPlan = o.user().create({
+  email: 'alice@example.com',
+  name: 'Alice',
+});
+
+// Update user by ID
+const updatePlan = o.user().update(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { email: 'newemail@example.com' },
+  { params: { userId: 1 } },
+);
+
+// Delete user by ID
+const deletePlan = o.user().delete(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { params: { userId: 1 } },
+);
+```
+
+**Key Points**:
+- ORM lane compiles to SQL lane primitives (EXISTS subqueries, includeMany, DML operations)
+- Model registry proxy provides discoverable entrypoint (`orm.user()`, `orm.post()`)
+- Relation filters compile to EXISTS/NOT EXISTS subqueries
+- Includes compile to SQL lane `includeMany()` (capability-gated)
+- Writes use model-to-column mapping from contract mappings
+- All ORM plans have `meta.lane = 'orm'` and appropriate annotations
+
 ### Plan Model
 
 - **Plans are immutable** - Built once, never mutated
@@ -1099,6 +1228,7 @@ pnpm test:coverage:packages
 24. **Avoiding Unnecessary Type Casts and Optional Chaining** - Added guidance on avoiding unnecessary type casts and optional chaining. Always check the actual type signature before adding casts. Use dot notation (`.`) instead of optional chaining (`?.`) when values are guaranteed to exist. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
 25. **Test File Organization** - Established 500-line limit for test files. Large test files should be split by functionality (basic, errors, structure, generation), feature area (joins, projections, includes), or test type (unit, integration, edge-cases). Use descriptive file names following the pattern `{base}.{category}.test.ts` (e.g., `codecs.registry.test.ts`, `runtime.joins.test.ts`, `driver.errors.test.ts`). Split files at natural boundaries (describe blocks, functional groups) and ensure each new file has all necessary imports and setup. See `.cursor/rules/test-file-organization.mdc` for detailed guidelines.
 26. **Test Assertion Patterns** - Refactored brittle test patterns to use object comparison (`expect(row).toEqual({ ... })`) instead of piece-by-piece property checks. Use `toMatchObject` for partial comparisons, `expect.any()` for type-only checks, and `expect.not.objectContaining()` for absence checks. For plan structure assertions, compare entire AST structures rather than checking individual properties. This improves maintainability, readability, type safety, and reduces brittleness. See `.cursor/rules/test-file-organization.mdc` for details.
+27. **ORM Lane Implementation** - Implemented model-centric ORM lane with discoverable entrypoint (`orm.<model>()`), relation filters (`where.related.<relation>.some/none/every`), includes (`include.<relation>(child => ...)`), and base-model writes (`create()`, `update()`, `delete()`). ORM lane compiles to SQL lane primitives (EXISTS subqueries, includeMany, DML operations). Model-to-column mapping for writes uses contract mappings. Relation filters compile to EXISTS/NOT EXISTS subqueries. Includes are capability-gated (requires `lateral: true` and `jsonAgg: true`). File organization: ORM implementation split into `orm.ts` (entrypoint), `orm-types.ts` (types), `orm-builder.ts` (main builder), `orm-relation-filter.ts` (relation filters), `orm-include-child.ts` (include child builder).
 
 ### Future Work
 
@@ -1231,6 +1361,76 @@ const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
   .build();
 
 type JoinedRow = ResultType<typeof joinedPlan>;  // { userId: number; postId: number; title: string }
+```
+
+**ORM Lane Usage:**
+```typescript
+import { orm } from '@prisma-next/sql-query/orm';
+import { param } from '@prisma-next/sql-query/param';
+import type { ResultType } from '@prisma-next/sql-query/types';
+import type { Contract, CodecTypes } from './contract.d';
+
+const contract = validateContract<Contract>(contractJson);
+const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+
+// Read with relation filter
+const plan = o.user()
+  .where((u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return o.user().where.related.posts.some((p) => {
+      const postModel = p as { published: { eq: (v: boolean) => unknown } };
+      return postModel.published.eq(true);
+    });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown };
+    return { id: model.id, email: model.email };
+  })
+  .findMany();
+
+// Read with include
+const planWithInclude = o.user()
+  .include.posts((child) => {
+    const childBuilder = child as {
+      select: (fn: (model: unknown) => unknown) => unknown;
+    };
+    return childBuilder.select((p) => {
+      const model = p as { id: unknown; title: unknown };
+      return { id: model.id, title: model.title };
+    });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown; posts: boolean };
+    return { id: model.id, email: model.email, posts: true };
+  })
+  .findMany();
+
+// Write operations
+const createPlan = o.user().create({
+  email: 'alice@example.com',
+  name: 'Alice',
+});
+
+const updatePlan = o.user().update(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { email: 'newemail@example.com' },
+  { params: { userId: 1 } },
+);
+
+const deletePlan = o.user().delete(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { params: { userId: 1 } },
+);
+
+// Extract row types
+type UserRow = ResultType<typeof plan>;
+type UserWithPosts = ResultType<typeof planWithInclude>;
 ```
 
 **Contract column types:**
