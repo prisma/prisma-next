@@ -37,6 +37,7 @@ describe('Operation lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -66,6 +67,7 @@ describe('Operation lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'cosine_similarity(${self}, ${arg0})',
       },
     };
@@ -99,6 +101,7 @@ describe('Operation lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'cosine_similarity(${self}, ${arg0}, ${arg1}, ${arg2})',
       },
     };
@@ -126,6 +129,7 @@ describe('Operation lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -157,6 +161,7 @@ describe('Operation lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -183,6 +188,7 @@ describe('Operation lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };

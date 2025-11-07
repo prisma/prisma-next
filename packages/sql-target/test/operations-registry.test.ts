@@ -17,6 +17,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -37,6 +38,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -48,6 +50,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <-> ${arg0}',
       },
     };
@@ -70,6 +73,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -88,6 +92,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -99,6 +104,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'cosine_similarity(${self}, ${arg0})',
       },
     };
@@ -119,6 +125,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -130,6 +137,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'distance(${self}, ${arg0})',
       },
     };
@@ -151,6 +159,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -170,6 +179,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -189,6 +199,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'normalize(${self})',
       },
     };
@@ -208,6 +219,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'cosine_similarity(${self}, ${arg0}, ${arg1}, ${arg2})',
       },
     };
@@ -227,6 +239,7 @@ describe('OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
       capabilities: ['pgvector.index.ivfflat'],

@@ -17,6 +17,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'infix',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: '${self} <=> ${arg0}',
             },
           },
@@ -45,6 +46,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'infix',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: '${self} <=> ${arg0}',
             },
           },
@@ -66,6 +68,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'infix',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: '${self} <-> ${arg0}',
             },
           },
@@ -107,6 +110,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'infix',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: '${self} <=> ${arg0}',
             },
           },
@@ -128,6 +132,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: 'cosine_similarity(${self}, ${arg0})',
             },
           },
@@ -157,6 +162,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'infix',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: '${self} <=> ${arg0}',
             },
           },
@@ -178,6 +184,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: 'distance(${self}, ${arg0})',
             },
           },

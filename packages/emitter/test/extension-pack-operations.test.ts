@@ -29,6 +29,7 @@ describe('ExtensionPackManifest with operations', () => {
           lowering: {
             targetFamily: 'sql',
             strategy: 'infix',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
             template: '${self} <=> ${arg0}',
           },
         },
@@ -69,6 +70,7 @@ describe('ExtensionPackManifest with operations', () => {
           lowering: {
             targetFamily: 'sql',
             strategy: 'infix',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
             template: '${self} <=> ${arg0}',
           },
         },
@@ -80,6 +82,7 @@ describe('ExtensionPackManifest with operations', () => {
           lowering: {
             targetFamily: 'sql',
             strategy: 'infix',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
             template: '${self} <-> ${arg0}',
           },
         },
@@ -105,6 +108,7 @@ describe('ExtensionPackManifest with operations', () => {
           lowering: {
             targetFamily: 'sql',
             strategy: 'infix',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
             template: '${self} <=> ${arg0}',
           },
           capabilities: ['pgvector.index.ivfflat'],
@@ -131,6 +135,7 @@ describe('ExtensionPackManifest with operations', () => {
           lowering: {
             targetFamily: 'sql',
             strategy: 'infix',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
             template: '${self} <=> ${arg0}',
           },
         },
@@ -156,6 +161,7 @@ describe('ExtensionPackManifest with operations', () => {
           lowering: {
             targetFamily: 'sql',
             strategy: 'infix',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
             template: '${self} <=> ${arg0}',
           },
         },
@@ -181,6 +187,7 @@ describe('ExtensionPackManifest with operations', () => {
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
             template: 'normalize(${self})',
           },
         },
@@ -209,6 +216,7 @@ describe('ExtensionPackManifest with operations', () => {
           lowering: {
             targetFamily: 'sql',
             strategy: 'infix',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
             template: '${self} <=> ${arg0}',
           },
         },

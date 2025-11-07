@@ -42,6 +42,7 @@ describe('Operation capability gating', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
       capabilities: ['pgvector.index.ivfflat'],
@@ -84,6 +85,7 @@ describe('Operation capability gating', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
       capabilities: ['pgvector.index.ivfflat'],
@@ -126,6 +128,7 @@ describe('Operation capability gating', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
     };
@@ -171,6 +174,7 @@ describe('Operation capability gating', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: '${self} <=> ${arg0}',
       },
       capabilities: ['pgvector.index.ivfflat', 'pgvector.index.hnsw'],
