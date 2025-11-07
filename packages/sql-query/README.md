@@ -83,6 +83,8 @@ flowchart TD
 - Infers JavaScript types from contract types
 - Supports column builders with metadata
 - Attaches operations from operation registry to column builders based on column typeId
+- Accepts `RuntimeContext` for operations registry (optional)
+- `codecTypes` is a generic type parameter only (compile-time), not a runtime parameter
 
 ### Parameter Builder (`param.ts`)
 - Parameter placeholder factory
@@ -137,14 +139,20 @@ flowchart TD
 
 ```typescript
 import { sql, schema } from '@prisma-next/sql-query/sql';
-import contract from './contract.json';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import type { Contract, CodecTypes } from './contract.d';
+import contractJson from './contract.json' assert { type: 'json' };
 
-const t = schema(contract);
+const contract = validateContract<Contract>(contractJson);
+const context = createRuntimeContext({ adapter, extensions: [] });
 
-const plan = sql()
-  .from(t.user)
-  .where(t.user.active.eq(param('active')))
-  .select({ id: t.user.id, email: t.user.email })
+// Get tables from schema (pass context for operations registry)
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
+
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(tables.user)
+  .where(tables.user.columns.active.eq(param('active')))
+  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
   .limit(100)
   .build();
 ```
@@ -153,19 +161,23 @@ const plan = sql()
 
 ```typescript
 import { sql, schema } from '@prisma-next/sql-query/sql';
-import contract from './contract.json';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import type { Contract, CodecTypes } from './contract.d';
+import contractJson from './contract.json' assert { type: 'json' };
 
-const t = schema(contract);
+const contract = validateContract<Contract>(contractJson);
+const context = createRuntimeContext({ adapter, extensions: [] });
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
 
-const plan = sql()
-  .from(t.user)
-  .innerJoin(t.post, (on) => on.eqCol(t.user.id, t.post.userId))
-  .where(t.user.active.eq(param('active')))
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(tables.user)
+  .innerJoin(tables.post, (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId))
+  .where(tables.user.columns.active.eq(param('active')))
   .select({
-    userId: t.user.id,
-    email: t.user.email,
-    postId: t.post.id,
-    title: t.post.title,
+    userId: tables.user.columns.id,
+    email: tables.user.columns.email,
+    postId: tables.post.columns.id,
+    title: tables.post.columns.title,
   })
   .build({ params: { active: true } });
 ```
@@ -174,19 +186,23 @@ const plan = sql()
 
 ```typescript
 import { sql, schema } from '@prisma-next/sql-query/sql';
-import contract from './contract.json';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import type { Contract, CodecTypes } from './contract.d';
+import contractJson from './contract.json' assert { type: 'json' };
 
-const t = schema(contract);
+const contract = validateContract<Contract>(contractJson);
+const context = createRuntimeContext({ adapter, extensions: [] });
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
 
 // Nested projection shape for compile-time type inference
-const plan = sql()
-  .from(t.user)
-  .innerJoin(t.post, (on) => on.eqCol(t.user.id, t.post.userId))
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(tables.user)
+  .innerJoin(tables.post, (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId))
   .select({
-    name: t.user.name,
+    name: tables.user.columns.name,
     post: {
-      title: t.post.title,
-      content: t.post.content,
+      title: tables.post.columns.title,
+      content: tables.post.columns.content,
     },
   })
   .build();
@@ -199,26 +215,30 @@ const plan = sql()
 
 ```typescript
 import { sql, schema } from '@prisma-next/sql-query/sql';
-import contract from './contract.json';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import type { Contract, CodecTypes } from './contract.d';
+import contractJson from './contract.json' assert { type: 'json' };
 
-const t = schema(contract);
+const contract = validateContract<Contract>(contractJson);
+const context = createRuntimeContext({ adapter, extensions: [] });
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
 
 // includeMany returns one row per parent with nested array of children
-const plan = sql()
-  .from(t.user)
+const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  .from(tables.user)
   .includeMany(
-    t.post,
-    (on) => on.eqCol(t.user.id, t.post.userId),
+    tables.post,
+    (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId),
     (child) => child
-      .select({ id: t.post.id, title: t.post.title })
-      .where(t.post.published.eq(true))
-      .orderBy(t.post.createdAt.desc())
+      .select({ id: tables.post.columns.id, title: tables.post.columns.title })
+      .where(tables.post.columns.published.eq(true))
+      .orderBy(tables.post.columns.createdAt.desc())
       .limit(10),
     { alias: 'posts' }
   )
   .select({
-    id: t.user.id,
-    name: t.user.name,
+    id: tables.user.columns.id,
+    name: tables.user.columns.name,
     posts: true,  // Boolean true references the include alias
   })
   .build();

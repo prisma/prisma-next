@@ -17,8 +17,6 @@ Execute query Plans with deterministic verification, guardrails, and feedback. P
 - **Contract Verification**: Verify loaded contract against database marker (`coreHash` and `profileHash`)
 - **Plan Execution**: Execute Plans through adapters and drivers
 - **Plugin Pipeline**: Apply guardrails (lints, budgets, telemetry) before and during execution
-- **Codec Composition**: Compose codec registries from adapters and extension packs
-- **Operations Registry**: Assemble operations registry from extension packs for query building
 - **Result Streaming**: Stream results as `AsyncIterable<Row>` for efficient processing
 - **Error Mapping**: Map driver errors to stable `RuntimeError` envelope
 
@@ -79,7 +77,15 @@ flowchart TD
 - Main orchestrator for query execution
 - Manages contract verification, plugin lifecycle, and result streaming
 - Coordinates adapters, drivers, codecs, and operations registry
-- Assembles operations registry from extension packs
+- Uses `RuntimeContext` for codec and operations registries (decoupled from runtime)
+
+### RuntimeContext (`context.ts`)
+- Encapsulates `OperationRegistry` and `CodecRegistry`
+- Decouples registries from `Runtime`, allowing them to be passed to schema/query builders
+- Composes codecs and operations from adapters and extensions programmatically
+- **Extension Interface**: Extensions provide `codecs?()` and `operations?()` methods
+- **Adapter as Extension**: Adapters are treated as extensions (provide codecs via `profile.codecs()`)
+- No file I/O at runtime - everything is bundled
 
 ### Codecs (`codecs/`)
 - **Encoding**: Encode JavaScript values to wire format for parameters
@@ -133,35 +139,36 @@ flowchart TD
 ## Usage
 
 ```typescript
-import { createRuntime } from '@prisma-next/runtime';
+import { createRuntime, createRuntimeContext } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
-import { loadExtensionPacks } from '@prisma-next/emitter';
 import { schema } from '@prisma-next/sql-query/schema';
+import pgVector from '@prisma/extension-pg-vector';
 import contract from './contract.json';
 
-// Load extension packs
-const adapterPath = './packages/adapter-postgres';
-const packPaths = ['./packages/pack-pgvector'];
-const extensions = loadExtensionPacks(adapterPath, packPaths);
+// Create adapter
+const adapter = createPostgresAdapter();
 
-// Create runtime with extensions
+// Create context with adapter and extensions (programmatic registration)
+const context = createRuntimeContext({
+  adapter,
+  extensions: [pgVector()],  // Extensions provide codecs and operations programmatically
+});
+
+// Create runtime with context
 const runtime = createRuntime({
   contract,
-  adapter: createPostgresAdapter(),
+  adapter,
   driver: createPostgresDriver({ connectionString: process.env.DATABASE_URL }),
   verify: { mode: 'onFirstUse', requireMarker: false },
-  extensions,  // Pass extensions to runtime
+  context,  // Pass context to runtime
   plugins: [
     // Add lints, budgets, telemetry plugins
   ],
 });
 
-// Get operations registry from runtime
-const operationRegistry = runtime.operations();
-
-// Use operations registry in schema
-const tables = schema(contract, undefined, operationRegistry, contract.capabilities);
+// Use context in schema (for operations registry)
+const tables = schema(contract, context).tables;
 
 // Execute a plan
 for await (const row of runtime.execute(plan)) {
@@ -169,9 +176,22 @@ for await (const row of runtime.execute(plan)) {
 }
 ```
 
+### Extension Interface
+
+Extensions provide `codecs?()` and `operations?()` methods programmatically. No file I/O at runtime - everything is bundled:
+
+```typescript
+interface Extension {
+  codecs?(): CodecRegistry;
+  operations?(): ReadonlyArray<OperationSignature>;
+}
+```
+
+**Adapter as Extension**: Adapters are treated as extensions (provide codecs via `profile.codecs()`). The adapter is automatically included in the context when creating it.
+
 ## Exports
 
-- `.`: Main runtime API (`createRuntime`, types)
+- `.`: Main runtime API (`createRuntime`, `createRuntimeContext`, `RuntimeContext`, `Extension`, types)
 - `./test/utils`: Runtime-specific test utilities
 
 ### Test Utilities

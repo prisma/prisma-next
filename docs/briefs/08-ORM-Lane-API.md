@@ -21,7 +21,7 @@ Introduce a model-centric ORM lane that optimizes for discoverability and relati
 - Base-model writes (terminal): `create(data)`, `update(where, data)`, `delete(where)`.
 - Chain before terminals: `.where(...)`, `.orderBy(...)`, `.take(n)`, `.skip(n)`, `.select(...)`.
 - Relation filters (filter-only): `where.related.<relation>.some/none/every(predicate)`.
-- Child selection (nested includes): `include.<relation>(child => child.select(...).where(...).orderBy(...).take(n))` — capability-gated by `lateral` + `jsonAgg`.
+- Child selection (nested includes): `include.<relation>(child => child.select(...).where(...).orderBy(...).take(n))` — capability-gated by a single adapter capability `includes.singleStmt`.
 - No nested writes yet.
 
 ### API design
@@ -41,7 +41,7 @@ orm.post().where.related.author.some(a => a.where(aa => aa.name.eq(param('name')
 orm.post().where.related.author.none(a => a.where(aa => aa.active.eq(false)) ).findMany();
 orm.post().where.related.author.every(a => a.where(aa => aa.orgId.eq(param('org')))).findMany();
 
-// Include child rows (nested array) — capability-gated (lateral + jsonAgg)
+// Include child rows (nested array) — capability-gated (includes.singleStmt)
 const usersWithPosts = await orm.user()
   .include.posts(p => p
     .where(pp => pp.createdAt.gt(param('since')))
@@ -64,7 +64,7 @@ await orm.user().delete({ id: 1 });
 Notes
 - `where.related.<relation>` exposes relations from the contract (`Contract['relations'][Model]`) as dot-properties, typed and explicit.
 - `.some/.none/.every` compile respectively to `EXISTS`, `NOT EXISTS`, and `NOT EXISTS` of the complement (or adapter `join.semi` when available). No ordering/limit/select inside the predicate; it’s a filter-only scope.
-- `.include.<relation>(...)` compiles to the SQL lane `includeMany` (LATERAL + json_agg) and is capability-gated; compile-time error when capabilities are not present.
+- `.include.<relation>(...)` compiles to the SQL lane `includeMany` and is capability-gated by `includes.singleStmt`; compile-time error when the capability is not declared as a literal `true` in `contract.d.ts` (fallback: PLAN.UNSUPPORTED at build if not literal).
 - `.select(...)` uses projection shaping rules from the SQL lane (nested objects allowed; compiles to aliased flat columns; types reflect nested shape).
 
 ### Lowering
@@ -73,7 +73,7 @@ Notes
   - where: column=param maps to SQL lane where
   - orderBy/take/skip maps to lane equivalents
   - related.some/none/every maps to EXISTS/NOT EXISTS subqueries built from relation metadata, or `join.semi` when supported by the adapter
-  - include.<relation>(...) maps to SQL lane includeMany (Slice 7), rendered as LEFT JOIN LATERAL + json_agg; child where/orderBy/take applied inside the lateral; alias is the relation name by default
+  - include.<relation>(...) maps to SQL lane includeMany (Slice 7). The adapter chooses the concrete single-statement lowering strategy (e.g., LATERAL+json_agg on Postgres, correlated JSON subquery on MySQL/MariaDB, APPLY+FOR JSON on SQL Server/Oracle). Child where/orderBy/take are applied inside the subquery; alias defaults to the relation name.
   - select maps to SQL lane projection shaping (nested compile-time only)
 - Terminal read methods call `.build()` and hand the plan to runtime; writes compile to single-statement DML plans (MVP).
 
@@ -130,7 +130,7 @@ const users = await orm.user()
 - Unit tests: chained related filters compile to expected AST structure (stub JSON) and disallow invalid operations inside predicate.
 
 4) Includes (child selection)
-- Implement `include.<relation>(child => child.where(...).orderBy(...).take(n).select(...))` with capability gating (lateral + jsonAgg).
+- Implement `include.<relation>(child => child.where(...).orderBy(...).take(n).select(...))` with capability gating via `includes.singleStmt`.
 - Validate: child projection non-empty; alias collision checks with other includes and selected fields; relation name must exist on model.
 - Lower to SQL lane includeMany; unit tests verify AST includes and projection includeRef; type tests verify row includes `{ [alias]: Array<ChildShape> }` when selected.
 
@@ -151,13 +151,13 @@ const users = await orm.user()
 - `orm.<model>()` exists with chained `.where/.orderBy/.take/.skip/.select` and terminal `.findMany/.findFirst/.findUnique`.
 - `where.related.<relation>.some/none/every` works for any relation defined in the contract; filters base rows only; typed and discoverable.
 - Lowering uses EXISTS/NOT EXISTS (or join.semi) with explicit relation metadata; no ambiguity.
- - `include.<relation>(...)` exists (capability-gated) and compiles to SQL lane includeMany; selecting the include alias contributes a nested array type to the row.
+ - `include.<relation>(...)` exists (capability-gated by `includes.singleStmt`) and compiles to SQL lane includeMany; selecting the include alias contributes a nested array type to the row.
 - Base writes compile to single DML statements; no nested writes.
 - Tests pass: unit (builder API, relation filters, writes), type-level (ResultType from select), integration (stub lowerer AST).
 
 ### Future work (follow-up slices)
 
-- Nested result includes for arrays/objects (via `includeMany` API; capability-gated by lateral + jsonAgg).
+- Nested result includes for arrays/objects (via `includeMany` API; capability-gated by `includes.singleStmt`).
 - Nested writes (connect/create/update on relations).
 - Operation registry for pack-defined operators and parameterized types (vector/geospatial).
 

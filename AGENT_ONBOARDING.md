@@ -82,7 +82,7 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 3. **Validation**: `validateContract<TContract>(json)` validates structure and returns typed contract
    - Note: Type canonicalization happens at authoring time, not during validation
    - Contract JSON should contain only fully qualified type IDs
-4. **Usage**: DSL functions (`sql()`, `schema()`, `makeT()`) accept contract and propagate types
+4. **Usage**: DSL functions (`sql()`, `schema()`) accept contract and propagate types. Extensions are registered programmatically via `RuntimeContext`.
 
 ### Contract Types Pattern
 
@@ -121,38 +121,75 @@ SqlContract<
 **CodecTypes** (imported from adapter):
 - `CodecTypes`: `Record<codecId, { input: unknown, output: unknown }>` - TypeScript type info for codec input/output types
 - Imported from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
-- Provided as generic parameter to `sql()` and `schema()` functions
+- Provided as generic parameter to `sql()` and `schema()` functions (compile-time only, not a runtime parameter)
+
+### RuntimeContext and Extensions
+
+**RuntimeContext** encapsulates `OperationRegistry` and `CodecRegistry`, decoupling them from `Runtime` and allowing them to be passed to schema/query builders:
+
+```typescript
+import { createRuntimeContext } from '@prisma-next/runtime';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import pgVector from '@prisma/extension-pg-vector';
+
+// Create context with adapter and extensions
+const adapter = createPostgresAdapter();
+const context = createRuntimeContext({
+  adapter,
+  extensions: [pgVector()],  // Programmatic extension registration
+});
+
+// Pass context to runtime and schema
+const runtime = createRuntime({ contract, adapter, driver, context });
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
+```
+
+**Extension Interface**: Extensions provide `codecs?()` and `operations?()` methods programmatically. No file I/O at runtime - everything is bundled:
+
+```typescript
+interface Extension {
+  codecs?(): CodecRegistry;
+  operations?(): ReadonlyArray<OperationSignature>;
+}
+```
+
+**Adapter as Extension**: Adapters are treated as extensions (provide codecs via `profile.codecs()`). The adapter is automatically included in the context when creating it.
 
 ### Query DSL Pattern
 
 ```typescript
-import { sql, schema, makeT, param } from '@prisma-next/sql-query/sql';
+import { sql, schema, param } from '@prisma-next/sql-query/sql';
 import { validateContract } from '@prisma-next/sql-query/schema';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import contractJson from './contract.json' assert { type: 'json' };
 import type { Contract, CodecTypes } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
-const t = makeT<Contract, CodecTypes>(contract);  // Table/column accessor: t.user.id
-const tables = schema<Contract, CodecTypes>(contract).tables;  // Table builders
+
+// Create context (includes adapter codecs and any extensions)
+const context = createRuntimeContext({ adapter, extensions: [] });
+
+// Get tables from schema (pass context for operations registry)
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
 
 // Basic query with where clause
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .where(t.user.id.eq(param('userId')))
-  .select({ id: t.user.id, email: t.user.email })
+  .where(tables.user.columns.id.eq(param('userId')))
+  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
   .limit(10)
   .build({ params: { userId: 42 } });  // Returns immutable Plan
 
 // Query with join
 const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .innerJoin(tables.post, (on) => on.eqCol(t.user.id, t.post.userId))
-  .where(t.user.active.eq(param('active')))
+  .innerJoin(tables.post, (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId))
+  .where(tables.user.columns.active.eq(param('active')))
   .select({
-    userId: t.user.id,
-    email: t.user.email,
-    postId: t.post.id,
-    title: t.post.title,
+    userId: tables.user.columns.id,
+    email: tables.user.columns.email,
+    postId: tables.post.columns.id,
+    title: tables.post.columns.title,
   })
   .build({ params: { active: true } });
 
@@ -755,7 +792,9 @@ test('Type IDs are literal types', () => {
 8. **Type tests** - Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 9. **Core is lane-agnostic** - Never create discriminated unions based on `lane` field. The core should not be aware of specific lane implementations.
 10. **Unified Type Identifiers** - Every column `type` must be a fully qualified type ID (`ns/name@version`). Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation. No codec decorations or scalar fallbacks.
-11. **CodecTypes Generic** - Always provide `CodecTypes` as a generic parameter to `sql()` and `schema()` functions. Import from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
+11. **CodecTypes Generic** - Always provide `CodecTypes` as a generic parameter to `sql()` and `schema()` functions (compile-time only, not a runtime parameter). Import from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
+12. **RuntimeContext Pattern** - Use `createRuntimeContext()` to create a context with adapter and extensions. Pass the context to both `createRuntime()` and `schema()`. Extensions are registered programmatically (no file I/O at runtime). Adapters are treated as extensions (provide codecs via `profile.codecs()`).
+13. **Schema API** - `schema()` accepts `contract` and optional `context` (for operations registry). Removed `makeT()` function - use `schema().tables` instead. `codecTypes` is a generic type parameter only, not a runtime parameter.
 12. **Contract Validation** - Always validate contracts with `validateContract<Contract>(contractJson)` before use. **CRITICAL**: The type parameter `TContract` must be a fully-typed contract type (from `contract.d.ts`), NOT a generic `SqlContract<SqlStorage>`. Using a generic type will cause all subsequent type inference to fail (types will be `unknown`). **Important**: `validateContract()` does not perform canonicalization - it expects all types to already be fully qualified type IDs (`pg/int4@1`, not `int4`). Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation. The contract JSON must contain only fully qualified type IDs. See `.cursor/rules/validate-contract-usage.mdc` for details.
 13. **No Backward Compatibility** - Never add backward compatibility code, migration paths, or deprecation warnings. This project has no external consumers - change implementations directly.
 14. **Runtime Agnostic** - The runtime must not contain target-specific logic (e.g., special-case Date handling for specific codec IDs). Use generic codec resolution only.
@@ -1055,26 +1094,30 @@ const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 **Create a query:**
 ```typescript
 import { sql, schema, param } from '@prisma-next/sql-query/sql';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
-const tables = schema<Contract, CodecTypes>(contract).tables;
-const t = makeT<Contract, CodecTypes>(contract);
+// Create context (includes adapter codecs and any extensions)
+const context = createRuntimeContext({ adapter, extensions: [] });
+
+// Get tables from schema (pass context for operations registry)
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
 
 // Basic query
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .select({ id: t.user.id, email: t.user.email })
+  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
   .build();
 
 // Query with join
 const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
-  .innerJoin(tables.post, (on) => on.eqCol(t.user.id, t.post.userId))
-  .where(t.user.active.eq(param('active')))
+  .innerJoin(tables.post, (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId))
+  .where(tables.user.columns.active.eq(param('active')))
   .select({
-    userId: t.user.id,
-    postId: t.post.id,
-    title: t.post.title,
+    userId: tables.user.columns.id,
+    postId: tables.post.columns.id,
+    title: tables.post.columns.title,
   })
   .build({ params: { active: true } });
 ```
