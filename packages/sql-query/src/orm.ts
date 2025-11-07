@@ -41,11 +41,11 @@ export function orm<
 
 // Re-export types for convenience
 export type {
+  ModelColumnAccessor,
   OrmBuilderOptions,
   OrmModelBuilder,
   OrmRegistry,
   OrmRelationAccessor,
   OrmRelationFilterBuilder,
   OrmWhereProperty,
-  ModelColumnAccessor,
 } from './orm-types';

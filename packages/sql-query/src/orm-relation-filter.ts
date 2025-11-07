@@ -1,8 +1,8 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
+import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
 import { schema } from './schema';
 import type { BinaryBuilder, ColumnBuilder } from './types';
-import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
 
 export class OrmRelationFilterBuilderImpl<
   TContract extends SqlContract<SqlStorage>,
@@ -52,7 +52,10 @@ export class OrmRelationFilterBuilderImpl<
     if (!this.modelAccessor) {
       this.modelAccessor = this._getModelAccessor();
     }
-    return this.modelAccessor!;
+    if (!this.modelAccessor) {
+      throw planInvalid(`Failed to get model accessor for ${this.childModelName}`);
+    }
+    return this.modelAccessor;
   }
 
   private _getModelAccessor(): ModelColumnAccessor<TContract, CodecTypes, ChildModelName> {

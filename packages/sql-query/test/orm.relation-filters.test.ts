@@ -5,8 +5,8 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
-import { param } from '../src/param';
 import { orm } from '../src/orm';
+import { param } from '../src/param';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract-with-relations.d';
 
@@ -122,7 +122,9 @@ describe('orm relation filters', () => {
       const model = child as { id: { eq: (p: unknown) => unknown } };
       return model.id.eq(param('userId'));
     });
-    const plan = (builderWithFilter as { findMany: (options?: { params?: Record<string, unknown> }) => unknown }).findMany({ params: { userId: 1 } });
+    const plan = (
+      builderWithFilter as { findMany: (options?: { params?: Record<string, unknown> }) => unknown }
+    ).findMany({ params: { userId: 1 } });
 
     expect(plan).toBeDefined();
     expect((plan as { meta: { lane: string } }).meta.lane).toBe('orm');
@@ -151,4 +153,3 @@ describe('orm relation filters', () => {
     }).toThrow();
   });
 });
-

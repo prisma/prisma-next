@@ -250,9 +250,9 @@ export type { ParamDescriptor, PlanMeta, PlanRefs, ResultType } from '@prisma-ne
 export type {
   BinaryExpr,
   ColumnRef,
-  ExistsExpr,
   DeleteAst,
   Direction,
+  ExistsExpr,
   IncludeAst,
   IncludeRef,
   InsertAst,

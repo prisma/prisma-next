@@ -229,7 +229,12 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
       for (const [relationName, relation] of Object.entries(model.relations)) {
         // For now, we'll do basic validation. Full FK validation can be added later
         // This would require checking that the relation's on.parentCols/childCols match FKs
-        if (typeof relation === 'object' && relation !== null && 'on' in relation && 'to' in relation) {
+        if (
+          typeof relation === 'object' &&
+          relation !== null &&
+          'on' in relation &&
+          'to' in relation
+        ) {
           const on = relation.on as { parentCols?: string[]; childCols?: string[] };
           const cardinality = (relation as { cardinality?: string }).cardinality;
           if (on.parentCols && on.childCols) {

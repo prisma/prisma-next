@@ -142,4 +142,3 @@ export type ModelColumnAccessor<
       }
     : never
   : never;
-
