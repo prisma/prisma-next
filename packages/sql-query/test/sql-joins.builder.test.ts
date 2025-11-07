@@ -221,7 +221,8 @@ describe('SQL builder joins', () => {
     expect(
       (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
     ).toHaveLength(1);
-    expect(plan.ast?.where).toBeDefined();
+    const ast = plan.ast as import('../src/types').SelectAst;
+    expect(ast?.where).toBeDefined();
     expect(plan.params).toEqual([42]);
   });
 

@@ -119,12 +119,13 @@ describe('SQL builder includeMany', () => {
       })
       .build();
 
-    expect(plan.ast?.includes).toBeDefined();
-    expect(plan.ast?.includes?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.kind).toBe('includeMany');
-    expect(plan.ast?.includes?.[0]?.alias).toBe('post');
-    expect(plan.ast?.includes?.[0]?.child.table.name).toBe('post');
-    expect(plan.ast?.includes?.[0]?.child.project.length).toBe(2);
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes).toBeDefined();
+    expect(ast?.includes?.length).toBe(1);
+    expect(ast?.includes?.[0]?.kind).toBe('includeMany');
+    expect(ast?.includes?.[0]?.alias).toBe('post');
+    expect(ast?.includes?.[0]?.child.table.name).toBe('post');
+    expect(ast?.includes?.[0]?.child.project.length).toBe(2);
   });
 
   it('builds a plan with includeMany using custom alias', () => {
@@ -150,9 +151,10 @@ describe('SQL builder includeMany', () => {
       })
       .build();
 
-    expect(plan.ast?.includes).toBeDefined();
-    expect(plan.ast?.includes?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.alias).toBe('posts');
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes).toBeDefined();
+    expect(ast?.includes?.length).toBe(1);
+    expect(ast?.includes?.[0]?.alias).toBe('posts');
   });
 
   it('builds a plan with includeMany with child where clause', () => {
@@ -180,8 +182,9 @@ describe('SQL builder includeMany', () => {
       })
       .build({ params: { title: 'Test' } });
 
-    expect(plan.ast?.includes?.[0]?.child.where).toBeDefined();
-    expect(plan.ast?.includes?.[0]?.child.where?.kind).toBe('bin');
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes?.[0]?.child.where).toBeDefined();
+    expect(ast?.includes?.[0]?.child.where?.kind).toBe('bin');
   });
 
   it('builds a plan with includeMany with child orderBy clause', () => {
@@ -209,9 +212,10 @@ describe('SQL builder includeMany', () => {
       })
       .build();
 
-    expect(plan.ast?.includes?.[0]?.child.orderBy).toBeDefined();
-    expect(plan.ast?.includes?.[0]?.child.orderBy?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.child.orderBy?.[0]?.dir).toBe('desc');
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes?.[0]?.child.orderBy).toBeDefined();
+    expect(ast?.includes?.[0]?.child.orderBy?.length).toBe(1);
+    expect(ast?.includes?.[0]?.child.orderBy?.[0]?.dir).toBe('desc');
   });
 
   it('builds a plan with includeMany with child limit clause', () => {
@@ -236,6 +240,7 @@ describe('SQL builder includeMany', () => {
       })
       .build();
 
-    expect(plan.ast?.includes?.[0]?.child.limit).toBe(10);
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes?.[0]?.child.limit).toBe(10);
   });
 });

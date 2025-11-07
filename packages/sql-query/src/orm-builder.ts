@@ -10,6 +10,7 @@ import type {
   OrmRelationFilterBuilder,
   OrmWhereProperty,
 } from './orm-types';
+import { param } from './param';
 import { schema } from './schema';
 import { createJoinOnBuilder, sql } from './sql';
 import type {
@@ -19,13 +20,17 @@ import type {
   BuildOptions,
   ColumnBuilder,
   ColumnRef,
+  DeleteAst,
   ExistsExpr,
   InferNestedProjectionRow,
+  InsertAst,
   LoweredStatement,
   OrderBuilder,
+  ParamPlaceholder,
   Plan,
   SelectAst,
   TableRef,
+  UpdateAst,
 } from './types';
 
 interface RelationFilter {
@@ -901,6 +906,214 @@ export class OrmModelBuilderImpl<
     options?: BuildOptions,
   ): Plan<Row> {
     return this.where(where).take(1).findMany(options);
+  }
+
+  create(data: Record<string, unknown>, options?: BuildOptions): Plan<number> {
+    // Validate data is non-empty
+    if (!data || Object.keys(data).length === 0) {
+      throw planInvalid('create() requires at least one field');
+    }
+
+    // Convert model field names to column names and ParamPlaceholder map
+    const values = this._convertModelFieldsToColumns(data);
+
+    // Get table name from mappings
+    const tableName = this.contract.mappings.modelToTable?.[this.modelName];
+    if (!tableName) {
+      throw planInvalid(`Model ${this.modelName} not found in mappings`);
+    }
+    const table: TableRef = { kind: 'table', name: tableName };
+
+    // Build insert query using SQL lane
+    const sqlBuilder = sql({
+      contract: this.contract,
+      adapter: this.adapter as Adapter<SelectAst | InsertAst, TContract, LoweredStatement>,
+      codecTypes: this.codecTypes,
+    });
+    const insertBuilder = (
+      sqlBuilder as {
+        insert: (table: TableRef, values: Record<string, ParamPlaceholder>) => unknown;
+      }
+    ).insert(table, values);
+
+    // Build plan with params from data object
+    const plan = (insertBuilder as { build: (options?: BuildOptions) => Plan<unknown> }).build({
+      ...options,
+      params: {
+        ...(options?.params ?? {}),
+        ...data,
+      },
+    });
+
+    // Return plan with ORM metadata
+    return {
+      ...plan,
+      meta: {
+        ...plan.meta,
+        lane: 'orm',
+        annotations: {
+          ...plan.meta.annotations,
+          intent: 'write',
+          isMutation: true,
+        },
+      },
+    } as Plan<number>;
+  }
+
+  update(
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    data: Record<string, unknown>,
+    options?: BuildOptions,
+  ): Plan<number> {
+    // Validate data is non-empty
+    if (!data || Object.keys(data).length === 0) {
+      throw planInvalid('update() requires at least one field');
+    }
+
+    // Convert model field names to column names and ParamPlaceholder map
+    const set = this._convertModelFieldsToColumns(data);
+
+    // Build where predicate from callback
+    const modelAccessor = this._getModelAccessor();
+    const wherePredicate = where(modelAccessor);
+
+    // Get table name from mappings
+    const tableName = this.contract.mappings.modelToTable?.[this.modelName];
+    if (!tableName) {
+      throw planInvalid(`Model ${this.modelName} not found in mappings`);
+    }
+    const table: TableRef = { kind: 'table', name: tableName };
+
+    // Build update query using SQL lane
+    const sqlBuilder = sql({
+      contract: this.contract,
+      adapter: this.adapter as Adapter<SelectAst | UpdateAst, TContract, LoweredStatement>,
+      codecTypes: this.codecTypes,
+    });
+    const updateBuilder = (
+      sqlBuilder as {
+        update: (
+          table: TableRef,
+          set: Record<string, ParamPlaceholder>,
+        ) => {
+          where: (predicate: BinaryBuilder) => { build: (options?: BuildOptions) => Plan<unknown> };
+        };
+      }
+    )
+      .update(table, set)
+      .where(wherePredicate);
+
+    // Build plan with params from both data and where predicate
+    // Note: If where predicate uses params with same names as data fields, they'll be merged
+    const plan = updateBuilder.build({
+      ...options,
+      params: {
+        ...(options?.params ?? {}),
+        ...data,
+      },
+    });
+
+    // Return plan with ORM metadata
+    return {
+      ...plan,
+      meta: {
+        ...plan.meta,
+        lane: 'orm',
+        annotations: {
+          ...plan.meta.annotations,
+          intent: 'write',
+          isMutation: true,
+        },
+      },
+    } as Plan<number>;
+  }
+
+  delete(
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    options?: BuildOptions,
+  ): Plan<number> {
+    // Build where predicate from callback
+    const modelAccessor = this._getModelAccessor();
+    const wherePredicate = where(modelAccessor);
+
+    // Get table name from mappings
+    const tableName = this.contract.mappings.modelToTable?.[this.modelName];
+    if (!tableName) {
+      throw planInvalid(`Model ${this.modelName} not found in mappings`);
+    }
+    const table: TableRef = { kind: 'table', name: tableName };
+
+    // Build delete query using SQL lane
+    const sqlBuilder = sql({
+      contract: this.contract,
+      adapter: this.adapter as Adapter<SelectAst | DeleteAst, TContract, LoweredStatement>,
+      codecTypes: this.codecTypes,
+    });
+    const deleteBuilder = (
+      sqlBuilder as {
+        delete: (table: TableRef) => {
+          where: (predicate: BinaryBuilder) => { build: (options?: BuildOptions) => Plan<unknown> };
+        };
+      }
+    )
+      .delete(table)
+      .where(wherePredicate);
+
+    // Build plan with params from where predicate
+    const plan = deleteBuilder.build(options);
+
+    // Return plan with ORM metadata
+    return {
+      ...plan,
+      meta: {
+        ...plan.meta,
+        lane: 'orm',
+        annotations: {
+          ...plan.meta.annotations,
+          intent: 'write',
+          isMutation: true,
+        },
+      },
+    } as Plan<number>;
+  }
+
+  private _convertModelFieldsToColumns(
+    fields: Record<string, unknown>,
+  ): Record<string, ParamPlaceholder> {
+    const model = this.contract.models[this.modelName];
+    if (!model || typeof model !== 'object' || !('fields' in model)) {
+      throw planInvalid(`Model ${this.modelName} does not have fields`);
+    }
+    const modelFields = model.fields as Record<string, { column?: string }>;
+
+    const result: Record<string, ParamPlaceholder> = {};
+
+    for (const fieldName in fields) {
+      if (!Object.hasOwn(fields, fieldName)) {
+        continue;
+      }
+
+      // Validate field exists in model
+      if (!Object.hasOwn(modelFields, fieldName)) {
+        throw planInvalid(`Field ${fieldName} does not exist on model ${this.modelName}`);
+      }
+
+      const field = modelFields[fieldName];
+      if (!field) {
+        continue;
+      }
+
+      // Get column name from mappings or field definition
+      const columnName =
+        this.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ??
+        field.column ??
+        fieldName;
+
+      // Create param placeholder with field name as param name
+      result[columnName] = param(fieldName);
+    }
+
+    return result;
   }
 
   private _getModelAccessor(): ModelColumnAccessor<TContract, CodecTypes, ModelName> {

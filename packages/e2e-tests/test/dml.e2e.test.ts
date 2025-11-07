@@ -3,18 +3,18 @@ import { fileURLToPath } from 'node:url';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import {
-  createTestRuntimeFromClient,
-  executePlanAndCollect,
-  setupE2EDatabase,
-} from '../../runtime/test/utils';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { loadContractFromDisk } from './utils';
+import {
+  createTestRuntimeFromClient,
+  executePlanAndCollect,
+  setupE2EDatabase,
+} from '../../runtime/test/utils';
 import type { Contract } from './fixtures/generated/contract.d';
+import { loadContractFromDisk } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

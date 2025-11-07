@@ -4,19 +4,18 @@ import { fileURLToPath } from 'node:url';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { param } from '@prisma-next/sql-query/param';
-import { schema } from '@prisma-next/sql-query/schema';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
 import {
   createTestRuntime,
   executePlanAndCollect,
   setupTestDatabase,
 } from '@prisma-next/runtime/test/utils';
+import { param } from '@prisma-next/sql-query/param';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

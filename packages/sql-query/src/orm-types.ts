@@ -154,6 +154,16 @@ export interface OrmModelBuilder<
     where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
     options?: BuildOptions,
   ): Plan<Row>;
+  create(data: Record<string, unknown>, options?: BuildOptions): Plan<number>;
+  update(
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    data: Record<string, unknown>,
+    options?: BuildOptions,
+  ): Plan<number>;
+  delete(
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    options?: BuildOptions,
+  ): Plan<number>;
 }
 
 export type ModelColumnAccessor<

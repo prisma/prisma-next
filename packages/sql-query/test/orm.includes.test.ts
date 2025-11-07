@@ -64,27 +64,31 @@ describe('orm includes', () => {
           };
         };
       }
-    ).include.posts((child) => {
+    ).include.posts((child: unknown) => {
       const childBuilder = child as {
-        where: (fn: (model: unknown) => unknown) => unknown;
-        orderBy: (fn: (model: unknown) => unknown) => unknown;
-        take: (n: number) => unknown;
-        select: (fn: (model: unknown) => unknown) => unknown;
+        where: (fn: (model: unknown) => unknown) => {
+          orderBy: (fn: (model: unknown) => unknown) => {
+            take: (n: number) => {
+              select: (fn: (model: unknown) => unknown) => unknown;
+            };
+          };
+        };
       };
-      return childBuilder
-        .where((p) => {
+      const result = childBuilder
+        .where((p: unknown) => {
           const model = p as { id: { eq: (p: unknown) => unknown } };
           return model.id.eq(param('postId'));
         })
-        .orderBy((p) => {
+        .orderBy((p: unknown) => {
           const model = p as { id: { desc: () => unknown } };
           return model.id.desc();
         })
         .take(10)
-        .select((p) => {
+        .select((p: unknown) => {
           const model = p as { id: unknown; title: unknown };
           return { id: model.id, title: model.title };
         });
+      return result;
     });
 
     expect(builderWithInclude).toBeDefined();
@@ -92,7 +96,8 @@ describe('orm includes', () => {
 
   it('builds plan with include', () => {
     const builder = (o as unknown as { user: () => unknown }).user();
-    const builderWithInclude = (
+    // @ts-expect-error - intentionally using type assertions in test
+    const builderWithInclude: unknown = (
       builder as {
         include: {
           posts: (child: unknown) => unknown;
@@ -100,16 +105,16 @@ describe('orm includes', () => {
         select: (fn: (model: unknown) => unknown) => unknown;
       }
     ).include
-      .posts((child) => {
+      .posts((child: unknown) => {
         const childBuilder = child as {
           select: (fn: (model: unknown) => unknown) => unknown;
         };
-        return childBuilder.select((p) => {
+        return childBuilder.select((p: unknown) => {
           const model = p as { id: unknown; title: unknown };
           return { id: model.id, title: model.title };
         });
       })
-      .select((u) => {
+      .select((u: unknown) => {
         const model = u as { id: unknown; email: unknown; posts: boolean };
         return { id: model.id, email: model.email, posts: true };
       });
@@ -135,7 +140,8 @@ describe('orm includes', () => {
 
   it('supports chaining include with other methods', () => {
     const builder = (o as unknown as { user: () => unknown }).user();
-    const builderWithInclude = (
+    // @ts-expect-error - intentionally using type assertions in test
+    const builderWithInclude: unknown = (
       builder as {
         include: {
           posts: (child: unknown) => unknown;
@@ -143,16 +149,16 @@ describe('orm includes', () => {
         where: (fn: (model: unknown) => unknown) => unknown;
       }
     ).include
-      .posts((child) => {
+      .posts((child: unknown) => {
         const childBuilder = child as {
           select: (fn: (model: unknown) => unknown) => unknown;
         };
-        return childBuilder.select((p) => {
+        return childBuilder.select((p: unknown) => {
           const model = p as { id: unknown };
           return { id: model.id };
         });
       })
-      .where((u) => {
+      .where((u: unknown) => {
         const model = u as { id: { eq: (p: unknown) => unknown } };
         return model.id.eq(param('userId'));
       });
@@ -172,10 +178,11 @@ describe('orm includes', () => {
 
   it('throws error when accessing invalid relation', () => {
     const builder = (o as unknown as { user: () => unknown }).user();
+    const builderInclude = (builder as { include: unknown }).include;
 
     expect(() => {
       (
-        builder.include as unknown as {
+        builderInclude as {
           invalidRelation: (child: unknown) => unknown;
         }
       ).invalidRelation((child: unknown) => child);
@@ -224,11 +231,11 @@ describe('orm includes', () => {
           posts: (child: unknown) => unknown;
         };
       }
-    ).include.posts((child) => {
+    ).include.posts((child: unknown) => {
       const childBuilder = child as {
         select: (fn: (model: unknown) => unknown) => unknown;
       };
-      return childBuilder.select((p) => {
+      return childBuilder.select((p: unknown) => {
         const model = p as { id: unknown };
         return { id: model.id };
       });
@@ -247,7 +254,7 @@ describe('orm includes', () => {
           posts: (child: unknown) => unknown;
         };
       }
-    ).include.posts((child) => {
+    ).include.posts((child: unknown) => {
       // Don't call select() - this should cause an error
       return child;
     });
