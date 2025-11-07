@@ -7,6 +7,7 @@ import type {
   BinaryBuilder,
   BuildOptions,
   ColumnBuilder,
+  ExistsExpr,
   InferNestedProjectionRow,
   LoweredStatement,
   OrderBuilder,
@@ -22,7 +23,6 @@ import type {
   OrmWhereProperty,
 } from './orm-types';
 import { OrmRelationFilterBuilderImpl } from './orm-relation-filter';
-import type { BinaryBuilder } from './types';
 
 interface RelationFilter {
   relationName: string;
@@ -352,6 +352,30 @@ export class OrmModelBuilderImpl<
     }
 
     const plan = query.build(options);
+
+    // Compile relation filters to EXISTS subqueries and combine with main where clause
+    if (this.relationFilters.length > 0) {
+      const existsExprs = this._buildExistsSubqueries(this.relationFilters, options);
+      if (existsExprs.length > 0) {
+        // Combine EXISTS expressions with main where clause using AND logic
+        // For now, we'll add them to the AST directly
+        const ast = plan.ast as SelectAst;
+        const combinedWhere = this._combineWhereClauses(ast.where, existsExprs);
+        const modifiedAst: SelectAst = {
+          ...ast,
+          where: combinedWhere,
+        };
+        return {
+          ...plan,
+          ast: modifiedAst,
+          meta: {
+            ...plan.meta,
+            lane: 'orm',
+          },
+        };
+      }
+    }
+
     return {
       ...plan,
       meta: {
@@ -359,6 +383,130 @@ export class OrmModelBuilderImpl<
         lane: 'orm',
       },
     };
+  }
+
+  private _buildExistsSubqueries(
+    relationFilters: RelationFilter[],
+    options?: BuildOptions,
+  ): ExistsExpr[] {
+    const existsExprs: ExistsExpr[] = [];
+
+    for (const filter of relationFilters) {
+      const childTableName = this.contract.mappings.modelToTable?.[filter.childModelName];
+      if (!childTableName) {
+        throw planInvalid(`Model ${filter.childModelName} not found in mappings`);
+      }
+
+      const childTable: TableRef = { kind: 'table', name: childTableName };
+      const parentTableName = this.contract.mappings.modelToTable?.[this.modelName];
+      if (!parentTableName) {
+        throw planInvalid(`Model ${this.modelName} not found in mappings`);
+      }
+
+      // Build join condition from relation metadata
+      // For EXISTS, we need to correlate the subquery with the outer query
+      // The join condition becomes WHERE parent_col = child_col
+      const joinConditions: Array<{ left: ColumnRef; right: ColumnRef }> = [];
+      for (let i = 0; i < filter.relation.on.parentCols.length; i++) {
+        const parentCol = filter.relation.on.parentCols[i];
+        const childCol = filter.relation.on.childCols[i];
+        joinConditions.push({
+          left: { kind: 'col', table: parentTableName, column: parentCol },
+          right: { kind: 'col', table: childTableName, column: childCol },
+        });
+      }
+
+      // Build child where clause if present
+      let childWhere: BinaryExpr | undefined = undefined;
+      if (filter.childWhere) {
+        // Build child where clause using SQL builder
+        const childSqlBuilder = sql({
+          contract: this.contract,
+          adapter: this.adapter,
+          codecTypes: this.codecTypes,
+        });
+        // Get child model accessor to build default projection
+        const childSchemaHandle = schema(this.contract, this.codecTypes);
+        const childSchemaTable = childSchemaHandle.tables[childTableName];
+        if (!childSchemaTable) {
+          throw planInvalid(`Table ${childTableName} not found in schema`);
+        }
+        const childModelAccessor: Record<string, ColumnBuilder> = {};
+        const childModel = this.contract.models[filter.childModelName];
+        if (childModel && typeof childModel === 'object' && 'fields' in childModel) {
+          const childModelFields = childModel.fields as Record<string, { column?: string }>;
+          for (const fieldName in childModelFields) {
+            const field = childModelFields[fieldName];
+            if (!field) continue;
+            const columnName =
+              this.contract.mappings.fieldToColumn?.[filter.childModelName]?.[fieldName] ??
+              field.column ??
+              fieldName;
+            const column = childSchemaTable.columns[columnName];
+            if (column) {
+              childModelAccessor[fieldName] = column;
+            }
+          }
+        }
+        // Use first column for projection (EXISTS doesn't care about the actual value)
+        const firstColumn = Object.values(childModelAccessor)[0];
+        if (!firstColumn) {
+          throw planInvalid(`No columns found for model ${filter.childModelName}`);
+        }
+        const childQuery = childSqlBuilder
+          .from(childTable)
+          .where(filter.childWhere)
+          .select({ _exists: firstColumn });
+        const childPlan = childQuery.build(options);
+        const childAst = childPlan.ast as SelectAst;
+        childWhere = childAst.where as BinaryExpr | undefined;
+      }
+
+      // Build subquery AST
+      // For EXISTS, we only need SELECT 1 FROM child_table WHERE join_condition AND child_where
+      // For now, we'll build a simple subquery with just the first join condition
+      // TODO: Support combining multiple join conditions with AND
+      const subqueryWhere: BinaryExpr | undefined = childWhere;
+      // For EXISTS, we need at least one column in the projection
+      // Use the first join condition's right column as a simple projection
+      const projectionColumn = joinConditions[0]?.right ?? { kind: 'col', table: childTableName, column: 'id' };
+      const subquery: SelectAst = {
+        kind: 'select',
+        from: childTable,
+        project: [{ alias: '_exists', expr: projectionColumn }],
+        ...(subqueryWhere ? { where: subqueryWhere } : {}),
+      };
+
+      // Determine if this is NOT EXISTS based on filter type
+      const notExists = filter.filterType === 'none' || filter.filterType === 'every';
+
+      const existsExpr: ExistsExpr = {
+        kind: 'exists',
+        not: notExists,
+        subquery,
+      };
+
+      existsExprs.push(existsExpr);
+    }
+
+    return existsExprs;
+  }
+
+  private _combineWhereClauses(
+    mainWhere: BinaryExpr | ExistsExpr | undefined,
+    existsExprs: ExistsExpr[],
+  ): BinaryExpr | ExistsExpr {
+    // For now, if we have multiple EXISTS expressions, we'll just use the first one
+    // TODO: Support combining multiple EXISTS expressions with AND logic
+    // This requires extending the AST to support boolean composition (AND/OR)
+    if (existsExprs.length === 1) {
+      return existsExprs[0];
+    }
+    if (mainWhere) {
+      return mainWhere;
+    }
+    // Fallback: return first EXISTS expression
+    return existsExprs[0];
   }
 
   findFirst(options?: BuildOptions): Plan<Row> {

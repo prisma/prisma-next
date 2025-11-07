@@ -4,6 +4,7 @@ import type {
   BinaryExpr,
   ColumnRef,
   DeleteAst,
+  ExistsExpr,
   InsertAst,
   JoinAst,
   LowererContext,
@@ -75,7 +76,7 @@ function renderSelect(ast: SelectAst): string {
     ? ast.includes.map((include) => renderInclude(include)).join(' ')
     : '';
 
-  const whereClause = ast.where ? ` WHERE ${renderBinary(ast.where)}` : '';
+  const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where)}` : '';
   const orderClause = ast.orderBy?.length
     ? ` ORDER BY ${ast.orderBy
         .map((order) => `${renderColumn(order.expr)} ${order.dir.toUpperCase()}`)
@@ -103,6 +104,15 @@ function renderProjection(ast: SelectAst): string {
       return `${column} AS ${alias}`;
     })
     .join(', ');
+}
+
+function renderWhere(expr: BinaryExpr | ExistsExpr): string {
+  if (expr.kind === 'exists') {
+    const notKeyword = expr.not ? 'NOT ' : '';
+    const subquery = renderSelect(expr.subquery);
+    return `${notKeyword}EXISTS (${subquery})`;
+  }
+  return renderBinary(expr);
 }
 
 function renderBinary(expr: BinaryExpr): string {
@@ -154,7 +164,7 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
   // Build WHERE clause: combine ON condition with any additional WHERE clauses
   let whereClause = ` WHERE ${onCondition}`;
   if (include.child.where) {
-    whereClause += ` AND ${renderBinary(include.child.where)}`;
+    whereClause += ` AND ${renderWhere(include.child.where)}`;
   }
 
   // Add ORDER BY if present - it goes inside json_agg() call

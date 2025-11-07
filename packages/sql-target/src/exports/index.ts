@@ -23,6 +23,7 @@ export {
   BinaryExpr,
   ColumnRef,
   DeleteAst,
+  ExistsExpr,
   Direction,
   IncludeAst,
   IncludeRef,

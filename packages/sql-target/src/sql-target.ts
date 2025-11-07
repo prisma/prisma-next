@@ -90,6 +90,12 @@ export interface BinaryExpr {
   readonly right: ParamRef;
 }
 
+export interface ExistsExpr {
+  readonly kind: 'exists';
+  readonly not: boolean;
+  readonly subquery: SelectAst;
+}
+
 export type JoinOnExpr = {
   readonly kind: 'eqCol';
   readonly left: ColumnRef;
@@ -114,7 +120,7 @@ export interface IncludeAst {
   readonly child: {
     readonly table: TableRef;
     readonly on: JoinOnExpr;
-    readonly where?: BinaryExpr;
+    readonly where?: BinaryExpr | ExistsExpr;
     readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
     readonly limit?: number;
     readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
@@ -130,7 +136,7 @@ export interface SelectAst {
     alias: string;
     expr: ColumnRef | IncludeRef;
   }>;
-  readonly where?: BinaryExpr;
+  readonly where?: BinaryExpr | ExistsExpr;
   readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
   readonly limit?: number;
 }

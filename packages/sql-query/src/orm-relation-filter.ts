@@ -1,10 +1,7 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import { schema } from './schema';
-import type {
-  BinaryBuilder,
-  ColumnBuilder,
-} from './types';
+import type { BinaryBuilder, ColumnBuilder } from './types';
 import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
 
 export class OrmRelationFilterBuilderImpl<
@@ -18,12 +15,10 @@ export class OrmRelationFilterBuilderImpl<
   private readonly childModelName: ChildModelName;
   private wherePredicate: BinaryBuilder | undefined = undefined;
   private readonly adapter: OrmBuilderOptions<TContract, CodecTypes>['adapter'];
-  private modelAccessor: ModelColumnAccessor<TContract, CodecTypes, ChildModelName> | undefined = undefined;
+  private modelAccessor: ModelColumnAccessor<TContract, CodecTypes, ChildModelName> | undefined =
+    undefined;
 
-  constructor(
-    options: OrmBuilderOptions<TContract, CodecTypes>,
-    childModelName: ChildModelName,
-  ) {
+  constructor(options: OrmBuilderOptions<TContract, CodecTypes>, childModelName: ChildModelName) {
     this.contract = options.contract;
     this.adapter = options.adapter;
     this.codecTypes = (options.codecTypes ?? {}) as CodecTypes;
@@ -39,7 +34,9 @@ export class OrmRelationFilterBuilderImpl<
       this.childModelName,
     );
     builder.modelAccessor = this.modelAccessor;
-    builder.wherePredicate = fn(this.modelAccessor);
+    if (this.modelAccessor) {
+      builder.wherePredicate = fn(this.modelAccessor);
+    }
     return builder;
   }
 
@@ -55,7 +52,7 @@ export class OrmRelationFilterBuilderImpl<
     if (!this.modelAccessor) {
       this.modelAccessor = this._getModelAccessor();
     }
-    return this.modelAccessor;
+    return this.modelAccessor!;
   }
 
   private _getModelAccessor(): ModelColumnAccessor<TContract, CodecTypes, ChildModelName> {
@@ -92,4 +89,3 @@ export class OrmRelationFilterBuilderImpl<
     return accessor;
   }
 }
-
