@@ -204,6 +204,40 @@ it('test', async () => {
 - ❌ Don't duplicate helpers that already exist in the shared packages
 - ❌ Don't add dependencies to `@prisma-next/test-utils` on other `@prisma-next/*` packages (it must remain dependency-free)
 
+## Test File Organization
+
+**Maximum file size: 500 lines**
+
+Test files should be kept under 500 lines. Split large files by:
+- Functionality (basic, errors, structure, generation)
+- Feature area (joins, projections, includes)
+- Test type (unit, integration, edge-cases)
+
+Use descriptive file names: `codecs.registry.test.ts`, `runtime.joins.test.ts`, `driver.errors.test.ts`
+
+See `.cursor/rules/test-file-organization.mdc` for detailed guidelines.
+
+## Test Assertion Patterns
+
+### Prefer Object Comparison
+
+**✅ CORRECT: Use `toEqual` or `toMatchObject`**
+
+```typescript
+expect(rows[0]).toEqual({ id: 1, name: 'Test User' });
+expect(rows[0]).toMatchObject({ id: expect.any(Number), email: expect.any(String) });
+```
+
+**❌ WRONG: Piece-by-piece property checks**
+
+```typescript
+expect(rows[0]).toHaveProperty('id');
+expect(rows[0]).toHaveProperty('name');
+expect(typeof rows[0]?.['id']).toBe('number');
+```
+
+**Why?** Object comparison is more maintainable, readable, type-safe, and less brittle.
+
 ## Common Mistakes and Corrections
 
 ### Importing from `@prisma-next/test-utils` directly

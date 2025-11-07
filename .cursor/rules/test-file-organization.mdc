@@ -1,0 +1,206 @@
+---
+description: Test file organization and splitting guidelines
+alwaysApply: false
+---
+
+# Test File Organization
+
+## File Size Limits
+
+**Maximum file size: 500 lines**
+
+Test files should be kept under 500 lines to maintain readability and navigability. If a test file exceeds this limit, it should be split into multiple files.
+
+## Splitting Strategy
+
+### When to Split
+
+Split test files when:
+- ✅ File exceeds 500 lines
+- ✅ File contains multiple distinct concerns that can be logically separated
+- ✅ File has multiple top-level `describe` blocks that can be split by functionality
+
+### How to Split
+
+**1. Identify logical groupings:**
+- Group tests by functionality (e.g., "basic", "errors", "structure", "generation")
+- Group tests by feature area (e.g., "joins", "projections", "includes")
+- Group tests by test type (e.g., "unit", "integration", "edge-cases")
+
+**2. Use descriptive file names:**
+- Use suffixes to indicate test category: `.basic.test.ts`, `.errors.test.ts`, `.structure.test.ts`
+- Use prefixes for feature areas: `runtime.joins.test.ts`, `runtime.projections.test.ts`
+- Keep the base name consistent: `codecs.registry.test.ts`, `codecs.encoding.test.ts`
+
+**3. Split at natural boundaries:**
+- Split by `describe` blocks when they represent distinct concerns
+- Split by test categories (basic vs advanced, success vs error cases)
+- Split by feature areas (joins, projections, includes, etc.)
+
+**4. Ensure each file is complete:**
+- Each new file must have all necessary imports
+- Each new file must have all necessary setup/teardown code
+- Each new file should be independently runnable
+
+### Examples
+
+**✅ CORRECT: Split by functionality**
+
+```typescript
+// codecs.registry.test.ts - Registry operations
+describe('codec registry', () => {
+  it('registers codec', () => { /* ... */ });
+  it('gets codec by id', () => { /* ... */ });
+  it('checks if codec exists', () => { /* ... */ });
+});
+
+// codecs.encoding.test.ts - Encoding operations
+describe('codec encoding', () => {
+  it('encodes string value', () => { /* ... */ });
+  it('encodes number value', () => { /* ... */ });
+  it('handles null values', () => { /* ... */ });
+});
+
+// codecs.decoding.test.ts - Decoding operations
+describe('codec decoding', () => {
+  it('decodes string value', () => { /* ... */ });
+  it('decodes number value', () => { /* ... */ });
+  it('handles null values', () => { /* ... */ });
+});
+```
+
+**✅ CORRECT: Split by feature area**
+
+```typescript
+// runtime.joins.test.ts - Join-related tests
+describe('runtime joins', () => {
+  it('executes inner join', () => { /* ... */ });
+  it('executes left join', () => { /* ... */ });
+  it('executes right join', () => { /* ... */ });
+});
+
+// runtime.projections.test.ts - Projection-related tests
+describe('runtime projections', () => {
+  it('executes nested projection', () => { /* ... */ });
+  it('executes multi-level projection', () => { /* ... */ });
+});
+```
+
+**✅ CORRECT: Split by test type**
+
+```typescript
+// runtime.constructor.test.ts - Constructor tests
+describe('runtime constructor', () => {
+  it('creates runtime with default mode', () => { /* ... */ });
+  it('creates runtime with permissive mode', () => { /* ... */ });
+});
+
+// runtime.edge-cases.test.ts - Edge case tests
+describe('runtime edge cases', () => {
+  it('handles empty result set', () => { /* ... */ });
+  it('handles plugin errors', () => { /* ... */ });
+});
+```
+
+**❌ WRONG: Split arbitrarily without logical grouping**
+
+```typescript
+// codecs.part1.test.ts - First 250 lines
+// codecs.part2.test.ts - Next 250 lines
+// codecs.part3.test.ts - Remaining lines
+```
+
+**Why?** Arbitrary splits make it hard to find related tests and understand the test organization.
+
+## Test Assertion Patterns
+
+### Prefer Object Comparison Over Property-by-Property Checks
+
+**✅ CORRECT: Use `toEqual` or `toMatchObject` for object comparison**
+
+```typescript
+// Compare entire objects
+expect(rows[0]).toEqual({ id: 1, name: 'Test User', email: 'test@example.com' });
+
+// Use toMatchObject for partial comparison
+expect(rows[0]).toMatchObject({ id: expect.any(Number), email: expect.any(String) });
+
+// Use expect.any() for type-only checks
+expect(rows[0]).toMatchObject({ id: expect.any(Number) });
+
+// Use expect.not.objectContaining() for absence checks
+expect(rows[0]).not.toMatchObject({ deletedAt: expect.anything() });
+```
+
+**❌ WRONG: Piece-by-piece property checks**
+
+```typescript
+// Brittle, hard to maintain, breaks with type changes
+expect(rows[0]).toHaveProperty('id');
+expect(rows[0]).toHaveProperty('name');
+expect(rows[0]).toHaveProperty('email');
+expect(typeof rows[0]?.['id']).toBe('number');
+expect(typeof rows[0]?.['name']).toBe('string');
+expect(typeof rows[0]?.['email']).toBe('string');
+```
+
+**Why?** Object comparison is:
+- More maintainable (single assertion per object)
+- More readable (shows expected structure clearly)
+- Type-safe (TypeScript can infer types from objects)
+- Less brittle (doesn't break when properties are added/removed)
+
+### Plan Structure Assertions
+
+**✅ CORRECT: Compare entire plan structures**
+
+```typescript
+expect(plan.ast?.joins).toEqual([
+  {
+    kind: 'join',
+    joinType: 'inner',
+    table: { kind: 'table', name: 'post' },
+    on: {
+      kind: 'eqCol',
+      left: { kind: 'col', table: 'user', column: 'id' },
+      right: { kind: 'col', table: 'post', column: 'userId' },
+    },
+  },
+]);
+```
+
+**❌ WRONG: Piece-by-piece plan checks**
+
+```typescript
+// Brittle, doesn't verify complete structure
+expect(plan.ast?.joins?.length).toBe(1);
+expect(plan.ast?.joins?.[0]?.joinType).toBe('inner');
+expect(plan.ast?.joins?.[0]?.table?.name).toBe('post');
+```
+
+**Why?** Full structure comparison ensures all AST fields are present and correct, not just a subset.
+
+## File Naming Conventions
+
+**Pattern:** `{base}.{category}.test.ts`
+
+- **Base name**: The main subject being tested (e.g., `codecs`, `runtime`, `driver`)
+- **Category**: The test category (e.g., `basic`, `errors`, `structure`, `generation`, `joins`, `projections`)
+- **Extension**: Always `.test.ts` for test files
+
+**Examples:**
+- `codecs.registry.test.ts` - Codec registry tests
+- `codecs.encoding.test.ts` - Codec encoding tests
+- `runtime.joins.test.ts` - Runtime join tests
+- `runtime.projections.test.ts` - Runtime projection tests
+- `driver.basic.test.ts` - Driver basic functionality tests
+- `driver.errors.test.ts` - Driver error handling tests
+
+## Verification
+
+After splitting files, verify:
+- ✅ All files are under 500 lines
+- ✅ Each file has all necessary imports
+- ✅ Each file is independently runnable
+- ✅ Test descriptions are clear and descriptive
+- ✅ File names follow the naming convention
