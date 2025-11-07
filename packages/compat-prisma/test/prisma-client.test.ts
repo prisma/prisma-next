@@ -10,6 +10,7 @@ import {
 } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';
@@ -83,22 +84,19 @@ async function createUser(
   return client.user.create({ data: input });
 }
 
-describe(
-  'PrismaClient compatibility layer - dual implementation harness',
-  { timeout: 15000 },
-  () => {
-    let database: Awaited<ReturnType<typeof createDevDatabase>>;
-    let client: Client;
-    let prismaPN: PrismaClient;
+describe('PrismaClient compatibility layer - dual implementation harness', () => {
+  let database: Awaited<ReturnType<typeof createDevDatabase>>;
+  let client: Client;
+  let prismaPN: PrismaClient;
 
-    beforeAll(async () => {
-      database = await createDevDatabase({
-        acceleratePort: 54000,
-        databasePort: 54001,
-        shadowDatabasePort: 54002,
-      });
-      client = new Client({ connectionString: database.connectionString });
-      await client.connect();
+  beforeAll(async () => {
+    database = await createDevDatabase({
+      acceleratePort: 54000,
+      databasePort: 54001,
+      shadowDatabasePort: 54002,
+    });
+    client = new Client({ connectionString: database.connectionString });
+    await client.connect();
 
       // Create test table (shared for both implementations)
       await client.query(`
@@ -134,7 +132,7 @@ describe(
         contract: validatedContract,
         runtime,
       });
-    });
+    }, timeouts.spinUpPpgDev);
 
     afterAll(async () => {
       try {

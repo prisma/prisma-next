@@ -11,7 +11,7 @@ import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { ResultType } from '@prisma-next/sql-query/types';
-import { type DevDatabase, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { type DevDatabase, timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
@@ -31,7 +31,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-describe('end-to-end includeMany and leftJoin queries', { timeout: 30000 }, () => {
+describe('end-to-end includeMany and leftJoin queries', () => {
   it('includeMany returns one row per parent with nested array of children', async () => {
     const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);
 
@@ -124,7 +124,7 @@ describe('end-to-end includeMany and leftJoin queries', { timeout: 30000 }, () =
       },
       { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('includeMany with child where, orderBy, and limit filters children', async () => {
     const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);

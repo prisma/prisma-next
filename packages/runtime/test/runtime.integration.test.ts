@@ -1,23 +1,27 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 
-import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { Client } from 'pg';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import { timeouts } from '@prisma-next/test-utils';
+
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+
 import { budgets } from '../src/plugins/budgets';
 import { lints } from '../src/plugins/lints';
+import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import {
   createDevDatabase,
-  createTestRuntime,
-  drainPlanExecution,
-  executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
+  createTestRuntime,
+  executePlanAndCollect,
+  drainPlanExecution,
 } from './utils';
 
 const fixtureContract = loadContractFixture();
@@ -32,7 +36,7 @@ const plan = builder
   .limit(5)
   .build();
 
-describe('runtime execute integration', { timeout: 30000 }, () => {
+describe('runtime execute integration', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   /** Raw Postgres client for direct interaction with the database */
@@ -50,7 +54,7 @@ describe('runtime execute integration', { timeout: 30000 }, () => {
       connect: { client: client },
       cursor: { disabled: true },
     });
-  }, 30000);
+  }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
     try {
@@ -62,7 +66,7 @@ describe('runtime execute integration', { timeout: 30000 }, () => {
   });
 
   beforeEach(async () => {
-    await setupTestDatabase(client, fixtureContract, async (c: typeof client) => {
+    await setupTestDatabase(client, fixtureContract, async (c) => {
       await c.query('drop table if exists "user"');
       await c.query('create table "user" (id serial primary key, email text not null)');
       await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
@@ -82,10 +86,10 @@ describe('runtime execute integration', { timeout: 30000 }, () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    const rows = await executePlanAndCollect(runtime, plan);
+    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
 
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows.map((r: (typeof rows)[0]) => r.email)).toContain('ada@example.com');
+    expect(rows.map((r) => r['email'])).toContain('ada@example.com');
   });
 
   it('throws when marker hash mismatches contract', async () => {
@@ -162,7 +166,7 @@ describe('runtime execute integration', { timeout: 30000 }, () => {
       },
     );
 
-    const rows = await executePlanAndCollect(runtime, rawPlan);
+    const rows = await executePlanAndCollect<{ id: number }>(runtime, rawPlan);
 
     expect(rows.length).toBeGreaterThan(0);
 

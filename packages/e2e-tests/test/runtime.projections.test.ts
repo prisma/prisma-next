@@ -10,7 +10,7 @@ import {
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { ResultType } from '@prisma-next/sql-query/types';
-import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 import { loadContractFromDisk } from './utils';
@@ -19,7 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-describe('end-to-end nested projection queries', { timeout: 30000 }, () => {
+describe('end-to-end nested projection queries', () => {
   it('nested projection returns flat rows with correct aliases', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
@@ -96,7 +96,7 @@ describe('end-to-end nested projection queries', { timeout: 30000 }, () => {
       },
       { acceleratePort: 54080, databasePort: 54081, shadowDatabasePort: 54082 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('multi-level nested projection returns flat rows with correct aliases', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -167,7 +167,7 @@ describe('end-to-end nested projection queries', { timeout: 30000 }, () => {
       },
       { acceleratePort: 54090, databasePort: 54091, shadowDatabasePort: 54092 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('nested projection with joins returns flat rows with correct aliases', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -261,7 +261,7 @@ describe('end-to-end nested projection queries', { timeout: 30000 }, () => {
       },
       { acceleratePort: 54100, databasePort: 54101, shadowDatabasePort: 54102 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('mixed leaves and nested objects in projection returns flat rows', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);

@@ -1,8 +1,6 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
+import { timeouts } from '@prisma-next/test-utils';
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
@@ -14,7 +12,7 @@ export default defineConfig({
         singleThread: true,
       },
     },
-    testTimeout: 15000,
-    hookTimeout: 15000,
+    testTimeout: timeouts.default,
+    hookTimeout: timeouts.default,
   },
 });

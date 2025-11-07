@@ -9,7 +9,7 @@ import {
 } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 import { loadContractFromDisk } from './utils';
@@ -18,7 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-describe('end-to-end JOIN queries', { timeout: 30000 }, () => {
+describe('end-to-end JOIN queries', () => {
   it('INNER JOIN returns matching rows', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
@@ -86,7 +86,7 @@ describe('end-to-end JOIN queries', { timeout: 30000 }, () => {
       },
       { acceleratePort: 54030, databasePort: 54031, shadowDatabasePort: 54032 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('LEFT JOIN returns all users including those without posts', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);

@@ -9,7 +9,7 @@ import {
 } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 import { emitAndVerifyContract, loadContractFromDisk } from './utils';
@@ -18,7 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '../../..');
 
-describe('end-to-end basic queries', { timeout: 30000 }, () => {
+describe('end-to-end basic queries', () => {
   const adapterPath = resolve(repoRoot, 'packages/adapter-postgres');
   const cliPath = resolve(repoRoot, 'packages/cli/dist/cli.js');
   const contractTsPath = resolve(__dirname, 'fixtures/contract.ts');
@@ -69,5 +69,5 @@ describe('end-to-end basic queries', { timeout: 30000 }, () => {
       },
       { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 });
