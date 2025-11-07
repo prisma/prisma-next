@@ -1,20 +1,24 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
+import { OrmIncludeChildBuilderImpl } from './orm-include-child';
 import { OrmRelationFilterBuilderImpl } from './orm-relation-filter';
 import type {
   ModelColumnAccessor,
   OrmBuilderOptions,
+  OrmIncludeAccessor,
   OrmModelBuilder,
   OrmRelationFilterBuilder,
   OrmWhereProperty,
 } from './orm-types';
 import { schema } from './schema';
-import { sql } from './sql';
+import { createJoinOnBuilder, sql } from './sql';
 import type {
   Adapter,
   BinaryBuilder,
+  BinaryExpr,
   BuildOptions,
   ColumnBuilder,
+  ColumnRef,
   ExistsExpr,
   InferNestedProjectionRow,
   LoweredStatement,
@@ -39,6 +43,30 @@ interface RelationFilter {
   };
 }
 
+interface OrmIncludeState {
+  relationName: string;
+  childModelName: string;
+  childTable: TableRef;
+  childWhere: BinaryBuilder | undefined;
+  childOrderBy: OrderBuilder | undefined;
+  childLimit: number | undefined;
+  childProjection:
+    | Record<
+        string,
+        ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+      >
+    | undefined;
+  alias: string;
+  relation: {
+    to: string;
+    cardinality: string;
+    on: {
+      parentCols: readonly string[];
+      childCols: readonly string[];
+    };
+  };
+}
+
 export class OrmModelBuilderImpl<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
@@ -53,6 +81,7 @@ export class OrmModelBuilderImpl<
   private table: TableRef;
   private wherePredicate: BinaryBuilder | undefined = undefined;
   private relationFilters: RelationFilter[] = [];
+  private includes: OrmIncludeState[] = [];
   private orderByExpr: OrderBuilder | undefined = undefined;
   private limitValue: number | undefined = undefined;
   private offsetValue: number | undefined = undefined;
@@ -93,6 +122,7 @@ export class OrmModelBuilderImpl<
       builder['table'] = this.table;
       builder.wherePredicate = fn(this._getModelAccessor());
       builder.relationFilters = this.relationFilters;
+      builder.includes = this.includes;
       builder.orderByExpr = this.orderByExpr;
       builder.limitValue = this.limitValue;
       builder.offsetValue = this.offsetValue;
@@ -109,6 +139,133 @@ export class OrmModelBuilderImpl<
       ModelName,
       Row
     >;
+  }
+
+  get include(): OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row> {
+    return this._createIncludeProxy();
+  }
+
+  private _createIncludeProxy(): OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row> {
+    const self = this;
+    // Relations are keyed by table name, not model name
+    const tableName = this.contract.mappings.modelToTable?.[this.modelName];
+    if (!tableName) {
+      return {} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>;
+    }
+    const modelRelations = this.contract.relations?.[tableName];
+    if (!modelRelations || typeof modelRelations !== 'object') {
+      return {} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>;
+    }
+
+    return new Proxy({} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>, {
+      get(_target, prop) {
+        if (typeof prop !== 'string') {
+          return undefined;
+        }
+
+        const relation = (modelRelations as Record<string, { to?: string }>)[prop];
+        if (!relation || typeof relation !== 'object' || !('to' in relation)) {
+          throw planInvalid(`Relation ${prop} not found on model ${self.modelName}`);
+        }
+
+        const childModelName = relation.to as string;
+        const relationDef = relation as {
+          to: string;
+          cardinality: string;
+          on: { parentCols: readonly string[]; childCols: readonly string[] };
+        };
+
+        return (
+          child: (
+            child: import('./orm-include-child').OrmIncludeChildBuilder<
+              TContract,
+              CodecTypes,
+              typeof childModelName
+            >,
+          ) => import('./orm-include-child').OrmIncludeChildBuilder<
+            TContract,
+            CodecTypes,
+            typeof childModelName,
+            unknown
+          >,
+        ) => {
+          return self._applyInclude(prop, childModelName, child, relationDef);
+        };
+      },
+    });
+  }
+
+  private _applyInclude(
+    relationName: string,
+    childModelName: string,
+    childBuilderFn: (
+      child: import('./orm-include-child').OrmIncludeChildBuilder<TContract, CodecTypes, string>,
+    ) => import('./orm-include-child').OrmIncludeChildBuilder<
+      TContract,
+      CodecTypes,
+      string,
+      unknown
+    >,
+    relationDef: {
+      to: string;
+      cardinality: string;
+      on: { parentCols: readonly string[]; childCols: readonly string[] };
+    },
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
+    // Get child table
+    const childTableName = this.contract.mappings.modelToTable?.[childModelName];
+    if (!childTableName) {
+      throw planInvalid(`Model ${childModelName} not found in mappings`);
+    }
+    const childTable: TableRef = { kind: 'table', name: childTableName };
+
+    // Create child builder and apply callback
+    const childBuilder = new OrmIncludeChildBuilderImpl<TContract, CodecTypes, string>(
+      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      childModelName,
+    );
+    const builtChild = childBuilderFn(
+      childBuilder as import('./orm-include-child').OrmIncludeChildBuilder<
+        TContract,
+        CodecTypes,
+        string
+      >,
+    );
+    const childState = (
+      builtChild as import('./orm-include-child').OrmIncludeChildBuilderImpl<
+        TContract,
+        CodecTypes,
+        string
+      >
+    ).getState();
+
+    // Store the include
+    // Note: Child projection validation happens in findMany() when compiling to includeMany
+    const includeState: OrmIncludeState = {
+      relationName,
+      childModelName,
+      childTable,
+      childWhere: childState.childWhere,
+      childOrderBy: childState.childOrderBy,
+      childLimit: childState.childLimit,
+      childProjection: childState.childProjection,
+      alias: relationName,
+      relation: relationDef,
+    };
+
+    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
+      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      this.modelName,
+    );
+    builder['table'] = this.table;
+    builder.wherePredicate = this.wherePredicate;
+    builder.relationFilters = this.relationFilters;
+    builder.includes = [...this.includes, includeState];
+    builder.orderByExpr = this.orderByExpr;
+    builder.limitValue = this.limitValue;
+    builder.offsetValue = this.offsetValue;
+    builder.projection = this.projection;
+    return builder;
   }
 
   private _createRelatedProxy(): OrmWhereProperty<
@@ -320,6 +477,7 @@ export class OrmModelBuilderImpl<
     builder['table'] = this.table;
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = [...this.relationFilters, relationFilter];
+    builder.includes = this.includes;
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = this.limitValue;
     builder.offsetValue = this.offsetValue;
@@ -337,6 +495,7 @@ export class OrmModelBuilderImpl<
     builder['table'] = this.table;
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
+    builder.includes = this.includes;
     builder.orderByExpr = fn(this._getModelAccessor());
     builder.limitValue = this.limitValue;
     builder.offsetValue = this.offsetValue;
@@ -352,6 +511,7 @@ export class OrmModelBuilderImpl<
     builder['table'] = this.table;
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
+    builder.includes = this.includes;
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = n;
     builder.offsetValue = this.offsetValue;
@@ -369,6 +529,7 @@ export class OrmModelBuilderImpl<
     builder['table'] = this.table;
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
+    builder.includes = this.includes;
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = this.limitValue;
     builder.offsetValue = n;
@@ -401,6 +562,7 @@ export class OrmModelBuilderImpl<
     builder['table'] = this.table;
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
+    builder.includes = this.includes;
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = this.limitValue;
     builder.offsetValue = this.offsetValue;
@@ -423,6 +585,117 @@ export class OrmModelBuilderImpl<
 
     if (this.wherePredicate) {
       query = query.where(this.wherePredicate);
+    }
+
+    // Compile includes to includeMany before other operations
+    for (const includeState of this.includes) {
+      // Capability check
+      const target = this.contract.target;
+      const capabilities = this.contract.capabilities;
+      if (!capabilities || !capabilities[target]) {
+        throw planInvalid('includeMany requires lateral and jsonAgg capabilities');
+      }
+      const targetCapabilities = capabilities[target];
+      if (capabilities[target]['lateral'] !== true || targetCapabilities['jsonAgg'] !== true) {
+        throw planInvalid('includeMany requires lateral and jsonAgg capabilities to be true');
+      }
+
+      // Build join condition from relation metadata
+      const joinOnBuilder = createJoinOnBuilder();
+      const parentTableName = this.contract.mappings.modelToTable?.[this.modelName];
+      if (!parentTableName) {
+        throw planInvalid(`Model ${this.modelName} not found in mappings`);
+      }
+
+      // Get parent and child column builders for join condition
+      const parentSchemaHandle = schema(this.contract, this.codecTypes);
+      const parentSchemaTable = parentSchemaHandle.tables[parentTableName];
+      if (!parentSchemaTable) {
+        throw planInvalid(`Table ${parentTableName} not found in schema`);
+      }
+      const childSchemaHandle = schema(this.contract, this.codecTypes);
+      const childSchemaTable = childSchemaHandle.tables[includeState.childTable.name];
+      if (!childSchemaTable) {
+        throw planInvalid(`Table ${includeState.childTable.name} not found in schema`);
+      }
+
+      // Build join predicate from relation metadata
+      // For now, support single-column joins (most common case)
+      if (
+        includeState.relation.on.parentCols.length !== 1 ||
+        includeState.relation.on.childCols.length !== 1
+      ) {
+        throw planInvalid('Multi-column joins in includes are not yet supported');
+      }
+      const parentColName = includeState.relation.on.parentCols[0];
+      const childColName = includeState.relation.on.childCols[0];
+      if (!parentColName || !childColName) {
+        throw planInvalid('Join columns must be defined');
+      }
+      const parentCol = parentSchemaTable.columns[parentColName];
+      const childCol = childSchemaTable.columns[childColName];
+      if (!parentCol) {
+        throw planInvalid(`Column ${parentColName} not found in table ${parentTableName}`);
+      }
+      if (!childCol) {
+        throw planInvalid(
+          `Column ${childColName} not found in table ${includeState.childTable.name}`,
+        );
+      }
+
+      const onPredicate = joinOnBuilder.eqCol(parentCol, childCol);
+
+      // Convert ORM child builder state to SQL lane IncludeChildBuilder
+      // We need to create an IncludeChildBuilder that applies the stored state
+      query = query.includeMany(
+        includeState.childTable,
+        () => onPredicate,
+        (child) => {
+          // Apply child where
+          let builtChild = child;
+          if (includeState.childWhere) {
+            builtChild = builtChild.where(includeState.childWhere);
+          }
+          // Apply child orderBy
+          if (includeState.childOrderBy) {
+            // Convert OrderBuilder to ReturnType<ColumnBuilder['asc']>
+            // OrderBuilder has expr and dir, which matches the SQL lane's orderBy signature
+            builtChild = builtChild.orderBy(
+              includeState.childOrderBy as ReturnType<ColumnBuilder['asc']>,
+            );
+          }
+          // Apply child limit
+          if (includeState.childLimit !== undefined) {
+            builtChild = builtChild.limit(includeState.childLimit);
+          }
+          // Apply child projection
+          // Validate child projection is non-empty
+          if (!includeState.childProjection) {
+            throw planInvalid('Child projection must be specified');
+          }
+          // Note: SQL lane's IncludeChildBuilder.select() doesn't accept boolean values
+          // The ORM's childProjection may have boolean values for include references,
+          // but those are handled at the parent level, not in child includes
+          // Filter out boolean values - they're not valid in child projections
+          const filteredProjection: Record<
+            string,
+            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          > = {};
+          for (const [key, value] of Object.entries(includeState.childProjection)) {
+            if (value !== true && value !== false) {
+              filteredProjection[key] = value as
+                | ColumnBuilder
+                | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>;
+            }
+          }
+          if (Object.keys(filteredProjection).length === 0) {
+            throw planInvalid('Child projection must not be empty after filtering boolean values');
+          }
+          builtChild = builtChild.select(filteredProjection);
+          return builtChild;
+        },
+        { alias: includeState.alias },
+      );
     }
 
     if (this.orderByExpr) {
@@ -462,7 +735,7 @@ export class OrmModelBuilderImpl<
         const combinedWhere = this._combineWhereClauses(ast.where, existsExprs);
         const modifiedAst: SelectAst = {
           ...ast,
-          where: combinedWhere,
+          ...(combinedWhere !== undefined ? { where: combinedWhere } : {}),
         };
         return {
           ...plan,
@@ -509,6 +782,9 @@ export class OrmModelBuilderImpl<
       for (let i = 0; i < filter.relation.on.parentCols.length; i++) {
         const parentCol = filter.relation.on.parentCols[i];
         const childCol = filter.relation.on.childCols[i];
+        if (!parentCol || !childCol) {
+          continue;
+        }
         joinConditions.push({
           left: { kind: 'col', table: parentTableName, column: parentCol },
           right: { kind: 'col', table: childTableName, column: childCol },
@@ -598,7 +874,7 @@ export class OrmModelBuilderImpl<
   private _combineWhereClauses(
     mainWhere: BinaryExpr | ExistsExpr | undefined,
     existsExprs: ExistsExpr[],
-  ): BinaryExpr | ExistsExpr {
+  ): BinaryExpr | ExistsExpr | undefined {
     // For now, if we have multiple EXISTS expressions, we'll just use the first one
     // TODO: Support combining multiple EXISTS expressions with AND logic
     // This requires extending the AST to support boolean composition (AND/OR)
@@ -608,8 +884,11 @@ export class OrmModelBuilderImpl<
     if (mainWhere) {
       return mainWhere;
     }
-    // Fallback: return first EXISTS expression
-    return existsExprs[0];
+    // Fallback: return first EXISTS expression if available
+    if (existsExprs.length > 0) {
+      return existsExprs[0];
+    }
+    return undefined;
   }
 
   findFirst(options?: BuildOptions): Plan<Row> {

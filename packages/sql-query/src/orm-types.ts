@@ -89,6 +89,39 @@ export type OrmWhereProperty<
     : never;
 };
 
+// Include accessor - exposes relations with include methods
+export type OrmIncludeAccessor<
+  TContract extends SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }>,
+  ModelName extends string,
+  Row,
+> = TContract['relations'][ModelName] extends Record<string, { to: infer To }>
+  ? To extends string
+    ? {
+        readonly [K in keyof TContract['relations'][ModelName]]: TContract['relations'][ModelName][K] extends {
+          to: infer ChildModelName;
+        }
+          ? ChildModelName extends string
+            ? (
+                child: (
+                  child: import('./orm-include-child').OrmIncludeChildBuilder<
+                    TContract,
+                    CodecTypes,
+                    ChildModelName
+                  >,
+                ) => import('./orm-include-child').OrmIncludeChildBuilder<
+                  TContract,
+                  CodecTypes,
+                  ChildModelName,
+                  unknown
+                >,
+              ) => OrmModelBuilder<TContract, CodecTypes, ModelName, Row>
+            : never
+          : never;
+      }
+    : never
+  : never;
+
 export interface OrmModelBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
@@ -96,6 +129,7 @@ export interface OrmModelBuilder<
   Row = unknown,
 > {
   where: OrmWhereProperty<TContract, CodecTypes, ModelName, Row>;
+  include: OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>;
   orderBy(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => OrderBuilder,
   ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
