@@ -106,6 +106,7 @@ createRuntime({
 - Enum scalars autogenerate core/enum with allowed variants
 - Column nullability in contract enforces null passthrough before decoding
 - For JSON projections originating from SQL functions (json_agg), lanes may include annotations.projectionTypes to instruct nested decoding
+- **includeMany special handling**: The SQL DSL's `includeMany` feature marks include aliases in `meta.projection` with the special marker `include:alias` (e.g., `{ posts: 'include:posts' }`). The runtime detects this marker and parses JSON arrays from include aliases, converting `NULL` to empty arrays `[]` for consistency. Include aliases are excluded from codec assignments since they are JSON arrays, not scalar values.
 
 ### Lane hints
 

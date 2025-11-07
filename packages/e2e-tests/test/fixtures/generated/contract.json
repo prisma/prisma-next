@@ -2,8 +2,8 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:4768be240743140e08d53bd1e8ae733cfc6adc6e8607a305320bd1ea45222bfe",
-  "profileHash": "sha256:28ccf0c9c2899807cc8791c378d6bd821b9d3d3996443984949d4f6ce2b3728d",
+  "coreHash": "sha256:ed815971b72345ce75f9c02c783dff4fe8bf13f1ccf2842bb15f317bec4940dd",
+  "profileHash": "sha256:68910bb2d84a7097a239982d21995ededbf540f12044b0da051b272ce9b32b80",
   "models": {
     "Comment": {
       "fields": {
@@ -74,6 +74,9 @@
           "id": {
             "type": "pg/int4@1"
           },
+          "published": {
+            "type": "pg/bool@1"
+          },
           "title": {
             "type": "pg/text@1"
           },
@@ -98,6 +101,12 @@
           "columns": ["id"]
         }
       }
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "jsonAgg": true,
+      "lateral": true
     }
   },
   "extensions": {

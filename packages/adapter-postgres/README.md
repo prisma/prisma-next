@@ -16,7 +16,8 @@ Provide PostgreSQL-specific adapter implementation, codecs, and capabilities. En
 
 - **Adapter Implementation**: Implement `Adapter` SPI for PostgreSQL
   - Lower SQL ASTs to PostgreSQL dialect SQL
-  - Advertise PostgreSQL capabilities
+  - Render `includeMany` as `LEFT JOIN LATERAL` with `json_agg` for nested array includes
+  - Advertise PostgreSQL capabilities (`lateral`, `jsonAgg`)
   - Normalize PostgreSQL EXPLAIN output
   - Map PostgreSQL errors to `RuntimeError` envelope
 - **Codec Definitions**: Define PostgreSQL codecs for type conversion
@@ -74,7 +75,8 @@ flowchart TD
 - Main adapter implementation
 - Lowers SQL ASTs to PostgreSQL SQL
 - Renders joins (INNER, LEFT, RIGHT, FULL) with ON conditions
-- Advertises PostgreSQL capabilities
+- Renders `includeMany` as `LEFT JOIN LATERAL` with `json_agg` for nested array includes
+- Advertises PostgreSQL capabilities (`lateral`, `jsonAgg`)
 - Maps PostgreSQL errors to `RuntimeError`
 
 ### Codecs (`codecs.ts`)
@@ -127,6 +129,31 @@ const runtime = createRuntime({
   adapter: createPostgresAdapter(),
   driver: postgresDriver,
 });
+```
+
+## includeMany Support
+
+The adapter supports `includeMany` for nested array includes using PostgreSQL's `LATERAL` joins and `json_agg`:
+
+**Lowering Strategy:**
+- Renders `includeMany` as `LEFT JOIN LATERAL` with a subquery that uses `json_agg(json_build_object(...))` to aggregate child rows into a JSON array
+- The ON condition from the include is moved into the WHERE clause of the lateral subquery
+- When both `ORDER BY` and `LIMIT` are present, wraps the query in an inner SELECT that projects individual columns with aliases, then uses `json_agg(row_to_json(sub.*))` on the result
+- Uses different aliases for the table (`{alias}_lateral`) and column (`{alias}`) to avoid ambiguity
+
+**Capabilities Required:**
+- `lateral: true` - Enables LATERAL join support
+- `jsonAgg: true` - Enables `json_agg` function support
+
+**Example SQL Output:**
+```sql
+SELECT "user"."id" AS "id", "posts_lateral"."posts" AS "posts"
+FROM "user"
+LEFT JOIN LATERAL (
+  SELECT json_agg(json_build_object('id', "post"."id", 'title', "post"."title")) AS "posts"
+  FROM "post"
+  WHERE "user"."id" = "post"."userId"
+) AS "posts_lateral" ON true
 ```
 
 ## Exports

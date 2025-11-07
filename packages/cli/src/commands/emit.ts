@@ -72,15 +72,21 @@ export function createEmitCommand(): Command {
           writeFileSync(contractJsonPath, JSON.stringify(contractJsonWithMeta, null, 2), 'utf-8');
           writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
 
+          // eslint-disable-next-line no-undef
           console.log(`✓ Emitted contract.json to ${contractJsonPath}`);
+          // eslint-disable-next-line no-undef
           console.log(`✓ Emitted contract.d.ts to ${contractDtsPath}`);
+          // eslint-disable-next-line no-undef
           console.log(`  coreHash: ${result.coreHash}`);
           if (result.profileHash) {
+            // eslint-disable-next-line no-undef
             console.log(`  profileHash: ${result.profileHash}`);
           }
         } catch (error) {
           if (error instanceof Error) {
+            // eslint-disable-next-line no-undef
             console.error(`Error: ${error.message}`);
+            // eslint-disable-next-line no-undef
             process.exit(1);
           }
           throw error;

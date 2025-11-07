@@ -68,6 +68,7 @@ flowchart TD
 - Compiles to Plans with AST, SQL, and metadata
 - Supports projections, filters, joins, ordering, limits
 - **Nested Projection Shaping**: Express nested object literals in `.select()` for compile-time type inference, while runtime produces flat SQL with flattened aliases (e.g., `post.title` → `post_title`)
+- **Nested Array Includes (`includeMany`)**: Express 1:N relationships that return one row per parent with a nested array field for children, built in a single statement using `LATERAL` + `json_agg` when supported. Requires both `lateral` and `jsonAgg` capabilities to be `true` in the contract.
 - Join methods: `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`
 - Join ON conditions use `on.eqCol(left, right)` callback pattern
 - Self-joins are not supported in MVP
@@ -188,6 +189,40 @@ const plan = sql()
 // ResultType<typeof plan> infers: { name: string, post: { title: string, content: string } }
 // Runtime returns flat rows with flattened aliases: { name: string, post_title: string, post_content: string }
 ```
+
+### SQL DSL with includeMany
+
+```typescript
+import { sql, schema } from '@prisma-next/sql-query/sql';
+import contract from './contract.json';
+
+const t = schema(contract);
+
+// includeMany returns one row per parent with nested array of children
+const plan = sql()
+  .from(t.user)
+  .includeMany(
+    t.post,
+    (on) => on.eqCol(t.user.id, t.post.userId),
+    (child) => child
+      .select({ id: t.post.id, title: t.post.title })
+      .where(t.post.published.eq(true))
+      .orderBy(t.post.createdAt.desc())
+      .limit(10),
+    { alias: 'posts' }
+  )
+  .select({
+    id: t.user.id,
+    name: t.user.name,
+    posts: true,  // Boolean true references the include alias
+  })
+  .build();
+
+// ResultType<typeof plan> infers: { id: number; name: string; posts: Array<{ id: number; title: string }> }
+// Runtime returns: { id: 1, name: "Alice", posts: [{ id: 1, title: "Post 1" }, ...] }
+```
+
+**Note**: `includeMany` is capability-gated and requires both `lateral: true` and `jsonAgg: true` in the contract's capabilities. It's a separate feature from nested projection shaping (which flattens nested objects into flat rows).
 
 ### Contract Validation
 

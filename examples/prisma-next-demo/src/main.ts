@@ -2,6 +2,7 @@ import { closeRuntime } from './prisma/runtime';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
+import { getUsersWithPosts } from './queries/get-users-with-posts';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
@@ -30,8 +31,12 @@ const [cmd, ...args] = argv;
       const userId = Number.parseInt(userIdStr, 10);
       const posts = await getUserPosts(userId);
       console.log(JSON.stringify(posts, null, 2));
+    } else if (cmd === 'users-with-posts') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const users = await getUsersWithPosts(limit);
+      console.log(JSON.stringify(users, null, 2));
     } else {
-      console.log('Usage: pnpm start -- [users [limit] | user <userId> | posts <userId>]');
+      console.log('Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | users-with-posts [limit]]');
       process.exit(1);
     }
   } catch (error) {

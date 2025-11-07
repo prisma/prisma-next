@@ -296,12 +296,14 @@ class ModelDelegate {
     where: Record<string, unknown>;
     data: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
+    void _args;
     throw this.unsupportedError('update() mutations are not supported in MVP compatibility layer');
   }
 
   async delete(_args: {
     where: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
+    void _args;
     throw this.unsupportedError('delete() mutations are not supported in MVP compatibility layer');
   }
 

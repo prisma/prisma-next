@@ -67,6 +67,63 @@ export function decodeRow(
   for (const alias of aliases) {
     const wireValue = row[alias];
 
+    // Check if this is an include alias (marked with "include:alias" in meta.projection)
+    const projection = plan.meta.projection;
+    const projectionValue = projection && typeof projection === 'object' && !Array.isArray(projection)
+      ? (projection as Record<string, string>)[alias]
+      : undefined;
+
+    if (typeof projectionValue === 'string' && projectionValue.startsWith('include:')) {
+      // This is an include alias - parse JSON array
+      if (wireValue === null || wireValue === undefined) {
+        decoded[alias] = [];
+        continue;
+      }
+
+      // Parse JSON array from wire value
+      try {
+        let parsed: unknown;
+        if (typeof wireValue === 'string') {
+          parsed = JSON.parse(wireValue);
+        } else if (Array.isArray(wireValue)) {
+          // Already an array (driver may have parsed it)
+          parsed = wireValue;
+        } else {
+          // Unexpected type - try to parse as JSON string
+          parsed = JSON.parse(String(wireValue));
+        }
+
+        // Ensure it's an array
+        if (!Array.isArray(parsed)) {
+          throw new Error(`Expected array for include alias '${alias}', got ${typeof parsed}`);
+        }
+
+        decoded[alias] = parsed;
+      } catch (error) {
+        // Wrap error in RUNTIME.DECODE_FAILED envelope
+        const decodeError = new Error(
+          `Failed to parse JSON array for include alias '${alias}': ${error instanceof Error ? error.message : String(error)}`,
+        ) as Error & {
+          code: string;
+          category: string;
+          severity: string;
+          details?: Record<string, unknown>;
+        };
+        decodeError.code = 'RUNTIME.DECODE_FAILED';
+        decodeError.category = 'RUNTIME';
+        decodeError.severity = 'error';
+        decodeError.details = {
+          alias,
+          wirePreview:
+            typeof wireValue === 'string' && wireValue.length > 100
+              ? wireValue.substring(0, 100) + '...'
+              : String(wireValue).substring(0, 100),
+        };
+        throw decodeError;
+      }
+      continue;
+    }
+
     // Null short-circuit: pass through without decoding
     if (wireValue === null || wireValue === undefined) {
       decoded[alias] = wireValue;

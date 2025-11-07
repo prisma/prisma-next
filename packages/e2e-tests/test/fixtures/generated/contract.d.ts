@@ -28,6 +28,7 @@ export type Contract = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
           readonly userId: { readonly type: 'pg/int4@1'; readonly nullable: false };
           readonly title: { readonly type: 'pg/text@1'; readonly nullable: false };
+          readonly published: { readonly type: 'pg/bool@1'; readonly nullable: false };
         };
         primaryKey: { readonly columns: readonly ['id'] };
       };
