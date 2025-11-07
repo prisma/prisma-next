@@ -2,6 +2,7 @@ import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
+import type { ResultType } from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -117,7 +118,8 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
           },
         });
 
-      const rows = await executePlanAndCollect(runtime, insertPlan);
+      type Row = ResultType<typeof insertPlan>;
+      const rows: Row[] = await executePlanAndCollect(runtime, insertPlan);
 
       expect(rows.length).toBe(1);
       expect(rows[0]).toMatchObject({
@@ -187,7 +189,8 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
           },
         });
 
-      const rows = await executePlanAndCollect(runtime, updatePlan);
+      type Row = ResultType<typeof updatePlan>;
+      const rows: Row[] = await executePlanAndCollect(runtime, updatePlan);
 
       expect(rows.length).toBe(1);
       expect(rows[0]).toMatchObject({
@@ -256,7 +259,8 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
           },
         });
 
-      const rows = await executePlanAndCollect(runtime, deletePlan);
+      type Row = ResultType<typeof deletePlan>;
+      const rows: Row[] = await executePlanAndCollect(runtime, deletePlan);
 
       expect(rows.length).toBe(1);
       expect(rows[0]).toMatchObject({

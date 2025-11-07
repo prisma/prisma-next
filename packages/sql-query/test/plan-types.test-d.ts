@@ -722,3 +722,110 @@ test('nested projection with joins infers nested Row type', () => {
 
   expectTypeOf(_plan).toExtend<Plan<Row>>();
 });
+
+test('insert without returning() has unknown Row type', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const tables = schema<Contract, CodecTypes>(contract).tables;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
+
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
+    .insert(userTable, {
+      email: { kind: 'param-placeholder', name: 'email' },
+    })
+    .build({ params: { email: 'test@example.com' } });
+
+  // Without returning(), Row type should be unknown
+  expectTypeOf<ResultType<typeof _plan>>().toEqualTypeOf<unknown>();
+});
+
+test('insert with returning() infers Row type', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const tables = schema<Contract, CodecTypes>(contract).tables;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
+
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
+    .insert(userTable, {
+      email: { kind: 'param-placeholder', name: 'email' },
+    })
+    .returning(idColumn, emailColumn)
+    .build({ params: { email: 'test@example.com' } });
+
+  type Row = ResultType<typeof _plan>;
+
+  // Row type should be inferred from returning() columns
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+  // Verify the overall structure
+  expectTypeOf<Row>().toExtend<{ id: number; email: string }>();
+
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
+});
+
+test('update with returning() infers Row type', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const tables = schema<Contract, CodecTypes>(contract).tables;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
+
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
+    .update(userTable, {
+      email: { kind: 'param-placeholder', name: 'newEmail' },
+    })
+    .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
+    .returning(idColumn, emailColumn)
+    .build({ params: { newEmail: 'updated@example.com', userId: 1 } });
+
+  type Row = ResultType<typeof _plan>;
+
+  // Row type should be inferred from returning() columns
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+  // Verify the overall structure
+  expectTypeOf<Row>().toExtend<{ id: number; email: string }>();
+
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
+});
+
+test('delete with returning() infers Row type', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const tables = schema<Contract, CodecTypes>(contract).tables;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
+
+  const _plan = sql<Contract, CodecTypes>({ contract, adapter })
+    .delete(userTable)
+    .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
+    .returning(idColumn, emailColumn)
+    .build({ params: { userId: 1 } });
+
+  type Row = ResultType<typeof _plan>;
+
+  // Row type should be inferred from returning() columns
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+  // Verify the overall structure
+  expectTypeOf<Row>().toExtend<{ id: number; email: string }>();
+
+  expectTypeOf(_plan).toExtend<Plan<Row>>();
+});

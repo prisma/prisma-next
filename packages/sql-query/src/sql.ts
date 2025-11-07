@@ -10,6 +10,7 @@ import type {
   DeleteAst,
   Direction,
   InferNestedProjectionRow,
+  InferReturningRow,
   IncludeRef,
   InsertAst,
   JoinOnBuilder,
@@ -1190,33 +1191,43 @@ export type SelectBuilder<
 export interface InsertBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
 > {
-  returning(...columns: ColumnBuilder[]): InsertBuilder<TContract, CodecTypes>;
-  build(options?: BuildOptions): Plan<unknown>;
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
 }
 
 export interface UpdateBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
 > {
-  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes>;
-  returning(...columns: ColumnBuilder[]): UpdateBuilder<TContract, CodecTypes>;
-  build(options?: BuildOptions): Plan<unknown>;
+  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row>;
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
 }
 
 export interface DeleteBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
 > {
-  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes>;
-  returning(...columns: ColumnBuilder[]): DeleteBuilder<TContract, CodecTypes>;
-  build(options?: BuildOptions): Plan<unknown>;
+  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row>;
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
 }
 
 class InsertBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> implements InsertBuilder<TContract, CodecTypes>
+  Row = unknown,
+> implements InsertBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
   private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
@@ -1237,8 +1248,10 @@ class InsertBuilderImpl<
     this.values = values;
   }
 
-  returning(...columns: ColumnBuilder[]): InsertBuilder<TContract, CodecTypes> {
-    const builder = new InsertBuilderImpl<TContract, CodecTypes>(
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    const builder = new InsertBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -1251,7 +1264,7 @@ class InsertBuilderImpl<
     return builder;
   }
 
-  build(options?: BuildOptions): Plan<unknown> {
+  build(options?: BuildOptions): Plan<Row> {
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
     const paramDescriptors: ParamDescriptor[] = [];
     const paramValues: unknown[] = [];
@@ -1329,7 +1342,7 @@ class InsertBuilderImpl<
       ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
     });
 
-    const plan: Plan<unknown> = Object.freeze({
+    const plan: Plan<Row> = Object.freeze({
       ast,
       sql: loweredBody.sql,
       params: loweredBody.params ?? paramValues,
@@ -1351,7 +1364,8 @@ class InsertBuilderImpl<
 class UpdateBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> implements UpdateBuilder<TContract, CodecTypes>
+  Row = unknown,
+> implements UpdateBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
   private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
@@ -1373,8 +1387,8 @@ class UpdateBuilderImpl<
     this.set = set;
   }
 
-  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes> {
-    const builder = new UpdateBuilderImpl<TContract, CodecTypes>(
+  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row> {
+    const builder = new UpdateBuilderImpl<TContract, CodecTypes, Row>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -1388,8 +1402,10 @@ class UpdateBuilderImpl<
     return builder;
   }
 
-  returning(...columns: ColumnBuilder[]): UpdateBuilder<TContract, CodecTypes> {
-    const builder = new UpdateBuilderImpl<TContract, CodecTypes>(
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    const builder = new UpdateBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -1405,7 +1421,7 @@ class UpdateBuilderImpl<
     return builder;
   }
 
-  build(options?: BuildOptions): Plan<unknown> {
+  build(options?: BuildOptions): Plan<Row> {
     if (!this.wherePredicate) {
       throw planInvalid('where() must be called before building an UPDATE query');
     }
@@ -1504,7 +1520,7 @@ class UpdateBuilderImpl<
       where: this.wherePredicate,
     });
 
-    const plan: Plan<unknown> = Object.freeze({
+    const plan: Plan<Row> = Object.freeze({
       ast,
       sql: loweredBody.sql,
       params: loweredBody.params ?? paramValues,
@@ -1581,7 +1597,8 @@ class UpdateBuilderImpl<
 class DeleteBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> implements DeleteBuilder<TContract, CodecTypes>
+  Row = unknown,
+> implements DeleteBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
   private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
@@ -1597,8 +1614,8 @@ class DeleteBuilderImpl<
     this.table = table;
   }
 
-  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes> {
-    const builder = new DeleteBuilderImpl<TContract, CodecTypes>(
+  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row> {
+    const builder = new DeleteBuilderImpl<TContract, CodecTypes, Row>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -1611,8 +1628,10 @@ class DeleteBuilderImpl<
     return builder;
   }
 
-  returning(...columns: ColumnBuilder[]): DeleteBuilder<TContract, CodecTypes> {
-    const builder = new DeleteBuilderImpl<TContract, CodecTypes>(
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    const builder = new DeleteBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -1627,7 +1646,7 @@ class DeleteBuilderImpl<
     return builder;
   }
 
-  build(options?: BuildOptions): Plan<unknown> {
+  build(options?: BuildOptions): Plan<Row> {
     if (!this.wherePredicate) {
       throw planInvalid('where() must be called before building a DELETE query');
     }
@@ -1690,7 +1709,7 @@ class DeleteBuilderImpl<
       where: this.wherePredicate,
     });
 
-    const plan: Plan<unknown> = Object.freeze({
+    const plan: Plan<Row> = Object.freeze({
       ast,
       sql: loweredBody.sql,
       params: loweredBody.params ?? paramValues,

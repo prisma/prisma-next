@@ -331,6 +331,22 @@ export type InferNestedProjectionRow<
 };
 
 /**
+ * Infers Row type from a tuple of ColumnBuilders used in returning() clause.
+ * Extracts column name and JsType from each ColumnBuilder and creates a Record.
+ */
+export type InferReturningRow<
+  Columns extends readonly ColumnBuilder[],
+> = Columns extends readonly [infer First, ...infer Rest]
+  ? First extends ColumnBuilder<infer Name, infer _Meta, infer JsType>
+    ? Name extends string
+      ? Rest extends readonly ColumnBuilder[]
+        ? { [K in Name]: JsType } & InferReturningRow<Rest>
+        : { [K in Name]: JsType }
+      : never
+    : never
+  : {};
+
+/**
  * Utility type to check if a contract has the required capabilities for includeMany.
  * Requires both `lateral` and `jsonAgg` to be `true` in the contract's capabilities for the target.
  * Capabilities are nested by target: `{ [target]: { lateral: true, jsonAgg: true } }`
