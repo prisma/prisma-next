@@ -6,7 +6,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["dist/**", "coverage/**", "node_modules/**", ".prisma/**", "**/*.d.ts"]
+    "ignore": [
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      ".prisma/**",
+      "**/*.d.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
