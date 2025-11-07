@@ -185,4 +185,3 @@ describe('sql-target-family-hook', () => {
     }).not.toThrow();
   });
 });
-

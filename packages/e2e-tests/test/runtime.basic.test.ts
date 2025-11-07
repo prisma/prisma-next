@@ -71,4 +71,3 @@ describe('end-to-end basic queries', { timeout: 30000 }, () => {
     );
   });
 });
-

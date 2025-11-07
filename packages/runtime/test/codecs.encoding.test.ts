@@ -222,4 +222,3 @@ describe('Param Encoding Error Handling', () => {
     expect(encoded).toEqual([]);
   });
 });
-

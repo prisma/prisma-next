@@ -415,4 +415,3 @@ describe('Row Decoding', () => {
     expect(() => decodeRow(row, plan, registry)).toThrow();
   });
 });
-

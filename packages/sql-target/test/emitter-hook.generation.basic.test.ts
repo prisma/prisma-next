@@ -419,4 +419,3 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain("readonly id: { readonly column: 'id' }");
   });
 });
-

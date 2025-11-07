@@ -268,4 +268,3 @@ describe('Runtime class', () => {
     });
   });
 });
-

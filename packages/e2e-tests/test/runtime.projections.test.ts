@@ -359,4 +359,3 @@ describe('end-to-end nested projection queries', { timeout: 30000 }, () => {
     );
   });
 });
-

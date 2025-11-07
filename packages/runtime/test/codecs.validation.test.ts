@@ -182,4 +182,3 @@ describe('Codec Registry Validation', () => {
     expect(() => validateCodecRegistryCompleteness(emptyRegistry, contract)).not.toThrow();
   });
 });
-

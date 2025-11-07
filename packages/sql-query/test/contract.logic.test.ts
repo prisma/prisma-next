@@ -241,4 +241,3 @@ describe('validateContract logic validation', () => {
     expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
   });
 });
-

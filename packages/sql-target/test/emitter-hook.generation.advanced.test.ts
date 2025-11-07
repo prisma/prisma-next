@@ -302,4 +302,3 @@ describe('sql-target-family-hook', () => {
     expect(imports.length).toBe(0);
   });
 });
-

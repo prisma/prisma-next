@@ -451,4 +451,3 @@ describe('sql-target-family-hook', () => {
     }).toThrow('column count');
   });
 });
-

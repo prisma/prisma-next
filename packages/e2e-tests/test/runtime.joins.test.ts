@@ -399,4 +399,3 @@ describe('end-to-end JOIN queries', { timeout: 30000 }, () => {
     );
   });
 });
-

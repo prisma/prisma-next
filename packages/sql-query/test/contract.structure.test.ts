@@ -114,4 +114,3 @@ describe('validateContract structure validation', () => {
     expect(result.capabilities).toEqual({ feature: { enabled: true } });
   });
 });
-

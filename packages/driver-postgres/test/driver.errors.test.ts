@@ -215,4 +215,3 @@ describe('@prisma-next/driver-postgres', () => {
     expect(rows.length).toBeGreaterThan(0);
   });
 });
-
