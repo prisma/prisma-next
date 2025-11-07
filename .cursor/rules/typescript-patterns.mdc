@@ -563,9 +563,41 @@ const plan = sql
 
 See `.cursor/rules/query-patterns.mdc` for full details on query patterns, type inference, and common usage patterns.
 
+## Type Safety is Non-Negotiable
+
+**CRITICAL RULE**: Never disable type checking with `@ts-expect-error` or type assertions to work around broken types. Type safety is one of the most important characteristics of this codebase, especially for the ORM implementation. If types aren't working, you haven't done your job - fix the type definitions, not the usage.
+
+**❌ WRONG: Suppressing type errors instead of fixing them**
+
+```typescript
+// @ts-expect-error - Plan type is complex, runtime works correctly
+const result = await runtime.execute(plan);
+```
+
+**✅ CORRECT: Fix the type by properly typing the plan**
+
+```typescript
+import type { Plan } from '@prisma-next/contract/types';
+
+const plan = orm.user().create({ email }) as Plan<number>;
+const result = runtime.execute(plan);
+```
+
+**Why this matters:**
+- Type safety is a core feature that users rely on
+- Suppressing errors hides real type problems
+- Broken types indicate incomplete implementation
+- Users deserve full type safety, not workarounds
+
+**When type inference fails:**
+1. Check if the return type is correctly defined in the interface
+2. Use explicit type assertions (`as Plan<number>`) if the type is correct but inference fails
+3. Fix the type definitions if they're incorrect
+4. Never use `@ts-expect-error` to silence type errors in production code
+
 ## Type Assertions in Test Files
 
-**Pattern**: Use `@ts-expect-error` comments for intentional type assertions in test files when working with dynamic proxy objects or complex type scenarios.
+**Pattern**: Use `@ts-expect-error` comments for intentional type assertions in test files when working with dynamic proxy objects or complex type scenarios. This is ONLY acceptable in test files, never in production code.
 
 **❌ WRONG: Adding type assertions without explanation**
 
@@ -593,10 +625,12 @@ const builderWithInclude: unknown = (
 ```
 
 **When to use `@ts-expect-error`:**
-- When working with dynamic proxy objects (e.g., ORM model registry)
-- When intentionally using type assertions for test purposes
-- When TypeScript can't infer complex dynamic types correctly
+- When working with dynamic proxy objects (e.g., ORM model registry) in test files only
+- When intentionally testing invalid inputs or error cases
+- When TypeScript can't infer complex dynamic types correctly in test contexts
 - Always include a comment explaining why the assertion is needed
+
+**CRITICAL: Never use `@ts-expect-error` to suppress type errors in production code or to work around broken types. Type safety is a core feature of this codebase. If types aren't working, fix the type definitions, not the usage.**
 
 **Handling Implicit `any` in Test Callbacks:**
 
