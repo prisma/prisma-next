@@ -1,7 +1,7 @@
-import { param } from '@prisma-next/sql-query/param';
 import type { Plan, ResultType } from '@prisma-next/contract/types';
+import { param } from '@prisma-next/sql-query/param';
 import { schema, sql } from '../src/prisma/query';
-import { getRuntime, closeRuntime } from '../src/prisma/runtime';
+import { closeRuntime, getRuntime } from '../src/prisma/runtime';
 
 async function collectRows<T>(plan: Plan<T>): Promise<ResultType<T>[]> {
   const runtime = getRuntime();

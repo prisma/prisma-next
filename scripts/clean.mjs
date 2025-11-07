@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 import { rm } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const repoRoot = join(__dirname, '..');
+const _repoRoot = join(__dirname, '..');
 
 const outputDirs = ['dist', 'coverage', '.tmp-output'];
 

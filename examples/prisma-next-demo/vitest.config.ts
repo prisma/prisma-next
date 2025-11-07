@@ -1,6 +1,6 @@
+import { timeouts } from '@prisma-next/test-utils';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
-import { timeouts } from '@prisma-next/test-utils';
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
