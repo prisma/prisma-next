@@ -46,25 +46,33 @@ function extractEstimatedRows(rows: ReadonlyArray<Record<string, unknown>>): num
   return undefined;
 }
 
+type ExplainNode = {
+  Plan?: unknown;
+  Plans?: unknown[];
+  'Plan Rows'?: number;
+  [key: string]: unknown;
+};
+
 function findPlanRows(node: unknown): number | undefined {
   if (!node || typeof node !== 'object') {
     return undefined;
   }
 
-  const planRows = (node as Record<string, unknown>)['Plan Rows'];
+  const explainNode = node as ExplainNode;
+  const planRows = explainNode['Plan Rows'];
   if (typeof planRows === 'number') {
     return planRows;
   }
 
-  if ('Plan' in (node as Record<string, unknown>)) {
-    const nested = findPlanRows((node as Record<string, unknown>).Plan);
+  if ('Plan' in explainNode && explainNode.Plan !== undefined) {
+    const nested = findPlanRows(explainNode.Plan);
     if (nested !== undefined) {
       return nested;
     }
   }
 
-  if (Array.isArray((node as Record<string, unknown>).Plans)) {
-    for (const child of (node as Record<string, unknown>).Plans as unknown[]) {
+  if (Array.isArray(explainNode.Plans)) {
+    for (const child of explainNode.Plans) {
       const nested = findPlanRows(child);
       if (nested !== undefined) {
         return nested;
@@ -154,10 +162,8 @@ export function budgets(options?: BudgetsOptions): Plugin {
 
     // Check if annotations provide limit hint
     // MVP: no SQL parsing, so rely on lane-provided hints only
-    return (
-      typeof plan.meta.annotations?.limit === 'number' ||
-      typeof plan.meta.annotations?.LIMIT === 'number'
-    );
+    const annotations = plan.meta.annotations as { limit?: number; LIMIT?: number } | undefined;
+    return typeof annotations?.limit === 'number' || typeof annotations?.LIMIT === 'number';
   }
 
   return Object.freeze({

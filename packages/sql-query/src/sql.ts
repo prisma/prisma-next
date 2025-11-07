@@ -379,7 +379,7 @@ class SelectBuilderImpl<
       throw planInvalid('includeMany requires lateral and jsonAgg capabilities');
     }
     const targetCapabilities = capabilities[target];
-    if (targetCapabilities['lateral'] !== true || targetCapabilities['jsonAgg'] !== true) {
+    if (capabilities[target]['lateral'] !== true || targetCapabilities['jsonAgg'] !== true) {
       throw planInvalid('includeMany requires lateral and jsonAgg capabilities to be true');
     }
 

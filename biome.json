@@ -6,7 +6,14 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["dist/**", "coverage/**", "node_modules/**", ".prisma/**", "**/*.d.ts", "**/contract.json"]
+    "ignore": [
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      ".prisma/**",
+      "**/*.d.ts",
+      "**/contract.json"
+    ]
   },
   "formatter": {
     "enabled": true,
