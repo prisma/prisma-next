@@ -395,7 +395,7 @@ describe('validateContract', () => {
       storage: {
         tables: {
           User: {
-            ...validContract.storage.tables.User,
+            ...validContract.storage.tables['User'],
             primaryKey: { columns: ['nonExistent'] },
           },
         },
@@ -432,7 +432,7 @@ describe('validateContract', () => {
     expectTypeOf(result).toMatchTypeOf<SqlContract<SqlStorage>>();
     // Verify structure is validated at runtime
     expect(result.storage.tables).toHaveProperty('User');
-    expect(result.storage.tables.User?.columns).toHaveProperty('id');
+    expect(result.storage.tables['User']?.columns).toHaveProperty('id');
   });
 
   it('handles missing relations field', () => {

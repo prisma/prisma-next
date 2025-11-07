@@ -98,12 +98,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user!;
+    const userTable = tables['user']!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns.id!, email: userColumns.email! })
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
       .build();
 
     // Unbounded SELECT should be blocked pre-exec (estimated 10_000 > maxRows 50)
@@ -129,12 +129,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user!;
+    const userTable = tables['user']!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns.id!, email: userColumns.email! })
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(5)
       .build();
 
@@ -157,13 +157,13 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user!;
+    const userTable = tables['user']!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     // Use LIMIT that's within heuristic but exceeds streaming budget
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns.id!, email: userColumns.email! })
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(100)
       .build();
 
@@ -241,12 +241,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user!;
+    const userTable = tables['user']!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns.id!, email: userColumns.email! })
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(1)
       .build();
 
@@ -277,12 +277,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user!;
+    const userTable = tables['user']!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns.id!, email: userColumns.email! })
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(1)
       .build();
 
@@ -317,12 +317,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user!;
+    const userTable = tables['user']!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns.id!, email: userColumns.email! })
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(1)
       .build();
 
@@ -358,12 +358,12 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
     });
 
     const tables = schema(fixtureContract).tables;
-    const userTable = tables.user!;
+    const userTable = tables['user']!;
     const userColumns = userTable.columns;
     const builder = sql({ contract: fixtureContract, adapter });
     const plan = builder
       .from(userTable)
-      .select({ id: userColumns.id!, email: userColumns.email! })
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
       .limit(1)
       .build();
 

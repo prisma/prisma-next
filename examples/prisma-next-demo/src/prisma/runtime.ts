@@ -11,7 +11,7 @@ let client: Client | undefined;
 
 export function getRuntime() {
   if (!runtime) {
-    const connectionString = process.env.DATABASE_URL;
+    const connectionString = process.env['DATABASE_URL'];
     if (!connectionString) {
       throw new Error('DATABASE_URL environment variable is required');
     }

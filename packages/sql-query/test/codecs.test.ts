@@ -96,12 +96,12 @@ describe('DSL Lane Codec Type Stamping', () => {
     expect(plan.meta.projectionTypes).toBeDefined();
     const projectionTypes = plan.meta.projectionTypes!;
 
-    expect(projectionTypes.userId).toBeDefined();
-    expect(projectionTypes.userEmail).toBeDefined();
+    expect(projectionTypes['userId']).toBeDefined();
+    expect(projectionTypes['userEmail']).toBeDefined();
 
     // Verify types match the column types from contract
-    expect(typeof projectionTypes.userId).toBe('string');
-    expect(typeof projectionTypes.userEmail).toBe('string');
+    expect(typeof projectionTypes['userId']).toBe('string');
+    expect(typeof projectionTypes['userEmail']).toBe('string');
   });
 
   it('includes nullable in paramDescriptors', () => {
@@ -199,9 +199,9 @@ describe('DSL Lane Codec Type Stamping', () => {
       .build();
 
     const projectionTypes = plan.meta.projectionTypes!;
-    expect(projectionTypes.id).toBeDefined();
-    expect(projectionTypes.email).toBeDefined();
-    expect(projectionTypes.createdAt).toBeDefined();
+    expect(projectionTypes['id']).toBeDefined();
+    expect(projectionTypes['email']).toBeDefined();
+    expect(projectionTypes['createdAt']).toBeDefined();
   });
 
   it('maintains projectionTypes order matching projection', () => {

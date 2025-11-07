@@ -101,7 +101,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           });
 
           const tables = schema<Contract, CodecTypes>(contract).tables;
-          const userTable = tables.User;
+          const userTable = tables['User'];
           if (!userTable) {
             throw new Error('User table not found');
           }
@@ -200,7 +200,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           });
 
           const tables = schema<Contract, CodecTypes>(contract).tables;
-          const userTable = tables.User;
+          const userTable = tables['User'];
           if (!userTable) {
             throw new Error('User table not found');
           }
@@ -297,7 +297,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           });
 
           const tables = schema<Contract, CodecTypes>(contract).tables;
-          const userTable = tables.User;
+          const userTable = tables['User'];
           if (!userTable) {
             throw new Error('User table not found');
           }

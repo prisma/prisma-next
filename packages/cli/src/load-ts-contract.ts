@@ -151,6 +151,9 @@ export async function loadContractFromTs(
     }
 
     const bundleContent = result.outputFiles[0]?.text;
+    if (bundleContent === undefined) {
+      throw new Error('Bundle content is undefined');
+    }
     writeFileSync(tempFile, bundleContent, 'utf-8');
 
     const module = (await import(`file://${tempFile}`)) as {

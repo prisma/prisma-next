@@ -88,12 +88,12 @@ describe('emit integration', () => {
     type CodecTypes = Record<string, { input: unknown; output: unknown }>;
 
     const tables = schema<Contract, CodecTypes>(validatedContract).tables;
-    const userTable = tables.user;
+    const userTable = tables['user'];
     if (!userTable) {
       throw new Error('User table not found');
     }
-    const idColumn = userTable.columns.id;
-    const emailColumn = userTable.columns.email;
+    const idColumn = userTable.columns['id'];
+    const emailColumn = userTable.columns['email'];
     if (!idColumn || !emailColumn) {
       throw new Error('Columns not found');
     }
@@ -131,12 +131,12 @@ describe('emit integration', () => {
 
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    if (!contractJson1.extensions) {
-      contractJson1.extensions = {};
+    if (!contractJson1['extensions']) {
+      contractJson1['extensions'] = {};
     }
-    const extensions = contractJson1.extensions as Record<string, unknown>;
-    if (!extensions.pg) {
-      extensions.pg = {};
+    const extensions = contractJson1['extensions'] as Record<string, unknown>;
+    if (!extensions['pg']) {
+      extensions['pg'] = {};
     }
 
     const contract2 = contractJson1 as unknown as ContractIR;

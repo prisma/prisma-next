@@ -46,9 +46,9 @@ export async function stampMarker(options: StampMarkerOptions) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const connectionString = process.env.DATABASE_URL;
-  const coreHash = process.env.CONTRACT_CORE_HASH;
-  const profileHash = process.env.CONTRACT_PROFILE_HASH;
+  const connectionString = process.env['DATABASE_URL'];
+  const coreHash = process.env['CONTRACT_CORE_HASH'];
+  const profileHash = process.env['CONTRACT_PROFILE_HASH'];
 
   if (!connectionString || !coreHash || !profileHash) {
     console.error(

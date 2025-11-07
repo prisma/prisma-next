@@ -66,6 +66,10 @@ describe('codec() factory function', () => {
     expect(encoded).toBe('2024-01-15T10:30:00.000Z');
     expect(typeof encoded).toBe('string');
 
+    if (encoded === undefined) {
+      throw new Error('encoded should not be undefined');
+    }
+
     const decoded = dateCodec.decode(encoded);
     expect(decoded).toBeInstanceOf(Date);
     expect(decoded.getTime()).toBe(testDate.getTime());

@@ -15,7 +15,7 @@ let compatPrisma: CompatPrismaClient | undefined;
  */
 export async function getPrisma() {
   // Check USE_COMPAT env var
-  const useCompat = process.env.USE_COMPAT === 'true';
+  const useCompat = process.env['USE_COMPAT'] === 'true';
 
   if (useCompat) {
     // Use Prisma Next compatibility layer

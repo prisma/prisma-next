@@ -12,7 +12,7 @@ import contract from './contract.json' assert { type: 'json' };
 const contractData = validateContract<SqlContract>(contract);
 
 export async function stampMarker() {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = process.env['DATABASE_URL'];
   if (!connectionString) {
     throw new Error('DATABASE_URL environment variable is required');
   }

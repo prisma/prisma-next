@@ -85,7 +85,7 @@ class ModelDelegate {
           throw this.unsupportedError(`Unknown field '${field}' in where clause`);
         }
         // Access column via columns property to avoid conflicts with table properties
-        const columns = this.table.columns as Record<string, ColumnBuilder> | undefined;
+        const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
         const column = columns?.[field];
         if (
           !column ||
@@ -121,7 +121,7 @@ class ModelDelegate {
           if (!tableDef || !tableDef.columns[field]) {
             throw this.unsupportedError(`Unknown field '${field}' in select clause`);
           }
-          const columns = this.table.columns as Record<string, ColumnBuilder> | undefined;
+          const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
           const column = columns?.[field];
           if (
             !column ||
@@ -137,7 +137,7 @@ class ModelDelegate {
     } else {
       // Default: select all columns from contract definition
       const tableDef = this.contract.storage.tables[tableName];
-      const tableColumns = this.table.columns as Record<string, ColumnBuilder> | undefined;
+      const tableColumns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
       if (tableDef && tableColumns) {
         for (const columnName of Object.keys(tableDef.columns)) {
           // Access column via columns property to avoid conflicts with table properties like 'name'
@@ -186,7 +186,7 @@ class ModelDelegate {
       if (!tableDef || !tableDef.columns[field]) {
         throw this.unsupportedError(`Unknown field '${field}' in orderBy clause`);
       }
-      const columns = this.table.columns as Record<string, ColumnBuilder> | undefined;
+      const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
       const column = columns?.[field];
       if (
         !column ||

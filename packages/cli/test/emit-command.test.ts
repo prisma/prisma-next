@@ -80,8 +80,8 @@ describe('emit command', () => {
       string,
       unknown
     >;
-    expect(contractJson.targetFamily).toBe('sql');
-    expect(contractJson._generated).toBeDefined();
+    expect(contractJson['targetFamily']).toBe('sql');
+    expect(contractJson['_generated']).toBeDefined();
 
     const contractDts = readFileSync(contractDtsPath, 'utf-8');
     expect(contractDts).toContain('export type Contract');

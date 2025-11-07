@@ -48,7 +48,7 @@ beforeAll(async () => {
 
 describe('runtime execute integration', () => {
   it('streams rows and enforces marker verification', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
+    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -76,7 +76,7 @@ describe('runtime execute integration', () => {
           profileHash: contract.profileHash ?? contract.coreHash,
         });
 
-        await withClient(connectionString, async (client) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
           await client.query(
             'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
@@ -89,19 +89,19 @@ describe('runtime execute integration', () => {
           ]);
         });
 
-        const rowCount = await withClient(connectionString, async (client) => {
+        const rowCount = await withClient(connectionString, async (client: import('pg').Client) => {
           const result = await client.query('select count(*)::int as count from "user"');
           return result.rows[0]?.count as number;
         });
         expect(rowCount).toBe(1);
 
         const tables = schema(contract).tables;
-        const userTable = tables.user!;
+        const userTable = tables['user']!;
         const plan = sql({ contract, adapter })
-          .from(tables.user!)
+          .from(tables['user']!)
           .select({
-            id: userTable.columns.id!,
-            email: userTable.columns.email!,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
           })
           .limit(10)
           .build();
@@ -159,7 +159,7 @@ describe('runtime execute integration', () => {
   });
 
   it('infers correct types from query plans', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
+    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -187,7 +187,7 @@ describe('runtime execute integration', () => {
           profileHash: contract.profileHash ?? contract.coreHash,
         });
 
-        await withClient(connectionString, async (client) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
           await client.query(
             'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
@@ -205,15 +205,15 @@ describe('runtime execute integration', () => {
         });
 
         const tables = schema(contract).tables;
-        const userTable = tables.user!;
-        const postTable = tables.post!;
+        const userTable = tables['user']!;
+        const postTable = tables['post']!;
 
         const userPlan = sql({ contract, adapter })
           .from(userTable)
           .select({
-            id: userTable.columns.id!,
-            email: userTable.columns.email!,
-            createdAt: userTable.columns.createdAt!,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
+            createdAt: userTable.columns['createdAt']!,
           })
           .limit(10)
           .build();
@@ -222,12 +222,12 @@ describe('runtime execute integration', () => {
 
         const postPlan = sql({ contract, adapter })
           .from(postTable)
-          .where(postTable.columns.userId?.eq(param('userId')))
+          .where(postTable.columns['userId']!.eq(param('userId')))
           .select({
-            id: postTable.columns.id!,
-            title: postTable.columns.title!,
-            userId: postTable.columns.userId!,
-            createdAt: postTable.columns.createdAt!,
+            id: postTable.columns['id']!,
+            title: postTable.columns['title']!,
+            userId: postTable.columns['userId']!,
+            createdAt: postTable.columns['createdAt']!,
           })
           .build({ params: { userId: 1 } });
 
@@ -253,7 +253,7 @@ describe('runtime execute integration', () => {
   });
 
   it('enforces row budget on unbounded queries', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
+    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -281,7 +281,7 @@ describe('runtime execute integration', () => {
           profileHash: contract.profileHash ?? contract.coreHash,
         });
 
-        await withClient(connectionString, async (client) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
           await client.query(
             'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
@@ -294,12 +294,12 @@ describe('runtime execute integration', () => {
         });
 
         const tables = schema(contract).tables;
-        const userTable = tables.user!;
+        const userTable = tables['user']!;
         const unboundedPlan = sql({ contract, adapter })
-          .from(tables.user!)
+          .from(tables['user']!)
           .select({
-            id: userTable.columns.id!,
-            email: userTable.columns.email!,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
           })
           .build();
 
@@ -313,10 +313,10 @@ describe('runtime execute integration', () => {
         });
 
         const boundedPlan = sql({ contract, adapter })
-          .from(tables.user!)
+          .from(tables['user']!)
           .select({
-            id: userTable.columns.id!,
-            email: userTable.columns.email!,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
           })
           .limit(10)
           .build();
@@ -334,7 +334,7 @@ describe('runtime execute integration', () => {
   });
 
   it('enforces streaming row budget', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
+    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -362,7 +362,7 @@ describe('runtime execute integration', () => {
           profileHash: contract.profileHash ?? contract.coreHash,
         });
 
-        await withClient(connectionString, async (client) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
           await client.query(
             'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
@@ -375,12 +375,12 @@ describe('runtime execute integration', () => {
         });
 
         const tables = schema(contract).tables;
-        const userTable = tables.user!;
+        const userTable = tables['user']!;
         const plan = sql({ contract, adapter })
-          .from(tables.user!)
+          .from(tables['user']!)
           .select({
-            id: userTable.columns.id!,
-            email: userTable.columns.email!,
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
           })
           .limit(50)
           .build();

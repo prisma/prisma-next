@@ -26,12 +26,12 @@ import {
 const fixtureContract = loadContractFixture();
 const tables = schema(fixtureContract).tables;
 const adapter = createPostgresAdapter();
-const userTable = tables.user!;
+const userTable = tables['user']!;
 const userColumns = userTable.columns;
 const builder = sql({ contract: fixtureContract, adapter });
 const plan = builder
   .from(userTable)
-  .select({ id: userColumns.id!, email: userColumns.email! })
+  .select({ id: userColumns['id']!, email: userColumns['email']! })
   .limit(5)
   .build();
 

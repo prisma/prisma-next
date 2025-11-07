@@ -1318,21 +1318,534 @@ describe("end-to-end query with emitted contract", { timeout: 30000 }, () => {
             type Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(2);
-            expect(
-              rows.every((r: Row) => r.userEmail === "ada@example.com")
-            ).toBe(true);
-            expect(rows.some((r: Row) => r.postTitle === "Ada Post 1")).toBe(
-              true
+            expect(rows[0]).toHaveProperty('postId');
+            expect(rows[0]).toHaveProperty('postTitle');
+            expect(rows[0]).toHaveProperty('userId');
+            expect(rows[0]).toHaveProperty('userEmail');
+            expect(rows[0]!.userEmail).toBe('ada@example.com');
+            expect(rows[1]!.userEmail).toBe('ada@example.com');
+
+            expect(plan.meta.refs?.tables).toContain('user');
+            expect(plan.meta.refs?.tables).toContain('post');
+          } finally {
+            await runtime.close();
+          }
+        });
+      },
+      { acceleratePort: 54040, databasePort: 54041, shadowDatabasePort: 54042 },
+    );
+  });
+
+  it('RIGHT JOIN returns all posts including those without users', async () => {
+    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+            await c.query('drop table if exists "comment"');
+            await c.query('drop table if exists "post"');
+            await c.query('drop table if exists "user"');
+            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query(
+              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
             );
-            expect(rows.some((r: Row) => r.postTitle === "Ada Post 2")).toBe(
-              true
+            await c.query('insert into "user" (email) values ($1)', ['ada@example.com']);
+            await c.query('insert into "post" ("userId", title) values ($1, $2), ($3, $4)', [
+              1,
+              'First Post',
+              999,
+              'Orphan Post',
+            ]);
+          });
+
+          const adapter = createPostgresAdapter();
+          const runtime = createTestRuntimeFromClient(contract, client, adapter);
+          try {
+            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const user = tables.user!;
+            const post = tables.post!;
+            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              .from(user)
+              .rightJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+              .select({
+                userId: user.columns.id!,
+                email: user.columns.email!,
+                postId: post.columns.id!,
+                title: post.columns.title!,
+              })
+              .build();
+
+            const rows = await executePlanAndCollect(runtime, plan);
+            type Row = ResultType<typeof plan>;
+
+            expect(rows.length).toBe(2);
+            const adaPostRow = rows.find((r: Row) => r.email === 'ada@example.com');
+            const orphanPostRow = rows.find((r: Row) => r.title === 'Orphan Post');
+
+            expect(adaPostRow).toBeDefined();
+            expect(adaPostRow?.userId).not.toBeNull();
+            expect(adaPostRow?.email).toBe('ada@example.com');
+            expect(adaPostRow?.postId).not.toBeNull();
+            expect(adaPostRow?.title).toBe('First Post');
+
+            expect(orphanPostRow).toBeDefined();
+            expect(orphanPostRow?.userId).toBeNull();
+            expect(orphanPostRow?.email).toBeNull();
+            expect(orphanPostRow?.postId).not.toBeNull();
+            expect(orphanPostRow?.title).toBe('Orphan Post');
+
+            expect(plan.meta.refs?.tables).toContain('user');
+            expect(plan.meta.refs?.tables).toContain('post');
+          } finally {
+            await runtime.close();
+          }
+        });
+      },
+      { acceleratePort: 54060, databasePort: 54061, shadowDatabasePort: 54062 },
+    );
+  });
+
+  it('chained joins (user -> post -> comment) returns correct results', async () => {
+    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+            await c.query('drop table if exists "comment"');
+            await c.query('drop table if exists "post"');
+            await c.query('drop table if exists "user"');
+            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query(
+              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+            );
+            await c.query(
+              'create table "comment" (id serial primary key, "postId" int4 not null, content text not null)',
+            );
+            await c.query('insert into "user" (email) values ($1), ($2)', [
+              'ada@example.com',
+              'tess@example.com',
+            ]);
+            await c.query('insert into "post" ("userId", title) values ($1, $2), ($1, $3)', [
+              1,
+              'First Post',
+              'Second Post',
+            ]);
+            await c.query('insert into "comment" ("postId", content) values ($1, $2), ($1, $3)', [
+              1,
+              'First Comment',
+              'Second Comment',
+            ]);
+          });
+
+          const adapter = createPostgresAdapter();
+          const runtime = createTestRuntimeFromClient(contract, client, adapter);
+          try {
+            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const user = tables.user!;
+            const post = tables.post!;
+            const comment = tables.comment!;
+            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              .from(user)
+              .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+              .leftJoin(comment, (on) => on.eqCol(post.columns.id!, comment.columns.postId!))
+              .select({
+                userId: user.columns.id!,
+                email: user.columns.email!,
+                postId: post.columns.id!,
+                title: post.columns.title!,
+                commentId: comment.columns.id!,
+                content: comment.columns.content!,
+              })
+              .build();
+
+            expect(plan.ast?.joins).toBeDefined();
+            expect(plan.ast?.joins?.length).toBe(2);
+            expect(plan.ast?.joins?.[0]?.joinType).toBe('inner');
+            expect(plan.ast?.joins?.[0]?.table.name).toBe('post');
+            expect(plan.ast?.joins?.[1]?.joinType).toBe('left');
+            expect(plan.ast?.joins?.[1]?.table.name).toBe('comment');
+
+              const rows = await executePlanAndCollect(runtime, plan);
+
+            expect(rows.length).toBe(3);
+            const firstPostRow = rows.find(
+              (r: (typeof rows)[0]) => r.title === 'First Post' && r.commentId !== null,
+            );
+            const secondPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Second Post');
+
+            expect(firstPostRow).toBeDefined();
+            expect(firstPostRow?.commentId).not.toBeNull();
+            expect(firstPostRow?.content).not.toBeNull();
+
+            expect(secondPostRow).toBeDefined();
+            expect(secondPostRow?.commentId).toBeNull();
+            expect(secondPostRow?.content).toBeNull();
+
+            expect(plan.meta.refs?.tables).toContain('user');
+            expect(plan.meta.refs?.tables).toContain('post');
+            expect(plan.meta.refs?.tables).toContain('comment');
+            expect(plan.meta.refs?.columns).toEqual(
+              expect.arrayContaining([
+                { table: 'user', column: 'id' },
+                { table: 'post', column: 'userId' },
+                { table: 'post', column: 'id' },
+                { table: 'comment', column: 'postId' },
+              ]),
             );
           } finally {
             await runtime.close();
           }
         });
       },
-      { acceleratePort: 54080, databasePort: 54081, shadowDatabasePort: 54082 }
+      { acceleratePort: 54080, databasePort: 54081, shadowDatabasePort: 54082 },
+    );
+  });
+
+  it('nested projection returns flat rows with correct aliases', async () => {
+    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+            await c.query('drop table if exists "user"');
+            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
+              'ada@example.com',
+              'tess@example.com',
+              'mike@example.com',
+            ]);
+          });
+
+          const adapter = createPostgresAdapter();
+          const runtime = createTestRuntimeFromClient(contract, client, adapter);
+          try {
+            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const user = tables.user!;
+            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              .from(user)
+              .select({
+                name: user.columns.email!,
+                post: {
+                  title: user.columns.id!,
+                },
+              })
+              .build();
+
+            const rows = await executePlanAndCollect(runtime, plan);
+
+            expect(rows.length).toBe(3);
+            expect(rows[0]).toHaveProperty('name');
+            expect(rows[0]).toHaveProperty('post_title');
+            expect(rows[0]).not.toHaveProperty('post');
+
+            expect(typeof rows[0]?.['name']).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('number');
+
+            type Row = ResultType<typeof plan>;
+            expectTypeOf<Row>().toExtend<{
+              name: string;
+              post: { title: number };
+            }>();
+            expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+            expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
+            expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
+
+              const flatRow0 = rows[0] as Record<string, unknown>;
+              expect(flatRow0['name']).toBe('ada@example.com');
+              expect(flatRow0['post_title']).toBe(1);
+            expect({
+              name: flatRow0['name'],
+              post: { title: flatRow0['post_title'] },
+            }).toEqual({
+              name: 'ada@example.com',
+              post: { title: 1 },
+            });
+
+            expect(plan.meta.projection).toEqual({
+              name: 'user.email',
+              post_title: 'user.id',
+            });
+
+            expect(plan.meta.projectionTypes).toEqual({
+              name: 'pg/text@1',
+              post_title: 'pg/int4@1',
+            });
+          } finally {
+            await runtime.close();
+          }
+        });
+      },
+      { acceleratePort: 54080, databasePort: 54081, shadowDatabasePort: 54082 },
+    );
+  });
+
+  it('multi-level nested projection returns flat rows with correct aliases', async () => {
+    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+            await c.query('drop table if exists "user"');
+            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query('insert into "user" (email) values ($1), ($2)', [
+              'ada@example.com',
+              'tess@example.com',
+            ]);
+          });
+
+          const adapter = createPostgresAdapter();
+          const runtime = createTestRuntimeFromClient(contract, client, adapter);
+          try {
+            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const user = tables.user!;
+            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              .from(user)
+              .select({
+                a: {
+                  b: {
+                    c: user.columns.id!,
+                  },
+                },
+              })
+              .build();
+
+            const rows = await executePlanAndCollect(runtime, plan);
+
+            expect(rows.length).toBe(2);
+            expect(rows[0]).toHaveProperty('a_b_c');
+            expect(rows[0]).not.toHaveProperty('a');
+
+            expect(typeof (rows[0] as Record<string, unknown>)['a_b_c']).toBe('number');
+
+            type Row = ResultType<typeof plan>;
+            expectTypeOf<Row>().toExtend<{
+              a: { b: { c: number } };
+            }>();
+            expectTypeOf<Row['a']>().toEqualTypeOf<{ b: { c: number } }>();
+            expectTypeOf<Row['a']['b']>().toEqualTypeOf<{ c: number }>();
+            expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
+
+            const flatRow0 = rows[0] as Record<string, unknown>;
+            expect(flatRow0['a_b_c']).toBe(1);
+            expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
+              a: { b: { c: 1 } },
+            });
+
+            const flatRow1 = rows[1] as Record<string, unknown>;
+            expect(flatRow1['a_b_c']).toBe(2);
+            expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
+              a: { b: { c: 2 } },
+            });
+
+            expect(plan.meta.projection).toEqual({
+              a_b_c: 'user.id',
+            });
+          } finally {
+            await runtime.close();
+          }
+        });
+      },
+      { acceleratePort: 54090, databasePort: 54091, shadowDatabasePort: 54092 },
+    );
+  });
+
+  it('nested projection with joins returns flat rows with correct aliases', async () => {
+    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+            await c.query('drop table if exists "post"');
+            await c.query('drop table if exists "user"');
+            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query(
+              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+            );
+            await c.query('insert into "user" (email) values ($1), ($2)', [
+              'ada@example.com',
+              'tess@example.com',
+            ]);
+            await c.query('insert into "post" ("userId", title) values ($1, $2), ($1, $3)', [
+              1,
+              'First Post',
+              'Second Post',
+            ]);
+          });
+
+          const adapter = createPostgresAdapter();
+          const runtime = createTestRuntimeFromClient(contract, client, adapter);
+          try {
+            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const user = tables.user!;
+            const post = tables.post!;
+            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              .from(user)
+              .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+              .select({
+                name: user.columns.email!,
+                post: {
+                  title: post.columns.title!,
+                  id: post.columns.id!,
+                },
+              })
+              .build();
+
+            const rows = await executePlanAndCollect(runtime, plan);
+
+            expect(rows.length).toBe(2);
+            expect(rows[0]).toHaveProperty('name');
+            expect(rows[0]).toHaveProperty('post_title');
+            expect(rows[0]).toHaveProperty('post_id');
+            expect(rows[0]).not.toHaveProperty('post');
+
+            expect(typeof rows[0]?.['name']).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_id']).toBe('number');
+
+            type Row = ResultType<typeof plan>;
+            expectTypeOf<Row>().toExtend<{
+              name: string;
+              post: { title: string; id: number };
+            }>();
+            expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+            expectTypeOf<Row['post']>().toEqualTypeOf<{
+              title: string;
+              id: number;
+            }>();
+            expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+            expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
+
+            const flatRow0 = rows[0] as Record<string, unknown>;
+            expect(flatRow0['name']).toBe('ada@example.com');
+            expect(flatRow0['post_title']).toBe('First Post');
+            expect(flatRow0['post_id']).toBe(1);
+            expect({
+              name: flatRow0['name'],
+              post: { title: flatRow0['post_title'], id: flatRow0['post_id'] },
+            }).toEqual({
+              name: 'ada@example.com',
+              post: { title: 'First Post', id: 1 },
+            });
+
+            expect(plan.meta.projection).toEqual({
+              name: 'user.email',
+              post_title: 'post.title',
+              post_id: 'post.id',
+            });
+
+            expect(plan.meta.refs?.tables).toContain('user');
+            expect(plan.meta.refs?.tables).toContain('post');
+          } finally {
+            await runtime.close();
+          }
+        });
+      },
+      { acceleratePort: 54100, databasePort: 54101, shadowDatabasePort: 54102 },
+    );
+  });
+
+  it('mixed leaves and nested objects in projection returns flat rows', async () => {
+    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+            await c.query('drop table if exists "user"');
+            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query('insert into "user" (email) values ($1), ($2)', [
+              'ada@example.com',
+              'tess@example.com',
+            ]);
+          });
+
+          const adapter = createPostgresAdapter();
+          const runtime = createTestRuntimeFromClient(contract, client, adapter);
+          try {
+            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const user = tables.user!;
+            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              .from(user)
+              .select({
+                id: user.columns.id!,
+                post: {
+                  title: user.columns.email!,
+                  author: {
+                    name: user.columns.id!,
+                  },
+                },
+                email: user.columns.email!,
+              })
+              .build();
+
+            const rows = await executePlanAndCollect(runtime, plan);
+
+            expect(rows.length).toBe(2);
+            expect(rows[0]).toHaveProperty('id');
+            expect(rows[0]).toHaveProperty('post_title');
+            expect(rows[0]).toHaveProperty('post_author_name');
+            expect(rows[0]).toHaveProperty('email');
+            expect(rows[0]).not.toHaveProperty('post');
+
+            expect(typeof rows[0]?.id).toBe('number');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_author_name']).toBe('number');
+            expect(typeof rows[0]?.email).toBe('string');
+
+            type Row = ResultType<typeof plan>;
+            expectTypeOf<Row>().toExtend<{
+              id: number;
+              post: { title: string; author: { name: number } };
+              email: string;
+            }>();
+            expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+            expectTypeOf<Row['post']>().toEqualTypeOf<{
+              title: string;
+              author: { name: number };
+            }>();
+            expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+            expectTypeOf<Row['post']['author']>().toEqualTypeOf<{
+              name: number;
+            }>();
+            expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
+            expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+            const flatRow0 = rows[0] as Record<string, unknown>;
+            expect(flatRow0['id']).toBe(1);
+            expect(flatRow0['post_title']).toBe('ada@example.com');
+            expect(flatRow0['post_author_name']).toBe(1);
+            expect(flatRow0['email']).toBe('ada@example.com');
+            expect({
+              id: flatRow0['id'],
+              post: {
+                title: flatRow0['post_title'],
+                author: { name: flatRow0['post_author_name'] },
+              },
+              email: flatRow0['email'],
+            }).toEqual({
+              id: 1,
+              post: { title: 'ada@example.com', author: { name: 1 } },
+              email: 'ada@example.com',
+            });
+
+            expect(plan.meta.projection).toEqual({
+              id: 'user.id',
+              post_title: 'user.email',
+              post_author_name: 'user.id',
+              email: 'user.email',
+            });
+          } finally {
+            await runtime.close();
+          }
+        });
+      },
+      { acceleratePort: 54110, databasePort: 54111, shadowDatabasePort: 54112 },
+>>>>>>> a477070 (Fix a lot of type errors)
     );
   });
 });

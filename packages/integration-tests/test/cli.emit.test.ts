@@ -133,18 +133,18 @@ export const contract = defineContract<CodecTypes>()
 
     expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
     expect(validatedContract.target).toBe(originalContract.target);
-    const tables = validatedContract.storage.tables as Record<string, unknown> | undefined;
-    const originalTables = originalContract.storage?.tables as Record<string, unknown> | undefined;
-    const userTable = tables?.user as Record<string, unknown> | undefined;
-    const originalUserTable = originalTables?.user as Record<string, unknown> | undefined;
+    const tables = validatedContract.storage['tables'] as Record<string, unknown> | undefined;
+    const originalTables = originalContract.storage?.['tables'] as Record<string, unknown> | undefined;
+    const userTable = tables?.['user'] as Record<string, unknown> | undefined;
+    const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
     if (userTable && originalUserTable) {
-      const columns = userTable.columns as Record<string, { type?: string }> | undefined;
-      const originalColumns = originalUserTable.columns as
+      const columns = userTable['columns'] as Record<string, { type?: string }> | undefined;
+      const originalColumns = originalUserTable['columns'] as
         | Record<string, { type?: string }>
         | undefined;
       if (columns && originalColumns) {
-        expect(columns.id?.type).toBe(originalColumns.id?.type);
-        expect(columns.email?.type).toBe(originalColumns.email?.type);
+        expect(columns['id']?.type).toBe(originalColumns['id']?.type);
+        expect(columns['email']?.type).toBe(originalColumns['email']?.type);
       }
     }
   });

@@ -57,14 +57,14 @@ function findPlanRows(node: unknown): number | undefined {
   }
 
   if ('Plan' in (node as Record<string, unknown>)) {
-    const nested = findPlanRows((node as Record<string, unknown>).Plan);
+    const nested = findPlanRows((node as Record<string, unknown>)['Plan']);
     if (nested !== undefined) {
       return nested;
     }
   }
 
-  if (Array.isArray((node as Record<string, unknown>).Plans)) {
-    for (const child of (node as Record<string, unknown>).Plans as unknown[]) {
+  if (Array.isArray((node as Record<string, unknown>)['Plans'])) {
+    for (const child of (node as Record<string, unknown>)['Plans'] as unknown[]) {
       const nested = findPlanRows(child);
       if (nested !== undefined) {
         return nested;
@@ -155,8 +155,8 @@ export function budgets(options?: BudgetsOptions): Plugin {
     // Check if annotations provide limit hint
     // MVP: no SQL parsing, so rely on lane-provided hints only
     return (
-      typeof plan.meta.annotations?.limit === 'number' ||
-      typeof plan.meta.annotations?.LIMIT === 'number'
+      typeof plan.meta.annotations?.['limit'] === 'number' ||
+      typeof plan.meta.annotations?.['LIMIT'] === 'number'
     );
   }
 

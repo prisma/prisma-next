@@ -178,7 +178,9 @@ export async function setupE2EDatabase(
 
 // Re-export generic utilities from test-utils
 export {
+  collectAsync,
   createDevDatabase,
+  teardownTestDatabase,
   withClient,
   type DevDatabase,
 } from '@prisma-next/test-utils';

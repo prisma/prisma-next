@@ -56,11 +56,11 @@ describe('emit command functionality', () => {
       string,
       unknown
     >;
-    expect(contractJson.targetFamily).toBe('sql');
-    expect(contractJson.target).toBe('postgres');
-    const storage = contractJson.storage as Record<string, unknown> | undefined;
-    const tables = storage?.tables as Record<string, unknown> | undefined;
-    expect(tables?.user).toBeDefined();
+    expect(contractJson['targetFamily']).toBe('sql');
+    expect(contractJson['target']).toBe('postgres');
+    const storage = contractJson['storage'] as Record<string, unknown> | undefined;
+    const tables = storage?.['tables'] as Record<string, unknown> | undefined;
+    expect(tables?.['user']).toBeDefined();
 
     const contractDts = readFileSync(contractDtsPath, 'utf-8');
     expect(contractDts).toContain('export type Contract');
