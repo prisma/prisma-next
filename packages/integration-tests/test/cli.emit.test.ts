@@ -134,7 +134,9 @@ export const contract = defineContract<CodecTypes>()
     expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
     expect(validatedContract.target).toBe(originalContract.target);
     const tables = validatedContract.storage['tables'] as Record<string, unknown> | undefined;
-    const originalTables = originalContract.storage?.['tables'] as Record<string, unknown> | undefined;
+    const originalTables = originalContract.storage?.['tables'] as
+      | Record<string, unknown>
+      | undefined;
     const userTable = tables?.['user'] as Record<string, unknown> | undefined;
     const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
     if (userTable && originalUserTable) {

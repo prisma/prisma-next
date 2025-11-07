@@ -1236,7 +1236,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(plan.ast?.joins?.[1]?.joinType).toBe('left');
             expect(plan.ast?.joins?.[1]?.table.name).toBe('comment');
 
-              const rows = await executePlanAndCollect(runtime, plan);
+            const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(3);
             const firstPostRow = rows.find(
@@ -1322,9 +1322,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
             expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
 
-              const flatRow0 = rows[0] as Record<string, unknown>;
-              expect(flatRow0['name']).toBe('ada@example.com');
-              expect(flatRow0['post_title']).toBe(1);
+            const flatRow0 = rows[0] as Record<string, unknown>;
+            expect(flatRow0['name']).toBe('ada@example.com');
+            expect(flatRow0['post_title']).toBe(1);
             expect({
               name: flatRow0['name'],
               post: { title: flatRow0['post_title'] },
