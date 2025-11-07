@@ -112,7 +112,7 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-      expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toEqual([
+    expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toEqual([
       {
         kind: 'join',
         joinType: 'inner',
@@ -143,8 +143,10 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-      expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toBeDefined();
-      expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toEqual([
+    expect(
+      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+    ).toBeDefined();
+    expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toEqual([
       {
         kind: 'join',
         joinType: 'inner',
@@ -185,7 +187,12 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-      expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins?.map((j) => ({ kind: j.kind, joinType: j.joinType }))).toEqual([
+    expect(
+      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins?.map((j) => ({
+        kind: j.kind,
+        joinType: j.joinType,
+      })),
+    ).toEqual([
       { kind: 'join', joinType: 'inner' },
       { kind: 'join', joinType: 'left' },
       { kind: 'join', joinType: 'right' },
@@ -208,8 +215,12 @@ describe('SQL builder joins', () => {
       })
       .build({ params: { userId: 42 } });
 
-      expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toBeDefined();
-      expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toHaveLength(1);
+    expect(
+      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+    ).toBeDefined();
+    expect(
+      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+    ).toHaveLength(1);
     expect(plan.ast?.where).toBeDefined();
     expect(plan.params).toEqual([42]);
   });
@@ -268,7 +279,10 @@ describe('SQL builder joins', () => {
 
       const builtPlan = plan.select({ userId: userColumns.id }).build();
 
-      expect((builtPlan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins?.[0]?.joinType).toBe(joinType);
+      expect(
+        (builtPlan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins?.[0]
+          ?.joinType,
+      ).toBe(joinType);
     }
   });
 
@@ -359,7 +373,9 @@ describe('SQL builder joins', () => {
       const selectAst = plan.ast as import('@prisma-next/sql-target').SelectAst | undefined;
       expect(selectAst?.joins).toBeDefined();
       expect(selectAst?.joins?.length).toBe(1);
-      expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project).toEqual([
+      expect(
+        (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project,
+      ).toEqual([
         { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_title', expr: { kind: 'col', table: 'post', column: 'title' } },
         { alias: 'post_id', expr: { kind: 'col', table: 'post', column: 'id' } },
@@ -423,7 +439,9 @@ describe('SQL builder joins', () => {
         })
         .build();
 
-      expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project).toEqual([
+      expect(
+        (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project,
+      ).toEqual([
         { alias: 'user_id', expr: { kind: 'col', table: 'user', column: 'id' } },
         { alias: 'user_email', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_info_title', expr: { kind: 'col', table: 'post', column: 'title' } },

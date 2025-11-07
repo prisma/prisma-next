@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "format": "pnpm biome format --write .",
     "test": "turbo run test",
     "test:packages": "turbo run test --filter='!./examples/**'",
     "test:examples": "turbo run test --filter='./examples/**'",

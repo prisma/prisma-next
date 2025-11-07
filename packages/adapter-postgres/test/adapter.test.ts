@@ -265,7 +265,10 @@ describe('createPostgresAdapter', () => {
           },
         };
 
-        const lowered = adapter.lower(ast, { contract, params: ['test@example.com', new Date('2024-01-01')] });
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['test@example.com', new Date('2024-01-01')],
+        });
 
         expect(lowered.body).toEqual({
           sql: 'INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2)',
@@ -289,7 +292,10 @@ describe('createPostgresAdapter', () => {
           ],
         };
 
-        const lowered = adapter.lower(ast, { contract, params: ['test@example.com', new Date('2024-01-01')] });
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['test@example.com', new Date('2024-01-01')],
+        });
 
         expect(lowered.body).toEqual({
           sql: 'INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2) RETURNING "user"."id", "user"."email"',

@@ -10,13 +10,7 @@ import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type {
-  Adapter,
-  DeleteAst,
-  InsertAst,
-  LoweredStatement,
-  UpdateAst,
-} from '../src/types';
+import type { Adapter, DeleteAst, InsertAst, LoweredStatement, UpdateAst } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -42,7 +36,10 @@ function createStubAdapter(): Adapter<
         return createCodecRegistry();
       },
     },
-    lower(ast: InsertAst | UpdateAst | DeleteAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
+    lower(
+      ast: InsertAst | UpdateAst | DeleteAst,
+      ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] },
+    ) {
       const sqlText = JSON.stringify(ast);
       return {
         profileId: this.profile.id,
@@ -271,9 +268,7 @@ describe('DML builders', () => {
 
     it('throws error if where is not called', () => {
       expect(() => {
-        sql<Contract, CodecTypes>({ contract, adapter })
-          .delete(tables.user)
-          .build({ params: {} });
+        sql<Contract, CodecTypes>({ contract, adapter }).delete(tables.user).build({ params: {} });
       }).toThrow('where() must be called before building a DELETE query');
     });
   });
@@ -334,7 +329,10 @@ describe('DML builders', () => {
         },
       };
 
-      const plan = sql<Contract, CodecTypes>({ contract: contractWithReturning as Contract, adapter })
+      const plan = sql<Contract, CodecTypes>({
+        contract: contractWithReturning as Contract,
+        adapter,
+      })
         .insert(tables.user, {
           email: param('email'),
         })
@@ -391,4 +389,3 @@ describe('DML builders', () => {
     });
   });
 });
-

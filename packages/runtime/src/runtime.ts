@@ -1,5 +1,12 @@
 import type { Plan } from '@prisma-next/contract/types';
-import type { Adapter, LoweredStatement, SelectAst, SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
+import type {
+  Adapter,
+  LoweredStatement,
+  SelectAst,
+  SqlContract,
+  SqlDriver,
+  SqlStorage,
+} from '@prisma-next/sql-target';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow, readContractMarker } from './marker';
 

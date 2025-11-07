@@ -141,7 +141,12 @@ export function budgets(options?: BudgetsOptions): Plugin {
     const tableEstimate = tableRows[table] ?? defaultTableRows;
 
     // Check if there's a LIMIT in the AST (only SELECT has limit)
-    if (plan.ast && typeof plan.ast === 'object' && 'kind' in plan.ast && plan.ast.kind === 'select') {
+    if (
+      plan.ast &&
+      typeof plan.ast === 'object' &&
+      'kind' in plan.ast &&
+      plan.ast.kind === 'select'
+    ) {
       const selectAst = plan.ast as SelectAst;
       if (typeof selectAst.limit === 'number') {
         // Bounded: use min of LIMIT and table estimate
@@ -160,7 +165,12 @@ export function budgets(options?: BudgetsOptions): Plugin {
    */
   function hasDetectableLimit(plan: Plan): boolean {
     // Check AST limit if available (only SELECT has limit)
-    if (plan.ast && typeof plan.ast === 'object' && 'kind' in plan.ast && plan.ast.kind === 'select') {
+    if (
+      plan.ast &&
+      typeof plan.ast === 'object' &&
+      'kind' in plan.ast &&
+      plan.ast.kind === 'select'
+    ) {
       const selectAst = plan.ast as SelectAst;
       if (typeof selectAst.limit === 'number') {
         return true;

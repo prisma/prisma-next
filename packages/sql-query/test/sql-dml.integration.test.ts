@@ -8,10 +8,7 @@ import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
-import {
-  createDevDatabase,
-  teardownTestDatabase,
-} from '@prisma-next/test-utils';
+import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
 import {
   createTestRuntime,
   executePlanAndCollect,
@@ -300,4 +297,3 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
     });
   });
 });
-

@@ -31,10 +31,7 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-target';
 
-import type {
-  Plan,
-  PlanRefs,
-} from '@prisma-next/contract/types';
+import type { Plan, PlanRefs } from '@prisma-next/contract/types';
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';
@@ -216,9 +213,10 @@ export type InferNestedProjectionRow<
  * Infers Row type from a tuple of ColumnBuilders used in returning() clause.
  * Extracts column name and JsType from each ColumnBuilder and creates a Record.
  */
-export type InferReturningRow<
-  Columns extends readonly ColumnBuilder[],
-> = Columns extends readonly [infer First, ...infer Rest]
+export type InferReturningRow<Columns extends readonly ColumnBuilder[]> = Columns extends readonly [
+  infer First,
+  ...infer Rest,
+]
   ? First extends ColumnBuilder<infer Name, infer _Meta, infer JsType>
     ? Name extends string
       ? Rest extends readonly ColumnBuilder[]
@@ -342,7 +340,6 @@ export type ColumnsOf<
     ? C
     : never
   : never;
-
 
 export interface RawTemplateOptions {
   readonly refs?: PlanRefs;

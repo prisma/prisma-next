@@ -11,10 +11,7 @@ import { sql } from '@prisma-next/sql-query/sql';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import {
-  createDevDatabase,
-  teardownTestDatabase,
-} from '@prisma-next/test-utils';
+import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
 import {
   createTestRuntime,
   executePlanAndCollect,
@@ -154,4 +151,3 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
     expect(selectResult.rows.length).toBe(0);
   });
 });
-

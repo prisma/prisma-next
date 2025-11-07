@@ -27,10 +27,10 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
     await withDevDatabase(
       async ({ connectionString }: { connectionString: string }) => {
         await withClient(connectionString, async (client: import('pg').Client) => {
-            await setupE2EDatabase(client, contract, async (c: typeof client) => {
-              await c.query('DROP TABLE IF EXISTS "user"');
-              await c.query('CREATE TABLE "user" (id SERIAL PRIMARY KEY, email TEXT NOT NULL)');
-            });
+          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+            await c.query('DROP TABLE IF EXISTS "user"');
+            await c.query('CREATE TABLE "user" (id SERIAL PRIMARY KEY, email TEXT NOT NULL)');
+          });
 
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
@@ -112,4 +112,3 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
     );
   });
 });
-

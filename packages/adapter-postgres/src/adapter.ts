@@ -14,11 +14,7 @@ import type {
 } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { codecDefinitions } from './codecs';
-import type {
-  PostgresAdapterOptions,
-  PostgresContract,
-  PostgresLoweredStatement,
-} from './types';
+import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -28,9 +24,7 @@ const defaultCapabilities = Object.freeze({
   },
 });
 
-class PostgresAdapterImpl
-  implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement>
-{
+class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement> {
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecRegistry = (() => {
     const registry = createCodecRegistry();
