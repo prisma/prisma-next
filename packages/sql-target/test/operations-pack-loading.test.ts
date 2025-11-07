@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assembleOperationRegistry } from '../src/operations-registry';
-import { createOperationRegistry } from '../src/operations-registry';
-import type { ExtensionPack } from '@prisma-next/emitter/types';
-import type { OperationManifest } from '@prisma-next/emitter/types';
+import { assembleOperationRegistry, createOperationRegistry } from '../src/operations-registry';
+import type { ExtensionPack } from '@prisma-next/emitter';
 
 describe('assembleOperationRegistry', () => {
   it('assembles registry from extension pack manifests', () => {
@@ -140,7 +138,9 @@ describe('assembleOperationRegistry', () => {
 
     expect(() => {
       assembleOperationRegistry([pack1, pack2]);
-    }).toThrow('Operation method "cosineDistance" already registered for typeId "pgvector/vector@1"');
+    }).toThrow(
+      'Operation method "cosineDistance" already registered for typeId "pgvector/vector@1"',
+    );
   });
 
   it('allows same method name for different typeIds', () => {
@@ -191,4 +191,3 @@ describe('assembleOperationRegistry', () => {
     expect(registry.byType('pg/point@1')).toHaveLength(1);
   });
 });
-

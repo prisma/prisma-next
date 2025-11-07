@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createOperationRegistry, type OperationSignature } from '../src/operations-registry';
+import { createOperationRegistry, type OperationSignature } from '@prisma-next/sql-target';
 import { schema } from '../src/schema';
 import { validateContract } from '../src/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
@@ -88,7 +88,9 @@ describe('Operation capability gating', () => {
 
     const tables = schema(contract, undefined, registry).tables;
     const vectorColumn = tables.user.columns.vector;
-    expect((vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance).toBeUndefined();
+    expect(
+      (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
+    ).toBeUndefined();
   });
 
   it('exposes operation without capabilities regardless of contract capabilities', () => {
@@ -173,7 +175,8 @@ describe('Operation capability gating', () => {
 
     const tables = schema(contract, undefined, registry).tables;
     const vectorColumn = tables.user.columns.vector;
-    expect((vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance).toBeUndefined();
+    expect(
+      (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
+    ).toBeUndefined();
   });
 });
-

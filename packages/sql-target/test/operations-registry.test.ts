@@ -209,11 +209,7 @@ describe('OperationRegistry', () => {
     const signature: OperationSignature = {
       forTypeId: 'pg/vector@1',
       method: 'cosineSimilarity',
-      args: [
-        { kind: 'typeId', type: 'pg/vector@1' },
-        { kind: 'param' },
-        { kind: 'literal' },
-      ],
+      args: [{ kind: 'typeId', type: 'pg/vector@1' }, { kind: 'param' }, { kind: 'literal' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -247,4 +243,3 @@ describe('OperationRegistry', () => {
     expect(operations[0]?.capabilities).toEqual(['pgvector.index.ivfflat']);
   });
 });
-

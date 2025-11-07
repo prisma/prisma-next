@@ -7,7 +7,7 @@ import type {
   ParamRef,
   SelectAst,
 } from '@prisma-next/sql-query/types';
-import type { LoweringSpec, ReturnSpec } from '@prisma-next/sql-query/operations-registry';
+import type { LoweringSpec, ReturnSpec } from '@prisma-next/sql-target';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
@@ -117,7 +117,9 @@ describe('Operation lowering', () => {
     };
 
     const lowered = adapter.lower(ast, { contract, params: [42] });
-    expect(lowered.body.sql).toContain('cosine_similarity("user"."vector", "user"."otherVector", $1, 42)');
+    expect(lowered.body.sql).toContain(
+      'cosine_similarity("user"."vector", "user"."otherVector", $1, 42)',
+    );
   });
 
   it('lowers operation in where clause', () => {
@@ -202,4 +204,3 @@ describe('Operation lowering', () => {
     expect(lowered.body.sql).toContain('"user"."vector" <=>');
   });
 });
-

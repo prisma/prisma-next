@@ -8,7 +8,8 @@ import type {
   ParamPlaceholder,
   TableRef,
 } from './types';
-import { attachOperationsToColumnBuilder, type OperationRegistry } from './operations-registry';
+import type { OperationRegistry } from '@prisma-next/sql-target';
+import { attachOperationsToColumnBuilder } from './operations-registry';
 
 type TableColumns<Table extends { columns: Record<string, StorageColumn> }> = Table['columns'];
 

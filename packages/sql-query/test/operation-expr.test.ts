@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  ColumnRef,
-  LiteralExpr,
-  OperationExpr,
-  ParamRef,
-  SelectAst,
-} from '../src/types';
-import type { LoweringSpec, ReturnSpec } from '../src/operations-registry';
+import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef, SelectAst } from '../src/types';
+import type { LoweringSpec, ReturnSpec } from '@prisma-next/sql-target';
 
 describe('OperationExpr', () => {
   it('defines OperationExpr with infix strategy', () => {
@@ -162,4 +156,3 @@ describe('OperationExpr', () => {
     expect(ast.orderBy?.[0]?.expr.kind).toBe('operation');
   });
 });
-

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createOperationRegistry, type OperationSignature } from '../src/operations-registry';
+import { createOperationRegistry, type OperationSignature } from '@prisma-next/sql-target';
 import { schema, makeT } from '../src/schema';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
@@ -122,8 +122,9 @@ describe('ColumnBuilder operations', () => {
 
     const tables = schema(contract, undefined, registry).tables;
     const vectorColumn = tables.user.columns.vector;
-    const result = (vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown })
-      .cosineDistance(param('other'));
+    const result = (
+      vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
+    ).cosineDistance(param('other'));
     expect(result).toBeDefined();
     expect(result).toHaveProperty('kind', 'column');
   });
@@ -145,8 +146,9 @@ describe('ColumnBuilder operations', () => {
 
     const tables = schema(contract, undefined, registry).tables;
     const vectorColumn = tables.user.columns.vector;
-    const result = (vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown })
-      .cosineDistance(param('other'));
+    const result = (
+      vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
+    ).cosineDistance(param('other'));
     expect(result).toHaveProperty('kind', 'column');
     expect(result).toHaveProperty('columnMeta');
   });
@@ -168,8 +170,9 @@ describe('ColumnBuilder operations', () => {
 
     const tables = schema(contract, undefined, registry).tables;
     const vectorColumn = tables.user.columns.vector;
-    const distance = (vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown })
-      .cosineDistance(param('other'));
+    const distance = (
+      vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
+    ).cosineDistance(param('other'));
     const binary = distance.eq(param('threshold'));
     expect(binary).toHaveProperty('kind', 'binary');
   });
@@ -191,10 +194,10 @@ describe('ColumnBuilder operations', () => {
 
     const tables = schema(contract, undefined, registry).tables;
     const vectorColumn = tables.user.columns.vector;
-    const distance = (vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown })
-      .cosineDistance(param('other'));
+    const distance = (
+      vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
+    ).cosineDistance(param('other'));
     const order = distance.asc();
     expect(order).toHaveProperty('kind', 'order');
   });
 });
-

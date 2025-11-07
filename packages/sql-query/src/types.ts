@@ -20,7 +20,7 @@ export type {
 } from '@prisma-next/sql-target';
 
 import type { Adapter, SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
-import type { LoweringSpec, ReturnSpec } from './operations-registry';
+import type { LoweringSpec, ReturnSpec } from '@prisma-next/sql-target';
 
 export type Direction = 'asc' | 'desc';
 
