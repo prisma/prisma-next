@@ -3,7 +3,7 @@ import type { SqlContract } from '@prisma-next/sql-target';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { validateContract } from '../src/contract';
-import { makeT, schema } from '../src/schema';
+import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Plan, ResultType, TableKey, TablesOf } from '../src/types';
 import type { CodecTypes, Contract, ScalarToJs } from './fixtures/contract.d';
@@ -313,11 +313,10 @@ test('Contract namespace types are available', () => {
   expectTypeOf<UserModelName>().toEqualTypeOf<'User'>();
 });
 
-test('makeT() returns tables graph', () => {
+test('schema().tables returns tables graph', () => {
   const contract = validateContract<Contract>(contractJson);
-  const t = makeT<Contract, CodecTypes>(contract);
+  const t = schema<Contract, CodecTypes>(contract).tables;
 
-  // makeT should return the same as schema().tables
   expectTypeOf(t).toHaveProperty('user');
   const userTable = t.user;
   if (userTable) {

@@ -246,11 +246,4 @@ export function schema<
   return Object.freeze({ tables });
 }
 
-export function makeT<
-  Contract extends SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(contract: Contract, context?: RuntimeContext): ExtractSchemaTables<Contract, CodecTypes> {
-  return schema<Contract, CodecTypes>(contract, context).tables;
-}
-
 export type { ColumnBuilderImpl as Column, TableBuilderImpl as Table };
