@@ -1,30 +1,30 @@
-import { describe, expect, it } from "vitest";
-import { canonicalizeContract } from "../src/canonicalization";
-import type { ContractIR } from "../src/types";
+import { describe, expect, it } from 'vitest';
+import { canonicalizeContract } from '../src/canonicalization';
+import type { ContractIR } from '../src/types';
 
-describe("canonicalization", () => {
-  it("orders top-level sections correctly", () => {
+describe('canonicalization', () => {
+  it('orders top-level sections correctly', () => {
     const ir: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
-      schemaVersion: "1",
+      targetFamily: 'sql',
+      target: 'postgres',
+      schemaVersion: '1',
       models: {},
       storage: { tables: {} },
       capabilities: { postgres: { jsonAgg: true } },
-      meta: { source: "test" },
+      meta: { source: 'test' },
     };
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
 
     const keys = Object.keys(parsed);
-    const schemaVersionIndex = keys.indexOf("schemaVersion");
-    const targetFamilyIndex = keys.indexOf("targetFamily");
-    const targetIndex = keys.indexOf("target");
-    const modelsIndex = keys.indexOf("models");
-    const storageIndex = keys.indexOf("storage");
-    const capabilitiesIndex = keys.indexOf("capabilities");
-    const metaIndex = keys.indexOf("meta");
+    const schemaVersionIndex = keys.indexOf('schemaVersion');
+    const targetFamilyIndex = keys.indexOf('targetFamily');
+    const targetIndex = keys.indexOf('target');
+    const modelsIndex = keys.indexOf('models');
+    const storageIndex = keys.indexOf('storage');
+    const capabilitiesIndex = keys.indexOf('capabilities');
+    const metaIndex = keys.indexOf('meta');
 
     expect(schemaVersionIndex).toBeLessThan(targetFamilyIndex);
     expect(targetFamilyIndex).toBeLessThan(targetIndex);
@@ -34,16 +34,16 @@ describe("canonicalization", () => {
     expect(capabilitiesIndex).toBeLessThan(metaIndex);
   });
 
-  it("omits nullable false from columns", () => {
+  it('omits nullable false from columns', () => {
     const ir: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
+      targetFamily: 'sql',
+      target: 'postgres',
       storage: {
         tables: {
           user: {
             columns: {
-              id: { type: "pg/int4@1", nullable: false },
-              email: { type: "pg/text@1", nullable: true },
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: true },
             },
           },
         },
@@ -52,20 +52,20 @@ describe("canonicalization", () => {
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
-    const storage = parsed["storage"] as Record<string, unknown>;
-    const tables = storage["tables"] as Record<string, unknown>;
-    const user = tables["user"] as Record<string, unknown>;
-    const columns = user["columns"] as Record<string, unknown>;
-    const id = columns["id"] as Record<string, unknown>;
-    const email = columns["email"] as Record<string, unknown>;
-    expect(id["nullable"]).toBeUndefined();
-    expect(email["nullable"]).toBe(true);
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const id = columns['id'] as Record<string, unknown>;
+    const email = columns['email'] as Record<string, unknown>;
+    expect(id['nullable']).toBeUndefined();
+    expect(email['nullable']).toBe(true);
   });
 
-  it("omits empty arrays and objects except required ones", () => {
+  it('omits empty arrays and objects except required ones', () => {
     const ir: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
+      targetFamily: 'sql',
+      target: 'postgres',
       models: {},
       storage: { tables: {} },
       capabilities: {},
@@ -75,28 +75,26 @@ describe("canonicalization", () => {
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
-    expect(parsed["models"]).toBeDefined();
-    expect(
-      (parsed["storage"] as Record<string, unknown>)["tables"]
-    ).toBeDefined();
-    expect(parsed["capabilities"]).toBeUndefined();
-    expect(parsed["extensions"]).toBeUndefined();
-    expect(parsed["meta"]).toBeUndefined();
+    expect(parsed['models']).toBeDefined();
+    expect((parsed['storage'] as Record<string, unknown>)['tables']).toBeDefined();
+    expect(parsed['capabilities']).toBeUndefined();
+    expect(parsed['extensions']).toBeUndefined();
+    expect(parsed['meta']).toBeUndefined();
   });
 
-  it("preserves semantic array order for column lists", () => {
+  it('preserves semantic array order for column lists', () => {
     const ir: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
+      targetFamily: 'sql',
+      target: 'postgres',
       storage: {
         tables: {
           user: {
             columns: {
-              first: { type: "pg/text@1" },
-              second: { type: "pg/text@1" },
+              first: { type: 'pg/text@1' },
+              second: { type: 'pg/text@1' },
             },
             primaryKey: {
-              columns: ["second", "first"],
+              columns: ['second', 'first'],
             },
           },
         },
@@ -106,17 +104,17 @@ describe("canonicalization", () => {
     const result1 = canonicalizeContract(ir);
 
     const ir2: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
+      targetFamily: 'sql',
+      target: 'postgres',
       storage: {
         tables: {
           user: {
             columns: {
-              first: { type: "pg/text@1" },
-              second: { type: "pg/text@1" },
+              first: { type: 'pg/text@1' },
+              second: { type: 'pg/text@1' },
             },
             primaryKey: {
-              columns: ["first", "second"],
+              columns: ['first', 'second'],
             },
           },
         },
@@ -128,19 +126,19 @@ describe("canonicalization", () => {
     expect(result1).not.toBe(result2);
   });
 
-  it("sorts non-semantic arrays by canonical name", () => {
+  it('sorts non-semantic arrays by canonical name', () => {
     const ir: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
+      targetFamily: 'sql',
+      target: 'postgres',
       storage: {
         tables: {
           user: {
             columns: {
-              id: { type: "pg/int4@1" },
+              id: { type: 'pg/int4@1' },
             },
             indexes: [
-              { columns: ["id"], name: "user_email_idx" },
-              { columns: ["id"], name: "user_name_idx" },
+              { columns: ['id'], name: 'user_email_idx' },
+              { columns: ['id'], name: 'user_name_idx' },
             ],
           },
         },
@@ -149,25 +147,25 @@ describe("canonicalization", () => {
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
-    const storage = parsed["storage"] as Record<string, unknown>;
-    const tables = storage["tables"] as Record<string, unknown>;
-    const user = tables["user"] as Record<string, unknown>;
-    const indexes = user["indexes"] as Array<{ name: string }>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const indexes = user['indexes'] as Array<{ name: string }>;
     const indexNames = indexes.map((idx) => idx.name);
-    expect(indexNames).toEqual(["user_email_idx", "user_name_idx"]);
+    expect(indexNames).toEqual(['user_email_idx', 'user_name_idx']);
   });
 
-  it("sorts nested object keys lexicographically", () => {
+  it('sorts nested object keys lexicographically', () => {
     const ir: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
+      targetFamily: 'sql',
+      target: 'postgres',
       storage: {
         tables: {
           user: {
             columns: {
-              z_field: { type: "pg/text@1" },
-              a_field: { type: "pg/text@1" },
-              m_field: { type: "pg/text@1" },
+              z_field: { type: 'pg/text@1' },
+              a_field: { type: 'pg/text@1' },
+              m_field: { type: 'pg/text@1' },
             },
           },
         },
@@ -176,41 +174,41 @@ describe("canonicalization", () => {
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
-    const storage = parsed["storage"] as Record<string, unknown>;
-    const tables = storage["tables"] as Record<string, unknown>;
-    const user = tables["user"] as Record<string, unknown>;
-    const columns = user["columns"] as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
     const columnKeys = Object.keys(columns);
-    expect(columnKeys).toEqual(["a_field", "m_field", "z_field"]);
+    expect(columnKeys).toEqual(['a_field', 'm_field', 'z_field']);
   });
 
-  it("sorts extension namespaces lexicographically", () => {
+  it('sorts extension namespaces lexicographically', () => {
     const ir: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
+      targetFamily: 'sql',
+      target: 'postgres',
       extensions: {
-        pgvector: { version: "1.0.0" },
-        postgres: { version: "15.0.0" },
-        another: { version: "1.0.0" },
+        pgvector: { version: '1.0.0' },
+        postgres: { version: '15.0.0' },
+        another: { version: '1.0.0' },
       },
     };
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
-    const extensions = parsed["extensions"] as Record<string, unknown>;
+    const extensions = parsed['extensions'] as Record<string, unknown>;
     const extensionKeys = Object.keys(extensions);
-    expect(extensionKeys).toEqual(["another", "pgvector", "postgres"]);
+    expect(extensionKeys).toEqual(['another', 'pgvector', 'postgres']);
   });
 
-  it("omits generated false", () => {
+  it('omits generated false', () => {
     const ir: ContractIR = {
-      targetFamily: "sql",
-      target: "postgres",
+      targetFamily: 'sql',
+      target: 'postgres',
       storage: {
         tables: {
           user: {
             columns: {
-              id: { type: "pg/int4@1", generated: false },
+              id: { type: 'pg/int4@1', generated: false },
             },
           },
         },
@@ -219,11 +217,11 @@ describe("canonicalization", () => {
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
-    const storage = parsed["storage"] as Record<string, unknown>;
-    const tables = storage["tables"] as Record<string, unknown>;
-    const user = tables["user"] as Record<string, unknown>;
-    const columns = user["columns"] as Record<string, unknown>;
-    const id = columns["id"] as Record<string, unknown>;
-    expect(id["generated"]).toBeUndefined();
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const id = columns['id'] as Record<string, unknown>;
+    expect(id['generated']).toBeUndefined();
   });
 });

@@ -1,3 +1,4 @@
 {
-  "cSpell.words": ["codegen", "Lowerer"]
+  "cSpell.words": ["codegen", "Lowerer"],
+  "editor.defaultFormatter": "biomejs.biome"
 }

@@ -57,7 +57,9 @@
       "linter": {
         "rules": {
           "style": {
-            "noNonNullAssertion": "off",
+            "noNonNullAssertion": "off"
+          },
+          "complexity": {
             "useLiteralKeys": "off"
           }
         }

@@ -2,7 +2,6 @@ import { expectTypeOf, test } from 'vitest';
 import { type Codec, codec } from '../src/codecs';
 
 test('codec() creates Codec with literal ID type', () => {
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _testCodec = codec<'test/literal@1', string, string>({
     typeId: 'test/literal@1',
     targetTypes: ['literal'],
@@ -16,7 +15,6 @@ test('codec() creates Codec with literal ID type', () => {
 });
 
 test('codec() preserves literal ID from inference', () => {
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _testCodec = codec({
     typeId: 'test/inferred@1' as const,
     targetTypes: ['inferred'],
@@ -29,7 +27,6 @@ test('codec() preserves literal ID from inference', () => {
 });
 
 test('codec() preserves input type (TJs)', () => {
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _stringCodec = codec<'test/string@1', string, string>({
     typeId: 'test/string@1',
     targetTypes: ['string'],
@@ -37,7 +34,6 @@ test('codec() preserves input type (TJs)', () => {
     decode: (wire: string) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _numberCodec = codec<'test/number@1', number, number>({
     typeId: 'test/number@1',
     targetTypes: ['number'],
@@ -45,7 +41,6 @@ test('codec() preserves input type (TJs)', () => {
     decode: (wire: number) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _dateCodec = codec<'test/date@1', string, Date>({
     typeId: 'test/date@1',
     targetTypes: ['date'],
@@ -60,7 +55,6 @@ test('codec() preserves input type (TJs)', () => {
 });
 
 test('codec() preserves output type (TJs)', () => {
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _stringCodec = codec<'test/string@1', string, string>({
     typeId: 'test/string@1',
     targetTypes: ['string'],
@@ -68,7 +62,6 @@ test('codec() preserves output type (TJs)', () => {
     decode: (wire: string) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _numberCodec = codec<'test/number@1', number, number>({
     typeId: 'test/number@1',
     targetTypes: ['number'],
@@ -76,7 +69,6 @@ test('codec() preserves output type (TJs)', () => {
     decode: (wire: number) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _dateCodec = codec<'test/date@1', string, Date>({
     typeId: 'test/date@1',
     targetTypes: ['date'],
@@ -91,7 +83,6 @@ test('codec() preserves output type (TJs)', () => {
 });
 
 test('codec() preserves wire type (TWire)', () => {
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _stringCodec = codec<'test/string@1', string, string>({
     typeId: 'test/string@1',
     targetTypes: ['string'],
@@ -99,7 +90,6 @@ test('codec() preserves wire type (TWire)', () => {
     decode: (wire: string) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _dateCodec = codec<'test/date@1', string, Date>({
     typeId: 'test/date@1',
     targetTypes: ['date'],

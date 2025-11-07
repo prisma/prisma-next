@@ -23,7 +23,6 @@ test('CodecTypes structure matches expected types with correct literal IDs', () 
     decode: (wire: boolean) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _codecs = defineCodecs()
     .add('text', textCodec)
     .add('int4', intCodec)
@@ -65,7 +64,6 @@ test('ScalarToJs structure matches expected types with correct JS types', () => 
     decode: (wire: string): Date => new Date(wire),
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _codecs = defineCodecs()
     .add('text', textCodec)
     .add('int4', intCodec)
@@ -88,7 +86,6 @@ test('literal types are preserved (not widened to string)', () => {
     decode: (wire: string) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _codecs = defineCodecs().add('text', textCodec);
 
   type CodecTypes = typeof _codecs.CodecTypes;
@@ -107,7 +104,6 @@ test('ExtractCodecTypes extracts correct types from builder', () => {
     decode: (wire: string) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _codecs = defineCodecs().add('text', textCodec);
 
   // Verify literal ID is preserved as key
@@ -126,7 +122,6 @@ test('ExtractScalarToJs extracts correct types from builder', () => {
     decode: (wire: string) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _codecs = defineCodecs().add('text', textCodec);
 
   type ScalarToJs = typeof _codecs.ScalarToJs;
@@ -150,7 +145,6 @@ test('builder chain preserves literal types and aggregates correctly', () => {
   });
 
   const builder1 = defineCodecs().add('text', textCodec);
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _builder2 = builder1.add('int4', intCodec);
 
   type Builder1Types = typeof builder1.CodecTypes;
@@ -213,7 +207,6 @@ test('dataTypes preserves literal type IDs', () => {
     decode: (wire: number) => wire,
   });
 
-  // biome-ignore lint/correctness/noUnusedVariables: variable used for type checking
   const _codecs = defineCodecs().add('text', textCodec).add('int4', intCodec);
 
   type DataTypes = typeof _codecs.dataTypes;

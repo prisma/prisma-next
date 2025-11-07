@@ -58,4 +58,3 @@ export async function emitAndVerifyContract(
 
   return validateContract<SqlContract<SqlStorage>>(emittedContract);
 }
-
