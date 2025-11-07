@@ -13,7 +13,8 @@ import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { ResultType } from '@prisma-next/sql-query/types';
-import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { withClient, withDevDatabase, type DevDatabase } from '@prisma-next/test-utils';
+import type { Client } from 'pg';
 import { emitAndVerifyContract, loadContractFromDisk } from './utils';
 
 import type { Contract } from './fixtures/generated/contract.d';
@@ -74,8 +75,8 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows.length).toBeGreaterThan(1);
             expect(rows[0]).toHaveProperty('id');
             expect(rows[0]).toHaveProperty('email');
-            expect(typeof rows[0]?.id).toBe('number');
-            expect(typeof rows[0]?.email).toBe('string');
+            expect(typeof rows[0]?.['id']).toBe('number');
+            expect(typeof rows[0]?.['email']).toBe('string');
           } finally {
             await runtime.close();
           }
@@ -134,10 +135,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('email');
             expect(rows[0]).toHaveProperty('postId');
             expect(rows[0]).toHaveProperty('title');
-            expect(typeof rows[0]?.userId).toBe('number');
-            expect(typeof rows[0]?.email).toBe('string');
-            expect(typeof rows[0]?.postId).toBe('number');
-            expect(typeof rows[0]?.title).toBe('string');
+            expect(typeof rows[0]?.['userId']).toBe('number');
+            expect(typeof rows[0]?.['email']).toBe('string');
+            expect(typeof rows[0]?.['postId']).toBe('number');
+            expect(typeof rows[0]?.['title']).toBe('string');
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -503,8 +504,8 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('post_title');
             expect(rows[0]).not.toHaveProperty('post');
 
-            expect(typeof rows[0]?.name).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>).post_title).toBe('number');
+            expect(typeof rows[0]?.['name']).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('number');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -516,11 +517,11 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
 
             const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0.name).toBe('ada@example.com');
-            expect(flatRow0.post_title).toBe(1);
+            expect(flatRow0['name']).toBe('ada@example.com');
+            expect(flatRow0['post_title']).toBe(1);
             expect({
-              name: flatRow0.name,
-              post: { title: flatRow0.post_title },
+              name: flatRow0['name'],
+              post: { title: flatRow0['post_title'] },
             }).toEqual({
               name: 'ada@example.com',
               post: { title: 1 },
@@ -581,7 +582,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('a_b_c');
             expect(rows[0]).not.toHaveProperty('a');
 
-            expect(typeof (rows[0] as Record<string, unknown>).a_b_c).toBe('number');
+            expect(typeof (rows[0] as Record<string, unknown>)['a_b_c']).toBe('number');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -592,14 +593,14 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
 
             const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0.a_b_c).toBe(1);
-            expect({ a: { b: { c: flatRow0.a_b_c } } }).toEqual({
+            expect(flatRow0['a_b_c']).toBe(1);
+            expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
               a: { b: { c: 1 } },
             });
 
             const flatRow1 = rows[1] as Record<string, unknown>;
-            expect(flatRow1.a_b_c).toBe(2);
-            expect({ a: { b: { c: flatRow1.a_b_c } } }).toEqual({
+            expect(flatRow1['a_b_c']).toBe(2);
+            expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
               a: { b: { c: 2 } },
             });
 
@@ -665,9 +666,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('post_id');
             expect(rows[0]).not.toHaveProperty('post');
 
-            expect(typeof rows[0]?.name).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>).post_title).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>).post_id).toBe('number');
+            expect(typeof rows[0]?.['name']).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_id']).toBe('number');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -683,12 +684,12 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
 
             const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0.name).toBe('ada@example.com');
-            expect(flatRow0.post_title).toBe('First Post');
-            expect(flatRow0.post_id).toBe(1);
+            expect(flatRow0['name']).toBe('ada@example.com');
+            expect(flatRow0['post_title']).toBe('First Post');
+            expect(flatRow0['post_id']).toBe(1);
             expect({
-              name: flatRow0.name,
-              post: { title: flatRow0.post_title, id: flatRow0.post_id },
+              name: flatRow0['name'],
+              post: { title: flatRow0['post_title'], id: flatRow0['post_id'] },
             }).toEqual({
               name: 'ada@example.com',
               post: { title: 'First Post', id: 1 },
@@ -754,10 +755,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('email');
             expect(rows[0]).not.toHaveProperty('post');
 
-            expect(typeof rows[0]?.id).toBe('number');
-            expect(typeof (rows[0] as Record<string, unknown>).post_title).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>).post_author_name).toBe('number');
-            expect(typeof rows[0]?.email).toBe('string');
+            expect(typeof rows[0]?.['id']).toBe('number');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
+            expect(typeof (rows[0] as Record<string, unknown>)['post_author_name']).toBe('number');
+            expect(typeof rows[0]?.['email']).toBe('string');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -778,17 +779,17 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expectTypeOf<Row['email']>().toEqualTypeOf<string>();
 
             const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0.id).toBe(1);
-            expect(flatRow0.post_title).toBe('ada@example.com');
-            expect(flatRow0.post_author_name).toBe(1);
-            expect(flatRow0.email).toBe('ada@example.com');
+            expect(flatRow0['id']).toBe(1);
+            expect(flatRow0['post_title']).toBe('ada@example.com');
+            expect(flatRow0['post_author_name']).toBe(1);
+            expect(flatRow0['email']).toBe('ada@example.com');
             expect({
-              id: flatRow0.id,
+              id: flatRow0['id'],
               post: {
-                title: flatRow0.post_title,
-                author: { name: flatRow0.post_author_name },
+                title: flatRow0['post_title'],
+                author: { name: flatRow0['post_author_name'] },
               },
-              email: flatRow0.email,
+              email: flatRow0['email'],
             }).toEqual({
               id: 1,
               post: { title: 'ada@example.com', author: { name: 1 } },
@@ -1086,7 +1087,6 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             type Row = ResultType<typeof plan>;
 
             expect(rows.length).toBe(2);
-<<<<<<< HEAD
             expect(rows[0]).toHaveProperty('postId');
             expect(rows[0]).toHaveProperty('postTitle');
             expect(rows[0]).toHaveProperty('userId');
@@ -1101,7 +1101,7 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
           }
         });
       },
-      { acceleratePort: 54040, databasePort: 54041, shadowDatabasePort: 54042 },
+      { acceleratePort: 54080, databasePort: 54081, shadowDatabasePort: 54082 },
     );
   });
 
@@ -1263,18 +1263,12 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
                 { table: 'comment', column: 'postId' },
               ]),
             );
-=======
-            expect(rows.every((r: Row) => r.userEmail === 'ada@example.com')).toBe(true);
-            expect(rows.some((r: Row) => r.postTitle === 'Ada Post 1')).toBe(true);
-            expect(rows.some((r: Row) => r.postTitle === 'Ada Post 2')).toBe(true);
->>>>>>> 67fe366 (Fix a lot of type errors)
           } finally {
             await runtime.close();
           }
         });
       },
       { acceleratePort: 54080, databasePort: 54081, shadowDatabasePort: 54082 },
-<<<<<<< HEAD
     );
   });
 
@@ -1567,10 +1561,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             expect(rows[0]).toHaveProperty('email');
             expect(rows[0]).not.toHaveProperty('post');
 
-            expect(typeof rows[0]?.id).toBe('number');
+            expect(typeof rows[0]?.['id']).toBe('number');
             expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
             expect(typeof (rows[0] as Record<string, unknown>)['post_author_name']).toBe('number');
-            expect(typeof rows[0]?.email).toBe('string');
+            expect(typeof rows[0]?.['email']).toBe('string');
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -1620,9 +1614,6 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
         });
       },
       { acceleratePort: 54110, databasePort: 54111, shadowDatabasePort: 54112 },
->>>>>>> a477070 (Fix a lot of type errors)
-=======
->>>>>>> 67fe366 (Fix a lot of type errors)
     );
   });
 });

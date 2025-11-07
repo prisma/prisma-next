@@ -254,14 +254,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       },
     } as Plan<unknown>;
 
-<<<<<<< HEAD
-    const rows = (await executePlanAndCollect(runtime, planWithOverride)) as Record<
-      string,
-      unknown
-    >[];
-=======
     const rows = await executePlanAndCollect(runtime, planWithOverride);
->>>>>>> 67fe366 (Fix a lot of type errors)
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
@@ -390,11 +383,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
       .select({
         name: testDataColumns['name']!,
       })
-<<<<<<< HEAD
       .where(testDataColumns['id']!.eq(param('id')))
-=======
-      .where(testDataColumns['id']?.eq(param('id')))
->>>>>>> 67fe366 (Fix a lot of type errors)
       .build({ params: { id: 1 } });
 
     expect(selectPlan.meta.annotations).toBeDefined();
