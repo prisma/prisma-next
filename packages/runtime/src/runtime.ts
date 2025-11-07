@@ -18,16 +18,11 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-import type { ExtensionPack } from '@prisma-next/emitter';
-import {
-  assembleOperationRegistry,
-  type CodecRegistry,
-  createCodecRegistry,
-  type OperationRegistry,
-} from '@prisma-next/sql-target';
+import type { RuntimeContext } from './context';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
+import type { CodecRegistry, OperationRegistry } from '@prisma-next/sql-target';
 import type { Plugin } from './plugins/types';
 
 export interface RuntimeOptions<
@@ -37,10 +32,10 @@ export interface RuntimeOptions<
   readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
+  readonly context: RuntimeContext;
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: import('./plugins/types').Log;
-  readonly extensions?: ReadonlyArray<ExtensionPack>;
 }
 
 export interface Runtime {
@@ -76,7 +71,7 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { driver, contract, adapter, extensions } = options;
+    const { driver, contract, adapter, context } = options;
     this.contract = contract;
     this.adapter = adapter;
     this.driver = driver;
@@ -89,19 +84,9 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
     this._telemetry = null;
     this.codecRegistryValidated = false;
 
-    // Compose codec registry from adapter codecs
-    const registry = createCodecRegistry();
-    const adapterRegistry = this.adapter.profile.codecs();
-
-    // Register all adapter codecs
-    for (const codec of adapterRegistry.values()) {
-      registry.register(codec);
-    }
-
-    this.codecRegistry = registry;
-
-    // Compose operations registry from extension packs
-    this.operationRegistry = assembleOperationRegistry(extensions ?? []);
+    // Use registries from context
+    this.codecRegistry = context.codecs;
+    this.operationRegistry = context.operations;
 
     this.pluginContext = {
       contract: this.contract,

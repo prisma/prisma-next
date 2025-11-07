@@ -1,4 +1,5 @@
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
+import type { RuntimeContext } from '@prisma-next/runtime';
 import { planInvalid } from './errors';
 import type {
   BinaryBuilder,
@@ -113,7 +114,6 @@ function buildColumns<
   tableName: TableName,
   storage: SqlStorage,
   _contract: Contract,
-  _codecTypes: CodecTypes,
   operationRegistry?: OperationRegistry,
   contractCapabilities?: Record<string, Record<string, boolean>>,
 ): ColumnBuilders<
@@ -211,22 +211,18 @@ export type SchemaHandle<
 export function schema<
   Contract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(
-  contract: Contract,
-  codecTypes?: CodecTypes,
-  operationRegistry?: OperationRegistry,
-): SchemaHandle<Contract, CodecTypes> {
+>(contract: Contract, context?: RuntimeContext): SchemaHandle<Contract, CodecTypes> {
   const storage = contract.storage;
-  const codecTypesValue = (codecTypes ?? {}) as CodecTypes;
   const tables = {} as ExtractSchemaTables<Contract, CodecTypes>;
   const contractCapabilities = contract.capabilities;
+
+  const operationRegistry = context?.operations;
 
   for (const tableName in storage.tables) {
     const columns = buildColumns<Contract, typeof tableName, CodecTypes>(
       tableName,
       storage,
       contract,
-      codecTypesValue,
       operationRegistry,
       contractCapabilities,
     );
@@ -253,12 +249,8 @@ export function schema<
 export function makeT<
   Contract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(
-  contract: Contract,
-  codecTypes?: CodecTypes,
-  operationRegistry?: OperationRegistry,
-): ExtractSchemaTables<Contract, CodecTypes> {
-  return schema<Contract, CodecTypes>(contract, codecTypes, operationRegistry).tables;
+>(contract: Contract, context?: RuntimeContext): ExtractSchemaTables<Contract, CodecTypes> {
+  return schema<Contract, CodecTypes>(contract, context).tables;
 }
 
 export type { ColumnBuilderImpl as Column, TableBuilderImpl as Table };

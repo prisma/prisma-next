@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createOperationRegistry, type OperationSignature } from '@prisma-next/sql-target';
-import { schema, makeT } from '../src/schema';
+import {
+  createCodecRegistry,
+  createOperationRegistry,
+  type OperationSignature,
+} from '@prisma-next/sql-target';
+import { schema } from '../src/schema';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
@@ -41,7 +45,7 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     expect(vectorColumn).toBeDefined();
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
@@ -64,7 +68,7 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const idColumn = tables.user.columns.id;
     expect(idColumn).toBeDefined();
     expect((idColumn as unknown as { cosineDistance?: unknown }).cosineDistance).toBeUndefined();
@@ -97,7 +101,7 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature1);
     registry.register(signature2);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
@@ -120,7 +124,7 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     const result = (
       vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
@@ -144,7 +148,7 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     const result = (
       vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
@@ -168,7 +172,7 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     const distance = (
       vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
@@ -192,7 +196,7 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     const distance = (
       vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }

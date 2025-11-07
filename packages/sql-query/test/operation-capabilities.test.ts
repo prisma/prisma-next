@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createOperationRegistry, type OperationSignature } from '@prisma-next/sql-target';
+import {
+  createCodecRegistry,
+  createOperationRegistry,
+  type OperationSignature,
+} from '@prisma-next/sql-target';
 import { schema } from '../src/schema';
 import { validateContract } from '../src/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
@@ -44,7 +48,7 @@ describe('Operation capability gating', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
@@ -86,7 +90,7 @@ describe('Operation capability gating', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     expect(
       (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
@@ -127,7 +131,7 @@ describe('Operation capability gating', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
@@ -173,7 +177,7 @@ describe('Operation capability gating', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, undefined, registry).tables;
+    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
     const vectorColumn = tables.user.columns.vector;
     expect(
       (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
