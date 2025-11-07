@@ -1192,5 +1192,125 @@ plan.meta.projectionTypes;       // { id: 'pg/int4@1' }
 
 ---
 
+## 🔑 Implementation Learnings
+
+This section documents key learnings from implementing features in Prisma Next, particularly patterns and gotchas discovered during development.
+
+### PostgreSQL LATERAL Join Column Selection
+
+When using LATERAL joins in PostgreSQL adapters, use different aliases for the table alias and column alias to avoid ambiguity:
+
+- **Table alias**: Use `{alias}_lateral` (e.g., `posts_lateral`)
+- **Column alias**: Use `{alias}` (e.g., `posts`)
+- **Selection**: Select using `table_alias.column_alias` (e.g., `"posts_lateral"."posts"`)
+
+This pattern prevents PostgreSQL from getting confused when both the table and column have the same name.
+
+**Example:**
+```typescript
+// In adapter lowering
+const tableAlias = `${alias}_lateral`;  // e.g., "posts_lateral"
+return `LEFT JOIN LATERAL ${subquery} AS ${quoteIdentifier(tableAlias)} ON true`;
+
+// In projection rendering
+return `${quoteIdentifier(tableAlias)}.${quoteIdentifier(item.expr.alias)} AS ${quoteIdentifier(item.alias)}`;
+// Results in: "posts_lateral"."posts" AS "posts"
+```
+
+### Identifier Quoting Pattern
+
+Don't quote identifiers early in functions. Quote them only when needed in SQL generation to avoid double-quoting issues:
+
+**❌ Wrong:**
+```typescript
+function renderInclude(include: IncludeAst): string {
+  const alias = quoteIdentifier(include.alias);  // Already quoted: "posts"
+  // Later: quoteIdentifier(alias) would produce """posts""" (triple quotes)
+  return `... AS ${quoteIdentifier(alias)} ...`;
+}
+```
+
+**✅ Correct:**
+```typescript
+function renderInclude(include: IncludeAst): string {
+  const alias = include.alias;  // Unquoted: posts
+  // Quote only when needed in SQL
+  return `... AS ${quoteIdentifier(alias)} ...`;  // Produces: "posts"
+}
+```
+
+### ORDER BY with LIMIT in Subqueries
+
+When both ORDER BY and LIMIT are present in a LATERAL subquery, wrap the query in an inner SELECT that projects individual columns with aliases, then use `json_agg(row_to_json(sub.*))` on the result:
+
+**Pattern:**
+```sql
+SELECT json_agg(row_to_json(sub.*)) AS "posts"
+FROM (
+  SELECT "post"."id" AS "id", "post"."title" AS "title"
+  FROM "post"
+  WHERE ...
+  ORDER BY "id" ASC  -- Use column alias, not table.column
+  LIMIT 1
+) sub
+```
+
+**Key points:**
+- Use column aliases in ORDER BY when the column is in the SELECT list
+- Map column references to their aliases before generating ORDER BY clause
+- Wrap in subquery to avoid GROUP BY issues with aggregates
+
+### Type Inference for Nested Arrays
+
+Track includes at the type level using a type parameter map in the builder to enable proper type inference:
+
+**Pattern:**
+```typescript
+class SelectBuilderImpl<
+  TContract extends SqlContract<SqlStorage>,
+  Row = unknown,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Includes extends Record<string, any> = Record<string, never>,  // Track includes
+> {
+  includeMany<ChildProjection, ChildRow>(
+    child: TableBuilder,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+    childBuilder: (child: IncludeChildBuilder) => IncludeChildBuilder<TContract, CodecTypes, ChildRow>,
+    options: { alias: string }
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes & { [K in typeof options.alias]: ChildRow }> {
+    // Implementation updates Includes type parameter
+  }
+}
+```
+
+This allows `InferNestedProjectionRow` to look up include aliases and infer `Array<ChildShape>` instead of `Array<unknown>`.
+
+### Runtime JSON Array Decoding
+
+Use special markers in plan metadata to identify include aliases that need JSON array parsing:
+
+**Pattern:**
+```typescript
+// In plan meta
+meta.projection = {
+  id: 'user.id',
+  posts: 'include:posts'  // Special marker
+};
+
+// In runtime decoding
+if (typeof projectionValue === 'string' && projectionValue.startsWith('include:')) {
+  // Parse JSON array from wire value
+  const parsed = JSON.parse(wireValue);
+  decoded[alias] = Array.isArray(parsed) ? parsed : [];
+}
+```
+
+**Key points:**
+- Convert `NULL` to empty arrays `[]` for consistency
+- Exclude include aliases from codec assignments (they're JSON arrays, not scalars)
+- Handle both string and already-parsed array values from drivers
+
+---
+
 **Remember**: This is a prototype. Some design docs describe future state. Focus on the MVP spec and the briefs marked "complete" for implemented features.
 

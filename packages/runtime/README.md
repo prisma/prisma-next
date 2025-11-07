@@ -83,6 +83,7 @@ flowchart TD
 - **Encoding**: Encode JavaScript values to wire format for parameters
 - **Decoding**: Decode wire format values to JavaScript types
 - **Validation**: Validate decoded values against contract types
+- **JSON Array Decoding**: Special handling for `includeMany` results - detects `include:alias` markers in plan metadata and parses JSON arrays from include aliases, converting `NULL` to empty arrays `[]` for consistency
 
 ### Plugins (`plugins/`)
 - **Lints**: Pre-execution validation and warnings
