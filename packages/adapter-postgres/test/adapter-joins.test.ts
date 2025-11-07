@@ -256,4 +256,31 @@ describe('Postgres adapter join rendering', () => {
       'SELECT "user"."id" AS "id" FROM "user" INNER JOIN "post" ON "user"."id" = "post"."userId" ORDER BY "post"."id" DESC LIMIT 10',
     );
   });
+
+  it('throws error for unsupported join ON expression kind', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      joins: [
+        {
+          kind: 'join',
+          joinType: 'inner',
+          table: { kind: 'table', name: 'post' },
+          on: {
+            // @ts-expect-error - Testing unsupported join ON expression kind
+            kind: 'unsupported',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: { kind: 'col', table: 'post', column: 'userId' },
+          },
+        },
+      ],
+      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+    };
+
+    expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
+      'Unsupported join ON expression kind: unsupported',
+    );
+  });
 });

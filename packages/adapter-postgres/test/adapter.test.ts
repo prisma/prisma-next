@@ -176,6 +176,88 @@ describe('createPostgresAdapter', () => {
       expect(result.body.sql).toContain('10');
     });
 
+    it('uses column aliases in ORDER BY when LIMIT is present and column is in SELECT list', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        includes: [
+          {
+            kind: 'includeMany',
+            alias: 'posts',
+            child: {
+              table: { kind: 'table', name: 'post' },
+              on: {
+                kind: 'eqCol',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'col', table: 'post', column: 'userId' },
+              },
+              limit: 10,
+              orderBy: [
+                {
+                  expr: { kind: 'col', table: 'post', column: 'id' },
+                  dir: 'desc',
+                },
+              ],
+              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+            },
+          },
+        ],
+        project: [
+          { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
+        ],
+      };
+
+      const result = adapter.lower(ast, { contract, params: [] });
+
+      // When ORDER BY column is in SELECT list, it should use the column alias
+      expect(result.body.sql).toContain('ORDER BY "id" DESC');
+      expect(result.body.sql).toContain('LIMIT 10');
+    });
+
+    it('uses full column reference in ORDER BY when LIMIT is present and column is not in SELECT list', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        includes: [
+          {
+            kind: 'includeMany',
+            alias: 'posts',
+            child: {
+              table: { kind: 'table', name: 'post' },
+              on: {
+                kind: 'eqCol',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'col', table: 'post', column: 'userId' },
+              },
+              limit: 10,
+              orderBy: [
+                {
+                  expr: { kind: 'col', table: 'post', column: 'createdAt' },
+                  dir: 'desc',
+                },
+              ],
+              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+            },
+          },
+        ],
+        project: [
+          { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
+        ],
+      };
+
+      const result = adapter.lower(ast, { contract, params: [] });
+
+      // When ORDER BY column is NOT in SELECT list, it should use full column reference
+      expect(result.body.sql).toContain('ORDER BY "post"."createdAt" DESC');
+      expect(result.body.sql).toContain('LIMIT 10');
+    });
+
     it('includes WHERE in lateral subquery', () => {
       const adapter = createPostgresAdapter();
 
