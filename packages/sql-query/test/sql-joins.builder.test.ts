@@ -112,15 +112,18 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-    expect(plan.ast?.joins).toBeDefined();
-    expect(plan.ast?.joins?.length).toBe(1);
-    expect(plan.ast?.joins?.[0]?.joinType).toBe('inner');
-    expect(plan.ast?.joins?.[0]?.table.name).toBe('post');
-    expect(plan.ast?.joins?.[0]?.on.kind).toBe('eqCol');
-    expect(plan.ast?.joins?.[0]?.on.left.table).toBe('user');
-    expect(plan.ast?.joins?.[0]?.on.left.column).toBe('id');
-    expect(plan.ast?.joins?.[0]?.on.right.table).toBe('post');
-    expect(plan.ast?.joins?.[0]?.on.right.column).toBe('userId');
+    expect(plan.ast?.joins).toEqual([
+      {
+        kind: 'join',
+        joinType: 'inner',
+        table: { kind: 'table', name: 'post' },
+        on: {
+          kind: 'eqCol',
+          left: { kind: 'col', table: 'user', column: 'id' },
+          right: { kind: 'col', table: 'post', column: 'userId' },
+        },
+      },
+    ]);
   });
 
   it('builds a plan with chained joins', () => {
@@ -141,11 +144,28 @@ describe('SQL builder joins', () => {
       .build();
 
     expect(plan.ast?.joins).toBeDefined();
-    expect(plan.ast?.joins?.length).toBe(2);
-    expect(plan.ast?.joins?.[0]?.joinType).toBe('inner');
-    expect(plan.ast?.joins?.[0]?.table.name).toBe('post');
-    expect(plan.ast?.joins?.[1]?.joinType).toBe('left');
-    expect(plan.ast?.joins?.[1]?.table.name).toBe('comment');
+    expect(plan.ast?.joins).toEqual([
+      {
+        kind: 'join',
+        joinType: 'inner',
+        table: { kind: 'table', name: 'post' },
+        on: {
+          kind: 'eqCol',
+          left: { kind: 'col', table: 'user', column: 'id' },
+          right: { kind: 'col', table: 'post', column: 'userId' },
+        },
+      },
+      {
+        kind: 'join',
+        joinType: 'left',
+        table: { kind: 'table', name: 'comment' },
+        on: {
+          kind: 'eqCol',
+          left: { kind: 'col', table: 'post', column: 'id' },
+          right: { kind: 'col', table: 'comment', column: 'postId' },
+        },
+      },
+    ]);
   });
 
   it('preserves join order across multiple chained joins', () => {
@@ -165,11 +185,12 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-    expect(plan.ast?.joins?.length).toBe(4);
-    expect(plan.ast?.joins?.[0]?.joinType).toBe('inner');
-    expect(plan.ast?.joins?.[1]?.joinType).toBe('left');
-    expect(plan.ast?.joins?.[2]?.joinType).toBe('right');
-    expect(plan.ast?.joins?.[3]?.joinType).toBe('full');
+    expect(plan.ast?.joins?.map((j) => ({ kind: j.kind, joinType: j.joinType }))).toEqual([
+      { kind: 'join', joinType: 'inner' },
+      { kind: 'join', joinType: 'left' },
+      { kind: 'join', joinType: 'right' },
+      { kind: 'join', joinType: 'full' },
+    ]);
   });
 
   it('works with where clause alongside joins', () => {
@@ -188,7 +209,7 @@ describe('SQL builder joins', () => {
       .build({ params: { userId: 42 } });
 
     expect(plan.ast?.joins).toBeDefined();
-    expect(plan.ast?.joins?.length).toBe(1);
+    expect(plan.ast?.joins).toHaveLength(1);
     expect(plan.ast?.where).toBeDefined();
     expect(plan.params).toEqual([42]);
   });

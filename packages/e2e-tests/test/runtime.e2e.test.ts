@@ -71,10 +71,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBeGreaterThan(1);
-            expect(rows[0]).toHaveProperty('id');
-            expect(rows[0]).toHaveProperty('email');
-            expect(typeof rows[0]?.['id']).toBe('number');
-            expect(typeof rows[0]?.['email']).toBe('string');
+            expect(rows[0]).toMatchObject({
+              id: expect.any(Number),
+              email: expect.any(String),
+            });
           } finally {
             await runtime.close();
           }
@@ -129,14 +129,12 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(3);
-            expect(rows[0]).toHaveProperty('userId');
-            expect(rows[0]).toHaveProperty('email');
-            expect(rows[0]).toHaveProperty('postId');
-            expect(rows[0]).toHaveProperty('title');
-            expect(typeof rows[0]?.['userId']).toBe('number');
-            expect(typeof rows[0]?.['email']).toBe('string');
-            expect(typeof rows[0]?.['postId']).toBe('number');
-            expect(typeof rows[0]?.['title']).toBe('string');
+            expect(rows[0]).toMatchObject({
+              userId: expect.any(Number),
+              email: expect.any(String),
+              postId: expect.any(Number),
+              title: expect.any(String),
+            });
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -417,12 +415,18 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               })
               .build();
 
-            expect(plan.ast?.joins).toBeDefined();
-            expect(plan.ast?.joins?.length).toBe(2);
-            expect(plan.ast?.joins?.[0]?.joinType).toBe('inner');
-            expect(plan.ast?.joins?.[0]?.table.name).toBe('post');
-            expect(plan.ast?.joins?.[1]?.joinType).toBe('left');
-            expect(plan.ast?.joins?.[1]?.table.name).toBe('comment');
+            expect(plan.ast?.joins).toEqual([
+              {
+                kind: 'join',
+                joinType: 'inner',
+                table: { kind: 'table', name: 'post' },
+              },
+              {
+                kind: 'join',
+                joinType: 'left',
+                table: { kind: 'table', name: 'comment' },
+              },
+            ]);
 
             const rows = await executePlanAndCollect(runtime, plan);
 
@@ -494,12 +498,11 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(3);
-            expect(rows[0]).toHaveProperty('name');
-            expect(rows[0]).toHaveProperty('post_title');
-            expect(rows[0]).not.toHaveProperty('post');
-
-            expect(typeof rows[0]?.['name']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('number');
+            expect(rows[0]).toMatchObject({
+              name: expect.any(String),
+              post_title: expect.any(Number),
+            });
+            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -573,10 +576,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(2);
-            expect(rows[0]).toHaveProperty('a_b_c');
-            expect(rows[0]).not.toHaveProperty('a');
-
-            expect(typeof (rows[0] as Record<string, unknown>)['a_b_c']).toBe('number');
+            expect(rows[0]).toMatchObject({
+              a_b_c: expect.any(Number),
+            });
+            expect(rows[0]).toEqual(expect.not.objectContaining({ a: expect.anything() }));
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -655,14 +658,12 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(2);
-            expect(rows[0]).toHaveProperty('name');
-            expect(rows[0]).toHaveProperty('post_title');
-            expect(rows[0]).toHaveProperty('post_id');
-            expect(rows[0]).not.toHaveProperty('post');
-
-            expect(typeof rows[0]?.['name']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_id']).toBe('number');
+            expect(rows[0]).toMatchObject({
+              name: expect.any(String),
+              post_title: expect.any(String),
+              post_id: expect.any(Number),
+            });
+            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -743,16 +744,13 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(2);
-            expect(rows[0]).toHaveProperty('id');
-            expect(rows[0]).toHaveProperty('post_title');
-            expect(rows[0]).toHaveProperty('post_author_name');
-            expect(rows[0]).toHaveProperty('email');
-            expect(rows[0]).not.toHaveProperty('post');
-
-            expect(typeof rows[0]?.['id']).toBe('number');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_author_name']).toBe('number');
-            expect(typeof rows[0]?.['email']).toBe('string');
+            expect(rows[0]).toMatchObject({
+              id: expect.any(Number),
+              post_title: expect.any(String),
+              post_author_name: expect.any(Number),
+              email: expect.any(String),
+            });
+            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -955,8 +953,9 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(1);
-            expect(rows[0]!.posts.length).toBe(1);
-            expect(rows[0]!.posts[0]!.title).toBe('Published Post 1');
+            expect(rows[0]).toMatchObject({
+              posts: [{ title: 'Published Post 1' }],
+            });
           } finally {
             await runtime.close();
           }
@@ -1080,12 +1079,15 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(2);
-            expect(rows[0]).toHaveProperty('postId');
-            expect(rows[0]).toHaveProperty('postTitle');
-            expect(rows[0]).toHaveProperty('userId');
-            expect(rows[0]).toHaveProperty('userEmail');
-            expect(rows[0]!.userEmail).toBe('ada@example.com');
-            expect(rows[1]!.userEmail).toBe('ada@example.com');
+            expect(rows[0]).toMatchObject({
+              postId: expect.any(Number),
+              postTitle: expect.any(String),
+              userId: expect.any(Number),
+              userEmail: 'ada@example.com',
+            });
+            expect(rows[1]).toMatchObject({
+              userEmail: 'ada@example.com',
+            });
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -1222,12 +1224,18 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
               })
               .build();
 
-            expect(plan.ast?.joins).toBeDefined();
-            expect(plan.ast?.joins?.length).toBe(2);
-            expect(plan.ast?.joins?.[0]?.joinType).toBe('inner');
-            expect(plan.ast?.joins?.[0]?.table.name).toBe('post');
-            expect(plan.ast?.joins?.[1]?.joinType).toBe('left');
-            expect(plan.ast?.joins?.[1]?.table.name).toBe('comment');
+            expect(plan.ast?.joins).toEqual([
+              {
+                kind: 'join',
+                joinType: 'inner',
+                table: { kind: 'table', name: 'post' },
+              },
+              {
+                kind: 'join',
+                joinType: 'left',
+                table: { kind: 'table', name: 'comment' },
+              },
+            ]);
 
             const rows = await executePlanAndCollect(runtime, plan);
 
@@ -1299,12 +1307,11 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(3);
-            expect(rows[0]).toHaveProperty('name');
-            expect(rows[0]).toHaveProperty('post_title');
-            expect(rows[0]).not.toHaveProperty('post');
-
-            expect(typeof rows[0]?.['name']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('number');
+            expect(rows[0]).toMatchObject({
+              name: expect.any(String),
+              post_title: expect.any(Number),
+            });
+            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -1378,10 +1385,10 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(2);
-            expect(rows[0]).toHaveProperty('a_b_c');
-            expect(rows[0]).not.toHaveProperty('a');
-
-            expect(typeof (rows[0] as Record<string, unknown>)['a_b_c']).toBe('number');
+            expect(rows[0]).toMatchObject({
+              a_b_c: expect.any(Number),
+            });
+            expect(rows[0]).toEqual(expect.not.objectContaining({ a: expect.anything() }));
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -1460,14 +1467,12 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(2);
-            expect(rows[0]).toHaveProperty('name');
-            expect(rows[0]).toHaveProperty('post_title');
-            expect(rows[0]).toHaveProperty('post_id');
-            expect(rows[0]).not.toHaveProperty('post');
-
-            expect(typeof rows[0]?.['name']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_id']).toBe('number');
+            expect(rows[0]).toMatchObject({
+              name: expect.any(String),
+              post_title: expect.any(String),
+              post_id: expect.any(Number),
+            });
+            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{
@@ -1548,16 +1553,13 @@ describe('end-to-end query with emitted contract', { timeout: 30000 }, () => {
             const rows = await executePlanAndCollect(runtime, plan);
 
             expect(rows.length).toBe(2);
-            expect(rows[0]).toHaveProperty('id');
-            expect(rows[0]).toHaveProperty('post_title');
-            expect(rows[0]).toHaveProperty('post_author_name');
-            expect(rows[0]).toHaveProperty('email');
-            expect(rows[0]).not.toHaveProperty('post');
-
-            expect(typeof rows[0]?.['id']).toBe('number');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_title']).toBe('string');
-            expect(typeof (rows[0] as Record<string, unknown>)['post_author_name']).toBe('number');
-            expect(typeof rows[0]?.['email']).toBe('string');
+            expect(rows[0]).toMatchObject({
+              id: expect.any(Number),
+              post_title: expect.any(String),
+              post_author_name: expect.any(Number),
+              email: expect.any(String),
+            });
+            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
             type Row = ResultType<typeof plan>;
             expectTypeOf<Row>().toExtend<{

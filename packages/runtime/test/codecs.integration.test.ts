@@ -393,6 +393,6 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
 
     const rows = await executePlanAndCollect(runtime, selectPlan);
     expect(rows.length).toBe(1);
-    expect(rows[0]?.name).toBe('Test User');
+    expect(rows[0]).toEqual({ name: 'Test User' });
   });
 });
