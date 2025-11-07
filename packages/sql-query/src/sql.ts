@@ -128,11 +128,7 @@ class IncludeChildBuilderImpl<
   private childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
   private childLimit?: number;
 
-  constructor(
-    contract: TContract,
-    codecTypes: CodecTypes,
-    table: TableRef,
-  ) {
+  constructor(contract: TContract, codecTypes: CodecTypes, table: TableRef) {
     this.contract = contract;
     this.codecTypes = codecTypes;
     this.table = table;
@@ -141,17 +137,25 @@ class IncludeChildBuilderImpl<
   select<
     P extends Record<
       string,
-      ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+      | ColumnBuilder
+      | Record<
+          string,
+          | ColumnBuilder
+          | Record<
+              string,
+              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+            >
+        >
     >,
   >(
     projection: P,
   ): IncludeChildBuilderImpl<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>> {
     const projectionState = buildProjectionState(this.table, projection);
-    const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>>(
-      this.contract,
-      this.codecTypes,
-      this.table,
-    );
+    const builder = new IncludeChildBuilderImpl<
+      TContract,
+      CodecTypes,
+      InferNestedProjectionRow<P, CodecTypes>
+    >(this.contract, this.codecTypes, this.table);
     builder.childProjection = projectionState;
     if (this.childWhere !== undefined) {
       builder.childWhere = this.childWhere;
@@ -184,7 +188,9 @@ class IncludeChildBuilderImpl<
     return builder;
   }
 
-  orderBy(order: ReturnType<ColumnBuilder['asc']>): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
+  orderBy(
+    order: ReturnType<ColumnBuilder['asc']>,
+  ): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
@@ -264,13 +270,23 @@ export interface IncludeChildBuilder<
   select<
     P extends Record<
       string,
-      ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+      | ColumnBuilder
+      | Record<
+          string,
+          | ColumnBuilder
+          | Record<
+              string,
+              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+            >
+        >
     >,
   >(
     projection: P,
   ): IncludeChildBuilder<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>>;
   where(expr: BinaryBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
-  orderBy(order: ReturnType<ColumnBuilder['asc']>): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
+  orderBy(
+    order: ReturnType<ColumnBuilder['asc']>,
+  ): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
   limit(count: number): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
 }
 
@@ -336,14 +352,24 @@ class SelectBuilderImpl<
   includeMany<
     ChildProjection extends Record<
       string,
-      ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+      | ColumnBuilder
+      | Record<
+          string,
+          | ColumnBuilder
+          | Record<
+              string,
+              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+            >
+        >
     >,
     ChildRow = InferNestedProjectionRow<ChildProjection, CodecTypes>,
     AliasName extends string = string,
   >(
     childTable: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
-    childBuilder: (child: IncludeChildBuilder<TContract, CodecTypes, unknown>) => IncludeChildBuilder<TContract, CodecTypes, ChildRow>,
+    childBuilder: (
+      child: IncludeChildBuilder<TContract, CodecTypes, unknown>,
+    ) => IncludeChildBuilder<TContract, CodecTypes, ChildRow>,
     options?: { alias?: AliasName },
   ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes & { [K in AliasName]: ChildRow }> {
     // Runtime capability check
@@ -375,8 +401,12 @@ class SelectBuilderImpl<
       this.codecTypes,
       childTable,
     );
-    const builtChild = childBuilder(childBuilderImpl as IncludeChildBuilder<TContract, CodecTypes, unknown>);
-    const childState = (builtChild as IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>).getState();
+    const builtChild = childBuilder(
+      childBuilderImpl as IncludeChildBuilder<TContract, CodecTypes, unknown>,
+    );
+    const childState = (
+      builtChild as IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>
+    ).getState();
 
     // Validate child projection is non-empty
     if (childState.childProjection.aliases.length === 0) {
@@ -389,14 +419,18 @@ class SelectBuilderImpl<
     // Check for alias collisions with existing projection
     if (this.state.projection) {
       if (this.state.projection.aliases.includes(alias)) {
-        throw planInvalid(`Alias collision: include alias "${alias}" conflicts with existing projection alias`);
+        throw planInvalid(
+          `Alias collision: include alias "${alias}" conflicts with existing projection alias`,
+        );
       }
     }
 
     // Check for alias collisions with existing includes
     const existingIncludes = this.state.includes ?? [];
     if (existingIncludes.some((inc) => inc.alias === alias)) {
-      throw planInvalid(`Alias collision: include alias "${alias}" conflicts with existing include alias`);
+      throw planInvalid(
+        `Alias collision: include alias "${alias}" conflicts with existing include alias`,
+      );
     }
 
     const includeState: IncludeState = {
@@ -476,15 +510,34 @@ class SelectBuilderImpl<
   select<
     P extends Record<
       string,
-      ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+      | ColumnBuilder
+      | boolean
+      | Record<
+          string,
+          | ColumnBuilder
+          | Record<
+              string,
+              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+            >
+        >
     >,
   >(
     projection: P,
-  ): SelectBuilderImpl<TContract, InferNestedProjectionRow<P, CodecTypes, Includes>, CodecTypes, Includes> {
+  ): SelectBuilderImpl<
+    TContract,
+    InferNestedProjectionRow<P, CodecTypes, Includes>,
+    CodecTypes,
+    Includes
+  > {
     const table = this.ensureFrom();
     const projectionState = buildProjectionState(table, projection, this.state.includes);
 
-    return new SelectBuilderImpl<TContract, InferNestedProjectionRow<P, CodecTypes, Includes>, CodecTypes, Includes>(
+    return new SelectBuilderImpl<
+      TContract,
+      InferNestedProjectionRow<P, CodecTypes, Includes>,
+      CodecTypes,
+      Includes
+    >(
       {
         contract: this.contract,
         adapter: this.adapter,
@@ -494,7 +547,9 @@ class SelectBuilderImpl<
     );
   }
 
-  orderBy(order: ReturnType<ColumnBuilder['asc']>): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+  orderBy(
+    order: ReturnType<ColumnBuilder['asc']>,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         contract: this.contract,
@@ -592,7 +647,12 @@ class SelectBuilderImpl<
 
       let childWhere: BinaryExpr | undefined;
       if (include.childWhere) {
-        const whereResult = this._buildWhereExpr(include.childWhere, paramsMap, paramDescriptors, paramValues);
+        const whereResult = this._buildWhereExpr(
+          include.childWhere,
+          paramsMap,
+          paramDescriptors,
+          paramValues,
+        );
         childWhere = whereResult?.expr;
       }
 
@@ -789,7 +849,6 @@ class SelectBuilderImpl<
   }
 }
 
-
 function isColumnBuilder(value: unknown): value is ColumnBuilder {
   return (
     typeof value === 'object' &&
@@ -802,7 +861,15 @@ function isColumnBuilder(value: unknown): value is ColumnBuilder {
 function flattenProjection(
   projection: Record<
     string,
-    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+    | ColumnBuilder
+    | Record<
+        string,
+        | ColumnBuilder
+        | Record<
+            string,
+            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          >
+      >
   >,
   tracker: AliasTracker,
   currentPath: string[] = [],
@@ -821,7 +888,15 @@ function flattenProjection(
       const nested = flattenProjection(
         value as Record<
           string,
-          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+          | ColumnBuilder
+          | Record<
+              string,
+              | ColumnBuilder
+              | Record<
+                  string,
+                  ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+                >
+            >
         >,
         tracker,
         path,
@@ -829,7 +904,9 @@ function flattenProjection(
       aliases.push(...nested.aliases);
       columns.push(...nested.columns);
     } else {
-      throw planInvalid(`Invalid projection value at path ${path.join('.')}: expected ColumnBuilder or nested object`);
+      throw planInvalid(
+        `Invalid projection value at path ${path.join('.')}: expected ColumnBuilder or nested object`,
+      );
     }
   }
 
@@ -840,7 +917,16 @@ function buildProjectionState(
   _table: TableRef,
   projection: Record<
     string,
-    ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+    | ColumnBuilder
+    | boolean
+    | Record<
+        string,
+        | ColumnBuilder
+        | Record<
+            string,
+            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          >
+      >
   >,
   includes?: ReadonlyArray<IncludeState>,
 ): ProjectionState {
@@ -853,7 +939,9 @@ function buildProjectionState(
       // Boolean true means this is an include reference
       const matchingInclude = includes?.find((inc) => inc.alias === key);
       if (!matchingInclude) {
-        throw planInvalid(`Include alias "${key}" not found. Did you call includeMany() with alias "${key}"?`);
+        throw planInvalid(
+          `Include alias "${key}" not found. Did you call includeMany() with alias "${key}"?`,
+        );
       }
       // For include references, we track the alias but use a placeholder column
       // The actual handling happens in AST building where we create includeRef
@@ -874,7 +962,15 @@ function buildProjectionState(
       const nested = flattenProjection(
         value as Record<
           string,
-          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>>>
+          | ColumnBuilder
+          | Record<
+              string,
+              | ColumnBuilder
+              | Record<
+                  string,
+                  ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+                >
+            >
         >,
         tracker,
         [key],
@@ -882,7 +978,9 @@ function buildProjectionState(
       aliases.push(...nested.aliases);
       columns.push(...nested.columns);
     } else {
-      throw planInvalid(`Invalid projection value at key "${key}": expected ColumnBuilder, boolean true (for includes), or nested object`);
+      throw planInvalid(
+        `Invalid projection value at key "${key}": expected ColumnBuilder, boolean true (for includes), or nested object`,
+      );
     }
   }
 
@@ -1079,12 +1177,9 @@ export function sql<
 >(
   options: SqlBuilderOptions<TContract, CodecTypes>,
 ): SelectBuilder<TContract, unknown, CodecTypes, Record<string, never>> {
-  const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(options) as SelectBuilder<
-    TContract,
-    unknown,
-    CodecTypes,
-    Record<string, never>
-  >;
+  const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(
+    options,
+  ) as SelectBuilder<TContract, unknown, CodecTypes, Record<string, never>>;
   const rawFactory = createRawFactory(options.contract);
 
   Object.defineProperty(builder, 'raw', {

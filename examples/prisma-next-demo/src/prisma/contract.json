@@ -84,6 +84,12 @@
       }
     }
   },
+  "capabilities": {
+    "postgres": {
+      "lateral": true,
+      "jsonAgg": true
+    }
+  },
   "extensions": {
     "postgres": {
       "version": "15.0.0"
