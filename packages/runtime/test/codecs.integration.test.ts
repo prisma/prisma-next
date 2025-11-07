@@ -256,7 +256,7 @@ describe('Codecs Integration Tests', { timeout: 30000 }, () => {
     const rows = await executePlanAndCollect(runtime, planWithOverride);
     expect(rows.length).toBe(1);
 
-    const row = rows[0]!;
+    const row = rows[0]! as Record<string, unknown>;
     expect(row['created_at']).toBeDefined();
     expect(typeof row['created_at']).toBe('string');
   });

@@ -185,18 +185,6 @@ export async function setupE2EDatabase(
   await setupTestDatabase(client, contract, setupFn);
 }
 
-/**
- * Tears down test database by dropping specified tables.
- */
-export async function teardownTestDatabase(
-  client: Client,
-  tableNames: readonly string[],
-): Promise<void> {
-  for (const tableName of tableNames) {
-    await client.query(`drop table if exists "${tableName}" cascade`);
-  }
-}
-
 // Re-export generic utilities from test-utils
 export {
   collectAsync,
