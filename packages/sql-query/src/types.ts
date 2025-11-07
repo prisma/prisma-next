@@ -20,6 +20,7 @@ export type {
 } from '@prisma-next/sql-target';
 
 import type { Adapter, SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
+import type { LoweringSpec, ReturnSpec } from './operations-registry';
 
 export type Direction = 'asc' | 'desc';
 
@@ -34,7 +35,7 @@ export interface OrderBuilder<
   JsType = unknown,
 > {
   readonly kind: 'order';
-  readonly expr: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
+  readonly expr: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly dir: Direction;
 }
 
@@ -59,7 +60,7 @@ export interface BinaryBuilder<
 > {
   readonly kind: 'binary';
   readonly op: 'eq';
-  readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
+  readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly right: ParamPlaceholder;
 }
 
@@ -93,12 +94,27 @@ export interface ParamRef {
   readonly name?: string;
 }
 
-export type Expr = ColumnRef | ParamRef;
+export interface LiteralExpr {
+  readonly kind: 'literal';
+  readonly value: unknown;
+}
+
+export interface OperationExpr {
+  readonly kind: 'operation';
+  readonly method: string;
+  readonly forTypeId: string;
+  readonly self: ColumnRef;
+  readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr>;
+  readonly returns: ReturnSpec;
+  readonly lowering: LoweringSpec;
+}
+
+export type Expr = ColumnRef | ParamRef | OperationExpr;
 
 export interface BinaryExpr {
   readonly kind: 'bin';
   readonly op: 'eq';
-  readonly left: ColumnRef;
+  readonly left: ColumnRef | OperationExpr;
   readonly right: ParamRef;
 }
 
@@ -140,10 +156,10 @@ export interface SelectAst {
   readonly includes?: ReadonlyArray<IncludeAst>;
   readonly project: ReadonlyArray<{
     alias: string;
-    expr: ColumnRef | IncludeRef;
+    expr: ColumnRef | IncludeRef | OperationExpr;
   }>;
   readonly where?: BinaryExpr;
-  readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
+  readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
   readonly limit?: number;
 }
 

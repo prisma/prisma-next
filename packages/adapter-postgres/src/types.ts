@@ -3,7 +3,9 @@ import type {
   ColumnRef,
   Direction,
   JoinAst,
+  LiteralExpr,
   LoweredStatement,
+  OperationExpr,
   ParamRef,
   SelectAst,
 } from '@prisma-next/sql-query/types';
@@ -29,6 +31,8 @@ export type {
   ColumnRef,
   Direction,
   JoinAst,
+  LiteralExpr,
+  OperationExpr,
   ParamRef,
   SelectAst,
   StorageColumn,

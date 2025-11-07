@@ -13,6 +13,7 @@ import type {
   JoinOnBuilder,
   JoinOnPredicate,
   LoweredStatement,
+  OperationExpr,
   ParamDescriptor,
   Plan,
   PlanMeta,
@@ -604,14 +605,17 @@ class SelectBuilderImpl<
     const orderByClause = this.state.orderBy
       ? ([
           {
-            expr: {
-              kind: 'col',
-              table: this.state.orderBy.expr.table,
-              column: this.state.orderBy.expr.column,
-            },
+            expr:
+              'kind' in this.state.orderBy.expr && this.state.orderBy.expr.kind === 'operation'
+                ? this.state.orderBy.expr
+                : {
+                    kind: 'col' as const,
+                    table: this.state.orderBy.expr.table,
+                    column: this.state.orderBy.expr.column,
+                  },
             dir: this.state.orderBy.dir,
           },
-        ] as ReadonlyArray<{ expr: ColumnRef; dir: Direction }>)
+        ] as ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>)
       : undefined;
 
     const joins = this.state.joins?.map((join) => ({
@@ -697,8 +701,9 @@ class SelectBuilderImpl<
       };
     });
 
-    // Build projection with support for includeRef
-    const projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef }> = [];
+    // Build projection with support for includeRef and OperationExpr
+    const projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }> =
+      [];
     for (let i = 0; i < projection.aliases.length; i++) {
       const alias = projection.aliases[i];
       if (!alias) {
@@ -718,20 +723,29 @@ class SelectBuilderImpl<
           expr: { kind: 'includeRef', alias },
         });
       } else {
-        // This is a regular column
-        const tableName = column.table;
-        const columnName = column.column;
-        if (!tableName || !columnName) {
-          throw planInvalid(`Invalid column for alias ${alias} at index ${i}`);
+        // Check if this column has an operation expression
+        const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+        if (operationExpr) {
+          projectEntries.push({
+            alias,
+            expr: operationExpr,
+          });
+        } else {
+          // This is a regular column
+          const tableName = column.table;
+          const columnName = column.column;
+          if (!tableName || !columnName) {
+            throw planInvalid(`Invalid column for alias ${alias} at index ${i}`);
+          }
+          projectEntries.push({
+            alias,
+            expr: {
+              kind: 'col',
+              table: tableName,
+              column: columnName,
+            },
+          });
         }
-        projectEntries.push({
-          alias,
-          expr: {
-            kind: 'col',
-            table: tableName,
-            column: columnName,
-          },
-        });
       }
     }
 
@@ -796,12 +810,7 @@ class SelectBuilderImpl<
     descriptors: ParamDescriptor[],
     values: unknown[],
   ): {
-    expr: {
-      readonly kind: 'bin';
-      readonly op: 'eq';
-      readonly left: { kind: 'col'; table: string; column: string };
-      readonly right: { kind: 'param'; index: number; name?: string };
-    };
+    expr: BinaryExpr;
     codecId?: string;
     paramName: string;
   } {
@@ -815,30 +824,38 @@ class SelectBuilderImpl<
     const value = paramsMap[paramName];
     const index = values.push(value);
 
-    const meta = (where.left.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+    let leftExpr: ColumnRef | OperationExpr;
+    let codecId: string | undefined;
 
-    descriptors.push({
-      name: paramName,
-      source: 'dsl',
-      refs: { table: where.left.table, column: where.left.column },
-      ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
-      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
-    });
+    if ('kind' in where.left && where.left.kind === 'operation') {
+      leftExpr = where.left;
+    } else {
+      const meta = (where.left.columnMeta ?? {}) as { type?: string; nullable?: boolean };
 
-    // Get codec ID from column metadata type (already canonicalized)
-    const contractTable = this.contract.storage.tables[where.left.table];
-    const columnMeta = contractTable?.columns[where.left.column];
-    const codecId = columnMeta?.type;
+      descriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: where.left.table, column: where.left.column },
+        ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+        ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+      });
+
+      const contractTable = this.contract.storage.tables[where.left.table];
+      const columnMeta = contractTable?.columns[where.left.column];
+      codecId = columnMeta?.type;
+
+      leftExpr = {
+        kind: 'col',
+        table: where.left.table,
+        column: where.left.column,
+      };
+    }
 
     return {
       expr: {
         kind: 'bin',
         op: 'eq',
-        left: {
-          kind: 'col',
-          table: where.left.table,
-          column: where.left.column,
-        },
+        left: leftExpr,
         right: {
           kind: 'param',
           index,
@@ -1010,10 +1027,26 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsTables = new Set<string>([args.table.name]);
 
   for (const column of args.projection.columns) {
-    refsColumns.set(`${column.table}.${column.column}`, {
-      table: column.table,
-      column: column.column,
-    });
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      refsColumns.set(`${operationExpr.self.table}.${operationExpr.self.column}`, {
+        table: operationExpr.self.table,
+        column: operationExpr.self.column,
+      });
+      for (const arg of operationExpr.args) {
+        if (arg.kind === 'col') {
+          refsColumns.set(`${arg.table}.${arg.column}`, {
+            table: arg.table,
+            column: arg.column,
+          });
+        }
+      }
+    } else if (column.table && column.column) {
+      refsColumns.set(`${column.table}.${column.column}`, {
+        table: column.table,
+        column: column.column,
+      });
+    }
   }
 
   if (args.joins) {
@@ -1069,17 +1102,47 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.where) {
-    refsColumns.set(`${args.where.left.table}.${args.where.left.column}`, {
-      table: args.where.left.table,
-      column: args.where.left.column,
-    });
+    if ('kind' in args.where.left && args.where.left.kind === 'operation') {
+      refsColumns.set(`${args.where.left.self.table}.${args.where.left.self.column}`, {
+        table: args.where.left.self.table,
+        column: args.where.left.self.column,
+      });
+      for (const arg of args.where.left.args) {
+        if (arg.kind === 'col') {
+          refsColumns.set(`${arg.table}.${arg.column}`, {
+            table: arg.table,
+            column: arg.column,
+          });
+        }
+      }
+    } else {
+      refsColumns.set(`${args.where.left.table}.${args.where.left.column}`, {
+        table: args.where.left.table,
+        column: args.where.left.column,
+      });
+    }
   }
 
   if (args.orderBy) {
-    refsColumns.set(`${args.orderBy.expr.table}.${args.orderBy.expr.column}`, {
-      table: args.orderBy.expr.table,
-      column: args.orderBy.expr.column,
-    });
+    if ('kind' in args.orderBy.expr && args.orderBy.expr.kind === 'operation') {
+      refsColumns.set(`${args.orderBy.expr.self.table}.${args.orderBy.expr.self.column}`, {
+        table: args.orderBy.expr.self.table,
+        column: args.orderBy.expr.self.column,
+      });
+      for (const arg of args.orderBy.expr.args) {
+        if (arg.kind === 'col') {
+          refsColumns.set(`${arg.table}.${arg.column}`, {
+            table: arg.table,
+            column: arg.column,
+          });
+        }
+      }
+    } else {
+      refsColumns.set(`${args.orderBy.expr.table}.${args.orderBy.expr.column}`, {
+        table: args.orderBy.expr.table,
+        column: args.orderBy.expr.column,
+      });
+    }
   }
 
   // Build projection map - mark include aliases with special marker
@@ -1098,6 +1161,10 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
         // This is a placeholder column for an include - skip it
         return [alias, `include:${alias}`];
       }
+      const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+      if (operationExpr) {
+        return [alias, `operation:${operationExpr.method}`];
+      }
       return [alias, `${column.table}.${column.column}`];
     }),
   );
@@ -1114,9 +1181,18 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    const columnMeta = column.columnMeta;
-    if (columnMeta?.type) {
-      projectionTypes[alias] = columnMeta.type;
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      if (operationExpr.returns.kind === 'typeId') {
+        projectionTypes[alias] = operationExpr.returns.type;
+      } else if (operationExpr.returns.kind === 'builtin') {
+        projectionTypes[alias] = operationExpr.returns.type;
+      }
+    } else {
+      const columnMeta = column.columnMeta;
+      if (columnMeta?.type) {
+        projectionTypes[alias] = columnMeta.type;
+      }
     }
   }
 
@@ -1132,10 +1208,17 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    // Use columnMeta.type directly as typeId (already canonicalized)
-    const columnMeta = column.columnMeta;
-    if (columnMeta?.type) {
-      projectionCodecs[alias] = columnMeta.type;
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      if (operationExpr.returns.kind === 'typeId') {
+        projectionCodecs[alias] = operationExpr.returns.type;
+      }
+    } else {
+      // Use columnMeta.type directly as typeId (already canonicalized)
+      const columnMeta = column.columnMeta;
+      if (columnMeta?.type) {
+        projectionCodecs[alias] = columnMeta.type;
+      }
     }
   }
 

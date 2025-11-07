@@ -5,6 +5,8 @@ import type {
   BinaryExpr,
   ColumnRef,
   JoinAst,
+  LiteralExpr,
+  OperationExpr,
   ParamRef,
   PostgresAdapterOptions,
   PostgresContract,
@@ -63,7 +65,13 @@ function renderSelect(ast: SelectAst): string {
   const whereClause = ast.where ? ` WHERE ${renderBinary(ast.where)}` : '';
   const orderClause = ast.orderBy?.length
     ? ` ORDER BY ${ast.orderBy
-        .map((order) => `${renderColumn(order.expr)} ${order.dir.toUpperCase()}`)
+        .map((order) => {
+          const expr =
+            order.expr.kind === 'operation'
+              ? renderOperation(order.expr)
+              : renderColumn(order.expr);
+          return `${expr} ${order.dir.toUpperCase()}`;
+        })
         .join(', ')}`
     : '';
   const limitClause = typeof ast.limit === 'number' ? ` LIMIT ${ast.limit}` : '';
@@ -83,6 +91,11 @@ function renderProjection(ast: SelectAst): string {
         const tableAlias = `${item.expr.alias}_lateral`;
         return `${quoteIdentifier(tableAlias)}.${quoteIdentifier(item.expr.alias)} AS ${quoteIdentifier(item.alias)}`;
       }
+      if (item.expr.kind === 'operation') {
+        const operation = renderOperation(item.expr);
+        const alias = quoteIdentifier(item.alias);
+        return `${operation} AS ${alias}`;
+      }
       const column = renderColumn(item.expr);
       const alias = quoteIdentifier(item.alias);
       return `${column} AS ${alias}`;
@@ -91,9 +104,10 @@ function renderProjection(ast: SelectAst): string {
 }
 
 function renderBinary(expr: BinaryExpr): string {
-  const left = renderColumn(expr.left);
+  const left =
+    expr.left.kind === 'operation' ? renderOperation(expr.left) : renderColumn(expr.left);
   const right = renderParam(expr.right);
-  return `${left} = ${right}`;
+  return `(${left}) = ${right}`;
 }
 
 function renderColumn(ref: ColumnRef): string {
@@ -102,6 +116,50 @@ function renderColumn(ref: ColumnRef): string {
 
 function renderParam(ref: ParamRef): string {
   return `$${ref.index}`;
+}
+
+function renderLiteral(expr: LiteralExpr): string {
+  if (typeof expr.value === 'string') {
+    return `'${expr.value.replace(/'/g, "''")}'`;
+  }
+  if (typeof expr.value === 'number' || typeof expr.value === 'boolean') {
+    return String(expr.value);
+  }
+  if (expr.value === null) {
+    return 'NULL';
+  }
+  if (Array.isArray(expr.value)) {
+    return `ARRAY[${expr.value.map((v) => renderLiteral({ kind: 'literal', value: v })).join(', ')}]`;
+  }
+  return JSON.stringify(expr.value);
+}
+
+function renderOperation(expr: OperationExpr): string {
+  const self = renderColumn(expr.self);
+  const args = expr.args.map((arg, index) => {
+    if (arg.kind === 'col') {
+      return renderColumn(arg);
+    }
+    if (arg.kind === 'param') {
+      return renderParam(arg);
+    }
+    if (arg.kind === 'literal') {
+      return renderLiteral(arg);
+    }
+    throw new Error(`Unsupported argument kind: ${arg.kind}`);
+  });
+
+  let result = expr.lowering.template;
+  result = result.replace(/\$\{self\}/g, self);
+  for (let i = 0; i < args.length; i++) {
+    result = result.replace(new RegExp(`\\$\\{arg${i}\\}`, 'g'), args[i] ?? '');
+  }
+
+  if (expr.lowering.strategy === 'function') {
+    return result;
+  }
+
+  return result;
 }
 
 function renderJoin(join: JoinAst): string {

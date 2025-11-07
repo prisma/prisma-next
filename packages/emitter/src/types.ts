@@ -4,6 +4,30 @@ export interface TypesImportSpec {
   readonly alias: string;
 }
 
+export type ArgSpecManifest =
+  | { readonly kind: 'typeId'; readonly type: string }
+  | { readonly kind: 'param' }
+  | { readonly kind: 'literal' };
+
+export type ReturnSpecManifest =
+  | { readonly kind: 'typeId'; readonly type: string }
+  | { readonly kind: 'builtin'; readonly type: 'number' | 'boolean' | 'string' };
+
+export interface LoweringSpecManifest {
+  readonly targetFamily: 'sql';
+  readonly strategy: 'infix' | 'function';
+  readonly template: string;
+}
+
+export interface OperationManifest {
+  readonly for: string;
+  readonly method: string;
+  readonly args: ReadonlyArray<ArgSpecManifest>;
+  readonly returns: ReturnSpecManifest;
+  readonly lowering: LoweringSpecManifest;
+  readonly capabilities?: ReadonlyArray<string>;
+}
+
 export interface ExtensionPackManifest {
   readonly id: string;
   readonly version: string;
@@ -14,6 +38,7 @@ export interface ExtensionPackManifest {
       readonly import: TypesImportSpec;
     };
   };
+  readonly operations?: ReadonlyArray<OperationManifest>;
 }
 
 export interface ExtensionPack {
