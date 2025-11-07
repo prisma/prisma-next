@@ -2,26 +2,23 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import { Client } from 'pg';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { schema } from '@prisma-next/sql-query/schema';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { timeouts } from '@prisma-next/test-utils';
-
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-
+import { timeouts } from '@prisma-next/test-utils';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import { budgets } from '../src/plugins/budgets';
 import { lints } from '../src/plugins/lints';
-import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import {
   createDevDatabase,
+  createTestRuntime,
+  drainPlanExecution,
+  executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
-  createTestRuntime,
-  executePlanAndCollect,
-  drainPlanExecution,
 } from './utils';
 
 const fixtureContract = loadContractFixture();
@@ -86,7 +83,7 @@ describe('runtime execute integration', () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    const rows = await executePlanAndCollect<Record<string, unknown>>(runtime, plan);
+    const rows = await executePlanAndCollect(runtime, plan);
 
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.map((r) => r['email'])).toContain('ada@example.com');
@@ -166,7 +163,7 @@ describe('runtime execute integration', () => {
       },
     );
 
-    const rows = await executePlanAndCollect<{ id: number }>(runtime, rawPlan);
+    const rows = await executePlanAndCollect(runtime, rawPlan);
 
     expect(rows.length).toBeGreaterThan(0);
 

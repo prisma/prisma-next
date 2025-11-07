@@ -11,5 +11,6 @@ export default defineConfig({
   clean: true,
   target: 'es2022',
   minify: false,
-  external: ['@prisma/dev'],
+  external: ['@prisma/dev', 'pg', /^node:/],
+  noExternal: [],
 });

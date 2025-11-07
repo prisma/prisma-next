@@ -23,7 +23,7 @@ function normalizeConnectionString(raw: string): string {
   return url.toString();
 }
 
-export interface DevDatabase {
+interface DevDatabase {
   readonly connectionString: string;
   close(): Promise<void>;
 }
