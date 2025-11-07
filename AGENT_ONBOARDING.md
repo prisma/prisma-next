@@ -821,6 +821,12 @@ This section describes the current state of the projection system, which is need
 - Join columns are available for selection in projections
 - Result typing is derived solely from projection, unaffected by joins
 
+**includeMany:**
+- Enables 1:N relationships that return one row per parent with a nested array field for children
+- Built in a single SQL statement using `LATERAL` joins and `json_agg` when supported
+- Requires both `lateral: true` and `jsonAgg: true` capabilities in the contract
+- See `packages/sql-query/README.md` for usage examples and implementation details
+
 ### What Needs to Change for Nested Projections
 
 **Type Inference:**

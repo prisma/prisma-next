@@ -1,0 +1,87 @@
+---
+description: Type inference patterns for includeMany feature
+alwaysApply: false
+---
+
+# includeMany Type Inference Patterns
+
+## Includes Map Pattern
+
+When implementing `includeMany` or similar features that accumulate type information:
+
+**Pattern**: Use a generic type parameter that accumulates include definitions:
+
+```typescript
+class SelectBuilderImpl<
+  TContract extends SqlContract<SqlStorage>,
+  Row = unknown,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Includes extends Record<string, any> = Record<string, never>,  // Accumulates includes
+> {
+  includeMany<..., AliasName extends string = string>(
+    ...
+  ): SelectBuilderImpl<..., Includes & { [K in AliasName]: ChildRow }> {
+    // Updates Includes map with new include
+  }
+}
+```
+
+**Why**: This allows TypeScript to track include definitions across multiple `includeMany()` calls and infer correct array types in the final result.
+
+## ExtractIncludeType Helper
+
+When looking up types from an accumulated map:
+
+**Pattern**: Use a helper type that safely extracts types:
+
+```typescript
+type ExtractIncludeType<
+  K extends string,
+  Includes extends Record<string, any>,
+> = K extends keyof Includes ? Includes[K] : unknown;
+```
+
+**Why**: This provides type-safe lookup with a fallback to `unknown` if the key doesn't exist, preventing type errors while maintaining type safety.
+
+## Boolean True for Include References
+
+When using boolean `true` to mark include references in projections:
+
+**Pattern**: Handle `true` in type inference:
+
+```typescript
+: P[K] extends true
+  ? Array<ExtractIncludeType<K & string, Includes>>
+  : ...
+```
+
+**Why**: This allows `select({ posts: true })` to infer `Array<ChildShape>` from the `Includes` map, providing type-safe include references.
+
+## Capability Gating
+
+When gating features by capabilities:
+
+**Pattern**: Check capabilities at both runtime and type level:
+
+```typescript
+// Runtime check
+if (targetCapabilities['lateral'] !== true || targetCapabilities['jsonAgg'] !== true) {
+  throw planInvalid('includeMany requires lateral and jsonAgg capabilities');
+}
+
+// Type-level gating
+export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>> =
+  TContract extends { capabilities: infer C; target: infer T }
+    ? T extends string
+      ? C extends Record<string, Record<string, boolean>>
+        ? C extends { [K in T]: infer TargetCaps }
+          ? TargetCaps extends { lateral: true; jsonAgg: true }
+            ? true
+            : false
+          : false
+        : false
+      : false
+    : false;
+```
+
+**Why**: Runtime checks prevent execution errors, type-level gating prevents compilation errors and provides better developer experience.
