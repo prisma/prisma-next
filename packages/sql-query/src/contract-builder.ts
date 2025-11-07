@@ -384,9 +384,18 @@ class ContractBuilder<
   Extensions extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > {
-  private readonly state: ContractBuilderState<Target, Tables, Models, CoreHash, Extensions, Capabilities>;
+  private readonly state: ContractBuilderState<
+    Target,
+    Tables,
+    Models,
+    CoreHash,
+    Extensions,
+    Capabilities
+  >;
 
-  constructor(state?: ContractBuilderState<Target, Tables, Models, CoreHash, Extensions, Capabilities>) {
+  constructor(
+    state?: ContractBuilderState<Target, Tables, Models, CoreHash, Extensions, Capabilities>,
+  ) {
     this.state =
       state ??
       ({
