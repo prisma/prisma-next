@@ -35,10 +35,7 @@ describe('ExtensionPackManifest with operations', () => {
       ],
     };
 
-    await writeFile(
-      join(tempDir, 'packs', 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-    );
+    await writeFile(join(tempDir, 'packs', 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations).toBeDefined();
@@ -53,10 +50,7 @@ describe('ExtensionPackManifest with operations', () => {
       version: '15.0.0',
     };
 
-    await writeFile(
-      join(tempDir, 'packs', 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-    );
+    await writeFile(join(tempDir, 'packs', 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations).toBeUndefined();
@@ -92,10 +86,7 @@ describe('ExtensionPackManifest with operations', () => {
       ],
     };
 
-    await writeFile(
-      join(tempDir, 'packs', 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-    );
+    await writeFile(join(tempDir, 'packs', 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations).toHaveLength(2);
@@ -121,10 +112,7 @@ describe('ExtensionPackManifest with operations', () => {
       ],
     };
 
-    await writeFile(
-      join(tempDir, 'packs', 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-    );
+    await writeFile(join(tempDir, 'packs', 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations?.[0]?.capabilities).toEqual(['pgvector.index.ivfflat']);
@@ -149,10 +137,7 @@ describe('ExtensionPackManifest with operations', () => {
       ],
     };
 
-    await writeFile(
-      join(tempDir, 'packs', 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-    );
+    await writeFile(join(tempDir, 'packs', 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations?.[0]?.args[0]).toEqual({ kind: 'param' });
@@ -177,10 +162,7 @@ describe('ExtensionPackManifest with operations', () => {
       ],
     };
 
-    await writeFile(
-      join(tempDir, 'packs', 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-    );
+    await writeFile(join(tempDir, 'packs', 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations?.[0]?.args[0]).toEqual({ kind: 'literal' });
@@ -205,10 +187,7 @@ describe('ExtensionPackManifest with operations', () => {
       ],
     };
 
-    await writeFile(
-      join(tempDir, 'packs', 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-    );
+    await writeFile(join(tempDir, 'packs', 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations?.[0]?.returns).toEqual({
@@ -236,14 +215,10 @@ describe('ExtensionPackManifest with operations', () => {
       ],
     };
 
-    await writeFile(
-      join(tempDir, 'packs', 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-    );
+    await writeFile(join(tempDir, 'packs', 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     expect(() => {
       loadExtensionPackManifest(tempDir);
     }).toThrow();
   });
 });
-
