@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SelectAst as SelectAstType, SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
@@ -15,7 +15,6 @@ import type {
   ParamDescriptor,
   SelectAst,
 } from '../src/types';
-import type { SelectAst as SelectAstType } from '@prisma-next/sql-target';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');

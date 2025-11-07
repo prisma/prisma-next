@@ -47,18 +47,18 @@ describe('orm entrypoint', () => {
     const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
 
     expect(o).toHaveProperty('user');
-    expect(typeof (o as { user: () => unknown }).user).toBe('function');
+    expect(typeof (o as unknown as { user: () => unknown }).user).toBe('function');
   });
 
   it('returns OrmModelBuilder when accessing model', () => {
     const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
 
-    const builder = (o as { user: () => unknown }).user();
+    const builder = (o as unknown as { user: () => unknown }).user();
 
     expect(builder).toBeDefined();
-    expect(typeof builder.where).toBe('function');
-    expect(typeof builder.select).toBe('function');
-    expect(typeof builder.findMany).toBe('function');
+    expect(typeof (builder as { where: unknown }).where).toBe('function');
+    expect(typeof (builder as { select: unknown }).select).toBe('function');
+    expect(typeof (builder as { findMany: unknown }).findMany).toBe('function');
   });
 
   it('throws error when accessing invalid model at runtime', () => {

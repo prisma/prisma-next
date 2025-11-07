@@ -19,6 +19,7 @@ export type {
   StorageTable,
 } from '@prisma-next/sql-target';
 
+import type { Plan, PlanRefs } from '@prisma-next/contract/types';
 import type {
   Adapter,
   ColumnRef,
@@ -30,8 +31,6 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-target';
-
-import type { Plan, PlanRefs } from '@prisma-next/contract/types';
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';
@@ -224,7 +223,7 @@ export type InferReturningRow<Columns extends readonly ColumnBuilder[]> = Column
         : { [K in Name]: JsType }
       : never
     : never
-  : {};
+  : Record<string, never>;
 
 /**
  * Utility type to check if a contract has the required capabilities for includeMany.

@@ -1,14 +1,13 @@
-import { param } from '@prisma-next/sql-query/param';
-import { schema } from '@prisma-next/sql-query/schema';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
 import type { ResultType } from '@prisma-next/contract/types';
+import { param } from '@prisma-next/sql-query/param';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
-import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
 import {
   createTestRuntime,
   executePlanAndCollect,
@@ -42,6 +41,11 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
   models: {},
   relations: {},
   mappings: {},
+  capabilities: {
+    postgres: {
+      returning: true,
+    },
+  },
 };
 const fixtureContract = validateContract(fixtureContractRaw);
 
@@ -99,15 +103,24 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
-      const userTable = tables.user;
+      const userTable = tables['user'];
+      if (!userTable) {
+        throw new Error('user table not found');
+      }
       const userColumns = userTable.columns;
+      const idCol = userColumns['id'];
+      const emailCol = userColumns['email'];
+      const createdAtCol = userColumns['createdAt'];
+      if (!idCol || !emailCol || !createdAtCol) {
+        throw new Error('Required columns not found');
+      }
 
       const insertPlan = builder
         .insert(userTable, {
           email: param('email'),
           createdAt: param('createdAt'),
         })
-        .returning(userColumns.id, userColumns.email, userColumns.createdAt)
+        .returning(idCol, emailCol, createdAtCol)
         .build({
           params: {
             email: 'test@example.com',
@@ -131,7 +144,10 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
-      const userTable = tables.user;
+      const userTable = tables['user'];
+      if (!userTable) {
+        throw new Error('user table not found');
+      }
 
       const insertPlan = builder
         .insert(userTable, {
@@ -170,15 +186,23 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
-      const userTable = tables.user;
+      const userTable = tables['user'];
+      if (!userTable) {
+        throw new Error('user table not found');
+      }
       const userColumns = userTable.columns;
+      const idCol = userColumns['id'];
+      const emailCol = userColumns['email'];
+      if (!idCol || !emailCol) {
+        throw new Error('Required columns not found');
+      }
 
       const updatePlan = builder
         .update(userTable, {
           email: param('newEmail'),
         })
-        .where(userColumns.id.eq(param('userId')))
-        .returning(userColumns.id, userColumns.email)
+        .where(idCol.eq(param('userId')))
+        .returning(idCol, emailCol)
         .build({
           params: {
             newEmail: 'updated@example.com',
@@ -204,14 +228,21 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
-      const userTable = tables.user;
+      const userTable = tables['user'];
+      if (!userTable) {
+        throw new Error('user table not found');
+      }
       const userColumns = userTable.columns;
+      const idCol = userColumns['id'];
+      if (!idCol) {
+        throw new Error('Required column not found');
+      }
 
       const updatePlan = builder
         .update(userTable, {
           email: param('newEmail'),
         })
-        .where(userColumns.id.eq(param('userId')))
+        .where(idCol.eq(param('userId')))
         .build({
           params: {
             newEmail: 'updated2@example.com',
@@ -243,13 +274,21 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
-      const userTable = tables.user;
+      const userTable = tables['user'];
+      if (!userTable) {
+        throw new Error('user table not found');
+      }
       const userColumns = userTable.columns;
+      const idCol = userColumns['id'];
+      const emailCol = userColumns['email'];
+      if (!idCol || !emailCol) {
+        throw new Error('Required columns not found');
+      }
 
       const deletePlan = builder
         .delete(userTable)
-        .where(userColumns.id.eq(param('userId')))
-        .returning(userColumns.id, userColumns.email)
+        .where(idCol.eq(param('userId')))
+        .returning(idCol, emailCol)
         .build({
           params: {
             userId: 1,
@@ -275,12 +314,19 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
-      const userTable = tables.user;
+      const userTable = tables['user'];
+      if (!userTable) {
+        throw new Error('user table not found');
+      }
       const userColumns = userTable.columns;
+      const idCol = userColumns['id'];
+      if (!idCol) {
+        throw new Error('Required column not found');
+      }
 
       const deletePlan = builder
         .delete(userTable)
-        .where(userColumns.id.eq(param('userId')))
+        .where(idCol.eq(param('userId')))
         .build({
           params: {
             userId: 1,

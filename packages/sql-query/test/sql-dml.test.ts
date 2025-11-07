@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { describe, expect, it } from 'vitest';
-
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
+import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
@@ -113,6 +111,7 @@ describe('DML builders', () => {
         sql<Contract, CodecTypes>({ contract, adapter })
           .insert(tables.user, {
             unknownColumn: param('value'),
+            // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
           } as any)
           .build({ params: { value: 'test' } });
       }).toThrow('Unknown column unknownColumn in table user');
@@ -207,6 +206,7 @@ describe('DML builders', () => {
         sql<Contract, CodecTypes>({ contract, adapter })
           .update(tables.user, {
             unknownColumn: param('value'),
+            // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
           } as any)
           .where(userColumns.id.eq(param('userId')))
           .build({ params: { value: 'test', userId: 1 } });

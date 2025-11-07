@@ -177,7 +177,7 @@ describe('builder integration', () => {
 
     // Runtime checks
     expect(_plan.ast).toBeDefined();
-    expect(_plan.ast?.kind).toBe('select');
+    expect((_plan.ast as { kind: string })?.kind).toBe('select');
     expect(_plan.meta.coreHash).toBe('sha256:test-core');
 
     // Type checks - verify plan types are specific

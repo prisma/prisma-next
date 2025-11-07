@@ -18,9 +18,9 @@ import type {
   LoweredStatement,
   ParamDescriptor,
   ParamPlaceholder,
+  ParamRef,
   Plan,
   PlanMeta,
-  ParamRef,
   RawFactory,
   SelectAst,
   SqlBuilderOptions,
@@ -1293,7 +1293,7 @@ class InsertBuilderImpl<
       }
 
       const paramName = placeholder.name;
-      if (!Object.prototype.hasOwnProperty.call(paramsMap, paramName)) {
+      if (!Object.hasOwn(paramsMap, paramName)) {
         throw planInvalid(`Missing value for parameter ${paramName}`);
       }
 
@@ -1465,7 +1465,7 @@ class UpdateBuilderImpl<
       }
 
       const paramName = placeholder.name;
-      if (!Object.prototype.hasOwnProperty.call(paramsMap, paramName)) {
+      if (!Object.hasOwn(paramsMap, paramName)) {
         throw planInvalid(`Missing value for parameter ${paramName}`);
       }
 
@@ -1574,7 +1574,7 @@ class UpdateBuilderImpl<
     const placeholder = where.right;
     const paramName = placeholder.name;
 
-    if (!Object.prototype.hasOwnProperty.call(paramsMap, paramName)) {
+    if (!Object.hasOwn(paramsMap, paramName)) {
       throw planInvalid(`Missing value for parameter ${paramName}`);
     }
 
@@ -1774,7 +1774,7 @@ class DeleteBuilderImpl<
     const placeholder = where.right;
     const paramName = placeholder.name;
 
-    if (!Object.prototype.hasOwnProperty.call(paramsMap, paramName)) {
+    if (!Object.hasOwn(paramsMap, paramName)) {
       throw planInvalid(`Missing value for parameter ${paramName}`);
     }
 

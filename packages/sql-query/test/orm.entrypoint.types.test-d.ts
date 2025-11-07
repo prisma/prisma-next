@@ -24,5 +24,5 @@ test('invalid model access rejected at compile time', () => {
   type OrmRegistry = ReturnType<typeof orm<Contract, CodecTypes>>;
 
   // @ts-expect-error - invalidModel should not exist
-  type InvalidAccess = OrmRegistry['invalidModel'];
+  type _InvalidAccess = OrmRegistry['invalidModel'];
 });

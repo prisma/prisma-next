@@ -70,7 +70,7 @@ export interface OrmModelBuilder<
 
 type ModelColumnAccessor<
   TContract extends SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }>,
+  _CodecTypes extends Record<string, { output: unknown }>,
   ModelName extends string,
 > = TContract['models'][ModelName] extends { fields: infer Fields }
   ? Fields extends Record<string, unknown>
@@ -301,13 +301,14 @@ class OrmModelBuilderImpl<
 
     const accessor = {} as ModelColumnAccessor<TContract, CodecTypes, ModelName>;
     const model = this.contract.models[this.modelName];
-    if (!model || !('fields' in model)) {
+    if (!model || typeof model !== 'object' || !('fields' in model)) {
       throw planInvalid(`Model ${this.modelName} does not have fields`);
     }
     const modelFields = model.fields as Record<string, { column?: string }>;
 
     for (const fieldName in modelFields) {
       const field = modelFields[fieldName];
+      if (!field) continue;
       const columnName =
         this.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ??
         field.column ??
@@ -335,7 +336,11 @@ export function orm<
       }
 
       const modelName = (prop.charAt(0).toUpperCase() + prop.slice(1)) as ModelName<TContract>;
-      if (!(modelName in contract.models)) {
+      if (
+        !contract.models ||
+        typeof contract.models !== 'object' ||
+        !(modelName in contract.models)
+      ) {
         throw planInvalid(`Model ${prop} (resolved to ${modelName}) not found in contract`);
       }
 
@@ -347,7 +352,7 @@ export function orm<
         return false;
       }
       const modelName = (prop.charAt(0).toUpperCase() + prop.slice(1)) as ModelName<TContract>;
-      return modelName in contract.models;
+      return contract.models && typeof contract.models === 'object' && modelName in contract.models;
     },
   });
 }

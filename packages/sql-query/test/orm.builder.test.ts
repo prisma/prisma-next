@@ -5,8 +5,8 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
-import { param } from '../src/param';
 import { orm } from '../src/orm';
+import { param } from '../src/param';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 
@@ -46,7 +46,7 @@ describe('orm base builder', () => {
   const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
 
   it('chains where clause', () => {
-    const builder = (o as { user: () => unknown }).user();
+    const builder = (o as unknown as { user: () => unknown }).user();
     const builderWithWhere = (builder as { where: (fn: (m: unknown) => unknown) => unknown }).where(
       (m: unknown) => {
         const model = m as { id: { eq: (p: unknown) => unknown } };
@@ -59,7 +59,7 @@ describe('orm base builder', () => {
   });
 
   it('chains orderBy clause', () => {
-    const builder = (o as { user: () => unknown }).user();
+    const builder = (o as unknown as { user: () => unknown }).user();
     const builderWithOrder = (
       builder as { orderBy: (fn: (m: unknown) => unknown) => unknown }
     ).orderBy((m: unknown) => {
@@ -71,21 +71,21 @@ describe('orm base builder', () => {
   });
 
   it('chains take limit', () => {
-    const builder = (o as { user: () => unknown }).user();
+    const builder = (o as unknown as { user: () => unknown }).user();
     const builderWithLimit = (builder as { take: (n: number) => unknown }).take(10);
 
     expect(builderWithLimit).toBeDefined();
   });
 
   it('chains skip offset', () => {
-    const builder = (o as { user: () => unknown }).user();
+    const builder = (o as unknown as { user: () => unknown }).user();
     const builderWithSkip = (builder as { skip: (n: number) => unknown }).skip(5);
 
     expect(builderWithSkip).toBeDefined();
   });
 
   it('chains select projection', () => {
-    const builder = (o as { user: () => unknown }).user();
+    const builder = (o as unknown as { user: () => unknown }).user();
     const builderWithSelect = (
       builder as { select: (fn: (m: unknown) => unknown) => unknown }
     ).select((m: unknown) => {
@@ -97,8 +97,10 @@ describe('orm base builder', () => {
   });
 
   it('builds plan with findMany', () => {
-    const builder = (o as { user: () => unknown }).user();
-    const plan = (builder as { findMany: () => unknown }).findMany({ params: {} });
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const plan = (
+      builder as { findMany: (options?: { params?: Record<string, unknown> }) => unknown }
+    ).findMany({ params: {} });
 
     expect(plan).toBeDefined();
     expect((plan as { meta: { lane: string } }).meta.lane).toBe('orm');
@@ -106,8 +108,10 @@ describe('orm base builder', () => {
   });
 
   it('builds plan with findFirst', () => {
-    const builder = (o as { user: () => unknown }).user();
-    const plan = (builder as { findFirst: () => unknown }).findFirst({ params: {} });
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const plan = (
+      builder as { findFirst: (options?: { params?: Record<string, unknown> }) => unknown }
+    ).findFirst({ params: {} });
 
     expect(plan).toBeDefined();
     expect((plan as { meta: { lane: string } }).meta.lane).toBe('orm');
@@ -115,7 +119,7 @@ describe('orm base builder', () => {
   });
 
   it('builds plan with findUnique', () => {
-    const builder = (o as { user: () => unknown }).user();
+    const builder = (o as unknown as { user: () => unknown }).user();
     const plan = (
       builder as {
         findUnique: (
