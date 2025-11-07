@@ -1,10 +1,10 @@
 import { param } from '@prisma-next/sql-query/param';
-import { schema, sql } from '../prisma/query';
+import { sql, tables } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
 
 export async function insertUser(email: string) {
   const runtime = getRuntime();
-  const userTable = schema.tables.user;
+  const userTable = tables.user;
   const userColumns = userTable.columns;
 
   const plan = sql
@@ -28,7 +28,7 @@ export async function insertUser(email: string) {
 
 export async function updateUser(userId: number, newEmail: string) {
   const runtime = getRuntime();
-  const userTable = schema.tables.user;
+  const userTable = tables.user;
   const userColumns = userTable.columns;
 
   const plan = sql
@@ -54,7 +54,7 @@ export async function updateUser(userId: number, newEmail: string) {
 
 export async function deleteUser(userId: number) {
   const runtime = getRuntime();
-  const userTable = schema.tables.user;
+  const userTable = tables.user;
   const userColumns = userTable.columns;
 
   const plan = sql

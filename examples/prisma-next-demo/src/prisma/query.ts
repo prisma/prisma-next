@@ -13,3 +13,4 @@ export const sql = sqlBuilder<Contract, CodecTypes>({
 });
 
 export const schema = schemaBuilder<Contract, CodecTypes>(contract);
+export const tables = schema.tables;
