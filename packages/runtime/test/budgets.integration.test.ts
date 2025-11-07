@@ -2,6 +2,7 @@ import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
@@ -37,7 +38,7 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
 };
 const fixtureContract = validateContract(fixtureContractRaw);
 
-describe('budgets plugin integration', { timeout: 100 }, () => {
+describe('budgets plugin integration', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
@@ -54,7 +55,7 @@ describe('budgets plugin integration', { timeout: 100 }, () => {
       connect: { client },
       cursor: { disabled: true },
     });
-  }, 3000);
+  }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
     try {

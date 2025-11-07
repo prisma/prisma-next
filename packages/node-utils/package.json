@@ -8,7 +8,8 @@
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../biome.json --error-on-warnings"
+    "lint": "biome check . --config-path ../../biome.json --error-on-warnings",
+    "clean": "node ../../scripts/clean.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

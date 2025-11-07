@@ -9,7 +9,7 @@ import {
 } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 import { loadContractFromDisk } from './utils';
@@ -18,75 +18,79 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-describe('end-to-end JOIN queries', { timeout: 30000 }, () => {
-  it('INNER JOIN returns matching rows', async () => {
-    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+describe('end-to-end JOIN queries', () => {
+  it(
+    'INNER JOIN returns matching rows',
+    async () => {
+      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-    await withDevDatabase(
-      async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
-              'ada@example.com',
-              'tess@example.com',
-              'mike@example.com',
-            ]);
-            await c.query(
-              'insert into "post" ("userId", title) values ($1, $2), ($1, $3), ($4, $5)',
-              [1, 'First Post', 'Second Post', 2, 'Third Post'],
-            );
-          });
-
-          const adapter = createPostgresAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client, adapter);
-          try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
-            const user = tables.user!;
-            const post = tables.post!;
-            const plan = sql<Contract, CodecTypes>({ contract, adapter })
-              .from(user)
-              .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
-              .select({
-                userId: user.columns.id!,
-                email: user.columns.email!,
-                postId: post.columns.id!,
-                title: post.columns.title!,
-              })
-              .build();
-
-            const rows = await executePlanAndCollect(runtime, plan);
-
-            expect(rows.length).toBe(3);
-            expect(rows[0]).toMatchObject({
-              userId: expect.any(Number),
-              email: expect.any(String),
-              postId: expect.any(Number),
-              title: expect.any(String),
+      await withDevDatabase(
+        async ({ connectionString }: { connectionString: string }) => {
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await setupE2EDatabase(client, contract, async (c: typeof client) => {
+              await c.query('drop table if exists "comment"');
+              await c.query('drop table if exists "post"');
+              await c.query('drop table if exists "user"');
+              await c.query('create table "user" (id serial primary key, email text not null)');
+              await c.query(
+                'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+              );
+              await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
+                'ada@example.com',
+                'tess@example.com',
+                'mike@example.com',
+              ]);
+              await c.query(
+                'insert into "post" ("userId", title) values ($1, $2), ($1, $3), ($4, $5)',
+                [1, 'First Post', 'Second Post', 2, 'Third Post'],
+              );
             });
 
-            expect(plan.meta.refs?.tables).toContain('user');
-            expect(plan.meta.refs?.tables).toContain('post');
-            expect(plan.meta.refs?.columns).toEqual(
-              expect.arrayContaining([
-                { table: 'user', column: 'id' },
-                { table: 'post', column: 'userId' },
-              ]),
-            );
-          } finally {
-            await runtime.close();
-          }
-        });
-      },
-      { acceleratePort: 54030, databasePort: 54031, shadowDatabasePort: 54032 },
-    );
-  });
+            const adapter = createPostgresAdapter();
+            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            try {
+              const tables = schema<Contract, CodecTypes>(contract).tables;
+              const user = tables.user!;
+              const post = tables.post!;
+              const plan = sql<Contract, CodecTypes>({ contract, adapter })
+                .from(user)
+                .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+                .select({
+                  userId: user.columns.id!,
+                  email: user.columns.email!,
+                  postId: post.columns.id!,
+                  title: post.columns.title!,
+                })
+                .build();
+
+              const rows = await executePlanAndCollect(runtime, plan);
+
+              expect(rows.length).toBe(3);
+              expect(rows[0]).toMatchObject({
+                userId: expect.any(Number),
+                email: expect.any(String),
+                postId: expect.any(Number),
+                title: expect.any(String),
+              });
+
+              expect(plan.meta.refs?.tables).toContain('user');
+              expect(plan.meta.refs?.tables).toContain('post');
+              expect(plan.meta.refs?.columns).toEqual(
+                expect.arrayContaining([
+                  { table: 'user', column: 'id' },
+                  { table: 'post', column: 'userId' },
+                ]),
+              );
+            } finally {
+              await runtime.close();
+            }
+          });
+        },
+        { acceleratePort: 54030, databasePort: 54031, shadowDatabasePort: 54032 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('LEFT JOIN returns all users including those without posts', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);

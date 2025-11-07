@@ -2,6 +2,8 @@ import type { StartServerOptions } from '@prisma/dev';
 import { unstable_startServer } from '@prisma/dev';
 import { Client } from 'pg';
 
+export * from '../timeouts';
+
 function normalizeConnectionString(raw: string): string {
   // eslint-disable-next-line no-undef
   const url = new URL(raw);

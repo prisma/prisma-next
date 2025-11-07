@@ -1,9 +1,9 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    threads: false,
-    testTimeout: 10000,
+    testTimeout: timeouts.default,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -10,8 +10,8 @@ import {
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { ResultType } from '@prisma-next/contract/types';
-import { type DevDatabase, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import type { ResultType } from '@prisma-next/sql-query/types';
+import { type DevDatabase, timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
@@ -31,100 +31,104 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-describe('end-to-end includeMany and leftJoin queries', { timeout: 30000 }, () => {
-  it('includeMany returns one row per parent with nested array of children', async () => {
-    const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);
+describe('end-to-end includeMany and leftJoin queries', () => {
+  it(
+    'includeMany returns one row per parent with nested array of children',
+    async () => {
+      const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);
 
-    await withDevDatabase(
-      async ({ connectionString }: DevDatabase) => {
-        await withClient(connectionString, async (client: Client) => {
-          await setupE2EDatabase(client, contract, async (c: Client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
-              'ada@example.com',
-              'tess@example.com',
-              'mike@example.com',
-            ]);
-            await c.query(
-              'insert into "post" ("userId", title) values ($1, $2), ($1, $3), ($4, $5)',
-              [1, 'Ada Post 1', 'Ada Post 2', 2, 'Tess Post 1'],
-            );
-          });
+      await withDevDatabase(
+        async ({ connectionString }: DevDatabase) => {
+          await withClient(connectionString, async (client: Client) => {
+            await setupE2EDatabase(client, contract, async (c: Client) => {
+              await c.query('drop table if exists "comment"');
+              await c.query('drop table if exists "post"');
+              await c.query('drop table if exists "user"');
+              await c.query('create table "user" (id serial primary key, email text not null)');
+              await c.query(
+                'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+              );
+              await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
+                'ada@example.com',
+                'tess@example.com',
+                'mike@example.com',
+              ]);
+              await c.query(
+                'insert into "post" ("userId", title) values ($1, $2), ($1, $3), ($4, $5)',
+                [1, 'Ada Post 1', 'Ada Post 2', 2, 'Tess Post 1'],
+              );
+            });
 
-          const adapter = createPostgresAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client, adapter);
-          try {
-            const tables = schema<ContractWithCapabilities, CodecTypes>(contract).tables;
-            const user = tables['user']!;
-            const post = tables['post']!;
-            const plan = sql<ContractWithCapabilities, CodecTypes>({
-              contract,
-              adapter,
-            })
-              .from(user)
-              .includeMany(
-                post,
-                (on) => on.eqCol(user.columns['id']!, post.columns['userId']!),
-                (child) =>
-                  child.select({
-                    id: post.columns['id']!,
-                    title: post.columns['title']!,
-                  }),
-                { alias: 'posts' },
-              )
-              .select({
-                id: user.columns['id']!,
-                email: user.columns['email']!,
-                posts: true,
+            const adapter = createPostgresAdapter();
+            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            try {
+              const tables = schema<ContractWithCapabilities, CodecTypes>(contract).tables;
+              const user = tables['user']!;
+              const post = tables['post']!;
+              const plan = sql<ContractWithCapabilities, CodecTypes>({
+                contract,
+                adapter,
               })
-              .build();
+                .from(user)
+                .includeMany(
+                  post,
+                  (on) => on.eqCol(user.columns['id']!, post.columns['userId']!),
+                  (child) =>
+                    child.select({
+                      id: post.columns['id']!,
+                      title: post.columns['title']!,
+                    }),
+                  { alias: 'posts' },
+                )
+                .select({
+                  id: user.columns['id']!,
+                  email: user.columns['email']!,
+                  posts: true,
+                })
+                .build();
 
-            const rows = await executePlanAndCollect(runtime, plan);
-            type Row = ResultType<typeof plan>;
+              const rows = await executePlanAndCollect(runtime, plan);
+              type Row = ResultType<typeof plan>;
 
-            expect(rows.length).toBe(3);
+              expect(rows.length).toBe(3);
 
-            const adaRow = rows.find((r: Row) => r.email === 'ada@example.com');
-            expect(adaRow).toBeDefined();
-            expect(adaRow!.posts).toBeDefined();
-            expect(Array.isArray(adaRow!.posts)).toBe(true);
-            expect(adaRow!.posts.length).toBe(2);
-            expect(adaRow!.posts[0]).toHaveProperty('id');
-            expect(adaRow!.posts[0]).toHaveProperty('title');
-            expect(adaRow!.posts[0]!.id).toBe(1);
-            expect(adaRow!.posts[0]!.title).toBe('Ada Post 1');
-            expect(adaRow!.posts[1]!.id).toBe(2);
-            expect(adaRow!.posts[1]!.title).toBe('Ada Post 2');
+              const adaRow = rows.find((r: Row) => r.email === 'ada@example.com');
+              expect(adaRow).toBeDefined();
+              expect(adaRow!.posts).toBeDefined();
+              expect(Array.isArray(adaRow!.posts)).toBe(true);
+              expect(adaRow!.posts.length).toBe(2);
+              expect(adaRow!.posts[0]).toHaveProperty('id');
+              expect(adaRow!.posts[0]).toHaveProperty('title');
+              expect(adaRow!.posts[0]!.id).toBe(1);
+              expect(adaRow!.posts[0]!.title).toBe('Ada Post 1');
+              expect(adaRow!.posts[1]!.id).toBe(2);
+              expect(adaRow!.posts[1]!.title).toBe('Ada Post 2');
 
-            const tessRow = rows.find((r: Row) => r.email === 'tess@example.com');
-            expect(tessRow).toBeDefined();
-            expect(tessRow!.posts).toBeDefined();
-            expect(Array.isArray(tessRow!.posts)).toBe(true);
-            expect(tessRow!.posts.length).toBe(1);
-            expect(tessRow!.posts[0]!.id).toBe(3);
-            expect(tessRow!.posts[0]!.title).toBe('Tess Post 1');
+              const tessRow = rows.find((r: Row) => r.email === 'tess@example.com');
+              expect(tessRow).toBeDefined();
+              expect(tessRow!.posts).toBeDefined();
+              expect(Array.isArray(tessRow!.posts)).toBe(true);
+              expect(tessRow!.posts.length).toBe(1);
+              expect(tessRow!.posts[0]!.id).toBe(3);
+              expect(tessRow!.posts[0]!.title).toBe('Tess Post 1');
 
-            const mikeRow = rows.find((r: Row) => r.email === 'mike@example.com');
-            expect(mikeRow).toBeDefined();
-            expect(mikeRow!.posts).toBeDefined();
-            expect(Array.isArray(mikeRow!.posts)).toBe(true);
-            expect(mikeRow!.posts.length).toBe(0);
+              const mikeRow = rows.find((r: Row) => r.email === 'mike@example.com');
+              expect(mikeRow).toBeDefined();
+              expect(mikeRow!.posts).toBeDefined();
+              expect(Array.isArray(mikeRow!.posts)).toBe(true);
+              expect(mikeRow!.posts.length).toBe(0);
 
-            expectTypeOf<Row['posts']>().toEqualTypeOf<Array<{ id: number; title: string }>>();
-          } finally {
-            await runtime.close();
-          }
-        });
-      },
-      { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
-    );
-  });
+              expectTypeOf<Row['posts']>().toEqualTypeOf<Array<{ id: number; title: string }>>();
+            } finally {
+              await runtime.close();
+            }
+          });
+        },
+        { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('includeMany with child where, orderBy, and limit filters children', async () => {
     const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);

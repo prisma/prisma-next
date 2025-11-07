@@ -10,6 +10,7 @@ import {
 } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';
@@ -22,7 +23,7 @@ function normalizeConnectionString(raw: string): string {
   return url.toString();
 }
 
-export interface DevDatabase {
+interface DevDatabase {
   readonly connectionString: string;
   close(): Promise<void>;
 }
@@ -83,25 +84,22 @@ async function createUser(
   return client.user.create({ data: input });
 }
 
-describe(
-  'PrismaClient compatibility layer - dual implementation harness',
-  { timeout: 15000 },
-  () => {
-    let database: Awaited<ReturnType<typeof createDevDatabase>>;
-    let client: Client;
-    let prismaPN: PrismaClient;
+describe('PrismaClient compatibility layer - dual implementation harness', () => {
+  let database: Awaited<ReturnType<typeof createDevDatabase>>;
+  let client: Client;
+  let prismaPN: PrismaClient;
 
-    beforeAll(async () => {
-      database = await createDevDatabase({
-        acceleratePort: 54000,
-        databasePort: 54001,
-        shadowDatabasePort: 54002,
-      });
-      client = new Client({ connectionString: database.connectionString });
-      await client.connect();
+  beforeAll(async () => {
+    database = await createDevDatabase({
+      acceleratePort: 54000,
+      databasePort: 54001,
+      shadowDatabasePort: 54002,
+    });
+    client = new Client({ connectionString: database.connectionString });
+    await client.connect();
 
-      // Create test table (shared for both implementations)
-      await client.query(`
+    // Create test table (shared for both implementations)
+    await client.query(`
         DROP TABLE IF EXISTS "user";
         CREATE TABLE "user" (
           id TEXT PRIMARY KEY,
@@ -111,194 +109,193 @@ describe(
         );
       `);
 
-      // Use the same client connection to avoid multiple connections to dev database
-      const driver = createPostgresDriverFromOptions({
-        connect: { client },
-        cursor: { disabled: true },
-      });
-
-      // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
-      const validatedContract = validateContract(testContract);
-
-      const runtime = createRuntime({
-        contract: validatedContract,
-        adapter: createPostgresAdapter(),
-        driver,
-        verify: {
-          mode: 'onFirstUse',
-          requireMarker: false,
-        },
-      });
-
-      prismaPN = new PrismaClient({
-        contract: validatedContract,
-        runtime,
-      });
+    // Use the same client connection to avoid multiple connections to dev database
+    const driver = createPostgresDriverFromOptions({
+      connect: { client },
+      cursor: { disabled: true },
     });
 
-    afterAll(async () => {
-      try {
-        await prismaPN.$disconnect();
-        await client.query('DROP TABLE IF EXISTS "user"');
-        await client.end();
-        await database.close();
-      } catch {
-        // Ignore cleanup errors
-      }
+    // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
+    const validatedContract = validateContract(testContract);
+
+    const runtime = createRuntime({
+      contract: validatedContract,
+      adapter: createPostgresAdapter(),
+      driver,
+      verify: {
+        mode: 'onFirstUse',
+        requireMarker: false,
+      },
     });
 
-    beforeEach(async () => {
-      // Reset schema between tests
-      await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
+    prismaPN = new PrismaClient({
+      contract: validatedContract,
+      runtime,
+    });
+  }, timeouts.spinUpPpgDev);
+
+  afterAll(async () => {
+    try {
+      await prismaPN.$disconnect();
       await client.query('DROP TABLE IF EXISTS "user"');
-      await client.query(`CREATE TABLE "user" (
+      await client.end();
+      await database.close();
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  beforeEach(async () => {
+    // Reset schema between tests
+    await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
+    await client.query('DROP TABLE IF EXISTS "user"');
+    await client.query(`CREATE TABLE "user" (
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         name TEXT NOT NULL,
         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )`);
 
-      // Create marker schema and table
-      await client.query(ensureSchemaStatement.sql);
-      await client.query(ensureTableStatement.sql);
+    // Create marker schema and table
+    await client.query(ensureSchemaStatement.sql);
+    await client.query(ensureTableStatement.sql);
 
-      // Write contract marker
-      const write = writeContractMarker({
-        coreHash: testContract.coreHash,
-        profileHash: testContract.profileHash ?? 'sha256:test-profile',
-        contractJson: testContract,
-        canonicalVersion: 1,
+    // Write contract marker
+    const write = writeContractMarker({
+      coreHash: testContract.coreHash,
+      profileHash: testContract.profileHash ?? 'sha256:test-profile',
+      contractJson: testContract,
+      canonicalVersion: 1,
+    });
+    await client.query(write.insert.sql, [...write.insert.params]);
+  });
+
+  describe('PN + compatibility layer', () => {
+    it('creates a user and returns the created record', async () => {
+      const result = await createUser(prismaPN, {
+        id: 'test-1',
+        email: 'test@example.com',
+        name: 'Test User',
       });
-      await client.query(write.insert.sql, [...write.insert.params]);
+
+      expect(result).toBeDefined();
+      expect(result['id']).toBe('test-1');
+      expect(result['email']).toBe('test@example.com');
+      expect(result['name']).toBe('Test User');
+      expect(result['createdAt']).toBeDefined();
     });
 
-    describe('PN + compatibility layer', () => {
-      it('creates a user and returns the created record', async () => {
-        const result = await createUser(prismaPN, {
-          id: 'test-1',
-          email: 'test@example.com',
-          name: 'Test User',
-        });
-
-        expect(result).toBeDefined();
-        expect(result['id']).toBe('test-1');
-        expect(result['email']).toBe('test@example.com');
-        expect(result['name']).toBe('Test User');
-        expect(result['createdAt']).toBeDefined();
+    it('finds a unique user by id', async () => {
+      // Seed data
+      await createUser(prismaPN, {
+        id: 'test-1',
+        email: 'test@example.com',
+        name: 'Test User',
       });
 
-      it('finds a unique user by id', async () => {
-        // Seed data
+      const result = await readUserById(prismaPN, 'test-1');
+
+      expect(result).toBeDefined();
+      expect(result?.['id']).toBe('test-1');
+      expect(result?.['email']).toBe('test@example.com');
+      expect(result?.['name']).toBe('Test User');
+    });
+
+    it('returns null for findUnique when not found', async () => {
+      const result = await readUserById(prismaPN, 'non-existent');
+
+      expect(result).toBeNull();
+    });
+
+    it('finds many users', async () => {
+      // Create multiple users
+      await createUser(prismaPN, {
+        id: 'test-1',
+        email: 'test1@example.com',
+        name: 'Test User 1',
+      });
+      await createUser(prismaPN, {
+        id: 'test-2',
+        email: 'test2@example.com',
+        name: 'Test User 2',
+      });
+
+      const results = await prismaPN.user.findMany();
+
+      expect(results.length).toBe(2);
+      expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-1')).toBe(true);
+      expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-2')).toBe(true);
+    });
+
+    it('finds first user with where clause', async () => {
+      await createUser(prismaPN, {
+        id: 'test-1',
+        email: 'test@example.com',
+        name: 'Test User',
+      });
+
+      const result = await prismaPN.user.findFirst({
+        where: { email: 'test@example.com' },
+      });
+
+      expect(result).toBeDefined();
+      expect(result?.['email']).toBe('test@example.com');
+    });
+  });
+
+  describe('Guardrail: unbounded findMany should trigger budget error', () => {
+    it('throws BUDGET.ROWS_EXCEEDED for unbounded select without limit', async () => {
+      // Create many users to exceed budget
+      for (let i = 0; i < 20; i++) {
         await createUser(prismaPN, {
-          id: 'test-1',
-          email: 'test@example.com',
-          name: 'Test User',
+          id: `test-${i}`,
+          email: `test${i}@example.com`,
+          name: `Test User ${i}`,
         });
+      }
 
-        const result = await readUserById(prismaPN, 'test-1');
+      // Runtime should have budgets enabled by default
+      // For MVP, we'll test that findMany without take throws when budgets are enabled
+      // Note: This test may need adjustment based on actual budget configuration
+      await expect(prismaPN.user.findMany()).resolves.toBeDefined();
 
-        expect(result).toBeDefined();
-        expect(result?.['id']).toBe('test-1');
-        expect(result?.['email']).toBe('test@example.com');
-        expect(result?.['name']).toBe('Test User');
-      });
+      // With take, it should work
+      const results = await prismaPN.user.findMany({ take: 10 });
+      expect(results.length).toBeLessThanOrEqual(10);
+    });
+  });
 
-      it('returns null for findUnique when not found', async () => {
-        const result = await readUserById(prismaPN, 'non-existent');
+  describe('Contract drift handling', () => {
+    it('verifies contract marker on first use', async () => {
+      // Runtime is configured with verify.mode: 'onFirstUse'
+      // This should verify the contract on first query execution
+      const result = await readUserById(prismaPN, 'non-existent');
+      expect(result).toBeNull();
+      // If contract mismatch occurred, we would have thrown CONTRACT.MARKER_MISMATCH
+    });
+  });
 
-        expect(result).toBeNull();
-      });
-
-      it('finds many users', async () => {
-        // Create multiple users
-        await createUser(prismaPN, {
-          id: 'test-1',
-          email: 'test1@example.com',
-          name: 'Test User 1',
-        });
-        await createUser(prismaPN, {
-          id: 'test-2',
-          email: 'test2@example.com',
-          name: 'Test User 2',
-        });
-
-        const results = await prismaPN.user.findMany();
-
-        expect(results.length).toBe(2);
-        expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-1')).toBe(true);
-        expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-2')).toBe(true);
-      });
-
-      it('finds first user with where clause', async () => {
-        await createUser(prismaPN, {
-          id: 'test-1',
-          email: 'test@example.com',
-          name: 'Test User',
-        });
-
-        const result = await prismaPN.user.findFirst({
-          where: { email: 'test@example.com' },
-        });
-
-        expect(result).toBeDefined();
-        expect(result?.['email']).toBe('test@example.com');
-      });
+  describe('Proxy edge cases', () => {
+    it('handles non-string property access', () => {
+      const prop = Symbol('test');
+      const value = (prismaPN as unknown as Record<symbol, unknown>)[prop];
+      expect(value).toBeUndefined();
     });
 
-    describe('Guardrail: unbounded findMany should trigger budget error', () => {
-      it('throws BUDGET.ROWS_EXCEEDED for unbounded select without limit', async () => {
-        // Create many users to exceed budget
-        for (let i = 0; i < 20; i++) {
-          await createUser(prismaPN, {
-            id: `test-${i}`,
-            email: `test${i}@example.com`,
-            name: `Test User ${i}`,
-          });
-        }
-
-        // Runtime should have budgets enabled by default
-        // For MVP, we'll test that findMany without take throws when budgets are enabled
-        // Note: This test may need adjustment based on actual budget configuration
-        await expect(prismaPN.user.findMany()).resolves.toBeDefined();
-
-        // With take, it should work
-        const results = await prismaPN.user.findMany({ take: 10 });
-        expect(results.length).toBeLessThanOrEqual(10);
-      });
+    it('handles numeric property access', () => {
+      const value = (prismaPN as Record<number, unknown>)[0];
+      expect(value).toBeUndefined();
     });
 
-    describe('Contract drift handling', () => {
-      it('verifies contract marker on first use', async () => {
-        // Runtime is configured with verify.mode: 'onFirstUse'
-        // This should verify the contract on first query execution
-        const result = await readUserById(prismaPN, 'non-existent');
-        expect(result).toBeNull();
-        // If contract mismatch occurred, we would have thrown CONTRACT.MARKER_MISMATCH
-      });
+    it('returns undefined for non-model properties', () => {
+      const value = (prismaPN as Record<string, unknown>)['nonexistent'];
+      expect(value).toBeUndefined();
     });
 
-    describe('Proxy edge cases', () => {
-      it('handles non-string property access', () => {
-        const prop = Symbol('test');
-        const value = (prismaPN as unknown as Record<symbol, unknown>)[prop];
-        expect(value).toBeUndefined();
-      });
-
-      it('handles numeric property access', () => {
-        const value = (prismaPN as Record<number, unknown>)[0];
-        expect(value).toBeUndefined();
-      });
-
-      it('returns undefined for non-model properties', () => {
-        const value = (prismaPN as Record<string, unknown>)['nonexistent'];
-        expect(value).toBeUndefined();
-      });
-
-      it('handles property access on proxy', () => {
-        const userModel = prismaPN.user;
-        expect(userModel).toBeDefined();
-        expect(typeof userModel.findUnique).toBe('function');
-      });
+    it('handles property access on proxy', () => {
+      const userModel = prismaPN.user;
+      expect(userModel).toBeDefined();
+      expect(typeof userModel.findUnique).toBe('function');
     });
-  },
-);
+  });
+});

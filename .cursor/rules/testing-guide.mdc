@@ -288,12 +288,29 @@ export default defineConfig({
 
 **Issue:** Database setup in tests can take time, causing timeout errors.
 
-**Solution:** Set appropriate timeouts for `describe` blocks and `beforeAll` hooks:
+**Solution:** Scope timeouts as narrowly as possible - only to the specific hooks or tests that need them, not to the entire `describe` block:
+
+**❌ WRONG: Setting timeout on describe block**
 ```typescript
-describe('test suite', { timeout: 30000 }, () => {
-  beforeAll(async () => { /* ... */ }, 30000);
+describe('test suite', { timeout: timeouts.spinUpPpgDev }, () => {
+  beforeAll(async () => { /* database setup */ });
+  // All tests inherit the increased timeout unnecessarily
 });
 ```
+
+**✅ CORRECT: Set timeout only on the hook that needs it**
+```typescript
+describe('test suite', () => {
+  beforeAll(async () => {
+    // Database setup that needs increased timeout
+  }, timeouts.spinUpPpgDev);
+
+  // Tests use default timeout
+  it('test', async () => { /* ... */ });
+});
+```
+
+**Why?** Scoping timeouts narrowly ensures only the operations that actually need more time (like spinning up a database) get the increased timeout. This prevents unnecessary timeouts on fast operations and makes test failures more precise.
 
 ### SQL table name quoting
 
