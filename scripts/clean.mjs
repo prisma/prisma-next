@@ -8,11 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = join(__dirname, '..');
 
-const outputDirs = [
-  'dist',
-  'coverage',
-  '.tmp-output',
-];
+const outputDirs = ['dist', 'coverage', '.tmp-output'];
 
 async function cleanPackage(packagePath) {
   const cleaned = [];
@@ -44,4 +40,3 @@ main().catch((error) => {
   console.error('Error cleaning:', error);
   process.exit(1);
 });
-
