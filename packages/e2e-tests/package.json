@@ -7,7 +7,8 @@
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../biome.json --error-on-warnings",
-    "gen-contract": "node ./scripts/gen-contract.cjs"
+    "gen-contract": "node ./scripts/gen-contract.cjs",
+    "clean": "node ../../scripts/clean.mjs"
   },
   "devDependencies": {
     "vitest": "^2.1.1",
