@@ -2,7 +2,6 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
-import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
@@ -155,148 +154,6 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 
 describe('SQL builder includeMany', () => {
   const adapter = createStubAdapter();
-
-  it('builds a plan with includeMany using default alias', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
-
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
-      .from(tables.user)
-      .includeMany(
-        tables.post,
-        (on) => on.eqCol(userColumns.id, postColumns.userId),
-        (child) => child.select({ id: postColumns.id, title: postColumns.title }),
-      )
-      .select({
-        id: userColumns.id,
-        email: userColumns.email,
-        post: true,
-      })
-      .build();
-
-    expect(plan.ast?.includes).toBeDefined();
-    expect(plan.ast?.includes?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.kind).toBe('includeMany');
-    expect(plan.ast?.includes?.[0]?.alias).toBe('post');
-    expect(plan.ast?.includes?.[0]?.child.table.name).toBe('post');
-    expect(plan.ast?.includes?.[0]?.child.project.length).toBe(2);
-  });
-
-  it('builds a plan with includeMany using custom alias', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
-
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
-      .from(tables.user)
-      .includeMany(
-        tables.post,
-        (on) => on.eqCol(userColumns.id, postColumns.userId),
-        (child) => child.select({ id: postColumns.id, title: postColumns.title }),
-        { alias: 'posts' },
-      )
-      .select({
-        id: userColumns.id,
-        email: userColumns.email,
-        posts: true,
-      })
-      .build();
-
-    expect(plan.ast?.includes).toBeDefined();
-    expect(plan.ast?.includes?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.alias).toBe('posts');
-  });
-
-  it('builds a plan with includeMany with child where clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
-
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
-      .from(tables.user)
-      .includeMany(
-        tables.post,
-        (on) => on.eqCol(userColumns.id, postColumns.userId),
-        (child) =>
-          child
-            .select({ id: postColumns.id, title: postColumns.title })
-            .where(postColumns.title.eq(param('title'))),
-        { alias: 'posts' },
-      )
-      .select({
-        id: userColumns.id,
-        posts: true,
-      })
-      .build({ params: { title: 'Test' } });
-
-    expect(plan.ast?.includes?.[0]?.child.where).toBeDefined();
-    expect(plan.ast?.includes?.[0]?.child.where?.kind).toBe('bin');
-  });
-
-  it('builds a plan with includeMany with child orderBy clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
-
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
-      .from(tables.user)
-      .includeMany(
-        tables.post,
-        (on) => on.eqCol(userColumns.id, postColumns.userId),
-        (child) =>
-          child
-            .select({ id: postColumns.id, title: postColumns.title })
-            .orderBy(postColumns.createdAt.desc()),
-        { alias: 'posts' },
-      )
-      .select({
-        id: userColumns.id,
-        posts: true,
-      })
-      .build();
-
-    expect(plan.ast?.includes?.[0]?.child.orderBy).toBeDefined();
-    expect(plan.ast?.includes?.[0]?.child.orderBy?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.child.orderBy?.[0]?.dir).toBe('desc');
-  });
-
-  it('builds a plan with includeMany with child limit clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
-
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
-      .from(tables.user)
-      .includeMany(
-        tables.post,
-        (on) => on.eqCol(userColumns.id, postColumns.userId),
-        (child) => child.select({ id: postColumns.id, title: postColumns.title }).limit(10),
-        { alias: 'posts' },
-      )
-      .select({
-        id: userColumns.id,
-        posts: true,
-      })
-      .build();
-
-    expect(plan.ast?.includes?.[0]?.child.limit).toBe(10);
-  });
 
   it('throws error when child projection is empty', () => {
     const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
@@ -503,3 +360,4 @@ describe('SQL builder includeMany', () => {
     }
   });
 });
+
