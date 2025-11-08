@@ -20,6 +20,7 @@ describe('validateContract logic validation', () => {
           primaryKey: { columns: ['id'] },
           uniques: [{ columns: ['email'] }],
           indexes: [{ columns: ['name'] }],
+          foreignKeys: [],
         },
         Post: {
           columns: {
@@ -28,6 +29,8 @@ describe('validateContract logic validation', () => {
             title: { type: 'pg/text@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
           foreignKeys: [
             {
               columns: ['userId'],
@@ -51,6 +54,14 @@ describe('validateContract logic validation', () => {
           User: {
             ...validContractInput.storage.tables.User,
             primaryKey: { columns: ['nonExistent'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          Post: {
+            ...validContractInput.storage.tables.Post,
+            uniques: [],
+            indexes: [],
           },
         },
       },
@@ -69,6 +80,13 @@ describe('validateContract logic validation', () => {
           User: {
             ...validContractInput.storage.tables.User,
             uniques: [{ columns: ['nonExistent'] }],
+            indexes: [],
+            foreignKeys: [],
+          },
+          Post: {
+            ...validContractInput.storage.tables.Post,
+            uniques: [],
+            indexes: [],
           },
         },
       },
@@ -87,6 +105,13 @@ describe('validateContract logic validation', () => {
           User: {
             ...validContractInput.storage.tables.User,
             indexes: [{ columns: ['nonExistent'] }],
+            uniques: [],
+            foreignKeys: [],
+          },
+          Post: {
+            ...validContractInput.storage.tables.Post,
+            uniques: [],
+            indexes: [],
           },
         },
       },
@@ -102,6 +127,12 @@ describe('validateContract logic validation', () => {
       ...validContractInput,
       storage: {
         tables: {
+          User: {
+            ...validContractInput.storage.tables.User,
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
           Post: {
             ...validContractInput.storage.tables.Post,
             foreignKeys: [
@@ -110,6 +141,8 @@ describe('validateContract logic validation', () => {
                 references: { table: 'NonExistent', columns: ['id'] },
               },
             ],
+            uniques: [],
+            indexes: [],
           },
         },
       },
@@ -125,6 +158,12 @@ describe('validateContract logic validation', () => {
       ...validContractInput,
       storage: {
         tables: {
+          User: {
+            ...validContractInput.storage.tables.User,
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
           Post: {
             ...validContractInput.storage.tables.Post,
             foreignKeys: [
@@ -133,6 +172,8 @@ describe('validateContract logic validation', () => {
                 references: { table: 'User', columns: ['id'] },
               },
             ],
+            uniques: [],
+            indexes: [],
           },
         },
       },
@@ -148,7 +189,12 @@ describe('validateContract logic validation', () => {
       ...validContractInput,
       storage: {
         tables: {
-          User: validContractInput.storage.tables.User,
+          User: {
+            ...validContractInput.storage.tables.User,
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
           Post: {
             ...validContractInput.storage.tables.Post,
             foreignKeys: [
@@ -157,6 +203,8 @@ describe('validateContract logic validation', () => {
                 references: { table: 'User', columns: ['nonExistent'] },
               },
             ],
+            uniques: [],
+            indexes: [],
           },
         },
       },
@@ -172,7 +220,12 @@ describe('validateContract logic validation', () => {
       ...validContractInput,
       storage: {
         tables: {
-          User: validContractInput.storage.tables.User,
+          User: {
+            ...validContractInput.storage.tables.User,
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
           Post: {
             ...validContractInput.storage.tables.Post,
             foreignKeys: [
@@ -181,6 +234,8 @@ describe('validateContract logic validation', () => {
                 references: { table: 'User', columns: ['id', 'email'] },
               },
             ],
+            uniques: [],
+            indexes: [],
           },
         },
       },
@@ -202,6 +257,9 @@ describe('validateContract logic validation', () => {
               roleId: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['userId', 'roleId'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -220,6 +278,9 @@ describe('validateContract logic validation', () => {
               tenantId: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id', 'tenantId'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           Post: {
             columns: {
@@ -228,6 +289,8 @@ describe('validateContract logic validation', () => {
               tenantId: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
             foreignKeys: [
               {
                 columns: ['userId', 'tenantId'],

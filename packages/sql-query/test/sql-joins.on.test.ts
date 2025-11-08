@@ -42,6 +42,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -49,6 +53,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           userId: { type: 'pg/int4@1', nullable: false },
           title: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },

@@ -52,6 +52,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -59,6 +63,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           userId: { type: 'pg/int4@1', nullable: false },
           title: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       comment: {
         columns: {
@@ -66,6 +74,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           postId: { type: 'pg/int4@1', nullable: false },
           content: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
@@ -240,8 +252,6 @@ describe('SQL builder joins', () => {
     const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithPosts, adapter);
     const builder = sql<ContractWithPosts, CodecTypes>({ context }).from(tables.user);
 
     expect(() =>
@@ -257,8 +267,6 @@ describe('SQL builder joins', () => {
     const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithPosts, adapter);
     const builder = sql<ContractWithPosts, CodecTypes>({ context }).from(tables.user);
 
     expect(() =>
@@ -276,10 +284,7 @@ describe('SQL builder joins', () => {
     const joinTypes = ['inner', 'left', 'right', 'full'] as const;
 
     for (const joinType of joinTypes) {
-      const builder = sql<ContractWithPosts, CodecTypes>({
-        contract: contractWithPosts,
-        adapter,
-      }).from(tables.user);
+      const builder = sql<ContractWithPosts, CodecTypes>({ context }).from(tables.user);
 
       const plan =
         joinType === 'inner'
@@ -374,13 +379,11 @@ describe('SQL builder joins', () => {
   describe('nested projections with joins', () => {
     it('flattens nested projection over joined columns', () => {
       const adapter = createStubAdapter();
-    const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+      const context = createTestContext(contractWithPosts, adapter);
+      const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
       const userColumns = tables.user.columns;
       const postColumns = tables.post.columns;
 
-      const adapter = createStubAdapter();
-      const context = createTestContext(contractWithPosts, adapter);
       const plan = sql<ContractWithPosts, CodecTypes>({ context })
         .from(tables.user)
         .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
@@ -413,13 +416,11 @@ describe('SQL builder joins', () => {
 
     it('includes all referenced columns in meta refs for nested projections with joins', () => {
       const adapter = createStubAdapter();
-    const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+      const context = createTestContext(contractWithPosts, adapter);
+      const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
       const userColumns = tables.user.columns;
       const postColumns = tables.post.columns;
 
-      const adapter = createStubAdapter();
-      const context = createTestContext(contractWithPosts, adapter);
       const plan = sql<ContractWithPosts, CodecTypes>({ context })
         .from(tables.user)
         .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))

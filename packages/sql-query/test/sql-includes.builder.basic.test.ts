@@ -53,6 +53,10 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -61,6 +65,10 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
           title: { type: 'pg/text@1', nullable: false },
           createdAt: { type: 'pg/timestamptz@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
