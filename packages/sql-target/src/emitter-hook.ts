@@ -338,7 +338,7 @@ export type Relations = Contract['relations'];
 
       const uniques = table.uniques
         .map((u) => {
-          const cols = u.columns.map((c) => `'${c}'`).join(', ');
+          const cols = u.columns.map((c: string) => `'${c}'`).join(', ');
           const name = u.name ? `; readonly name: '${u.name}'` : '';
           return `{ readonly columns: readonly [${cols}]${name} }`;
         })
@@ -347,7 +347,7 @@ export type Relations = Contract['relations'];
 
       const indexes = table.indexes
         .map((i) => {
-          const cols = i.columns.map((c) => `'${c}'`).join(', ');
+          const cols = i.columns.map((c: string) => `'${c}'`).join(', ');
           const name = i.name ? `; readonly name: '${i.name}'` : '';
           return `{ readonly columns: readonly [${cols}]${name} }`;
         })
@@ -356,8 +356,8 @@ export type Relations = Contract['relations'];
 
       const fks = table.foreignKeys
         .map((fk) => {
-          const cols = fk.columns.map((c) => `'${c}'`).join(', ');
-          const refCols = fk.references.columns.map((c) => `'${c}'`).join(', ');
+          const cols = fk.columns.map((c: string) => `'${c}'`).join(', ');
+          const refCols = fk.references.columns.map((c: string) => `'${c}'`).join(', ');
           const name = fk.name ? `; readonly name: '${fk.name}'` : '';
           return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${name} }`;
         })

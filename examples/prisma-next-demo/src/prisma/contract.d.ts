@@ -24,6 +24,9 @@ export type Contract = SqlContract<
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; readonly nullable: false };
         };
         primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
       };
       readonly post: {
         columns: {
@@ -33,6 +36,9 @@ export type Contract = SqlContract<
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; readonly nullable: false };
         };
         primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
       };
     };
   },

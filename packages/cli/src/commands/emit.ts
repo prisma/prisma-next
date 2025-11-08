@@ -1,6 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { Command } from 'commander';
 import { loadContractFromTs } from '../load-ts-contract';
@@ -35,7 +37,11 @@ export function createEmitCommand(): Command {
 
           const packs = loadExtensionPacks(adapterPath, extensionPaths);
 
-          const contract = await loadContractFromTs(contractPath);
+          const contractRaw = await loadContractFromTs(contractPath);
+
+          // Normalize the contract to ensure all required fields are present
+          // This ensures consistency between CLI emit and programmatic emit
+          const contract = validateContract<SqlContract<SqlStorage>>(contractRaw);
 
           let targetFamily: typeof sqlTargetFamilyHook | undefined;
           if (contract.targetFamily === 'sql') {
@@ -44,8 +50,12 @@ export function createEmitCommand(): Command {
             throw new Error(`Unsupported target family: ${contract.targetFamily}`);
           }
 
+          // Strip mappings before emitting - mappings are not part of ContractIR
+          // They are computed at runtime and should not be persisted to contract.json
+          const { mappings: _mappings, ...contractIR } = contract;
+
           const result = await emit(
-            contract,
+            contractIR as unknown as typeof contractRaw,
             {
               outputDir,
               packs,
