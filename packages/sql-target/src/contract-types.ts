@@ -95,3 +95,9 @@ export type SqlContract<
   readonly relations: R;
   readonly mappings: Map;
 };
+
+export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =
+  TContract['mappings']['codecTypes'];
+
+export type ExtractOperationTypes<TContract extends SqlContract<SqlStorage>> =
+  TContract['mappings']['operationTypes'];

@@ -14,6 +14,8 @@ export type {
   StorageColumn,
   StorageTable,
   UniqueConstraint,
+  ExtractCodecTypes,
+  ExtractOperationTypes,
 } from '../contract-types';
 export { sqlTargetFamilyHook } from '../emitter-hook';
 export type {

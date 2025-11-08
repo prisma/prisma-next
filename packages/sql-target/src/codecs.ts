@@ -165,7 +165,7 @@ export type CodecOutput<T> = T extends Codec<string, unknown, infer JsT> ? JsT :
 /**
  * Type helper to extract codec types from builder instance.
  */
-export type ExtractCodecTypes<
+type ExtractCodecTypes<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
 > = {
   readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id, unknown, unknown>

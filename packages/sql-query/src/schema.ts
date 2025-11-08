@@ -1,5 +1,7 @@
 import type { RuntimeContext } from '@prisma-next/runtime';
 import type {
+  ExtractCodecTypes,
+  ExtractOperationTypes,
   OperationRegistry,
   SqlContract,
   SqlStorage,
@@ -13,8 +15,6 @@ import type {
   CodecTypes as CodecTypesType,
   ColumnBuilder,
   ComputeColumnJsType,
-  ExtractCodecTypes,
-  ExtractOperationTypes,
   OperationTypes,
   OrderBuilder,
   ParamPlaceholder,
