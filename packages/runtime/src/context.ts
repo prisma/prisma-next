@@ -1,5 +1,5 @@
-import type { Adapter } from '@prisma-next/sql-query/types';
 import type {
+  Adapter,
   CodecRegistry,
   LoweredStatement,
   OperationRegistry,

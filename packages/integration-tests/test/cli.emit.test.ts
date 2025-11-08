@@ -82,14 +82,16 @@ export const contract = defineContract<CodecTypes>()
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
     const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
 
-    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-    expect(contractJson['targetFamily']).toBe('sql');
-    expect(contractJson['target']).toBe('postgres');
-    expect(
-      ((contractJson['storage'] as Record<string, unknown>)['tables'] as Record<string, unknown>)[
-        'user'
-      ],
-    ).toBeDefined();
+    const contractJson = JSON.parse(contractJsonContent);
+    expect(contractJson).toMatchObject({
+      targetFamily: 'sql',
+      target: 'postgres',
+      storage: {
+        tables: {
+          user: expect.anything(),
+        },
+      },
+    });
 
     expect(contractDtsContent).toContain('export type Contract');
     expect(contractDtsContent).toContain('CodecTypes');

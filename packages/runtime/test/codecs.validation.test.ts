@@ -1,9 +1,9 @@
-import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../../adapter-postgres/src/codecs';
 import { extractTypeIds, validateCodecRegistryCompleteness } from '../src/codecs/validation';
+import { createTestContract } from './utils';
 
 function createRegistry() {
   const registry = createCodecRegistry();
@@ -51,7 +51,7 @@ describe('Codec Registry Validation', () => {
       },
     };
 
-    const contract = validateContract(contractRaw);
+    const contract = createTestContract(contractRaw);
     const typeIds = extractTypeIds(contract);
     expect(typeIds.size).toBe(3);
     expect(typeIds.has('pg/int4@1')).toBe(true);
@@ -107,7 +107,7 @@ describe('Codec Registry Validation', () => {
       },
     };
 
-    const contract = validateContract(contractRaw);
+    const contract = createTestContract(contractRaw);
     const typeIds = extractTypeIds(contract);
     expect(typeIds.size).toBe(2);
     expect(typeIds.has('pg/int4@1')).toBe(true);
@@ -141,7 +141,7 @@ describe('Codec Registry Validation', () => {
         operationTypes: {},
       },
     };
-    const contract = validateContract(contractRaw);
+    const contract = createTestContract(contractRaw);
 
     const registry = createRegistry();
     expect(() => validateCodecRegistryCompleteness(registry, contract)).not.toThrow();

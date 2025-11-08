@@ -115,11 +115,14 @@ export interface CreateTestRuntimeOptions {
 export function createTestContext(
   contract: SqlContract<SqlStorage>,
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+  options?: {
+    extensions?: ReadonlyArray<import('../src/context').Extension>;
+  },
 ): ReturnType<typeof createRuntimeContext> {
   return createRuntimeContext({
     contract,
     adapter,
-    extensions: [],
+    extensions: options?.extensions ?? [],
   });
 }
 
@@ -226,6 +229,19 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
       };
     },
   };
+}
+
+/**
+ * Creates a valid test contract without using validateContract.
+ * Ensures mappings are present and returns the contract with proper typing.
+ * This helper allows tests to create contracts without depending on sql-query.
+ */
+export function createTestContract<T extends SqlContract<SqlStorage>>(contract: T): T {
+  // Ensure mappings are present
+  if (!contract.mappings) {
+    contract.mappings = { codecTypes: {}, operationTypes: {} };
+  }
+  return contract as T;
 }
 
 // Re-export generic utilities from test-utils

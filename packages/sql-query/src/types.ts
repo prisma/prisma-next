@@ -1,24 +1,3 @@
-export type {
-  Adapter,
-  AdapterProfile,
-  AdapterTarget,
-  LoweredPayload,
-  Lowerer,
-  LowererContext,
-  ModelDefinition,
-  ModelField,
-  ModelStorage,
-  SqlContract,
-  SqlDriver,
-  SqlExecuteRequest,
-  SqlExplainResult,
-  SqlMappings,
-  SqlQueryResult,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-target';
-
 import type { Plan, PlanRefs } from '@prisma-next/contract/types';
 import type {
   ArgSpec,
@@ -407,28 +386,6 @@ export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>
       : false
     : false;
 
-// Re-export Plan types from contract for backward compatibility
-export type { ParamDescriptor, PlanMeta, PlanRefs, ResultType } from '@prisma-next/contract/types';
-
-// Re-export AST types from sql-target for backward compatibility
-export type {
-  BinaryExpr,
-  ColumnRef,
-  DeleteAst,
-  Direction,
-  ExistsExpr,
-  IncludeAst,
-  IncludeRef,
-  InsertAst,
-  JoinAst,
-  JoinOnExpr,
-  LoweredStatement,
-  ParamRef,
-  QueryAst,
-  SelectAst,
-  TableRef,
-  UpdateAst,
-} from '@prisma-next/sql-target';
 
 /**
  * SQL-specific Plan type that refines the ast field to use QueryAst.
@@ -438,9 +395,6 @@ export type SqlPlan<Row = unknown> = Omit<Plan<Row>, 'ast'> & {
   readonly ast?: QueryAst;
 };
 
-// Re-export Plan as SqlPlan for backward compatibility
-// Also export as Plan for compatibility with existing code
-export type { Plan } from '@prisma-next/contract/types';
 
 /**
  * Helper types for extracting contract structure.

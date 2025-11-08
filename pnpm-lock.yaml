@@ -423,6 +423,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../contract
+      '@prisma-next/runtime':
+        specifier: workspace:*
+        version: link:../runtime
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
@@ -430,9 +433,6 @@ importers:
         specifier: ^2.1.25
         version: 2.1.25
     devDependencies:
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../test-utils

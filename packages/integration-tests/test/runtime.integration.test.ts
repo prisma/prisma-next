@@ -5,22 +5,20 @@ import { fileURLToPath } from 'node:url';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { timeouts } from '@prisma-next/test-utils';
-import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
-import { budgets } from '../src/plugins/budgets';
-import { lints } from '../src/plugins/lints';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import { budgets, lints } from '@prisma-next/runtime';
 import {
-  createDevDatabase,
   createTestContext,
   createTestRuntime,
   drainPlanExecution,
   executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
-} from './utils';
+} from '@prisma-next/runtime/test/utils';
+import { timeouts, createDevDatabase } from '@prisma-next/test-utils';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const fixtureContract = loadContractFixture();
 const adapter = createPostgresAdapter();
@@ -283,3 +281,4 @@ function loadContractFixture(): SqlContract<SqlStorage> {
   const contractJson = JSON.parse(json) as unknown;
   return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
+

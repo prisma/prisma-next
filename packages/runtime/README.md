@@ -8,6 +8,8 @@ The runtime is the executable core of Prisma Next. It orchestrates query executi
 
 The runtime follows a "thin core, fat targets" philosophy: it contains no dialect-specific logic, no transport/pooling code, and no policy enforcement. Instead, it coordinates adapters, drivers, and plugins to deliver deterministic behavior with tight feedback loops.
 
+**Target-Agnostic Design**: The runtime must remain target-agnostic and must not depend on lane-specific packages (e.g., `@prisma-next/sql-query`). Runtime works with generic interfaces from `@prisma-next/sql-target` to enable extensibility across target families (SQL, Document, Graph, etc.).
+
 ## Purpose
 
 Execute query Plans with deterministic verification, guardrails, and feedback. Provide a unified execution surface that works across all query lanes (DSL, ORM, Raw SQL, TypedSQL).
@@ -27,6 +29,20 @@ Execute query Plans with deterministic verification, guardrails, and feedback. P
 - Policy definition (plugins)
 
 ## Architecture
+
+### Target-Agnostic Design
+
+**CRITICAL**: The runtime must remain **target-agnostic** and must not depend on lane-specific packages (e.g., `@prisma-next/sql-query`). This follows the "thin core, fat targets" philosophy:
+
+- **Runtime works with generic interfaces**: Runtime uses generic interfaces from `@prisma-next/sql-target` (e.g., `Adapter`, `SqlContract`, `CodecRegistry`, `OperationRegistry`) but does not depend on lane-specific query builders
+- **No lane-specific dependencies**: Runtime must not import from `@prisma-next/sql-query` in source code. The SQL query package is only in `devDependencies` for tests
+- **Adapter abstraction**: Runtime coordinates with adapters through generic interfaces, not lane-specific types
+- **Enables extensibility**: This design allows adding new target families (e.g., Document, Graph) without modifying the runtime
+
+**Dependency Rules:**
+- ✅ **Allowed**: `@prisma-next/sql-target` (generic SQL target family interfaces)
+- ✅ **Allowed**: `@prisma-next/contract` (core contract types)
+- ❌ **Forbidden**: `@prisma-next/sql-query` (SQL lane-specific query builders) - only in `devDependencies` for tests
 
 ```mermaid
 flowchart TD
@@ -117,9 +133,17 @@ flowchart TD
 
 ## Dependencies
 
-- **`@prisma-next/sql-query`**: Plan types and SQL contract types
-- **`@prisma-next/sql-target`**: Adapter SPI, codec interfaces, SQL contract types
-- **`@prisma-next/driver-postgres`**: Postgres driver implementation
+### Runtime Dependencies
+
+- **`@prisma-next/contract`**: Core contract types (`ContractBase`, `Plan`, `PlanRefs`)
+- **`@prisma-next/sql-target`**: Generic SQL target family interfaces (`Adapter`, `SqlContract`, `CodecRegistry`, `OperationRegistry`, `SqlStorage`)
+- **`@prisma-next/driver-postgres`**: Postgres driver implementation (target-specific, but runtime uses generic driver interface)
+
+### Test Dependencies
+
+- **`@prisma-next/sql-query`**: SQL lane query builders (only in `devDependencies` for tests, **not imported in source code**)
+
+**Important**: Runtime source code must not import from `@prisma-next/sql-query`. This package is only available in tests to enable test utilities. Runtime works with generic interfaces from `@prisma-next/sql-target` to remain target-agnostic.
 
 ## Related Subsystems
 

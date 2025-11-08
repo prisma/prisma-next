@@ -14,11 +14,11 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/runtime": "workspace:*",
     "@prisma-next/sql-target": "workspace:*",
     "arktype": "^2.1.25"
   },
   "devDependencies": {
-    "@prisma-next/runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/pg": "^8.11.10",
     "pg": "^8.11.5",

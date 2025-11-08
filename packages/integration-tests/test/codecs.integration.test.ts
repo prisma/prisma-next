@@ -3,19 +3,18 @@ import { param } from '@prisma-next/sql-query/param';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { timeouts } from '@prisma-next/test-utils';
-import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
-  createDevDatabase,
   createTestContext,
   createTestRuntime,
   executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
-} from './utils';
+} from '@prisma-next/runtime/test/utils';
+import { timeouts, createDevDatabase } from '@prisma-next/test-utils';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -415,3 +414,4 @@ describe('Codecs Integration Tests', () => {
     expect(rows[0]).toEqual({ name: 'Test User' });
   });
 });
+

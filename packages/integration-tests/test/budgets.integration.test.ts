@@ -2,20 +2,19 @@ import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { timeouts } from '@prisma-next/test-utils';
-import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { budgets } from '../src/plugins/budgets';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { budgets } from '@prisma-next/runtime';
 import {
-  createDevDatabase,
   createTestContext,
   createTestRuntime,
   drainPlanExecution,
   executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
-} from './utils';
+} from '@prisma-next/runtime/test/utils';
+import { timeouts, createDevDatabase } from '@prisma-next/test-utils';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -393,3 +392,4 @@ describe('budgets plugin integration', () => {
     );
   });
 });
+
