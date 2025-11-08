@@ -6,6 +6,79 @@ alwaysApply: false
 
 This document covers important TypeScript patterns and architectural principles used in this codebase.
 
+## Generic Parameter Defaults
+
+**CRITICAL RULE**: Generic types or interfaces should **not** provide defaults unless the type actually makes sense with non-specific values. Most of the time, we need a generic parameter to be provided or it's not worth having.
+
+### The Problem
+
+Default generic parameters can create a false sense of flexibility. If a type is useless without specific values, defaults are misleading and add unnecessary complexity.
+
+### When Defaults Are Appropriate
+
+**✅ CORRECT: Default makes sense - type is useful with default value**
+
+```typescript
+// Array is useful even with unknown element type
+interface Array<T = unknown> {
+  length: number;
+  [index: number]: T;
+}
+
+// Optional generic with sensible default
+interface EventEmitter<T = unknown> {
+  emit(event: string, data: T): void;
+}
+```
+
+### When Defaults Are NOT Appropriate
+
+**❌ WRONG: Type is useless without specific values**
+
+```typescript
+// This type is useless without specific Name, Nullable, Type values
+interface ColumnBuilderState<
+  Name extends string = string,
+  Nullable extends boolean = boolean,
+  Type extends string = string,
+> {
+  readonly name: Name;
+  readonly nullable: Nullable;
+  readonly type: Type;
+}
+```
+
+**✅ CORRECT: Remove defaults - type requires specific values**
+
+```typescript
+// Type requires specific values to be useful
+interface ColumnBuilderState<
+  Name extends string,
+  Nullable extends boolean,
+  Type extends string,
+> {
+  readonly name: Name;
+  readonly nullable: Nullable;
+  readonly type: Type;
+}
+```
+
+### Why This Matters
+
+1. **Clarity**: Makes it clear that specific values are required
+2. **Type Safety**: Prevents accidental use with default (often too-broad) types
+3. **Simplicity**: Removes unused defaults that add noise
+4. **Intent**: Signals that the type is designed for specific use cases, not generic ones
+
+### Pattern
+
+**Before adding defaults, ask:**
+- Does this type make sense with the default values?
+- Would someone ever want to use this type with defaults?
+- Are the defaults just there "in case" or do they serve a real purpose?
+
+**If the answer is "no" or "just in case", remove the defaults.**
+
 ## Interface-Based Design with Factory Functions
 
 **Pattern**: Export interfaces and factory functions, keep classes as private implementation details.

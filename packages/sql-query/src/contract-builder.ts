@@ -80,8 +80,16 @@ type BuildModelFields<Fields extends Record<string, string>> = {
   readonly [K in keyof Fields]: { readonly column: Fields[K] };
 };
 
-type ExtractModelFields<T extends ModelBuilderState<string, string, Record<string, string>>> =
-  T extends ModelBuilderState<string, string, infer F> ? F : never;
+type ExtractModelFields<
+  T extends ModelBuilderState<
+    string,
+    string,
+    Record<string, string>,
+    Record<string, RelationDefinition>
+  >,
+> = T extends ModelBuilderState<string, string, infer F, Record<string, RelationDefinition>>
+  ? F
+  : never;
 
 type ExtractModelRelations<
   T extends ModelBuilderState<
@@ -113,23 +121,16 @@ type BuildRelations<
   readonly [K in keyof Models as Models[K]['table']]: ExtractModelRelations<Models[K]>;
 };
 
-interface ColumnBuilderState<
-  Name extends string = string,
-  Nullable extends boolean = boolean,
-  Type extends string = string,
-> {
+interface ColumnBuilderState<Name extends string, Nullable extends boolean, Type extends string> {
   readonly name: Name;
   readonly nullable: Nullable;
   readonly type: Type;
 }
 
 interface TableBuilderState<
-  Name extends string = string,
-  Columns extends Record<string, ColumnBuilderState<string, boolean, string>> = Record<
-    string,
-    ColumnBuilderState<string, boolean, string>
-  >,
-  PrimaryKey extends readonly string[] | undefined = undefined,
+  Name extends string,
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
+  PrimaryKey extends readonly string[] | undefined,
 > {
   readonly name: Name;
   readonly columns: Columns;
@@ -151,10 +152,10 @@ type RelationDefinition = {
 };
 
 interface ModelBuilderState<
-  Name extends string = string,
-  Table extends string = string,
-  Fields extends Record<string, string> = Record<string, string>,
-  Relations extends Record<string, RelationDefinition> = Record<string, RelationDefinition>,
+  Name extends string,
+  Table extends string,
+  Fields extends Record<string, string>,
+  Relations extends Record<string, RelationDefinition>,
 > {
   readonly name: Name;
   readonly table: Table;
@@ -162,11 +163,7 @@ interface ModelBuilderState<
   readonly relations: Relations;
 }
 
-export interface ColumnBuilder<
-  Name extends string,
-  Nullable extends boolean = false,
-  Type extends string = string,
-> {
+export interface ColumnBuilder<Name extends string, Nullable extends boolean, Type extends string> {
   nullable<Value extends boolean>(value?: Value): ColumnBuilder<Name, Value, Type>;
   type<Id extends string>(id: Id): ColumnBuilder<Name, Nullable, Id>;
   build(): ColumnBuilderState<Name, Nullable, Type>;
@@ -445,9 +442,12 @@ interface ContractBuilderState<
       readonly string[] | undefined
     >
   >,
-  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>> = Record<
+  Models extends Record<
     string,
-    ModelBuilderState<string, string, Record<string, string>>
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  > = Record<
+    string,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   >,
   CoreHash extends string | undefined = string | undefined,
   Extensions extends Record<string, unknown> | undefined = undefined,
@@ -689,7 +689,7 @@ class ContractBuilder<
 
       const tableStateTyped = tableState as unknown as {
         name: string;
-        columns: Record<string, ColumnBuilderState>;
+        columns: Record<string, ColumnBuilderState<string, boolean, string>>;
         primaryKey?: readonly string[] | { columns: readonly string[] };
       };
 
