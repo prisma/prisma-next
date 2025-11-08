@@ -18,6 +18,7 @@
     "@prisma-next/runtime": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
     "pg": "^8.11.5"
   },
   "devDependencies": {

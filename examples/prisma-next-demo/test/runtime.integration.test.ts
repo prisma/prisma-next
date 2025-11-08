@@ -5,7 +5,7 @@ import { loadContractFromTs } from '@prisma-next/cli';
 import type { ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { budgets, createRuntime } from '@prisma-next/runtime';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
 import { param } from '@prisma-next/sql-query/param';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
@@ -58,8 +58,9 @@ describe('runtime execute integration', () => {
             connect: { pool },
             cursor: { disabled: true },
           });
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const runtime = createRuntime({
-            contract,
+            context,
             adapter,
             driver,
             verify: { mode: 'always', requireMarker: true },
@@ -101,9 +102,9 @@ describe('runtime execute integration', () => {
             );
             expect(rowCount).toBe(1);
 
-            const tables = schema(contract).tables;
+            const tables = schema(context).tables;
             const userTable = tables['user']!;
-            const plan = sql({ contract, adapter })
+            const plan = sql({ context })
               .from(tables['user']!)
               .select({
                 id: userTable.columns['id']!,
@@ -121,7 +122,7 @@ describe('runtime execute integration', () => {
             expect(rows).toHaveLength(1);
             expect(rows[0]).toMatchObject({ email: 'alice@example.com' });
 
-            const root = sql({ contract, adapter });
+            const root = sql({ context });
             const templatePlan = root.raw.with({ annotations: { limit: 1 } })`
           select id, email from "user"
           where email = ${'alice@example.com'}
@@ -162,7 +163,7 @@ describe('runtime execute integration', () => {
             await runtime.close();
           }
         },
-        { acceleratePort: 54300, databasePort: 54301, shadowDatabasePort: 54302 },
+        {},
       );
     },
     timeouts.typeScriptCompilation * 2,
@@ -177,11 +178,12 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const runtime = createRuntime({
-          contract,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const runtime = createRuntime({
+            context,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
               maxRows: 10_000,
@@ -215,11 +217,11 @@ describe('runtime execute integration', () => {
             );
           });
 
-          const tables = schema(contract).tables;
+          const tables = schema(context).tables;
           const userTable = tables['user']!;
           const postTable = tables['post']!;
 
-          const userPlan = sql({ contract, adapter })
+          const userPlan = sql({ context })
             .from(userTable)
             .select({
               id: userTable.columns['id']!,
@@ -231,7 +233,7 @@ describe('runtime execute integration', () => {
 
           type UserRow = ResultType<typeof userPlan>;
 
-          const postPlan = sql({ contract, adapter })
+          const postPlan = sql({ context })
             .from(postTable)
             .where(postTable.columns['userId']!.eq(param('userId')))
             .select({
@@ -261,7 +263,7 @@ describe('runtime execute integration', () => {
           await runtime.close();
         }
       },
-      { acceleratePort: 54303, databasePort: 54304, shadowDatabasePort: 54305 },
+      {},
     );
   });
 
@@ -274,11 +276,12 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const runtime = createRuntime({
-          contract,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const runtime = createRuntime({
+            context,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
               maxRows: 50,
@@ -307,9 +310,9 @@ describe('runtime execute integration', () => {
             }
           });
 
-          const tables = schema(contract).tables;
+          const tables = schema(context).tables;
           const userTable = tables['user']!;
-          const unboundedPlan = sql({ contract, adapter })
+          const unboundedPlan = sql({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -326,7 +329,7 @@ describe('runtime execute integration', () => {
             category: 'BUDGET',
           });
 
-          const boundedPlan = sql({ contract, adapter })
+          const boundedPlan = sql({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -345,7 +348,7 @@ describe('runtime execute integration', () => {
           await runtime.close();
         }
       },
-      { acceleratePort: 54306, databasePort: 54307, shadowDatabasePort: 54308 },
+      {},
     );
   });
 
@@ -358,11 +361,12 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const runtime = createRuntime({
-          contract,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const runtime = createRuntime({
+            context,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
               maxRows: 10,
@@ -391,9 +395,9 @@ describe('runtime execute integration', () => {
             }
           });
 
-          const tables = schema(contract).tables;
+          const tables = schema(context).tables;
           const userTable = tables['user']!;
-          const plan = sql({ contract, adapter })
+          const plan = sql({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -414,7 +418,7 @@ describe('runtime execute integration', () => {
           await runtime.close();
         }
       },
-      { acceleratePort: 54309, databasePort: 54310, shadowDatabasePort: 54311 },
+      {},
     );
   });
 
@@ -427,11 +431,12 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const runtime = createRuntime({
-          contract,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const runtime = createRuntime({
+            context,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
               maxRows: 10_000,
@@ -466,11 +471,11 @@ describe('runtime execute integration', () => {
             );
           });
 
-          const tables = schema(contract).tables;
+          const tables = schema(context).tables;
           const userTable = tables['user']!;
           const postTable = tables['post']!;
 
-          const plan = sql({ contract, adapter })
+          const plan = sql({ context })
             .from(userTable)
             .includeMany(
               postTable,
@@ -523,7 +528,7 @@ describe('runtime execute integration', () => {
           await runtime.close();
         }
       },
-      { acceleratePort: 54312, databasePort: 54313, shadowDatabasePort: 54314 },
+      {},
     );
   });
 });

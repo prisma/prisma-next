@@ -1,5 +1,6 @@
 import type { StartServerOptions } from '@prisma/dev';
 import { unstable_startServer } from '@prisma/dev';
+import { randomInt } from 'node:crypto';
 import { Client } from 'pg';
 
 export * from '../timeouts';
@@ -33,13 +34,45 @@ export async function createDevDatabase(options?: StartServerOptions): Promise<D
 }
 
 /**
+ * Generates random ports for parallel test execution.
+ * Uses a base port range (55000-64999) to provide 10,000 possible ports,
+ * allowing for many parallel test executions without conflicts.
+ */
+function generateRandomPorts(): {
+  acceleratePort: number;
+  databasePort: number;
+  shadowDatabasePort: number;
+} {
+  // Use base port 55000-64999 to avoid conflicts with other services
+  // Generate random offset for each test to avoid conflicts in parallel execution
+  // 10,000 port range provides ample space for many parallel tests
+  const basePort = 55000 + randomInt(0, 10000);
+  return {
+    acceleratePort: basePort,
+    databasePort: basePort + 1,
+    shadowDatabasePort: basePort + 2,
+  };
+}
+
+/**
  * Executes a function with a dev database, automatically cleaning up afterward.
+ * If no ports are provided, random ports will be generated to avoid conflicts in parallel execution.
  */
 export async function withDevDatabase<T>(
   fn: (ctx: DevDatabase) => Promise<T>,
   options?: StartServerOptions,
 ): Promise<T> {
-  const database = await createDevDatabase(options);
+  // If no ports specified, generate random ones to avoid conflicts in parallel execution
+  const finalOptions: StartServerOptions = options || {};
+  if (
+    !finalOptions.acceleratePort &&
+    !finalOptions.databasePort &&
+    !finalOptions.shadowDatabasePort
+  ) {
+    const randomPorts = generateRandomPorts();
+    Object.assign(finalOptions, randomPorts);
+  }
+  const database = await createDevDatabase(finalOptions);
   try {
     return await fn(database);
   } finally {

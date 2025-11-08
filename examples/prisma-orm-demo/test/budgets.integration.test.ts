@@ -1,45 +1,22 @@
-import type { StartServerOptions } from '@prisma/dev';
-import { unstable_startServer } from '@prisma/dev';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
   budgets,
   createRuntime,
+  createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/runtime';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
+import { withDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
-import type { CodecTypes, Contract } from '../src/prisma-next/contract.d';
+import type { Contract } from '../src/prisma-next/contract.d';
 import contractJson from '../src/prisma-next/contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-
-// Copy of withDevDatabase helper (like compat-prisma does)
-function normalizeConnectionString(raw: string): string {
-  const url = new URL(raw);
-  if (url.hostname === 'localhost' || url.hostname === '::1') {
-    url.hostname = '127.0.0.1';
-  }
-  return url.toString();
-}
-
-async function withDevDatabase<T>(
-  fn: (ctx: { connectionString: string }) => Promise<T>,
-  options?: StartServerOptions,
-): Promise<T> {
-  const server = await unstable_startServer(options);
-  const connectionString = normalizeConnectionString(server.database.connectionString);
-
-  try {
-    return await fn({ connectionString });
-  } finally {
-    await server.close();
-  }
-}
 
 describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () => {
   it('blocks unbounded SELECT queries', async () => {
@@ -85,8 +62,9 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           });
           await client.query(write.insert.sql, [...write.insert.params]);
 
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const runtime = createRuntime({
-            contract,
+            context,
             adapter,
             driver,
             verify: { mode: 'onFirstUse', requireMarker: false },
@@ -99,7 +77,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
             ],
           });
 
-          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const tables = schema(context).tables;
           const userTable = tables['User'];
           if (!userTable) {
             throw new Error('User table not found');
@@ -110,7 +88,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           if (!idColumn || !emailColumn) {
             throw new Error('Columns id or email not found');
           }
-          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+          const plan = sql({ context })
             .from(userTable)
             .select({
               id: idColumn,
@@ -133,11 +111,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           await client.end();
         }
       },
-      {
-        acceleratePort: 54020,
-        databasePort: 54021,
-        shadowDatabasePort: 54022,
-      },
+      {},
     );
   });
 
@@ -184,8 +158,9 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           });
           await client.query(write.insert.sql, [...write.insert.params]);
 
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const runtime = createRuntime({
-            contract,
+            context,
             adapter,
             driver,
             verify: { mode: 'onFirstUse', requireMarker: false },
@@ -198,7 +173,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
             ],
           });
 
-          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const tables = schema(context).tables;
           const userTable = tables['User'];
           if (!userTable) {
             throw new Error('User table not found');
@@ -209,7 +184,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           if (!idColumn || !emailColumn) {
             throw new Error('Columns id or email not found');
           }
-          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+          const plan = sql({ context })
             .from(userTable)
             .select({
               id: idColumn,
@@ -230,11 +205,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           await client.end();
         }
       },
-      {
-        acceleratePort: 54030,
-        databasePort: 54031,
-        shadowDatabasePort: 54032,
-      },
+      {},
     );
   });
 
@@ -281,8 +252,9 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           });
           await client.query(write.insert.sql, [...write.insert.params]);
 
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const runtime = createRuntime({
-            contract,
+            context,
             adapter,
             driver,
             verify: { mode: 'onFirstUse', requireMarker: false },
@@ -295,7 +267,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
             ],
           });
 
-          const tables = schema<Contract, CodecTypes>(contract).tables;
+          const tables = schema(context).tables;
           const userTable = tables['User'];
           if (!userTable) {
             throw new Error('User table not found');
@@ -306,7 +278,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           if (!idColumn || !emailColumn) {
             throw new Error('Columns id or email not found');
           }
-          const plan = sql<Contract, CodecTypes>({ contract, adapter })
+          const plan = sql({ context })
             .from(userTable)
             .select({
               id: idColumn,
@@ -329,11 +301,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           await client.end();
         }
       },
-      {
-        acceleratePort: 54040,
-        databasePort: 54041,
-        shadowDatabasePort: 54042,
-      },
+      {},
     );
   });
 });
