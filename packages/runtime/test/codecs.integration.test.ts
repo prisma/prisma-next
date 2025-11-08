@@ -43,7 +43,10 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 };
 const fixtureContract = validateContract(fixtureContractRaw);
 

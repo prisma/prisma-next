@@ -29,12 +29,18 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
           id: { type: 'pg/text@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 };
 const fixtureContract = validateContract(fixtureContractRaw);
 

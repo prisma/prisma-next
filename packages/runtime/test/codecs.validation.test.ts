@@ -28,18 +28,27 @@ describe('Codec Registry Validation', () => {
               email: { type: 'pg/text@1', nullable: false },
               createdAt: { type: 'pg/timestamptz@1', nullable: true },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
               title: { type: 'pg/text@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
       models: {},
       relations: {},
-      mappings: {},
+      mappings: {
+        codecTypes: {},
+        operationTypes: {},
+      },
     };
 
     const contract = validateContract(contractRaw);
@@ -61,7 +70,10 @@ describe('Codec Registry Validation', () => {
       },
       models: {},
       relations: {},
-      mappings: {},
+      mappings: {
+        codecTypes: {},
+        operationTypes: {},
+      },
     };
 
     const typeIds = extractTypeIds(contract);
@@ -81,12 +93,18 @@ describe('Codec Registry Validation', () => {
               id: { type: 'pg/int4@1', nullable: false },
               email: { nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
       models: {},
       relations: {},
-      mappings: {},
+      mappings: {
+        codecTypes: {},
+        operationTypes: {},
+      },
     };
 
     const contract = validateContract(contractRaw);
@@ -109,12 +127,18 @@ describe('Codec Registry Validation', () => {
               email: { type: 'pg/text@1', nullable: false },
               createdAt: { type: 'pg/timestamptz@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
       models: {},
       relations: {},
-      mappings: {},
+      mappings: {
+        codecTypes: {},
+        operationTypes: {},
+      },
     };
     const contract = validateContract(contractRaw);
 
@@ -137,12 +161,18 @@ describe('Codec Registry Validation', () => {
               email: { type: 'pg/text@1', nullable: false },
               unknownType: { type: 'unknown/type@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
       models: {},
       relations: {},
-      mappings: {},
+      mappings: {
+        codecTypes: {},
+        operationTypes: {},
+      },
     };
 
     const registry = createRegistry();
