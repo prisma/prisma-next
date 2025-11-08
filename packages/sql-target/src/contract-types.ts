@@ -69,6 +69,18 @@ export type SqlMappings = {
    * Not present in contract.json; compile-time only.
    */
   readonly scalarToJs?: Record<string, unknown>;
+  /**
+   * Types-only codec type mapping.
+   * Provided via contract.d.ts imports from adapter/extension exports.
+   * Not present in contract.json; compile-time only.
+   */
+  readonly codecTypes: Record<string, { readonly output: unknown }>;
+  /**
+   * Types-only operation type mapping.
+   * Provided via contract.d.ts imports from adapter/extension exports.
+   * Not present in contract.json; compile-time only.
+   */
+  readonly operationTypes: Record<string, Record<string, unknown>>;
 };
 
 export type SqlContract<

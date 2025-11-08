@@ -9,6 +9,8 @@ import type {
   ColumnRef,
   DeleteAst,
   Direction,
+  ExtractCodecTypes,
+  ExtractOperationTypes,
   IncludeRef,
   InferNestedProjectionRow,
   InferReturningRow,
@@ -304,14 +306,18 @@ class SelectBuilderImpl<
   Includes extends Record<string, unknown> = Record<string, never>,
 > {
   private readonly contract: TContract;
-  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    SelectAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
   private readonly codecTypes: CodecTypes;
   private state: BuilderState = {};
 
-  constructor(options: SqlBuilderOptions<TContract, CodecTypes>, state?: BuilderState) {
-    this.contract = options.contract;
-    this.adapter = options.adapter;
-    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
+  constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     if (state) {
       this.state = state;
     }
@@ -1329,20 +1335,24 @@ class InsertBuilderImpl<
 > implements InsertBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    SelectAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
   private readonly codecTypes: CodecTypes;
   private readonly table: TableRef;
   private readonly values: Record<string, ParamPlaceholder>;
   private returningColumns: ColumnBuilder[] = [];
 
   constructor(
-    options: SqlBuilderOptions<TContract, CodecTypes>,
+    options: SqlBuilderOptions<TContract>,
     table: TableRef,
     values: Record<string, ParamPlaceholder>,
   ) {
-    this.contract = options.contract;
-    this.adapter = options.adapter;
-    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.table = table;
     this.values = values;
   }
@@ -1478,7 +1488,11 @@ class UpdateBuilderImpl<
 > implements UpdateBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    SelectAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
   private readonly codecTypes: CodecTypes;
   private readonly table: TableRef;
   private readonly set: Record<string, ParamPlaceholder>;
@@ -1486,13 +1500,13 @@ class UpdateBuilderImpl<
   private returningColumns: ColumnBuilder[] = [];
 
   constructor(
-    options: SqlBuilderOptions<TContract, CodecTypes>,
+    options: SqlBuilderOptions<TContract>,
     table: TableRef,
     set: Record<string, ParamPlaceholder>,
   ) {
-    this.contract = options.contract;
-    this.adapter = options.adapter;
-    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.table = table;
     this.set = set;
   }
@@ -1722,16 +1736,20 @@ class DeleteBuilderImpl<
 > implements DeleteBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    SelectAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
   private readonly codecTypes: CodecTypes;
   private readonly table: TableRef;
   private wherePredicate?: BinaryBuilder;
   private returningColumns: ColumnBuilder[] = [];
 
   constructor(options: SqlBuilderOptions<TContract, CodecTypes>, table: TableRef) {
-    this.contract = options.contract;
-    this.adapter = options.adapter;
-    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.table = table;
   }
 
@@ -1915,16 +1933,20 @@ class DeleteBuilderImpl<
   }
 }
 
-export function sql<
-  TContract extends SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(
-  options: SqlBuilderOptions<TContract, CodecTypes>,
-): SelectBuilder<TContract, unknown, CodecTypes, Record<string, never>> {
+export function sql<TContract extends SqlContract<SqlStorage>>(
+  options: SqlBuilderOptions<TContract>,
+): SelectBuilder<
+  TContract,
+  unknown,
+  ExtractCodecTypes<TContract>,
+  ExtractOperationTypes<TContract>
+> {
+  type CodecTypes = ExtractCodecTypes<TContract>;
+  type Operations = ExtractOperationTypes<TContract>;
   const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(
     options,
-  ) as SelectBuilder<TContract, unknown, CodecTypes, Record<string, never>>;
-  const rawFactory = createRawFactory(options.contract);
+  ) as SelectBuilder<TContract, unknown, CodecTypes, Operations>;
+  const rawFactory = createRawFactory(options.context.contract);
 
   Object.defineProperty(builder, 'raw', {
     value: rawFactory,

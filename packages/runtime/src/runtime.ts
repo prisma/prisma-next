@@ -35,11 +35,10 @@ import type { Plugin } from './plugins/types';
 export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
-  readonly contract: TContract;
   readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
-  readonly context: RuntimeContext;
+  readonly context: RuntimeContext<TContract>;
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: import('./plugins/types').Log;
@@ -78,8 +77,8 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { driver, contract, adapter, context } = options;
-    this.contract = contract;
+    const { driver, adapter, context } = options;
+    this.contract = context.contract;
     this.adapter = adapter;
     this.driver = driver;
     this.plugins = options.plugins ?? [];

@@ -97,10 +97,10 @@ export class OrmModelBuilderImpl<
       >
     | undefined = undefined;
 
-  constructor(options: OrmBuilderOptions<TContract, CodecTypes>, modelName: ModelName) {
-    this.contract = options.contract;
-    this.adapter = options.adapter;
-    this.codecTypes = (options.codecTypes ?? {}) as CodecTypes;
+  constructor(options: OrmBuilderOptions<TContract>, modelName: ModelName) {
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.modelName = modelName;
 
     const tableName = this.contract.mappings.modelToTable?.[modelName];
@@ -108,7 +108,7 @@ export class OrmModelBuilderImpl<
       throw planInvalid(`Model ${modelName} not found in mappings`);
     }
 
-    const schemaHandle = schema(this.contract, this.codecTypes);
+    const schemaHandle = schema(options.context);
     const table = schemaHandle.tables[tableName];
     if (!table) {
       throw planInvalid(`Table ${tableName} not found in schema`);

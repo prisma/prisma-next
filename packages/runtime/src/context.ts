@@ -1,14 +1,18 @@
 import type { Adapter } from '@prisma-next/sql-query/types';
 import type {
   CodecRegistry,
+  LoweredStatement,
   OperationRegistry,
   OperationSignature,
+  SelectAst,
   SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-target';
 import { createCodecRegistry, createOperationRegistry } from '@prisma-next/sql-target';
 
-export interface RuntimeContext {
+export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> {
+  readonly contract: TContract;
+  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly operations: OperationRegistry;
   readonly codecs: CodecRegistry;
 }
@@ -21,14 +25,15 @@ export interface Extension {
 export interface CreateRuntimeContextOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
-  readonly adapter: Adapter<unknown, TContract, unknown>;
+  readonly contract: TContract;
+  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly extensions?: ReadonlyArray<Extension>;
 }
 
 export function createRuntimeContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
->(options: CreateRuntimeContextOptions<TContract>): RuntimeContext {
-  const { adapter, extensions } = options;
+>(options: CreateRuntimeContextOptions<TContract>): RuntimeContext<TContract> {
+  const { contract, adapter, extensions } = options;
 
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
@@ -58,6 +63,8 @@ export function createRuntimeContext<
   }
 
   return {
+    contract,
+    adapter,
     operations: operationRegistry,
     codecs: codecRegistry,
   };

@@ -12,6 +12,8 @@ import type {
   CodecTypes as CodecTypesType,
   ColumnBuilder,
   ComputeColumnJsType,
+  ExtractCodecTypes,
+  ExtractOperationTypes,
   OperationTypes,
   OrderBuilder,
   ParamPlaceholder,
@@ -158,16 +160,21 @@ function buildColumns<
       columnName,
       columnDef as StorageColumn,
     );
-    const builderWithOps = attachOperationsToColumnBuilder(
-      columnBuilder,
+    const builderWithOps = attachOperationsToColumnBuilder<
+      string,
+      StorageColumn,
+      unknown,
+      Operations
+    >(
+      columnBuilder as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
       columnDef as StorageColumn,
       operationRegistry,
       contractCapabilities,
-    );
+    ) as ColumnBuilder<string, StorageColumn, unknown, Operations>;
     // Type assertion to preserve the mapped type structure
-    (result as unknown as Record<string, ColumnBuilder<string, StorageColumn, unknown>>)[
-      columnName
-    ] = builderWithOps;
+    (
+      result as unknown as Record<string, ColumnBuilder<string, StorageColumn, unknown, Operations>>
+    )[columnName] = builderWithOps;
   }
 
   return result;
@@ -233,26 +240,26 @@ export type SchemaHandle<
 /**
  * Creates a schema handle for building SQL queries.
  *
- * @param contract - The SQL contract containing storage, models, and capabilities
- * @param context - Optional runtime context containing codec and operation registries
+ * @param context - Runtime context containing contract, codec and operation registries
  * @returns A schema handle with typed table builders
  *
  * @example
  * ```typescript
- * const schemaHandle = schema<Contract, CodecTypes, OperationTypes>(contract, context);
+ * const schemaHandle = schema<Contract>(context);
  * const userTable = schemaHandle.tables.user;
  * ```
  */
-export function schema<
-  Contract extends SqlContract<SqlStorage>,
-  CodecTypes extends CodecTypesType = Record<string, never>,
-  Operations extends OperationTypes = Record<string, never>,
->(contract: Contract, context?: RuntimeContext): SchemaHandle<Contract, CodecTypes, Operations> {
+export function schema<Contract extends SqlContract<SqlStorage>>(
+  context: RuntimeContext<Contract>,
+): SchemaHandle<Contract, ExtractCodecTypes<Contract>, ExtractOperationTypes<Contract>> {
+  const contract = context.contract;
   const storage = contract.storage;
+  type CodecTypes = ExtractCodecTypes<Contract>;
+  type Operations = ExtractOperationTypes<Contract>;
   const tables = {} as ExtractSchemaTables<Contract, CodecTypes, Operations>;
   const contractCapabilities = contract.capabilities;
 
-  const operationRegistry = context?.operations;
+  const operationRegistry = context.operations;
 
   for (const tableName in storage.tables) {
     const columns = buildColumns<Contract, typeof tableName, CodecTypes, Operations>(
@@ -281,7 +288,7 @@ export function schema<
     ) as ExtractSchemaTables<Contract, CodecTypes, Operations>[typeof tableName];
   }
 
-  return Object.freeze({ tables });
+  return Object.freeze({ tables }) as SchemaHandle<Contract, CodecTypes, Operations>;
 }
 
 export type { ColumnBuilderImpl as Column, TableBuilderImpl as Table };

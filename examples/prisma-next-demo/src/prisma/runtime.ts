@@ -28,15 +28,15 @@ export function getRuntime() {
 
     const adapter = createPostgresAdapter();
 
-    // Create context with adapter (adapter provides codecs via profile.codecs())
+    // Create context with contract and adapter (adapter provides codecs via profile.codecs())
     // Extensions can be added programmatically when available
     context = createRuntimeContext({
+      contract,
       adapter,
       extensions: [],
     });
 
     runtime = createRuntime({
-      contract,
       adapter,
       driver,
       verify: {

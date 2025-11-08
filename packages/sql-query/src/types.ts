@@ -35,6 +35,28 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-target';
 
+/**
+ * Extracts CodecTypes from a Contract's mappings.
+ * Falls back to Record<string, never> if not present.
+ */
+export type ExtractCodecTypes<Contract extends SqlContract<SqlStorage>> =
+  Contract['mappings'] extends { codecTypes: infer CT }
+    ? CT extends Record<string, { readonly output: unknown }>
+      ? CT
+      : Record<string, never>
+    : Record<string, never>;
+
+/**
+ * Extracts OperationTypes from a Contract's mappings.
+ * Falls back to Record<string, never> if not present.
+ */
+export type ExtractOperationTypes<Contract extends SqlContract<SqlStorage>> =
+  Contract['mappings'] extends { operationTypes: infer OT }
+    ? OT extends Record<string, Record<string, unknown>>
+      ? OT
+      : Record<string, never>
+    : Record<string, never>;
+
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';
   readonly name: string;
@@ -539,9 +561,6 @@ export interface BuildOptions {
 
 export interface SqlBuilderOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > {
-  readonly contract: TContract;
-  readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
-  readonly codecTypes?: CodecTypes;
+  readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
 }

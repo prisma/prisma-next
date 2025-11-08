@@ -96,6 +96,8 @@ export type Contract = SqlContract<
       };
     };
     readonly scalarToJs: ScalarToJs;
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: OperationTypes;
   }
 > & {
   readonly storage: {
@@ -117,6 +119,9 @@ export type Contract = SqlContract<
 
 // Codec type map and scalar mapping imported from adapter
 export type { CodecTypes, ScalarToJs };
+
+// Operation types (empty for now, can be extended by extension packs)
+export type OperationTypes = Record<string, never>;
 
 // Direct model exports for easy importing
 export type User = Contract['models']['User'];

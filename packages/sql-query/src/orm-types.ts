@@ -1,23 +1,16 @@
+import type { RuntimeContext } from '@prisma-next/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type {
-  Adapter,
   BinaryBuilder,
   BuildOptions,
   ColumnBuilder,
   InferNestedProjectionRow,
-  LoweredStatement,
   OrderBuilder,
   Plan,
-  SelectAst,
 } from './types';
 
-export interface OrmBuilderOptions<
-  TContract extends SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-> {
-  readonly contract: TContract;
-  readonly adapter: Adapter<SelectAst, TContract, LoweredStatement>;
-  readonly codecTypes?: CodecTypes;
+export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {
+  readonly context: RuntimeContext<TContract>;
 }
 
 type ModelName<TContract extends SqlContract<SqlStorage>> = keyof TContract['models'] & string;

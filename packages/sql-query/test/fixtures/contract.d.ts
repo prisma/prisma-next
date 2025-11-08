@@ -53,6 +53,8 @@ export type Contract = SqlContract<
       };
     };
     readonly scalarToJs: ScalarToJs;
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: OperationTypes;
   }
 > & {
   readonly storage: {
