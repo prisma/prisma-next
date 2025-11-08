@@ -12,10 +12,10 @@ describe('DSL Lane Codec Type Stamping', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const context = createTestContext(contract, adapter);
-  const tables = schema<Contract, CodecTypes>(context).tables;
+  const tables = schema<Contract>(context).tables;
 
   it('stamps paramDescriptors.type from columnMeta.type', () => {
-    const builder = sql<Contract, CodecTypes>({ context });
+    const builder = sql<Contract>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -28,12 +28,7 @@ describe('DSL Lane Codec Type Stamping', () => {
     }
     const plan = builder
       .from(userTable)
-      .where(
-        (idColumn as { eq: (value: { kind: string; name: string }) => unknown }).eq({
-          kind: 'param-placeholder',
-          name: 'userId',
-        }) as unknown as { kind: string; op: string; left: unknown; right: unknown },
-      )
+      .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
       .select({
         id: idColumn,
         email: emailColumn,
@@ -50,7 +45,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('stamps projectionTypes mapping alias → scalar type', () => {
-    const builder = sql<Contract, CodecTypes>({ context });
+    const builder = sql<Contract>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -82,7 +77,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('stamps projectionTypes for aliased columns', () => {
-    const builder = sql<Contract, CodecTypes>({ context });
+    const builder = sql<Contract>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -112,7 +107,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('includes nullable in paramDescriptors', () => {
-    const builder = sql<Contract, CodecTypes>({ context });
+    const builder = sql<Contract>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -123,12 +118,7 @@ describe('DSL Lane Codec Type Stamping', () => {
     }
     const plan = builder
       .from(userTable)
-      .where(
-        (idColumn as { eq: (value: { kind: string; name: string }) => unknown }).eq({
-          kind: 'param-placeholder',
-          name: 'userId',
-        }) as unknown as { kind: string; op: string; left: unknown; right: unknown },
-      )
+      .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
       .select({
         id: idColumn,
       })
@@ -141,7 +131,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('Plan has Row generic type', () => {
-    const builder = sql<Contract, CodecTypes>({ context });
+    const builder = sql<Contract>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');

@@ -1,4 +1,3 @@
-import type { CodecTypes as PgCodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { SqlContract } from '@prisma-next/sql-target';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { expectTypeOf, test } from 'vitest';
@@ -6,9 +5,10 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Plan, ResultType, TableKey, TablesOf } from '../src/types';
-import type { CodecTypes, Contract, ScalarToJs } from './fixtures/contract.d';
+import type { TableKey, TablesOf } from '../src/types';
+import type { Contract, ScalarToJs } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
+import type { Plan, ResultType } from '@prisma-next/contract/types';
 
 // Helper to simulate execute signature
 function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
@@ -156,12 +156,11 @@ test('builder chain preserves Row type through methods', () => {
   const tables = schema(context).tables;
   const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
-  const userColumns = getTableColumns(userTable);
+  const userColumns = userTable.columns;
   const idColumn = userColumns.id;
   const emailColumn = userColumns.email;
   if (!idColumn || !emailColumn) throw new Error('columns not found');
 
-  const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const builderAfterFrom = sql({ context }).from(userTable);
   const builderWithSelect = builderAfterFrom.select({
     id: idColumn,
@@ -288,8 +287,6 @@ test('generic contract types are preserved', () => {
   expectTypeOf<ContractTables>().toHaveProperty('user');
 
   // Verify schema() preserves contract generic - should have literal 'user' key
-  const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const schemaHandle = schema(context);
   expectTypeOf(schemaHandle.tables).toHaveProperty('user');
 
@@ -460,6 +457,9 @@ test('result typing is derived solely from projection, unaffected by joins', () 
             readonly id: { readonly type: 'pg/int4@1'; nullable: false };
             readonly email: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly uniques: readonly never[];
+          readonly indexes: readonly never[];
+          readonly foreignKeys: readonly never[];
         };
         readonly post: {
           readonly columns: {
@@ -467,12 +467,21 @@ test('result typing is derived solely from projection, unaffected by joins', () 
             readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
             readonly title: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly uniques: readonly never[];
+          readonly indexes: readonly never[];
+          readonly foreignKeys: readonly never[];
         };
       };
     },
     Record<string, never>,
     Record<string, never>,
-    Record<string, never>
+    {
+      readonly codecTypes: {
+        readonly 'pg/int4@1': { readonly output: number };
+        readonly 'pg/text@1': { readonly output: string };
+      };
+      readonly operationTypes: Record<string, Record<string, unknown>>;
+    }
   >;
 
   const contractWithPosts = validateContract<ContractWithPosts>({
@@ -487,6 +496,9 @@ test('result typing is derived solely from projection, unaffected by joins', () 
             id: { type: 'pg/int4@1', nullable: false },
             email: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
         post: {
           columns: {
@@ -494,30 +506,36 @@ test('result typing is derived solely from projection, unaffected by joins', () 
             userId: { type: 'pg/int4@1', nullable: false },
             title: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },
     models: {},
     relations: {},
-    mappings: {},
+    mappings: {
+      codecTypes: {},
+      operationTypes: {},
+    } as unknown as ContractWithPosts['mappings'],
   });
 
   const adapter = createPostgresAdapter();
   const context = createRuntimeContext({ contract: contractWithPosts, adapter, extensions: [] });
   const tables = schema(context).tables;
-  const userTable = tables.user;
-  const postTable = tables.post;
+  const userTable = tables['user'];
+  const postTable = tables['post'];
   if (!userTable || !postTable) throw new Error('tables not found');
   const userColumns = userTable.columns;
   const postColumns = postTable.columns;
 
   const _plan = sql({ context })
     .from(userTable)
-    .innerJoin(postTable, (on) => on.eqCol(userColumns.id!, postColumns.userId!))
+    .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
     .select({
-      userId: userColumns.id!,
-      postId: postColumns.id!,
-      title: postColumns.title!,
+      userId: userColumns['id']!,
+      postId: postColumns['id']!,
+      title: postColumns['title']!,
     })
     .build();
 
@@ -664,6 +682,9 @@ test('nested projection with joins infers nested Row type', () => {
             readonly id: { readonly type: 'pg/int4@1'; nullable: false };
             readonly email: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly uniques: readonly never[];
+          readonly indexes: readonly never[];
+          readonly foreignKeys: readonly never[];
         };
         readonly post: {
           readonly columns: {
@@ -671,12 +692,21 @@ test('nested projection with joins infers nested Row type', () => {
             readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
             readonly title: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly uniques: readonly never[];
+          readonly indexes: readonly never[];
+          readonly foreignKeys: readonly never[];
         };
       };
     },
     Record<string, never>,
     Record<string, never>,
-    Record<string, never>
+    {
+      readonly codecTypes: {
+        readonly 'pg/int4@1': { readonly output: number };
+        readonly 'pg/text@1': { readonly output: string };
+      };
+      readonly operationTypes: Record<string, Record<string, unknown>>;
+    }
   >;
 
   const contractWithPosts = validateContract<ContractWithPosts>({
@@ -691,6 +721,9 @@ test('nested projection with joins infers nested Row type', () => {
             id: { type: 'pg/int4@1', nullable: false },
             email: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
         post: {
           columns: {
@@ -698,31 +731,37 @@ test('nested projection with joins infers nested Row type', () => {
             userId: { type: 'pg/int4@1', nullable: false },
             title: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },
     models: {},
     relations: {},
-    mappings: {},
+    mappings: {
+      codecTypes: {},
+      operationTypes: {},
+    } as unknown as ContractWithPosts['mappings'],
   });
 
   const adapter = createPostgresAdapter();
   const context = createRuntimeContext({ contract: contractWithPosts, adapter, extensions: [] });
   const tables = schema(context).tables;
-  const userTable = tables.user;
-  const postTable = tables.post;
+  const userTable = tables['user'];
+  const postTable = tables['post'];
   if (!userTable || !postTable) throw new Error('tables not found');
   const userColumns = userTable.columns;
   const postColumns = postTable.columns;
 
   const _plan = sql({ context })
     .from(userTable)
-    .innerJoin(postTable, (on) => on.eqCol(userColumns.id!, postColumns.userId!))
+    .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
     .select({
-      name: userColumns.email!,
+      name: userColumns['email']!,
       post: {
-        title: postColumns.title!,
-        id: postColumns.id!,
+        title: postColumns['title']!,
+        id: postColumns['id']!,
       },
     })
     .build();

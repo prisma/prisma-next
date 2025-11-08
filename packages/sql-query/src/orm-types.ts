@@ -2,11 +2,13 @@ import type { Plan } from '@prisma-next/contract/types';
 import type { RuntimeContext } from '@prisma-next/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type {
-  BinaryBuilder,
+  AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyOrderBuilder,
   BuildOptions,
   ColumnBuilder,
   InferNestedProjectionRow,
-  OrderBuilder,
+  NestedProjection,
 } from './types';
 
 export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {
@@ -62,7 +64,7 @@ export interface OrmRelationFilterBuilder<
   ChildModelName extends string,
 > {
   where(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => BinaryBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyBinaryBuilder,
   ): OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>;
 }
 
@@ -98,7 +100,7 @@ export type OrmWhereProperty<
   ModelName extends string,
   Row,
 > = ((
-  fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+  fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
 ) => OrmModelBuilder<TContract, CodecTypes, ModelName, Row>) & {
   related: ModelRelations<TContract, ModelName> extends Record<string, { to: infer To }>
     ? To extends string
@@ -163,14 +165,14 @@ export interface OrmModelBuilder<
   where: OrmWhereProperty<TContract, CodecTypes, ModelName, Row>;
   include: OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>;
   orderBy(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => OrderBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyOrderBuilder,
   ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
   take(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
   skip(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
   select<
     Projection extends Record<
       string,
-      ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+      AnyColumnBuilder | boolean | NestedProjection
     >,
   >(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => Projection,
@@ -183,17 +185,17 @@ export interface OrmModelBuilder<
   findMany(options?: BuildOptions): Plan<Row>;
   findFirst(options?: BuildOptions): Plan<Row>;
   findUnique(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     options?: BuildOptions,
   ): Plan<Row>;
   create(data: Record<string, unknown>, options?: BuildOptions): Plan<number>;
   update(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     data: Record<string, unknown>,
     options?: BuildOptions,
   ): Plan<number>;
   delete(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     options?: BuildOptions,
   ): Plan<number>;
 }

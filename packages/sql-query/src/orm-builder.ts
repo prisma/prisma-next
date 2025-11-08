@@ -25,10 +25,13 @@ import { param } from './param';
 import { schema } from './schema';
 import { createJoinOnBuilder, sql } from './sql';
 import type {
-  BinaryBuilder,
+  AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyOrderBuilder,
   BuildOptions,
   ColumnBuilder,
   InferNestedProjectionRow,
+  NestedProjection,
   OrderBuilder,
   ParamPlaceholder,
 } from './types';
@@ -37,7 +40,7 @@ interface RelationFilter {
   relationName: string;
   childModelName: string;
   filterType: 'some' | 'none' | 'every';
-  childWhere: BinaryBuilder | undefined;
+  childWhere: AnyBinaryBuilder | undefined;
   relation: {
     to: string;
     cardinality: string;
@@ -52,15 +55,10 @@ interface OrmIncludeState {
   relationName: string;
   childModelName: string;
   childTable: TableRef;
-  childWhere: BinaryBuilder | undefined;
-  childOrderBy: OrderBuilder | undefined;
+  childWhere: AnyBinaryBuilder | undefined;
+  childOrderBy: AnyOrderBuilder | undefined;
   childLimit: number | undefined;
-  childProjection:
-    | Record<
-        string,
-        ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-      >
-    | undefined;
+  childProjection: Record<string, AnyColumnBuilder | boolean | NestedProjection> | undefined;
   alias: string;
   relation: {
     to: string;
@@ -83,18 +81,14 @@ export class OrmModelBuilderImpl<
   private readonly contract: TContract;
   private readonly modelName: ModelName;
   private table: TableRef;
-  private wherePredicate: BinaryBuilder | undefined = undefined;
+  private wherePredicate: AnyBinaryBuilder | undefined = undefined;
   private relationFilters: RelationFilter[] = [];
   private includes: OrmIncludeState[] = [];
-  private orderByExpr: OrderBuilder | undefined = undefined;
+  private orderByExpr: AnyOrderBuilder | undefined = undefined;
   private limitValue: number | undefined = undefined;
   private offsetValue: number | undefined = undefined;
-  private projection:
-    | Record<
-        string,
-        ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-      >
-    | undefined = undefined;
+  private projection: Record<string, AnyColumnBuilder | boolean | NestedProjection> | undefined =
+    undefined;
 
   constructor(options: OrmBuilderOptions<TContract>, modelName: ModelName) {
     this.context = options.context;
@@ -116,7 +110,7 @@ export class OrmModelBuilderImpl<
 
   get where(): OrmWhereProperty<TContract, CodecTypes, ModelName, Row> {
     const whereFn = (
-      fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+      fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> => {
       const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
         { context: this.context },
@@ -326,17 +320,17 @@ export class OrmModelBuilderImpl<
                 | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
             ) =>
               | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-              | BinaryBuilder,
+              | AnyBinaryBuilder,
           ) => {
             const result = fn(builderWithAccessor);
-            // If result is a BinaryBuilder, wrap it in a builder
+            // If result is a AnyBinaryBuilder, wrap it in a builder
             if (result && 'kind' in result && result.kind === 'binary') {
               const wrappedBuilder = new OrmRelationFilterBuilderImpl<
                 TContract,
                 CodecTypes,
                 typeof childModelName
               >({ context: self.context }, childModelName);
-              wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
+              wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
               return self._applyRelationFilter(
                 prop,
                 childModelName,
@@ -361,7 +355,7 @@ export class OrmModelBuilderImpl<
                 | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
             ) =>
               | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-              | BinaryBuilder,
+              | AnyBinaryBuilder,
           ) => {
             const result = fn(builderWithAccessor);
             if (result && 'kind' in result && result.kind === 'binary') {
@@ -370,7 +364,7 @@ export class OrmModelBuilderImpl<
                 CodecTypes,
                 typeof childModelName
               >({ context: self.context }, childModelName);
-              wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
+              wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
               return self._applyRelationFilter(
                 prop,
                 childModelName,
@@ -395,7 +389,7 @@ export class OrmModelBuilderImpl<
                 | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
             ) =>
               | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-              | BinaryBuilder,
+              | AnyBinaryBuilder,
           ) => {
             const result = fn(builderWithAccessor);
             if (result && 'kind' in result && result.kind === 'binary') {
@@ -404,7 +398,7 @@ export class OrmModelBuilderImpl<
                 CodecTypes,
                 typeof childModelName
               >({ context: self.context }, childModelName);
-              wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
+              wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
               return self._applyRelationFilter(
                 prop,
                 childModelName,
@@ -528,12 +522,7 @@ export class OrmModelBuilderImpl<
     return builder;
   }
 
-  select<
-    Projection extends Record<
-      string,
-      ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-    >,
-  >(
+  select<Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>>(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => Projection,
   ): OrmModelBuilder<
     TContract,
@@ -661,26 +650,16 @@ export class OrmModelBuilderImpl<
           // The ORM's childProjection may have boolean values for include references,
           // but those are handled at the parent level, not in child includes
           // Filter out boolean values - they're not valid in child projections
-          const filteredProjection: Record<
-            string,
-            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-          > = {};
+          const filteredProjection: Record<string, AnyColumnBuilder | NestedProjection> = {};
           for (const [key, value] of Object.entries(includeState.childProjection)) {
             if (value !== true && value !== false) {
-              filteredProjection[key] = value as
-                | ColumnBuilder
-                | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>;
+              filteredProjection[key] = value as AnyColumnBuilder | NestedProjection;
             }
           }
           if (Object.keys(filteredProjection).length === 0) {
             throw planInvalid('Child projection must not be empty after filtering boolean values');
           }
-          builtChild = builtChild.select(
-            filteredProjection as Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >,
-          );
+          builtChild = builtChild.select(filteredProjection as NestedProjection);
           return builtChild;
         },
         { alias: includeState.alias },
@@ -707,7 +686,7 @@ export class OrmModelBuilderImpl<
     } else {
       // Default projection: select all columns
       const modelAccessor = this._getModelAccessor();
-      const defaultProjection: Record<string, ColumnBuilder> = {};
+      const defaultProjection: Record<string, AnyColumnBuilder> = {};
       for (const fieldName in modelAccessor) {
         defaultProjection[fieldName] = modelAccessor[fieldName];
       }
@@ -793,7 +772,7 @@ export class OrmModelBuilderImpl<
         if (!childSchemaTable) {
           throw planInvalid(`Table ${childTableName} not found in schema`);
         }
-        const childModelAccessor: Record<string, ColumnBuilder> = {};
+        const childModelAccessor: Record<string, AnyColumnBuilder> = {};
         const childModel = this.contract.models[filter.childModelName];
         if (childModel && typeof childModel === 'object' && 'fields' in childModel) {
           const childModelFields = childModel.fields as Record<string, { column?: string }>;
@@ -806,9 +785,8 @@ export class OrmModelBuilderImpl<
               fieldName;
             const column = childSchemaTable.columns[columnName];
             if (column) {
-              // @ts-expect-error - ModelColumnAccessor type is inferred from contract shape at runtime
-              // TypeScript can't verify the shape matches, but runtime validation ensures correctness
-              (childModelAccessor as Record<string, ColumnBuilder>)[fieldName] = column;
+              // ModelColumnAccessor is validated at runtime via contract; cast for type compatibility
+              (childModelAccessor as Record<string, AnyColumnBuilder>)[fieldName] = column;
             }
           }
         }
@@ -886,7 +864,7 @@ export class OrmModelBuilderImpl<
   }
 
   findUnique(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     options?: BuildOptions,
   ): Plan<Row> {
     return this.where(where).take(1).findMany(options);
@@ -941,7 +919,7 @@ export class OrmModelBuilderImpl<
   }
 
   update(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     data: Record<string, unknown>,
     options?: BuildOptions,
   ): Plan<number> {
@@ -972,7 +950,7 @@ export class OrmModelBuilderImpl<
           table: TableRef,
           set: Record<string, ParamPlaceholder>,
         ) => {
-          where: (predicate: BinaryBuilder) => { build: (options?: BuildOptions) => Plan<unknown> };
+          where: (predicate: AnyBinaryBuilder) => { build: (options?: BuildOptions) => Plan<unknown> };
         };
       }
     )
@@ -1005,7 +983,7 @@ export class OrmModelBuilderImpl<
   }
 
   delete(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     options?: BuildOptions,
   ): Plan<number> {
     // Build where predicate from callback
@@ -1024,7 +1002,7 @@ export class OrmModelBuilderImpl<
     const deleteBuilder = (
       sqlBuilder as {
         delete: (table: TableRef) => {
-          where: (predicate: BinaryBuilder) => { build: (options?: BuildOptions) => Plan<unknown> };
+          where: (predicate: AnyBinaryBuilder) => { build: (options?: BuildOptions) => Plan<unknown> };
         };
       }
     )
@@ -1099,7 +1077,7 @@ export class OrmModelBuilderImpl<
       throw planInvalid(`Table ${tableName} not found in schema`);
     }
 
-    const accessor: Record<string, ColumnBuilder> = {};
+    const accessor: Record<string, AnyColumnBuilder> = {};
     const model = this.contract.models[this.modelName];
     if (!model || typeof model !== 'object' || !('fields' in model)) {
       throw planInvalid(`Model ${this.modelName} does not have fields`);
@@ -1115,7 +1093,7 @@ export class OrmModelBuilderImpl<
         fieldName;
       const column = table.columns[columnName];
       if (column) {
-        accessor[fieldName] = column as ColumnBuilder;
+        accessor[fieldName] = column as AnyColumnBuilder;
       }
     }
 

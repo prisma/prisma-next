@@ -24,7 +24,9 @@ export function getPrismaNextRuntime() {
     });
 
     runtime = createRuntime({
-      contract: validateContract(contractJson),
+      context: {
+        contract: validateContract(contractJson),
+      },
       adapter: createPostgresAdapter(),
       driver,
       verify: {

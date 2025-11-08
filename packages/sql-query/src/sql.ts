@@ -13,6 +13,8 @@ import type {
   SelectAst,
   SqlContract,
   SqlStorage,
+  ExtractCodecTypes,
+  ExtractOperationTypes,
   StorageColumn,
   TableRef,
   UpdateAst,
@@ -20,15 +22,17 @@ import type {
 import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
 import type {
+  AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyOrderBuilder,
   BinaryBuilder,
   BuildOptions,
-  ColumnBuilder,
-  ExtractCodecTypes,
-  ExtractOperationTypes,
+  CodecTypes as CodecTypesMap,
   InferNestedProjectionRow,
   InferReturningRow,
   JoinOnBuilder,
   JoinOnPredicate,
+  NestedProjection,
   OrderBuilder,
   ParamPlaceholder,
   RawFactory,
@@ -67,9 +71,7 @@ function collectColumnRefs(expr: ColumnRef | ParamRef | LiteralExpr | OperationE
 /**
  * Type predicate to check if an expression is an OperationExpr.
  */
-function isOperationExpr(
-  expr: ColumnBuilder<string, StorageColumn, unknown> | OperationExpr,
-): expr is OperationExpr {
+function isOperationExpr(expr: AnyColumnBuilder | OperationExpr): expr is OperationExpr {
   return typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'operation';
 }
 
@@ -77,7 +79,7 @@ function isOperationExpr(
  * Helper to extract table and column from a ColumnBuilder or OperationExpr.
  * For OperationExpr, recursively unwraps to find the base ColumnRef.
  */
-function getColumnInfo(expr: ColumnBuilder<string, StorageColumn, unknown> | OperationExpr): {
+function getColumnInfo(expr: AnyColumnBuilder | OperationExpr): {
   table: string;
   column: string;
 } {
@@ -101,8 +103,8 @@ interface IncludeState {
   readonly table: TableRef;
   readonly on: JoinOnPredicate;
   readonly childProjection: ProjectionState;
-  readonly childWhere?: BinaryBuilder;
-  readonly childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+  readonly childWhere?: AnyBinaryBuilder;
+  readonly childOrderBy?: AnyOrderBuilder;
   readonly childLimit?: number;
 }
 
@@ -111,15 +113,17 @@ interface BuilderState {
   joins?: ReadonlyArray<JoinState>;
   includes?: ReadonlyArray<IncludeState>;
   projection?: ProjectionState;
-  where?: BinaryBuilder;
-  orderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+  where?: AnyBinaryBuilder;
+  orderBy?: AnyOrderBuilder;
   limit?: number;
 }
 
 interface ProjectionState {
   readonly aliases: string[];
-  readonly columns: ColumnBuilder[];
+  readonly columns: AnyColumnBuilder[];
 }
+
+type ProjectionInput = Record<string, AnyColumnBuilder | boolean | NestedProjection>;
 
 function generateAlias(path: string[]): string {
   if (path.length === 0) {
@@ -155,10 +159,7 @@ class AliasTracker {
 }
 
 class JoinOnBuilderImpl implements JoinOnBuilder {
-  eqCol(
-    left: ColumnBuilder<string, StorageColumn, unknown>,
-    right: ColumnBuilder<string, StorageColumn, unknown>,
-  ): JoinOnPredicate {
+  eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate {
     if (!left || !isColumnBuilder(left)) {
       throw planInvalid('Join ON left operand must be a column');
     }
@@ -176,8 +177,8 @@ class JoinOnBuilderImpl implements JoinOnBuilder {
 
     return {
       kind: 'join-on',
-      left: left as ColumnBuilder<string, StorageColumn, unknown>,
-      right: right as ColumnBuilder<string, StorageColumn, unknown>,
+      left: left as AnyColumnBuilder,
+      right: right as AnyColumnBuilder,
     };
   }
 }
@@ -188,7 +189,7 @@ export function createJoinOnBuilder(): JoinOnBuilder {
 
 class IncludeChildBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends CodecTypesMap = CodecTypesMap,
   ChildRow = unknown,
 > {
   private readonly contract: TContract;
@@ -196,7 +197,7 @@ class IncludeChildBuilderImpl<
   private readonly table: TableRef;
   private childProjection?: ProjectionState;
   private childWhere?: BinaryBuilder;
-  private childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+  private childOrderBy?: OrderBuilder;
   private childLimit?: number;
 
   constructor(contract: TContract, codecTypes: CodecTypes, table: TableRef) {
@@ -205,20 +206,7 @@ class IncludeChildBuilderImpl<
     this.table = table;
   }
 
-  select<
-    P extends Record<
-      string,
-      | ColumnBuilder
-      | Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >
-        >
-    >,
-  >(
+  select<P extends NestedProjection>(
     projection: P,
   ): IncludeChildBuilderImpl<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>> {
     const projectionState = buildProjectionState(this.table, projection);
@@ -240,7 +228,7 @@ class IncludeChildBuilderImpl<
     return builder;
   }
 
-  where(expr: BinaryBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
+  where(expr: AnyBinaryBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
@@ -259,9 +247,7 @@ class IncludeChildBuilderImpl<
     return builder;
   }
 
-  orderBy(
-    order: ReturnType<ColumnBuilder['asc']>,
-  ): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
+  orderBy(order: AnyOrderBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
@@ -305,8 +291,8 @@ class IncludeChildBuilderImpl<
 
   getState(): {
     childProjection: ProjectionState;
-    childWhere?: BinaryBuilder<string, StorageColumn, unknown>;
-    childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+    childWhere?: AnyBinaryBuilder;
+    childOrderBy?: AnyOrderBuilder;
     childLimit?: number;
   } {
     if (!this.childProjection) {
@@ -314,8 +300,8 @@ class IncludeChildBuilderImpl<
     }
     const state: {
       childProjection: ProjectionState;
-      childWhere?: BinaryBuilder<string, StorageColumn, unknown>;
-      childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+      childWhere?: AnyBinaryBuilder;
+      childOrderBy?: AnyOrderBuilder;
       childLimit?: number;
     } = {
       childProjection: this.childProjection,
@@ -335,36 +321,21 @@ class IncludeChildBuilderImpl<
 
 export interface IncludeChildBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   ChildRow = unknown,
 > {
-  select<
-    P extends Record<
-      string,
-      | ColumnBuilder
-      | Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >
-        >
-    >,
-  >(
+  select<P extends NestedProjection>(
     projection: P,
   ): IncludeChildBuilder<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>>;
-  where(expr: BinaryBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
-  orderBy(
-    order: ReturnType<ColumnBuilder['asc']>,
-  ): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
+  where(expr: AnyBinaryBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
+  orderBy(order: AnyOrderBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
   limit(count: number): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
 }
 
 class SelectBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > {
   private readonly contract: TContract;
@@ -425,18 +396,7 @@ class SelectBuilderImpl<
   }
 
   includeMany<
-    ChildProjection extends Record<
-      string,
-      | ColumnBuilder
-      | Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >
-        >
-    >,
+    ChildProjection extends NestedProjection,
     ChildRow = InferNestedProjectionRow<ChildProjection, CodecTypes>,
     AliasName extends string = string,
   >(
@@ -572,7 +532,7 @@ class SelectBuilderImpl<
     );
   }
 
-  where(expr: BinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+  where(expr: AnyBinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         context: this.context,
@@ -581,21 +541,7 @@ class SelectBuilderImpl<
     );
   }
 
-  select<
-    P extends Record<
-      string,
-      | ColumnBuilder
-      | boolean
-      | Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >
-        >
-    >,
-  >(
+  select<P extends ProjectionInput>(
     projection: P,
   ): SelectBuilderImpl<
     TContract,
@@ -619,9 +565,7 @@ class SelectBuilderImpl<
     );
   }
 
-  orderBy(
-    order: ReturnType<ColumnBuilder['asc']>,
-  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+  orderBy(order: AnyOrderBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         context: this.context,
@@ -968,7 +912,7 @@ class SelectBuilderImpl<
   }
 }
 
-function isColumnBuilder(value: unknown): value is ColumnBuilder {
+function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -978,23 +922,12 @@ function isColumnBuilder(value: unknown): value is ColumnBuilder {
 }
 
 function flattenProjection(
-  projection: Record<
-    string,
-    | ColumnBuilder
-    | Record<
-        string,
-        | ColumnBuilder
-        | Record<
-            string,
-            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-          >
-      >
-  >,
+  projection: NestedProjection,
   tracker: AliasTracker,
   currentPath: string[] = [],
-): { aliases: string[]; columns: ColumnBuilder[] } {
+): { aliases: string[]; columns: AnyColumnBuilder[] } {
   const aliases: string[] = [];
-  const columns: ColumnBuilder[] = [];
+  const columns: AnyColumnBuilder[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     const path = [...currentPath, key];
@@ -1004,22 +937,7 @@ function flattenProjection(
       aliases.push(alias);
       columns.push(value);
     } else if (typeof value === 'object' && value !== null) {
-      const nested = flattenProjection(
-        value as Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              | ColumnBuilder
-              | Record<
-                  string,
-                  ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-                >
-            >
-        >,
-        tracker,
-        path,
-      );
+      const nested = flattenProjection(value, tracker, path);
       aliases.push(...nested.aliases);
       columns.push(...nested.columns);
     } else {
@@ -1034,24 +952,12 @@ function flattenProjection(
 
 function buildProjectionState(
   _table: TableRef,
-  projection: Record<
-    string,
-    | ColumnBuilder
-    | boolean
-    | Record<
-        string,
-        | ColumnBuilder
-        | Record<
-            string,
-            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-          >
-      >
-  >,
+  projection: ProjectionInput,
   includes?: ReadonlyArray<IncludeState>,
 ): ProjectionState {
   const tracker = new AliasTracker();
   const aliases: string[] = [];
-  const columns: ColumnBuilder[] = [];
+  const columns: AnyColumnBuilder[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     if (value === true) {
@@ -1072,28 +978,13 @@ function buildProjectionState(
         table: matchingInclude.table.name,
         column: '',
         columnMeta: { type: 'core/json@1', nullable: true },
-      } as ColumnBuilder);
+      } as AnyColumnBuilder);
     } else if (isColumnBuilder(value)) {
       const alias = tracker.register([key]);
       aliases.push(alias);
       columns.push(value);
     } else if (typeof value === 'object' && value !== null) {
-      const nested = flattenProjection(
-        value as Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              | ColumnBuilder
-              | Record<
-                  string,
-                  ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-                >
-            >
-        >,
-        tracker,
-        [key],
-      );
+      const nested = flattenProjection(value as NestedProjection, tracker, [key]);
       aliases.push(...nested.aliases);
       columns.push(...nested.columns);
     } else {
@@ -1117,7 +1008,7 @@ interface MetaBuildArgs {
   readonly joins?: ReadonlyArray<JoinState>;
   readonly includes?: ReadonlyArray<IncludeState>;
   readonly where?: BinaryBuilder;
-  readonly orderBy?: ReturnType<ColumnBuilder['asc']>;
+  readonly orderBy?: OrderBuilder;
   readonly paramDescriptors: ParamDescriptor[];
   readonly paramCodecs?: Record<string, string>;
 }
@@ -1203,7 +1094,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
         const orderBy = include.childOrderBy as unknown as {
-          expr?: ColumnBuilder<string, StorageColumn, unknown> | OperationExpr;
+          expr?: AnyColumnBuilder | OperationExpr;
         };
         if (orderBy.expr) {
           const colInfo = getColumnInfo(orderBy.expr);
@@ -1241,7 +1132,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
 
   if (args.orderBy) {
     const orderBy = args.orderBy as unknown as {
-      expr?: ColumnBuilder<string, StorageColumn, unknown> | OperationExpr;
+      expr?: AnyColumnBuilder | OperationExpr;
     };
     const orderByExpr = orderBy.expr;
     if (orderByExpr) {
@@ -1381,7 +1272,7 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
 export type SelectBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > = SelectBuilderImpl<TContract, Row, CodecTypes, Includes> & {
   readonly raw: RawFactory;
@@ -1398,10 +1289,10 @@ export type SelectBuilder<
 
 export interface InsertBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Row = unknown,
 > {
-  returning<const Columns extends readonly ColumnBuilder[]>(
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
   build(options?: BuildOptions): Plan<Row>;
@@ -1409,11 +1300,11 @@ export interface InsertBuilder<
 
 export interface UpdateBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Row = unknown,
 > {
   where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row>;
-  returning<const Columns extends readonly ColumnBuilder[]>(
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
   build(options?: BuildOptions): Plan<Row>;
@@ -1421,11 +1312,11 @@ export interface UpdateBuilder<
 
 export interface DeleteBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Row = unknown,
 > {
   where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row>;
-  returning<const Columns extends readonly ColumnBuilder[]>(
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
   build(options?: BuildOptions): Plan<Row>;
@@ -1433,7 +1324,7 @@ export interface DeleteBuilder<
 
 class InsertBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Row = unknown,
 > implements InsertBuilder<TContract, CodecTypes, Row>
 {
@@ -1446,7 +1337,7 @@ class InsertBuilderImpl<
   private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
   private readonly table: TableRef;
   private readonly values: Record<string, ParamPlaceholder>;
-  private returningColumns: ColumnBuilder[] = [];
+  private returningColumns: AnyColumnBuilder[] = [];
 
   constructor(
     options: SqlBuilderOptions<TContract>,
@@ -1460,7 +1351,7 @@ class InsertBuilderImpl<
     this.values = values;
   }
 
-  returning<const Columns extends readonly ColumnBuilder[]>(
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
     // Runtime capability check
@@ -1592,7 +1483,7 @@ class InsertBuilderImpl<
 
 class UpdateBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Row = unknown,
 > implements UpdateBuilder<TContract, CodecTypes, Row>
 {
@@ -1606,7 +1497,7 @@ class UpdateBuilderImpl<
   private readonly table: TableRef;
   private readonly set: Record<string, ParamPlaceholder>;
   private wherePredicate?: BinaryBuilder;
-  private returningColumns: ColumnBuilder[] = [];
+  private returningColumns: AnyColumnBuilder[] = [];
 
   constructor(
     options: SqlBuilderOptions<TContract>,
@@ -1633,7 +1524,7 @@ class UpdateBuilderImpl<
     return builder;
   }
 
-  returning<const Columns extends readonly ColumnBuilder[]>(
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
     // Runtime capability check
@@ -1873,7 +1764,7 @@ class DeleteBuilderImpl<
   private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
   private readonly table: TableRef;
   private wherePredicate?: BinaryBuilder;
-  private returningColumns: ColumnBuilder[] = [];
+  private returningColumns: AnyColumnBuilder[] = [];
 
   constructor(options: SqlBuilderOptions<TContract>, table: TableRef) {
     this.context = options.context;
@@ -1894,7 +1785,7 @@ class DeleteBuilderImpl<
     return builder;
   }
 
-  returning<const Columns extends readonly ColumnBuilder[]>(
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
     // Runtime capability check
@@ -2082,9 +1973,10 @@ class DeleteBuilderImpl<
   }
 }
 
-export function sql<TContract extends SqlContract<SqlStorage>>(
-  options: SqlBuilderOptions<TContract>,
-): SelectBuilder<
+export function sql<
+  TContract extends SqlContract<SqlStorage>,
+  _CodecTypes extends Record<string, { readonly output: unknown }> = ExtractCodecTypes<TContract>,
+>(options: SqlBuilderOptions<TContract>): SelectBuilder<
   TContract,
   unknown,
   ExtractCodecTypes<TContract>,

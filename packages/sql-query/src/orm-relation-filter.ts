@@ -3,7 +3,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
 import { schema } from './schema';
-import type { BinaryBuilder, ColumnBuilder } from './types';
+import type { AnyBinaryBuilder, AnyColumnBuilder } from './types';
 
 export class OrmRelationFilterBuilderImpl<
   TContract extends SqlContract<SqlStorage>,
@@ -14,7 +14,7 @@ export class OrmRelationFilterBuilderImpl<
   private readonly context: RuntimeContext<TContract>;
   private readonly contract: TContract;
   private readonly childModelName: ChildModelName;
-  private wherePredicate: BinaryBuilder | undefined = undefined;
+  private wherePredicate: AnyBinaryBuilder | undefined = undefined;
   private modelAccessor: ModelColumnAccessor<TContract, CodecTypes, ChildModelName> | undefined =
     undefined;
 
@@ -26,7 +26,7 @@ export class OrmRelationFilterBuilderImpl<
   }
 
   where(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => BinaryBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyBinaryBuilder,
   ): OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName> {
     const builder = new OrmRelationFilterBuilderImpl<TContract, CodecTypes, ChildModelName>(
       { context: this.context },
@@ -39,7 +39,7 @@ export class OrmRelationFilterBuilderImpl<
     return builder;
   }
 
-  getWherePredicate(): BinaryBuilder | undefined {
+  getWherePredicate(): AnyBinaryBuilder | undefined {
     return this.wherePredicate;
   }
 
@@ -68,7 +68,7 @@ export class OrmRelationFilterBuilderImpl<
       throw planInvalid(`Table ${tableName} not found in schema`);
     }
 
-    const accessor: Record<string, ColumnBuilder> = {};
+    const accessor: Record<string, AnyColumnBuilder> = {};
     const model = this.contract.models[this.childModelName];
     if (!model || typeof model !== 'object' || !('fields' in model)) {
       throw planInvalid(`Model ${this.childModelName} does not have fields`);
@@ -84,7 +84,7 @@ export class OrmRelationFilterBuilderImpl<
         fieldName;
       const column = table.columns[columnName];
       if (column) {
-        accessor[fieldName] = column as ColumnBuilder;
+        accessor[fieldName] = column as AnyColumnBuilder;
       }
     }
 

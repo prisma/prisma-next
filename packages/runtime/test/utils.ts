@@ -12,6 +12,7 @@ import { createCodecRegistry } from '@prisma-next/sql-target';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { Log, Plugin, SqlStatement } from '../src/exports';
+import type { RuntimeContext } from '../src/context';
 import {
   createRuntime,
   createRuntimeContext,
@@ -112,14 +113,14 @@ export interface CreateTestRuntimeOptions {
  * Creates a runtime context with standard test configuration.
  * This helper DRYs up the common pattern of context creation in tests.
  */
-export function createTestContext(
-  contract: SqlContract<SqlStorage>,
+export function createTestContext<TContract extends SqlContract<SqlStorage>>(
+  contract: TContract,
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
   options?: {
     extensions?: ReadonlyArray<import('../src/context').Extension>;
   },
-): ReturnType<typeof createRuntimeContext> {
-  return createRuntimeContext({
+): RuntimeContext<TContract> {
+  return createRuntimeContext<TContract>({
     contract,
     adapter,
     extensions: options?.extensions ?? [],
@@ -153,7 +154,7 @@ export function createTestRuntime(
       mode: 'onFirstUse' | 'startup' | 'always';
       requireMarker: boolean;
     };
-    context: ReturnType<typeof createRuntimeContext>;
+    context: RuntimeContext<SqlContract<SqlStorage>>;
     plugins?: readonly Plugin[];
     mode?: 'strict' | 'permissive';
     log?: Log;

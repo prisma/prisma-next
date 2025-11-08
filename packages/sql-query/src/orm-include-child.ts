@@ -3,7 +3,13 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import type { ModelColumnAccessor, OrmBuilderOptions } from './orm-types';
 import { schema } from './schema';
-import type { BinaryBuilder, ColumnBuilder, InferNestedProjectionRow, OrderBuilder } from './types';
+import type {
+  AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyOrderBuilder,
+  InferNestedProjectionRow,
+  NestedProjection,
+} from './types';
 
 export interface OrmIncludeChildBuilder<
   TContract extends SqlContract<SqlStorage>,
@@ -12,17 +18,14 @@ export interface OrmIncludeChildBuilder<
   ChildRow = unknown,
 > {
   where(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => BinaryBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyBinaryBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>;
   orderBy(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => OrderBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyOrderBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>;
   take(n: number): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>;
   select<
-    Projection extends Record<
-      string,
-      ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-    >,
+    Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
   >(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => Projection,
   ): OrmIncludeChildBuilder<
@@ -43,15 +46,11 @@ export class OrmIncludeChildBuilderImpl<
   private readonly context: RuntimeContext<TContract>;
   private readonly contract: TContract;
   private readonly childModelName: ChildModelName;
-  private childWhere: BinaryBuilder | undefined;
-  private childOrderBy: OrderBuilder | undefined;
+  private childWhere: AnyBinaryBuilder | undefined;
+  private childOrderBy: AnyOrderBuilder | undefined;
   private childLimit: number | undefined;
-  private childProjection:
-    | Record<
-        string,
-        ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-      >
-    | undefined = undefined;
+  private childProjection: Record<string, AnyColumnBuilder | boolean | NestedProjection> | undefined =
+    undefined;
 
   constructor(options: OrmBuilderOptions<TContract>, childModelName: ChildModelName) {
     this.context = options.context;
@@ -60,7 +59,7 @@ export class OrmIncludeChildBuilderImpl<
   }
 
   where(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => BinaryBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyBinaryBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow> {
     const builder = new OrmIncludeChildBuilderImpl<TContract, CodecTypes, ChildModelName, ChildRow>(
       { context: this.context },
@@ -74,7 +73,7 @@ export class OrmIncludeChildBuilderImpl<
   }
 
   orderBy(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => OrderBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyOrderBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow> {
     const builder = new OrmIncludeChildBuilderImpl<TContract, CodecTypes, ChildModelName, ChildRow>(
       { context: this.context },
@@ -100,10 +99,7 @@ export class OrmIncludeChildBuilderImpl<
   }
 
   select<
-    Projection extends Record<
-      string,
-      ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-    >,
+    Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
   >(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => Projection,
   ): OrmIncludeChildBuilder<
@@ -126,13 +122,10 @@ export class OrmIncludeChildBuilderImpl<
   }
 
   getState(): {
-    childWhere?: BinaryBuilder;
-    childOrderBy?: OrderBuilder;
+    childWhere?: AnyBinaryBuilder;
+    childOrderBy?: AnyOrderBuilder;
     childLimit?: number;
-    childProjection?: Record<
-      string,
-      ColumnBuilder | boolean | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-    >;
+    childProjection?: Record<string, AnyColumnBuilder | boolean | NestedProjection>;
   } {
     return {
       ...(this.childWhere !== undefined ? { childWhere: this.childWhere } : {}),
@@ -169,9 +162,8 @@ export class OrmIncludeChildBuilderImpl<
         fieldName;
       const column = table.columns[columnName];
       if (column) {
-        // @ts-expect-error - ModelColumnAccessor type is inferred from contract shape at runtime
-        // TypeScript can't verify the shape matches, but runtime validation ensures correctness
-        (accessor as Record<string, ColumnBuilder>)[fieldName] = column;
+        // ModelColumnAccessor alignment is ensured by contract validation; cast for compatibility
+        (accessor as Record<string, AnyColumnBuilder>)[fieldName] = column;
       }
     }
 

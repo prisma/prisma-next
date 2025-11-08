@@ -13,28 +13,6 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-target';
 
-/**
- * Extracts CodecTypes from a Contract's mappings.
- * Falls back to Record<string, never> if not present.
- */
-export type ExtractCodecTypes<Contract extends SqlContract<SqlStorage>> =
-  Contract['mappings'] extends { codecTypes: infer CT }
-    ? CT extends Record<string, { readonly output: unknown }>
-      ? CT
-      : Record<string, never>
-    : Record<string, never>;
-
-/**
- * Extracts OperationTypes from a Contract's mappings.
- * Falls back to Record<string, never> if not present.
- */
-export type ExtractOperationTypes<Contract extends SqlContract<SqlStorage>> =
-  Contract['mappings'] extends { operationTypes: infer OT }
-    ? OT extends Record<string, Record<string, unknown>>
-      ? OT
-      : Record<string, never>
-    : Record<string, never>;
-
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';
   readonly name: string;
@@ -89,17 +67,19 @@ export interface BinaryBuilder<
   readonly right: ParamPlaceholder;
 }
 
+// Helper aliases for usage sites where the specific column parameters are irrelevant
+export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, OperationTypes>;
+export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
+export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
+
 export interface JoinOnBuilder {
-  eqCol(
-    left: ColumnBuilder<string, StorageColumn, unknown>,
-    right: ColumnBuilder<string, StorageColumn, unknown>,
-  ): JoinOnPredicate;
+  eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate;
 }
 
 export interface JoinOnPredicate {
   readonly kind: 'join-on';
-  readonly left: ColumnBuilder<string, StorageColumn, unknown>;
-  readonly right: ColumnBuilder<string, StorageColumn, unknown>;
+  readonly left: AnyColumnBuilder;
+  readonly right: AnyColumnBuilder;
 }
 
 export type Expr = ColumnRef | ParamRef;
@@ -110,9 +90,9 @@ export type Expr = ColumnRef | ParamRef;
  */
 type ExtractCodecOutputType<
   CodecId extends string,
-  CodecTypes extends Record<string, { output: unknown }>,
+  CodecTypes extends Record<string, { readonly output: unknown }>,
 > = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId] extends { output: infer Output }
+  ? CodecTypes[CodecId] extends { readonly output: infer Output }
     ? Output
     : never
   : never;
@@ -159,7 +139,7 @@ export type OperationTypes = Record<string, Record<string, OperationTypeSignatur
  * };
  * ```
  */
-export type CodecTypes = Record<string, { output: unknown }>;
+export type CodecTypes = Record<string, { readonly output: unknown }>;
 
 /**
  * Extracts operations for a given typeId from the operation registry.
@@ -210,7 +190,7 @@ type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly 
   : [];
 
 type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
-  ? ColumnBuilder<string, StorageColumn, unknown>
+  ? AnyColumnBuilder
   : Arg extends { kind: 'param' }
     ? ParamPlaceholder
     : Arg extends { kind: 'literal' }
@@ -236,7 +216,7 @@ type OperationReturn<
         ? ColumnBuilder<ColumnName, ColumnMeta, string>
         : ColumnBuilder<ColumnName, ColumnMeta, unknown>
   : Returns extends { kind: 'typeId' }
-    ? ColumnBuilder<string, StorageColumn, unknown>
+    ? AnyColumnBuilder
     : ColumnBuilder<ColumnName, ColumnMeta, unknown>;
 
 /**
@@ -252,7 +232,7 @@ export type ComputeColumnJsType<
   _TableName extends string,
   _ColumnName extends string,
   ColumnMeta extends StorageColumn,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }>,
 > = ColumnMeta extends { type: infer T; nullable: infer N }
   ? T extends string
     ? ExtractCodecOutputType<T, CodecTypes> extends infer CodecOutput
@@ -275,9 +255,9 @@ export type ComputeColumnJsType<
  * Extracts JsType from a ColumnBuilder.
  * Directly accesses the __jsType property.
  */
-type ExtractJsTypeFromColumnBuilder<CB extends ColumnBuilder> = CB['__jsType'];
+type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB['__jsType'];
 
-export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
+export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
   [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;
 };
 
@@ -286,13 +266,13 @@ export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
  */
 export type NestedProjection = Record<
   string,
-  | ColumnBuilder
+  | AnyColumnBuilder
   | Record<
       string,
-      | ColumnBuilder
+      | AnyColumnBuilder
       | Record<
           string,
-          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          AnyColumnBuilder | Record<string, AnyColumnBuilder | Record<string, AnyColumnBuilder>>
         >
     >
 >;
@@ -315,38 +295,15 @@ type ExtractIncludeType<
  * by looking up the include alias in the Includes type map.
  */
 export type InferNestedProjectionRow<
-  P extends Record<
-    string,
-    | ColumnBuilder
-    | boolean
-    | Record<
-        string,
-        | ColumnBuilder
-        | Record<
-            string,
-            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-          >
-      >
-  >,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  P extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > = {
-  [K in keyof P]: P[K] extends ColumnBuilder
+  [K in keyof P]: P[K] extends AnyColumnBuilder
     ? ExtractJsTypeFromColumnBuilder<P[K]>
     : P[K] extends true
       ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
-      : P[K] extends Record<
-            string,
-            | ColumnBuilder
-            | Record<
-                string,
-                | ColumnBuilder
-                | Record<
-                    string,
-                    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-                  >
-              >
-          >
+      : P[K] extends NestedProjection
         ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
         : never;
 };
@@ -355,13 +312,18 @@ export type InferNestedProjectionRow<
  * Infers Row type from a tuple of ColumnBuilders used in returning() clause.
  * Extracts column name and JsType from each ColumnBuilder and creates a Record.
  */
-export type InferReturningRow<Columns extends readonly ColumnBuilder[]> = Columns extends readonly [
+export type InferReturningRow<Columns extends readonly AnyColumnBuilder[]> = Columns extends readonly [
   infer First,
   ...infer Rest,
 ]
-  ? First extends ColumnBuilder<infer Name, infer _Meta, infer JsType>
+  ? First extends ColumnBuilder<
+      infer Name,
+      infer _Meta,
+      infer JsType,
+      infer _Ops extends OperationTypes
+    >
     ? Name extends string
-      ? Rest extends readonly ColumnBuilder[]
+      ? Rest extends readonly AnyColumnBuilder[]
         ? { [K in Name]: JsType } & InferReturningRow<Rest>
         : { [K in Name]: JsType }
       : never

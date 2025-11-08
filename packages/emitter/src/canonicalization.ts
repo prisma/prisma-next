@@ -72,8 +72,32 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isRequiredModels = currentPath.length === 1 && currentPath[0] === 'models';
       const isRequiredTables =
         currentPath.length === 2 && currentPath[0] === 'storage' && currentPath[1] === 'tables';
+      const isModelRelations =
+        currentPath.length === 3 && currentPath[0] === 'models' && currentPath[2] === 'relations';
+      const isTableUniques =
+        currentPath.length === 4 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'tables' &&
+        currentPath[3] === 'uniques';
+      const isTableIndexes =
+        currentPath.length === 4 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'tables' &&
+        currentPath[3] === 'indexes';
+      const isTableForeignKeys =
+        currentPath.length === 4 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'tables' &&
+        currentPath[3] === 'foreignKeys';
 
-      if (!isRequiredModels && !isRequiredTables) {
+      if (
+        !isRequiredModels &&
+        !isRequiredTables &&
+        !isModelRelations &&
+        !isTableUniques &&
+        !isTableIndexes &&
+        !isTableForeignKeys
+      ) {
         continue;
       }
     }

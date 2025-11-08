@@ -8,7 +8,7 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
-import type { ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
+import type { AnyColumnBuilder, ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
 
 function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
   return (
@@ -21,7 +21,7 @@ function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
   );
 }
 
-function isColumnBuilder(value: unknown): value is ColumnBuilder {
+function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -43,12 +43,12 @@ function isColumnBuilder(value: unknown): value is ColumnBuilder {
  */
 function executeOperation(
   signature: OperationSignature,
-  selfBuilder: ColumnBuilder<string, StorageColumn, unknown>,
+  selfBuilder: AnyColumnBuilder,
   args: unknown[],
   columnMeta: StorageColumn,
   operationRegistry?: OperationRegistry,
   contractCapabilities?: Record<string, Record<string, boolean>>,
-): ColumnBuilder<string, StorageColumn, unknown> & { _operationExpr?: OperationExpr } {
+): AnyColumnBuilder & { _operationExpr?: OperationExpr } {
   if (args.length !== signature.args.length) {
     throw planInvalid(
       `Operation ${signature.method} expects ${signature.args.length} arguments, got ${args.length}`,
@@ -162,7 +162,7 @@ function executeOperation(
       });
     },
     _operationExpr: operationExpr,
-  } as unknown as ColumnBuilder<string, StorageColumn, unknown> & {
+  } as unknown as AnyColumnBuilder & {
     _operationExpr?: OperationExpr;
   };
 
@@ -173,7 +173,7 @@ function executeOperation(
       returnColumnMeta,
       operationRegistry,
       contractCapabilities,
-    ) as ColumnBuilder<string, StorageColumn, unknown> & {
+    ) as AnyColumnBuilder & {
       _operationExpr?: OperationExpr;
     };
     return Object.freeze(resultWithOps);
