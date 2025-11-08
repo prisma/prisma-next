@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
@@ -33,12 +33,13 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
           });
 
           const adapter = createPostgresAdapter();
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const tables = schema<Contract>(context).tables;
             const userTable = tables.user!;
             const userColumns = userTable.columns;
-            const builder = sql<Contract, CodecTypes>({ contract, adapter });
+            const builder = sql({ context });
 
             // Insert
             const insertPlan = builder

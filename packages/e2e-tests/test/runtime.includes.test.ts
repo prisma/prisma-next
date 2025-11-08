@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import {
   createTestRuntimeFromClient,
   executePlanAndCollect,
@@ -60,14 +60,14 @@ describe('end-to-end includeMany and leftJoin queries', () => {
             });
 
             const adapter = createPostgresAdapter();
+            const context = createRuntimeContext({ contract, adapter, extensions: [] });
             const runtime = createTestRuntimeFromClient(contract, client, adapter);
             try {
-              const tables = schema<ContractWithCapabilities, CodecTypes>(contract).tables;
+              const tables = schema<ContractWithCapabilities>(context).tables;
               const user = tables['user']!;
               const post = tables['post']!;
-              const plan = sql<ContractWithCapabilities, CodecTypes>({
-                contract,
-                adapter,
+              const plan = sql({
+                context,
               })
                 .from(user)
                 .includeMany(
@@ -152,14 +152,14 @@ describe('end-to-end includeMany and leftJoin queries', () => {
           });
 
           const adapter = createPostgresAdapter();
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<ContractWithCapabilities, CodecTypes>(contract).tables;
+            const tables = schema<ContractWithCapabilities>(context).tables;
             const user = tables['user']!;
             const post = tables['post']!;
-            const plan = sql<ContractWithCapabilities, CodecTypes>({
-              contract,
-              adapter,
+            const plan = sql({
+              context,
             })
               .from(user)
               .includeMany(
@@ -223,12 +223,13 @@ describe('end-to-end includeMany and leftJoin queries', () => {
           });
 
           const adapter = createPostgresAdapter();
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const tables = schema<Contract>(context).tables;
             const user = tables['user']!;
             const post = tables['post']!;
-            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            const plan = sql({ context })
               .from(post)
               .leftJoin(user, (on) => on.eqCol(post.columns['userId']!, user.columns['id']!))
               .select({
@@ -292,12 +293,13 @@ describe('end-to-end includeMany and leftJoin queries', () => {
           });
 
           const adapter = createPostgresAdapter();
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const tables = schema<Contract>(context).tables;
             const user = tables['user']!;
             const post = tables['post']!;
-            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            const plan = sql({ context })
               .from(post)
               .leftJoin(user, (on) => on.eqCol(post.columns['userId']!, user.columns['id']!))
               .where(user.columns['email']!.eq(param('email')))

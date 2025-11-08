@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import {
   createTestRuntimeFromClient,
   executePlanAndCollect,
@@ -41,9 +41,10 @@ describe('end-to-end nested projection queries', () => {
             const adapter = createPostgresAdapter();
             const runtime = createTestRuntimeFromClient(contract, client, adapter);
             try {
-              const tables = schema<Contract, CodecTypes>(contract).tables;
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema<Contract>(context).tables;
               const user = tables.user!;
-              const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              const plan = sql({ context })
                 .from(user)
                 .select({
                   name: user.columns.email!,
@@ -122,9 +123,10 @@ describe('end-to-end nested projection queries', () => {
             const adapter = createPostgresAdapter();
             const runtime = createTestRuntimeFromClient(contract, client, adapter);
             try {
-              const tables = schema<Contract, CodecTypes>(contract).tables;
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema<Contract>(context).tables;
               const user = tables.user!;
-              const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              const plan = sql({ context })
                 .from(user)
                 .select({
                   a: {
