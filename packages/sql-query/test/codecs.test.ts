@@ -3,7 +3,7 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Plan } from '../src/types';
+import type { Plan } from '@prisma-next/contract/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 import { createTestContext } from '../../runtime/test/utils';

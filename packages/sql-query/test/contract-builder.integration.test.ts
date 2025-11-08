@@ -5,7 +5,7 @@ import { validateContract } from '../src/contract';
 import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { ResultType } from '../src/types';
+import type { ResultType } from '@prisma-next/contract/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 import { createTestContext, createStubAdapter } from '../../runtime/test/utils';

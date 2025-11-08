@@ -4,6 +4,7 @@ import type {
   SqlContract,
   SqlStorage,
   StorageColumn,
+  TableRef,
 } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import { attachOperationsToColumnBuilder } from './operations-registry';
@@ -17,7 +18,6 @@ import type {
   OperationTypes,
   OrderBuilder,
   ParamPlaceholder,
-  TableRef,
 } from './types';
 
 type TableColumns<Table extends { columns: Record<string, StorageColumn> }> = Table['columns'];

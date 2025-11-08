@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { JoinAst, JoinOnExpr, SelectAst } from '../src/types';
+import type { JoinAst, JoinOnExpr, SelectAst } from '@prisma-next/sql-target';
 
 describe('Join AST types', () => {
   it('defines JoinOnExpr with eqCol kind', () => {

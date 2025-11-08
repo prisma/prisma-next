@@ -5,13 +5,11 @@ import { expectTypeOf, test } from 'vitest';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
+import type { ResultType } from '@prisma-next/contract/types';
 import type {
-  Adapter,
   HasIncludeManyCapabilities,
   InferNestedProjectionRow,
-  LoweredStatement,
-  ResultType,
-  SelectAst,
 } from '../src/types';
 
 // Test contracts with different capability configurations

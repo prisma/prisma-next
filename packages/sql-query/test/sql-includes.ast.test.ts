@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BinaryExpr, ColumnRef, Direction, IncludeAst, SelectAst } from '../src/types';
+import type { BinaryExpr, ColumnRef, Direction, IncludeAst, SelectAst } from '@prisma-next/sql-target';
 
 describe('Include AST types', () => {
   it('defines IncludeAst with includeMany kind', () => {

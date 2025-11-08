@@ -8,7 +8,7 @@ import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Adapter, DeleteAst, InsertAst, LoweredStatement, UpdateAst } from '../src/types';
+import type { Adapter, DeleteAst, InsertAst, LoweredStatement, UpdateAst } from '@prisma-next/sql-target';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import { createTestContext } from '../../runtime/test/utils';
 

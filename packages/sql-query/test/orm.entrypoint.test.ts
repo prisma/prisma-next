@@ -6,7 +6,7 @@ import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { orm } from '../src/orm';
-import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
 import type { Contract } from './fixtures/contract.d';
 import { createTestContext } from '../../runtime/test/utils';
 

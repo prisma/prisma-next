@@ -1,10 +1,7 @@
+import type { ParamDescriptor, Plan, PlanMeta, PlanRefs } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import type {
-  ParamDescriptor,
-  Plan,
-  PlanMeta,
-  PlanRefs,
   RawFactory,
   RawFunctionOptions,
   RawTemplateFactory,
@@ -165,16 +162,21 @@ function freezeRefs(refs: PlanRefs): PlanRefs {
   return Object.freeze({
     ...(refs.tables ? { tables: Object.freeze([...refs.tables]) } : {}),
     ...(refs.columns
-      ? { columns: Object.freeze(refs.columns.map((col) => Object.freeze({ ...col }))) }
+      ? {
+          columns: Object.freeze(
+            refs.columns.map((col: { table: string; column: string }) => Object.freeze({ ...col })),
+          ),
+        }
       : {}),
     ...(refs.indexes
       ? {
           indexes: Object.freeze(
-            refs.indexes.map((index) =>
-              Object.freeze({
-                ...index,
-                columns: Object.freeze([...index.columns]),
-              }),
+            refs.indexes.map(
+              (index: { table: string; columns: ReadonlyArray<string>; name?: string }) =>
+                Object.freeze({
+                  ...index,
+                  columns: Object.freeze([...index.columns]),
+                }),
             ),
           ),
         }

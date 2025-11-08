@@ -1,3 +1,4 @@
+import type { Plan } from '@prisma-next/contract/types';
 import type { RuntimeContext } from '@prisma-next/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type {
@@ -6,7 +7,6 @@ import type {
   ColumnBuilder,
   InferNestedProjectionRow,
   OrderBuilder,
-  Plan,
 } from './types';
 
 export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
 import type { CodecTypes } from './fixtures/contract.d';
 import { createTestContext } from '../../runtime/test/utils';
 

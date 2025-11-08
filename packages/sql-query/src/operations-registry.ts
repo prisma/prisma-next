@@ -1,12 +1,14 @@
 import type {
+  ColumnRef,
   LiteralExpr,
   OperationExpr,
   OperationRegistry,
   OperationSignature,
+  ParamRef,
   StorageColumn,
 } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
-import type { ColumnBuilder, ColumnRef, OperationTypes, ParamPlaceholder, ParamRef } from './types';
+import type { ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
 
 function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
   return (
