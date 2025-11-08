@@ -9,6 +9,7 @@ import { orm } from '../src/orm';
 import { param } from '../src/param';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
+import { createTestContext } from '../../runtime/test/utils';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -42,8 +43,8 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 describe('orm base builder', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
-  const codecTypes = {} as CodecTypes;
-  const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+  const context = createTestContext(contract, adapter);
+  const o = orm<Contract>({ context });
 
   it('chains where clause', () => {
     const builder = (o as unknown as { user: () => unknown }).user();

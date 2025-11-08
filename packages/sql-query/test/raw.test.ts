@@ -99,7 +99,7 @@ describe('raw lane', () => {
   });
 
   it('exposes raw via the package export surface', () => {
-    const exportedRoot = exportedSql({ contract, adapter });
+    const exportedRoot = exportedSql({ context });
     expect(typeof exportedRoot.raw).toBe('function');
 
     const plan = exportedRoot.raw('select 1', { params: [] });

@@ -53,8 +53,8 @@ describe('orm writes', () => {
     Contract,
     LoweredStatement
   >;
-  const codecTypes = {} as CodecTypes;
-  const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+  const context = createTestContext(contract, adapter);
+  const o = orm<Contract>({ context });
 
   it('creates a row with create()', () => {
     const builder = (o as unknown as { user: () => unknown }).user();

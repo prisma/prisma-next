@@ -56,9 +56,6 @@ describe('Codecs Integration Tests', () => {
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
   const adapter = createPostgresAdapter();
-  const context = createTestContext(fixtureContract, adapter);
-  const tables = schema(context).tables;
-  const builder = sql({ context });
 
   beforeAll(async () => {
     database = await createDevDatabase({
@@ -117,9 +114,11 @@ describe('Codecs Integration Tests', () => {
     );
 
     // Query to verify the date was stored correctly
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const testDataTable = tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const selectPlan = builder
+    const selectPlan = sql({ context })
       .from(testDataTable)
       .select({
         id: testDataColumns['id']!,
@@ -150,9 +149,11 @@ describe('Codecs Integration Tests', () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const testDataTable = tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const selectPlan = builder
+    const selectPlan = sql({ context })
       .from(testDataTable)
       .select({
         name: testDataColumns['name']!,
@@ -180,9 +181,11 @@ describe('Codecs Integration Tests', () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const testDataTable = tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const selectPlan = builder
+    const selectPlan = sql({ context })
       .from(testDataTable)
       .select({
         score: testDataColumns['score']!,
@@ -208,9 +211,11 @@ describe('Codecs Integration Tests', () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const testDataTable = tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const selectPlan = builder
+    const selectPlan = sql({ context })
       .from(testDataTable)
       .select({
         name: testDataColumns['name']!,
@@ -236,9 +241,11 @@ describe('Codecs Integration Tests', () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const testDataTable = tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const basePlan = builder
+    const basePlan = sql({ context })
       .from(testDataTable)
       .select({
         created_at: testDataColumns['created_at']!,
@@ -281,9 +288,11 @@ describe('Codecs Integration Tests', () => {
       null,
     ]);
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const testDataTable = tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const selectPlan = builder
+    const selectPlan = sql({ context })
       .from(testDataTable)
       .select({
         created_at: testDataColumns['created_at']!,
@@ -308,9 +317,11 @@ describe('Codecs Integration Tests', () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const testDataTable = tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const selectPlan = builder
+    const selectPlan = sql({ context })
       .from(testDataTable)
       .select({
         name: testDataColumns['name']!,

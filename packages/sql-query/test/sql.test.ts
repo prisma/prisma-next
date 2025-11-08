@@ -16,6 +16,7 @@ import type {
   SelectAst,
 } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
+import { createTestContext, createStubAdapter } from '../../runtime/test/utils';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -48,13 +49,14 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 
 describe('sql DSL builder', () => {
   const contract = loadContract('contract');
-  const tables = schema<Contract, CodecTypes>(contract).tables;
   const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
+  const tables = schema<Contract, CodecTypes>(context).tables;
 
   it('builds a select plan with projection, where, order, and limit', () => {
     const userColumns = tables.user.columns;
 
-    const plan = sql<Contract, CodecTypes>({ contract, adapter })
+    const plan = sql<Contract, CodecTypes>({ context })
       .from(tables.user)
       .select({
         id: userColumns.id,
@@ -116,11 +118,7 @@ describe('sql DSL builder', () => {
   });
 
   it('throws PLAN.INVALID when selecting an invalid column', () => {
-    const builder = sql<Contract, CodecTypes>({
-      contract,
-      adapter,
-      codecTypes: {} as CodecTypes,
-    }).from(tables.user);
+    const builder = sql<Contract, CodecTypes>({ context }).from(tables.user);
 
     // Invalid: passing something that's not a ColumnBuilder or nested object
     expect(() => builder.select({ invalid: null as unknown as ColumnBuilder })).toThrowError(
@@ -131,7 +129,7 @@ describe('sql DSL builder', () => {
   it('throws PLAN.INVALID when parameter value is missing', () => {
     const userColumns = tables.user.columns;
 
-    const builder = sql<Contract, CodecTypes>({ contract, adapter, codecTypes: {} as CodecTypes })
+    const builder = sql<Contract, CodecTypes>({ context })
       .from(tables.user)
       .select({
         id: userColumns.id,
@@ -164,9 +162,10 @@ describe('sql DSL builder', () => {
       };
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
-      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
-        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
+      const contextWithCodecs = createTestContext(contractValidated, adapter);
+      const userColumns = schema<Contract, CodecTypes>(contextWithCodecs).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ context: contextWithCodecs })
+        .from(schema<Contract, CodecTypes>(contextWithCodecs).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -182,9 +181,10 @@ describe('sql DSL builder', () => {
 
     it('encodes codec assignments from column types for WHERE parameters', () => {
       const contractValidated = validateContract<Contract>(contract);
-      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
-        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
+      const contextValidated = createTestContext(contractValidated, adapter);
+      const userColumns = schema<Contract, CodecTypes>(contextValidated).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ context: contextValidated })
+        .from(schema<Contract, CodecTypes>(contextValidated).tables.user)
         .select({
           email: userColumns.email,
         })
@@ -220,9 +220,10 @@ describe('sql DSL builder', () => {
       };
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
-      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
-        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
+      const contextWithCodecs = createTestContext(contractValidated, adapter);
+      const userColumns = schema<Contract, CodecTypes>(contextWithCodecs).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ context: contextWithCodecs })
+        .from(schema<Contract, CodecTypes>(contextWithCodecs).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -241,7 +242,7 @@ describe('sql DSL builder', () => {
     it('includes codec annotations from column types', () => {
       // Contract fixture has column types as pg/*@1 IDs
       const userColumns = tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           id: userColumns.id,
@@ -261,7 +262,7 @@ describe('sql DSL builder', () => {
     it('flattens single-level nested projection', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           name: userColumns.email,
@@ -285,7 +286,7 @@ describe('sql DSL builder', () => {
     it('flattens multi-level nested projection', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           a: {
@@ -308,7 +309,7 @@ describe('sql DSL builder', () => {
     it('handles mixed leaves and nested objects', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           id: userColumns.id,
@@ -340,7 +341,7 @@ describe('sql DSL builder', () => {
     it('throws PLAN.INVALID on alias collision', () => {
       const userColumns = tables.user.columns;
 
-      const builder = sql<Contract, CodecTypes>({ contract, adapter }).from(tables.user);
+      const builder = sql<Contract, CodecTypes>({ context }).from(tables.user);
 
       expect(() =>
         builder.select({
@@ -355,7 +356,7 @@ describe('sql DSL builder', () => {
     it('includes projectionTypes for nested projections', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           name: userColumns.email,
@@ -374,7 +375,7 @@ describe('sql DSL builder', () => {
     it('includes codec annotations for nested projections', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           name: userColumns.email,

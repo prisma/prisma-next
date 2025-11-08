@@ -6,14 +6,16 @@ import { sql } from '../src/sql';
 import type { Plan } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
+import { createTestContext } from '../../runtime/test/utils';
 
 describe('DSL Lane Codec Type Stamping', () => {
   const contract = validateContract<Contract>(contractJson);
-  const tables = schema<Contract, CodecTypes>(contract).tables;
   const adapter = createPostgresAdapter();
+  const context = createTestContext(contract, adapter);
+  const tables = schema<Contract, CodecTypes>(context).tables;
 
   it('stamps paramDescriptors.type from columnMeta.type', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter });
+    const builder = sql<Contract, CodecTypes>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -48,7 +50,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('stamps projectionTypes mapping alias → scalar type', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter });
+    const builder = sql<Contract, CodecTypes>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -80,7 +82,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('stamps projectionTypes for aliased columns', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter });
+    const builder = sql<Contract, CodecTypes>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -110,7 +112,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('includes nullable in paramDescriptors', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter });
+    const builder = sql<Contract, CodecTypes>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -139,7 +141,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('Plan has Row generic type', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter });
+    const builder = sql<Contract, CodecTypes>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -163,7 +165,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('ResultType utility extracts row type', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter });
+    const builder = sql<Contract, CodecTypes>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -188,7 +190,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('stamps projectionTypes for all selected columns', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter });
+    const builder = sql<Contract, CodecTypes>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');
@@ -215,7 +217,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   });
 
   it('maintains projectionTypes order matching projection', () => {
-    const builder = sql<Contract, CodecTypes>({ contract, adapter });
+    const builder = sql<Contract, CodecTypes>({ context });
     const userTable = tables.user;
     if (!userTable) {
       throw new Error('user table not found');

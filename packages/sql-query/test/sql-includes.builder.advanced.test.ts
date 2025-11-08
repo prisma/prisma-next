@@ -6,6 +6,7 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import type { CodecTypes } from './fixtures/contract.d';
+import { createTestContext } from '../../runtime/test/utils';
 
 // Define a fully-typed contract type with capabilities
 type ContractWithCapabilities = SqlContract<
@@ -156,12 +157,14 @@ describe('SQL builder includeMany', () => {
   const adapter = createStubAdapter();
 
   it('throws error when child projection is empty', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+      sql<ContractWithCapabilities, CodecTypes>({ context })
         .from(tables.user)
         .includeMany(
           tables.post,
@@ -178,12 +181,14 @@ describe('SQL builder includeMany', () => {
   });
 
   it('throws error on alias collision', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+      sql<ContractWithCapabilities, CodecTypes>({ context })
         .from(tables.user)
         .includeMany(
           tables.post,
@@ -200,12 +205,14 @@ describe('SQL builder includeMany', () => {
   });
 
   it('throws error when ON condition uses same table', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+      sql<ContractWithCapabilities, CodecTypes>({ context })
         .from(tables.user)
         .includeMany(
           tables.post,

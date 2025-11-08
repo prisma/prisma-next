@@ -4,6 +4,7 @@ import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { createJoinOnBuilder } from '../src/sql';
 import type { CodecTypes } from './fixtures/contract.d';
+import { createTestContext, createStubAdapter } from '../../runtime/test/utils';
 
 // Define a fully-typed contract type for this test
 type ContractWithPosts = SqlContract<
@@ -59,7 +60,9 @@ const contractWithPosts = validateContract<ContractWithPosts>({
 describe('JoinOnBuilder', () => {
   it('creates a join ON predicate from two columns', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -74,7 +77,9 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when left operand is not a column', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
     const postColumns = tables.post.columns;
 
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -90,7 +95,9 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when right operand is not a column', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
 
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -106,7 +113,9 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when both columns are from the same table (self-join)', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
 
     expect(() => on.eqCol(userColumns.id, userColumns.id)).toThrowError(

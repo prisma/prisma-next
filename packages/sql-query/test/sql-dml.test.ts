@@ -10,6 +10,7 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Adapter, DeleteAst, InsertAst, LoweredStatement, UpdateAst } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
+import { createTestContext } from '../../runtime/test/utils';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -49,12 +50,13 @@ function createStubAdapter(): Adapter<
 
 describe('DML builders', () => {
   const contract = loadContract('contract');
-  const tables = schema<Contract, CodecTypes>(contract).tables;
   const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
+  const tables = schema<Contract, CodecTypes>(context).tables;
 
   describe('insert', () => {
     it('builds an insert plan with values', () => {
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .insert(tables.user, {
           email: param('email'),
           createdAt: param('createdAt'),
@@ -84,7 +86,7 @@ describe('DML builders', () => {
 
     it('builds an insert plan with returning clause', () => {
       const userColumns = tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .insert(tables.user, {
           email: param('email'),
           createdAt: param('createdAt'),
@@ -108,7 +110,7 @@ describe('DML builders', () => {
 
     it('throws error for unknown column', () => {
       expect(() => {
-        sql<Contract, CodecTypes>({ contract, adapter })
+        sql<Contract, CodecTypes>({ context })
           .insert(tables.user, {
             unknownColumn: param('value'),
             // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -119,7 +121,7 @@ describe('DML builders', () => {
 
     it('throws error for missing parameter', () => {
       expect(() => {
-        sql<Contract, CodecTypes>({ contract, adapter })
+        sql<Contract, CodecTypes>({ context })
           .insert(tables.user, {
             email: param('email'),
           })
@@ -131,7 +133,7 @@ describe('DML builders', () => {
   describe('update', () => {
     it('builds an update plan with set and where', () => {
       const userColumns = tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .update(tables.user, {
           email: param('newEmail'),
         })
@@ -165,7 +167,7 @@ describe('DML builders', () => {
 
     it('builds an update plan with returning clause', () => {
       const userColumns = tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .update(tables.user, {
           email: param('newEmail'),
         })
@@ -192,7 +194,7 @@ describe('DML builders', () => {
 
     it('throws error if where is not called', () => {
       expect(() => {
-        sql<Contract, CodecTypes>({ contract, adapter })
+        sql<Contract, CodecTypes>({ context })
           .update(tables.user, {
             email: param('newEmail'),
           })
@@ -203,7 +205,7 @@ describe('DML builders', () => {
     it('throws error for unknown column', () => {
       const userColumns = tables.user.columns;
       expect(() => {
-        sql<Contract, CodecTypes>({ contract, adapter })
+        sql<Contract, CodecTypes>({ context })
           .update(tables.user, {
             unknownColumn: param('value'),
             // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -217,7 +219,7 @@ describe('DML builders', () => {
   describe('delete', () => {
     it('builds a delete plan with where', () => {
       const userColumns = tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .delete(tables.user)
         .where(userColumns.id.eq(param('userId')))
         .build({ params: { userId: 1 } });
@@ -246,7 +248,7 @@ describe('DML builders', () => {
 
     it('builds a delete plan with returning clause', () => {
       const userColumns = tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .delete(tables.user)
         .where(userColumns.id.eq(param('userId')))
         .returning(userColumns.id, userColumns.email)
@@ -268,7 +270,7 @@ describe('DML builders', () => {
 
     it('throws error if where is not called', () => {
       expect(() => {
-        sql<Contract, CodecTypes>({ contract, adapter }).delete(tables.user).build({ params: {} });
+        sql<Contract, CodecTypes>({ context }).delete(tables.user).build({ params: {} });
       }).toThrow('where() must be called before building a DELETE query');
     });
   });
@@ -287,8 +289,9 @@ describe('DML builders', () => {
         },
       };
 
+      const contextWithoutReturning = createTestContext(contractWithoutReturning as Contract, adapter);
       expect(() => {
-        sql<Contract, CodecTypes>({ contract: contractWithoutReturning as Contract, adapter })
+        sql<Contract, CodecTypes>({ context: contextWithoutReturning })
           .insert(tables.user, {
             email: param('email'),
           })
@@ -308,8 +311,9 @@ describe('DML builders', () => {
         },
       };
 
+      const contextWithReturningFalse = createTestContext(contractWithReturningFalse as Contract, adapter);
       expect(() => {
-        sql<Contract, CodecTypes>({ contract: contractWithReturningFalse as Contract, adapter })
+        sql<Contract, CodecTypes>({ context: contextWithReturningFalse })
           .insert(tables.user, {
             email: param('email'),
           })
@@ -329,10 +333,8 @@ describe('DML builders', () => {
         },
       };
 
-      const plan = sql<Contract, CodecTypes>({
-        contract: contractWithReturning as Contract,
-        adapter,
-      })
+      const contextWithReturning = createTestContext(contractWithReturning as Contract, adapter);
+      const plan = sql<Contract, CodecTypes>({ context: contextWithReturning })
         .insert(tables.user, {
           email: param('email'),
         })
@@ -359,8 +361,9 @@ describe('DML builders', () => {
         },
       };
 
+      const contextWithoutReturning = createTestContext(contractWithoutReturning as Contract, adapter);
       expect(() => {
-        sql<Contract, CodecTypes>({ contract: contractWithoutReturning as Contract, adapter })
+        sql<Contract, CodecTypes>({ context: contextWithoutReturning })
           .update(tables.user, {
             email: param('newEmail'),
           })
@@ -380,8 +383,9 @@ describe('DML builders', () => {
         },
       };
 
+      const contextWithoutReturning = createTestContext(contractWithoutReturning as Contract, adapter);
       expect(() => {
-        sql<Contract, CodecTypes>({ contract: contractWithoutReturning as Contract, adapter })
+        sql<Contract, CodecTypes>({ context: contextWithoutReturning })
           .delete(tables.user)
           .where(userColumns.id.eq(param('userId')))
           .returning(userColumns.id, userColumns.email);

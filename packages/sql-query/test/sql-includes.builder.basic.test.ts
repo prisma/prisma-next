@@ -7,6 +7,7 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import type { CodecTypes } from './fixtures/contract.d';
+import { createTestContext } from '../../runtime/test/utils';
 
 // Define a fully-typed contract type with capabilities
 type ContractWithCapabilities = SqlContract<
@@ -98,14 +99,13 @@ describe('SQL builder includeMany', () => {
   const adapter = createStubAdapter();
 
   it('builds a plan with includeMany using default alias', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -129,14 +129,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany using custom alias', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -158,14 +157,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany with child where clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -188,14 +186,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany with child orderBy clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -219,14 +216,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany with child limit clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,

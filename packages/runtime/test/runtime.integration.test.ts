@@ -24,16 +24,6 @@ import {
 
 const fixtureContract = loadContractFixture();
 const adapter = createPostgresAdapter();
-const context = createTestContext(fixtureContract, adapter);
-const tables = schema(context).tables;
-const userTable = tables['user']!;
-const userColumns = userTable.columns;
-const builder = sql({ context });
-const plan = builder
-  .from(userTable)
-  .select({ id: userColumns['id']!, email: userColumns['email']! })
-  .limit(5)
-  .build();
 
 describe('runtime execute integration', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -85,6 +75,16 @@ describe('runtime execute integration', () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const plan = sql({ context })
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .limit(5)
+      .build();
+
     const rows = await executePlanAndCollect(runtime, plan);
 
     expect(rows.length).toBeGreaterThan(0);
@@ -101,6 +101,16 @@ describe('runtime execute integration', () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const plan = sql({ context })
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .limit(5)
+      .build();
+
     await expect(async () => {
       await drainPlanExecution(runtime, plan);
     }).rejects.toMatchObject({ code: 'PLAN.HASH_MISMATCH' });
@@ -112,6 +122,7 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
+    const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw`
       select * from "user"
     `;
@@ -135,6 +146,7 @@ describe('runtime execute integration', () => {
       plugins: [lints(), budgets()],
     });
 
+    const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
@@ -153,6 +165,7 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
+    const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw('select id from "user" where email = $1 limit $2', {
       params: ['ada@example.com', 1],
       refs: {
@@ -176,6 +189,7 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
+    const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw('insert into "user" (email) values ($1)', {
       params: ['read-only@example.com'],
       annotations: { intent: 'report' },
@@ -200,6 +214,7 @@ describe('runtime execute integration', () => {
       mode: 'permissive',
     });
 
+    const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
@@ -222,6 +237,7 @@ describe('runtime execute integration', () => {
       mode: 'permissive',
     });
 
+    const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
@@ -238,6 +254,7 @@ describe('runtime execute integration', () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
+    const context = createTestContext(fixtureContract, adapter);
     const planOne = sql({ context }).raw(
       'select id from "user" where email = \'ada@example.com\' limit 1',
       { params: [] },

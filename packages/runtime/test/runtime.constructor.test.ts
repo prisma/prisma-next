@@ -95,8 +95,9 @@ describe('Runtime class', () => {
       const mockDriver = createMockDriver();
       const adapter = createPostgresAdapter();
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },

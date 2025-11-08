@@ -1,39 +1,30 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { Contract } from '../../sql-query/test/fixtures/contract.d';
+import contractJson from '../../sql-query/test/fixtures/contract.json' with { type: 'json' };
 import { createRuntime } from '../src/runtime';
 import { createRuntimeContext } from '../src/context';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const fixtureDir = join(__dirname, '../../sql/test/fixtures');
-
-function loadContract(name: string): Contract {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents) as unknown;
-  return validateContract<Contract>(contractJson);
-}
-
 test('execute() preserves Row type from Plan', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
-  const userTable = tables.user!;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const plan = sql({ context })
     .from(userTable)
     .select({
-      id: userColumns.id!,
-      email: userColumns.email!,
+      id: idColumn,
+      email: emailColumn,
     })
     .build();
 
@@ -61,18 +52,22 @@ test('execute() preserves Row type from Plan', () => {
 });
 
 test('execute() signature matches Plan Row type', () => {
-  const contract = loadContract('contract');
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
-  const userTable = tables.user!;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
   const userColumns = userTable.columns;
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
 
   const plan = sql({ context })
     .from(userTable)
     .select({
-      id: userColumns.id!,
-      email: userColumns.email!,
+      id: idColumn,
+      email: emailColumn,
     })
     .build();
 

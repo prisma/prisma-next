@@ -118,7 +118,9 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
-    const tables = schema<typeof contract, CodecTypes>(contract).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema<typeof contract, CodecTypes>(context).tables;
     const userTable = tables.user;
     expect(userTable).toBeDefined();
     expect(userTable?.columns).toHaveProperty('id');
@@ -143,11 +145,12 @@ describe('builder integration', () => {
       .build();
 
     const adapter = createStubAdapter();
-    const tables = schema<typeof contract, CodecTypes>(contract).tables;
+    const context = createTestContext(contract, adapter);
+    const tables = schema<typeof contract, CodecTypes>(context).tables;
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract, CodecTypes>({ contract, adapter })
+    const _plan = sql<typeof contract, CodecTypes>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
@@ -188,11 +191,12 @@ describe('builder integration', () => {
       .build();
 
     const adapter = createStubAdapter();
-    const tables = schema<typeof contract, CodecTypes>(contract).tables;
+    const context = createTestContext(contract, adapter);
+    const tables = schema<typeof contract, CodecTypes>(context).tables;
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract, CodecTypes>({ contract, adapter })
+    const _plan = sql<typeof contract, CodecTypes>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
