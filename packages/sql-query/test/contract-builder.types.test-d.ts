@@ -14,9 +14,9 @@ test('builder contract types match fixture contract types', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', 'int4', { nullable: false })
-        .column('email', 'text', { nullable: false })
-        .column('createdAt', 'timestamptz', { nullable: false })
+        .column('id', { type: 'pg/int4@1', nullable: false })
+        .column('email', { type: 'pg/text@1', nullable: false })
+        .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
         .primaryKey(['id']),
     )
     .model('User', 'user', (m) =>
@@ -40,9 +40,9 @@ test('ResultType inference works identically to fixture contract', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', 'int4', { nullable: false })
-        .column('email', 'text', { nullable: false })
-        .column('createdAt', 'timestamptz', { nullable: false })
+        .column('id', { type: 'pg/int4@1', nullable: false })
+        .column('email', { type: 'pg/text@1', nullable: false })
+        .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
         .primaryKey(['id']),
     )
     .model('User', 'user', (m) =>
@@ -102,9 +102,9 @@ test('codec type inference via type option', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', 'int4', { nullable: false, type: dataTypes.int4 })
-        .column('email', 'text', { nullable: false, type: dataTypes.text })
-        .column('createdAt', 'timestamptz', { nullable: false, type: dataTypes.timestamptz }),
+        .column('id', { type: dataTypes.int4, nullable: false })
+        .column('email', { type: dataTypes.text, nullable: false })
+        .column('createdAt', { type: dataTypes.timestamptz, nullable: false }),
     )
     .model('User', 'user', (m) =>
       m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
@@ -145,7 +145,7 @@ test('contract structure type matches SqlContract', () => {
   const contract = defineContract<CodecTypes>()
     .target('postgres')
     .table('user', (t) =>
-      t.column('id', 'int4', { nullable: false }).column('email', 'text', { nullable: false }),
+      t.column('id', { type: 'pg/int4@1', nullable: false }).column('email', { type: 'pg/text@1', nullable: false }),
     )
     .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
     .build();

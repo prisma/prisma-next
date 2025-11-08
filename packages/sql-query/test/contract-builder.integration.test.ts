@@ -36,9 +36,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -107,9 +107,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -127,9 +127,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -151,9 +151,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -196,9 +196,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -242,9 +242,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -295,8 +295,8 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false, type: dataTypes.int4 })
-          .column('email', 'text', { nullable: false, type: dataTypes.text }),
+          .column('id', { type: dataTypes.int4, nullable: false })
+          .column('email', { type: dataTypes.text, nullable: false }),
       )
       .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
       .build();
@@ -310,7 +310,7 @@ describe('builder integration', () => {
     expect(() => {
       defineContract<CodecTypes>()
         .target('postgres')
-        .table('user', (t) => t.column('id', 'int4', { type: 'invalid' }))
+        .table('user', (t) => t.column('id', { type: 'invalid' }))
         .build();
     }).toThrow(/type must be in format/);
   });
@@ -321,15 +321,15 @@ describe('builder integration', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', 'int4', { nullable: false })
-            .column('email', 'text', { nullable: false })
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('email', { type: 'pg/text@1', nullable: false })
             .primaryKey(['id']),
         )
         .table('post', (t) =>
           t
-            .column('id', 'int4', { nullable: false })
-            .column('userId', 'int4', { nullable: false })
-            .column('title', 'text', { nullable: false })
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('userId', { type: 'pg/int4@1', nullable: false })
+            .column('title', { type: 'pg/text@1', nullable: false })
             .primaryKey(['id']),
         )
         .model('User', 'user', (m) =>
@@ -390,20 +390,20 @@ describe('builder integration', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', 'int4', { nullable: false })
-            .column('email', 'text', { nullable: false })
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('email', { type: 'pg/text@1', nullable: false })
             .primaryKey(['id']),
         )
         .table('role', (t) =>
           t
-            .column('id', 'int4', { nullable: false })
-            .column('name', 'text', { nullable: false })
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('name', { type: 'pg/text@1', nullable: false })
             .primaryKey(['id']),
         )
         .table('userRole', (t) =>
           t
-            .column('userId', 'int4', { nullable: false })
-            .column('roleId', 'int4', { nullable: false })
+            .column('userId', { type: 'pg/int4@1', nullable: false })
+            .column('roleId', { type: 'pg/int4@1', nullable: false })
             .primaryKey(['userId', 'roleId']),
         )
         .model('User', 'user', (m) =>
@@ -475,8 +475,8 @@ describe('builder integration', () => {
       expect(() => {
         defineContract<CodecTypes>()
           .target('postgres')
-          .table('user', (t) => t.column('id', 'int4', { nullable: false }))
-          .table('post', (t) => t.column('id', 'int4', { nullable: false }))
+          .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('post', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
           .model('User', 'user', (m) =>
             m.relation('posts', {
               toModel: 'Post',
@@ -498,8 +498,8 @@ describe('builder integration', () => {
       expect(() => {
         defineContract<CodecTypes>()
           .target('postgres')
-          .table('user', (t) => t.column('id', 'int4', { nullable: false }))
-          .table('post', (t) => t.column('id', 'int4', { nullable: false }))
+          .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('post', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
           .model('User', 'user', (m) =>
             m.relation('posts', {
               toModel: 'Post',
@@ -521,8 +521,8 @@ describe('builder integration', () => {
       expect(() => {
         defineContract<CodecTypes>()
           .target('postgres')
-          .table('user', (t) => t.column('id', 'int4', { nullable: false }))
-          .table('role', (t) => t.column('id', 'int4', { nullable: false }))
+          .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('role', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
           .model('User', 'user', (m) =>
             m.relation('roles', {
               toModel: 'Role',
@@ -544,9 +544,9 @@ describe('builder integration', () => {
       expect(() => {
         defineContract<CodecTypes>()
           .target('postgres')
-          .table('user', (t) => t.column('id', 'int4', { nullable: false }))
-          .table('role', (t) => t.column('id', 'int4', { nullable: false }))
-          .table('userRole', (t) => t.column('userId', 'int4', { nullable: false }))
+          .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('role', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('userRole', (t) => t.column('userId', { type: 'pg/int4@1', nullable: false }))
           .model('User', 'user', (m) =>
             m.relation('roles', {
               toModel: 'Role',
