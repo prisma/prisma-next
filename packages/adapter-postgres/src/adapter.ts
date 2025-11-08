@@ -8,13 +8,14 @@ import type {
   IncludeRef,
   InsertAst,
   JoinAst,
+  LiteralExpr,
   LowererContext,
+  OperationExpr,
   ParamRef,
   QueryAst,
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-target';
-import type { LiteralExpr, OperationExpr } from '@prisma-next/sql-query/types';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';

@@ -6,7 +6,6 @@ import type {
   InsertAst,
   JoinAst,
   LiteralExpr,
-  LoweredStatement,
   OperationExpr,
   ParamRef,
   QueryAst,

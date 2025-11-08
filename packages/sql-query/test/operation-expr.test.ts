@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { OperationExpr, SelectAst } from '../src/types';
+import type { OperationExpr, SelectAst } from '@prisma-next/sql-target';
 
 describe('OperationExpr', () => {
   it('defines OperationExpr with infix strategy', () => {

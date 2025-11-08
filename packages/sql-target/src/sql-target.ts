@@ -83,10 +83,25 @@ export interface ParamRef {
   readonly name?: string;
 }
 
+export interface LiteralExpr {
+  readonly kind: 'literal';
+  readonly value: unknown;
+}
+
+export interface OperationExpr {
+  readonly kind: 'operation';
+  readonly method: string;
+  readonly forTypeId: string;
+  readonly self: ColumnRef;
+  readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr>;
+  readonly returns: import('./operations-registry').ReturnSpec;
+  readonly lowering: import('./operations-registry').LoweringSpec;
+}
+
 export interface BinaryExpr {
   readonly kind: 'bin';
   readonly op: 'eq';
-  readonly left: ColumnRef;
+  readonly left: ColumnRef | OperationExpr;
   readonly right: ParamRef;
 }
 
@@ -121,9 +136,9 @@ export interface IncludeAst {
     readonly table: TableRef;
     readonly on: JoinOnExpr;
     readonly where?: BinaryExpr | ExistsExpr;
-    readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
+    readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
     readonly limit?: number;
-    readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
+    readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef | OperationExpr }>;
   };
 }
 
@@ -134,10 +149,10 @@ export interface SelectAst {
   readonly includes?: ReadonlyArray<IncludeAst>;
   readonly project: ReadonlyArray<{
     alias: string;
-    expr: ColumnRef | IncludeRef;
+    expr: ColumnRef | IncludeRef | OperationExpr;
   }>;
   readonly where?: BinaryExpr | ExistsExpr;
-  readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
+  readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
   readonly limit?: number;
 }
 

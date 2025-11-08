@@ -25,8 +25,10 @@ import type {
   ArgSpec,
   ColumnRef,
   Direction,
+  LiteralExpr,
   LoweredStatement,
   LoweringSpec,
+  OperationExpr,
   ParamRef,
   QueryAst,
   ReturnSpec,
@@ -125,21 +127,6 @@ export interface JoinOnPredicate {
 }
 
 export type Expr = ColumnRef | ParamRef;
-
-export interface LiteralExpr {
-  readonly kind: 'literal';
-  readonly value: unknown;
-}
-
-export interface OperationExpr {
-  readonly kind: 'operation';
-  readonly method: string;
-  readonly forTypeId: string;
-  readonly self: ColumnRef;
-  readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr>;
-  readonly returns: ReturnSpec;
-  readonly lowering: LoweringSpec;
-}
 
 /**
  * Helper type to extract codec output type from CodecTypes.
