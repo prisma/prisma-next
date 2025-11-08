@@ -9,24 +9,24 @@ import type {
 } from '@prisma-next/sql-target';
 import { computeMappings } from './contract';
 
-type BuildStorageColumn<
-  Nullable extends boolean,
-  Type extends string,
-> = {
+type BuildStorageColumn<Nullable extends boolean, Type extends string> = {
   readonly type: Type;
   readonly nullable: Nullable;
 };
 
 type BuildStorageTable<
   _TableName extends string,
-  Columns extends Record<string, { nullable: boolean; type: string }>,
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
   PK extends readonly string[] | undefined,
 > = {
   readonly columns: {
-    readonly [K in keyof Columns]: BuildStorageColumn<
-      Columns[K]['nullable'] & boolean,
-      Columns[K]['type'] & string
-    >;
+    readonly [K in keyof Columns]: Columns[K] extends ColumnBuilderState<
+      string,
+      infer Null,
+      infer TType
+    >
+      ? BuildStorageColumn<Null & boolean, TType>
+      : never;
   };
   readonly uniques: ReadonlyArray<never>;
   readonly indexes: ReadonlyArray<never>;
@@ -38,7 +38,7 @@ type BuildStorageTable<
 type ExtractColumns<
   T extends TableBuilderState<
     string,
-    Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+    Record<string, ColumnBuilderState<string, boolean, string>>,
     readonly string[] | undefined
   >,
 > = T extends TableBuilderState<string, infer C, readonly string[] | undefined> ? C : never;
@@ -46,33 +46,23 @@ type ExtractColumns<
 type ExtractPrimaryKey<
   T extends TableBuilderState<
     string,
-    Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+    Record<string, ColumnBuilderState<string, boolean, string>>,
     readonly string[] | undefined
   >,
 > = T extends TableBuilderState<
   string,
-  Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+  Record<string, ColumnBuilderState<string, boolean, string>>,
   infer PK
 >
   ? PK
   : never;
-
-type NormalizeColumns<
-  C extends Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
-> = {
-  [K in keyof C]: C[K] extends ColumnBuilderState<string, infer Null, infer TType>
-    ? TType extends string
-      ? { nullable: Null & boolean; type: TType }
-      : never
-    : never;
-};
 
 type BuildStorage<
   Tables extends Record<
     string,
     TableBuilderState<
       string,
-      Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
   >,
@@ -80,7 +70,7 @@ type BuildStorage<
   readonly tables: {
     readonly [K in keyof Tables]: BuildStorageTable<
       K & string,
-      NormalizeColumns<ExtractColumns<Tables[K]>>,
+      ExtractColumns<Tables[K]>,
       ExtractPrimaryKey<Tables[K]>
     >;
   };
@@ -126,7 +116,7 @@ type BuildRelations<
 interface ColumnBuilderState<
   Name extends string = string,
   Nullable extends boolean = boolean,
-  Type extends string | undefined = string | undefined,
+  Type extends string = string,
 > {
   readonly name: Name;
   readonly nullable: Nullable;
@@ -135,10 +125,10 @@ interface ColumnBuilderState<
 
 interface TableBuilderState<
   Name extends string = string,
-  Columns extends Record<
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>> = Record<
     string,
-    ColumnBuilderState<string, boolean, string | undefined>
-  > = Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+    ColumnBuilderState<string, boolean, string>
+  >,
   PrimaryKey extends readonly string[] | undefined = undefined,
 > {
   readonly name: Name;
@@ -175,7 +165,7 @@ interface ModelBuilderState<
 export interface ColumnBuilder<
   Name extends string,
   Nullable extends boolean = false,
-  Type extends string | undefined = undefined,
+  Type extends string = string,
 > {
   nullable<Value extends boolean>(value?: Value): ColumnBuilder<Name, Value, Type>;
   type<Id extends string>(id: Id): ColumnBuilder<Name, Nullable, Id>;
@@ -184,10 +174,10 @@ export interface ColumnBuilder<
 
 class TableBuilder<
   Name extends string,
-  Columns extends Record<
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>> = Record<
     string,
-    ColumnBuilderState<string, boolean, string | undefined>
-  > = Record<string, never>,
+    never
+  >,
   PrimaryKey extends readonly string[] | undefined = undefined,
 > {
   private readonly _name: Name;
@@ -200,10 +190,7 @@ class TableBuilder<
     this._primaryKey = primaryKey as PrimaryKey;
   }
 
-  column<
-    ColName extends string,
-    TOptions extends { type: string; nullable?: boolean },
-  >(
+  column<ColName extends string, TOptions extends { type: string; nullable?: boolean }>(
     name: ColName,
     options: TOptions,
   ): TableBuilder<
@@ -447,14 +434,14 @@ interface ContractBuilderState<
     string,
     TableBuilderState<
       string,
-      Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
   > = Record<
     string,
     TableBuilderState<
       string,
-      Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
   >,
@@ -481,7 +468,7 @@ class ContractBuilder<
     string,
     TableBuilderState<
       string,
-      Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
   > = Record<string, never>,
@@ -544,7 +531,7 @@ class ContractBuilder<
     TableName extends string,
     T extends TableBuilder<
       TableName,
-      Record<string, ColumnBuilderState<string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >,
   >(
@@ -650,7 +637,12 @@ class ContractBuilder<
    * @returns A normalized SqlContract with all required fields present
    */
   build(): Target extends string
-    ? SqlContract<BuildStorage<Tables>, BuildModels<Models>, BuildRelations<Models>, SqlMappings> & {
+    ? SqlContract<
+        BuildStorage<Tables>,
+        BuildModels<Models>,
+        BuildRelations<Models>,
+        SqlMappings
+      > & {
         readonly schemaVersion: '1';
         readonly target: Target;
         readonly targetFamily: 'sql';
@@ -710,7 +702,9 @@ class ContractBuilder<
         if (!columnState) continue;
 
         if (!columnState.type) {
-          throw new Error(`Column "${columnName}" in table "${tableName}" is missing required type`);
+          throw new Error(
+            `Column "${columnName}" in table "${tableName}" is missing required type`,
+          );
         }
         const column: StorageColumn = {
           type: columnState.type,
