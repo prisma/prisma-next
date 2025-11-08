@@ -9,27 +9,12 @@ import type {
 } from '@prisma-next/sql-target';
 import { computeMappings } from './contract';
 
-export interface ColumnOptions<TType extends string = string> {
-  nullable?: boolean;
-  type?: TType;
-}
-
-type CanonicalizeType<
-  Scalar extends string,
-  Target extends string,
-> = Scalar extends `pg/${infer _Scalar}@${infer _Version}`
-  ? Scalar
-  : Target extends 'postgres'
-    ? `pg/${Scalar}@1`
-    : Scalar;
-
 type BuildStorageColumn<
   Scalar extends string,
   Nullable extends boolean,
   Type extends string | undefined,
-  Target extends string,
 > = {
-  readonly type: Type extends string ? Type : CanonicalizeType<Scalar, Target>;
+  readonly type: Type extends string ? Type : Scalar;
   readonly nullable: Nullable;
 };
 
@@ -37,28 +22,20 @@ type BuildStorageTable<
   _TableName extends string,
   Columns extends Record<string, { scalar: string; nullable: boolean; type?: unknown }>,
   PK extends readonly string[] | undefined,
-  Target extends string,
 > = {
   readonly columns: {
     readonly [K in keyof Columns]: Columns[K] extends { type: infer TType }
       ? TType extends string
-        ? BuildStorageColumn<
-            Columns[K]['scalar'] & string,
-            Columns[K]['nullable'] & boolean,
-            TType,
-            Target
-          >
+        ? BuildStorageColumn<Columns[K]['scalar'] & string, Columns[K]['nullable'] & boolean, TType>
         : BuildStorageColumn<
             Columns[K]['scalar'] & string,
             Columns[K]['nullable'] & boolean,
-            undefined,
-            Target
+            undefined
           >
       : BuildStorageColumn<
           Columns[K]['scalar'] & string,
           Columns[K]['nullable'] & boolean,
-          undefined,
-          Target
+          undefined
         >;
   };
   readonly uniques: ReadonlyArray<never>;
@@ -107,14 +84,12 @@ type BuildStorage<
       readonly string[] | undefined
     >
   >,
-  Target extends string,
 > = {
   readonly tables: {
     readonly [K in keyof Tables]: BuildStorageTable<
       K & string,
       NormalizeColumns<ExtractColumns<Tables[K]>>,
-      ExtractPrimaryKey<Tables[K]>,
-      Target
+      ExtractPrimaryKey<Tables[K]>
     >;
   };
 };
@@ -706,12 +681,7 @@ class ContractBuilder<
    * @returns A normalized SqlContract with all required fields present
    */
   build(): Target extends string
-    ? SqlContract<
-        BuildStorage<Tables, Target & string>,
-        BuildModels<Models>,
-        Record<string, never>,
-        SqlMappings
-      > & {
+    ? SqlContract<BuildStorage<Tables>, BuildModels<Models>, Record<string, never>, SqlMappings> & {
         readonly schemaVersion: '1';
         readonly target: Target;
         readonly targetFamily: 'sql';
@@ -726,7 +696,7 @@ class ContractBuilder<
     // Type helper to ensure literal types are preserved in return type
     type BuiltContract = Target extends string
       ? SqlContract<
-          BuildStorage<Tables, Target & string>,
+          BuildStorage<Tables>,
           BuildModels<Models>,
           BuildRelations<Models>,
           SqlMappings
@@ -749,7 +719,7 @@ class ContractBuilder<
     const target = this.state.target as Target & string;
 
     // Build storage tables - construct as partial first, then assert full type
-    const storageTables: Partial<BuildStorage<Tables, Target & string>['tables']> = {};
+    const storageTables: Partial<BuildStorage<Tables>['tables']> = {};
 
     // Iterate over tables - TypeScript will see keys as string, but type assertion preserves literals
     for (const tableName in this.state.tables) {
@@ -883,7 +853,7 @@ class ContractBuilder<
 
     // Type assertions to preserve literal types from generics
     // The type system knows these match BuildStorage/BuildModels from the generics
-    const storage = { tables: storageTables } as unknown as BuildStorage<Tables, Target & string>;
+    const storage = { tables: storageTables } as unknown as BuildStorage<Tables>;
     const models = modelsPartial as unknown as BuildModels<Models>;
     const relations = relationsPartial as unknown as BuildRelations<Models>;
 
@@ -903,8 +873,10 @@ class ContractBuilder<
       relations,
       storage,
       mappings,
-      ...(this.state.extensions ? { extensions: this.state.extensions } : {}),
-      ...(this.state.capabilities ? { capabilities: this.state.capabilities } : {}),
+      extensions: this.state.extensions || {},
+      capabilities: this.state.capabilities || {},
+      meta: {},
+      sources: {},
     } as unknown as BuiltContract;
 
     return contract as BuiltContract;
