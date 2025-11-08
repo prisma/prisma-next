@@ -37,6 +37,9 @@ export interface ExtensionPackManifest {
     readonly codecTypes?: {
       readonly import: TypesImportSpec;
     };
+    readonly operationTypes?: {
+      readonly import: TypesImportSpec;
+    };
   };
   readonly operations?: ReadonlyArray<OperationManifest>;
 }

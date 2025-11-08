@@ -47,7 +47,9 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     expect(vectorColumn).toBeDefined();
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
@@ -71,7 +73,9 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const idColumn = tables.user.columns.id;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const idColumn = userTable.columns['id'];
     expect(idColumn).toBeDefined();
     expect((idColumn as unknown as { cosineDistance?: unknown }).cosineDistance).toBeUndefined();
   });
@@ -106,7 +110,9 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature2);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
     );
@@ -130,7 +136,9 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     const result = (
       vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
     ).cosineDistance(param('other'));
@@ -155,7 +163,9 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     const result = (
       vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
     ).cosineDistance(param('other'));
@@ -180,9 +190,13 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     const distance = (
-      vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
+      vectorColumn as unknown as {
+        cosineDistance: (arg: unknown) => { eq: (value: unknown) => { kind: string } };
+      }
     ).cosineDistance(param('other'));
     const binary = distance.eq(param('threshold'));
     expect(binary).toHaveProperty('kind', 'binary');
@@ -205,9 +219,13 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     const distance = (
-      vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
+      vectorColumn as unknown as {
+        cosineDistance: (arg: unknown) => { asc: () => { kind: string } };
+      }
     ).cosineDistance(param('other'));
     const order = distance.asc();
     expect(order).toHaveProperty('kind', 'order');

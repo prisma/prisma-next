@@ -58,6 +58,8 @@ export interface ColumnBuilderBase<
   eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
+  // Helper property for type extraction (not used at runtime)
+  readonly __jsType?: JsType;
 }
 
 /**
@@ -385,10 +387,26 @@ export type ComputeColumnJsType<
  *
  * Extracts the pre-computed JsType from each ColumnBuilder in the projection.
  */
-export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
-  [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
+/**
+ * Extracts JsType from a ColumnBuilder.
+ * Since ColumnBuilder = ColumnBuilderBase<...> & ..., we extract from ColumnBuilderBase.
+ * We use a distributive conditional type to extract from the intersection.
+ * The tuple wrapper helps TypeScript with intersection type matching.
+ */
+type ExtractJsTypeFromColumnBuilder<CB extends ColumnBuilder> = [CB] extends [
+  ColumnBuilderBase<infer _Name, infer _Meta, infer JsType>,
+]
+  ? JsType
+  : [CB] extends [
+        {
+          eq: (value: ParamPlaceholder) => BinaryBuilder<infer _Name, infer _Meta, infer JsType>;
+        },
+      ]
     ? JsType
-    : never;
+    : unknown;
+
+export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
+  [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;
 };
 
 /**
@@ -441,8 +459,8 @@ export type InferNestedProjectionRow<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > = {
-  [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
-    ? JsType
+  [K in keyof P]: P[K] extends ColumnBuilder
+    ? ExtractJsTypeFromColumnBuilder<P[K]>
     : P[K] extends true
       ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
       : P[K] extends Record<

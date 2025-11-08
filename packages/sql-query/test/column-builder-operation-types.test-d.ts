@@ -49,7 +49,13 @@ test('ColumnBuilder does not include operations for different typeId', () => {
     TestOperations
   >;
 
-  expectTypeOf<TestColumnBuilder>().not.toHaveProperty('cosineDistance');
+  // Type check: cosineDistance should not be in the keys for a different typeId
+  // Note: This is a compile-time check, so we just verify the type structure
+  // The type system will error if cosineDistance is incorrectly included
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  type _Keys = keyof TestColumnBuilder;
+  // @ts-expect-error - cosineDistance should not exist on this type
+  type _HasCosineDistance = TestColumnBuilder['cosineDistance'];
 });
 
 test('ColumnBuilder handles empty operations', () => {
@@ -62,6 +68,11 @@ test('ColumnBuilder handles empty operations', () => {
     EmptyOperations
   >;
 
-  expectTypeOf<TestColumnBuilder>().not.toHaveProperty('cosineDistance');
+  // Type check: cosineDistance should not be in the keys for a different typeId
+  // Note: This is a compile-time check, so we just verify the type structure
+  // The type system will error if cosineDistance is incorrectly included
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  type _Keys = keyof TestColumnBuilder;
+  // @ts-expect-error - cosineDistance should not exist on this type
+  type _HasCosineDistance = TestColumnBuilder['cosineDistance'];
 });
-

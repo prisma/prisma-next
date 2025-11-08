@@ -12,6 +12,7 @@ import type {
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
+export type OperationTypes = Record<string, never>;
 
 export type Contract = SqlContract<
   {

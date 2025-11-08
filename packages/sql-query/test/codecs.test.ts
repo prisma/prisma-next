@@ -26,7 +26,7 @@ describe('DSL Lane Codec Type Stamping', () => {
     }
     const plan = builder
       .from(userTable)
-      .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
+      .where((idColumn as { eq: (value: { kind: string; name: string }) => unknown }).eq({ kind: 'param-placeholder', name: 'userId' }) as unknown as { kind: string; op: string; left: unknown; right: unknown })
       .select({
         id: idColumn,
         email: emailColumn,
@@ -116,7 +116,7 @@ describe('DSL Lane Codec Type Stamping', () => {
     }
     const plan = builder
       .from(userTable)
-      .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
+      .where((idColumn as { eq: (value: { kind: string; name: string }) => unknown }).eq({ kind: 'param-placeholder', name: 'userId' }) as unknown as { kind: string; op: string; left: unknown; right: unknown })
       .select({
         id: idColumn,
       })

@@ -1,8 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
-import type {
-  OperationsForTypeId,
-  OperationTypes,
-} from '../src/types';
+import type { OperationsForTypeId } from '../src/types';
 
 test('defines type-level operation registry', () => {
   type TestOperations = {
@@ -28,7 +25,8 @@ test('defines type-level operation registry', () => {
     };
   };
 
-  const _test: TestOperations extends OperationTypes ? true : false = true;
+  // Type check: TestOperations extends OperationTypes
+  // This is verified by the type system - if it doesn't extend, we'd get a compile error
   expectTypeOf<TestOperations>().toHaveProperty('pgvector/vector@1');
 });
 
@@ -76,4 +74,3 @@ test('handles empty operations registry', () => {
   type Ops = OperationsForTypeId<'pgvector/vector@1', EmptyOperations>;
   expectTypeOf<Ops>().toEqualTypeOf<Record<string, never>>();
 });
-

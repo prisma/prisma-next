@@ -197,12 +197,15 @@ export const sqlTargetFamilyHook = {
   },
 
   generateContractTypes(ir: ContractIR, packs: ReadonlyArray<ExtensionPack>): string {
-    const imports = this.getTypesImports(packs);
-    const importLines = imports.map(
+    const codecImports = this.getCodecTypesImports(packs);
+    const operationImports = this.getOperationTypesImports(packs);
+    const allImports = [...codecImports, ...operationImports];
+    const importLines = allImports.map(
       (imp) => `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`,
     );
 
-    const codecTypes = imports.map((imp) => imp.alias).join(' & ');
+    const codecTypes = codecImports.map((imp) => imp.alias).join(' & ');
+    const operationTypes = operationImports.map((imp) => imp.alias).join(' & ');
 
     const storage = ir.storage as SqlStorage;
     const models = ir.models as Record<string, ModelDefinition>;
@@ -221,6 +224,7 @@ import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@pri
 
 export type CodecTypes = ${codecTypes || 'Record<string, never>'};
 export type LaneCodecTypes = CodecTypes;
+export type OperationTypes = ${operationTypes || 'Record<string, never>'};
 
 export type Contract = SqlContract<
   ${storageType},
@@ -235,12 +239,23 @@ export type Relations = Contract['relations'];
 `;
   },
 
-  getTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec> {
+  getCodecTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec> {
     const imports: TypesImportSpec[] = [];
     for (const pack of packs) {
       const codecTypes = pack.manifest.types?.codecTypes;
       if (codecTypes?.import) {
         imports.push(codecTypes.import);
+      }
+    }
+    return imports;
+  },
+
+  getOperationTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec> {
+    const imports: TypesImportSpec[] = [];
+    for (const pack of packs) {
+      const operationTypes = pack.manifest.types?.operationTypes;
+      if (operationTypes?.import) {
+        imports.push(operationTypes.import);
       }
     }
     return imports;

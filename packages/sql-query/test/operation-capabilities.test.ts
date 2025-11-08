@@ -50,7 +50,9 @@ describe('Operation capability gating', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
     );
@@ -93,7 +95,9 @@ describe('Operation capability gating', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     expect(
       (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();
@@ -135,7 +139,9 @@ describe('Operation capability gating', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
     );
@@ -182,7 +188,9 @@ describe('Operation capability gating', () => {
     registry.register(signature);
 
     const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
-    const vectorColumn = tables.user.columns.vector;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
     expect(
       (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();

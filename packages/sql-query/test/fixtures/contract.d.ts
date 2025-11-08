@@ -66,5 +66,8 @@ export type Contract = SqlContract<
 // Codec type map and scalar mapping imported from adapter - used for type inference in lanes
 export type { CodecTypes, ScalarToJs };
 
+// Operation types (empty for now, can be extended by extension packs)
+export type OperationTypes = Record<string, never>;
+
 // Direct model exports for easy importing: import type { User } from './contract.d'
 export type User = Contract['models']['User'];

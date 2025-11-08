@@ -12,6 +12,7 @@ import type {
   ColumnBuilder,
   ColumnBuilderBase,
   ComputeColumnJsType,
+  OperationTypes,
   OrderBuilder,
   ParamPlaceholder,
   TableRef,
@@ -24,11 +25,13 @@ type ColumnBuilders<
   TableName extends string,
   Columns extends Record<string, StorageColumn>,
   CodecTypes extends Record<string, { output: unknown }>,
+  Operations extends OperationTypes = Record<string, never>,
 > = {
   readonly [K in keyof Columns]: ColumnBuilder<
     K & string,
     Columns[K],
-    ComputeColumnJsType<Contract, TableName, K & string, Columns[K], CodecTypes>
+    ComputeColumnJsType<Contract, TableName, K & string, Columns[K], CodecTypes>,
+    Operations
   >;
 };
 
@@ -92,18 +95,19 @@ class TableBuilderImpl<
   TableName extends string,
   Columns extends Record<string, StorageColumn>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Operations extends OperationTypes = Record<string, never>,
 > implements TableRef
 {
   readonly kind = 'table' as const;
-  readonly columns: ColumnBuilders<Contract, TableName, Columns, CodecTypes>;
+  readonly columns: ColumnBuilders<Contract, TableName, Columns, CodecTypes, Operations>;
   private readonly _name: TableName;
 
   constructor(
     name: TableName,
-    columns: Record<string, ColumnBuilder<string, StorageColumn, unknown>>,
+    columns: ColumnBuilders<Contract, TableName, Columns, CodecTypes, Operations>,
   ) {
     this._name = name;
-    this.columns = columns as ColumnBuilders<Contract, TableName, Columns, CodecTypes>;
+    this.columns = columns;
   }
 
   get name(): string {
@@ -115,6 +119,7 @@ function buildColumns<
   Contract extends SqlContract<SqlStorage>,
   TableName extends string,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Operations extends OperationTypes = Record<string, never>,
 >(
   tableName: TableName,
   storage: SqlStorage,
@@ -125,7 +130,8 @@ function buildColumns<
   Contract,
   TableName,
   Contract['storage']['tables'][TableName]['columns'],
-  CodecTypes
+  CodecTypes,
+  Operations
 > {
   const table = storage.tables[tableName];
 
@@ -137,7 +143,8 @@ function buildColumns<
     Contract,
     TableName,
     Contract['storage']['tables'][TableName]['columns'],
-    CodecTypes
+    CodecTypes,
+    Operations
   >;
 
   for (const [columnName, columnDef] of Object.entries(table.columns)) {
@@ -153,7 +160,8 @@ function buildColumns<
       operationRegistry,
       contractCapabilities,
     );
-    (result as Record<string, ColumnBuilder<string, StorageColumn, unknown>>)[columnName] =
+    // Type assertion to preserve the mapped type structure
+    (result as unknown as Record<string, ColumnBuilder<string, StorageColumn, unknown>>)[columnName] =
       builderWithOps;
   }
 
@@ -177,9 +185,10 @@ function createTableProxy<
   TableName extends string,
   Columns extends Record<string, StorageColumn>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Operations extends OperationTypes = Record<string, never>,
 >(
-  table: TableBuilderImpl<Contract, TableName, Columns, CodecTypes>,
-): TableBuilderImpl<Contract, TableName, Columns, CodecTypes> {
+  table: TableBuilderImpl<Contract, TableName, Columns, CodecTypes, Operations>,
+): TableBuilderImpl<Contract, TableName, Columns, CodecTypes, Operations> {
   return new Proxy(table, {
     get(target, prop) {
       if (prop === 'name' || prop === 'kind' || prop === 'columns') {
@@ -196,12 +205,14 @@ function createTableProxy<
 type ExtractSchemaTables<
   Contract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Operations extends OperationTypes = Record<string, never>,
 > = {
   readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
     Contract,
     TableName & string,
     TableColumns<Contract['storage']['tables'][TableName]>,
-    CodecTypes
+    CodecTypes,
+    Operations
   > &
     TableRef;
 };
@@ -209,22 +220,24 @@ type ExtractSchemaTables<
 export type SchemaHandle<
   Contract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Operations extends OperationTypes = Record<string, never>,
 > = {
-  readonly tables: ExtractSchemaTables<Contract, CodecTypes>;
+  readonly tables: ExtractSchemaTables<Contract, CodecTypes, Operations>;
 };
 
 export function schema<
   Contract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(contract: Contract, context?: RuntimeContext): SchemaHandle<Contract, CodecTypes> {
+  Operations extends OperationTypes = Record<string, never>,
+>(contract: Contract, context?: RuntimeContext): SchemaHandle<Contract, CodecTypes, Operations> {
   const storage = contract.storage;
-  const tables = {} as ExtractSchemaTables<Contract, CodecTypes>;
+  const tables = {} as ExtractSchemaTables<Contract, CodecTypes, Operations>;
   const contractCapabilities = contract.capabilities;
 
   const operationRegistry = context?.operations;
 
   for (const tableName in storage.tables) {
-    const columns = buildColumns<Contract, typeof tableName, CodecTypes>(
+    const columns = buildColumns<Contract, typeof tableName, CodecTypes, Operations>(
       tableName,
       storage,
       contract,
@@ -235,17 +248,19 @@ export function schema<
       Contract,
       typeof tableName & string,
       Contract['storage']['tables'][typeof tableName]['columns'],
-      CodecTypes
+      CodecTypes,
+      Operations
     >(tableName, columns);
     const proxiedTable = createTableProxy<
       Contract,
       typeof tableName & string,
       Contract['storage']['tables'][typeof tableName]['columns'],
-      CodecTypes
+      CodecTypes,
+      Operations
     >(table);
     (tables as Record<string, unknown>)[tableName] = Object.freeze(
       proxiedTable,
-    ) as ExtractSchemaTables<Contract, CodecTypes>[typeof tableName];
+    ) as ExtractSchemaTables<Contract, CodecTypes, Operations>[typeof tableName];
   }
 
   return Object.freeze({ tables });

@@ -43,6 +43,9 @@ const ExtensionPackManifestSchema = type({
     'codecTypes?': type({
       import: TypesImportSpecSchema,
     }),
+    'operationTypes?': type({
+      import: TypesImportSpecSchema,
+    }),
   }),
   'operations?': OperationManifestSchema.array(),
 });
