@@ -95,6 +95,7 @@ flowchart TD
 - **Signature**: `schema<Contract>(context: RuntimeContext<Contract>)` - accepts only context parameter
 - Types (`CodecTypes` and `OperationTypes`) are extracted automatically from `context.contract.mappings.codecTypes` and `context.contract.mappings.operationTypes`
 - Uses `ExtractCodecTypes<Contract>` and `ExtractOperationTypes<Contract>` helper types for type extraction
+- **Type System Note**: Runtime code uses generic types (`string`, `StorageColumn`) when iterating over columns, but the return type uses mapped types to preserve exact literal types at the type level
 
 ### Parameter Builder (`param.ts`)
 - Parameter placeholder factory
@@ -152,6 +153,8 @@ flowchart TD
 ### Operations Registry (`operations-registry.ts`)
 - `attachOperationsToColumnBuilder()`: Attach registered operations as methods on `ColumnBuilder` instances
 - Dynamically exposes operations based on column `typeId` and contract capabilities
+- **Operation Chaining**: When an operation returns a `typeId`, the returned `ColumnBuilder` automatically has operations for that type attached, enabling method chaining (e.g., `column.normalize().cosineDistance(other)`)
+- `executeOperation()`: Canonical operation invocation path that handles nested operations and automatically attaches operations to return values when they return a `typeId`
 
 ## Dependencies
 

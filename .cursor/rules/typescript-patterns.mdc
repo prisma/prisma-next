@@ -163,6 +163,57 @@ export function createColumnBuilder(): ColumnBuilder {
 }
 ```
 
+## Runtime Values Cannot Be Type Parameters
+
+**CRITICAL RULE**: TypeScript cannot use runtime values as type parameters. When iterating over object properties in a loop, you cannot use the loop variable as a type parameter.
+
+### The Problem
+
+TypeScript's type system operates at compile time, while runtime values exist at execution time. You cannot use a runtime value (like a loop variable) as a type parameter.
+
+**❌ WRONG: Using runtime value as type parameter**
+
+```typescript
+type Columns = Contract['storage']['tables'][TableName]['columns'];
+for (const columnName in table.columns) {
+  const columnNameKey = columnName as keyof Columns;
+  // Error: 'columnNameKey' refers to a value, but is being used as a type
+  const columnBuilder = new ColumnBuilderImpl<columnNameKey & string, Columns[columnNameKey]>(...);
+}
+```
+
+### The Solution
+
+Use generic types (`string`, `StorageColumn`) in runtime code and rely on mapped types in the return type to preserve exact literal types:
+
+**✅ CORRECT: Use generic types in runtime code**
+
+```typescript
+for (const columnName in table.columns) {
+  const columnDef = table.columns[columnName];
+  // Use generic types in runtime code
+  const columnBuilder = new ColumnBuilderImpl<string, StorageColumn>(
+    tableName,
+    columnName,
+    columnDef,
+  );
+  // Type system preserves exact types via mapped types in return type
+}
+```
+
+**Key Point:** The return type uses mapped types (`{ readonly [K in keyof Columns]: ... }`) that preserve exact column names and types at the type level, even though the runtime code uses generic types.
+
+### When This Pattern Applies
+
+- When iterating over object properties in a loop
+- When building dynamic structures from runtime data
+- When you need to preserve exact literal types in the return type
+- When the type system needs to infer types from the structure, not from runtime values
+
+### Related Pattern
+
+This is related to the "Type Preservation in Generics" pattern below, which covers preserving literal types through mapped types.
+
 ## Type Preservation in Generics
 
 **Challenge**: Preserving literal string types (e.g., `'pg/text@1'`) through complex generic type manipulations.

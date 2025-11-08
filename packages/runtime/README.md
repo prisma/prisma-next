@@ -102,6 +102,7 @@ flowchart TD
 
 ### Guardrails (`guardrails/`)
 - **Raw**: Guardrails for raw SQL execution
+  - **Unindexed Predicate Detection**: Warns when raw SQL plans have predicate columns but no supporting indexes. If no indexes are provided at all, all predicates are flagged as unindexed.
 
 ### Diagnostics (`diagnostics.ts`)
 - Error taxonomy and mapping
@@ -205,12 +206,32 @@ interface Extension {
 Runtime-specific test utilities are located in `runtime/test/utils.ts`. These utilities import generic helpers from `@prisma-next/test-utils` and provide runtime-specific functionality:
 
 **Available Utilities:**
+- `createTestContext(contract, adapter, options?)`: Creates a runtime context with standard test configuration. Accepts optional `extensions` parameter to register operations and codecs programmatically.
 - `executePlanAndCollect<P extends Plan>(runtime, plan)`: Executes a plan and collects all results into an array. The return type is automatically inferred from the plan's type parameter using `ResultType<P>[]`.
 - `drainPlanExecution(runtime, plan)`: Drains a plan execution, consuming all results without collecting them.
 - `executeStatement(client, statement)`: Executes a SQL statement on a database client.
 - `setupTestDatabase(client, contract, setupFn)`: Sets up database schema and data, then writes the contract marker.
 - `writeTestContractMarker(client, contract)`: Writes a contract marker to the database.
 - `createTestRuntime(contract, adapter, driver, options?)`: Creates a runtime with standard test configuration.
+
+**Using Extensions in Tests:**
+```typescript
+import { createTestContext } from '@prisma-next/runtime/test/utils';
+
+const signature: OperationSignature = {
+  forTypeId: 'pgvector/vector@1',
+  method: 'cosineDistance',
+  // ... operation definition
+};
+
+const context = createTestContext(contract, adapter, {
+  extensions: [
+    {
+      operations: () => [signature],
+    },
+  ],
+});
+```
 - `createTestRuntimeFromClient(contract, client, adapter, options?)`: Creates a runtime with the given contract and database client.
 - `setupE2EDatabase(client, contract, setupFn)`: Sets up E2E test database (wrapper around `setupTestDatabase`).
 

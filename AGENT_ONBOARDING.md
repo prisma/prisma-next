@@ -493,7 +493,7 @@ const deletePlan = o.user().delete(
 - **Test descriptions**: Omit "should" - `it("returns correct value")` not `it("should return correct value")`
 - **Node.js globals restriction**: `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`), `packages/node-utils/**/*.ts`, and `packages/cli/**/*.ts`. Other packages should not use these globals directly.
 - **Index signature property access**: When TypeScript requires it (e.g., `TS4111` error), use bracket notation: `contract['targetFamily']` instead of `contract.targetFamily`. This is required when accessing properties from index signatures.
-- **Unsafe assignments in tests**: When working with `JSON.parse()` results or dynamic imports in tests, use type assertions and biome-ignore comments as needed: `const json = JSON.parse(content) as Record<string, unknown>;`
+- **Unsafe assignments in tests**: When working with `JSON.parse()` results or dynamic imports in tests, prefer using `toMatchObject` for assertions instead of type casts. Only use type assertions when constructing typed objects from parsed JSON (e.g., `ContractIR` from `contractJson`). For assertions, use `expect(parsed).toMatchObject({ ... })` instead of `const json = JSON.parse(content) as Record<string, unknown>; expect(json['key']).toBe(...)`
 - **Avoid unnecessary type casts**: Always check the actual type signature before adding type casts. If a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`.
 - **Use dot notation for guaranteed values**: When accessing values that are guaranteed to exist (e.g., in test fixtures), use dot notation (`.`) instead of optional chaining (`?.`). Don't include `| undefined` in type assertions when values are guaranteed to exist.
 - **Biome ignore comments**: If you need to disable a rule for more than a couple of lines in a file, use a file-level ignore comment at the top of the file instead of many inline comments. Example: `// biome-ignore lint: test file with type assertions`
@@ -858,7 +858,8 @@ database = await createDevDatabase({
 - **Test descriptions**: Omit "should" - see `.cursor/rules/omit-should-in-tests.mdc`
 - **Shared Test Utilities**: Use `@prisma-next/test-utils` for generic test patterns, `@prisma-next/runtime/test/utils` for runtime-specific utilities, and `e2e-tests/test/utils.ts` for contract-related E2E utilities - see "E2E Test Patterns" below
 - **Test File Organization**: Keep test files under 500 lines. Split large files by functionality, feature area, or test type. Use descriptive file names like `codecs.registry.test.ts`, `runtime.joins.test.ts`. See `.cursor/rules/test-file-organization.mdc` for details
-- **Test Assertion Patterns**: Prefer object comparison (`expect(row).toEqual({ ... })`) over piece-by-piece property checks. Use `toMatchObject` for partial comparisons and `expect.any()` for type-only checks. See `.cursor/rules/test-file-organization.mdc` for details
+- **Test Assertion Patterns**: Prefer object comparison (`expect(row).toEqual({ ... })`) over piece-by-piece property checks. Use `toMatchObject` for partial comparisons and `expect.any()` for type-only checks. For parsed JSON, use `toMatchObject` instead of individual assertions with type casts. See `.cursor/rules/test-file-organization.mdc` for details
+- **Context Creation in Tests**: Always create `RuntimeContext` inside each test function, not at module level. Creating context at module level causes initialization/timing issues. See `.cursor/rules/testing-guide.mdc` for details
 
 ### E2E Test Patterns
 
@@ -1685,6 +1686,70 @@ if (typeof projectionValue === 'string' && projectionValue.startsWith('include:'
 - Exclude include aliases from codec assignments (they're JSON arrays, not scalars)
 - Handle both string and already-parsed array values from drivers
 
+### Operation Chaining Pattern
+
+Operations can be chained when an operation returns a `typeId` (e.g., `normalize()` returns `pgvector/vector@1`). The returned `ColumnBuilder` automatically has operations for that type attached, enabling method chaining:
+
+**Pattern:**
+```typescript
+// Operation that returns a typeId
+const normalized = vectorColumn.normalize();  // Returns ColumnBuilder with typeId 'pgvector/vector@1'
+// Normalized column has operations for 'pgvector/vector@1' attached
+const distance = normalized.cosineDistance(otherVector);  // Can chain operations
+```
+
+**Implementation:**
+- When `executeOperation` returns a `ColumnBuilder` with `returns: { kind: 'typeId' }`, it automatically attaches operations for that type using `attachOperationsToColumnBuilder`
+- This enables fluent chaining: `column.normalize().cosineDistance(other)`
+- Operations are attached based on the return type's `typeId`, not the original column's type
+
+**Key points:**
+- Operations that return `typeId` automatically get operations for that type attached
+- Chained operations produce nested `OperationExpr` trees in the AST
+- Metadata collection recursively walks nested operations to track all column dependencies
+
+### Testing with Extensions Pattern
+
+When writing tests that need operations, use the extension mechanism via `createTestContext` instead of manually creating operation registries:
+
+**✅ CORRECT: Use extension mechanism**
+```typescript
+import { createTestContext } from '@prisma-next/runtime/test/utils';
+
+const signature: OperationSignature = {
+  forTypeId: 'pgvector/vector@1',
+  method: 'cosineDistance',
+  // ... operation definition
+};
+
+const adapter = createStubAdapter();
+const context = createTestContext(contract, adapter, {
+  extensions: [
+    {
+      operations: () => [signature],
+    },
+  ],
+});
+```
+
+**❌ WRONG: Manual registry creation and context spreading**
+```typescript
+// Don't do this - creates unnecessary boilerplate
+const baseContext = createTestContext(contract, adapter);
+const operationRegistry = createOperationRegistry();
+operationRegistry.register(signature);
+const context = {
+  ...baseContext,
+  operations: operationRegistry,
+};
+```
+
+**Key points:**
+- `createTestContext` accepts an optional `extensions` parameter
+- Extensions provide operations programmatically via `operations?()` method
+- This pattern is consistent with production code using `createRuntimeContext`
+- Avoids unused `registry` variables and manual context spreading
+
 ### Capability Gating Pattern
 
 When implementing capability-gated features, follow the same pattern used by `includeMany` and `returning()`:
@@ -1716,6 +1781,161 @@ returning<const Columns extends readonly ColumnBuilder[]>(
 - Throw descriptive errors when capabilities are missing or false
 - Follow the same pattern across all capability-gated features for consistency
 - Adapters declare capabilities in their `defaultCapabilities` (e.g., `returning: true` for PostgreSQL)
+
+## Implementation Learnings
+
+### Context Creation in Tests
+
+**Issue:** Creating `RuntimeContext` at module level causes initialization/timing issues. The context may be undefined when `sql({ context })` is called, leading to "Cannot read properties of undefined (reading 'contract')" errors.
+
+**Solution:** Always create context inside each test function, not at module level. This ensures:
+- Fresh context per test (no shared state)
+- Adapter is fully initialized
+- No timing/initialization issues
+- Tests are isolated and independent
+
+**Pattern:**
+```typescript
+// ❌ WRONG: Module-level context creation
+const adapter = createPostgresAdapter();
+const context = createTestContext(fixtureContract, adapter);
+const tables = schema(context).tables;
+const builder = sql({ context });
+
+describe('tests', () => {
+  it('test', () => {
+    const plan = builder.from(tables.user).select(...).build();
+  });
+});
+
+// ✅ CORRECT: Context creation inside each test
+const adapter = createPostgresAdapter();
+
+describe('tests', () => {
+  it('test', () => {
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
+    const builder = sql({ context });
+    const plan = builder.from(tables.user).select(...).build();
+  });
+});
+```
+
+### Type System Limitations in Runtime Loops
+
+**Issue:** TypeScript cannot use runtime values as type parameters. When iterating over object properties in a loop, you cannot use the loop variable as a type parameter.
+
+**Solution:** Use generic types (`string`, `StorageColumn`) in runtime code and rely on mapped types in the return type to preserve exact literal types:
+
+```typescript
+// ❌ WRONG: Using runtime value as type parameter
+type Columns = Contract['storage']['tables'][TableName]['columns'];
+for (const columnName in table.columns) {
+  const columnNameKey = columnName as keyof Columns;
+  const columnBuilder = new ColumnBuilderImpl<columnNameKey & string, Columns[columnNameKey]>(...);
+  // Error: 'columnNameKey' refers to a value, but is being used as a type
+}
+
+// ✅ CORRECT: Use generic types in runtime code
+for (const columnName in table.columns) {
+  const columnDef = table.columns[columnName];
+  const columnBuilder = new ColumnBuilderImpl<string, StorageColumn>(...);
+  // Type system preserves exact types via mapped types in return type
+}
+```
+
+**Key Point:** The return type uses mapped types (`{ readonly [K in keyof Columns]: ... }`) that preserve exact column names and types at the type level, even though the runtime code uses generic types.
+
+### Test Assertion Patterns with JSON
+
+**Issue:** Tests often parse JSON and make individual assertions with nested type casts, making code hard to read and maintain.
+
+**Solution:** Use Vitest's `toMatchObject` for object matching instead of individual assertions with type casts:
+
+```typescript
+// ❌ WRONG: Individual assertions with type casts
+const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+expect(contractJson['schemaVersion']).toBe('1');
+expect(contractJson['targetFamily']).toBe('sql');
+expect((contractJson['storage'] as Record<string, unknown>)['tables']).toBeDefined();
+
+// ✅ CORRECT: Use toMatchObject
+const contractJson = JSON.parse(result.contractJson);
+expect(contractJson).toMatchObject({
+  schemaVersion: '1',
+  targetFamily: 'sql',
+  storage: {
+    tables: {
+      user: expect.anything(),
+    },
+  },
+});
+```
+
+**Benefits:**
+- Eliminates type casts
+- Makes nested structure clear
+- More maintainable and readable
+- Uses Vitest matchers like `expect.anything()` for nested objects
+
+### Guardrails: Unindexed Predicate Warnings
+
+**Issue:** When evaluating index coverage for raw SQL guardrails, if there are predicate columns but no indexes provided at all, the function would return early without warning.
+
+**Solution:** Explicitly check for the case where predicates exist but no indexes are provided, and push a warning:
+
+```typescript
+function evaluateIndexCoverage(refs: PlanRefs, lints: LintFinding[]) {
+  const predicateColumns = refs.columns ?? [];
+  if (predicateColumns.length === 0) {
+    return;
+  }
+
+  const indexes = refs.indexes ?? [];
+
+  // If there are no indexes at all, all predicates are unindexed
+  if (indexes.length === 0) {
+    lints.push(
+      createLint(
+        'LINT.UNINDEXED_PREDICATE',
+        'warn',
+        'Raw SQL plan predicates lack supporting indexes',
+        {
+          predicates: predicateColumns,
+        },
+      ),
+    );
+    return;
+  }
+  // ... rest of logic
+}
+```
+
+**Key Point:** Always handle the edge case where required data structures are missing (empty arrays/objects) rather than returning early silently.
+
+### Emitter: Handling Optional JSON Properties
+
+**Issue:** When parsing JSON and constructing `ContractIR` objects, properties like `relations`, `meta`, and `sources` may be `undefined` in the JSON, but the validation requires them to be objects.
+
+**Solution:** Use fallback empty objects when constructing `ContractIR` from parsed JSON:
+
+```typescript
+// ❌ WRONG: Direct assignment from parsed JSON
+const ir2: ContractIR = {
+  relations: contractJson1['relations'] as Record<string, unknown>,
+  meta: contractJson1['meta'] as Record<string, unknown>,
+  sources: contractJson1['sources'] as Record<string, unknown>,
+};
+
+// ✅ CORRECT: Fallback empty objects
+const ir2: ContractIR = {
+  relations: (contractJson1['relations'] as Record<string, unknown>) || {},
+  meta: (contractJson1['meta'] as Record<string, unknown>) || {},
+  sources: (contractJson1['sources'] as Record<string, unknown>) || {},
+};
+```
+
+**Key Point:** Match the pattern used for `capabilities` - always provide fallback empty objects for optional properties that must be objects.
 
 ---
 
