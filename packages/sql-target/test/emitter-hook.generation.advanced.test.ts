@@ -2,11 +2,25 @@ import type { ContractIR } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/emitter-hook';
 
+function createContractIR(overrides: Partial<ContractIR>): ContractIR {
+  return {
+    schemaVersion: '1',
+    targetFamily: 'sql',
+    target: 'test-db',
+    models: {},
+    relations: {},
+    storage: { tables: {} },
+    extensions: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+    ...overrides,
+  };
+}
+
 describe('sql-target-family-hook', () => {
   it('generates contract types with model relations', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
@@ -54,7 +68,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain('relations: {');
@@ -64,9 +78,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates relations type from models', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
@@ -120,7 +132,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain('export type Relations');
@@ -129,9 +141,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates relations type as empty when no relations', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
@@ -154,16 +164,14 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain('Record<string, never>');
   });
 
   it('generates mappings type from models and storage', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
@@ -190,7 +198,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain('export type Contract');
@@ -205,9 +213,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates mappings type with multiple models', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
@@ -248,7 +254,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain("modelToTable: { readonly User: 'user'; readonly Post: 'post' }");
@@ -256,7 +262,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates mappings type as SqlMappings when no models', () => {
-    const ir: ContractIR = {
+    const ir = createContractIR({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -272,7 +278,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain('SqlMappings');

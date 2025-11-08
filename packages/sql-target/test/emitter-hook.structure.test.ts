@@ -2,11 +2,25 @@ import type { ContractIR } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/emitter-hook';
 
+function createContractIR(overrides: Partial<ContractIR>): ContractIR {
+  return {
+    schemaVersion: '1',
+    targetFamily: 'sql',
+    target: 'test-db',
+    models: {},
+    relations: {},
+    storage: { tables: {} },
+    extensions: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+    ...overrides,
+  };
+}
+
 describe('sql-target-family-hook', () => {
   it('validates SQL structure', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
@@ -29,7 +43,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -37,9 +51,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('throws error for invalid structure', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'nonexistent' },
@@ -57,7 +69,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -65,15 +77,14 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model field missing column property', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
           fields: {
             id: {},
           },
+          relations: {},
         },
       },
       storage: {
@@ -89,7 +100,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -97,12 +108,9 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with missing targetFamily', () => {
-    const ir: ContractIR = {
-      target: 'test-db',
+    const ir = {
+      ...createContractIR({}),
       targetFamily: undefined as unknown as string,
-      storage: {
-        tables: {},
-      },
     } as ContractIR;
 
     expect(() => {
@@ -111,10 +119,9 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with missing storage', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
-    };
+    const ir = createContractIR({
+      storage: undefined as unknown as Record<string, unknown>,
+    }) as ContractIR;
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -122,11 +129,9 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with missing storage.tables', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {},
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -134,9 +139,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model missing storage.table', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           fields: {},
@@ -153,7 +156,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -161,9 +164,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model referencing non-existent table', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'nonexistent' },
@@ -181,7 +182,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -189,13 +190,12 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model table missing primary key', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
           fields: {},
+          relations: {},
         },
       },
       storage: {
@@ -208,7 +208,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -216,15 +216,14 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model field referencing non-existent column', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
           fields: {
             id: { column: 'nonexistent' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -240,7 +239,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -248,12 +247,12 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with missing model fields', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
+          fields: {},
+          relations: {},
         },
       },
       storage: {
@@ -269,7 +268,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -277,9 +276,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with primaryKey referencing non-existent column', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -293,7 +290,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -301,9 +298,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with unique constraint referencing non-existent column', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -318,7 +313,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -326,9 +321,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with index referencing non-existent column', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -343,7 +336,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -351,9 +344,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKey referencing non-existent column', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -382,7 +373,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -390,9 +381,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKey referencing non-existent table', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -421,7 +410,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -429,9 +418,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKey referencing non-existent referenced column', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -460,7 +447,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -468,9 +455,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKey column count mismatch', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -499,7 +484,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);

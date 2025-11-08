@@ -2,11 +2,25 @@ import type { ContractIR, ExtensionPackManifest } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/emitter-hook';
 
+function createContractIR(overrides: Partial<ContractIR>): ContractIR {
+  return {
+    schemaVersion: '1',
+    targetFamily: 'sql',
+    target: 'test-db',
+    models: {},
+    relations: {},
+    storage: { tables: {} },
+    extensions: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+    ...overrides,
+  };
+}
+
 describe('sql-target-family-hook', () => {
   it('validates types from referenced extensions', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       extensions: {
         postgres: {
           version: '15.0.0',
@@ -22,7 +36,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const manifests: ExtensionPackManifest[] = [
       {
@@ -37,9 +51,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('throws error for type ID from unreferenced extension', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -49,7 +61,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const manifests: ExtensionPackManifest[] = [
       {
@@ -64,9 +76,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('throws error for invalid type ID format', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -76,7 +86,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const manifests: ExtensionPackManifest[] = [];
 
@@ -86,9 +96,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types from loaded packs even if not in extensions', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -98,7 +106,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const manifests: ExtensionPackManifest[] = [
       {
@@ -113,9 +121,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with missing column type', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -125,7 +131,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const manifests: ExtensionPackManifest[] = [];
 
@@ -135,9 +141,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with type ID that fails regex match', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -147,7 +151,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       },
-    };
+    });
 
     const manifests: ExtensionPackManifest[] = [];
 
@@ -157,13 +161,11 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with empty storage', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
+    const ir = createContractIR({
       storage: {
         tables: {},
       },
-    };
+    });
 
     const manifests: ExtensionPackManifest[] = [];
 
@@ -173,10 +175,8 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with missing storage', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'test-db',
-    };
+    const ir = createContractIR({
+    });
 
     const manifests: ExtensionPackManifest[] = [];
 
