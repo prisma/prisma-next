@@ -22,7 +22,7 @@ export async function ormGetUsersWithPosts(limit = 10) {
       id: u.id,
       email: u.email,
       createdAt: u.createdAt,
-      posts: u.posts,
+      posts: true,
     }))
     .take(limit)
     .findMany({

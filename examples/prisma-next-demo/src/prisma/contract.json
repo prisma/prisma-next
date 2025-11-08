@@ -94,5 +94,35 @@
     "postgres": {
       "version": "15.0.0"
     }
+  },
+  "relations": {
+    "user": {
+      "posts": {
+        "to": "Post",
+        "cardinality": "1:N",
+        "on": {
+          "parentCols": [
+            "id"
+          ],
+          "childCols": [
+            "userId"
+          ]
+        }
+      }
+    },
+    "post": {
+      "user": {
+        "to": "User",
+        "cardinality": "N:1",
+        "on": {
+          "parentCols": [
+            "id"
+          ],
+          "childCols": [
+            "userId"
+          ]
+        }
+      }
+    }
   }
 }

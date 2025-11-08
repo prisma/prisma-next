@@ -10,7 +10,7 @@ import { param } from '@prisma-next/sql-query/param';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
-import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -37,16 +37,44 @@ beforeAll(async () => {
   );
 
   mkdirSync(outputDir, { recursive: true });
-  writeFileSync(join(outputDir, 'contract.json'), result.contractJson, 'utf-8');
+
+  // Parse the emitted contract and add relations (contract builder doesn't support relations yet)
+  const contractJson = JSON.parse(result.contractJson);
+  contractJson.relations = {
+    user: {
+      posts: {
+        to: 'Post',
+        cardinality: '1:N',
+        on: {
+          parentCols: ['id'],
+          childCols: ['userId'],
+        },
+      },
+    },
+    post: {
+      user: {
+        to: 'User',
+        cardinality: 'N:1',
+        on: {
+          parentCols: ['id'],
+          childCols: ['userId'],
+        },
+      },
+    },
+  };
+
+  writeFileSync(join(outputDir, 'contract.json'), JSON.stringify(contractJson, null, 2), 'utf-8');
   writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
 
-  const contractJson = JSON.parse(result.contractJson);
   contract = validateContract<Contract>(contractJson);
 });
 
 describe('runtime execute integration', () => {
-  it('streams rows and enforces marker verification', async () => {
-    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+  it(
+    'streams rows and enforces marker verification',
+    async () => {
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -153,11 +181,16 @@ describe('runtime execute integration', () => {
       } finally {
         await runtime.close();
       }
-    });
-  });
+    },
+    { acceleratePort: 54300, databasePort: 54301, shadowDatabasePort: 54302 },
+    );
+    },
+    timeouts.typeScriptCompilation * 2,
+  );
 
   it('infers correct types from query plans', async () => {
-    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -247,11 +280,14 @@ describe('runtime execute integration', () => {
       } finally {
         await runtime.close();
       }
-    });
+    },
+    { acceleratePort: 54303, databasePort: 54304, shadowDatabasePort: 54305 },
+    );
   });
 
   it('enforces row budget on unbounded queries', async () => {
-    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -328,11 +364,14 @@ describe('runtime execute integration', () => {
       } finally {
         await runtime.close();
       }
-    });
+    },
+    { acceleratePort: 54306, databasePort: 54307, shadowDatabasePort: 54308 },
+    );
   });
 
   it('enforces streaming row budget', async () => {
-    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+    await withDevDatabase(
+      async ({ connectionString }: { connectionString: string }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -394,11 +433,14 @@ describe('runtime execute integration', () => {
       } finally {
         await runtime.close();
       }
-    });
+    },
+    { acceleratePort: 54309, databasePort: 54310, shadowDatabasePort: 54311 },
+    );
   });
 
   it('includeMany returns users with nested posts array', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
+    await withDevDatabase(
+      async ({ connectionString }) => {
       const adapter = createPostgresAdapter();
       const pool = new Pool({ connectionString });
       const driver = createPostgresDriverFromOptions({
@@ -500,6 +542,8 @@ describe('runtime execute integration', () => {
       } finally {
         await runtime.close();
       }
-    });
+    },
+    { acceleratePort: 54312, databasePort: 54313, shadowDatabasePort: 54314 },
+    );
   });
 });

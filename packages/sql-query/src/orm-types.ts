@@ -22,11 +22,44 @@ export interface OrmBuilderOptions<
 
 type ModelName<TContract extends SqlContract<SqlStorage>> = keyof TContract['models'] & string;
 
+type LowercaseModelName<M extends string> = M extends `${infer First}${infer Rest}`
+  ? `${Lowercase<First>}${Rest}`
+  : M;
+
+// Helper to get table name from model name
+type ModelToTableName<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = TContract['mappings']['modelToTable'] extends Record<string, string>
+  ? TContract['mappings']['modelToTable'][ModelName] extends string
+    ? TContract['mappings']['modelToTable'][ModelName]
+    : never
+  : never;
+
+// Helper to get relations for a model (via table name)
+type ModelRelations<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelToTableName<TContract, ModelName> extends string
+  ? TContract['relations'][ModelToTableName<TContract, ModelName>] extends Record<
+      string,
+      { to: string }
+    >
+    ? TContract['relations'][ModelToTableName<TContract, ModelName>]
+    : Record<string, never>
+  : Record<string, never>;
+
 export type OrmRegistry<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > = {
   readonly [K in ModelName<TContract>]: () => OrmModelBuilder<TContract, CodecTypes, K>;
+} & {
+  readonly [K in ModelName<TContract> as LowercaseModelName<K>]: () => OrmModelBuilder<
+    TContract,
+    CodecTypes,
+    K
+  >;
 };
 
 // Relation filter builder - filter-only scope (no ordering/limit/select)
@@ -74,10 +107,13 @@ export type OrmWhereProperty<
 > = ((
   fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
 ) => OrmModelBuilder<TContract, CodecTypes, ModelName, Row>) & {
-  related: TContract['relations'][ModelName] extends Record<string, { to: infer To }>
+  related: ModelRelations<TContract, ModelName> extends Record<string, { to: infer To }>
     ? To extends string
       ? {
-          readonly [K in keyof TContract['relations'][ModelName]]: TContract['relations'][ModelName][K] extends {
+          readonly [K in keyof ModelRelations<TContract, ModelName>]: ModelRelations<
+            TContract,
+            ModelName
+          >[K] extends {
             to: infer ChildModelName;
           }
             ? ChildModelName extends string
@@ -85,8 +121,8 @@ export type OrmWhereProperty<
               : never
             : never;
         }
-      : never
-    : never;
+      : Record<string, never>
+    : Record<string, never>;
 };
 
 // Include accessor - exposes relations with include methods
@@ -95,10 +131,13 @@ export type OrmIncludeAccessor<
   CodecTypes extends Record<string, { output: unknown }>,
   ModelName extends string,
   Row,
-> = TContract['relations'][ModelName] extends Record<string, { to: infer To }>
+> = ModelRelations<TContract, ModelName> extends Record<string, { to: infer To }>
   ? To extends string
     ? {
-        readonly [K in keyof TContract['relations'][ModelName]]: TContract['relations'][ModelName][K] extends {
+        readonly [K in keyof ModelRelations<TContract, ModelName>]: ModelRelations<
+          TContract,
+          ModelName
+        >[K] extends {
           to: infer ChildModelName;
         }
           ? ChildModelName extends string
@@ -119,8 +158,8 @@ export type OrmIncludeAccessor<
             : never
           : never;
       }
-    : never
-  : never;
+    : Record<string, never>
+  : Record<string, never>;
 
 export interface OrmModelBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
