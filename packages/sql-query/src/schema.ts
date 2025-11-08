@@ -9,6 +9,7 @@ import { planInvalid } from './errors';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type {
   BinaryBuilder,
+  CodecTypes as CodecTypesType,
   ColumnBuilder,
   ColumnBuilderBase,
   ComputeColumnJsType,
@@ -225,15 +226,28 @@ type ExtractSchemaTables<
 
 export type SchemaHandle<
   Contract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends CodecTypesType = Record<string, never>,
   Operations extends OperationTypes = Record<string, never>,
 > = {
   readonly tables: ExtractSchemaTables<Contract, CodecTypes, Operations>;
 };
 
+/**
+ * Creates a schema handle for building SQL queries.
+ *
+ * @param contract - The SQL contract containing storage, models, and capabilities
+ * @param context - Optional runtime context containing codec and operation registries
+ * @returns A schema handle with typed table builders
+ *
+ * @example
+ * ```typescript
+ * const schemaHandle = schema<Contract, CodecTypes, OperationTypes>(contract, context);
+ * const userTable = schemaHandle.tables.user;
+ * ```
+ */
 export function schema<
   Contract extends SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends CodecTypesType = Record<string, never>,
   Operations extends OperationTypes = Record<string, never>,
 >(contract: Contract, context?: RuntimeContext): SchemaHandle<Contract, CodecTypes, Operations> {
   const storage = contract.storage;

@@ -278,6 +278,20 @@ export type OperationTypeSignature = {
 export type OperationTypes = Record<string, Record<string, OperationTypeSignature>>;
 
 /**
+ * CodecTypes represents a map of typeId to codec definitions.
+ * Each codec definition must have an `output` property indicating the JavaScript type.
+ *
+ * Example:
+ * ```typescript
+ * type MyCodecTypes: CodecTypes = {
+ *   'pg/int4@1': { output: number };
+ *   'pg/text@1': { output: string };
+ * };
+ * ```
+ */
+export type CodecTypes = Record<string, { output: unknown }>;
+
+/**
  * Extracts operations for a given typeId from the operation registry.
  * Returns an empty record if the typeId is not found.
  *
