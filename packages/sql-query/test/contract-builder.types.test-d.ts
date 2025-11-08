@@ -53,9 +53,7 @@ test('ResultType inference works identically to fixture contract', () => {
 
   const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof validatedBuilderContract>(
-    validatedBuilderContract,
-  ).tables;
+  const tables = schema<typeof validatedBuilderContract>(validatedBuilderContract).tables;
   const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
 

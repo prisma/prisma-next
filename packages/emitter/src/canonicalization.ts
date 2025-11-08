@@ -77,8 +77,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isRequiredCapabilities = currentPath.length === 1 && currentPath[0] === 'capabilities';
       const isRequiredMeta = currentPath.length === 1 && currentPath[0] === 'meta';
       const isRequiredSources = currentPath.length === 1 && currentPath[0] === 'sources';
-      const isExtensionNamespace =
-        currentPath.length === 2 && currentPath[0] === 'extensions';
+      const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensions';
       const isModelRelations =
         currentPath.length === 3 && currentPath[0] === 'models' && currentPath[2] === 'relations';
       const isTableUniques =

@@ -312,23 +312,21 @@ export type InferNestedProjectionRow<
  * Infers Row type from a tuple of ColumnBuilders used in returning() clause.
  * Extracts column name and JsType from each ColumnBuilder and creates a Record.
  */
-export type InferReturningRow<Columns extends readonly AnyColumnBuilder[]> = Columns extends readonly [
-  infer First,
-  ...infer Rest,
-]
-  ? First extends ColumnBuilder<
-      infer Name,
-      infer _Meta,
-      infer JsType,
-      infer _Ops extends OperationTypes
-    >
-    ? Name extends string
-      ? Rest extends readonly AnyColumnBuilder[]
-        ? { [K in Name]: JsType } & InferReturningRow<Rest>
-        : { [K in Name]: JsType }
+export type InferReturningRow<Columns extends readonly AnyColumnBuilder[]> =
+  Columns extends readonly [infer First, ...infer Rest]
+    ? First extends ColumnBuilder<
+        infer Name,
+        infer _Meta,
+        infer JsType,
+        infer _Ops extends OperationTypes
+      >
+      ? Name extends string
+        ? Rest extends readonly AnyColumnBuilder[]
+          ? { [K in Name]: JsType } & InferReturningRow<Rest>
+          : { [K in Name]: JsType }
+        : never
       : never
-    : never
-  : Record<string, never>;
+    : Record<string, never>;
 
 /**
  * Utility type to check if a contract has the required capabilities for includeMany.

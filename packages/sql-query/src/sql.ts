@@ -1976,7 +1976,9 @@ class DeleteBuilderImpl<
 export function sql<
   TContract extends SqlContract<SqlStorage>,
   _CodecTypes extends Record<string, { readonly output: unknown }> = ExtractCodecTypes<TContract>,
->(options: SqlBuilderOptions<TContract>): SelectBuilder<
+>(
+  options: SqlBuilderOptions<TContract>,
+): SelectBuilder<
   TContract,
   unknown,
   ExtractCodecTypes<TContract>,

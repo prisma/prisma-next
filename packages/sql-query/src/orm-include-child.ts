@@ -24,9 +24,7 @@ export interface OrmIncludeChildBuilder<
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyOrderBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>;
   take(n: number): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>;
-  select<
-    Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
-  >(
+  select<Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>>(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => Projection,
   ): OrmIncludeChildBuilder<
     TContract,
@@ -49,8 +47,9 @@ export class OrmIncludeChildBuilderImpl<
   private childWhere: AnyBinaryBuilder | undefined;
   private childOrderBy: AnyOrderBuilder | undefined;
   private childLimit: number | undefined;
-  private childProjection: Record<string, AnyColumnBuilder | boolean | NestedProjection> | undefined =
-    undefined;
+  private childProjection:
+    | Record<string, AnyColumnBuilder | boolean | NestedProjection>
+    | undefined = undefined;
 
   constructor(options: OrmBuilderOptions<TContract>, childModelName: ChildModelName) {
     this.context = options.context;
@@ -98,9 +97,7 @@ export class OrmIncludeChildBuilderImpl<
     return builder;
   }
 
-  select<
-    Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
-  >(
+  select<Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>>(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => Projection,
   ): OrmIncludeChildBuilder<
     TContract,

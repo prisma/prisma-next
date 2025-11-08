@@ -169,12 +169,7 @@ export interface OrmModelBuilder<
   ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
   take(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
   skip(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
-  select<
-    Projection extends Record<
-      string,
-      AnyColumnBuilder | boolean | NestedProjection
-    >,
-  >(
+  select<Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>>(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => Projection,
   ): OrmModelBuilder<
     TContract,

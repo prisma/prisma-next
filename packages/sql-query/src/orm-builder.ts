@@ -950,7 +950,9 @@ export class OrmModelBuilderImpl<
           table: TableRef,
           set: Record<string, ParamPlaceholder>,
         ) => {
-          where: (predicate: AnyBinaryBuilder) => { build: (options?: BuildOptions) => Plan<unknown> };
+          where: (predicate: AnyBinaryBuilder) => {
+            build: (options?: BuildOptions) => Plan<unknown>;
+          };
         };
       }
     )
@@ -1002,7 +1004,9 @@ export class OrmModelBuilderImpl<
     const deleteBuilder = (
       sqlBuilder as {
         delete: (table: TableRef) => {
-          where: (predicate: AnyBinaryBuilder) => { build: (options?: BuildOptions) => Plan<unknown> };
+          where: (predicate: AnyBinaryBuilder) => {
+            build: (options?: BuildOptions) => Plan<unknown>;
+          };
         };
       }
     )
