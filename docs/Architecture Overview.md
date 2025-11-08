@@ -247,6 +247,45 @@ Legacy Prisma required touching multiple layers of a monolithic Rust/TypeScript 
 
 Contributors extend behavior by publishing packs or adapters. Core recompilation is not required.
 
+## Package Layout & Families
+
+To make the "thin core, fat targets" principle enforceable in code, the repository is organized by rings (clean architecture) and by target family (e.g., SQL). See ADR 140 for details.
+
+Key points:
+- Core owns contracts, plan model, and a target-agnostic runtime kernel.
+- Family packages (e.g., `sql/`) contain family-specific contract types/emitter hooks, lanes, runtime implementation, and adapters.
+- No long-lived transitional shims are maintained; there are no external consumers. Short-lived internal bridges are allowed only during migration.
+
+Example layout
+
+```
+packages/
+  core/
+    contract/            # contract types + plan metadata
+    plan/                # diagnostics, shared errors
+    operations/          # target-neutral operation registry + helpers
+  authoring/
+    contract-authoring/  # TS builders, canonicalization, schema DSL
+  targets/
+    sql/
+      contract-types/
+      operations/
+      emitter/
+  lanes/
+    relational-core/     # schema + column builders, operation attachment
+    sql-lane/            # relational DSL + raw lane
+    orm-lane/            # ORM builder, includes, relation filters
+  runtime/
+    core/                # target-agnostic runtime kernel (verification, plugins, SPI)
+  sql/
+    sql-runtime/         # SQL runtime implementing the runtime SPI
+    postgres/
+      postgres-adapter/
+      postgres-driver/
+```
+
+Dependency direction is strictly one-way: `core → authoring → targets → lanes → runtime(core) → family runtime → adapters`. Inner rings never import outer rings. Enforce with tsconfig path groups, ESLint path rules, and an import-graph CI check.
+
 ### Diagram — Thin core, fat targets
 
 ```mermaid

@@ -73,6 +73,14 @@ packages/
 - Emitter remains target-agnostic with a hook registry keyed by `targetFamily`.
 - SQL-specific validation and `.d.ts` generation are implemented by the SQL hook under `packages/targets/sql/emitter`.
 
+### Package Naming Conventions
+
+- Package names use the `@prisma-next/<name>` convention.
+- Target families are encoded via prefixes (e.g., `sql-`), producing names like `@prisma-next/sql-lane`, regardless of nested folders.
+- Adapters/drivers retain conventional names (`@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) even when nested under `packages/sql/postgres/**`.
+- Rings are for dependency direction, not naming; only `runtime-core` carries its ring in the name for clarity.
+- See also: `docs/reference/Package Naming and Path Aliases.md` for concrete path→package mappings and tsconfig alias examples.
+
 ## Consequences
 
 ### Positive
@@ -111,4 +119,3 @@ packages/
 - ADR 016 — Adapter SPI for Lowering
 - ADR 121 — Contract.d.ts structure and relation typing
 - Brief: docs/briefs/12-Package-Layering.md
-
