@@ -5,17 +5,17 @@ export const contract = defineContract<CodecTypes>()
   .target('postgres')
   .table('user', (t) =>
     t
-      .column('id', 'int4', { nullable: false })
-      .column('email', 'text', { nullable: false })
-      .column('createdAt', 'timestamptz', { nullable: false })
+      .column('id', { type: 'pg/int4@1', nullable: false })
+      .column('email', { type: 'pg/text@1', nullable: false })
+      .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
       .primaryKey(['id']),
   )
   .table('post', (t) =>
     t
-      .column('id', 'int4', { nullable: false })
-      .column('title', 'text', { nullable: false })
-      .column('userId', 'int4', { nullable: false })
-      .column('createdAt', 'timestamptz', { nullable: false })
+      .column('id', { type: 'pg/int4@1', nullable: false })
+      .column('title', { type: 'pg/text@1', nullable: false })
+      .column('userId', { type: 'pg/int4@1', nullable: false })
+      .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
       .primaryKey(['id'])
       .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),
   )

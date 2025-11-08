@@ -85,6 +85,8 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
+    codecTypes: PgTypes;
+    operationTypes: Record<string, never>;
   }
 >;
 

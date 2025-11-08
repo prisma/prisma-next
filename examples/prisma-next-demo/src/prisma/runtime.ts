@@ -1,13 +1,13 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
+import { budgets, createRuntime, createRuntimeContext, RuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import { Pool } from 'pg';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-let runtime: ReturnType<typeof createRuntime> | undefined;
-let context: ReturnType<typeof createRuntimeContext> | undefined;
+let runtime: ReturnType<typeof createRuntime>;
+let context: RuntimeContext<Contract>;
 let pool: Pool | undefined;
 
 export function getRuntime() {
