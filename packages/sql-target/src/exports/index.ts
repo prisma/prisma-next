@@ -55,4 +55,5 @@ export {
   SqlQueryResult,
   TableRef,
   UpdateAst,
+  isOperationExpr,
 } from '../sql-target';
