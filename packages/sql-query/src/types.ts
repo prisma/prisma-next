@@ -50,22 +50,6 @@ export interface OrderBuilder<
   readonly dir: Direction;
 }
 
-export interface ColumnBuilderBase<
-  ColumnName extends string = string,
-  ColumnMeta extends StorageColumn = StorageColumn,
-  JsType = unknown,
-> {
-  readonly kind: 'column';
-  readonly table: string;
-  readonly column: ColumnName;
-  readonly columnMeta: ColumnMeta;
-  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
-  desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
-  // Helper property for type extraction (not used at runtime)
-  readonly __jsType: JsType;
-}
-
 /**
  * ColumnBuilder with optional operation methods based on the column's typeId.
  * When Operations is provided and the column's typeId matches, operation methods are included.
@@ -75,19 +59,24 @@ export type ColumnBuilder<
   ColumnMeta extends StorageColumn = StorageColumn,
   JsType = unknown,
   Operations extends OperationTypes = Record<string, never>,
-> = ColumnBuilderBase<ColumnName, ColumnMeta, JsType> &
-  (ColumnMeta extends { type: infer TypeId }
-    ? TypeId extends string
-      ? TypeId extends keyof Operations
-        ? OperationMethods<
-            OperationsForTypeId<TypeId, Operations>,
-            ColumnName,
-            StorageColumn,
-            JsType
-          >
-        : Record<string, never>
-      : Record<string, never>
-    : Record<string, never>);
+> = {
+  readonly kind: 'column';
+  readonly table: string;
+  readonly column: ColumnName;
+  readonly columnMeta: ColumnMeta;
+  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
+  desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
+  // Helper property for type extraction (not used at runtime)
+  readonly __jsType: JsType;
+} & (ColumnMeta['type'] extends keyof Operations
+  ? OperationMethods<
+      OperationsForTypeId<ColumnMeta['type'], Operations>,
+      ColumnName,
+      StorageColumn,
+      JsType
+    >
+  : Record<string, never>);
 
 export interface BinaryBuilder<
   ColumnName extends string = string,

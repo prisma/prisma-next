@@ -2,7 +2,6 @@ import type { OperationRegistry, StorageColumn } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import type {
   ColumnBuilder,
-  ColumnBuilderBase,
   ColumnRef,
   LiteralExpr,
   OperationExpr,
@@ -17,7 +16,7 @@ export function attachOperationsToColumnBuilder<
   JsType = unknown,
   Operations extends OperationTypes = Record<string, never>,
 >(
-  columnBuilder: ColumnBuilderBase<ColumnName, ColumnMeta, JsType>,
+  columnBuilder: ColumnBuilder<ColumnName, ColumnMeta, JsType, Record<string, never>>,
   columnMeta: ColumnMeta,
   registry: OperationRegistry | undefined,
   contractCapabilities?: Record<string, Record<string, boolean>>,
@@ -60,7 +59,7 @@ export function attachOperationsToColumnBuilder<
       }
     }
     (builderWithOps as Record<string, unknown>)[operation.method] = function (
-      this: ColumnBuilderBase<ColumnName, ColumnMeta, JsType>,
+      this: ColumnBuilder<ColumnName, ColumnMeta, JsType, Record<string, never>>,
       ...args: unknown[]
     ) {
       if (args.length !== operation.args.length) {

@@ -11,7 +11,6 @@ import type {
   BinaryBuilder,
   CodecTypes as CodecTypesType,
   ColumnBuilder,
-  ColumnBuilderBase,
   ComputeColumnJsType,
   OperationTypes,
   OrderBuilder,
@@ -40,8 +39,7 @@ class ColumnBuilderImpl<
   ColumnName extends string,
   ColumnMeta extends StorageColumn,
   JsType = unknown,
-> implements ColumnBuilderBase<ColumnName, ColumnMeta, JsType>
-{
+> {
   readonly kind = 'column' as const;
 
   constructor(
