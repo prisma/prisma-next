@@ -76,12 +76,11 @@ describe('emit command', () => {
     expect(existsSync(contractJsonPath)).toBe(true);
     expect(existsSync(contractDtsPath)).toBe(true);
 
-    const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as Record<
-      string,
-      unknown
-    >;
-    expect(contractJson['targetFamily']).toBe('sql');
-    expect(contractJson['_generated']).toBeDefined();
+    const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+    expect(contractJson).toMatchObject({
+      targetFamily: 'sql',
+      _generated: expect.anything(),
+    });
 
     const contractDts = readFileSync(contractDtsPath, 'utf-8');
     expect(contractDts).toContain('export type Contract');

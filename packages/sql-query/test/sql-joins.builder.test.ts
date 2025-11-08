@@ -107,7 +107,6 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 }
 
 describe('SQL builder joins', () => {
-
   it('builds a plan with a single inner join', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
@@ -447,12 +446,12 @@ describe('SQL builder joins', () => {
 
     it('handles multi-level nested projection with joins', () => {
       const adapter = createStubAdapter();
-    const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
+      const context = createTestContext(contractWithPosts, adapter);
+      const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+      const userColumns = tables.user.columns;
+      const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithPosts, CodecTypes>({ context })
+      const plan = sql<ContractWithPosts, CodecTypes>({ context })
         .from(tables.user)
         .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
         .select({

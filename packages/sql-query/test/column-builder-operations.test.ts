@@ -1,5 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { createOperationRegistry, type OperationSignature } from '@prisma-next/sql-target';
+import type { OperationSignature } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
@@ -32,7 +32,6 @@ describe('ColumnBuilder operations', () => {
   });
 
   it('exposes registered methods on columns with matching typeId', () => {
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -45,7 +44,6 @@ describe('ColumnBuilder operations', () => {
         template: '${self} <=> ${arg0}',
       },
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -66,7 +64,6 @@ describe('ColumnBuilder operations', () => {
   });
 
   it('does not expose registered methods on columns without matching typeId', () => {
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -79,7 +76,6 @@ describe('ColumnBuilder operations', () => {
         template: '${self} <=> ${arg0}',
       },
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -98,7 +94,6 @@ describe('ColumnBuilder operations', () => {
   });
 
   it('exposes multiple operations on same typeId', () => {
-    const registry = createOperationRegistry();
     const signature1: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -123,8 +118,6 @@ describe('ColumnBuilder operations', () => {
         template: '${self} <-> ${arg0}',
       },
     };
-    registry.register(signature1);
-    registry.register(signature2);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -145,7 +138,6 @@ describe('ColumnBuilder operations', () => {
   });
 
   it('registered method accepts param argument', () => {
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -158,7 +150,6 @@ describe('ColumnBuilder operations', () => {
         template: '${self} <=> ${arg0}',
       },
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -180,7 +171,6 @@ describe('ColumnBuilder operations', () => {
   });
 
   it('registered method returns ColumnBuilder with correct return type', () => {
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -193,7 +183,6 @@ describe('ColumnBuilder operations', () => {
         template: '${self} <=> ${arg0}',
       },
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -215,7 +204,6 @@ describe('ColumnBuilder operations', () => {
   });
 
   it('operation result can be used in where clause', () => {
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -228,7 +216,6 @@ describe('ColumnBuilder operations', () => {
         template: '${self} <=> ${arg0}',
       },
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -252,7 +239,6 @@ describe('ColumnBuilder operations', () => {
   });
 
   it('operation result can be used in orderBy', () => {
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -265,7 +251,6 @@ describe('ColumnBuilder operations', () => {
         template: '${self} <=> ${arg0}',
       },
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -289,7 +274,6 @@ describe('ColumnBuilder operations', () => {
   });
 
   it('chains operations producing nested OperationExpr trees', () => {
-    const registry = createOperationRegistry();
     const signature1: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'normalize',
@@ -314,8 +298,6 @@ describe('ColumnBuilder operations', () => {
         template: '${self} <=> ${arg0}',
       },
     };
-    registry.register(signature1);
-    registry.register(signature2);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {

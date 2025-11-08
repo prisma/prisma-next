@@ -239,9 +239,12 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
 export function createTestContract<T extends SqlContract<SqlStorage>>(contract: T): T {
   // Ensure mappings are present
   if (!contract.mappings) {
-    contract.mappings = { codecTypes: {}, operationTypes: {} };
+    return {
+      ...contract,
+      mappings: { codecTypes: {}, operationTypes: {} },
+    } as T;
   }
-  return contract as T;
+  return contract;
 }
 
 // Re-export generic utilities from test-utils

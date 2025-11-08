@@ -289,7 +289,10 @@ describe('DML builders', () => {
         },
       };
 
-      const contextWithoutReturning = createTestContext(contractWithoutReturning as Contract, adapter);
+      const contextWithoutReturning = createTestContext(
+        contractWithoutReturning as Contract,
+        adapter,
+      );
       expect(() => {
         sql<Contract, CodecTypes>({ context: contextWithoutReturning })
           .insert(tables.user, {
@@ -311,7 +314,10 @@ describe('DML builders', () => {
         },
       };
 
-      const contextWithReturningFalse = createTestContext(contractWithReturningFalse as Contract, adapter);
+      const contextWithReturningFalse = createTestContext(
+        contractWithReturningFalse as Contract,
+        adapter,
+      );
       expect(() => {
         sql<Contract, CodecTypes>({ context: contextWithReturningFalse })
           .insert(tables.user, {
@@ -361,7 +367,10 @@ describe('DML builders', () => {
         },
       };
 
-      const contextWithoutReturning = createTestContext(contractWithoutReturning as Contract, adapter);
+      const contextWithoutReturning = createTestContext(
+        contractWithoutReturning as Contract,
+        adapter,
+      );
       expect(() => {
         sql<Contract, CodecTypes>({ context: contextWithoutReturning })
           .update(tables.user, {
@@ -383,7 +392,10 @@ describe('DML builders', () => {
         },
       };
 
-      const contextWithoutReturning = createTestContext(contractWithoutReturning as Contract, adapter);
+      const contextWithoutReturning = createTestContext(
+        contractWithoutReturning as Contract,
+        adapter,
+      );
       expect(() => {
         sql<Contract, CodecTypes>({ context: contextWithoutReturning })
           .delete(tables.user)

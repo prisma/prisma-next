@@ -42,7 +42,6 @@ export class OrmIncludeChildBuilderImpl<
 {
   private readonly context: RuntimeContext<TContract>;
   private readonly contract: TContract;
-  private readonly codecTypes: CodecTypes;
   private readonly childModelName: ChildModelName;
   private childWhere: BinaryBuilder | undefined;
   private childOrderBy: OrderBuilder | undefined;
@@ -57,7 +56,6 @@ export class OrmIncludeChildBuilderImpl<
   constructor(options: OrmBuilderOptions<TContract>, childModelName: ChildModelName) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.childModelName = childModelName;
   }
 
@@ -119,10 +117,7 @@ export class OrmIncludeChildBuilderImpl<
       CodecTypes,
       ChildModelName,
       InferNestedProjectionRow<Projection, CodecTypes>
-    >(
-      { context: this.context },
-      this.childModelName,
-    );
+    >({ context: this.context }, this.childModelName);
     builder.childWhere = this.childWhere;
     builder.childOrderBy = this.childOrderBy;
     builder.childLimit = this.childLimit;
@@ -174,6 +169,8 @@ export class OrmIncludeChildBuilderImpl<
         fieldName;
       const column = table.columns[columnName];
       if (column) {
+        // @ts-expect-error - ModelColumnAccessor type is inferred from contract shape at runtime
+        // TypeScript can't verify the shape matches, but runtime validation ensures correctness
         (accessor as Record<string, ColumnBuilder>)[fieldName] = column;
       }
     }

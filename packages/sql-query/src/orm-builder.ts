@@ -314,10 +314,7 @@ export class OrmModelBuilderImpl<
           TContract,
           CodecTypes,
           typeof childModelName
-        >(
-          { context: self.context },
-          childModelName,
-        );
+        >({ context: self.context }, childModelName);
         // Expose model accessor directly on the builder for convenience
         const modelAccessor = filterBuilder.getModelAccessor();
         const builderWithAccessor = Object.assign(
@@ -343,10 +340,7 @@ export class OrmModelBuilderImpl<
                 TContract,
                 CodecTypes,
                 typeof childModelName
-              >(
-                { context: self.context },
-                childModelName,
-              );
+              >({ context: self.context }, childModelName);
               wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
               return self._applyRelationFilter(
                 prop,
@@ -380,10 +374,7 @@ export class OrmModelBuilderImpl<
                 TContract,
                 CodecTypes,
                 typeof childModelName
-              >(
-                { context: self.context },
-                childModelName,
-              );
+              >({ context: self.context }, childModelName);
               wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
               return self._applyRelationFilter(
                 prop,
@@ -417,10 +408,7 @@ export class OrmModelBuilderImpl<
                 TContract,
                 CodecTypes,
                 typeof childModelName
-              >(
-                { context: self.context },
-                childModelName,
-              );
+              >({ context: self.context }, childModelName);
               wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
               return self._applyRelationFilter(
                 prop,
@@ -563,10 +551,7 @@ export class OrmModelBuilderImpl<
       CodecTypes,
       ModelName,
       InferNestedProjectionRow<Projection, CodecTypes>
-    >(
-      { context: this.context },
-      this.modelName,
-    );
+    >({ context: this.context }, this.modelName);
     builder['table'] = this.table;
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;

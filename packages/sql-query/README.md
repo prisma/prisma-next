@@ -368,7 +368,7 @@ const plan = sql`
 ```typescript
 import { orm } from '@prisma-next/sql-query/orm';
 import { param } from '@prisma-next/sql-query/param';
-import type { ResultType } from '@prisma-next/sql-query/types';
+import type { ResultType } from '@prisma-next/contract/types';
 import type { Contract, CodecTypes } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);

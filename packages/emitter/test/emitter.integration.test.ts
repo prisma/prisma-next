@@ -124,17 +124,18 @@ describe('emitter integration', () => {
     expect(result.contractDts).toContain('CodecTypes');
     expect(result.contractDts).toContain('LaneCodecTypes');
 
-    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
-    expect(contractJson['schemaVersion']).toBe('1');
-    expect(contractJson['targetFamily']).toBe('sql');
-    expect(contractJson['target']).toBe('postgres');
-    expect(contractJson['coreHash']).toBe(result.coreHash);
-    expect((contractJson['storage'] as Record<string, unknown>)['tables']).toBeDefined();
-    expect(
-      ((contractJson['storage'] as Record<string, unknown>)['tables'] as Record<string, unknown>)[
-        'user'
-      ],
-    ).toBeDefined();
+    const contractJson = JSON.parse(result.contractJson);
+    expect(contractJson).toMatchObject({
+      schemaVersion: '1',
+      targetFamily: 'sql',
+      target: 'postgres',
+      coreHash: result.coreHash,
+      storage: {
+        tables: {
+          user: expect.anything(),
+        },
+      },
+    });
   });
 
   it('produces stable hashes for identical input', async () => {
@@ -245,13 +246,13 @@ describe('emitter integration', () => {
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
       models: contractJson1['models'] as Record<string, unknown>,
-      relations: contractJson1['relations'] as Record<string, unknown>,
+      relations: (contractJson1['relations'] as Record<string, unknown>) || {},
       storage: contractJson1['storage'] as Record<string, unknown>,
       extensions: contractJson1['extensions'] as Record<string, unknown>,
       capabilities:
         (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
-      meta: contractJson1['meta'] as Record<string, unknown>,
-      sources: contractJson1['sources'] as Record<string, unknown>,
+      meta: (contractJson1['meta'] as Record<string, unknown>) || {},
+      sources: (contractJson1['sources'] as Record<string, unknown>) || {},
     };
 
     const result2 = await emit(ir2, options, mockSqlHook);

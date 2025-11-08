@@ -1,9 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import {
-  createCodecRegistry,
-  createOperationRegistry,
-  type OperationSignature,
-} from '@prisma-next/sql-target';
+import type { OperationSignature } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
@@ -38,7 +34,6 @@ describe('Operation capability gating', () => {
       mappings: {},
     });
 
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -52,7 +47,6 @@ describe('Operation capability gating', () => {
       },
       capabilities: ['pgvector.index.ivfflat'],
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -95,7 +89,6 @@ describe('Operation capability gating', () => {
       mappings: {},
     });
 
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -109,7 +102,6 @@ describe('Operation capability gating', () => {
       },
       capabilities: ['pgvector.index.ivfflat'],
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -152,7 +144,6 @@ describe('Operation capability gating', () => {
       mappings: {},
     });
 
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -165,7 +156,6 @@ describe('Operation capability gating', () => {
         template: '${self} <=> ${arg0}',
       },
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {
@@ -212,7 +202,6 @@ describe('Operation capability gating', () => {
       mappings: {},
     });
 
-    const registry = createOperationRegistry();
     const signature: OperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
@@ -226,7 +215,6 @@ describe('Operation capability gating', () => {
       },
       capabilities: ['pgvector.index.ivfflat', 'pgvector.index.hnsw'],
     };
-    registry.register(signature);
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter, {

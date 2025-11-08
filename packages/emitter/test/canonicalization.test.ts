@@ -87,12 +87,16 @@ describe('canonicalization', () => {
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result) as Record<string, unknown>;
-    expect(parsed['models']).toBeDefined();
-    expect((parsed['storage'] as Record<string, unknown>)['tables']).toBeDefined();
-    expect(parsed['capabilities']).toBeUndefined();
-    expect(parsed['extensions']).toBeUndefined();
-    expect(parsed['meta']).toBeUndefined();
+    const parsed = JSON.parse(result);
+    expect(parsed).toMatchObject({
+      models: expect.anything(),
+      storage: {
+        tables: expect.anything(),
+      },
+    });
+    expect(parsed).not.toHaveProperty('capabilities');
+    expect(parsed).not.toHaveProperty('extensions');
+    expect(parsed).not.toHaveProperty('meta');
   });
 
   it('preserves semantic array order for column lists', () => {
