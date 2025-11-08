@@ -5,6 +5,7 @@
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev --name init",
+    "emit": "prisma-next emit --contract prisma/contract.ts --out src/prisma-next --adapter ../../packages/adapter-postgres",
     "prisma-next:stamp": "tsx src/prisma-next/stamp-marker.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/index.ts",
@@ -20,6 +21,7 @@
     "pg": "^8.11.5"
   },
   "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
     "@prisma/dev": "^0.1.1",
     "@types/node": "^20.16.5",
     "@types/pg": "^8.11.10",
