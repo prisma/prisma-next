@@ -300,6 +300,10 @@ export type Relations = Contract['relations'];
     return imports;
   },
 
+  getTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec> {
+    return [...this.getCodecTypesImports(packs), ...this.getOperationTypesImports(packs)];
+  },
+
   /**
    * Generates TypeScript type definitions for storage tables.
    *

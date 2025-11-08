@@ -1,6 +1,11 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
-import { createRuntime, type Runtime } from '@prisma-next/runtime';
+import {
+  createRuntime,
+  createRuntimeContext,
+  type Runtime,
+  type RuntimeContext,
+} from '@prisma-next/runtime';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
@@ -35,6 +40,7 @@ class ModelDelegate {
 
   constructor(
     private readonly runtime: Runtime,
+    private readonly context: RuntimeContext<SqlContract<SqlStorage>>,
     private readonly contract: SqlContract<SqlStorage>,
     private readonly table: TableRef & Record<string, ColumnBuilder>,
     tableName: string,
@@ -70,8 +76,7 @@ class ModelDelegate {
 
   async findMany(args: FindManyArgs = {}): Promise<Record<string, unknown>[]> {
     const tableName = this.tableName;
-    const adapter = createPostgresAdapter();
-    let query = sql({ contract: this.contract, adapter }).from(this.tableRef);
+    let query = sql({ context: this.context }).from(this.tableRef);
 
     // Handle where clause (equality only for MVP)
     if (args.where) {
@@ -86,7 +91,7 @@ class ModelDelegate {
         }
         // Access column via columns property to avoid conflicts with table properties
         const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-        const column = columns?.[field];
+        const column = columns?.[field] as ColumnBuilder | undefined;
         if (
           !column ||
           typeof column !== 'object' ||
@@ -95,7 +100,7 @@ class ModelDelegate {
         ) {
           throw this.unsupportedError(`Invalid column '${field}' in where clause`);
         }
-        whereConditions.push({ column, value });
+        whereConditions.push({ column: column as ColumnBuilder, value });
       }
 
       if (whereConditions.length === 1) {
@@ -122,7 +127,7 @@ class ModelDelegate {
             throw this.unsupportedError(`Unknown field '${field}' in select clause`);
           }
           const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-          const column = columns?.[field];
+          const column = columns?.[field] as ColumnBuilder | undefined;
           if (
             !column ||
             typeof column !== 'object' ||
@@ -131,7 +136,7 @@ class ModelDelegate {
           ) {
             throw this.unsupportedError(`Invalid column '${field}' in select clause`);
           }
-          projection[field] = column;
+          projection[field] = column as ColumnBuilder;
         }
       }
     } else {
@@ -141,14 +146,14 @@ class ModelDelegate {
       if (tableDef && tableColumns) {
         for (const columnName of Object.keys(tableDef.columns)) {
           // Access column via columns property to avoid conflicts with table properties like 'name'
-          const column = tableColumns[columnName];
+          const column = tableColumns[columnName] as ColumnBuilder | undefined;
           if (
             column &&
             typeof column === 'object' &&
             'kind' in column &&
             column.kind === 'column'
           ) {
-            projection[columnName] = column;
+            projection[columnName] = column as ColumnBuilder;
           }
         }
       }
@@ -156,9 +161,9 @@ class ModelDelegate {
       // Fallback: iterate table columns directly
       if (Object.keys(projection).length === 0 && tableColumns) {
         for (const key in tableColumns) {
-          const value = tableColumns[key];
+          const value = tableColumns[key] as ColumnBuilder | undefined;
           if (value && typeof value === 'object' && 'kind' in value && value.kind === 'column') {
-            projection[key] = value;
+            projection[key] = value as ColumnBuilder;
           }
         }
       }
@@ -187,7 +192,7 @@ class ModelDelegate {
         throw this.unsupportedError(`Unknown field '${field}' in orderBy clause`);
       }
       const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-      const column = columns?.[field];
+      const column = columns?.[field] as ColumnBuilder | undefined;
       if (
         !column ||
         typeof column !== 'object' ||
@@ -197,7 +202,9 @@ class ModelDelegate {
         throw this.unsupportedError(`Invalid column '${field}' in orderBy clause`);
       }
 
-      query = query.orderBy(direction === 'asc' ? column.asc() : column.desc());
+      query = query.orderBy(
+        direction === 'asc' ? (column as ColumnBuilder).asc() : (column as ColumnBuilder).desc(),
+      );
     }
 
     // Handle pagination
@@ -261,7 +268,7 @@ class ModelDelegate {
     }
 
     // Use raw SQL for INSERT (MVP approach)
-    const sqlBuilder = sql({ contract: this.contract, adapter: createPostgresAdapter() });
+    const sqlBuilder = sql({ context: this.context });
     const insertPlan = sqlBuilder.raw(
       `INSERT INTO "${tableName}" (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`,
       {
@@ -337,6 +344,7 @@ class ModelDelegate {
 
 class PrismaClientImpl {
   readonly runtime: Runtime;
+  readonly context: RuntimeContext<SqlContract<SqlStorage>>;
   readonly contract: SqlContract<SqlStorage>;
   readonly schemaHandle: ReturnType<typeof schema>;
   readonly models: Record<string, ModelDelegate> = {};
@@ -348,11 +356,18 @@ class PrismaClientImpl {
     // Currently only SQL contracts are supported
     this.contract = options.contract;
 
+    // Create context with contract and adapter
+    const adapter = createPostgresAdapter();
+    this.context = createRuntimeContext({
+      contract: this.contract,
+      adapter,
+      extensions: [],
+    });
+
     // Initialize runtime if not provided
     if (options.runtime) {
       this.runtime = options.runtime;
     } else {
-      const adapter = createPostgresAdapter();
       const connectionString = options.connectionString ?? process.env['DATABASE_URL'];
 
       if (!connectionString) {
@@ -362,9 +377,9 @@ class PrismaClientImpl {
       const driver = createPostgresDriver(connectionString);
 
       this.runtime = createRuntime({
-        contract: this.contract,
         adapter,
         driver,
+        context: this.context,
         verify: {
           mode: 'onFirstUse',
           requireMarker: false,
@@ -373,7 +388,7 @@ class PrismaClientImpl {
     }
 
     // Initialize schema handle
-    this.schemaHandle = schema(this.contract);
+    this.schemaHandle = schema(this.context);
 
     // Build model delegates
     for (const [tableName, table] of Object.entries(this.schemaHandle.tables)) {
@@ -382,6 +397,7 @@ class PrismaClientImpl {
       // Pass tableName explicitly since Object.assign in TableBuilderImpl may interfere with name property
       this.models[modelName] = new ModelDelegate(
         this.runtime,
+        this.context,
         this.contract,
         table as unknown as TableRef & Record<string, ColumnBuilder>,
         tableName,

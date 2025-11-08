@@ -72,6 +72,13 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isRequiredModels = currentPath.length === 1 && currentPath[0] === 'models';
       const isRequiredTables =
         currentPath.length === 2 && currentPath[0] === 'storage' && currentPath[1] === 'tables';
+      const isRequiredRelations = currentPath.length === 1 && currentPath[0] === 'relations';
+      const isRequiredExtensions = currentPath.length === 1 && currentPath[0] === 'extensions';
+      const isRequiredCapabilities = currentPath.length === 1 && currentPath[0] === 'capabilities';
+      const isRequiredMeta = currentPath.length === 1 && currentPath[0] === 'meta';
+      const isRequiredSources = currentPath.length === 1 && currentPath[0] === 'sources';
+      const isExtensionNamespace =
+        currentPath.length === 2 && currentPath[0] === 'extensions';
       const isModelRelations =
         currentPath.length === 3 && currentPath[0] === 'models' && currentPath[2] === 'relations';
       const isTableUniques =
@@ -93,6 +100,12 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       if (
         !isRequiredModels &&
         !isRequiredTables &&
+        !isRequiredRelations &&
+        !isRequiredExtensions &&
+        !isRequiredCapabilities &&
+        !isRequiredMeta &&
+        !isRequiredSources &&
+        !isExtensionNamespace &&
         !isModelRelations &&
         !isTableUniques &&
         !isTableIndexes &&
