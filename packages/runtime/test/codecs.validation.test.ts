@@ -109,8 +109,9 @@ describe('Codec Registry Validation', () => {
 
     const contract = validateContract(contractRaw);
     const typeIds = extractTypeIds(contract);
-    expect(typeIds.size).toBe(1);
+    expect(typeIds.size).toBe(2);
     expect(typeIds.has('pg/int4@1')).toBe(true);
+    expect(typeIds.has('pg/text@1')).toBe(true);
   });
 
   it('validates complete registry passes', () => {

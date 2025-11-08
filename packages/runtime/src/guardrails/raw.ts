@@ -90,7 +90,19 @@ function evaluateIndexCoverage(refs: PlanRefs, lints: LintFinding[]) {
   }
 
   const indexes = refs.indexes ?? [];
+
+  // If there are no indexes at all, all predicates are unindexed
   if (indexes.length === 0) {
+    lints.push(
+      createLint(
+        'LINT.UNINDEXED_PREDICATE',
+        'warn',
+        'Raw SQL plan predicates lack supporting indexes',
+        {
+          predicates: predicateColumns,
+        },
+      ),
+    );
     return;
   }
 

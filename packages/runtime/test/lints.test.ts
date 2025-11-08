@@ -130,7 +130,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createMockContext();
       const plan: Plan = {
-        sql: 'SELECT id FROM "user" WHERE email = $1',
+        sql: 'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
         params: ['test@example.com'],
         meta: {
           target: 'postgres',
