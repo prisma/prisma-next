@@ -163,7 +163,10 @@ function sortIndexesAndUniques(storage: unknown): unknown {
   const result: StorageObject = { ...storageObj };
 
   result.tables = {};
-  for (const [tableName, table] of Object.entries(tables)) {
+  // Sort table names to ensure deterministic ordering
+  const sortedTableNames = Object.keys(tables).sort();
+  for (const tableName of sortedTableNames) {
+    const table = tables[tableName];
     if (!table || typeof table !== 'object') {
       result.tables[tableName] = table;
       continue;
