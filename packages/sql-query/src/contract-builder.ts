@@ -819,6 +819,13 @@ class ContractBuilder<
     const models = modelsPartial as unknown as BuildModels<Models>;
     const relations = relationsPartial as unknown as BuildRelations<Models>;
 
+    // Check if relations object has any actual relations (not just empty objects)
+    const relationsRecord = relations as Record<string, Record<string, unknown>>;
+    const hasRelations = Object.keys(relationsRecord).some(
+      (tableName) =>
+        relationsRecord[tableName] && Object.keys(relationsRecord[tableName]).length > 0,
+    );
+
     const mappings = computeMappings(
       models as unknown as Record<string, ModelDefinition>,
       storage as SqlStorage,
@@ -832,7 +839,7 @@ class ContractBuilder<
       targetFamily: 'sql' as const,
       coreHash: this.state.coreHash || 'sha256:ts-builder-placeholder',
       models,
-      relations,
+      ...(hasRelations ? { relations } : {}),
       storage,
       mappings,
       extensions: this.state.extensions || {},
@@ -841,7 +848,17 @@ class ContractBuilder<
       sources: {},
     } as unknown as BuiltContract;
 
-    return contract as BuiltContract;
+    return contract as unknown as ReturnType<
+      ContractBuilder<
+        CodecTypes,
+        Target,
+        Tables,
+        Models,
+        CoreHash,
+        Extensions,
+        Capabilities
+      >['build']
+    >;
   }
 }
 

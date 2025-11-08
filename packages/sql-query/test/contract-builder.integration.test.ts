@@ -370,19 +370,32 @@ describe('builder integration', () => {
 
       // Runtime checks
       expect(contract.relations).toBeDefined();
-      expect(contract.relations.user).toBeDefined();
-      expect(contract.relations.user.posts).toBeDefined();
-      expect(contract.relations.user.posts.to).toBe('Post');
-      expect(contract.relations.user.posts.cardinality).toBe('1:N');
-      expect(contract.relations.user.posts.on.parentCols).toEqual(['id']);
-      expect(contract.relations.user.posts.on.childCols).toEqual(['userId']);
+      const relations = contract.relations as Record<string, Record<string, unknown>>;
+      const userRelations = relations['user'] as Record<string, unknown>;
+      const postRelations = relations['post'] as Record<string, unknown>;
+      expect(userRelations).toBeDefined();
+      expect(userRelations['posts']).toBeDefined();
+      const userPosts = userRelations['posts'] as {
+        to: string;
+        cardinality: string;
+        on: { parentCols: readonly string[]; childCols: readonly string[] };
+      };
+      expect(userPosts.to).toBe('Post');
+      expect(userPosts.cardinality).toBe('1:N');
+      expect(userPosts.on.parentCols).toEqual(['id']);
+      expect(userPosts.on.childCols).toEqual(['userId']);
 
-      expect(contract.relations.post).toBeDefined();
-      expect(contract.relations.post.user).toBeDefined();
-      expect(contract.relations.post.user.to).toBe('User');
-      expect(contract.relations.post.user.cardinality).toBe('N:1');
-      expect(contract.relations.post.user.on.parentCols).toEqual(['userId']);
-      expect(contract.relations.post.user.on.childCols).toEqual(['id']);
+      expect(postRelations).toBeDefined();
+      expect(postRelations['user']).toBeDefined();
+      const postUser = postRelations['user'] as {
+        to: string;
+        cardinality: string;
+        on: { parentCols: readonly string[]; childCols: readonly string[] };
+      };
+      expect(postUser.to).toBe('User');
+      expect(postUser.cardinality).toBe('N:1');
+      expect(postUser.on.parentCols).toEqual(['userId']);
+      expect(postUser.on.childCols).toEqual(['id']);
     });
 
     it('builds a contract with N:M relation', () => {
@@ -452,23 +465,36 @@ describe('builder integration', () => {
         .build();
 
       // Runtime checks
-      expect(contract.relations.user).toBeDefined();
-      expect(contract.relations.user.roles).toBeDefined();
-      expect(contract.relations.user.roles.to).toBe('Role');
-      expect(contract.relations.user.roles.cardinality).toBe('N:M');
-      expect(contract.relations.user.roles.through).toBeDefined();
-      expect(contract.relations.user.roles.through?.table).toBe('userRole');
-      expect(contract.relations.user.roles.through?.parentCols).toEqual(['id']);
-      expect(contract.relations.user.roles.through?.childCols).toEqual(['userId']);
+      const relations = contract.relations as Record<string, Record<string, unknown>>;
+      const userRelations = relations['user'] as Record<string, unknown>;
+      const roleRelations = relations['role'] as Record<string, unknown>;
+      expect(userRelations).toBeDefined();
+      expect(userRelations['roles']).toBeDefined();
+      const userRoles = userRelations['roles'] as {
+        to: string;
+        cardinality: string;
+        through?: { table: string; parentCols: readonly string[]; childCols: readonly string[] };
+      };
+      expect(userRoles.to).toBe('Role');
+      expect(userRoles.cardinality).toBe('N:M');
+      expect(userRoles.through).toBeDefined();
+      expect(userRoles.through?.table).toBe('userRole');
+      expect(userRoles.through?.parentCols).toEqual(['id']);
+      expect(userRoles.through?.childCols).toEqual(['userId']);
 
-      expect(contract.relations.role).toBeDefined();
-      expect(contract.relations.role.users).toBeDefined();
-      expect(contract.relations.role.users.to).toBe('User');
-      expect(contract.relations.role.users.cardinality).toBe('N:M');
-      expect(contract.relations.role.users.through).toBeDefined();
-      expect(contract.relations.role.users.through?.table).toBe('userRole');
-      expect(contract.relations.role.users.through?.parentCols).toEqual(['id']);
-      expect(contract.relations.role.users.through?.childCols).toEqual(['roleId']);
+      expect(roleRelations).toBeDefined();
+      expect(roleRelations['users']).toBeDefined();
+      const roleUsers = roleRelations['users'] as {
+        to: string;
+        cardinality: string;
+        through?: { table: string; parentCols: readonly string[]; childCols: readonly string[] };
+      };
+      expect(roleUsers.to).toBe('User');
+      expect(roleUsers.cardinality).toBe('N:M');
+      expect(roleUsers.through).toBeDefined();
+      expect(roleUsers.through?.table).toBe('userRole');
+      expect(roleUsers.through?.parentCols).toEqual(['id']);
+      expect(roleUsers.through?.childCols).toEqual(['roleId']);
     });
 
     it('validates parentTable matches model table', () => {
@@ -483,12 +509,12 @@ describe('builder integration', () => {
               toTable: 'post',
               cardinality: '1:N',
               on: {
-                parentTable: 'wrongTable',
+                parentTable: 'wrongTable' as 'user',
                 parentColumns: ['id'],
                 childTable: 'post',
                 childColumns: ['userId'],
               },
-            }),
+            } as unknown as Parameters<typeof m.relation>[1]),
           )
           .build();
       }).toThrow(/parentTable.*does not match model table/);
@@ -523,19 +549,24 @@ describe('builder integration', () => {
           .target('postgres')
           .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
           .table('role', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
-          .model('User', 'user', (m) =>
-            m.relation('roles', {
-              toModel: 'Role',
-              toTable: 'role',
-              cardinality: 'N:M',
+          .model('User', 'user', (m) => {
+            // Intentionally omit through to test validation
+            const invalidRelation = {
+              toModel: 'Role' as const,
+              toTable: 'role' as const,
+              cardinality: 'N:M' as const,
               on: {
-                parentTable: 'user',
-                parentColumns: ['id'],
-                childTable: 'userRole',
-                childColumns: ['userId'],
+                parentTable: 'user' as const,
+                parentColumns: ['id'] as const,
+                childTable: 'userRole' as const,
+                childColumns: ['userId'] as const,
               },
-            } as any),
-          )
+            };
+            return m.relation(
+              'roles',
+              invalidRelation as unknown as Parameters<typeof m.relation>[1],
+            );
+          })
           .build();
       }).toThrow(/cardinality "N:M" requires through field/);
     });
