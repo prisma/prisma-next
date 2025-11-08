@@ -92,8 +92,8 @@ export interface OperationExpr {
   readonly kind: 'operation';
   readonly method: string;
   readonly forTypeId: string;
-  readonly self: ColumnRef;
-  readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr>;
+  readonly self: ColumnRef | OperationExpr;
+  readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr | OperationExpr>;
   readonly returns: import('./operations-registry').ReturnSpec;
   readonly lowering: import('./operations-registry').LoweringSpec;
 }

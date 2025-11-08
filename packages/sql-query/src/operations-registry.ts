@@ -1,14 +1,168 @@
-import type { OperationRegistry, StorageColumn } from '@prisma-next/sql-target';
-import { planInvalid } from './errors';
 import type {
-  ColumnBuilder,
-  ColumnRef,
   LiteralExpr,
   OperationExpr,
-  OperationTypes,
-  ParamPlaceholder,
-  ParamRef,
-} from './types';
+  OperationRegistry,
+  OperationSignature,
+  StorageColumn,
+} from '@prisma-next/sql-target';
+import { planInvalid } from './errors';
+import type { ColumnBuilder, ColumnRef, OperationTypes, ParamPlaceholder, ParamRef } from './types';
+
+function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'param-placeholder' &&
+    'name' in value &&
+    typeof (value as { name: unknown }).name === 'string'
+  );
+}
+
+function isColumnBuilder(value: unknown): value is ColumnBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'column'
+  );
+}
+
+/**
+ * Executes an operation and returns a column-shaped result object.
+ * This is the canonical entrypoint for operation invocation, enabling
+ * future enhancements like telemetry, caching, or tracing.
+ *
+ * @param signature - The operation signature from the registry
+ * @param selfBuilder - The column builder that the operation is called on
+ * @param args - The arguments passed to the operation
+ * @param columnMeta - The metadata of the column the operation is called on
+ * @returns A column-shaped builder with the operation expression attached
+ */
+function executeOperation(
+  signature: OperationSignature,
+  selfBuilder: ColumnBuilder<string, StorageColumn, unknown>,
+  args: unknown[],
+  columnMeta: StorageColumn,
+): ColumnBuilder<string, StorageColumn, unknown> & { _operationExpr?: OperationExpr } {
+  if (args.length !== signature.args.length) {
+    throw planInvalid(
+      `Operation ${signature.method} expects ${signature.args.length} arguments, got ${args.length}`,
+    );
+  }
+
+  // Check if this column builder has an existing operation expression
+  const selfBuilderWithExpr = selfBuilder as unknown as {
+    _operationExpr?: OperationExpr;
+    table: string;
+    column: string;
+  };
+  const selfExpr: ColumnRef | OperationExpr = selfBuilderWithExpr._operationExpr
+    ? selfBuilderWithExpr._operationExpr
+    : {
+        kind: 'col',
+        table: selfBuilderWithExpr.table,
+        column: selfBuilderWithExpr.column,
+      };
+
+  const operationArgs: Array<ColumnRef | ParamRef | LiteralExpr | OperationExpr> = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const argSpec = signature.args[i];
+    if (!argSpec) {
+      throw planInvalid(`Missing argument spec for argument ${i}`);
+    }
+
+    if (argSpec.kind === 'param') {
+      if (!isParamPlaceholder(arg)) {
+        throw planInvalid(`Argument ${i} must be a parameter placeholder`);
+      }
+      operationArgs.push({
+        kind: 'param',
+        index: 0,
+        name: arg.name,
+      });
+    } else if (argSpec.kind === 'typeId') {
+      if (!isColumnBuilder(arg)) {
+        throw planInvalid(`Argument ${i} must be a ColumnBuilder`);
+      }
+      const colBuilderWithExpr = arg as unknown as {
+        _operationExpr?: OperationExpr;
+        table: string;
+        column: string;
+      };
+      // Check if the column builder has an operation expression
+      if (colBuilderWithExpr._operationExpr) {
+        operationArgs.push(colBuilderWithExpr._operationExpr);
+      } else {
+        // Fall back to raw ColumnRef
+        operationArgs.push({
+          kind: 'col',
+          table: colBuilderWithExpr.table,
+          column: colBuilderWithExpr.column,
+        });
+      }
+    } else if (argSpec.kind === 'literal') {
+      operationArgs.push({
+        kind: 'literal',
+        value: arg,
+      });
+    }
+  }
+
+  const operationExpr: OperationExpr = {
+    kind: 'operation',
+    method: signature.method,
+    forTypeId: signature.forTypeId,
+    self: selfExpr,
+    args: operationArgs,
+    returns: signature.returns,
+    lowering: signature.lowering,
+  };
+
+  const returnTypeId = signature.returns.kind === 'typeId' ? signature.returns.type : undefined;
+  const returnColumnMeta: StorageColumn = returnTypeId
+    ? {
+        ...columnMeta,
+        type: returnTypeId,
+      }
+    : columnMeta;
+
+  const result = Object.freeze({
+    kind: 'column' as const,
+    table: selfBuilderWithExpr.table,
+    column: selfBuilderWithExpr.column,
+    get columnMeta() {
+      return returnColumnMeta;
+    },
+    eq(value: ParamPlaceholder) {
+      return Object.freeze({
+        kind: 'binary' as const,
+        op: 'eq' as const,
+        left: operationExpr,
+        right: value,
+      });
+    },
+    asc() {
+      return Object.freeze({
+        kind: 'order' as const,
+        expr: operationExpr,
+        dir: 'asc' as const,
+      });
+    },
+    desc() {
+      return Object.freeze({
+        kind: 'order' as const,
+        expr: operationExpr,
+        dir: 'desc' as const,
+      });
+    },
+    _operationExpr: operationExpr,
+  }) as unknown as ColumnBuilder<string, StorageColumn, unknown> & {
+    _operationExpr?: OperationExpr;
+  };
+  return result;
+}
 
 export function attachOperationsToColumnBuilder<
   ColumnName extends string,
@@ -58,115 +212,17 @@ export function attachOperationsToColumnBuilder<
         continue;
       }
     }
+    // Method sugar: attach operation as a method on the column builder
     (builderWithOps as Record<string, unknown>)[operation.method] = function (
       this: ColumnBuilder<ColumnName, ColumnMeta, JsType, Record<string, never>>,
       ...args: unknown[]
     ) {
-      if (args.length !== operation.args.length) {
-        throw planInvalid(
-          `Operation ${operation.method} expects ${operation.args.length} arguments, got ${args.length}`,
-        );
-      }
-
-      const selfRef: ColumnRef = {
-        kind: 'col',
-        table: this.table,
-        column: this.column,
-      };
-
-      const operationArgs: Array<ColumnRef | ParamRef | LiteralExpr> = [];
-      for (let i = 0; i < args.length; i++) {
-        const arg = args[i];
-        const argSpec = operation.args[i];
-        if (!argSpec) {
-          throw planInvalid(`Missing argument spec for argument ${i}`);
-        }
-
-        if (argSpec.kind === 'param') {
-          if (
-            !arg ||
-            typeof arg !== 'object' ||
-            !('kind' in arg) ||
-            arg.kind !== 'param-placeholder' ||
-            !('name' in arg)
-          ) {
-            throw planInvalid(`Argument ${i} must be a parameter placeholder`);
-          }
-          operationArgs.push({
-            kind: 'param',
-            index: 0,
-            name: (arg as ParamPlaceholder).name,
-          });
-        } else if (argSpec.kind === 'typeId') {
-          if (!arg || typeof arg !== 'object' || !('kind' in arg)) {
-            throw planInvalid(`Argument ${i} must be a ColumnBuilder`);
-          }
-          const colBuilder = arg as ColumnBuilder<string, StorageColumn, unknown>;
-          operationArgs.push({
-            kind: 'col',
-            table: colBuilder.table,
-            column: colBuilder.column,
-          });
-        } else if (argSpec.kind === 'literal') {
-          operationArgs.push({
-            kind: 'literal',
-            value: arg,
-          });
-        }
-      }
-
-      const operationExpr: OperationExpr = {
-        kind: 'operation',
-        method: operation.method,
-        forTypeId: operation.forTypeId,
-        self: selfRef,
-        args: operationArgs,
-        returns: operation.returns,
-        lowering: operation.lowering,
-      };
-
-      const returnTypeId = operation.returns.kind === 'typeId' ? operation.returns.type : undefined;
-      const returnColumnMeta: StorageColumn = returnTypeId
-        ? {
-            ...columnMeta,
-            type: returnTypeId,
-          }
-        : columnMeta;
-
-      const result = Object.freeze({
-        kind: 'column' as const,
-        table: this.table,
-        column: this.column,
-        get columnMeta() {
-          return returnColumnMeta;
-        },
-        eq(value: ParamPlaceholder) {
-          return Object.freeze({
-            kind: 'binary' as const,
-            op: 'eq' as const,
-            left: operationExpr,
-            right: value,
-          });
-        },
-        asc() {
-          return Object.freeze({
-            kind: 'order' as const,
-            expr: operationExpr,
-            dir: 'asc' as const,
-          });
-        },
-        desc() {
-          return Object.freeze({
-            kind: 'order' as const,
-            expr: operationExpr,
-            dir: 'desc' as const,
-          });
-        },
-        _operationExpr: operationExpr,
-      }) as unknown as ColumnBuilder<string, StorageColumn, unknown> & {
-        _operationExpr?: OperationExpr;
-      };
-      return result;
+      return executeOperation(
+        operation,
+        this as unknown as ColumnBuilder<string, StorageColumn, unknown>,
+        args,
+        columnMeta,
+      );
     };
   }
 

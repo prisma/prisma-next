@@ -171,8 +171,8 @@ function renderLiteral(expr: LiteralExpr): string {
 }
 
 function renderOperation(expr: OperationExpr): string {
-  const self = renderColumn(expr.self);
-  const args = expr.args.map((arg: ColumnRef | ParamRef | LiteralExpr) => {
+  const self = renderExpr(expr.self);
+  const args = expr.args.map((arg: ColumnRef | ParamRef | LiteralExpr | OperationExpr) => {
     if (arg.kind === 'col') {
       return renderColumn(arg);
     }
@@ -181,6 +181,9 @@ function renderOperation(expr: OperationExpr): string {
     }
     if (arg.kind === 'literal') {
       return renderLiteral(arg);
+    }
+    if (arg.kind === 'operation') {
+      return renderOperation(arg);
     }
     const _exhaustive: never = arg;
     throw new Error(`Unsupported argument kind: ${(_exhaustive as { kind: string }).kind}`);

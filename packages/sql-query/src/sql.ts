@@ -1,4 +1,11 @@
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
+import type {
+  LiteralExpr,
+  OperationExpr,
+  ParamRef,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+} from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
 import type {
@@ -18,10 +25,8 @@ import type {
   JoinOnBuilder,
   JoinOnPredicate,
   LoweredStatement,
-  OperationExpr,
   ParamDescriptor,
   ParamPlaceholder,
-  ParamRef,
   Plan,
   PlanMeta,
   RawFactory,
@@ -30,6 +35,37 @@ import type {
   TableRef,
   UpdateAst,
 } from './types';
+
+/**
+ * Recursively extracts the base ColumnRef from an OperationExpr.
+ * If the expression is already a ColumnRef, it is returned directly.
+ */
+function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef {
+  if (expr.kind === 'col') {
+    return expr;
+  }
+  return extractBaseColumnRef(expr.self);
+}
+
+/**
+ * Recursively collects all ColumnRef nodes from an expression tree.
+ * Handles nested OperationExpr structures by traversing both self and args.
+ */
+function collectColumnRefs(
+  expr: ColumnRef | ParamRef | LiteralExpr | OperationExpr,
+): ColumnRef[] {
+  if (expr.kind === 'col') {
+    return [expr];
+  }
+  if (expr.kind === 'operation') {
+    const refs: ColumnRef[] = collectColumnRefs(expr.self);
+    for (const arg of expr.args) {
+      refs.push(...collectColumnRefs(arg));
+    }
+    return refs;
+  }
+  return [];
+}
 
 interface JoinState {
   readonly joinType: 'inner' | 'left' | 'right' | 'full';
@@ -656,10 +692,11 @@ class SelectBuilderImpl<
               expr: (() => {
                 const expr = include.childOrderBy.expr;
                 if ('kind' in expr && expr.kind === 'operation') {
+                  const baseCol = extractBaseColumnRef(expr);
                   return {
                     kind: 'col' as const,
-                    table: expr.self.table,
-                    column: expr.self.column,
+                    table: baseCol.table,
+                    column: baseCol.column,
                   };
                 }
                 return {
@@ -1051,17 +1088,12 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   for (const column of args.projection.columns) {
     const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
     if (operationExpr) {
-      refsColumns.set(`${operationExpr.self.table}.${operationExpr.self.column}`, {
-        table: operationExpr.self.table,
-        column: operationExpr.self.column,
-      });
-      for (const arg of operationExpr.args) {
-        if (arg.kind === 'col') {
-          refsColumns.set(`${arg.table}.${arg.column}`, {
-            table: arg.table,
-            column: arg.column,
-          });
-        }
+      const allRefs = collectColumnRefs(operationExpr);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
+        });
       }
     } else if (column.table && column.column) {
       refsColumns.set(`${column.table}.${column.column}`, {
@@ -1109,39 +1141,36 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
       // Add child WHERE columns if present
       if (include.childWhere) {
         const left = include.childWhere.left;
-        const table = 'kind' in left && left.kind === 'operation' ? left.self.table : left.table;
-        const column = 'kind' in left && left.kind === 'operation' ? left.self.column : left.column;
-        refsColumns.set(`${table}.${column}`, {
-          table,
-          column,
+        const baseCol = left.kind === 'operation'
+          ? extractBaseColumnRef(left)
+          : left;
+        refsColumns.set(`${baseCol.table}.${baseCol.column}`, {
+          table: baseCol.table,
+          column: baseCol.column,
         });
       }
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
         const expr = include.childOrderBy.expr;
-        const table = 'kind' in expr && expr.kind === 'operation' ? expr.self.table : expr.table;
-        const column = 'kind' in expr && expr.kind === 'operation' ? expr.self.column : expr.column;
-        refsColumns.set(`${table}.${column}`, {
-          table,
-          column,
+        const baseCol = expr.kind === 'operation'
+          ? extractBaseColumnRef(expr)
+          : expr;
+        refsColumns.set(`${baseCol.table}.${baseCol.column}`, {
+          table: baseCol.table,
+          column: baseCol.column,
         });
       }
     }
   }
 
   if (args.where) {
-    if ('kind' in args.where.left && args.where.left.kind === 'operation') {
-      refsColumns.set(`${args.where.left.self.table}.${args.where.left.self.column}`, {
-        table: args.where.left.self.table,
-        column: args.where.left.self.column,
-      });
-      for (const arg of args.where.left.args) {
-        if (arg.kind === 'col') {
-          refsColumns.set(`${arg.table}.${arg.column}`, {
-            table: arg.table,
-            column: arg.column,
-          });
-        }
+    if (args.where.left.kind === 'operation') {
+      const allRefs = collectColumnRefs(args.where.left);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
+        });
       }
     } else {
       refsColumns.set(`${args.where.left.table}.${args.where.left.column}`, {
@@ -1152,18 +1181,13 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.orderBy) {
-    if ('kind' in args.orderBy.expr && args.orderBy.expr.kind === 'operation') {
-      refsColumns.set(`${args.orderBy.expr.self.table}.${args.orderBy.expr.self.column}`, {
-        table: args.orderBy.expr.self.table,
-        column: args.orderBy.expr.self.column,
-      });
-      for (const arg of args.orderBy.expr.args) {
-        if (arg.kind === 'col') {
-          refsColumns.set(`${arg.table}.${arg.column}`, {
-            table: arg.table,
-            column: arg.column,
-          });
-        }
+    if (args.orderBy.expr.kind === 'operation') {
+      const allRefs = collectColumnRefs(args.orderBy.expr);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
+        });
       }
     } else {
       refsColumns.set(`${args.orderBy.expr.table}.${args.orderBy.expr.column}`, {

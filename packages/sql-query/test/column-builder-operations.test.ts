@@ -1,6 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import {
-  createCodecRegistry,
   createOperationRegistry,
   type OperationSignature,
 } from '@prisma-next/sql-target';
@@ -301,5 +300,83 @@ describe('ColumnBuilder operations', () => {
     ).cosineDistance(param('other'));
     const order = distance.asc();
     expect(order).toHaveProperty('kind', 'order');
+  });
+
+  it('chains operations producing nested OperationExpr trees', () => {
+    const registry = createOperationRegistry();
+    const signature1: OperationSignature = {
+      forTypeId: 'pgvector/vector@1',
+      method: 'normalize',
+      args: [],
+      returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'normalize(${self})',
+      },
+    };
+    const signature2: OperationSignature = {
+      forTypeId: 'pgvector/vector@1',
+      method: 'cosineDistance',
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} <=> ${arg0}',
+      },
+    };
+    registry.register(signature1);
+    registry.register(signature2);
+
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => Array.from(registry.values()),
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables['user'];
+    if (!userTable) throw new Error('user table not found');
+    const vectorColumn = userTable.columns['vector'];
+
+    // Chain operations: normalize().cosineDistance(otherVector)
+    const normalized = (
+      vectorColumn as unknown as { normalize: () => unknown }
+    ).normalize();
+    const otherVectorColumn = userTable.columns['vector'];
+    const distance = (
+      normalized as unknown as {
+        cosineDistance: (arg: unknown) => unknown;
+        _operationExpr?: import('@prisma-next/sql-target').OperationExpr;
+      }
+    ).cosineDistance(otherVectorColumn);
+
+    // Verify the result has an operation expression
+    expect(distance).toHaveProperty('kind', 'column');
+    const distanceWithExpr = distance as unknown as {
+      _operationExpr?: import('@prisma-next/sql-target').OperationExpr;
+    };
+    expect(distanceWithExpr._operationExpr).toBeDefined();
+
+    // Verify the outer operation (cosineDistance) has the inner operation (normalize) as its self
+    const outerOp = distanceWithExpr._operationExpr;
+    expect(outerOp?.kind).toBe('operation');
+    expect(outerOp?.method).toBe('cosineDistance');
+    expect(outerOp?.self.kind).toBe('operation');
+
+    // Verify the inner operation (normalize) has the column as its self
+    const innerOp = outerOp?.self as import('@prisma-next/sql-target').OperationExpr;
+    expect(innerOp.kind).toBe('operation');
+    expect(innerOp.method).toBe('normalize');
+    expect(innerOp.self.kind).toBe('col');
+    expect((innerOp.self as { table: string; column: string }).table).toBe('user');
+    expect((innerOp.self as { table: string; column: string }).column).toBe('vector');
   });
 });

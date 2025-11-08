@@ -21,12 +21,9 @@ export type {
 
 import type { Plan, PlanRefs } from '@prisma-next/contract/types';
 import type {
-  Adapter,
   ArgSpec,
   ColumnRef,
   Direction,
-  LiteralExpr,
-  LoweredStatement,
   LoweringSpec,
   OperationExpr,
   ParamRef,
@@ -220,7 +217,7 @@ type OperationMethods<
 
 /**
  * Maps operation argument specs to TypeScript argument types.
- * - typeId args: ParamPlaceholder (for now, could be ColumnBuilder in future)
+ * - typeId args: ColumnBuilder (accepts base columns or operation results)
  * - param args: ParamPlaceholder
  * - literal args: unknown (could be more specific in future)
  */
@@ -234,7 +231,7 @@ type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly 
   : [];
 
 type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
-  ? ParamPlaceholder
+  ? ColumnBuilder<string, StorageColumn, unknown>
   : Arg extends { kind: 'param' }
     ? ParamPlaceholder
     : Arg extends { kind: 'literal' }
@@ -243,7 +240,7 @@ type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
 
 /**
  * Maps operation return spec to return type.
- * - builtin types: BinaryBuilder with appropriate return type
+ * - builtin types: ColumnBuilder with appropriate JsType (matches runtime behavior)
  * - typeId types: ColumnBuilder (for now, could be more specific in future)
  */
 type OperationReturn<
@@ -253,15 +250,15 @@ type OperationReturn<
   _JsType,
 > = Returns extends { kind: 'builtin'; type: infer T }
   ? T extends 'number'
-    ? BinaryBuilder<ColumnName, ColumnMeta, number>
+    ? ColumnBuilder<ColumnName, ColumnMeta, number>
     : T extends 'boolean'
-      ? BinaryBuilder<ColumnName, ColumnMeta, boolean>
+      ? ColumnBuilder<ColumnName, ColumnMeta, boolean>
       : T extends 'string'
-        ? BinaryBuilder<ColumnName, ColumnMeta, string>
-        : BinaryBuilder<ColumnName, ColumnMeta, unknown>
+        ? ColumnBuilder<ColumnName, ColumnMeta, string>
+        : ColumnBuilder<ColumnName, ColumnMeta, unknown>
   : Returns extends { kind: 'typeId' }
     ? ColumnBuilder<string, StorageColumn, unknown>
-    : BinaryBuilder<ColumnName, ColumnMeta, unknown>;
+    : ColumnBuilder<ColumnName, ColumnMeta, unknown>;
 
 /**
  * Computes JavaScript type for a column at column creation time.
