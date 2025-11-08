@@ -153,17 +153,14 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
-    const rawPlan = sql({ context }).raw(
-      'select id from "user" where email = $1 limit $2',
-      {
-        params: ['ada@example.com', 1],
-        refs: {
-          tables: ['user'],
-          columns: [{ table: 'user', column: 'email' }],
-          indexes: [],
-        },
+    const rawPlan = sql({ context }).raw('select id from "user" where email = $1 limit $2', {
+      params: ['ada@example.com', 1],
+      refs: {
+        tables: ['user'],
+        columns: [{ table: 'user', column: 'email' }],
+        indexes: [],
       },
-    );
+    });
 
     const rows = await executePlanAndCollect(runtime, rawPlan);
 
@@ -179,13 +176,10 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
-    const rawPlan = sql({ context }).raw(
-      'insert into "user" (email) values ($1)',
-      {
-        params: ['read-only@example.com'],
-        annotations: { intent: 'report' },
-      },
-    );
+    const rawPlan = sql({ context }).raw('insert into "user" (email) values ($1)', {
+      params: ['read-only@example.com'],
+      annotations: { intent: 'report' },
+    });
 
     await expect(async () => {
       await drainPlanExecution(runtime, rawPlan);

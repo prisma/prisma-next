@@ -28,10 +28,7 @@ export function orm<TContract extends SqlContract<SqlStorage>>(
       }
 
       return () =>
-        new OrmModelBuilderImpl<TContract, CodecTypes, typeof modelName>(
-          options,
-          modelName,
-        );
+        new OrmModelBuilderImpl<TContract, CodecTypes, typeof modelName>(options, modelName);
     },
     has(_target, prop) {
       if (typeof prop !== 'string') {

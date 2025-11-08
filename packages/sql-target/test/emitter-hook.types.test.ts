@@ -175,8 +175,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with missing storage', () => {
-    const ir = createContractIR({
-    });
+    const ir = createContractIR({});
 
     const manifests: ExtensionPackManifest[] = [];
 

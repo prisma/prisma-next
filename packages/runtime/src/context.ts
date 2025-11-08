@@ -10,7 +10,9 @@ import type {
 } from '@prisma-next/sql-target';
 import { createCodecRegistry, createOperationRegistry } from '@prisma-next/sql-target';
 
-export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> {
+export interface RuntimeContext<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+> {
   readonly contract: TContract;
   readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly operations: OperationRegistry;
