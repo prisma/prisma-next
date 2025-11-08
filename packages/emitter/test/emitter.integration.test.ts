@@ -75,12 +75,6 @@ describe('emitter integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
-        postgres: {
-          version: '15.0.0',
-        },
-        pg: {},
-      },
       models: {
         User: {
           storage: { table: 'user' },
@@ -88,8 +82,10 @@ describe('emitter integration', () => {
             id: { column: 'id' },
             email: { column: 'email' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -98,9 +94,21 @@ describe('emitter integration', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {
+        postgres: {
+          version: '15.0.0',
+        },
+        pg: {},
+      },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -134,20 +142,16 @@ describe('emitter integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
-        postgres: {
-          version: '15.0.0',
-        },
-        pg: {},
-      },
       models: {
         User: {
           storage: { table: 'user' },
           fields: {
             id: { column: 'id' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -155,9 +159,21 @@ describe('emitter integration', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {
+        postgres: {
+          version: '15.0.0',
+        },
+        pg: {},
+      },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -179,12 +195,6 @@ describe('emitter integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
-        postgres: {
-          version: '15.0.0',
-        },
-        pg: {},
-      },
       models: {
         User: {
           storage: { table: 'user' },
@@ -192,8 +202,10 @@ describe('emitter integration', () => {
             id: { column: 'id' },
             email: { column: 'email' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -202,9 +214,21 @@ describe('emitter integration', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {
+        postgres: {
+          version: '15.0.0',
+        },
+        pg: {},
+      },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -220,13 +244,11 @@ describe('emitter integration', () => {
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
       models: contractJson1['models'] as Record<string, unknown>,
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
-      ...(contractJson1['capabilities'] !== undefined && {
-        capabilities: contractJson1['capabilities'] as Record<string, Record<string, boolean>>,
-      }),
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -236,4 +258,8 @@ describe('emitter integration', () => {
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);
   });
+});
+
+});
+
 });

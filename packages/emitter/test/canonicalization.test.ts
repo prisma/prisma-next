@@ -9,9 +9,12 @@ describe('canonicalization', () => {
       target: 'postgres',
       schemaVersion: '1',
       models: {},
+      relations: {},
       storage: { tables: {} },
+      extensions: {},
       capabilities: { postgres: { jsonAgg: true } },
       meta: { source: 'test' },
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -38,6 +41,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -48,6 +54,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -66,11 +76,14 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
       models: {},
+      relations: {},
       storage: { tables: {} },
-      capabilities: {},
       extensions: {},
+      capabilities: {},
       meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -86,6 +99,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -99,6 +115,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result1 = canonicalizeContract(ir);
@@ -106,6 +126,9 @@ describe('canonicalization', () => {
     const ir2: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -119,6 +142,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result2 = canonicalizeContract(ir2);
@@ -130,6 +157,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -143,6 +173,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -159,6 +193,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -170,6 +207,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -186,11 +227,18 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
+      storage: { tables: {} },
       extensions: {
         pgvector: { version: '1.0.0' },
         postgres: { version: '15.0.0' },
         another: { version: '1.0.0' },
       },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -204,6 +252,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -213,6 +264,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);

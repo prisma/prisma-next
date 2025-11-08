@@ -50,16 +50,16 @@ export interface ExtensionPack {
 }
 
 export interface ContractIR {
-  readonly schemaVersion?: string;
+  readonly schemaVersion: string;
   readonly targetFamily: string;
   readonly target: string;
-  readonly models?: Record<string, unknown>;
-  readonly relations?: Record<string, unknown>;
-  readonly storage?: Record<string, unknown>;
-  readonly extensions?: Record<string, unknown>;
-  readonly capabilities?: Record<string, Record<string, boolean>>;
-  readonly meta?: Record<string, unknown>;
-  readonly sources?: Record<string, unknown>;
+  readonly models: Record<string, unknown>;
+  readonly relations: Record<string, unknown>;
+  readonly storage: Record<string, unknown>;
+  readonly extensions: Record<string, unknown>;
+  readonly capabilities: Record<string, Record<string, boolean>>;
+  readonly meta: Record<string, unknown>;
+  readonly sources: Record<string, unknown>;
 }
 
 export interface EmitOptions {

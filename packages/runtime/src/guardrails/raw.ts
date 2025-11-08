@@ -90,6 +90,10 @@ function evaluateIndexCoverage(refs: PlanRefs, lints: LintFinding[]) {
   }
 
   const indexes = refs.indexes ?? [];
+  if (indexes.length === 0) {
+    return;
+  }
+
   const hasSupportingIndex = predicateColumns.every((column) =>
     indexes.some(
       (index) =>

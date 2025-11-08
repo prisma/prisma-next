@@ -7,12 +7,12 @@ type NormalizedContract = {
   coreHash?: string;
   profileHash?: string;
   models: Record<string, unknown>;
-  relations?: Record<string, unknown>;
+  relations: Record<string, unknown>;
   storage: Record<string, unknown>;
-  extensions?: Record<string, unknown>;
-  capabilities?: Record<string, Record<string, boolean>>;
-  meta?: Record<string, unknown>;
-  sources?: Record<string, unknown>;
+  extensions: Record<string, unknown>;
+  capabilities: Record<string, Record<string, boolean>>;
+  meta: Record<string, unknown>;
+  sources: Record<string, unknown>;
 };
 
 const TOP_LEVEL_ORDER = [
@@ -180,11 +180,16 @@ export function canonicalizeContract(
   ir: ContractIR & { coreHash?: string; profileHash?: string },
 ): string {
   const normalized: NormalizedContract = {
-    schemaVersion: ir.schemaVersion ?? '1',
+    schemaVersion: ir.schemaVersion,
     targetFamily: ir.targetFamily,
     target: ir.target,
-    models: ir.models ?? {},
-    storage: ir.storage ?? { tables: {} },
+    models: ir.models,
+    relations: ir.relations,
+    storage: ir.storage,
+    extensions: ir.extensions,
+    capabilities: ir.capabilities,
+    meta: ir.meta,
+    sources: ir.sources,
   };
 
   if (ir.coreHash !== undefined) {
@@ -193,26 +198,6 @@ export function canonicalizeContract(
 
   if (ir.profileHash !== undefined) {
     normalized.profileHash = ir.profileHash;
-  }
-
-  if (ir.relations !== undefined && !isDefaultValue(ir.relations)) {
-    normalized.relations = ir.relations;
-  }
-
-  if (ir.extensions !== undefined && !isDefaultValue(ir.extensions)) {
-    normalized.extensions = ir.extensions;
-  }
-
-  if (ir.capabilities !== undefined && !isDefaultValue(ir.capabilities)) {
-    normalized.capabilities = ir.capabilities;
-  }
-
-  if (ir.meta !== undefined && !isDefaultValue(ir.meta)) {
-    normalized.meta = ir.meta;
-  }
-
-  if (ir.sources !== undefined && !isDefaultValue(ir.sources)) {
-    normalized.sources = ir.sources;
   }
 
   const withDefaultsOmitted = omitDefaults(normalized, []) as NormalizedContract;

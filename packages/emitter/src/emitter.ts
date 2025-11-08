@@ -11,14 +11,34 @@ function validateCoreStructure(ir: ContractIR): void {
   if (!ir.target) {
     throw new Error('ContractIR must have target');
   }
+  if (!ir.schemaVersion) {
+    throw new Error('ContractIR must have schemaVersion');
+  }
+  if (!ir.models || typeof ir.models !== 'object') {
+    throw new Error('ContractIR must have models');
+  }
+  if (!ir.storage || typeof ir.storage !== 'object') {
+    throw new Error('ContractIR must have storage');
+  }
+  if (!ir.relations || typeof ir.relations !== 'object') {
+    throw new Error('ContractIR must have relations');
+  }
+  if (!ir.extensions || typeof ir.extensions !== 'object') {
+    throw new Error('ContractIR must have extensions');
+  }
+  if (!ir.capabilities || typeof ir.capabilities !== 'object') {
+    throw new Error('ContractIR must have capabilities');
+  }
+  if (!ir.meta || typeof ir.meta !== 'object') {
+    throw new Error('ContractIR must have meta');
+  }
+  if (!ir.sources || typeof ir.sources !== 'object') {
+    throw new Error('ContractIR must have sources');
+  }
 }
 
 function validateExtensions(ir: ContractIR, packs: ReadonlyArray<ExtensionPack>): void {
-  const extensions = ir.extensions as Record<string, unknown> | undefined;
-  if (!extensions) {
-    return;
-  }
-
+  const extensions = ir.extensions as Record<string, unknown>;
   for (const pack of packs) {
     const packId = pack.manifest.id;
     if (!extensions[packId]) {
@@ -47,16 +67,16 @@ export async function emit(
   validateExtensions(ir, packs);
 
   const contractJson = {
-    schemaVersion: ir.schemaVersion || '1',
+    schemaVersion: ir.schemaVersion,
     targetFamily: ir.targetFamily,
     target: ir.target,
-    models: ir.models || {},
-    relations: ir.relations || {},
-    storage: ir.storage || {},
-    extensions: ir.extensions || {},
-    capabilities: ir.capabilities || {},
-    meta: ir.meta || {},
-    sources: ir.sources || {},
+    models: ir.models,
+    relations: ir.relations,
+    storage: ir.storage,
+    extensions: ir.extensions,
+    capabilities: ir.capabilities,
+    meta: ir.meta,
+    sources: ir.sources,
   } as const;
 
   const coreHash = computeCoreHash(contractJson);

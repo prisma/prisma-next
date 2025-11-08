@@ -8,7 +8,12 @@ describe('hashing', () => {
       targetFamily: 'sql',
       target: 'postgres',
       models: {},
+      relations: {},
       storage: { tables: {} },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const hash = computeCoreHash(contract);
@@ -20,7 +25,13 @@ describe('hashing', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
+      models: {},
+      relations: {},
+      storage: { tables: {} },
+      extensions: {},
       capabilities: { postgres: { jsonAgg: true } },
+      meta: {},
+      sources: {},
     };
 
     const hash = computeProfileHash(contract);
@@ -33,7 +44,12 @@ describe('hashing', () => {
       targetFamily: 'sql',
       target: 'postgres',
       models: {},
+      relations: {},
       storage: { tables: {} },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const hash1 = computeCoreHash(contract);

@@ -109,7 +109,11 @@ flowchart TD
   - `indexes`: defaults to `[]` (empty array)
   - `foreignKeys`: defaults to `[]` (empty array)
   - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
-- The builder is the **only** place where normalization should occur. Validators, parsers, and emitters assume contracts are already normalized.
+  - `extensions`: defaults to `{}` (empty object)
+  - `capabilities`: defaults to `{}` (empty object)
+  - `meta`: defaults to `{}` (empty object)
+  - `sources`: defaults to `{}` (empty object)
+- The builder is the **only** place where normalization should occur. Validators, parsers, and emitters assume contracts are already normalized (all required fields present, even if empty).
 
 ### Types (`types.ts`)
 - Plan types, AST types, and utility types

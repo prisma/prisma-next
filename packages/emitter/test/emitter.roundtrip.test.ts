@@ -72,12 +72,11 @@ export type Contract = unknown;
 describe('emitter round-trip', () => {
   it('round-trip with minimal IR', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
-        postgres: { version: '15.0.0' },
-        pg: {},
-      },
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -85,9 +84,19 @@ describe('emitter round-trip', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {
+        postgres: { version: '15.0.0' },
+        pg: {},
+      },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -103,13 +112,11 @@ describe('emitter round-trip', () => {
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
       models: contractJson1['models'] as Record<string, unknown>,
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
-      ...(contractJson1['capabilities'] !== undefined && {
-        capabilities: contractJson1['capabilities'] as Record<string, Record<string, boolean>>,
-      }),
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -122,11 +129,9 @@ describe('emitter round-trip', () => {
 
   it('round-trip with complex IR', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
-        postgres: { version: '15.0.0' },
-      },
       models: {
         User: {
           storage: { table: 'user' },
@@ -135,6 +140,7 @@ describe('emitter round-trip', () => {
             email: { column: 'email' },
             name: { column: 'name' },
           },
+          relations: {},
         },
         Post: {
           storage: { table: 'post' },
@@ -143,8 +149,10 @@ describe('emitter round-trip', () => {
             title: { column: 'title' },
             userId: { column: 'user_id' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -156,6 +164,7 @@ describe('emitter round-trip', () => {
             primaryKey: { columns: ['id'] },
             uniques: [{ columns: ['email'], name: 'user_email_key' }],
             indexes: [{ columns: ['name'], name: 'user_name_idx' }],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -164,6 +173,8 @@ describe('emitter round-trip', () => {
               user_id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
             foreignKeys: [
               {
                 columns: ['user_id'],
@@ -174,6 +185,12 @@ describe('emitter round-trip', () => {
           },
         },
       },
+      extensions: {
+        postgres: { version: '15.0.0' },
+      },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -189,13 +206,11 @@ describe('emitter round-trip', () => {
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
       models: contractJson1['models'] as Record<string, unknown>,
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
-      ...(contractJson1['capabilities'] !== undefined && {
-        capabilities: contractJson1['capabilities'] as Record<string, Record<string, boolean>>,
-      }),
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -208,12 +223,11 @@ describe('emitter round-trip', () => {
 
   it('round-trip with nullable fields', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
-        postgres: { version: '15.0.0' },
-        pg: {},
-      },
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -223,9 +237,19 @@ describe('emitter round-trip', () => {
               name: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {
+        postgres: { version: '15.0.0' },
+        pg: {},
+      },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -241,13 +265,11 @@ describe('emitter round-trip', () => {
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
       models: contractJson1['models'] as Record<string, unknown>,
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
-      ...(contractJson1['capabilities'] !== undefined && {
-        capabilities: contractJson1['capabilities'] as Record<string, Record<string, boolean>>,
-      }),
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -272,8 +294,24 @@ describe('emitter round-trip', () => {
 
   it('round-trip with capabilities', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
+      models: {},
+      relations: {},
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
       extensions: {
         postgres: { version: '15.0.0' },
         pg: {},
@@ -284,16 +322,8 @@ describe('emitter round-trip', () => {
           lateral: true,
         },
       },
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-          },
-        },
-      },
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -309,13 +339,11 @@ describe('emitter round-trip', () => {
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
       models: contractJson1['models'] as Record<string, unknown>,
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
-      ...(contractJson1['capabilities'] !== undefined && {
-        capabilities: contractJson1['capabilities'] as Record<string, Record<string, boolean>>,
-      }),
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -327,3 +355,5 @@ describe('emitter round-trip', () => {
     expect(result1.profileHash).toBe(result2.profileHash);
   });
 });
+
+

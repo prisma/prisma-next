@@ -3,15 +3,16 @@ import { canonicalizeContract } from './canonicalization';
 import type { ContractIR } from './types';
 
 type ContractInput = {
-  schemaVersion?: string;
+  schemaVersion: string;
   targetFamily: string;
   target: string;
-  models?: Record<string, unknown>;
-  relations?: Record<string, unknown>;
-  storage?: Record<string, unknown>;
-  extensions?: Record<string, unknown>;
-  sources?: Record<string, unknown>;
-  capabilities?: Record<string, Record<string, boolean>>;
+  models: Record<string, unknown>;
+  relations: Record<string, unknown>;
+  storage: Record<string, unknown>;
+  extensions: Record<string, unknown>;
+  sources: Record<string, unknown>;
+  capabilities: Record<string, Record<string, boolean>>;
+  meta: Record<string, unknown>;
   [key: string]: unknown;
 };
 
@@ -23,26 +24,16 @@ function computeHash(content: string): string {
 
 export function computeCoreHash(contract: ContractInput): string {
   const coreContract: ContractIR = {
-    ...(contract.schemaVersion !== undefined
-      ? { schemaVersion: contract.schemaVersion as string }
-      : {}),
-    targetFamily: contract.targetFamily as string,
-    target: contract.target as string,
-    ...(contract.models !== undefined
-      ? { models: contract.models as Record<string, unknown> }
-      : {}),
-    ...(contract.relations !== undefined
-      ? { relations: contract.relations as Record<string, unknown> }
-      : {}),
-    ...(contract.storage !== undefined
-      ? { storage: contract.storage as Record<string, unknown> }
-      : {}),
-    ...(contract.extensions !== undefined
-      ? { extensions: contract.extensions as Record<string, unknown> }
-      : {}),
-    ...(contract.sources !== undefined
-      ? { sources: contract.sources as Record<string, unknown> }
-      : {}),
+    schemaVersion: contract.schemaVersion,
+    targetFamily: contract.targetFamily,
+    target: contract.target,
+    models: contract.models,
+    relations: contract.relations,
+    storage: contract.storage,
+    extensions: contract.extensions,
+    sources: contract.sources,
+    capabilities: contract.capabilities,
+    meta: contract.meta,
   };
   const canonical = canonicalizeContract(coreContract);
   return computeHash(canonical);
@@ -50,14 +41,16 @@ export function computeCoreHash(contract: ContractInput): string {
 
 export function computeProfileHash(contract: ContractInput): string {
   const profileContract: ContractIR = {
-    ...(contract.schemaVersion !== undefined
-      ? { schemaVersion: contract.schemaVersion as string }
-      : {}),
-    targetFamily: contract.targetFamily as string,
-    target: contract.target as string,
-    ...(contract.capabilities !== undefined
-      ? { capabilities: contract.capabilities as Record<string, Record<string, boolean>> }
-      : {}),
+    schemaVersion: contract.schemaVersion,
+    targetFamily: contract.targetFamily,
+    target: contract.target,
+    models: {},
+    relations: {},
+    storage: {},
+    extensions: {},
+    capabilities: contract.capabilities,
+    meta: {},
+    sources: {},
   };
   const canonical = canonicalizeContract(profileContract);
   return computeHash(canonical);

@@ -23,7 +23,7 @@ Provide a deterministic, verifiable representation of the application's data con
 - **Emit**: Generate `contract.json` and `contract.d.ts` with family-specific type generation
 - **Extension Pack Loading**: Load and validate extension pack manifests (via utilities)
 
-**Note**: The emitter does NOT normalize contracts. Normalization must happen in the contract builder when the contract is created. The emitter assumes contracts are already normalized (all required fields present).
+**Note**: The emitter does NOT normalize contracts. Normalization must happen in the contract builder when the contract is created. The emitter assumes contracts are already normalized (all required fields present, including `schemaVersion`, `models`, `relations`, `storage`, `extensions`, `capabilities`, `meta`, and `sources`). All fields can be empty objects/arrays, but they must be present.
 
 **Non-goals:**
 - Migration planning or execution

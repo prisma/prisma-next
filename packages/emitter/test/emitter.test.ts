@@ -74,12 +74,6 @@ describe('emitter', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
-        postgres: {
-          version: '15.0.0',
-        },
-        pg: {},
-      },
       models: {
         User: {
           storage: { table: 'user' },
@@ -87,8 +81,10 @@ describe('emitter', () => {
             id: { column: 'id' },
             email: { column: 'email' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -97,9 +93,21 @@ describe('emitter', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {
+        postgres: {
+          version: '15.0.0',
+        },
+        pg: {},
+      },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -124,6 +132,8 @@ describe('emitter', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -131,9 +141,16 @@ describe('emitter', () => {
               id: { type: 'unknown/type@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -150,6 +167,8 @@ describe('emitter', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -157,9 +176,16 @@ describe('emitter', () => {
               id: { type: 'invalid-format', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -176,15 +202,24 @@ describe('emitter', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: undefined as unknown as string,
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     } as ContractIR;
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -203,15 +238,24 @@ describe('emitter', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: undefined as unknown as string,
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     } as ContractIR;
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -228,16 +272,24 @@ describe('emitter', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {},
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -255,15 +307,24 @@ describe('emitter', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -281,15 +342,24 @@ describe('emitter', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs: ExtensionPack[] = [];
@@ -300,4 +370,6 @@ describe('emitter', () => {
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
   });
+});
+
 });
