@@ -4,7 +4,6 @@ import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { createJoinOnBuilder } from '../src/sql';
-import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type for this test
 type ContractWithPosts = SqlContract<

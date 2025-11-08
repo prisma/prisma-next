@@ -11,8 +11,8 @@ import type {
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
-import type { Log, Plugin, SqlStatement } from '../src/exports';
 import type { RuntimeContext } from '../src/context';
+import type { Log, Plugin, SqlStatement } from '../src/exports';
 import {
   createRuntime,
   createRuntimeContext,

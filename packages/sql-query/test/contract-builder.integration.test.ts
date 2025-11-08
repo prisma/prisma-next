@@ -1,5 +1,5 @@
 import type { ResultType } from '@prisma-next/contract/types';
-import type { ModelDefinition, SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { ModelDefinition } from '@prisma-next/sql-target';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
 import { createStubAdapter, createTestContext } from '../../runtime/test/utils';

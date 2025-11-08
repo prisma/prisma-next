@@ -175,8 +175,6 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 }
 
 describe('SQL builder includeMany', () => {
-  const adapter = createStubAdapter();
-
   it('throws error when child projection is empty', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);

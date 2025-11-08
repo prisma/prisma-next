@@ -2,15 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type {
-  Adapter,
-  LoweredStatement,
-  SelectAst,
-  SelectAst as SelectAstType,
-  SqlContract,
-  SqlStorage,
-} from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
+import type { SelectAst as SelectAstType } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
@@ -27,26 +19,6 @@ function loadContract(name: string): Contract {
   const contents = readFileSync(filePath, 'utf8');
   const contractJson = JSON.parse(contents);
   return validateContract<Contract>(contractJson);
-}
-
-function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
-  return {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
-    },
-  };
 }
 
 describe('sql DSL builder', () => {

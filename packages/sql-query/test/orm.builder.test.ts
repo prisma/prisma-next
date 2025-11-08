@@ -14,7 +14,7 @@ import { createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { orm } from '../src/orm';
 import { param } from '../src/param';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

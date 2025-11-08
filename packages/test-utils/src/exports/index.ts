@@ -1,6 +1,6 @@
+import { randomInt } from 'node:crypto';
 import type { StartServerOptions } from '@prisma/dev';
 import { unstable_startServer } from '@prisma/dev';
-import { randomInt } from 'node:crypto';
 import { Client } from 'pg';
 
 export * from '../timeouts';
