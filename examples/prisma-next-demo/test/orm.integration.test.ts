@@ -35,30 +35,7 @@ beforeAll(async () => {
 
   mkdirSync(outputDir, { recursive: true });
 
-  // Parse the emitted contract and add relations (contract builder doesn't support relations yet)
   const contractJson = JSON.parse(result.contractJson);
-  contractJson.relations = {
-    user: {
-      posts: {
-        to: 'Post',
-        cardinality: '1:N',
-        on: {
-          parentCols: ['id'],
-          childCols: ['userId'],
-        },
-      },
-    },
-    post: {
-      user: {
-        to: 'User',
-        cardinality: 'N:1',
-        on: {
-          parentCols: ['id'],
-          childCols: ['userId'],
-        },
-      },
-    },
-  };
 
   writeFileSync(join(outputDir, 'contract.json'), JSON.stringify(contractJson, null, 2), 'utf-8');
   writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
@@ -68,75 +45,79 @@ beforeAll(async () => {
 }, timeouts.typeScriptCompilation);
 
 describe('ORM integration tests', () => {
-  it('orm.getUsers returns users with selected fields, respects limit and ordering', async () => {
-    await withDevDatabase(
-      async ({ connectionString }: { connectionString: string }) => {
-        // Set DATABASE_URL for getRuntime() used by query functions
-        const originalDatabaseUrl = process.env['DATABASE_URL'];
-        process.env['DATABASE_URL'] = connectionString;
-        await closeRuntime();
-
-        const adapter = createPostgresAdapter();
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
-        const runtime = createRuntime({
-          contract,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
-        });
-
-        try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client: import('pg').Client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query(
-              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now()), ($3, now())',
-              ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
-            );
-          });
-
-          const { ormGetUsers } = await import('../src/queries/orm-get-users');
-          const users = await ormGetUsers(2);
-
-          expect(users).toHaveLength(2);
-          expect(users[0]).toHaveProperty('id');
-          expect(users[0]).toHaveProperty('email');
-          expect(users[0]).toHaveProperty('createdAt');
-          expect(users[0]).not.toHaveProperty('posts');
-          expect(typeof (users[0] as { id: unknown }).id).toBe('number');
-          expect(typeof (users[0] as { email: unknown }).email).toBe('string');
-        } finally {
-          await runtime.close();
+  it(
+    'orm.getUsers returns users with selected fields, respects limit and ordering',
+    async () => {
+      await withDevDatabase(
+        async ({ connectionString }: { connectionString: string }) => {
+          // Set DATABASE_URL for getRuntime() used by query functions
+          const originalDatabaseUrl = process.env['DATABASE_URL'];
+          process.env['DATABASE_URL'] = connectionString;
           await closeRuntime();
-          if (originalDatabaseUrl !== undefined) {
-            process.env['DATABASE_URL'] = originalDatabaseUrl;
-          } else {
-            delete process.env['DATABASE_URL'];
+
+          const adapter = createPostgresAdapter();
+          const pool = new Pool({ connectionString });
+          const driver = createPostgresDriverFromOptions({
+            connect: { pool },
+            cursor: { disabled: true },
+          });
+          const runtime = createRuntime({
+            contract,
+            adapter,
+            driver,
+            verify: { mode: 'onFirstUse', requireMarker: false },
+            plugins: [
+              budgets({
+                maxRows: 10_000,
+                defaultTableRows: 10_000,
+                tableRows: { user: 10_000, post: 10_000 },
+              }),
+            ],
+          });
+
+          try {
+            await stampMarker({
+              connectionString,
+              coreHash: contract.coreHash,
+              profileHash: contract.profileHash ?? contract.coreHash,
+            });
+
+            await withClient(connectionString, async (client: import('pg').Client) => {
+              await client.query(
+                'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+              );
+              await client.query('truncate table "user" restart identity');
+              await client.query(
+                'insert into "user" (email, "createdAt") values ($1, now()), ($2, now()), ($3, now())',
+                ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
+              );
+            });
+
+            const { ormGetUsers } = await import('../src/queries/orm-get-users');
+            const users = await ormGetUsers(2);
+
+            expect(users).toHaveLength(2);
+            expect(users[0]).toHaveProperty('id');
+            expect(users[0]).toHaveProperty('email');
+            expect(users[0]).toHaveProperty('createdAt');
+            expect(users[0]).not.toHaveProperty('posts');
+            expect(typeof (users[0] as { id: unknown }).id).toBe('number');
+            expect(typeof (users[0] as { email: unknown }).email).toBe('string');
+          } finally {
+            await runtime.close();
+            await closeRuntime();
+            if (originalDatabaseUrl !== undefined) {
+              process.env['DATABASE_URL'] = originalDatabaseUrl;
+            } else {
+              delete process.env['DATABASE_URL'];
+            }
           }
-        }
-      },
-      { acceleratePort: 54400, databasePort: 54401, shadowDatabasePort: 54402 },
-    );
-  });
+        },
+        { acceleratePort: 54400, databasePort: 54401, shadowDatabasePort: 54402 },
+      );
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('orm.getUserById returns single user by ID', async () => {
     await withDevDatabase(

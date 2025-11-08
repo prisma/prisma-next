@@ -314,4 +314,259 @@ describe('builder integration', () => {
         .build();
     }).toThrow(/type must be in format/);
   });
+
+  describe('relation builder', () => {
+    it('builds a contract with 1:N relation', () => {
+      const contract = defineContract<CodecTypes>()
+        .target('postgres')
+        .table('user', (t) =>
+          t
+            .column('id', 'int4', { nullable: false })
+            .column('email', 'text', { nullable: false })
+            .primaryKey(['id']),
+        )
+        .table('post', (t) =>
+          t
+            .column('id', 'int4', { nullable: false })
+            .column('userId', 'int4', { nullable: false })
+            .column('title', 'text', { nullable: false })
+            .primaryKey(['id']),
+        )
+        .model('User', 'user', (m) =>
+          m
+            .field('id', 'id')
+            .field('email', 'email')
+            .relation('posts', {
+              toModel: 'Post',
+              toTable: 'post',
+              cardinality: '1:N',
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'post',
+                childColumns: ['userId'],
+              },
+            }),
+        )
+        .model('Post', 'post', (m) =>
+          m
+            .field('id', 'id')
+            .field('userId', 'userId')
+            .field('title', 'title')
+            .relation('user', {
+              toModel: 'User',
+              toTable: 'user',
+              cardinality: 'N:1',
+              on: {
+                parentTable: 'post',
+                parentColumns: ['userId'],
+                childTable: 'user',
+                childColumns: ['id'],
+              },
+            }),
+        )
+        .coreHash('sha256:test-core')
+        .build();
+
+      // Runtime checks
+      expect(contract.relations).toBeDefined();
+      expect(contract.relations.user).toBeDefined();
+      expect(contract.relations.user.posts).toBeDefined();
+      expect(contract.relations.user.posts.to).toBe('Post');
+      expect(contract.relations.user.posts.cardinality).toBe('1:N');
+      expect(contract.relations.user.posts.on.parentCols).toEqual(['id']);
+      expect(contract.relations.user.posts.on.childCols).toEqual(['userId']);
+
+      expect(contract.relations.post).toBeDefined();
+      expect(contract.relations.post.user).toBeDefined();
+      expect(contract.relations.post.user.to).toBe('User');
+      expect(contract.relations.post.user.cardinality).toBe('N:1');
+      expect(contract.relations.post.user.on.parentCols).toEqual(['userId']);
+      expect(contract.relations.post.user.on.childCols).toEqual(['id']);
+    });
+
+    it('builds a contract with N:M relation', () => {
+      const contract = defineContract<CodecTypes>()
+        .target('postgres')
+        .table('user', (t) =>
+          t
+            .column('id', 'int4', { nullable: false })
+            .column('email', 'text', { nullable: false })
+            .primaryKey(['id']),
+        )
+        .table('role', (t) =>
+          t
+            .column('id', 'int4', { nullable: false })
+            .column('name', 'text', { nullable: false })
+            .primaryKey(['id']),
+        )
+        .table('userRole', (t) =>
+          t
+            .column('userId', 'int4', { nullable: false })
+            .column('roleId', 'int4', { nullable: false })
+            .primaryKey(['userId', 'roleId']),
+        )
+        .model('User', 'user', (m) =>
+          m
+            .field('id', 'id')
+            .field('email', 'email')
+            .relation('roles', {
+              toModel: 'Role',
+              toTable: 'role',
+              cardinality: 'N:M',
+              through: {
+                table: 'userRole',
+                parentColumns: ['id'],
+                childColumns: ['userId'],
+              },
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'userRole',
+                childColumns: ['userId'],
+              },
+            }),
+        )
+        .model('Role', 'role', (m) =>
+          m
+            .field('id', 'id')
+            .field('name', 'name')
+            .relation('users', {
+              toModel: 'User',
+              toTable: 'user',
+              cardinality: 'N:M',
+              through: {
+                table: 'userRole',
+                parentColumns: ['id'],
+                childColumns: ['roleId'],
+              },
+              on: {
+                parentTable: 'role',
+                parentColumns: ['id'],
+                childTable: 'userRole',
+                childColumns: ['roleId'],
+              },
+            }),
+        )
+        .coreHash('sha256:test-core')
+        .build();
+
+      // Runtime checks
+      expect(contract.relations.user).toBeDefined();
+      expect(contract.relations.user.roles).toBeDefined();
+      expect(contract.relations.user.roles.to).toBe('Role');
+      expect(contract.relations.user.roles.cardinality).toBe('N:M');
+      expect(contract.relations.user.roles.through).toBeDefined();
+      expect(contract.relations.user.roles.through?.table).toBe('userRole');
+      expect(contract.relations.user.roles.through?.parentCols).toEqual(['id']);
+      expect(contract.relations.user.roles.through?.childCols).toEqual(['userId']);
+
+      expect(contract.relations.role).toBeDefined();
+      expect(contract.relations.role.users).toBeDefined();
+      expect(contract.relations.role.users.to).toBe('User');
+      expect(contract.relations.role.users.cardinality).toBe('N:M');
+      expect(contract.relations.role.users.through).toBeDefined();
+      expect(contract.relations.role.users.through?.table).toBe('userRole');
+      expect(contract.relations.role.users.through?.parentCols).toEqual(['id']);
+      expect(contract.relations.role.users.through?.childCols).toEqual(['roleId']);
+    });
+
+    it('validates parentTable matches model table', () => {
+      expect(() => {
+        defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) => t.column('id', 'int4', { nullable: false }))
+          .table('post', (t) => t.column('id', 'int4', { nullable: false }))
+          .model('User', 'user', (m) =>
+            m.relation('posts', {
+              toModel: 'Post',
+              toTable: 'post',
+              cardinality: '1:N',
+              on: {
+                parentTable: 'wrongTable',
+                parentColumns: ['id'],
+                childTable: 'post',
+                childColumns: ['userId'],
+              },
+            }),
+          )
+          .build();
+      }).toThrow(/parentTable.*does not match model table/);
+    });
+
+    it('validates childTable matches toTable for non-N:M relations', () => {
+      expect(() => {
+        defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) => t.column('id', 'int4', { nullable: false }))
+          .table('post', (t) => t.column('id', 'int4', { nullable: false }))
+          .model('User', 'user', (m) =>
+            m.relation('posts', {
+              toModel: 'Post',
+              toTable: 'post',
+              cardinality: '1:N',
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'wrongTable',
+                childColumns: ['userId'],
+              },
+            }),
+          )
+          .build();
+      }).toThrow(/childTable.*does not match toTable/);
+    });
+
+    it('validates N:M relations require through field', () => {
+      expect(() => {
+        defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) => t.column('id', 'int4', { nullable: false }))
+          .table('role', (t) => t.column('id', 'int4', { nullable: false }))
+          .model('User', 'user', (m) =>
+            m.relation('roles', {
+              toModel: 'Role',
+              toTable: 'role',
+              cardinality: 'N:M',
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'userRole',
+                childColumns: ['userId'],
+              },
+            } as any),
+          )
+          .build();
+      }).toThrow(/cardinality "N:M" requires through field/);
+    });
+
+    it('validates childTable matches through.table for N:M relations', () => {
+      expect(() => {
+        defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) => t.column('id', 'int4', { nullable: false }))
+          .table('role', (t) => t.column('id', 'int4', { nullable: false }))
+          .table('userRole', (t) => t.column('userId', 'int4', { nullable: false }))
+          .model('User', 'user', (m) =>
+            m.relation('roles', {
+              toModel: 'Role',
+              toTable: 'role',
+              cardinality: 'N:M',
+              through: {
+                table: 'userRole',
+                parentColumns: ['id'],
+                childColumns: ['userId'],
+              },
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'wrongTable',
+                childColumns: ['userId'],
+              },
+            }),
+          )
+          .build();
+      }).toThrow(/childTable.*does not match through.table/);
+    });
+  });
 });
