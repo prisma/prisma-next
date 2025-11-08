@@ -68,11 +68,11 @@ test('schema works with inferred contract type', () => {
   expectTypeOf(_userTable).not.toBeUndefined();
 });
 
-test('schema handles optional CodecTypes parameter', () => {
-  // Test schema without CodecTypes parameter
-  const schemaWithoutCodecTypes = schema(context);
+test('schema extracts CodecTypes automatically from contract', () => {
+  // Test that schema automatically extracts CodecTypes from contract
+  const schemaHandle = schema(context);
 
   // Should still work correctly
-  expectTypeOf(schemaWithoutCodecTypes.tables).toHaveProperty('user');
-  expectTypeOf(schemaWithoutCodecTypes.tables.user.columns).toHaveProperty('id');
+  expectTypeOf(schemaHandle.tables).toHaveProperty('user');
+  expectTypeOf(schemaHandle.tables.user.columns).toHaveProperty('id');
 });

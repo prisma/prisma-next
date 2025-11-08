@@ -110,7 +110,7 @@ describe('SQL builder joins', () => {
   it('builds a plan with a single inner join', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -142,7 +142,7 @@ describe('SQL builder joins', () => {
   it('builds a plan with chained joins', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
     const commentColumns = tables.comment.columns;
@@ -188,7 +188,7 @@ describe('SQL builder joins', () => {
   it('preserves join order across multiple chained joins', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
     const commentColumns = tables.comment.columns;
@@ -220,7 +220,7 @@ describe('SQL builder joins', () => {
   it('works with where clause alongside joins', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -248,7 +248,7 @@ describe('SQL builder joins', () => {
   it('throws PLAN.INVALID when joining unknown table', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
 
     const builder = sql<ContractWithPosts, CodecTypes>({ context }).from(tables.user);
@@ -263,7 +263,7 @@ describe('SQL builder joins', () => {
   it('throws PLAN.INVALID when attempting self-join', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
 
     const builder = sql<ContractWithPosts, CodecTypes>({ context }).from(tables.user);
@@ -276,7 +276,7 @@ describe('SQL builder joins', () => {
   it('supports all join types', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -306,7 +306,7 @@ describe('SQL builder joins', () => {
   it('includes joined tables in meta refs', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -327,7 +327,7 @@ describe('SQL builder joins', () => {
   it('includes ON columns in meta refs', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -350,7 +350,7 @@ describe('SQL builder joins', () => {
   it('includes all referenced columns in meta refs (projection, where, orderBy, joins)', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -379,7 +379,7 @@ describe('SQL builder joins', () => {
     it('flattens nested projection over joined columns', () => {
       const adapter = createStubAdapter();
       const context = createTestContext(contractWithPosts, adapter);
-      const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+      const tables = schema<ContractWithPosts>(context).tables;
       const userColumns = tables.user.columns;
       const postColumns = tables.post.columns;
 
@@ -416,7 +416,7 @@ describe('SQL builder joins', () => {
     it('includes all referenced columns in meta refs for nested projections with joins', () => {
       const adapter = createStubAdapter();
       const context = createTestContext(contractWithPosts, adapter);
-      const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+      const tables = schema<ContractWithPosts>(context).tables;
       const userColumns = tables.user.columns;
       const postColumns = tables.post.columns;
 
@@ -447,7 +447,7 @@ describe('SQL builder joins', () => {
     it('handles multi-level nested projection with joins', () => {
       const adapter = createStubAdapter();
       const context = createTestContext(contractWithPosts, adapter);
-      const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+      const tables = schema<ContractWithPosts>(context).tables;
       const userColumns = tables.user.columns;
       const postColumns = tables.post.columns;
 

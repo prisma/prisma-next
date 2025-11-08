@@ -53,7 +53,7 @@ test('ResultType inference works identically to fixture contract', () => {
 
   const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof validatedBuilderContract, CodecTypes>(
+  const tables = schema<typeof validatedBuilderContract>(
     validatedBuilderContract,
   ).tables;
   const userTable = tables.user;
@@ -74,7 +74,7 @@ test('ResultType inference works identically to fixture contract', () => {
   type BuilderRow = ResultType<typeof _plan>;
 
   const _fixtureContract = validateContract<Contract>(contractJson);
-  const fixtureTables = schema<Contract, CodecTypes>(_fixtureContract).tables;
+  const fixtureTables = schema<Contract>(_fixtureContract).tables;
   const fixtureUserTable = fixtureTables.user;
   if (!fixtureUserTable) throw new Error('fixture user table not found');
   const _fixturePlan = sql<Contract, CodecTypes>({ contract: _fixtureContract, adapter })
@@ -113,7 +113,7 @@ test('codec type inference via type option', () => {
 
   const validated = validateContract<typeof contract>(contract);
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof validated, CodecTypes>(validated).tables;
+  const tables = schema<typeof validated>(validated).tables;
   const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
 

@@ -58,7 +58,7 @@ describe('DML builders', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
   const context = createTestContext(contract, adapter);
-  const tables = schema<Contract, CodecTypes>(context).tables;
+  const tables = schema<Contract>(context).tables;
 
   describe('insert', () => {
     it('builds an insert plan with values', () => {

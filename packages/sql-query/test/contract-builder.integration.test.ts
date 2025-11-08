@@ -120,7 +120,7 @@ describe('builder integration', () => {
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
-    const tables = schema<typeof contract, CodecTypes>(context).tables;
+    const tables = schema<typeof contract>(context).tables;
     const userTable = tables.user;
     expect(userTable).toBeDefined();
     expect(userTable?.columns).toHaveProperty('id');
@@ -146,7 +146,7 @@ describe('builder integration', () => {
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
-    const tables = schema<typeof contract, CodecTypes>(context).tables;
+    const tables = schema<typeof contract>(context).tables;
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
@@ -192,7 +192,7 @@ describe('builder integration', () => {
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
-    const tables = schema<typeof contract, CodecTypes>(context).tables;
+    const tables = schema<typeof contract>(context).tables;
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 

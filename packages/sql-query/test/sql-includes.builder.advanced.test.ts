@@ -175,7 +175,7 @@ describe('SQL builder includeMany', () => {
   it('throws error when child projection is empty', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -199,7 +199,7 @@ describe('SQL builder includeMany', () => {
   it('throws error on alias collision', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -223,7 +223,7 @@ describe('SQL builder includeMany', () => {
   it('throws error when ON condition uses same table', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -247,7 +247,7 @@ describe('SQL builder includeMany', () => {
   it('throws error when capabilities are missing at runtime', () => {
     const adapterWithoutCaps = createStubAdapter();
     const contextWithoutCaps = createTestContext(contractWithoutCapabilities, adapterWithoutCaps);
-    const tables = schema<ContractWithoutCapabilities, CodecTypes>(contextWithoutCaps).tables;
+    const tables = schema<ContractWithoutCapabilities>(contextWithoutCaps).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -271,7 +271,7 @@ describe('SQL builder includeMany', () => {
   it('includes child table in meta.refs.tables', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -296,7 +296,7 @@ describe('SQL builder includeMany', () => {
   it('includes child columns in meta.refs.columns', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -324,7 +324,7 @@ describe('SQL builder includeMany', () => {
   it('marks include alias in meta.projection with special marker', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -351,7 +351,7 @@ describe('SQL builder includeMany', () => {
   it('does not add codec entries for includes in meta.annotations.codecs', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 

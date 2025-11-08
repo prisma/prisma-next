@@ -53,7 +53,7 @@ describe('sql DSL builder', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
   const context = createTestContext(contract, adapter);
-  const tables = schema<Contract, CodecTypes>(context).tables;
+  const tables = schema<Contract>(context).tables;
 
   it('builds a select plan with projection, where, order, and limit', () => {
     const userColumns = tables.user.columns;
@@ -165,9 +165,9 @@ describe('sql DSL builder', () => {
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
       const contextWithCodecs = createTestContext(contractValidated, adapter);
-      const userColumns = schema<Contract, CodecTypes>(contextWithCodecs).tables.user.columns;
+      const userColumns = schema<Contract>(contextWithCodecs).tables.user.columns;
       const plan = sql<Contract, CodecTypes>({ context: contextWithCodecs })
-        .from(schema<Contract, CodecTypes>(contextWithCodecs).tables.user)
+        .from(schema<Contract>(contextWithCodecs).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -184,9 +184,9 @@ describe('sql DSL builder', () => {
     it('encodes codec assignments from column types for WHERE parameters', () => {
       const contractValidated = validateContract<Contract>(contract);
       const contextValidated = createTestContext(contractValidated, adapter);
-      const userColumns = schema<Contract, CodecTypes>(contextValidated).tables.user.columns;
+      const userColumns = schema<Contract>(contextValidated).tables.user.columns;
       const plan = sql<Contract, CodecTypes>({ context: contextValidated })
-        .from(schema<Contract, CodecTypes>(contextValidated).tables.user)
+        .from(schema<Contract>(contextValidated).tables.user)
         .select({
           email: userColumns.email,
         })
@@ -223,9 +223,9 @@ describe('sql DSL builder', () => {
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
       const contextWithCodecs = createTestContext(contractValidated, adapter);
-      const userColumns = schema<Contract, CodecTypes>(contextWithCodecs).tables.user.columns;
+      const userColumns = schema<Contract>(contextWithCodecs).tables.user.columns;
       const plan = sql<Contract, CodecTypes>({ context: contextWithCodecs })
-        .from(schema<Contract, CodecTypes>(contextWithCodecs).tables.user)
+        .from(schema<Contract>(contextWithCodecs).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,

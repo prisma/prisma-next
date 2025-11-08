@@ -70,7 +70,7 @@ describe('JoinOnBuilder', () => {
     const on = createJoinOnBuilder();
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -87,7 +87,7 @@ describe('JoinOnBuilder', () => {
     const on = createJoinOnBuilder();
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const postColumns = tables.post.columns;
 
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -105,7 +105,7 @@ describe('JoinOnBuilder', () => {
     const on = createJoinOnBuilder();
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
 
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -123,7 +123,7 @@ describe('JoinOnBuilder', () => {
     const on = createJoinOnBuilder();
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
-    const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
 
     expect(() => on.eqCol(userColumns.id, userColumns.id)).toThrowError(

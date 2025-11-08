@@ -109,7 +109,7 @@ describe('SQL builder includeMany', () => {
   it('builds a plan with includeMany using default alias', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -139,7 +139,7 @@ describe('SQL builder includeMany', () => {
   it('builds a plan with includeMany using custom alias', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -167,7 +167,7 @@ describe('SQL builder includeMany', () => {
   it('builds a plan with includeMany with child where clause', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -196,7 +196,7 @@ describe('SQL builder includeMany', () => {
   it('builds a plan with includeMany with child orderBy clause', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -226,7 +226,7 @@ describe('SQL builder includeMany', () => {
   it('builds a plan with includeMany with child limit clause', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 

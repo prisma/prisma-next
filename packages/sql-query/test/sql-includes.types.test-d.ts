@@ -197,9 +197,7 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 // Type tests for includeMany result types
 test('ResultType yields Array<ChildShape> for includeMany', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(
-    testContractWithCapabilities,
-  ).tables;
+  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -238,9 +236,7 @@ test('ResultType yields Array<ChildShape> for includeMany', () => {
 
 test('Array element types match child projection types', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(
-    testContractWithCapabilities,
-  ).tables;
+  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -277,9 +273,7 @@ test('Array element types match child projection types', () => {
 
 test('Empty array type when no children', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(
-    testContractWithCapabilities,
-  ).tables;
+  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -313,9 +307,7 @@ test('Empty array type when no children', () => {
 
 test('includeMany with default alias uses table name', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(
-    testContractWithCapabilities,
-  ).tables;
+  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -353,9 +345,7 @@ test('includeMany with default alias uses table name', () => {
 
 test('includeMany preserves parent column types alongside includes', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(
-    testContractWithCapabilities,
-  ).tables;
+  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
@@ -475,7 +465,7 @@ test('includeMany with multiple includes preserves all types', () => {
     },
   });
 
-  const tablesWithComments = schema<ContractWithComments, CodecTypes>(contractWithComments).tables;
+  const tablesWithComments = schema<ContractWithComments>(contractWithComments).tables;
   const userTable = tablesWithComments['user']!;
   const postTable = tablesWithComments['post']!;
   const commentTable = tablesWithComments['comment']!;
@@ -530,9 +520,7 @@ test('includeMany with multiple includes preserves all types', () => {
 
 test('includeMany with nested child projection infers nested array element types', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities, CodecTypes>(
-    testContractWithCapabilities,
-  ).tables;
+  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 

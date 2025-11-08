@@ -190,7 +190,7 @@ const contract = validateContract<Contract>(contractJson);
 const context = createRuntimeContext({ adapter, extensions: [] });
 
 // Get tables from schema (pass context for operations registry)
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
+const tables = schema<Contract>(context).tables;
 
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
@@ -210,7 +210,7 @@ import contractJson from './contract.json' assert { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
 const context = createRuntimeContext({ adapter, extensions: [] });
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
+const tables = schema<Contract>(context).tables;
 
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .from(tables.user)
@@ -235,7 +235,7 @@ import contractJson from './contract.json' assert { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
 const context = createRuntimeContext({ adapter, extensions: [] });
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
+const tables = schema<Contract>(context).tables;
 
 // Nested projection shape for compile-time type inference
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -264,7 +264,7 @@ import contractJson from './contract.json' assert { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
 const context = createRuntimeContext({ adapter, extensions: [] });
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
+const tables = schema<Contract>(context).tables;
 
 // includeMany returns one row per parent with nested array of children
 const plan = sql<Contract, CodecTypes>({ contract, adapter })
@@ -301,8 +301,8 @@ import contract from './contract.json';
 import type { Contract } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
-const tables = schema<Contract, CodecTypes>(contract).tables;
-const t = makeT<Contract, CodecTypes>(contract);
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const tables = schema<Contract>(context).tables;
 
 // INSERT with returning
 const insertPlan = sql<Contract, CodecTypes>({ contract, adapter })

@@ -281,10 +281,9 @@ type ToOperationTypes<T> = T & OperationTypes;
  * const userTable = schemaHandle.tables.user;
  * ```
  */
-export function schema<
-  Contract extends SqlContract<SqlStorage>,
-  _CodecTypes extends CodecTypesType = ExtractCodecTypes<Contract>,
->(context: RuntimeContext<Contract>): SchemaReturnType<Contract> {
+export function schema<Contract extends SqlContract<SqlStorage>>(
+  context: RuntimeContext<Contract>,
+): SchemaReturnType<Contract> {
   const contract = context.contract;
   const storage = contract.storage;
   type CodecTypes = ExtractCodecTypes<Contract>;
