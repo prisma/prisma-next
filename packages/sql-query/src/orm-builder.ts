@@ -1,5 +1,15 @@
+import type { Plan } from '@prisma-next/contract/types';
 import type { RuntimeContext } from '@prisma-next/runtime';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  ExistsExpr,
+  SelectAst,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  TableRef,
+} from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import { OrmIncludeChildBuilderImpl } from './orm-include-child';
 import { OrmRelationFilterBuilderImpl } from './orm-relation-filter';
@@ -15,23 +25,12 @@ import { param } from './param';
 import { schema } from './schema';
 import { createJoinOnBuilder, sql } from './sql';
 import type {
-  Adapter,
   BinaryBuilder,
-  BinaryExpr,
   BuildOptions,
   ColumnBuilder,
-  ColumnRef,
-  DeleteAst,
-  ExistsExpr,
   InferNestedProjectionRow,
-  InsertAst,
-  LoweredStatement,
   OrderBuilder,
   ParamPlaceholder,
-  Plan,
-  SelectAst,
-  TableRef,
-  UpdateAst,
 } from './types';
 
 interface RelationFilter {
@@ -82,8 +81,6 @@ export class OrmModelBuilderImpl<
 {
   private readonly context: RuntimeContext<TContract>;
   private readonly contract: TContract;
-  private readonly adapter: Adapter<SelectAst, TContract, LoweredStatement>;
-  private readonly codecTypes: CodecTypes;
   private readonly modelName: ModelName;
   private table: TableRef;
   private wherePredicate: BinaryBuilder | undefined = undefined;
@@ -102,8 +99,6 @@ export class OrmModelBuilderImpl<
   constructor(options: OrmBuilderOptions<TContract>, modelName: ModelName) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.adapter = options.context.adapter;
-    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.modelName = modelName;
 
     const tableName = this.contract.mappings.modelToTable?.[modelName];
@@ -680,7 +675,12 @@ export class OrmModelBuilderImpl<
           if (Object.keys(filteredProjection).length === 0) {
             throw planInvalid('Child projection must not be empty after filtering boolean values');
           }
-          builtChild = builtChild.select(filteredProjection);
+          builtChild = builtChild.select(
+            filteredProjection as Record<
+              string,
+              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+            >,
+          );
           return builtChild;
         },
         { alias: includeState.alias },
@@ -688,7 +688,9 @@ export class OrmModelBuilderImpl<
     }
 
     if (this.orderByExpr) {
-      query = query.orderBy(this.orderByExpr);
+      query = query.orderBy(
+        this.orderByExpr as ReturnType<ColumnBuilder<string, StorageColumn>['asc']>,
+      );
     }
 
     if (this.limitValue !== undefined) {
@@ -804,7 +806,9 @@ export class OrmModelBuilderImpl<
               fieldName;
             const column = childSchemaTable.columns[columnName];
             if (column) {
-              childModelAccessor[fieldName] = column;
+              // @ts-expect-error - ModelColumnAccessor type is inferred from contract shape at runtime
+              // TypeScript can't verify the shape matches, but runtime validation ensures correctness
+              (childModelAccessor as Record<string, ColumnBuilder>)[fieldName] = column;
             }
           }
         }
@@ -1095,7 +1099,7 @@ export class OrmModelBuilderImpl<
       throw planInvalid(`Table ${tableName} not found in schema`);
     }
 
-    const accessor = {} as ModelColumnAccessor<TContract, CodecTypes, ModelName>;
+    const accessor: Record<string, ColumnBuilder> = {};
     const model = this.contract.models[this.modelName];
     if (!model || typeof model !== 'object' || !('fields' in model)) {
       throw planInvalid(`Model ${this.modelName} does not have fields`);
@@ -1111,10 +1115,10 @@ export class OrmModelBuilderImpl<
         fieldName;
       const column = table.columns[columnName];
       if (column) {
-        (accessor as Record<string, ColumnBuilder>)[fieldName] = column;
+        accessor[fieldName] = column as ColumnBuilder;
       }
     }
 
-    return accessor;
+    return accessor as ModelColumnAccessor<TContract, CodecTypes, ModelName>;
   }
 }

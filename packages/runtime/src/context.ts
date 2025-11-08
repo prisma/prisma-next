@@ -4,7 +4,7 @@ import type {
   LoweredStatement,
   OperationRegistry,
   OperationSignature,
-  SelectAst,
+  QueryAst,
   SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-target';
@@ -14,7 +14,9 @@ export interface RuntimeContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
   readonly contract: TContract;
-  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
+  readonly adapter:
+    | Adapter<QueryAst, TContract, LoweredStatement>
+    | Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly operations: OperationRegistry;
   readonly codecs: CodecRegistry;
 }
@@ -28,7 +30,9 @@ export interface CreateRuntimeContextOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
   readonly contract: TContract;
-  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
+  readonly adapter:
+    | Adapter<QueryAst, TContract, LoweredStatement>
+    | Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly extensions?: ReadonlyArray<Extension>;
 }
 

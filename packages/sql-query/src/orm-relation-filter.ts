@@ -1,3 +1,4 @@
+import type { RuntimeContext } from '@prisma-next/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
@@ -12,7 +13,6 @@ export class OrmRelationFilterBuilderImpl<
 {
   private readonly context: RuntimeContext<TContract>;
   private readonly contract: TContract;
-  private readonly codecTypes: CodecTypes;
   private readonly childModelName: ChildModelName;
   private wherePredicate: BinaryBuilder | undefined = undefined;
   private modelAccessor: ModelColumnAccessor<TContract, CodecTypes, ChildModelName> | undefined =
@@ -21,7 +21,6 @@ export class OrmRelationFilterBuilderImpl<
   constructor(options: OrmBuilderOptions<TContract>, childModelName: ChildModelName) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.childModelName = childModelName;
     this.modelAccessor = this._getModelAccessor();
   }
@@ -69,7 +68,7 @@ export class OrmRelationFilterBuilderImpl<
       throw planInvalid(`Table ${tableName} not found in schema`);
     }
 
-    const accessor = {} as ModelColumnAccessor<TContract, CodecTypes, ChildModelName>;
+    const accessor: Record<string, ColumnBuilder> = {};
     const model = this.contract.models[this.childModelName];
     if (!model || typeof model !== 'object' || !('fields' in model)) {
       throw planInvalid(`Model ${this.childModelName} does not have fields`);
@@ -85,10 +84,10 @@ export class OrmRelationFilterBuilderImpl<
         fieldName;
       const column = table.columns[columnName];
       if (column) {
-        (accessor as Record<string, ColumnBuilder>)[fieldName] = column;
+        accessor[fieldName] = column as ColumnBuilder;
       }
     }
 
-    return accessor;
+    return accessor as ModelColumnAccessor<TContract, CodecTypes, ChildModelName>;
   }
 }
