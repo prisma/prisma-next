@@ -110,7 +110,7 @@ export const sqlTargetFamilyHook = {
         }
 
         const columnNames = new Set(Object.keys(table.columns));
-        if (!model.fields) {
+        if (!model.fields || Object.keys(model.fields).length === 0) {
           throw new Error(`Model "${modelName}" is missing fields`);
         }
 
