@@ -25,6 +25,7 @@ import type {
   JoinOnBuilder,
   JoinOnPredicate,
   LoweredStatement,
+  OrderBuilder,
   ParamDescriptor,
   ParamPlaceholder,
   Plan,
@@ -51,9 +52,7 @@ function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef {
  * Recursively collects all ColumnRef nodes from an expression tree.
  * Handles nested OperationExpr structures by traversing both self and args.
  */
-function collectColumnRefs(
-  expr: ColumnRef | ParamRef | LiteralExpr | OperationExpr,
-): ColumnRef[] {
+function collectColumnRefs(expr: ColumnRef | ParamRef | LiteralExpr | OperationExpr): ColumnRef[] {
   if (expr.kind === 'col') {
     return [expr];
   }
@@ -65,6 +64,36 @@ function collectColumnRefs(
     return refs;
   }
   return [];
+}
+
+/**
+ * Helper to extract table and column from a ColumnBuilder or OperationExpr.
+ * For OperationExpr, recursively unwraps to find the base ColumnRef.
+ */
+function getColumnInfo(expr: ColumnBuilder<string, StorageColumn, unknown> | OperationExpr): {
+  table: string;
+  column: string;
+} {
+  if (expr.kind === 'operation') {
+    const baseCol = extractBaseColumnRef(expr);
+    return { table: baseCol.table, column: baseCol.column };
+  }
+  // expr.kind === 'column' (ColumnBuilder)
+  return { table: expr.table, column: expr.column };
+}
+
+/**
+ * Type guard to check if a value is an OrderBuilder.
+ */
+function isOrderBuilder(value: unknown): value is OrderBuilder<string, StorageColumn, unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'order' &&
+    'expr' in value &&
+    'dir' in value
+  );
 }
 
 interface JoinState {
@@ -1121,51 +1150,57 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     for (const include of args.includes) {
       refsTables.add(include.table.name);
       // Add ON condition columns
-      refsColumns.set(`${include.on.left.table}.${include.on.left.column}`, {
-        table: include.on.left.table,
-        column: include.on.left.column,
-      });
-      refsColumns.set(`${include.on.right.table}.${include.on.right.column}`, {
-        table: include.on.right.table,
-        column: include.on.right.column,
-      });
+      // JoinOnPredicate.left and .right are always ColumnBuilder
+      const onLeft = include.on.left as unknown as { table: string; column: string };
+      const onRight = include.on.right as unknown as { table: string; column: string };
+      if (onLeft.table && onLeft.column && onRight.table && onRight.column) {
+        refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
+          table: onLeft.table,
+          column: onLeft.column,
+        });
+        refsColumns.set(`${onRight.table}.${onRight.column}`, {
+          table: onRight.table,
+          column: onRight.column,
+        });
+      }
       // Add child projection columns
       for (const column of include.childProjection.columns) {
-        if (column.table && column.column) {
-          refsColumns.set(`${column.table}.${column.column}`, {
-            table: column.table,
-            column: column.column,
+        const col = column as unknown as { table?: string; column?: string };
+        if (col.table && col.column) {
+          refsColumns.set(`${col.table}.${col.column}`, {
+            table: col.table,
+            column: col.column,
           });
         }
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
-        const left = include.childWhere.left;
-        const baseCol = left.kind === 'operation'
-          ? extractBaseColumnRef(left)
-          : left;
-        refsColumns.set(`${baseCol.table}.${baseCol.column}`, {
-          table: baseCol.table,
-          column: baseCol.column,
+        const colInfo = getColumnInfo(include.childWhere.left);
+        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+          table: colInfo.table,
+          column: colInfo.column,
         });
       }
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
-        const expr = include.childOrderBy.expr;
-        const baseCol = expr.kind === 'operation'
-          ? extractBaseColumnRef(expr)
-          : expr;
-        refsColumns.set(`${baseCol.table}.${baseCol.column}`, {
-          table: baseCol.table,
-          column: baseCol.column,
-        });
+        const orderBy = include.childOrderBy as unknown as {
+          expr?: ColumnBuilder<string, StorageColumn, unknown> | OperationExpr;
+        };
+        if (orderBy.expr) {
+          const colInfo = getColumnInfo(orderBy.expr);
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
+          });
+        }
       }
     }
   }
 
   if (args.where) {
-    if (args.where.left.kind === 'operation') {
-      const allRefs = collectColumnRefs(args.where.left);
+    const whereLeft = args.where.left;
+    if (whereLeft.kind === 'operation') {
+      const allRefs = collectColumnRefs(whereLeft);
       for (const ref of allRefs) {
         refsColumns.set(`${ref.table}.${ref.column}`, {
           table: ref.table,
@@ -1173,27 +1208,40 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
         });
       }
     } else {
-      refsColumns.set(`${args.where.left.table}.${args.where.left.column}`, {
-        table: args.where.left.table,
-        column: args.where.left.column,
-      });
+      // whereLeft.kind === 'column' (ColumnBuilder)
+      const colBuilder = whereLeft as unknown as { table?: string; column?: string };
+      if (colBuilder.table && colBuilder.column) {
+        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
+          table: colBuilder.table,
+          column: colBuilder.column,
+        });
+      }
     }
   }
 
   if (args.orderBy) {
-    if (args.orderBy.expr.kind === 'operation') {
-      const allRefs = collectColumnRefs(args.orderBy.expr);
-      for (const ref of allRefs) {
-        refsColumns.set(`${ref.table}.${ref.column}`, {
-          table: ref.table,
-          column: ref.column,
-        });
+    const orderBy = args.orderBy as unknown as {
+      expr?: ColumnBuilder<string, StorageColumn, unknown> | OperationExpr;
+    };
+    if (orderBy.expr) {
+      if (orderBy.expr.kind === 'operation') {
+        const allRefs = collectColumnRefs(orderBy.expr);
+        for (const ref of allRefs) {
+          refsColumns.set(`${ref.table}.${ref.column}`, {
+            table: ref.table,
+            column: ref.column,
+          });
+        }
+      } else {
+        // orderBy.expr.kind === 'column' (ColumnBuilder)
+        const colBuilder = orderBy.expr as unknown as { table?: string; column?: string };
+        if (colBuilder.table && colBuilder.column) {
+          refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
+            table: colBuilder.table,
+            column: colBuilder.column,
+          });
+        }
       }
-    } else {
-      refsColumns.set(`${args.orderBy.expr.table}.${args.orderBy.expr.column}`, {
-        table: args.orderBy.expr.table,
-        column: args.orderBy.expr.column,
-      });
     }
   }
 

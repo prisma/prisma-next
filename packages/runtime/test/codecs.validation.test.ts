@@ -91,7 +91,7 @@ describe('Codec Registry Validation', () => {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
-              email: { nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
             },
             uniques: [],
             indexes: [],
@@ -204,7 +204,10 @@ describe('Codec Registry Validation', () => {
       },
       models: {},
       relations: {},
-      mappings: {},
+      mappings: {
+        codecTypes: {},
+        operationTypes: {},
+      },
     };
 
     const emptyRegistry = createCodecRegistry();
