@@ -1,10 +1,10 @@
 import type { SqlContract } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
+import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { createJoinOnBuilder } from '../src/sql';
 import type { CodecTypes } from './fixtures/contract.d';
-import { createTestContext, createStubAdapter } from '../../runtime/test/utils';
 
 // Define a fully-typed contract type for this test
 type ContractWithPosts = SqlContract<

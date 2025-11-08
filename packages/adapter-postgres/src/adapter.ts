@@ -16,8 +16,7 @@ import type {
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-target';
-import { isOperationExpr } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-target';
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 

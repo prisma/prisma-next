@@ -31,4 +31,3 @@ export const contract = defineContract<CodecTypes>()
     },
   })
   .build();
-

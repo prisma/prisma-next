@@ -1,14 +1,14 @@
+import type { ResultType } from '@prisma-next/contract/types';
 import type { ModelDefinition, SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
+import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { ResultType } from '@prisma-next/contract/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
-import { createTestContext, createStubAdapter } from '../../runtime/test/utils';
 
 describe('builder integration', () => {
   it('builds a contract matching fixture structure', () => {

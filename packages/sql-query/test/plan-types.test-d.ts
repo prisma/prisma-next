@@ -1,5 +1,6 @@
-import type { SqlContract } from '@prisma-next/sql-target';
+import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { createRuntimeContext } from '@prisma-next/runtime';
+import type { SqlContract } from '@prisma-next/sql-target';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { validateContract } from '../src/contract';
@@ -8,7 +9,6 @@ import { sql } from '../src/sql';
 import type { TableKey, TablesOf } from '../src/types';
 import type { Contract, ScalarToJs } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
-import type { Plan, ResultType } from '@prisma-next/contract/types';
 
 // Helper to simulate execute signature
 function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {

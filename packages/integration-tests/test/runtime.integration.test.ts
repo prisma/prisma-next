@@ -1,10 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { budgets, lints } from '@prisma-next/runtime';
@@ -16,7 +12,10 @@ import {
   setupTestDatabase,
   teardownTestDatabase,
 } from '@prisma-next/runtime/test/utils';
-import { timeouts, createDevDatabase } from '@prisma-next/test-utils';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 

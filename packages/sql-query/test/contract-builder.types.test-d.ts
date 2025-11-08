@@ -1,3 +1,4 @@
+import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
@@ -5,7 +6,6 @@ import { validateContract } from '../src/contract';
 import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Plan, ResultType } from '@prisma-next/contract/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 

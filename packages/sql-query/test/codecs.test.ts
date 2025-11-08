@@ -1,12 +1,12 @@
+import type { Plan } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import { createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Plan } from '@prisma-next/contract/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
-import { createTestContext } from '../../runtime/test/utils';
 
 describe('DSL Lane Codec Type Stamping', () => {
   const contract = validateContract<Contract>(contractJson);
