@@ -1,8 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import {
-  createOperationRegistry,
-  type OperationSignature,
-} from '@prisma-next/sql-target';
+import { createOperationRegistry, type OperationSignature } from '@prisma-next/sql-target';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
@@ -347,9 +344,7 @@ describe('ColumnBuilder operations', () => {
     const vectorColumn = userTable.columns['vector'];
 
     // Chain operations: normalize().cosineDistance(otherVector)
-    const normalized = (
-      vectorColumn as unknown as { normalize: () => unknown }
-    ).normalize();
+    const normalized = (vectorColumn as unknown as { normalize: () => unknown }).normalize();
     const otherVectorColumn = userTable.columns['vector'];
     const distance = (
       normalized as unknown as {

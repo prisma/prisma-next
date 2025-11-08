@@ -166,13 +166,25 @@ function buildColumns<
     const builderWithOps = attachOperationsToColumnBuilder<
       columnNameKey & string,
       Columns[columnNameKey],
-      ComputeColumnJsType<Contract, TableName, columnNameKey & string, Columns[columnNameKey], CodecTypes>,
+      ComputeColumnJsType<
+        Contract,
+        TableName,
+        columnNameKey & string,
+        Columns[columnNameKey],
+        CodecTypes
+      >,
       Operations
     >(
       columnBuilder as ColumnBuilder<
         columnNameKey & string,
         Columns[columnNameKey],
-        ComputeColumnJsType<Contract, TableName, columnNameKey & string, Columns[columnNameKey], CodecTypes>,
+        ComputeColumnJsType<
+          Contract,
+          TableName,
+          columnNameKey & string,
+          Columns[columnNameKey],
+          CodecTypes
+        >,
         Record<string, never>
       >,
       columnDef,
