@@ -72,6 +72,8 @@ flowchart TD
 ### Query Builder (`sql.ts`)
 - Relational DSL for building SQL queries
 - Compiles to Plans with AST, SQL, and metadata
+- **Signature**: `sql<Contract>(options: { context: RuntimeContext<Contract> })` - accepts only context parameter
+- Contract and adapter come from `context.contract` and `context.adapter`
 - Supports projections, filters, joins, ordering, limits
 - **Nested Projection Shaping**: Express nested object literals in `.select()` for compile-time type inference, while runtime produces flat SQL with flattened aliases (e.g., `post.title` → `post_title`)
 - **Nested Array Includes (`includeMany`)**: Express 1:N relationships that return one row per parent with a nested array field for children, built in a single statement using `LATERAL` + `json_agg` when supported. Requires both `lateral` and `jsonAgg` capabilities to be `true` in the contract.
@@ -90,8 +92,9 @@ flowchart TD
 - Infers JavaScript types from contract types
 - Supports column builders with metadata
 - Attaches operations from operation registry to column builders based on column typeId
-- Accepts `RuntimeContext` for operations registry (optional)
-- `codecTypes` is a generic type parameter only (compile-time), not a runtime parameter
+- **Signature**: `schema<Contract>(context: RuntimeContext<Contract>)` - accepts only context parameter
+- Types (`CodecTypes` and `OperationTypes`) are extracted automatically from `context.contract.mappings.codecTypes` and `context.contract.mappings.operationTypes`
+- Uses `ExtractCodecTypes<Contract>` and `ExtractOperationTypes<Contract>` helper types for type extraction
 
 ### Parameter Builder (`param.ts`)
 - Parameter placeholder factory
@@ -125,9 +128,15 @@ flowchart TD
 ### Types (`types.ts`)
 - Plan types, AST types, and utility types
 - Type inference helpers for columns and projections
+- **Type Extractors**: `ExtractCodecTypes<Contract>` and `ExtractOperationTypes<Contract>` helper types
+  - Extract `CodecTypes` from `Contract['mappings']['codecTypes']` with fallback to `Record<string, never>`
+  - Extract `OperationTypes` from `Contract['mappings']['operationTypes']` with fallback to `Record<string, never>`
+  - Used internally by `schema()`, `sql()`, and `orm()` to extract types automatically from contract
 
 ### ORM Lane (`orm.ts`)
 - Model-centric ORM API that compiles to SQL lane primitives
+- **Signature**: `orm<Contract>(options: { context: RuntimeContext<Contract> })` - accepts only context parameter
+- Contract and codecTypes come from `context.contract` and `context.contract.mappings.codecTypes`
 - **Entrypoint**: `orm.<model>()` with model registry proxy for discoverability
 - **Read Operations**: `findMany()`, `findFirst()`, `findUnique()` (not yet implemented)
 - **Chained Methods**: `where()`, `orderBy()`, `take()`, `skip()`, `select()`

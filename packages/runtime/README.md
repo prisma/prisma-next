@@ -80,11 +80,13 @@ flowchart TD
 - Uses `RuntimeContext` for codec and operations registries (decoupled from runtime)
 
 ### RuntimeContext (`context.ts`)
-- Encapsulates `OperationRegistry` and `CodecRegistry`
-- Decouples registries from `Runtime`, allowing them to be passed to schema/query builders
+- Encapsulates `SqlContract`, `OperationRegistry`, and `CodecRegistry`
+- Decouples contract and registries from `Runtime`, allowing them to be passed to schema/query builders
 - Composes codecs and operations from adapters and extensions programmatically
+- **Contract Storage**: Contract is stored in context (caller validates before passing)
 - **Extension Interface**: Extensions provide `codecs?()` and `operations?()` methods
 - **Adapter as Extension**: Adapters are treated as extensions (provide codecs via `profile.codecs()`)
+- **Signature**: `createRuntimeContext({ contract, adapter, extensions })` - contract must be validated before passing
 - No file I/O at runtime - everything is bundled
 
 ### Codecs (`codecs/`)
@@ -142,33 +144,37 @@ flowchart TD
 import { createRuntime, createRuntimeContext } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
-import { schema } from '@prisma-next/sql-query/schema';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import pgVector from '@prisma/extension-pg-vector';
-import contract from './contract.json';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+// Validate contract first (caller is responsible for validation)
+const contract = validateContract<Contract>(contractJson);
 
 // Create adapter
 const adapter = createPostgresAdapter();
 
-// Create context with adapter and extensions (programmatic registration)
+// Create context with validated contract, adapter, and extensions (programmatic registration)
 const context = createRuntimeContext({
+  contract,  // Contract is stored in context
   adapter,
   extensions: [pgVector()],  // Extensions provide codecs and operations programmatically
 });
 
-// Create runtime with context
+// Create runtime with context (contract comes from context)
 const runtime = createRuntime({
-  contract,
   adapter,
   driver: createPostgresDriver({ connectionString: process.env.DATABASE_URL }),
   verify: { mode: 'onFirstUse', requireMarker: false },
-  context,  // Pass context to runtime
+  context,  // Pass context to runtime (includes contract)
   plugins: [
     // Add lints, budgets, telemetry plugins
   ],
 });
 
-// Use context in schema (for operations registry)
-const tables = schema(contract, context).tables;
+// Use context in schema (types extracted automatically from contract)
+const tables = schema(context).tables;
 
 // Execute a plan
 for await (const row of runtime.execute(plan)) {

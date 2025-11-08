@@ -107,7 +107,7 @@ SqlContract<
   SqlStorage,           // { tables: Record<string, StorageTable> }
   Models,               // { User: ModelDef & { id: number, ... } }
   Relations,            // { user: { posts: RelationDef } }
-  Mappings              // { ModelToTable, TableToModel, FieldToColumn, ColumnToField, scalarToJs }
+  Mappings              // { ModelToTable, TableToModel, FieldToColumn, ColumnToField, scalarToJs, codecTypes, operationTypes }
 >
 ```
 
@@ -118,30 +118,40 @@ SqlContract<
 - The emitter validates that all type IDs come from referenced extensions but does not perform canonicalization
 - No codec decorations or extension metadata needed - the type ID is the source of truth
 
-**CodecTypes** (imported from adapter):
-- `CodecTypes`: `Record<codecId, { input: unknown, output: unknown }>` - TypeScript type info for codec input/output types
-- Imported from adapter exports: `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'`
-- Provided as generic parameter to `sql()` and `schema()` functions (compile-time only, not a runtime parameter)
+**CodecTypes and OperationTypes** (stored in contract mappings):
+- `CodecTypes`: `Record<codecId, { readonly output: unknown }>` - TypeScript type info for codec output types
+- `OperationTypes`: `Record<typeId, Record<operationName, unknown>>` - TypeScript type info for operation methods
+- Stored in `Contract['mappings']['codecTypes']` and `Contract['mappings']['operationTypes']` (compile-time only, not in contract.json)
+- Generated in `contract.d.ts` as intersections from extension pack imports
+- Extracted automatically using `ExtractCodecTypes<Contract>` and `ExtractOperationTypes<Contract>` helper types
+- Never passed as separate parameters to `schema()`, `sql()`, or `orm()` - types flow automatically from contract → context → builders
 
 ### RuntimeContext and Extensions
 
-**RuntimeContext** encapsulates `OperationRegistry` and `CodecRegistry`, decoupling them from `Runtime` and allowing them to be passed to schema/query builders:
+**RuntimeContext** encapsulates `SqlContract`, `OperationRegistry`, and `CodecRegistry`, decoupling them from `Runtime` and allowing them to be passed to schema/query builders:
 
 ```typescript
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import { validateContract } from '@prisma-next/sql-query/schema';
 import pgVector from '@prisma/extension-pg-vector';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
 
-// Create context with adapter and extensions
+// Validate contract first (caller is responsible for validation)
+const contract = validateContract<Contract>(contractJson);
+
+// Create context with validated contract, adapter, and extensions
 const adapter = createPostgresAdapter();
 const context = createRuntimeContext({
+  contract,  // Contract is stored in context
   adapter,
   extensions: [pgVector()],  // Programmatic extension registration
 });
 
-// Pass context to runtime and schema
-const runtime = createRuntime({ contract, adapter, driver, context });
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
+// Pass context to runtime and schema (contract comes from context)
+const runtime = createRuntime({ adapter, driver, context });
+const tables = schema(context).tables;  // Types extracted automatically from contract
 ```
 
 **Extension Interface**: Extensions provide `codecs?()` and `operations?()` methods programmatically. No file I/O at runtime - everything is bundled:
@@ -171,14 +181,17 @@ interface Extension {
 // src/prisma/query.ts
 import { schema as schemaBuilder } from '@prisma-next/sql-query/schema';
 import { sql as sqlBuilder } from '@prisma-next/sql-query/sql';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import { validateContract } from '@prisma-next/sql-query/schema';
 import { adapter } from './adapter';
-import type { CodecTypes, Contract } from './contract.d';
+import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
 
-export const sql = sqlBuilder<Contract, CodecTypes>({ contract, adapter });
-export const schema = schemaBuilder<Contract, CodecTypes>(contract);
+export const sql = sqlBuilder<Contract>({ context });
+export const schema = schemaBuilder<Contract>(context);
 export const tables = schema.tables;  // Convenience export for better DX
 ```
 
@@ -210,22 +223,24 @@ type UserRow = ResultType<typeof plan>;
 **Full Example**:
 
 ```typescript
-import { sql, schema, param } from '@prisma-next/sql-query/sql';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { sql, param } from '@prisma-next/sql-query/sql';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { createRuntimeContext } from '@prisma-next/runtime';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import contractJson from './contract.json' assert { type: 'json' };
-import type { Contract, CodecTypes } from './contract.d';
+import type { Contract } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
+const adapter = createPostgresAdapter();
 
-// Create context (includes adapter codecs and any extensions)
-const context = createRuntimeContext({ adapter, extensions: [] });
+// Create context with validated contract, adapter, and extensions
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
 
-// Get tables from schema (pass context for operations registry)
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
+// Get tables from schema (types extracted automatically from contract)
+const tables = schema(context).tables;
 
 // Basic query with where clause
-const plan = sql<Contract, CodecTypes>({ contract, adapter })
+const plan = sql({ context })
   .from(tables.user)
   .where(tables.user.columns.id.eq(param('userId')))
   .select({ id: tables.user.columns.id, email: tables.user.columns.email })
@@ -233,7 +248,7 @@ const plan = sql<Contract, CodecTypes>({ contract, adapter })
   .build({ params: { userId: 42 } });  // Returns immutable Plan
 
 // Query with join
-const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
+const joinedPlan = sql({ context })
   .from(tables.user)
   .innerJoin(tables.post, (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId))
   .where(tables.user.columns.active.eq(param('active')))
@@ -250,26 +265,26 @@ type UserRow = ResultType<typeof plan>;
 type JoinedRow = ResultType<typeof joinedPlan>;
 
 // DML operations (INSERT, UPDATE, DELETE)
-const insertPlan = sql<Contract, CodecTypes>({ contract, adapter })
+const insertPlan = sql({ context })
   .insert(tables.user, {
     email: param('email'),
     createdAt: param('createdAt'),
   })
-  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .returning(tables.user.columns.id, tables.user.columns.email)  // Capability-gated: requires returning: true
   .build({ params: { email: 'test@example.com', createdAt: new Date() } });
 
-const updatePlan = sql<Contract, CodecTypes>({ contract, adapter })
+const updatePlan = sql({ context })
   .update(tables.user, {
     email: param('newEmail'),
   })
-  .where(t.user.id.eq(param('userId')))
-  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .where(tables.user.columns.id.eq(param('userId')))
+  .returning(tables.user.columns.id, tables.user.columns.email)  // Capability-gated: requires returning: true
   .build({ params: { newEmail: 'updated@example.com', userId: 1 } });
 
-const deletePlan = sql<Contract, CodecTypes>({ contract, adapter })
+const deletePlan = sql({ context })
   .delete(tables.user)
-  .where(t.user.id.eq(param('userId')))
-  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .where(tables.user.columns.id.eq(param('userId')))
+  .returning(tables.user.columns.id, tables.user.columns.email)  // Capability-gated: requires returning: true
   .build({ params: { userId: 1 } });
 
 // Extract row types from DML plans
@@ -292,14 +307,14 @@ type DeleteRow = ResultType<typeof deletePlan>;  // { id: number; email: string 
 - Result typing is derived solely from projection, unaffected by joins
 - Example:
   ```typescript
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const plan = sql({ context })
     .from(tables.user)
-    .innerJoin(tables.post, (on) => on.eqCol(t.user.id, t.post.userId))
-    .where(t.user.active.eq(param('active')))
+    .innerJoin(tables.post, (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId))
+    .where(tables.user.columns.active.eq(param('active')))
     .select({
-      userId: t.user.id,
-      email: t.user.email,
-      postId: t.post.id,
+      userId: tables.user.columns.id,
+      email: tables.user.columns.email,
+      postId: tables.post.columns.id,
       title: t.post.title,
     })
     .build({ params: { active: true } });
@@ -314,11 +329,15 @@ The ORM lane provides a model-centric API that compiles to SQL lane primitives. 
 ```typescript
 import { orm } from '@prisma-next/sql-query/orm';
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { Contract, CodecTypes } from './contract.d';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import type { Contract } from './contract.d';
 import contractJson from './contract.json' assert { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+const adapter = createPostgresAdapter();
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const o = orm<Contract>({ context });
 
 // Model registry proxy: orm.user(), orm.post(), etc.
 const builder = o.user();
@@ -895,10 +914,11 @@ describe('end-to-end tests', () => {
 
           // Create runtime and execute plan
           const adapter = createPostgresAdapter();
+          const context = createTestContext(contract, adapter);
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
-            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            const tables = schema(context).tables;
+            const plan = sql({ context })
               .from(tables.user)
               .select({ id: tables.user.columns.id })
               .build();
@@ -1268,6 +1288,7 @@ pnpm test:coverage:packages
 25. **Test File Organization** - Established 500-line limit for test files. Large test files should be split by functionality (basic, errors, structure, generation), feature area (joins, projections, includes), or test type (unit, integration, edge-cases). Use descriptive file names following the pattern `{base}.{category}.test.ts` (e.g., `codecs.registry.test.ts`, `runtime.joins.test.ts`, `driver.errors.test.ts`). Split files at natural boundaries (describe blocks, functional groups) and ensure each new file has all necessary imports and setup. See `.cursor/rules/test-file-organization.mdc` for detailed guidelines.
 26. **Test Assertion Patterns** - Refactored brittle test patterns to use object comparison (`expect(row).toEqual({ ... })`) instead of piece-by-piece property checks. Use `toMatchObject` for partial comparisons, `expect.any()` for type-only checks, and `expect.not.objectContaining()` for absence checks. For plan structure assertions, compare entire AST structures rather than checking individual properties. This improves maintainability, readability, type safety, and reduces brittleness. See `.cursor/rules/test-file-organization.mdc` for details.
 27. **ORM Lane Implementation** - Implemented model-centric ORM lane with discoverable entrypoint (`orm.<model>()`), relation filters (`where.related.<relation>.some/none/every`), includes (`include.<relation>(child => ...)`), and base-model writes (`create()`, `update()`, `delete()`). ORM lane compiles to SQL lane primitives (EXISTS subqueries, includeMany, DML operations). Model-to-column mapping for writes uses contract mappings. Relation filters compile to EXISTS/NOT EXISTS subqueries. Includes are capability-gated (requires `lateral: true` and `jsonAgg: true`). File organization: ORM implementation split into `orm.ts` (entrypoint), `orm-types.ts` (types), `orm-builder.ts` (main builder), `orm-relation-filter.ts` (relation filters), `orm-include-child.ts` (include child builder).
+28. **Contract-in-Context Pattern** - Moved `CodecTypes` and `OperationTypes` into `SqlMappings` (non-optional, compile-time only). Contract is now stored in `RuntimeContext` (caller validates before passing). All builders (`schema()`, `sql()`, `orm()`) now accept only `context` parameter and extract types automatically using `ExtractCodecTypes<Contract>` and `ExtractOperationTypes<Contract>`. This eliminates the need to thread `CodecTypes` and `Operations` as type parameters throughout the codebase.
 
 ### Future Work
 
@@ -1284,10 +1305,12 @@ Check the TODO comments in code (especially `packages/sql-query/src/contract.ts`
 
 ## 💡 Quick Reference
 
-**Load a contract:**
+**Load a contract and create context:**
 ```typescript
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { Contract, CodecTypes } from './contract.d';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import type { Contract } from './contract.d';
 import contractJson from './contract.json' assert { type: 'json' };
 
 // Always validate - ensures structure and type safety
@@ -1296,6 +1319,10 @@ import contractJson from './contract.json' assert { type: 'json' };
 // CRITICAL: validateContract<TContract>() requires a fully-typed contract type TContract (from contract.d.ts), NOT a generic SqlContract<SqlStorage>
 // Using a generic type will cause all subsequent type inference to fail (types will be 'unknown')
 const contract = validateContract<Contract>(contractJson);
+
+// Create context with validated contract (caller is responsible for validation)
+const adapter = createPostgresAdapter();
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
 
 // In E2E tests, use loadContractFromDisk to load from committed fixtures
 // Note: loadContractFromDisk is in e2e-tests/test/utils.ts, not test-utils
@@ -1381,21 +1408,21 @@ await writeFile('./contract.d.ts', result.contractDts);
 ```typescript
 import type { ResultType } from '@prisma-next/sql-query/types';
 
-const plan = sql<Contract, CodecTypes>({ contract, adapter })
+const plan = sql({ context })
   .from(tables.user)
-  .select({ id: t.user.id, email: t.user.email })
+  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
   .build();
 
 type UserRow = ResultType<typeof plan>;  // Inferred type: { id: number; email: string }
 
 // With joins
-const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
+const joinedPlan = sql({ context })
   .from(tables.user)
-  .innerJoin(tables.post, (on) => on.eqCol(t.user.id, t.post.userId))
+  .innerJoin(tables.post, (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId))
   .select({
-    userId: t.user.id,
-    postId: t.post.id,
-    title: t.post.title,
+    userId: tables.user.columns.id,
+    postId: tables.post.columns.id,
+    title: tables.post.columns.title,
   })
   .build();
 
@@ -1406,11 +1433,16 @@ type JoinedRow = ResultType<typeof joinedPlan>;  // { userId: number; postId: nu
 ```typescript
 import { orm } from '@prisma-next/sql-query/orm';
 import { param } from '@prisma-next/sql-query/param';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import type { ResultType } from '@prisma-next/sql-query/types';
-import type { Contract, CodecTypes } from './contract.d';
+import type { Contract } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
-const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+const adapter = createPostgresAdapter();
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const o = orm<Contract>({ context });
 
 // Read with relation filter
 const plan = o.user()
@@ -1502,7 +1534,7 @@ export type Contract = SqlContract<{
 }>;
 
 // Plans encode type IDs in annotations
-const plan = sql<Contract, CodecTypes>({ contract, adapter })
+const plan = sql({ context })
   .from(tables.user)
   .select({ id: tables.user.columns.id })
   .build();

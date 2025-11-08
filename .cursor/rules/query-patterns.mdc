@@ -18,14 +18,16 @@ This document covers standard patterns for working with Prisma Next queries, inc
 import { schema as schemaBuilder } from '@prisma-next/sql-query/schema';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import { sql as sqlBuilder } from '@prisma-next/sql-query/sql';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { adapter } from './adapter';
-import type { CodecTypes, Contract } from './contract.d';
+import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
 
-export const sql = sqlBuilder<Contract, CodecTypes>({ contract, adapter });
-export const schema = schemaBuilder<Contract, CodecTypes>(contract);
+export const sql = sqlBuilder<Contract>({ context });
+export const schema = schemaBuilder<Contract>(context);
 export const tables = schema.tables;  // Convenience export
 ```
 
@@ -197,10 +199,15 @@ type UserWithPosts = ResultType<typeof plan>;
 
 ```typescript
 import { orm } from '@prisma-next/sql-query/orm';
-import type { Contract, CodecTypes } from './contract.d';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import type { Contract } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
-const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+const adapter = createPostgresAdapter();
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const o = orm<Contract>({ context });
 
 // Model registry proxy: orm.user(), orm.post(), etc.
 const builder = o.user();
