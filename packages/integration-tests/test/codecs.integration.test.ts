@@ -414,4 +414,3 @@ describe('Codecs Integration Tests', () => {
     expect(rows[0]).toEqual({ name: 'Test User' });
   });
 });
-

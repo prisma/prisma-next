@@ -386,7 +386,6 @@ export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>
       : false
     : false;
 
-
 /**
  * SQL-specific Plan type that refines the ast field to use QueryAst.
  * This is the type used by SQL query builders.
@@ -394,7 +393,6 @@ export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>
 export type SqlPlan<Row = unknown> = Omit<Plan<Row>, 'ast'> & {
   readonly ast?: QueryAst;
 };
-
 
 /**
  * Helper types for extracting contract structure.

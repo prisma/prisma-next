@@ -392,4 +392,3 @@ describe('budgets plugin integration', () => {
     );
   });
 });
-

@@ -7,10 +7,7 @@ import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
 import type { ResultType } from '@prisma-next/contract/types';
-import type {
-  HasIncludeManyCapabilities,
-  InferNestedProjectionRow,
-} from '../src/types';
+import type { HasIncludeManyCapabilities, InferNestedProjectionRow } from '../src/types';
 
 // Test contracts with different capability configurations
 type ContractWithCapabilities = SqlContract<SqlStorage> & {

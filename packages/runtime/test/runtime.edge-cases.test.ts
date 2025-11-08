@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { Plugin } from '../src/plugins/types';
 import { createRuntime } from '../src/runtime';
-import { createTestContext, createTestContract, drainPlanExecution, executePlanAndCollect } from './utils';
+import {
+  createTestContext,
+  createTestContract,
+  drainPlanExecution,
+  executePlanAndCollect,
+} from './utils';
 
 describe('Runtime class', () => {
   const mockContractRaw: SqlContract<SqlStorage> = {

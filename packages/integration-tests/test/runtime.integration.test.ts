@@ -281,4 +281,3 @@ function loadContractFixture(): SqlContract<SqlStorage> {
   const contractJson = JSON.parse(json) as unknown;
   return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
-
