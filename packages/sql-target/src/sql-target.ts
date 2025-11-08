@@ -98,6 +98,10 @@ export interface OperationExpr {
   readonly lowering: import('./operations-registry').LoweringSpec;
 }
 
+export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is OperationExpr {
+  return expr.kind === 'operation';
+}
+
 export interface BinaryExpr {
   readonly kind: 'bin';
   readonly op: 'eq';

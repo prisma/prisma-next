@@ -16,6 +16,7 @@ import type {
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-target';
+import { isOperationExpr } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
@@ -131,12 +132,12 @@ function renderWhere(expr: BinaryExpr | ExistsExpr): string {
 }
 
 function renderBinary(expr: BinaryExpr): string {
-  const left =
-    (expr.left as ColumnRef | OperationExpr).kind === 'operation'
-      ? renderOperation(expr.left as unknown as OperationExpr)
-      : renderColumn(expr.left as ColumnRef);
+  const leftExpr = expr.left as ColumnRef | OperationExpr;
+  const left = isOperationExpr(leftExpr) ? renderOperation(leftExpr) : renderColumn(leftExpr);
   const right = renderParam(expr.right);
-  return `(${left}) = ${right}`;
+  // Only wrap in parentheses if it's an operation expression
+  const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
+  return `${leftRendered} = ${right}`;
 }
 
 function renderColumn(ref: ColumnRef): string {
@@ -144,7 +145,7 @@ function renderColumn(ref: ColumnRef): string {
 }
 
 function renderExpr(expr: ColumnRef | OperationExpr): string {
-  if (expr.kind === 'operation') {
+  if (isOperationExpr(expr)) {
     return renderOperation(expr);
   }
   return renderColumn(expr);
