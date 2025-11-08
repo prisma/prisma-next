@@ -59,7 +59,7 @@ export interface ColumnBuilderBase<
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   // Helper property for type extraction (not used at runtime)
-  readonly __jsType?: JsType;
+  readonly __jsType: JsType;
 }
 
 /**
@@ -389,21 +389,9 @@ export type ComputeColumnJsType<
  */
 /**
  * Extracts JsType from a ColumnBuilder.
- * Since ColumnBuilder = ColumnBuilderBase<...> & ..., we extract from ColumnBuilderBase.
- * We use a distributive conditional type to extract from the intersection.
- * The tuple wrapper helps TypeScript with intersection type matching.
+ * Directly accesses the __jsType property.
  */
-type ExtractJsTypeFromColumnBuilder<CB extends ColumnBuilder> = [CB] extends [
-  ColumnBuilderBase<infer _Name, infer _Meta, infer JsType>,
-]
-  ? JsType
-  : [CB] extends [
-        {
-          eq: (value: ParamPlaceholder) => BinaryBuilder<infer _Name, infer _Meta, infer JsType>;
-        },
-      ]
-    ? JsType
-    : unknown;
+type ExtractJsTypeFromColumnBuilder<CB extends ColumnBuilder> = CB['__jsType'];
 
 export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
   [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;

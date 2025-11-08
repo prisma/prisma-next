@@ -53,6 +53,11 @@ class ColumnBuilderImpl<
     return this.storageColumn;
   }
 
+  // Type-level helper property (not used at runtime)
+  get __jsType(): JsType {
+    return undefined as unknown as JsType;
+  }
+
   eq(
     this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
     value: ParamPlaceholder,
@@ -161,8 +166,9 @@ function buildColumns<
       contractCapabilities,
     );
     // Type assertion to preserve the mapped type structure
-    (result as unknown as Record<string, ColumnBuilder<string, StorageColumn, unknown>>)[columnName] =
-      builderWithOps;
+    (result as unknown as Record<string, ColumnBuilder<string, StorageColumn, unknown>>)[
+      columnName
+    ] = builderWithOps;
   }
 
   return result;
