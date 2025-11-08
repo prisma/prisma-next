@@ -55,12 +55,18 @@ const testContract: SqlContract<SqlStorage> = {
           name: { type: 'pg/text@1', nullable: false },
           createdAt: { type: 'pg/timestamptz@1', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 };
 
 // Shared query module that accepts a client with used methods

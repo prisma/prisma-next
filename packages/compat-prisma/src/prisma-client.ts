@@ -33,6 +33,10 @@ interface FindManyArgs {
 
 type FindFirstArgs = FindManyArgs;
 
+type TableFromSchema<Contract extends SqlContract<SqlStorage>> = ReturnType<
+  typeof schema<Contract>
+>['tables'][string];
+
 function isColumnBuilder(value: unknown): value is ColumnBuilder {
   return (
     value !== null &&
@@ -52,7 +56,7 @@ class ModelDelegate {
     private readonly runtime: Runtime,
     private readonly context: RuntimeContext<SqlContract<SqlStorage>>,
     private readonly contract: SqlContract<SqlStorage>,
-    private readonly table: TableRef & Record<string, ColumnBuilder>,
+    private readonly table: TableFromSchema<SqlContract<SqlStorage>>,
     tableName: string,
   ) {
     // Store table name explicitly (from schema key)
@@ -100,8 +104,8 @@ class ModelDelegate {
           throw this.unsupportedError(`Unknown field '${field}' in where clause`);
         }
         // Access column via columns property to avoid conflicts with table properties
-        const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-        const column = columns?.[field];
+        const columns = this.table.columns;
+        const column = columns[field];
         if (!isColumnBuilder(column)) {
           throw this.unsupportedError(`Invalid column '${field}' in where clause`);
         }
@@ -134,8 +138,8 @@ class ModelDelegate {
           if (!tableDef || !tableDef.columns[field]) {
             throw this.unsupportedError(`Unknown field '${field}' in select clause`);
           }
-          const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-          const column = columns?.[field];
+          const columns = this.table.columns;
+          const column = columns[field];
           if (!isColumnBuilder(column)) {
             throw this.unsupportedError(`Invalid column '${field}' in select clause`);
           }
@@ -145,7 +149,7 @@ class ModelDelegate {
     } else {
       // Default: select all columns from contract definition
       const tableDef = this.contract.storage.tables[tableName];
-      const tableColumns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
+      const tableColumns = this.table.columns;
       if (tableDef && tableColumns) {
         for (const columnName of Object.keys(tableDef.columns)) {
           // Access column via columns property to avoid conflicts with table properties like 'name'
@@ -189,8 +193,8 @@ class ModelDelegate {
       if (!tableDef || !tableDef.columns[field]) {
         throw this.unsupportedError(`Unknown field '${field}' in orderBy clause`);
       }
-      const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-      const columnValue = columns?.[field];
+      const columns = this.table.columns;
+      const columnValue = columns[field];
       if (!isColumnBuilder(columnValue)) {
         throw this.unsupportedError(`Invalid column '${field}' in orderBy clause`);
       }
@@ -395,7 +399,7 @@ class PrismaClientImpl {
         this.runtime,
         this.context,
         this.contract,
-        table as unknown as TableRef & Record<string, ColumnBuilder>,
+        table as TableFromSchema<SqlContract<SqlStorage>>,
         tableName,
       );
     }
