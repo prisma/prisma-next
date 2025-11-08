@@ -116,7 +116,8 @@ describe('emitter round-trip', () => {
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
       extensions: contractJson1['extensions'] as Record<string, unknown>,
-      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
+      capabilities:
+        (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -210,7 +211,8 @@ describe('emitter round-trip', () => {
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
       extensions: contractJson1['extensions'] as Record<string, unknown>,
-      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
+      capabilities:
+        (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -269,7 +271,8 @@ describe('emitter round-trip', () => {
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
       extensions: contractJson1['extensions'] as Record<string, unknown>,
-      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
+      capabilities:
+        (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -343,7 +346,8 @@ describe('emitter round-trip', () => {
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
       extensions: contractJson1['extensions'] as Record<string, unknown>,
-      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
+      capabilities:
+        (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -355,5 +359,3 @@ describe('emitter round-trip', () => {
     expect(result1.profileHash).toBe(result2.profileHash);
   });
 });
-
-

@@ -371,5 +371,3 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
   });
 });
-
-});

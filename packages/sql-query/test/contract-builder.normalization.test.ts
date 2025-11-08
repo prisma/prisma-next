@@ -17,7 +17,9 @@ describe('contract builder normalization', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
       .table('user', (t) =>
-        t.column('id', { type: 'pg/int4@1', nullable: false }).column('email', { type: 'pg/text@1', nullable: true }),
+        t
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: true }),
       )
       .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
       .build();

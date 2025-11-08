@@ -248,7 +248,8 @@ describe('emitter integration', () => {
       relations: contractJson1['relations'] as Record<string, unknown>,
       storage: contractJson1['storage'] as Record<string, unknown>,
       extensions: contractJson1['extensions'] as Record<string, unknown>,
-      capabilities: (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
+      capabilities:
+        (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: contractJson1['meta'] as Record<string, unknown>,
       sources: contractJson1['sources'] as Record<string, unknown>,
     };
@@ -258,8 +259,4 @@ describe('emitter integration', () => {
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);
   });
-});
-
-});
-
 });
