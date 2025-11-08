@@ -4,7 +4,8 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { budgets, createRuntime } from '@prisma-next/runtime';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
+import { validateContract } from '@prisma-next/sql-query/schema';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
@@ -14,7 +15,7 @@ import type { Contract } from '../src/prisma/contract.d';
 import { closeRuntime } from '../src/prisma/runtime';
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 
-let contract: ReturnType<typeof import('@prisma-next/sql-query/schema').validateContract>;
+let contract: Contract;
 
 beforeAll(async () => {
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
@@ -35,12 +36,11 @@ beforeAll(async () => {
 
   mkdirSync(outputDir, { recursive: true });
 
-  const contractJson = JSON.parse(result.contractJson);
+  const contractJson = validateContract<Contract>(JSON.parse(result.contractJson));
 
   writeFileSync(join(outputDir, 'contract.json'), JSON.stringify(contractJson, null, 2), 'utf-8');
   writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
 
-  const { validateContract } = await import('@prisma-next/sql-query/schema');
   contract = validateContract<Contract>(contractJson);
 }, timeouts.typeScriptCompilation);
 
@@ -56,13 +56,14 @@ describe('ORM integration tests', () => {
           await closeRuntime();
 
           const adapter = createPostgresAdapter();
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const pool = new Pool({ connectionString });
           const driver = createPostgresDriverFromOptions({
             connect: { pool },
             cursor: { disabled: true },
           });
           const runtime = createRuntime({
-            contract,
+            context,
             adapter,
             driver,
             verify: { mode: 'onFirstUse', requireMarker: false },
@@ -127,13 +128,14 @@ describe('ORM integration tests', () => {
         process.env['DATABASE_URL'] = connectionString;
         await closeRuntime();
         const adapter = createPostgresAdapter();
+        const context = createRuntimeContext({ contract, adapter, extensions: [] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
           cursor: { disabled: true },
         });
         const runtime = createRuntime({
-          contract,
+          context,
           adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
@@ -192,13 +194,14 @@ describe('ORM integration tests', () => {
         process.env['DATABASE_URL'] = connectionString;
         await closeRuntime();
         const adapter = createPostgresAdapter();
+        const context = createRuntimeContext({ contract, adapter, extensions: [] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
           cursor: { disabled: true },
         });
         const runtime = createRuntime({
-          contract,
+          context,
           adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
@@ -264,13 +267,14 @@ describe('ORM integration tests', () => {
         process.env['DATABASE_URL'] = connectionString;
         await closeRuntime();
         const adapter = createPostgresAdapter();
+        const context = createRuntimeContext({ contract, adapter, extensions: [] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
           cursor: { disabled: true },
         });
         const runtime = createRuntime({
-          contract,
+          context,
           adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
@@ -342,13 +346,14 @@ describe('ORM integration tests', () => {
           await closeRuntime();
 
           const adapter = createPostgresAdapter();
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const pool = new Pool({ connectionString });
           const driver = createPostgresDriverFromOptions({
             connect: { pool },
             cursor: { disabled: true },
           });
           const runtime = createRuntime({
-            contract,
+            context,
             adapter,
             driver,
             verify: { mode: 'onFirstUse', requireMarker: false },
@@ -415,13 +420,14 @@ describe('ORM integration tests', () => {
           process.env['DATABASE_URL'] = connectionString;
           await closeRuntime();
           const adapter = createPostgresAdapter();
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const pool = new Pool({ connectionString });
           const driver = createPostgresDriverFromOptions({
             connect: { pool },
             cursor: { disabled: true },
           });
           const runtime = createRuntime({
-            contract,
+            context,
             adapter,
             driver,
             verify: { mode: 'onFirstUse', requireMarker: false },
@@ -496,13 +502,14 @@ describe('ORM integration tests', () => {
           // Reset cached runtime so it uses the new connection string
           await closeRuntime();
           const adapter = createPostgresAdapter();
+          const context = createRuntimeContext({ contract, adapter, extensions: [] });
           const pool = new Pool({ connectionString });
           const driver = createPostgresDriverFromOptions({
             connect: { pool },
             cursor: { disabled: true },
           });
           const runtime = createRuntime({
-            contract,
+            context,
             adapter,
             driver,
             verify: { mode: 'onFirstUse', requireMarker: false },

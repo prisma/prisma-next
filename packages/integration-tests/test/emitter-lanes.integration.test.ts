@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { ResultType } from '@prisma-next/contract/types';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type {
@@ -51,6 +52,7 @@ describe('emitter → lanes integration', () => {
 
   it('emits contract and uses it with lanes', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
       extensions: {
@@ -64,8 +66,10 @@ describe('emitter → lanes integration', () => {
             id: { column: 'id' },
             email: { column: 'email' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -74,9 +78,15 @@ describe('emitter → lanes integration', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -105,13 +115,13 @@ describe('emitter → lanes integration', () => {
     expect(contractDtsContent).toContain('export type LaneCodecTypes');
     expect(contractDtsContent).toContain('export type Contract');
 
-    const tables = schema(contract).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({ contract, adapter, extensions: [] });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
 
-    const adapter = createStubAdapter();
-
-    const plan = sql({ contract, adapter })
+    const plan = sql({ context })
       .from(userTable)
       .select({
         id: userTable.columns['id']!,
@@ -131,6 +141,7 @@ describe('emitter → lanes integration', () => {
 
   it('emits contract with nullable fields and infers types correctly', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
       extensions: {
@@ -145,8 +156,10 @@ describe('emitter → lanes integration', () => {
             email: { column: 'email' },
             name: { column: 'name' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -156,9 +169,15 @@ describe('emitter → lanes integration', () => {
               name: { type: 'pg/text@1', nullable: true },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -171,13 +190,13 @@ describe('emitter → lanes integration', () => {
     const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
     const contract = validateContract(contractJson);
 
-    const tables = schema(contract).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({ contract, adapter, extensions: [] });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
 
-    const adapter = createStubAdapter();
-
-    const plan = sql({ contract, adapter })
+    const plan = sql({ context })
       .from(userTable)
       .select({
         id: userTable.columns['id']!,
@@ -196,6 +215,7 @@ describe('emitter → lanes integration', () => {
 
   it('round-trip: IR → JSON → lanes → plan', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
       extensions: {
@@ -209,8 +229,10 @@ describe('emitter → lanes integration', () => {
             id: { column: 'id' },
             email: { column: 'email' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -219,9 +241,15 @@ describe('emitter → lanes integration', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -232,32 +260,10 @@ describe('emitter → lanes integration', () => {
 
     const result1 = await emit(ir, options, sqlTargetFamilyHook);
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
-    const contract1 = validateContract(contractJson1);
+    const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson1);
 
-    expect(contractJson1['extensions']).toHaveProperty('postgres');
-
-    const extensions = ((contractJson1['extensions'] as Record<string, unknown>) || {}) as Record<
-      string,
-      unknown
-    >;
-    const relations = contractJson1['relations'] as Record<string, unknown> | undefined;
-    const ir2: ContractIR = {
-      schemaVersion: contractJson1['schemaVersion'] as string,
-      targetFamily: contractJson1['targetFamily'] as string,
-      target: contractJson1['target'] as string,
-      extensions: {
-        postgres: extensions['postgres'],
-        pg: extensions['pg'] || {},
-      },
-      models: contractJson1['models'] as Record<string, unknown>,
-      storage: contractJson1['storage'] as Record<string, unknown>,
-      capabilities: contractJson1['capabilities'] as
-        | Record<string, Record<string, boolean>>
-        | undefined,
-      meta: contractJson1['meta'] as Record<string, unknown> | undefined,
-      sources: (contractJson1['sources'] as Record<string, unknown>) || undefined,
-      ...(relations ? { relations } : {}),
-    } as ContractIR;
+    // Cast to ContractIR for the emitter (SqlContract has all required ContractIR fields)
+    const ir2 = validatedContract as unknown as ContractIR;
 
     const packs2 = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
     const options2: EmitOptions = {
@@ -267,22 +273,23 @@ describe('emitter → lanes integration', () => {
 
     const result2 = await emit(ir2, options2, sqlTargetFamilyHook);
     const contractJson2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
-    const contract2 = validateContract(contractJson2);
+    const contract2 = validateContract<SqlContract<SqlStorage>>(contractJson2);
 
     expect(result1.contractJson).toBe(result2.contractJson);
     expect(result1.coreHash).toBe(result2.coreHash);
 
-    const tables1 = schema(contract1).tables;
+    const adapter = createStubAdapter();
+    const context1 = createRuntimeContext({ contract: validatedContract, adapter, extensions: [] });
+    const context2 = createRuntimeContext({ contract: contract2, adapter, extensions: [] });
+    const tables1 = schema(context1).tables;
     const userTable1 = tables1['user'];
     if (!userTable1) throw new Error('user table not found');
 
-    const tables2 = schema(contract2).tables;
+    const tables2 = schema(context2).tables;
     const userTable2 = tables2['user'];
     if (!userTable2) throw new Error('user table not found');
 
-    const adapter = createStubAdapter();
-
-    const plan1 = sql({ contract: contract1, adapter })
+    const plan1 = sql({ context: context1 })
       .from(userTable1)
       .select({
         id: userTable1.columns['id']!,
@@ -290,7 +297,7 @@ describe('emitter → lanes integration', () => {
       })
       .build();
 
-    const plan2 = sql({ contract: contract2, adapter })
+    const plan2 = sql({ context: context2 })
       .from(userTable2)
       .select({
         id: userTable2.columns['id']!,

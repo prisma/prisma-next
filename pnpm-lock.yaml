@@ -100,6 +100,9 @@ importers:
         specifier: ^8.11.5
         version: 8.16.3
     devDependencies:
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@prisma/dev':
         specifier: ^0.1.1
         version: 0.1.1(typescript@5.9.3)
@@ -168,6 +171,9 @@ importers:
         specifier: ^0.19.0
         version: 0.19.12
     devDependencies:
+      '@prisma-next/runtime':
+        specifier: workspace:*
+        version: link:../runtime
       '@prisma-next/sql-query':
         specifier: workspace:*
         version: link:../sql-query

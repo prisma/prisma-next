@@ -26,6 +26,7 @@ describe('contract.d.ts imports resolution', () => {
 
   it('generates contract.d.ts with all imports resolving correctly', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
       extensions: {
@@ -40,6 +41,7 @@ describe('contract.d.ts imports resolution', () => {
             email: { column: 'email' },
             createdAt: { column: 'createdAt' },
           },
+          relations: {},
         },
         Post: {
           storage: { table: 'post' },
@@ -48,8 +50,10 @@ describe('contract.d.ts imports resolution', () => {
             title: { column: 'title' },
             userId: { column: 'userId' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -59,6 +63,9 @@ describe('contract.d.ts imports resolution', () => {
               createdAt: { type: 'pg/timestamptz@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -67,9 +74,15 @@ describe('contract.d.ts imports resolution', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
@@ -195,6 +208,7 @@ type UserIdColumn = UserColumns['id'];
 
   it('generated contract.d.ts can be imported and used in TypeScript', async () => {
     const ir: ContractIR = {
+      schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
       extensions: {
@@ -208,8 +222,10 @@ type UserIdColumn = UserColumns['id'];
             id: { column: 'id' },
             email: { column: 'email' },
           },
+          relations: {},
         },
       },
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -218,9 +234,15 @@ type UserIdColumn = UserColumns['id'];
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);

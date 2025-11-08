@@ -86,9 +86,6 @@ describe('emit integration', () => {
 
     const adapter = createStubAdapter();
 
-    type Contract = typeof validatedContract;
-    type CodecTypes = Record<string, { input: unknown; output: unknown }>;
-
     const context = createRuntimeContext({ contract: validatedContract, adapter, extensions: [] });
     const tables = schema(context).tables;
     const userTable = tables['user'];
@@ -132,17 +129,14 @@ describe('emit integration', () => {
       sqlTargetFamilyHook,
     );
 
+    // Parse JSON and validate/normalize it (normal way to load contract JSON)
+    // This ensures all required fields are present (nullable, uniques, indexes, foreignKeys, etc.)
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
+    const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson1);
 
-    if (!contractJson1['extensions']) {
-      contractJson1['extensions'] = {};
-    }
-    const extensions = contractJson1['extensions'] as Record<string, unknown>;
-    if (!extensions['pg']) {
-      extensions['pg'] = {};
-    }
-
-    const contract2 = contractJson1 as unknown as ContractIR;
+    // SqlContract has all required ContractIR fields (validateContract normalizes them)
+    // The cast is needed because SqlContract has a 'mappings' field that ContractIR doesn't have
+    const contract2 = validatedContract as unknown as ContractIR;
 
     const result2 = await emit(
       contract2,
@@ -155,19 +149,7 @@ describe('emit integration', () => {
 
     const json1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
     const json2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
-    // Normalize: remove empty relations if present
-    if (
-      json1['relations'] &&
-      Object.keys(json1['relations'] as Record<string, unknown>).length === 0
-    ) {
-      delete json1['relations'];
-    }
-    if (
-      json2['relations'] &&
-      Object.keys(json2['relations'] as Record<string, unknown>).length === 0
-    ) {
-      delete json2['relations'];
-    }
+
     expect(JSON.stringify(json1, null, 2)).toBe(JSON.stringify(json2, null, 2));
     expect(result1.coreHash).toBe(result2.coreHash);
   });
