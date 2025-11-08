@@ -4,6 +4,7 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
   createRuntime,
+  createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
@@ -118,10 +119,17 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
     // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
     const validatedContract = validateContract(testContract);
 
-    const runtime = createRuntime({
+    const adapter = createPostgresAdapter();
+    const context = createRuntimeContext({
       contract: validatedContract,
-      adapter: createPostgresAdapter(),
+      adapter,
+      extensions: [],
+    });
+
+    const runtime = createRuntime({
+      adapter,
       driver,
+      context,
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,

@@ -9,7 +9,7 @@ import {
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { ColumnBuilder } from '@prisma-next/sql-query/types';
+import type { BinaryBuilder, ColumnBuilder, OrderBuilder } from '@prisma-next/sql-query/types';
 import type { SqlContract, SqlStorage, TableRef } from '@prisma-next/sql-target';
 
 interface PrismaClientOptions {
@@ -32,6 +32,16 @@ interface FindManyArgs {
 }
 
 type FindFirstArgs = FindManyArgs;
+
+function isColumnBuilder(value: unknown): value is ColumnBuilder {
+  return (
+    value !== null &&
+    value !== undefined &&
+    typeof value === 'object' &&
+    'kind' in value &&
+    value.kind === 'column'
+  );
+}
 
 // NOTE: we can rely on the Prisma ORM's complex type definitions for the method return values, we only need to ensure the compatibility layer behaves correctly at runtime
 class ModelDelegate {
@@ -91,16 +101,11 @@ class ModelDelegate {
         }
         // Access column via columns property to avoid conflicts with table properties
         const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-        const column = columns?.[field] as ColumnBuilder | undefined;
-        if (
-          !column ||
-          typeof column !== 'object' ||
-          !('kind' in column) ||
-          column.kind !== 'column'
-        ) {
+        const column = columns?.[field];
+        if (!isColumnBuilder(column)) {
           throw this.unsupportedError(`Invalid column '${field}' in where clause`);
         }
-        whereConditions.push({ column: column as ColumnBuilder, value });
+        whereConditions.push({ column, value });
       }
 
       if (whereConditions.length === 1) {
@@ -108,9 +113,12 @@ class ModelDelegate {
         if (!condition) {
           throw this.unsupportedError('Invalid where condition');
         }
-        const { column } = condition;
-        const paramPlaceholder = param(`${tableName}_${column.column}`);
-        query = query.where(column.eq(paramPlaceholder));
+        const column = condition.column as unknown as ColumnBuilder;
+        const paramPlaceholder = param(`${tableName}_${(column as { column: string }).column}`);
+        const binaryExpr = (column as { eq: (value: unknown) => BinaryBuilder }).eq(
+          paramPlaceholder,
+        );
+        query = query.where(binaryExpr);
       } else if (whereConditions.length > 1) {
         throw this.unsupportedError('Multiple where conditions (AND/OR) not supported in MVP');
       }
@@ -127,16 +135,11 @@ class ModelDelegate {
             throw this.unsupportedError(`Unknown field '${field}' in select clause`);
           }
           const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-          const column = columns?.[field] as ColumnBuilder | undefined;
-          if (
-            !column ||
-            typeof column !== 'object' ||
-            !('kind' in column) ||
-            column.kind !== 'column'
-          ) {
+          const column = columns?.[field];
+          if (!isColumnBuilder(column)) {
             throw this.unsupportedError(`Invalid column '${field}' in select clause`);
           }
-          projection[field] = column as ColumnBuilder;
+          projection[field] = column;
         }
       }
     } else {
@@ -146,14 +149,9 @@ class ModelDelegate {
       if (tableDef && tableColumns) {
         for (const columnName of Object.keys(tableDef.columns)) {
           // Access column via columns property to avoid conflicts with table properties like 'name'
-          const column = tableColumns[columnName] as ColumnBuilder | undefined;
-          if (
-            column &&
-            typeof column === 'object' &&
-            'kind' in column &&
-            column.kind === 'column'
-          ) {
-            projection[columnName] = column as ColumnBuilder;
+          const column = tableColumns[columnName];
+          if (isColumnBuilder(column)) {
+            projection[columnName] = column;
           }
         }
       }
@@ -161,9 +159,9 @@ class ModelDelegate {
       // Fallback: iterate table columns directly
       if (Object.keys(projection).length === 0 && tableColumns) {
         for (const key in tableColumns) {
-          const value = tableColumns[key] as ColumnBuilder | undefined;
-          if (value && typeof value === 'object' && 'kind' in value && value.kind === 'column') {
-            projection[key] = value as ColumnBuilder;
+          const value = tableColumns[key];
+          if (isColumnBuilder(value)) {
+            projection[key] = value;
           }
         }
       }
@@ -192,19 +190,17 @@ class ModelDelegate {
         throw this.unsupportedError(`Unknown field '${field}' in orderBy clause`);
       }
       const columns = this.table['columns'] as Record<string, ColumnBuilder> | undefined;
-      const column = columns?.[field] as ColumnBuilder | undefined;
-      if (
-        !column ||
-        typeof column !== 'object' ||
-        !('kind' in column) ||
-        column.kind !== 'column'
-      ) {
+      const columnValue = columns?.[field];
+      if (!isColumnBuilder(columnValue)) {
         throw this.unsupportedError(`Invalid column '${field}' in orderBy clause`);
       }
+      const column = columnValue as unknown as ColumnBuilder;
 
-      query = query.orderBy(
-        direction === 'asc' ? (column as ColumnBuilder).asc() : (column as ColumnBuilder).desc(),
-      );
+      const orderExpr: OrderBuilder =
+        direction === 'asc'
+          ? (column as { asc: () => OrderBuilder }).asc()
+          : (column as { desc: () => OrderBuilder }).desc();
+      query = query.orderBy(orderExpr);
     }
 
     // Handle pagination
