@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { ResultType } from '@prisma-next/contract/types';
 import type { ContractIR } from '@prisma-next/emitter';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type {
@@ -88,7 +89,8 @@ describe('emit integration', () => {
     type Contract = typeof validatedContract;
     type CodecTypes = Record<string, { input: unknown; output: unknown }>;
 
-    const tables = schema<Contract, CodecTypes>(validatedContract).tables;
+    const context = createRuntimeContext({ contract: validatedContract, adapter, extensions: [] });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) {
       throw new Error('User table not found');
@@ -98,7 +100,7 @@ describe('emit integration', () => {
     if (!idColumn || !emailColumn) {
       throw new Error('Columns not found');
     }
-    const plan = sql<Contract, CodecTypes>({ contract: validatedContract, adapter })
+    const plan = sql({ context })
       .from(userTable)
       .select({ id: idColumn, email: emailColumn })
       .build();

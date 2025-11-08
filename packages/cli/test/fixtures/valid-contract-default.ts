@@ -5,8 +5,8 @@ const contractObj = defineContract<CodecTypes>()
   .target('postgres')
   .table('user', (t) =>
     t
-      .column('id', 'int4', { nullable: false })
-      .column('email', 'text', { nullable: false })
+      .column('id', { type: 'pg/int4@1', nullable: false })
+      .column('email', { type: 'pg/text@1', nullable: false })
       .primaryKey(['id']),
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
