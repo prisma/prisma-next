@@ -143,6 +143,13 @@ function renderColumn(ref: ColumnRef): string {
   return `${quoteIdentifier(ref.table)}.${quoteIdentifier(ref.column)}`;
 }
 
+function renderExpr(expr: ColumnRef | OperationExpr): string {
+  if (expr.kind === 'operation') {
+    return renderOperation(expr);
+  }
+  return renderColumn(expr);
+}
+
 function renderParam(ref: ParamRef): string {
   return `$${ref.index}`;
 }
@@ -213,9 +220,9 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
 
   // Build the lateral subquery
   const childProjection = include.child.project
-    .map((item: { alias: string; expr: ColumnRef }) => {
-      const column = renderColumn(item.expr);
-      return `'${item.alias}', ${column}`;
+    .map((item: { alias: string; expr: ColumnRef | OperationExpr }) => {
+      const expr = renderExpr(item.expr);
+      return `'${item.alias}', ${expr}`;
     })
     .join(', ');
 
@@ -234,8 +241,8 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
   const childOrderBy = include.child.orderBy?.length
     ? ` ORDER BY ${include.child.orderBy
         .map(
-          (order: { expr: ColumnRef; dir: string }) =>
-            `${renderColumn(order.expr)} ${order.dir.toUpperCase()}`,
+          (order: { expr: ColumnRef | OperationExpr; dir: string }) =>
+            `${renderExpr(order.expr)} ${order.dir.toUpperCase()}`,
         )
         .join(', ')}`
     : '';
@@ -252,29 +259,34 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
     // With LIMIT, we need to wrap in a subquery
     // Select individual columns in inner query, then aggregate
     // Create a map of column references to their aliases for ORDER BY
+    // Only ColumnRef can be mapped (OperationExpr doesn't have table/column properties)
     const columnAliasMap = new Map<string, string>();
     for (const item of include.child.project) {
-      const columnKey = `${item.expr.table}.${item.expr.column}`;
-      columnAliasMap.set(columnKey, item.alias);
+      if (item.expr.kind === 'col') {
+        const columnKey = `${item.expr.table}.${item.expr.column}`;
+        columnAliasMap.set(columnKey, item.alias);
+      }
     }
 
     const innerColumns = include.child.project
-      .map((item: { alias: string; expr: ColumnRef }) => {
-        const column = renderColumn(item.expr);
-        return `${column} AS ${quoteIdentifier(item.alias)}`;
+      .map((item: { alias: string; expr: ColumnRef | OperationExpr }) => {
+        const expr = renderExpr(item.expr);
+        return `${expr} AS ${quoteIdentifier(item.alias)}`;
       })
       .join(', ');
 
     // For ORDER BY, use column aliases if the column is in the SELECT list
     const childOrderByWithAliases = include.child.orderBy?.length
       ? ` ORDER BY ${include.child.orderBy
-          .map((order: { expr: ColumnRef; dir: string }) => {
-            const columnKey = `${order.expr.table}.${order.expr.column}`;
-            const alias = columnAliasMap.get(columnKey);
-            if (alias) {
-              return `${quoteIdentifier(alias)} ${order.dir.toUpperCase()}`;
+          .map((order: { expr: ColumnRef | OperationExpr; dir: string }) => {
+            if (order.expr.kind === 'col') {
+              const columnKey = `${order.expr.table}.${order.expr.column}`;
+              const alias = columnAliasMap.get(columnKey);
+              if (alias) {
+                return `${quoteIdentifier(alias)} ${order.dir.toUpperCase()}`;
+              }
             }
-            return `${renderColumn(order.expr)} ${order.dir.toUpperCase()}`;
+            return `${renderExpr(order.expr)} ${order.dir.toUpperCase()}`;
           })
           .join(', ')}`
       : '';
