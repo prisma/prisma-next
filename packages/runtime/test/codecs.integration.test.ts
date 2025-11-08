@@ -10,6 +10,7 @@ import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapte
 import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import {
   createDevDatabase,
+  createTestContext,
   createTestRuntime,
   executePlanAndCollect,
   setupTestDatabase,
@@ -55,8 +56,9 @@ describe('Codecs Integration Tests', () => {
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
   const adapter = createPostgresAdapter();
-  const tables = schema(fixtureContract).tables;
-  const builder = sql({ contract: fixtureContract, adapter });
+  const context = createTestContext(fixtureContract, adapter);
+  const tables = schema(context).tables;
+  const builder = sql({ context });
 
   beforeAll(async () => {
     database = await createDevDatabase({
@@ -340,9 +342,10 @@ describe('Codecs Integration Tests', () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = schema(fixtureContract).tables['test_data']!;
+    const context = createTestContext(fixtureContract, adapter);
+    const testDataTable = schema(context).tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const testBuilder = sql({ contract: fixtureContract, adapter });
+    const testBuilder = sql({ context });
     const selectPlan = testBuilder
       .from(testDataTable)
       .select({
@@ -378,9 +381,10 @@ describe('Codecs Integration Tests', () => {
       '2024-01-15T10:30:00.000Z',
     ]);
 
-    const testDataTable = schema(fixtureContract).tables['test_data']!;
+    const context = createTestContext(fixtureContract, adapter);
+    const testDataTable = schema(context).tables['test_data']!;
     const testDataColumns = testDataTable.columns;
-    const testBuilder = sql({ contract: fixtureContract, adapter });
+    const testBuilder = sql({ context });
     const selectPlan = testBuilder
       .from(testDataTable)
       .select({

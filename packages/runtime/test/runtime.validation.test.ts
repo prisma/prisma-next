@@ -4,6 +4,7 @@ import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target
 import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createRuntime } from '../src/runtime';
+import { createTestContext } from './utils';
 import { drainPlanExecution } from './utils';
 
 describe('Runtime class', () => {
@@ -68,8 +69,9 @@ describe('Runtime class', () => {
       const mockDriver = createMockDriver();
       const adapter = createPostgresAdapter();
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -103,8 +105,9 @@ describe('Runtime class', () => {
         },
       };
 
+      const context = createTestContext(contractWithUnknownType, adapter);
       const runtime = createRuntime({
-        contract: contractWithUnknownType,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -131,8 +134,9 @@ describe('Runtime class', () => {
       const mockDriver = createMockDriver();
       const adapter = createPostgresAdapter();
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -156,8 +160,9 @@ describe('Runtime class', () => {
       const mockDriver = createMockDriver();
       const adapter = createPostgresAdapter();
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },

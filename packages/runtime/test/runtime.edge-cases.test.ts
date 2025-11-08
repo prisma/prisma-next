@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { Plugin } from '../src/plugins/types';
 import { createRuntime } from '../src/runtime';
-import { drainPlanExecution, executePlanAndCollect } from './utils';
+import { createTestContext, drainPlanExecution, executePlanAndCollect } from './utils';
 
 describe('Runtime class', () => {
   const mockContractRaw: SqlContract<SqlStorage> = {
@@ -74,8 +74,9 @@ describe('Runtime class', () => {
         // Empty result set
       });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -106,8 +107,9 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -132,8 +134,9 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -163,8 +166,9 @@ describe('Runtime class', () => {
         ],
       });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: true },
@@ -195,8 +199,9 @@ describe('Runtime class', () => {
         ],
       });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'always', requireMarker: true },

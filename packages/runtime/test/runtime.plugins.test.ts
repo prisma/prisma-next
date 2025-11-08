@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { Plugin } from '../src/plugins/types';
 import { createRuntime } from '../src/runtime';
-import { drainPlanExecution } from './utils';
+import { createTestContext, drainPlanExecution } from './utils';
 
 describe('Runtime class', () => {
   const mockContractRaw: SqlContract<SqlStorage> = {
@@ -78,8 +78,9 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -108,8 +109,9 @@ describe('Runtime class', () => {
         yield { id: 2, email: 'test2@example.com' };
       });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -134,8 +136,9 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -173,8 +176,9 @@ describe('Runtime class', () => {
         throw new Error('Execution failed');
       });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -216,8 +220,9 @@ describe('Runtime class', () => {
         throw new Error('Execution failed');
       });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -259,8 +264,9 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },

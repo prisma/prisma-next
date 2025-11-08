@@ -6,8 +6,9 @@ import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { CodecTypes, Contract } from '../../sql-query/test/fixtures/contract.d';
+import type { Contract } from '../../sql-query/test/fixtures/contract.d';
 import { createRuntime } from '../src/runtime';
+import { createRuntimeContext } from '../src/context';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,11 +24,12 @@ function loadContract(name: string): Contract {
 test('execute() preserves Row type from Plan', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof contract, CodecTypes>(contract).tables;
+  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const tables = schema(context).tables;
   const userTable = tables.user!;
   const userColumns = userTable.columns;
 
-  const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
+  const plan = sql({ context })
     .from(userTable)
     .select({
       id: userColumns.id!,
@@ -43,7 +45,7 @@ test('execute() preserves Row type from Plan', () => {
 
   // Create runtime with stub driver for type testing
   const runtime = createRuntime({
-    contract,
+    context,
     adapter,
     driver: {
       connect: async () => {},
@@ -61,11 +63,12 @@ test('execute() preserves Row type from Plan', () => {
 test('execute() signature matches Plan Row type', () => {
   const contract = loadContract('contract');
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof contract, CodecTypes>(contract).tables;
+  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const tables = schema(context).tables;
   const userTable = tables.user!;
   const userColumns = userTable.columns;
 
-  const plan = sql<typeof contract, CodecTypes>({ contract, adapter })
+  const plan = sql({ context })
     .from(userTable)
     .select({
       id: userColumns.id!,
