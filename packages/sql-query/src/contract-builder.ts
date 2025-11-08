@@ -794,13 +794,13 @@ class ContractBuilder<
       const tableName = modelStateTyped.table;
       if (!tableName) continue;
 
-      // Initialize relations object for this table if not exists
-      if (!relationsPartial[tableName]) {
-        relationsPartial[tableName] = {};
-      }
+      // Only initialize relations object for this table if it has relations
+      if (modelStateTyped.relations && Object.keys(modelStateTyped.relations).length > 0) {
+        if (!relationsPartial[tableName]) {
+          relationsPartial[tableName] = {};
+        }
 
-      // Add relations from this model to the table's relations
-      if (modelStateTyped.relations) {
+        // Add relations from this model to the table's relations
         const tableRelations = relationsPartial[tableName];
         if (tableRelations) {
           for (const relationName in modelStateTyped.relations) {
@@ -817,14 +817,6 @@ class ContractBuilder<
     // The type system knows these match BuildStorage/BuildModels from the generics
     const storage = { tables: storageTables } as unknown as BuildStorage<Tables>;
     const models = modelsPartial as unknown as BuildModels<Models>;
-    const relations = relationsPartial as unknown as BuildRelations<Models>;
-
-    // Check if relations object has any actual relations (not just empty objects)
-    const relationsRecord = relations as Record<string, Record<string, unknown>>;
-    const hasRelations = Object.keys(relationsRecord).some(
-      (tableName) =>
-        relationsRecord[tableName] && Object.keys(relationsRecord[tableName]).length > 0,
-    );
 
     const mappings = computeMappings(
       models as unknown as Record<string, ModelDefinition>,
@@ -833,13 +825,14 @@ class ContractBuilder<
 
     // Construct contract with explicit type that matches the generic parameters
     // This ensures TypeScript infers literal types from the generics, not runtime values
+    // Always include relations, even if empty (normalized to empty object)
     const contract = {
       schemaVersion: '1' as const,
       target,
       targetFamily: 'sql' as const,
       coreHash: this.state.coreHash || 'sha256:ts-builder-placeholder',
       models,
-      ...(hasRelations ? { relations } : {}),
+      relations: relationsPartial,
       storage,
       mappings,
       extensions: this.state.extensions || {},

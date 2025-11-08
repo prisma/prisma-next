@@ -1,3 +1,4 @@
+import type { RuntimeContext } from '@prisma-next/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import { OrmIncludeChildBuilderImpl } from './orm-include-child';
@@ -79,6 +80,7 @@ export class OrmModelBuilderImpl<
   Row = unknown,
 > implements OrmModelBuilder<TContract, CodecTypes, ModelName, Row>
 {
+  private readonly context: RuntimeContext<TContract>;
   private readonly contract: TContract;
   private readonly adapter: Adapter<SelectAst, TContract, LoweredStatement>;
   private readonly codecTypes: CodecTypes;
@@ -98,6 +100,7 @@ export class OrmModelBuilderImpl<
     | undefined = undefined;
 
   constructor(options: OrmBuilderOptions<TContract>, modelName: ModelName) {
+    this.context = options.context;
     this.contract = options.context.contract;
     this.adapter = options.context.adapter;
     this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
@@ -121,7 +124,7 @@ export class OrmModelBuilderImpl<
       fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => BinaryBuilder,
     ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> => {
       const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
-        { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+        { context: this.context },
         this.modelName,
       );
       builder['table'] = this.table;
@@ -226,7 +229,7 @@ export class OrmModelBuilderImpl<
 
     // Create child builder and apply callback
     const childBuilder = new OrmIncludeChildBuilderImpl<TContract, CodecTypes, string>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       childModelName,
     );
     const builtChild = childBuilderFn(
@@ -259,7 +262,7 @@ export class OrmModelBuilderImpl<
     };
 
     const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.modelName,
     );
     builder['table'] = this.table;
@@ -312,7 +315,7 @@ export class OrmModelBuilderImpl<
           CodecTypes,
           typeof childModelName
         >(
-          { contract: self.contract, adapter: self.adapter, codecTypes: self.codecTypes },
+          { context: self.context },
           childModelName,
         );
         // Expose model accessor directly on the builder for convenience
@@ -341,7 +344,7 @@ export class OrmModelBuilderImpl<
                 CodecTypes,
                 typeof childModelName
               >(
-                { contract: self.contract, adapter: self.adapter, codecTypes: self.codecTypes },
+                { context: self.context },
                 childModelName,
               );
               wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
@@ -378,7 +381,7 @@ export class OrmModelBuilderImpl<
                 CodecTypes,
                 typeof childModelName
               >(
-                { contract: self.contract, adapter: self.adapter, codecTypes: self.codecTypes },
+                { context: self.context },
                 childModelName,
               );
               wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
@@ -415,7 +418,7 @@ export class OrmModelBuilderImpl<
                 CodecTypes,
                 typeof childModelName
               >(
-                { contract: self.contract, adapter: self.adapter, codecTypes: self.codecTypes },
+                { context: self.context },
                 childModelName,
               );
               wrappedBuilder['wherePredicate'] = result as BinaryBuilder;
@@ -456,7 +459,7 @@ export class OrmModelBuilderImpl<
   ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
     // Create a relation filter builder and apply the callback
     const filterBuilder = new OrmRelationFilterBuilderImpl<TContract, CodecTypes, string>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       childModelName,
     );
     const appliedFilter = fn(
@@ -476,7 +479,7 @@ export class OrmModelBuilderImpl<
     };
 
     const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.modelName,
     );
     builder['table'] = this.table;
@@ -494,7 +497,7 @@ export class OrmModelBuilderImpl<
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => OrderBuilder,
   ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
     const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.modelName,
     );
     builder['table'] = this.table;
@@ -510,7 +513,7 @@ export class OrmModelBuilderImpl<
 
   take(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
     const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.modelName,
     );
     builder['table'] = this.table;
@@ -528,7 +531,7 @@ export class OrmModelBuilderImpl<
     // TODO: SQL lane doesn't support offset yet - this is a placeholder
     // When offset is added to SelectAst, implement it here
     const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.modelName,
     );
     builder['table'] = this.table;
@@ -561,7 +564,7 @@ export class OrmModelBuilderImpl<
       ModelName,
       InferNestedProjectionRow<Projection, CodecTypes>
     >(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.modelName,
     );
     builder['table'] = this.table;
@@ -581,11 +584,7 @@ export class OrmModelBuilderImpl<
   }
 
   findMany(options?: BuildOptions): Plan<Row> {
-    const sqlBuilder = sql({
-      contract: this.contract,
-      adapter: this.adapter,
-      codecTypes: this.codecTypes,
-    });
+    const sqlBuilder = sql({ context: this.context });
     let query = sqlBuilder.from(this.table);
 
     if (this.wherePredicate) {
@@ -613,12 +612,12 @@ export class OrmModelBuilderImpl<
       }
 
       // Get parent and child column builders for join condition
-      const parentSchemaHandle = schema(this.contract, this.codecTypes);
+      const parentSchemaHandle = schema(this.context);
       const parentSchemaTable = parentSchemaHandle.tables[parentTableName];
       if (!parentSchemaTable) {
         throw planInvalid(`Table ${parentTableName} not found in schema`);
       }
-      const childSchemaHandle = schema(this.contract, this.codecTypes);
+      const childSchemaHandle = schema(this.context);
       const childSchemaTable = childSchemaHandle.tables[includeState.childTable.name];
       if (!childSchemaTable) {
         throw planInvalid(`Table ${includeState.childTable.name} not found in schema`);
@@ -800,13 +799,9 @@ export class OrmModelBuilderImpl<
       let childWhere: BinaryExpr | undefined;
       if (filter.childWhere) {
         // Build child where clause using SQL builder
-        const childSqlBuilder = sql({
-          contract: this.contract,
-          adapter: this.adapter,
-          codecTypes: this.codecTypes,
-        });
+        const childSqlBuilder = sql({ context: this.context });
         // Get child model accessor to build default projection
-        const childSchemaHandle = schema(this.contract, this.codecTypes);
+        const childSchemaHandle = schema(this.context);
         const childSchemaTable = childSchemaHandle.tables[childTableName];
         if (!childSchemaTable) {
           throw planInvalid(`Table ${childTableName} not found in schema`);
@@ -925,11 +920,7 @@ export class OrmModelBuilderImpl<
     const table: TableRef = { kind: 'table', name: tableName };
 
     // Build insert query using SQL lane
-    const sqlBuilder = sql({
-      contract: this.contract,
-      adapter: this.adapter as Adapter<SelectAst | InsertAst, TContract, LoweredStatement>,
-      codecTypes: this.codecTypes,
-    });
+    const sqlBuilder = sql({ context: this.context });
     const insertBuilder = (
       sqlBuilder as {
         insert: (table: TableRef, values: Record<string, ParamPlaceholder>) => unknown;
@@ -985,11 +976,7 @@ export class OrmModelBuilderImpl<
     const table: TableRef = { kind: 'table', name: tableName };
 
     // Build update query using SQL lane
-    const sqlBuilder = sql({
-      contract: this.contract,
-      adapter: this.adapter as Adapter<SelectAst | UpdateAst, TContract, LoweredStatement>,
-      codecTypes: this.codecTypes,
-    });
+    const sqlBuilder = sql({ context: this.context });
     const updateBuilder = (
       sqlBuilder as {
         update: (
@@ -1044,11 +1031,7 @@ export class OrmModelBuilderImpl<
     const table: TableRef = { kind: 'table', name: tableName };
 
     // Build delete query using SQL lane
-    const sqlBuilder = sql({
-      contract: this.contract,
-      adapter: this.adapter as Adapter<SelectAst | DeleteAst, TContract, LoweredStatement>,
-      codecTypes: this.codecTypes,
-    });
+    const sqlBuilder = sql({ context: this.context });
     const deleteBuilder = (
       sqlBuilder as {
         delete: (table: TableRef) => {
@@ -1121,7 +1104,7 @@ export class OrmModelBuilderImpl<
     if (!tableName) {
       throw planInvalid(`Model ${this.modelName} not found in mappings`);
     }
-    const schemaHandle = schema(this.contract, this.codecTypes);
+    const schemaHandle = schema(this.context);
     const table = schemaHandle.tables[tableName];
     if (!table) {
       throw planInvalid(`Table ${tableName} not found in schema`);

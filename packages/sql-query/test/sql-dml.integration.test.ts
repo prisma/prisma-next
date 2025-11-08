@@ -41,7 +41,10 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
   capabilities: {
     postgres: {
       returning: true,
@@ -55,9 +58,6 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
   const adapter = createPostgresAdapter();
-  const context = createTestContext(fixtureContract, adapter);
-  const tables = schema(context).tables;
-  const builder = sql({ context });
 
   beforeAll(async () => {
     database = await createDevDatabase({
@@ -105,6 +105,9 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const builder = sql({ context });
       const userTable = tables['user'];
       if (!userTable) {
         throw new Error('user table not found');
@@ -122,7 +125,11 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
           email: param('email'),
           createdAt: param('createdAt'),
         })
-        .returning(idCol, emailCol, createdAtCol)
+        .returning(
+          idCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+          emailCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+          createdAtCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+        )
         .build({
           params: {
             email: 'test@example.com',
@@ -146,6 +153,9 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const builder = sql({ context });
       const userTable = tables['user'];
       if (!userTable) {
         throw new Error('user table not found');
@@ -188,6 +198,9 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const builder = sql({ context });
       const userTable = tables['user'];
       if (!userTable) {
         throw new Error('user table not found');
@@ -204,7 +217,10 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
           email: param('newEmail'),
         })
         .where(idCol.eq(param('userId')))
-        .returning(idCol, emailCol)
+        .returning(
+          idCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+          emailCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+        )
         .build({
           params: {
             newEmail: 'updated@example.com',
@@ -230,6 +246,9 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const builder = sql({ context });
       const userTable = tables['user'];
       if (!userTable) {
         throw new Error('user table not found');
@@ -276,6 +295,9 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const builder = sql({ context });
       const userTable = tables['user'];
       if (!userTable) {
         throw new Error('user table not found');
@@ -290,7 +312,10 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
       const deletePlan = builder
         .delete(userTable)
         .where(idCol.eq(param('userId')))
-        .returning(idCol, emailCol)
+        .returning(
+          idCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+          emailCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+        )
         .build({
           params: {
             userId: 1,
@@ -316,6 +341,9 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const builder = sql({ context });
       const userTable = tables['user'];
       if (!userTable) {
         throw new Error('user table not found');

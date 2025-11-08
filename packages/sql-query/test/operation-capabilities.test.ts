@@ -4,11 +4,10 @@ import {
   createOperationRegistry,
   type OperationSignature,
 } from '@prisma-next/sql-target';
-import { createRuntimeContext } from '@prisma-next/runtime';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
-import { createStubAdapter } from '../../runtime/test/utils';
+import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 
 describe('Operation capability gating', () => {
   it('exposes operation with required capability when capability is present', () => {
@@ -27,6 +26,10 @@ describe('Operation capability gating', () => {
             columns: {
               vector: { type: 'pgvector/vector@1', nullable: false },
             },
+            primaryKey: { columns: ['vector'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -52,9 +55,7 @@ describe('Operation capability gating', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -82,6 +83,10 @@ describe('Operation capability gating', () => {
             columns: {
               vector: { type: 'pgvector/vector@1', nullable: false },
             },
+            primaryKey: { columns: ['vector'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -107,9 +112,7 @@ describe('Operation capability gating', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -137,6 +140,10 @@ describe('Operation capability gating', () => {
             columns: {
               vector: { type: 'pgvector/vector@1', nullable: false },
             },
+            primaryKey: { columns: ['vector'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -161,9 +168,7 @@ describe('Operation capability gating', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -195,6 +200,10 @@ describe('Operation capability gating', () => {
             columns: {
               vector: { type: 'pgvector/vector@1', nullable: false },
             },
+            primaryKey: { columns: ['vector'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -220,9 +229,7 @@ describe('Operation capability gating', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],

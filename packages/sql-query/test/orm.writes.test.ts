@@ -9,6 +9,7 @@ import { orm } from '../src/orm';
 import { param } from '../src/param';
 import type { Adapter, DeleteAst, InsertAst, LoweredStatement, UpdateAst } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
+import { createTestContext } from '../../runtime/test/utils';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

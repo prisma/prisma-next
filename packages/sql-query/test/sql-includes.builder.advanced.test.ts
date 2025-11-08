@@ -245,17 +245,14 @@ describe('SQL builder includeMany', () => {
   });
 
   it('throws error when capabilities are missing at runtime', () => {
-    const tables = schema<ContractWithoutCapabilities, CodecTypes>(
-      contractWithoutCapabilities,
-    ).tables;
+    const adapterWithoutCaps = createStubAdapter();
+    const contextWithoutCaps = createTestContext(contractWithoutCapabilities, adapterWithoutCaps);
+    const tables = schema<ContractWithoutCapabilities, CodecTypes>(contextWithoutCaps).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithoutCapabilities, CodecTypes>({
-        contract: contractWithoutCapabilities,
-        adapter,
-      })
+      sql<ContractWithoutCapabilities, CodecTypes>({ context: contextWithoutCaps })
         .from(tables.user)
         .includeMany(
           tables.post,
@@ -272,14 +269,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('includes child table in meta.refs.tables', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -298,14 +294,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('includes child columns in meta.refs.columns', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -327,14 +322,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('marks include alias in meta.projection with special marker', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -355,14 +349,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('does not add codec entries for includes in meta.annotations.codecs', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities, CodecTypes>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,

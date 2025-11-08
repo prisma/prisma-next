@@ -1,11 +1,10 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createOperationRegistry, type OperationSignature } from '@prisma-next/sql-target';
-import { createRuntimeContext } from '@prisma-next/runtime';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
-import { createStubAdapter } from '../../runtime/test/utils';
+import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 
 describe('ColumnBuilder operations', () => {
   const contract = validateContract<SqlContract<SqlStorage>>({
@@ -20,6 +19,10 @@ describe('ColumnBuilder operations', () => {
             email: { type: 'pg/text@1', nullable: false },
             vector: { type: 'pgvector/vector@1', nullable: false },
           },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },
@@ -45,12 +48,10 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
-          operations: () => Array.from(registry.values()),
+          operations: () => [signature],
         },
       ],
     });
@@ -81,12 +82,10 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
-          operations: () => Array.from(registry.values()),
+          operations: () => [signature],
         },
       ],
     });
@@ -128,12 +127,10 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature2);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
-          operations: () => Array.from(registry.values()),
+          operations: () => [signature1, signature2],
         },
       ],
     });
@@ -164,12 +161,10 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
-          operations: () => Array.from(registry.values()),
+          operations: () => [signature],
         },
       ],
     });
@@ -201,12 +196,10 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
-          operations: () => Array.from(registry.values()),
+          operations: () => [signature],
         },
       ],
     });
@@ -238,12 +231,10 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
-          operations: () => Array.from(registry.values()),
+          operations: () => [signature],
         },
       ],
     });
@@ -277,12 +268,10 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
-          operations: () => Array.from(registry.values()),
+          operations: () => [signature],
         },
       ],
     });
@@ -329,12 +318,10 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature2);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({
-      contract,
-      adapter,
+    const context = createTestContext(contract, adapter, {
       extensions: [
         {
-          operations: () => Array.from(registry.values()),
+          operations: () => [signature1, signature2],
         },
       ],
     });

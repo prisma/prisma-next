@@ -10,18 +10,18 @@ export class OrmRelationFilterBuilderImpl<
   ChildModelName extends string,
 > implements OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>
 {
+  private readonly context: RuntimeContext<TContract>;
   private readonly contract: TContract;
   private readonly codecTypes: CodecTypes;
   private readonly childModelName: ChildModelName;
   private wherePredicate: BinaryBuilder | undefined = undefined;
-  private readonly adapter: OrmBuilderOptions<TContract, CodecTypes>['adapter'];
   private modelAccessor: ModelColumnAccessor<TContract, CodecTypes, ChildModelName> | undefined =
     undefined;
 
-  constructor(options: OrmBuilderOptions<TContract, CodecTypes>, childModelName: ChildModelName) {
-    this.contract = options.contract;
-    this.adapter = options.adapter;
-    this.codecTypes = (options.codecTypes ?? {}) as CodecTypes;
+  constructor(options: OrmBuilderOptions<TContract>, childModelName: ChildModelName) {
+    this.context = options.context;
+    this.contract = options.context.contract;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.childModelName = childModelName;
     this.modelAccessor = this._getModelAccessor();
   }
@@ -30,7 +30,7 @@ export class OrmRelationFilterBuilderImpl<
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => BinaryBuilder,
   ): OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName> {
     const builder = new OrmRelationFilterBuilderImpl<TContract, CodecTypes, ChildModelName>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.childModelName,
     );
     builder.modelAccessor = this.modelAccessor;
@@ -63,7 +63,7 @@ export class OrmRelationFilterBuilderImpl<
     if (!tableName) {
       throw planInvalid(`Model ${this.childModelName} not found in mappings`);
     }
-    const schemaHandle = schema(this.contract, this.codecTypes);
+    const schemaHandle = schema(this.context);
     const table = schemaHandle.tables[tableName];
     if (!table) {
       throw planInvalid(`Table ${tableName} not found in schema`);

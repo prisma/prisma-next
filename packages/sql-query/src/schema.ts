@@ -153,45 +153,27 @@ function buildColumns<
     Operations
   >;
 
-  type Columns = Contract['storage']['tables'][TableName]['columns'];
   for (const columnName in table.columns) {
-    const columnDef = table.columns[columnName as keyof Columns];
+    const columnDef = table.columns[columnName];
     if (!columnDef) continue;
-    const columnNameKey = columnName as keyof Columns;
-    const columnBuilder = new ColumnBuilderImpl<columnNameKey & string, Columns[columnNameKey]>(
+    const columnBuilder = new ColumnBuilderImpl<string, StorageColumn>(
       tableName,
       columnName,
       columnDef,
     );
     const builderWithOps = attachOperationsToColumnBuilder<
-      columnNameKey & string,
-      Columns[columnNameKey],
-      ComputeColumnJsType<
-        Contract,
-        TableName,
-        columnNameKey & string,
-        Columns[columnNameKey],
-        CodecTypes
-      >,
+      string,
+      StorageColumn,
+      unknown,
       Operations
     >(
-      columnBuilder as ColumnBuilder<
-        columnNameKey & string,
-        Columns[columnNameKey],
-        ComputeColumnJsType<
-          Contract,
-          TableName,
-          columnNameKey & string,
-          Columns[columnNameKey],
-          CodecTypes
-        >,
-        Record<string, never>
-      >,
+      columnBuilder as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
       columnDef,
       operationRegistry,
       contractCapabilities,
     );
     // Type assertion to preserve the mapped type structure
+    // At runtime we can't preserve exact literal types, so we assert the result matches the expected structure
     (
       result as unknown as Record<string, ColumnBuilder<string, StorageColumn, unknown, Operations>>
     )[columnName] = builderWithOps as ColumnBuilder<string, StorageColumn, unknown, Operations>;

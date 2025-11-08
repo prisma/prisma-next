@@ -220,11 +220,8 @@ describe('orm includes', () => {
         };
       },
     };
-    const oWithoutCaps = orm<RelationsContract, CodecTypes>({
-      contract: contractWithoutCaps,
-      adapter: adapterWithoutCapabilities,
-      codecTypes,
-    });
+    const contextWithoutCaps = createTestContext(contractWithoutCaps, adapterWithoutCapabilities);
+    const oWithoutCaps = orm<RelationsContract>({ context: contextWithoutCaps });
     const builder = (oWithoutCaps as unknown as { user: () => unknown }).user();
     const builderWithInclude = (
       builder as {

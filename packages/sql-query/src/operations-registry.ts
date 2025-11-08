@@ -44,6 +44,8 @@ function executeOperation(
   selfBuilder: ColumnBuilder<string, StorageColumn, unknown>,
   args: unknown[],
   columnMeta: StorageColumn,
+  operationRegistry?: OperationRegistry,
+  contractCapabilities?: Record<string, Record<string, boolean>>,
 ): ColumnBuilder<string, StorageColumn, unknown> & { _operationExpr?: OperationExpr } {
   if (args.length !== signature.args.length) {
     throw planInvalid(
@@ -128,7 +130,7 @@ function executeOperation(
       }
     : columnMeta;
 
-  const result = Object.freeze({
+  const baseResult = {
     kind: 'column' as const,
     table: selfBuilderWithExpr.table,
     column: selfBuilderWithExpr.column,
@@ -158,10 +160,24 @@ function executeOperation(
       });
     },
     _operationExpr: operationExpr,
-  }) as unknown as ColumnBuilder<string, StorageColumn, unknown> & {
+  } as unknown as ColumnBuilder<string, StorageColumn, unknown> & {
     _operationExpr?: OperationExpr;
   };
-  return result;
+
+  // If the return type is a typeId, attach operations for that type
+  if (returnTypeId && operationRegistry) {
+    const resultWithOps = attachOperationsToColumnBuilder(
+      baseResult as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
+      returnColumnMeta,
+      operationRegistry,
+      contractCapabilities,
+    ) as ColumnBuilder<string, StorageColumn, unknown> & {
+      _operationExpr?: OperationExpr;
+    };
+    return Object.freeze(resultWithOps);
+  }
+
+  return Object.freeze(baseResult);
 }
 
 export function attachOperationsToColumnBuilder<
@@ -222,6 +238,8 @@ export function attachOperationsToColumnBuilder<
         this as unknown as ColumnBuilder<string, StorageColumn, unknown>,
         args,
         columnMeta,
+        registry,
+        contractCapabilities,
       );
     };
   }

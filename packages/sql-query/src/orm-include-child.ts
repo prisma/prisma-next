@@ -1,3 +1,4 @@
+import type { RuntimeContext } from '@prisma-next/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import type { ModelColumnAccessor, OrmBuilderOptions } from './orm-types';
@@ -39,10 +40,10 @@ export class OrmIncludeChildBuilderImpl<
   ChildRow = unknown,
 > implements OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>
 {
+  private readonly context: RuntimeContext<TContract>;
   private readonly contract: TContract;
   private readonly codecTypes: CodecTypes;
   private readonly childModelName: ChildModelName;
-  private readonly adapter: OrmBuilderOptions<TContract, CodecTypes>['adapter'];
   private childWhere: BinaryBuilder | undefined;
   private childOrderBy: OrderBuilder | undefined;
   private childLimit: number | undefined;
@@ -53,10 +54,10 @@ export class OrmIncludeChildBuilderImpl<
       >
     | undefined = undefined;
 
-  constructor(options: OrmBuilderOptions<TContract, CodecTypes>, childModelName: ChildModelName) {
-    this.contract = options.contract;
-    this.adapter = options.adapter;
-    this.codecTypes = (options.codecTypes ?? {}) as CodecTypes;
+  constructor(options: OrmBuilderOptions<TContract>, childModelName: ChildModelName) {
+    this.context = options.context;
+    this.contract = options.context.contract;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     this.childModelName = childModelName;
   }
 
@@ -64,7 +65,7 @@ export class OrmIncludeChildBuilderImpl<
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => BinaryBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow> {
     const builder = new OrmIncludeChildBuilderImpl<TContract, CodecTypes, ChildModelName, ChildRow>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.childModelName,
     );
     builder.childWhere = fn(this._getModelAccessor());
@@ -78,7 +79,7 @@ export class OrmIncludeChildBuilderImpl<
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => OrderBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow> {
     const builder = new OrmIncludeChildBuilderImpl<TContract, CodecTypes, ChildModelName, ChildRow>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.childModelName,
     );
     builder.childWhere = this.childWhere;
@@ -90,7 +91,7 @@ export class OrmIncludeChildBuilderImpl<
 
   take(n: number): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow> {
     const builder = new OrmIncludeChildBuilderImpl<TContract, CodecTypes, ChildModelName, ChildRow>(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.childModelName,
     );
     builder.childWhere = this.childWhere;
@@ -119,7 +120,7 @@ export class OrmIncludeChildBuilderImpl<
       ChildModelName,
       InferNestedProjectionRow<Projection, CodecTypes>
     >(
-      { contract: this.contract, adapter: this.adapter, codecTypes: this.codecTypes },
+      { context: this.context },
       this.childModelName,
     );
     builder.childWhere = this.childWhere;
@@ -151,7 +152,7 @@ export class OrmIncludeChildBuilderImpl<
     if (!tableName) {
       throw planInvalid(`Model ${this.childModelName} not found in mappings`);
     }
-    const schemaHandle = schema(this.contract, this.codecTypes);
+    const schemaHandle = schema(this.context);
     const table = schemaHandle.tables[tableName];
     if (!table) {
       throw planInvalid(`Table ${tableName} not found in schema`);

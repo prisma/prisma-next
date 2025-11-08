@@ -449,12 +449,10 @@ describe('SQL builder joins', () => {
       const adapter = createStubAdapter();
     const context = createTestContext(contractWithPosts, adapter);
     const tables = schema<ContractWithPosts, CodecTypes>(context).tables;
-      const userColumns = tables.user.columns;
-      const postColumns = tables.post.columns;
+    const userColumns = tables.user.columns;
+    const postColumns = tables.post.columns;
 
-      const adapter = createStubAdapter();
-      const context = createTestContext(contractWithPosts, adapter);
-      const plan = sql<ContractWithPosts, CodecTypes>({ context })
+    const plan = sql<ContractWithPosts, CodecTypes>({ context })
         .from(tables.user)
         .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
         .select({
