@@ -97,11 +97,19 @@ flowchart TD
 ### Contract Validation (`contract.ts`)
 - Structural validation for SQL contracts using Arktype
 - Type guards and validation schemas
+- **Responsibility: Validation Only** - This function validates that the contract has the correct structure and types. It does NOT normalize the contract. The contract must already be normalized (all required fields present) before calling this function.
 - `validateContract<TContract>()` requires a fully-typed contract type `TContract` (from `contract.d.ts`), NOT a generic `SqlContract<SqlStorage>`. Using a generic type will cause all subsequent type inference to fail. See function documentation for details.
 
 ### Contract Builder (`contract-builder.ts`)
 - TypeScript builder for creating SQL contracts programmatically
 - Fluent API for defining tables, columns, constraints
+- **Responsibility: Normalization** - The builder normalizes contracts by setting default values for all required fields:
+  - `nullable`: defaults to `false` if not provided
+  - `uniques`: defaults to `[]` (empty array)
+  - `indexes`: defaults to `[]` (empty array)
+  - `foreignKeys`: defaults to `[]` (empty array)
+  - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
+- The builder is the **only** place where normalization should occur. Validators, parsers, and emitters assume contracts are already normalized.
 
 ### Types (`types.ts`)
 - Plan types, AST types, and utility types

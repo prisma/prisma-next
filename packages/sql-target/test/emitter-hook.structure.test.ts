@@ -13,6 +13,7 @@ describe('sql-target-family-hook', () => {
           fields: {
             id: { column: 'id' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -22,6 +23,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'sql/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -40,12 +44,16 @@ describe('sql-target-family-hook', () => {
         User: {
           storage: { table: 'nonexistent' },
           fields: {},
+          relations: {},
         },
       },
       storage: {
         tables: {
           user: {
             columns: {},
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -75,6 +83,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -129,12 +140,16 @@ describe('sql-target-family-hook', () => {
       models: {
         User: {
           fields: {},
+          relations: {},
         },
       },
       storage: {
         tables: {
           user: {
             columns: {},
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -153,12 +168,16 @@ describe('sql-target-family-hook', () => {
         User: {
           storage: { table: 'nonexistent' },
           fields: {},
+          relations: {},
         },
       },
       storage: {
         tables: {
           user: {
             columns: {},
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -183,6 +202,9 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {},
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -212,6 +234,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -238,6 +263,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -259,6 +287,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['nonexistent'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -282,6 +313,8 @@ describe('sql-target-family-hook', () => {
             },
             primaryKey: { columns: ['id'] },
             uniques: [{ columns: ['nonexistent'] }],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -304,7 +337,9 @@ describe('sql-target-family-hook', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
             indexes: [{ columns: ['nonexistent'] }],
+            foreignKeys: [],
           },
         },
       },
@@ -326,6 +361,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -333,6 +371,8 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
             foreignKeys: [
               {
                 columns: ['nonexistent'],
@@ -360,6 +400,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -367,6 +410,8 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -394,6 +439,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -401,6 +449,8 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -428,6 +478,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -435,6 +488,8 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
             foreignKeys: [
               {
                 columns: ['userId'],

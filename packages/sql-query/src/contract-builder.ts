@@ -61,6 +61,9 @@ type BuildStorageTable<
           Target
         >;
   };
+  readonly uniques: ReadonlyArray<never>;
+  readonly indexes: ReadonlyArray<never>;
+  readonly foreignKeys: ReadonlyArray<never>;
 } & (PK extends readonly string[]
   ? { readonly primaryKey: { readonly columns: PK } }
   : Record<string, never>);
@@ -516,6 +519,23 @@ class ContractBuilder<
     });
   }
 
+  /**
+   * Builds and normalizes the contract.
+   *
+   * **Responsibility: Normalization**
+   * This method is responsible for normalizing the contract IR by setting default values
+   * for all required fields:
+   * - `nullable`: defaults to `false` if not provided
+   * - `uniques`: defaults to `[]` (empty array)
+   * - `indexes`: defaults to `[]` (empty array)
+   * - `foreignKeys`: defaults to `[]` (empty array)
+   * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
+   *
+   * The contract builder is the **only** place where normalization should occur.
+   * Validators, parsers, and emitters should assume the contract is already normalized.
+   *
+   * @returns A normalized SqlContract with all required fields present
+   */
   build(): Target extends string
     ? SqlContract<
         BuildStorage<Tables, Target & string>,
@@ -609,6 +629,9 @@ class ContractBuilder<
               },
             }
           : {}),
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       };
 
       // Assign to storage tables - type assertion preserves literal keys
@@ -643,11 +666,12 @@ class ContractBuilder<
       }
 
       // Assign to models - type assertion preserves literal keys
-      (modelsPartial as Record<string, ModelDefinition>)[modelName] = {
+      (modelsPartial as unknown as Record<string, ModelDefinition>)[modelName] = {
         storage: {
           table: modelStateTyped.table,
         },
         fields: fields as Record<string, ModelField>,
+        relations: {},
       };
     }
 
@@ -657,7 +681,7 @@ class ContractBuilder<
     const models = modelsPartial as unknown as BuildModels<Models>;
 
     const mappings = computeMappings(
-      models as Record<string, ModelDefinition>,
+      models as unknown as Record<string, ModelDefinition>,
       storage as SqlStorage,
     );
 

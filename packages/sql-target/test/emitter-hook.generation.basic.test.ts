@@ -13,6 +13,7 @@ describe('sql-target-family-hook', () => {
           fields: {
             id: { column: 'id' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -22,6 +23,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'sql/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -42,6 +46,7 @@ describe('sql-target-family-hook', () => {
           fields: {
             id: { column: 'id' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -51,6 +56,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'sql/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -83,7 +91,9 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const imports = sqlTargetFamilyHook.getTypesImports(packs);
+    const codecImports = sqlTargetFamilyHook.getCodecTypesImports(packs);
+    const operationImports = sqlTargetFamilyHook.getOperationTypesImports(packs);
+    const imports = [...codecImports, ...operationImports];
     expect(imports.length).toBe(1);
     expect(imports[0]?.package).toBe('@test/adapter/codec-types');
     expect(imports[0]?.named).toBe('CodecTypes');
@@ -100,6 +110,9 @@ describe('sql-target-family-hook', () => {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -158,6 +171,8 @@ describe('sql-target-family-hook', () => {
             },
             primaryKey: { columns: ['id'] },
             uniques: [{ columns: ['email'] }],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -181,6 +196,8 @@ describe('sql-target-family-hook', () => {
             },
             primaryKey: { columns: ['id'] },
             uniques: [{ columns: ['email'], name: 'unique_email' }],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -203,7 +220,9 @@ describe('sql-target-family-hook', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
             indexes: [{ columns: ['email'] }],
+            foreignKeys: [],
           },
         },
       },
@@ -226,7 +245,9 @@ describe('sql-target-family-hook', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
             indexes: [{ columns: ['email'], name: 'idx_email' }],
+            foreignKeys: [],
           },
         },
       },
@@ -248,6 +269,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -255,6 +279,8 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -284,6 +310,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -291,6 +320,8 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
             foreignKeys: [
               {
                 columns: ['userId'],
@@ -319,6 +350,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'], name: 'pk_user' },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -340,6 +374,7 @@ describe('sql-target-family-hook', () => {
             email: { column: 'email' },
             name: { column: 'name' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -351,6 +386,9 @@ describe('sql-target-family-hook', () => {
               name: { type: 'pg/text@1', nullable: true },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -372,6 +410,7 @@ describe('sql-target-family-hook', () => {
             id: { column: 'id' },
             email: { column: 'nonexistent' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -382,6 +421,9 @@ describe('sql-target-family-hook', () => {
               email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -401,6 +443,7 @@ describe('sql-target-family-hook', () => {
           fields: {
             id: { column: 'id' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -410,6 +453,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },

@@ -28,6 +28,7 @@ describe('sql-target-family-hook', () => {
             id: { column: 'id' },
             userId: { column: 'userId' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -37,6 +38,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -44,6 +48,9 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -87,6 +94,7 @@ describe('sql-target-family-hook', () => {
             id: { column: 'id' },
             userId: { column: 'userId' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -96,6 +104,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -103,6 +114,9 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -124,6 +138,7 @@ describe('sql-target-family-hook', () => {
           fields: {
             id: { column: 'id' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -133,6 +148,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -154,6 +172,7 @@ describe('sql-target-family-hook', () => {
             email: { column: 'email' },
             name: { column: 'name' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -165,6 +184,9 @@ describe('sql-target-family-hook', () => {
               name: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -192,6 +214,7 @@ describe('sql-target-family-hook', () => {
           fields: {
             id: { column: 'id' },
           },
+          relations: {},
         },
         Post: {
           storage: { table: 'post' },
@@ -199,6 +222,7 @@ describe('sql-target-family-hook', () => {
             id: { column: 'id' },
             userId: { column: 'userId' },
           },
+          relations: {},
         },
       },
       storage: {
@@ -208,6 +232,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
           post: {
             columns: {
@@ -215,6 +242,9 @@ describe('sql-target-family-hook', () => {
               userId: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -236,6 +266,9 @@ describe('sql-target-family-hook', () => {
               id: { type: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },
@@ -281,7 +314,9 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const imports = sqlTargetFamilyHook.getTypesImports(packs);
+    const codecImports = sqlTargetFamilyHook.getCodecTypesImports(packs);
+    const operationImports = sqlTargetFamilyHook.getOperationTypesImports(packs);
+    const imports = [...codecImports, ...operationImports];
     expect(imports.length).toBe(2);
     expect(imports[0]?.package).toBe('@test/adapter/codec-types');
     expect(imports[1]?.package).toBe('@test/extension/codec-types');
@@ -298,7 +333,9 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const imports = sqlTargetFamilyHook.getTypesImports(packs);
+    const codecImports = sqlTargetFamilyHook.getCodecTypesImports(packs);
+    const operationImports = sqlTargetFamilyHook.getOperationTypesImports(packs);
+    const imports = [...codecImports, ...operationImports];
     expect(imports.length).toBe(0);
   });
 });

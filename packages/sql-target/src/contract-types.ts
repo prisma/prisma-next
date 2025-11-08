@@ -2,8 +2,8 @@ import type { ContractBase } from '@prisma-next/contract/types';
 
 // SQL family types
 export type StorageColumn = {
-  readonly type?: string;
-  readonly nullable?: boolean;
+  readonly type: string;
+  readonly nullable: boolean;
 };
 
 export type PrimaryKey = {
@@ -35,9 +35,9 @@ export type ForeignKey = {
 export type StorageTable = {
   readonly columns: Record<string, StorageColumn>;
   readonly primaryKey?: PrimaryKey;
-  readonly uniques?: ReadonlyArray<UniqueConstraint>;
-  readonly indexes?: ReadonlyArray<Index>;
-  readonly foreignKeys?: ReadonlyArray<ForeignKey>;
+  readonly uniques: ReadonlyArray<UniqueConstraint>;
+  readonly indexes: ReadonlyArray<Index>;
+  readonly foreignKeys: ReadonlyArray<ForeignKey>;
 };
 
 export type SqlStorage = {
@@ -55,7 +55,7 @@ export type ModelStorage = {
 export type ModelDefinition = {
   readonly storage: ModelStorage;
   readonly fields: Record<string, ModelField>;
-  readonly relations?: Record<string, unknown>;
+  readonly relations: Record<string, unknown>;
 };
 
 export type SqlMappings = {

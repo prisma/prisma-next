@@ -12,7 +12,8 @@
         "id": { "column": "id" },
         "email": { "column": "email" },
         "createdAt": { "column": "createdAt" }
-      }
+      },
+      "relations": {}
     }
   },
   "storage": {
@@ -25,9 +26,13 @@
         },
         "primaryKey": {
           "columns": ["id"]
-        }
+        },
+        "uniques": [],
+        "indexes": [],
+        "foreignKeys": []
       }
     }
   },
+  "relations": {},
   "extensions": {}
 }

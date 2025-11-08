@@ -17,11 +17,13 @@ Provide a deterministic, verifiable representation of the application's data con
 
 ## Responsibilities
 
-- **Parse & Normalize**: Accept contract IR (Intermediate Representation) from authoring surfaces
+- **Parse**: Accept contract IR (Intermediate Representation) from authoring surfaces
 - **Validate**: Core structure validation plus family-specific type and structure validation via hooks
 - **Canonicalize**: Compute `coreHash` (schema meaning) and `profileHash` (capabilities/pins) from canonical JSON
 - **Emit**: Generate `contract.json` and `contract.d.ts` with family-specific type generation
 - **Extension Pack Loading**: Load and validate extension pack manifests (via utilities)
+
+**Note**: The emitter does NOT normalize contracts. Normalization must happen in the contract builder when the contract is created. The emitter assumes contracts are already normalized (all required fields present).
 
 **Non-goals:**
 - Migration planning or execution

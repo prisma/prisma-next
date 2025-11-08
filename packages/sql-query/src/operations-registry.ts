@@ -27,9 +27,6 @@ export function attachOperationsToColumnBuilder<
   }
 
   const typeId = columnMeta.type;
-  if (!typeId) {
-    return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
-  }
 
   const operations = registry.byType(typeId);
   if (operations.length === 0) {
@@ -102,7 +99,7 @@ export function attachOperationsToColumnBuilder<
             name: (arg as ParamPlaceholder).name,
           });
         } else if (argSpec.kind === 'typeId') {
-          if (!arg || typeof arg !== 'object' || !('kind' in arg) || arg.kind !== 'column') {
+          if (!arg || typeof arg !== 'object' || !('kind' in arg)) {
             throw planInvalid(`Argument ${i} must be a ColumnBuilder`);
           }
           const colBuilder = arg as ColumnBuilder<string, StorageColumn, unknown>;

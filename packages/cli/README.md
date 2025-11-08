@@ -78,7 +78,8 @@ flowchart TD
 - Uses esbuild to bundle contract entry with import allowlist
 - Enforces allowlist: only `@prisma-next/*` packages allowed
 - Validates contract purity (JSON-serializable)
-- Returns `ContractIR` for emission
+- **Responsibility: Parsing Only** - This function loads and parses a TypeScript contract file. It does NOT normalize the contract. The contract should already be normalized if it was built using the contract builder. Normalization must happen in the contract builder when the contract is created.
+- Returns `ContractIR` for emission (should already be normalized)
 
 ### Emit Command (`commands/emit.ts`)
 - Command implementation using commander

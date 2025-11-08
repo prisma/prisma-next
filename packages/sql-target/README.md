@@ -70,8 +70,7 @@ flowchart TD
 
 ### Emitter Hook (`emitter-hook.ts`)
 - Implements `TargetFamilyHook` for SQL target family
-- Validates type IDs and contract structure
-- Generates `contract.d.ts` with SQL-specific types
+- **Responsibility: Validation and Type Generation Only** - This hook validates type IDs and contract structure, and generates `contract.d.ts` with SQL-specific types. It does NOT normalize contracts. The contract IR passed to this hook must already be normalized (all required fields present). Normalization must happen in the contract builder when the contract is created.
 - Includes warning header comments in generated `contract.d.ts` files to indicate they're generated artifacts
 
 ### Contract Types (`contract-types.ts`)

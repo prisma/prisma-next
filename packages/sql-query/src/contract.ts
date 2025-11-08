@@ -21,8 +21,8 @@ import type { O } from 'ts-toolbelt';
  * This validates the shape and types of the contract structure.
  */
 const StorageColumnSchema = type.declare<StorageColumn>().type({
-  'type?': 'string',
-  'nullable?': 'boolean',
+  type: 'string',
+  nullable: 'boolean',
 });
 
 const PrimaryKeySchema = type.declare<PrimaryKey>().type({
@@ -54,9 +54,9 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
 const StorageTableSchema = type.declare<StorageTable>().type({
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
-  'uniques?': UniqueConstraintSchema.array().readonly(),
-  'indexes?': IndexSchema.array().readonly(),
-  'foreignKeys?': ForeignKeySchema.array().readonly(),
+  uniques: UniqueConstraintSchema.array().readonly(),
+  indexes: IndexSchema.array().readonly(),
+  foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
 const StorageSchema = type.declare<SqlStorage>().type({
@@ -74,7 +74,7 @@ const ModelStorageSchema = type.declare<ModelStorage>().type({
 const ModelSchema = type.declare<ModelDefinition>().type({
   storage: ModelStorageSchema,
   fields: type({ '[string]': ModelFieldSchema }),
-  'relations?': 'Record<string, unknown>',
+  relations: type({ '[string]': 'unknown' }),
 });
 
 /**
@@ -97,6 +97,14 @@ const SqlContractSchema = type({
 
 /**
  * Validates the structural shape of a SqlContract using Arktype.
+ *
+ * **Responsibility: Validation Only**
+ * This function validates that the contract has the correct structure and types.
+ * It does NOT normalize the contract - normalization must happen in the contract builder.
+ *
+ * The contract passed to this function must already be normalized (all required fields present).
+ * If normalization is needed, it should be done by the contract builder before calling this function.
+ *
  * This ensures all required fields are present and have the correct types.
  *
  * @param value - The contract value to validate (typically from a JSON import)
@@ -225,29 +233,27 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
     }
 
     // Validate model relations have corresponding foreign keys
-    if (model.relations) {
-      for (const [relationName, relation] of Object.entries(model.relations)) {
-        // For now, we'll do basic validation. Full FK validation can be added later
-        // This would require checking that the relation's on.parentCols/childCols match FKs
-        if (typeof relation === 'object' && relation !== null && 'on' in relation) {
-          const on = relation.on as { parentCols?: string[]; childCols?: string[] };
-          if (on.parentCols && on.childCols) {
-            // Check that there's a foreign key matching this relation
-            const hasMatchingFk = table.foreignKeys?.some((fk) => {
-              return (
-                fk.columns.length === on.childCols?.length &&
-                fk.columns.every((col, i) => col === on.childCols?.[i]) &&
-                fk.references.table &&
-                fk.references.columns.length === on.parentCols?.length &&
-                fk.references.columns.every((col, i) => col === on.parentCols?.[i])
-              );
-            });
+    for (const [relationName, relation] of Object.entries(model.relations)) {
+      // For now, we'll do basic validation. Full FK validation can be added later
+      // This would require checking that the relation's on.parentCols/childCols match FKs
+      if (typeof relation === 'object' && relation !== null && 'on' in relation) {
+        const on = relation.on as { parentCols?: string[]; childCols?: string[] };
+        if (on.parentCols && on.childCols) {
+          // Check that there's a foreign key matching this relation
+          const hasMatchingFk = table.foreignKeys.some((fk) => {
+            return (
+              fk.columns.length === on.childCols?.length &&
+              fk.columns.every((col, i) => col === on.childCols?.[i]) &&
+              fk.references.table &&
+              fk.references.columns.length === on.parentCols?.length &&
+              fk.references.columns.every((col, i) => col === on.parentCols?.[i])
+            );
+          });
 
-            if (!hasMatchingFk) {
-              throw new Error(
-                `Model "${modelName}" relation "${relationName}" does not have a corresponding foreign key in table "${tableName}"`,
-              );
-            }
+          if (!hasMatchingFk) {
+            throw new Error(
+              `Model "${modelName}" relation "${relationName}" does not have a corresponding foreign key in table "${tableName}"`,
+            );
           }
         }
       }
@@ -269,72 +275,64 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
     }
 
     // Validate unique constraints reference existing columns
-    if (table.uniques) {
-      for (const unique of table.uniques) {
-        for (const colName of unique.columns) {
-          if (!columnNames.has(colName)) {
-            throw new Error(
-              `Table "${tableName}" unique constraint references non-existent column "${colName}"`,
-            );
-          }
+    for (const unique of table.uniques) {
+      for (const colName of unique.columns) {
+        if (!columnNames.has(colName)) {
+          throw new Error(
+            `Table "${tableName}" unique constraint references non-existent column "${colName}"`,
+          );
         }
       }
     }
 
     // Validate indexes reference existing columns
-    if (table.indexes) {
-      for (const index of table.indexes) {
-        for (const colName of index.columns) {
-          if (!columnNames.has(colName)) {
-            throw new Error(
-              `Table "${tableName}" index references non-existent column "${colName}"`,
-            );
-          }
+    for (const index of table.indexes) {
+      for (const colName of index.columns) {
+        if (!columnNames.has(colName)) {
+          throw new Error(`Table "${tableName}" index references non-existent column "${colName}"`);
         }
       }
     }
 
     // Validate foreignKeys reference existing tables and columns
-    if (table.foreignKeys) {
-      for (const fk of table.foreignKeys) {
-        // Validate FK columns exist in the referencing table
-        for (const colName of fk.columns) {
-          if (!columnNames.has(colName)) {
-            throw new Error(
-              `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
-            );
-          }
-        }
-
-        // Validate referenced table exists
-        if (!tableNames.has(fk.references.table)) {
+    for (const fk of table.foreignKeys) {
+      // Validate FK columns exist in the referencing table
+      for (const colName of fk.columns) {
+        if (!columnNames.has(colName)) {
           throw new Error(
-            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+            `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
           );
         }
+      }
 
-        // Validate referenced columns exist in the referenced table
-        const referencedTable = storage.tables[fk.references.table];
-        if (!referencedTable) {
+      // Validate referenced table exists
+      if (!tableNames.has(fk.references.table)) {
+        throw new Error(
+          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+        );
+      }
+
+      // Validate referenced columns exist in the referenced table
+      const referencedTable = storage.tables[fk.references.table];
+      if (!referencedTable) {
+        throw new Error(
+          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+        );
+      }
+      const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
+
+      for (const colName of fk.references.columns) {
+        if (!referencedColumnNames.has(colName)) {
           throw new Error(
-            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+            `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
           );
         }
-        const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
+      }
 
-        for (const colName of fk.references.columns) {
-          if (!referencedColumnNames.has(colName)) {
-            throw new Error(
-              `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
-            );
-          }
-        }
-
-        if (fk.columns.length !== fk.references.columns.length) {
-          throw new Error(
-            `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
-          );
-        }
+      if (fk.columns.length !== fk.references.columns.length) {
+        throw new Error(
+          `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
+        );
       }
     }
   }

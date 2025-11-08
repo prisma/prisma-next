@@ -34,7 +34,7 @@ export const sqlTargetFamilyHook = {
     for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
       const table = tableUnknown as StorageTable;
       for (const [colName, colUnknown] of Object.entries(table.columns)) {
-        const col = colUnknown as { type?: string; nullable?: boolean };
+        const col = colUnknown as { type: string; nullable?: boolean };
         if (!col.type) {
           throw new Error(`Column "${colName}" in table "${tableName}" is missing type`);
         }
@@ -62,6 +62,19 @@ export const sqlTargetFamilyHook = {
     }
   },
 
+  /**
+   * Validates the structure of a SQL contract IR.
+   *
+   * **Responsibility: Validation Only**
+   * This method validates that the contract IR has the correct SQL-specific structure.
+   * It does NOT normalize the contract - normalization must happen in the contract builder.
+   *
+   * The contract IR passed to this function must already be normalized (all required fields present).
+   * This method will throw an error if required fields are missing or have incorrect types.
+   *
+   * @param ir - The contract IR to validate (should already be normalized)
+   * @throws Error if the contract structure is invalid or missing required fields
+   */
   validateStructure(ir: ContractIR): void {
     if (ir.targetFamily !== 'sql') {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
@@ -113,12 +126,44 @@ export const sqlTargetFamilyHook = {
             );
           }
         }
+
+        // Validate required fields are present (normalized)
+        if (!model.relations || typeof model.relations !== 'object') {
+          throw new Error(
+            `Model "${modelName}" is missing required field "relations" (must be an object)`,
+          );
+        }
       }
     }
 
     for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
       const table = tableUnknown as StorageTable;
       const columnNames = new Set(Object.keys(table.columns));
+
+      // Validate required fields are present (normalized)
+      for (const [colName, col] of Object.entries(table.columns)) {
+        if (typeof col.nullable !== 'boolean') {
+          throw new Error(
+            `Table "${tableName}" column "${colName}" is missing required field "nullable" (must be a boolean)`,
+          );
+        }
+      }
+
+      if (!Array.isArray(table.uniques)) {
+        throw new Error(
+          `Table "${tableName}" is missing required field "uniques" (must be an array)`,
+        );
+      }
+      if (!Array.isArray(table.indexes)) {
+        throw new Error(
+          `Table "${tableName}" is missing required field "indexes" (must be an array)`,
+        );
+      }
+      if (!Array.isArray(table.foreignKeys)) {
+        throw new Error(
+          `Table "${tableName}" is missing required field "foreignKeys" (must be an array)`,
+        );
+      }
 
       if (table.primaryKey) {
         for (const colName of table.primaryKey.columns) {
@@ -130,67 +175,61 @@ export const sqlTargetFamilyHook = {
         }
       }
 
-      if (table.uniques) {
-        for (const unique of table.uniques) {
-          for (const colName of unique.columns) {
-            if (!columnNames.has(colName)) {
-              throw new Error(
-                `Table "${tableName}" unique constraint references non-existent column "${colName}"`,
-              );
-            }
+      for (const unique of table.uniques) {
+        for (const colName of unique.columns) {
+          if (!columnNames.has(colName)) {
+            throw new Error(
+              `Table "${tableName}" unique constraint references non-existent column "${colName}"`,
+            );
           }
         }
       }
 
-      if (table.indexes) {
-        for (const index of table.indexes) {
-          for (const colName of index.columns) {
-            if (!columnNames.has(colName)) {
-              throw new Error(
-                `Table "${tableName}" index references non-existent column "${colName}"`,
-              );
-            }
+      for (const index of table.indexes) {
+        for (const colName of index.columns) {
+          if (!columnNames.has(colName)) {
+            throw new Error(
+              `Table "${tableName}" index references non-existent column "${colName}"`,
+            );
           }
         }
       }
 
-      if (table.foreignKeys) {
-        for (const fk of table.foreignKeys) {
-          for (const colName of fk.columns) {
-            if (!columnNames.has(colName)) {
-              throw new Error(
-                `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
-              );
-            }
-          }
-
-          if (!tableNames.has(fk.references.table)) {
+      for (const fk of table.foreignKeys) {
+        for (const colName of fk.columns) {
+          if (!columnNames.has(colName)) {
             throw new Error(
-              `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+              `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
             );
           }
+        }
 
-          const referencedTable = storage.tables[fk.references.table];
-          if (!referencedTable) {
+        if (!tableNames.has(fk.references.table)) {
+          throw new Error(
+            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+          );
+        }
+
+        const referencedTable = storage.tables[fk.references.table];
+        if (!referencedTable) {
+          throw new Error(
+            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+          );
+        }
+
+        const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
+        for (const colName of fk.references.columns) {
+          if (!referencedColumnNames.has(colName)) {
             throw new Error(
-              `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+              `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
             );
           }
+        }
 
-          const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
-          for (const colName of fk.references.columns) {
-            if (!referencedColumnNames.has(colName)) {
-              throw new Error(
-                `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
-              );
-            }
-          }
-
-          if (fk.columns.length !== fk.references.columns.length) {
-            throw new Error(
-              `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
-            );
-          }
+        if (fk.columns.length !== fk.references.columns.length) {
+          throw new Error(
+            `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
+          );
         }
       }
     }
@@ -261,6 +300,18 @@ export type Relations = Contract['relations'];
     return imports;
   },
 
+  /**
+   * Generates TypeScript type definitions for storage tables.
+   *
+   * **Responsibility: Type Generation Only**
+   * This method generates TypeScript type definitions from normalized storage.
+   * It assumes the storage is already normalized (all required fields present).
+   *
+   * Normalization must happen in the contract builder before the contract reaches the emitter.
+   *
+   * @param storage - The normalized SQL storage to generate types for
+   * @returns TypeScript type definition string
+   */
   generateStorageType(storage: SqlStorage): string {
     const tables: string[] = [];
     for (const [tableName, table] of Object.entries(storage.tables)) {
@@ -281,7 +332,7 @@ export type Relations = Contract['relations'];
         tableParts.push(`primaryKey: { readonly columns: readonly [${pkCols}]${pkName} }`);
       }
 
-      if (table.uniques && table.uniques.length > 0) {
+      if (table.uniques.length > 0) {
         const uniques = table.uniques
           .map((u) => {
             const cols = u.columns.map((c) => `'${c}'`).join(', ');
@@ -292,7 +343,7 @@ export type Relations = Contract['relations'];
         tableParts.push(`uniques: readonly [${uniques}]`);
       }
 
-      if (table.indexes && table.indexes.length > 0) {
+      if (table.indexes.length > 0) {
         const indexes = table.indexes
           .map((i) => {
             const cols = i.columns.map((c) => `'${c}'`).join(', ');
@@ -303,7 +354,7 @@ export type Relations = Contract['relations'];
         tableParts.push(`indexes: readonly [${indexes}]`);
       }
 
-      if (table.foreignKeys && table.foreignKeys.length > 0) {
+      if (table.foreignKeys.length > 0) {
         const fks = table.foreignKeys
           .map((fk) => {
             const cols = fk.columns.map((c) => `'${c}'`).join(', ');
@@ -358,17 +409,15 @@ export type Relations = Contract['relations'];
       }
 
       const relations: string[] = [];
-      if (model.relations) {
-        for (const [relName, rel] of Object.entries(model.relations)) {
-          if (typeof rel === 'object' && rel !== null && 'on' in rel) {
-            const on = rel.on as { parentCols?: string[]; childCols?: string[] };
-            if (on.parentCols && on.childCols) {
-              const parentCols = on.parentCols.map((c) => `'${c}'`).join(', ');
-              const childCols = on.childCols.map((c) => `'${c}'`).join(', ');
-              relations.push(
-                `readonly ${relName}: { readonly on: { readonly parentCols: readonly [${parentCols}]; readonly childCols: readonly [${childCols}] } }`,
-              );
-            }
+      for (const [relName, rel] of Object.entries(model.relations)) {
+        if (typeof rel === 'object' && rel !== null && 'on' in rel) {
+          const on = rel.on as { parentCols?: string[]; childCols?: string[] };
+          if (on.parentCols && on.childCols) {
+            const parentCols = on.parentCols.map((c) => `'${c}'`).join(', ');
+            const childCols = on.childCols.map((c) => `'${c}'`).join(', ');
+            relations.push(
+              `readonly ${relName}: { readonly on: { readonly parentCols: readonly [${parentCols}]; readonly childCols: readonly [${childCols}] } }`,
+            );
           }
         }
       }
@@ -395,10 +444,8 @@ export type Relations = Contract['relations'];
 
     const relationTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models)) {
-      if (model.relations) {
-        for (const [relName] of Object.entries(model.relations)) {
-          relationTypes.push(`readonly ${modelName}.${relName}: unknown`);
-        }
+      for (const [relName] of Object.entries(model.relations)) {
+        relationTypes.push(`readonly ${modelName}.${relName}: unknown`);
       }
     }
 

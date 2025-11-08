@@ -17,6 +17,9 @@ export type Contract = SqlContract<
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
         };
+        readonly uniques: ReadonlyArray<never>;
+        readonly indexes: ReadonlyArray<never>;
+        readonly foreignKeys: ReadonlyArray<never>;
       };
     };
   },
