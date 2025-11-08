@@ -1,15 +1,22 @@
 import type {
   BinaryExpr,
   ColumnRef,
+  DeleteAst,
   Direction,
+  InsertAst,
   JoinAst,
   LiteralExpr,
   LoweredStatement,
   OperationExpr,
   ParamRef,
+  QueryAst,
   SelectAst,
-} from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-target';
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+  UpdateAst,
+} from '@prisma-next/sql-target';
 
 export interface PostgresAdapterOptions {
   readonly profileId?: string;
@@ -24,17 +31,21 @@ export interface OrderClause {
   readonly dir: Direction;
 }
 
-export type PostgresLoweredStatement = LoweredStatement;
+export type PostgresLoweredStatement = import('@prisma-next/sql-target').LoweredStatement;
 
 export type {
   BinaryExpr,
   ColumnRef,
+  DeleteAst,
   Direction,
+  InsertAst,
   JoinAst,
   LiteralExpr,
   OperationExpr,
   ParamRef,
+  QueryAst,
   SelectAst,
   StorageColumn,
   StorageTable,
+  UpdateAst,
 };

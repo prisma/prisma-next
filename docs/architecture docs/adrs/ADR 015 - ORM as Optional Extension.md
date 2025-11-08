@@ -23,7 +23,10 @@ Ship the ORM as an optional package layered on top of the SQL DSL and the data c
 
 ### In scope
 - Read-oriented relation traversal for 1:N and N:1 as sugar over joins and lateral subqueries
+- Relation filters via EXISTS/NOT EXISTS subqueries (`where.related.<relation>.some/none/every`)
 - Controlled shaping of nested results through adapter-provided lowering strategies
+- Base-model writes (`create()`, `update()`, `delete()`) that compile to SQL lane DML operations
+- Model-to-column mapping for writes using contract mappings
 - Emitting a single Plan per ORM call with meta.lane = 'orm'
 
 ### Out of scope for this ADR

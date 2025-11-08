@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SelectAst as SelectAstType, SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
@@ -271,7 +271,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'id' } },
       ]);
@@ -296,7 +296,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'a_b_c', expr: { kind: 'col', table: 'user', column: 'id' } },
       ]);
 
@@ -322,7 +322,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
         { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_author_name', expr: { kind: 'col', table: 'user', column: 'id' } },

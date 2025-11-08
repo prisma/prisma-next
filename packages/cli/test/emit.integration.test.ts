@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ResultType } from '@prisma-next/contract/types';
 import type { ContractIR } from '@prisma-next/emitter';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
@@ -10,10 +11,10 @@ import { sql } from '@prisma-next/sql-query/sql';
 import type {
   Adapter,
   LoweredStatement,
-  ResultType,
   SelectAst,
-} from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+  SqlContract,
+  SqlStorage,
+} from '@prisma-next/sql-target';
 import { createCodecRegistry, sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';

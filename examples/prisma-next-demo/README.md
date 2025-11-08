@@ -26,7 +26,12 @@ This demo shows:
    - Create a `.env` file
    - Add your PostgreSQL connection string: `DATABASE_URL=postgresql://user:pass@localhost:5432/prisma_next_demo?schema=public`
 
-3. Run tests:
+3. Seed the database:
+   ```bash
+   pnpm seed
+   ```
+
+4. Run tests:
    ```bash
    pnpm test
    ```

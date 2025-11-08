@@ -1,11 +1,11 @@
-import { schema, sql } from '../prisma/query';
+import { sql, tables } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
 import { collect } from './utils';
 
 export async function getUsersWithPosts(limit = 10) {
   const runtime = getRuntime();
-  const userTable = schema.tables.user;
-  const postTable = schema.tables.post;
+  const userTable = tables.user;
+  const postTable = tables.post;
 
   const plan = sql
     .from(userTable)

@@ -7,20 +7,26 @@ import type {
   BuildOptions,
   ColumnBuilder,
   ColumnRef,
+  DeleteAst,
   Direction,
   IncludeRef,
   InferNestedProjectionRow,
+  InferReturningRow,
+  InsertAst,
   JoinOnBuilder,
   JoinOnPredicate,
   LoweredStatement,
   OperationExpr,
   ParamDescriptor,
+  ParamPlaceholder,
+  ParamRef,
   Plan,
   PlanMeta,
   RawFactory,
   SelectAst,
   SqlBuilderOptions,
   TableRef,
+  UpdateAst,
 } from './types';
 
 interface JoinState {
@@ -1270,7 +1276,644 @@ export type SelectBuilder<
   Includes extends Record<string, unknown> = Record<string, never>,
 > = SelectBuilderImpl<TContract, Row, CodecTypes, Includes> & {
   readonly raw: RawFactory;
+  insert(
+    table: TableRef,
+    values: Record<string, ParamPlaceholder>,
+  ): InsertBuilder<TContract, CodecTypes>;
+  update(
+    table: TableRef,
+    set: Record<string, ParamPlaceholder>,
+  ): UpdateBuilder<TContract, CodecTypes>;
+  delete(table: TableRef): DeleteBuilder<TContract, CodecTypes>;
 };
+
+export interface InsertBuilder<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
+> {
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
+}
+
+export interface UpdateBuilder<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
+> {
+  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row>;
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
+}
+
+export interface DeleteBuilder<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
+> {
+  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row>;
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
+}
+
+class InsertBuilderImpl<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
+> implements InsertBuilder<TContract, CodecTypes, Row>
+{
+  private readonly contract: TContract;
+  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly codecTypes: CodecTypes;
+  private readonly table: TableRef;
+  private readonly values: Record<string, ParamPlaceholder>;
+  private returningColumns: ColumnBuilder[] = [];
+
+  constructor(
+    options: SqlBuilderOptions<TContract, CodecTypes>,
+    table: TableRef,
+    values: Record<string, ParamPlaceholder>,
+  ) {
+    this.contract = options.contract;
+    this.adapter = options.adapter;
+    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
+    this.table = table;
+    this.values = values;
+  }
+
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
+    const builder = new InsertBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+        codecTypes: this.codecTypes,
+      },
+      this.table,
+      this.values,
+    );
+    builder.returningColumns = [...this.returningColumns, ...columns];
+    return builder;
+  }
+
+  build(options?: BuildOptions): Plan<Row> {
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const contractTable = this.contract.storage.tables[this.table.name];
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${this.table.name}`);
+    }
+
+    const values: Record<string, ColumnRef | ParamRef> = {};
+    for (const [columnName, placeholder] of Object.entries(this.values)) {
+      if (!contractTable.columns[columnName]) {
+        throw planInvalid(`Unknown column ${columnName} in table ${this.table.name}`);
+      }
+
+      const paramName = placeholder.name;
+      if (!Object.hasOwn(paramsMap, paramName)) {
+        throw planInvalid(`Missing value for parameter ${paramName}`);
+      }
+
+      const value = paramsMap[paramName];
+      const index = paramValues.push(value);
+
+      const columnMeta = contractTable.columns[columnName];
+      const codecId = columnMeta?.type;
+      if (codecId && paramName) {
+        paramCodecs[paramName] = codecId;
+      }
+
+      paramDescriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: this.table.name, column: columnName },
+        ...(codecId ? { type: codecId } : {}),
+        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+      });
+
+      values[columnName] = {
+        kind: 'param',
+        index,
+        name: paramName,
+      };
+    }
+
+    const returning: ColumnRef[] = this.returningColumns.map((col) => ({
+      kind: 'col',
+      table: col.table,
+      column: col.column,
+    }));
+
+    const ast: InsertAst = {
+      kind: 'insert',
+      table: { kind: 'table', name: this.table.name },
+      values,
+      ...(returning.length > 0 ? { returning } : {}),
+    };
+
+    const lowered = this.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    const returningProjection: ProjectionState = {
+      aliases: this.returningColumns.map((col) => col.column),
+      columns: this.returningColumns,
+    };
+
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table: this.table,
+      projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+    });
+
+    const plan: Plan<Row> = Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
+      meta: {
+        ...planMeta,
+        lane: 'dsl',
+        annotations: {
+          ...planMeta.annotations,
+          intent: 'write',
+          isMutation: true,
+        },
+      },
+    });
+
+    return plan;
+  }
+}
+
+class UpdateBuilderImpl<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
+> implements UpdateBuilder<TContract, CodecTypes, Row>
+{
+  private readonly contract: TContract;
+  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly codecTypes: CodecTypes;
+  private readonly table: TableRef;
+  private readonly set: Record<string, ParamPlaceholder>;
+  private wherePredicate?: BinaryBuilder;
+  private returningColumns: ColumnBuilder[] = [];
+
+  constructor(
+    options: SqlBuilderOptions<TContract, CodecTypes>,
+    table: TableRef,
+    set: Record<string, ParamPlaceholder>,
+  ) {
+    this.contract = options.contract;
+    this.adapter = options.adapter;
+    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
+    this.table = table;
+    this.set = set;
+  }
+
+  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row> {
+    const builder = new UpdateBuilderImpl<TContract, CodecTypes, Row>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+        codecTypes: this.codecTypes,
+      },
+      this.table,
+      this.set,
+    );
+    builder.wherePredicate = predicate;
+    builder.returningColumns = [...this.returningColumns];
+    return builder;
+  }
+
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
+    const builder = new UpdateBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+        codecTypes: this.codecTypes,
+      },
+      this.table,
+      this.set,
+    );
+    if (this.wherePredicate) {
+      builder.wherePredicate = this.wherePredicate;
+    }
+    builder.returningColumns = [...this.returningColumns, ...columns];
+    return builder;
+  }
+
+  build(options?: BuildOptions): Plan<Row> {
+    if (!this.wherePredicate) {
+      throw planInvalid('where() must be called before building an UPDATE query');
+    }
+
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const contractTable = this.contract.storage.tables[this.table.name];
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${this.table.name}`);
+    }
+
+    const set: Record<string, ColumnRef | ParamRef> = {};
+    for (const [columnName, placeholder] of Object.entries(this.set)) {
+      if (!contractTable.columns[columnName]) {
+        throw planInvalid(`Unknown column ${columnName} in table ${this.table.name}`);
+      }
+
+      const paramName = placeholder.name;
+      if (!Object.hasOwn(paramsMap, paramName)) {
+        throw planInvalid(`Missing value for parameter ${paramName}`);
+      }
+
+      const value = paramsMap[paramName];
+      const index = paramValues.push(value);
+
+      const columnMeta = contractTable.columns[columnName];
+      const codecId = columnMeta?.type;
+      if (codecId && paramName) {
+        paramCodecs[paramName] = codecId;
+      }
+
+      paramDescriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: this.table.name, column: columnName },
+        ...(codecId ? { type: codecId } : {}),
+        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+      });
+
+      set[columnName] = {
+        kind: 'param',
+        index,
+        name: paramName,
+      };
+    }
+
+    const whereResult = this._buildWhereExpr(
+      this.wherePredicate,
+      paramsMap,
+      paramDescriptors,
+      paramValues,
+    );
+    const whereExpr = whereResult?.expr;
+    if (!whereExpr) {
+      throw planInvalid('Failed to build WHERE clause');
+    }
+
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
+
+    const returning: ColumnRef[] = this.returningColumns.map((col) => ({
+      kind: 'col',
+      table: col.table,
+      column: col.column,
+    }));
+
+    const ast: UpdateAst = {
+      kind: 'update',
+      table: { kind: 'table', name: this.table.name },
+      set,
+      where: whereExpr,
+      ...(returning.length > 0 ? { returning } : {}),
+    };
+
+    const lowered = this.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    const returningProjection: ProjectionState = {
+      aliases: this.returningColumns.map((col) => col.column),
+      columns: this.returningColumns,
+    };
+
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table: this.table,
+      projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      where: this.wherePredicate,
+    });
+
+    const plan: Plan<Row> = Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
+      meta: {
+        ...planMeta,
+        lane: 'dsl',
+        annotations: {
+          ...planMeta.annotations,
+          intent: 'write',
+          isMutation: true,
+          hasWhere: true,
+        },
+      },
+    });
+
+    return plan;
+  }
+
+  private _buildWhereExpr(
+    where: BinaryBuilder,
+    paramsMap: Record<string, unknown>,
+    descriptors: ParamDescriptor[],
+    values: unknown[],
+  ): {
+    expr: BinaryExpr;
+    codecId?: string;
+    paramName: string;
+  } {
+    const placeholder = where.right;
+    const paramName = placeholder.name;
+
+    if (!Object.hasOwn(paramsMap, paramName)) {
+      throw planInvalid(`Missing value for parameter ${paramName}`);
+    }
+
+    const value = paramsMap[paramName];
+    const index = values.push(value);
+
+    const meta = (where.left.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+
+    descriptors.push({
+      name: paramName,
+      source: 'dsl',
+      refs: { table: where.left.table, column: where.left.column },
+      ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+    });
+
+    const contractTable = this.contract.storage.tables[where.left.table];
+    const columnMeta = contractTable?.columns[where.left.column];
+    const codecId = columnMeta?.type;
+
+    return {
+      expr: {
+        kind: 'bin',
+        op: 'eq',
+        left: {
+          kind: 'col',
+          table: where.left.table,
+          column: where.left.column,
+        },
+        right: {
+          kind: 'param',
+          index,
+          name: paramName,
+        },
+      },
+      ...(codecId ? { codecId } : {}),
+      paramName,
+    };
+  }
+}
+
+class DeleteBuilderImpl<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
+> implements DeleteBuilder<TContract, CodecTypes, Row>
+{
+  private readonly contract: TContract;
+  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly codecTypes: CodecTypes;
+  private readonly table: TableRef;
+  private wherePredicate?: BinaryBuilder;
+  private returningColumns: ColumnBuilder[] = [];
+
+  constructor(options: SqlBuilderOptions<TContract, CodecTypes>, table: TableRef) {
+    this.contract = options.contract;
+    this.adapter = options.adapter;
+    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
+    this.table = table;
+  }
+
+  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row> {
+    const builder = new DeleteBuilderImpl<TContract, CodecTypes, Row>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+        codecTypes: this.codecTypes,
+      },
+      this.table,
+    );
+    builder.wherePredicate = predicate;
+    builder.returningColumns = [...this.returningColumns];
+    return builder;
+  }
+
+  returning<const Columns extends readonly ColumnBuilder[]>(
+    ...columns: Columns
+  ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
+    const builder = new DeleteBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
+      {
+        contract: this.contract,
+        adapter: this.adapter,
+        codecTypes: this.codecTypes,
+      },
+      this.table,
+    );
+    if (this.wherePredicate) {
+      builder.wherePredicate = this.wherePredicate;
+    }
+    builder.returningColumns = [...this.returningColumns, ...columns];
+    return builder;
+  }
+
+  build(options?: BuildOptions): Plan<Row> {
+    if (!this.wherePredicate) {
+      throw planInvalid('where() must be called before building a DELETE query');
+    }
+
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const contractTable = this.contract.storage.tables[this.table.name];
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${this.table.name}`);
+    }
+
+    const whereResult = this._buildWhereExpr(
+      this.wherePredicate,
+      paramsMap,
+      paramDescriptors,
+      paramValues,
+    );
+    const whereExpr = whereResult?.expr;
+    if (!whereExpr) {
+      throw planInvalid('Failed to build WHERE clause');
+    }
+
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
+
+    const returning: ColumnRef[] = this.returningColumns.map((col) => ({
+      kind: 'col',
+      table: col.table,
+      column: col.column,
+    }));
+
+    const ast: DeleteAst = {
+      kind: 'delete',
+      table: { kind: 'table', name: this.table.name },
+      where: whereExpr,
+      ...(returning.length > 0 ? { returning } : {}),
+    };
+
+    const lowered = this.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    const returningProjection: ProjectionState = {
+      aliases: this.returningColumns.map((col) => col.column),
+      columns: this.returningColumns,
+    };
+
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table: this.table,
+      projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      where: this.wherePredicate,
+    });
+
+    const plan: Plan<Row> = Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
+      meta: {
+        ...planMeta,
+        lane: 'dsl',
+        annotations: {
+          ...planMeta.annotations,
+          intent: 'write',
+          isMutation: true,
+          hasWhere: true,
+        },
+      },
+    });
+
+    return plan;
+  }
+
+  private _buildWhereExpr(
+    where: BinaryBuilder,
+    paramsMap: Record<string, unknown>,
+    descriptors: ParamDescriptor[],
+    values: unknown[],
+  ): {
+    expr: BinaryExpr;
+    codecId?: string;
+    paramName: string;
+  } {
+    const placeholder = where.right;
+    const paramName = placeholder.name;
+
+    if (!Object.hasOwn(paramsMap, paramName)) {
+      throw planInvalid(`Missing value for parameter ${paramName}`);
+    }
+
+    const value = paramsMap[paramName];
+    const index = values.push(value);
+
+    const meta = (where.left.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+
+    descriptors.push({
+      name: paramName,
+      source: 'dsl',
+      refs: { table: where.left.table, column: where.left.column },
+      ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+    });
+
+    const contractTable = this.contract.storage.tables[where.left.table];
+    const columnMeta = contractTable?.columns[where.left.column];
+    const codecId = columnMeta?.type;
+
+    return {
+      expr: {
+        kind: 'bin',
+        op: 'eq',
+        left: {
+          kind: 'col',
+          table: where.left.table,
+          column: where.left.column,
+        },
+        right: {
+          kind: 'param',
+          index,
+          name: paramName,
+        },
+      },
+      ...(codecId ? { codecId } : {}),
+      paramName,
+    };
+  }
+}
 
 export function sql<
   TContract extends SqlContract<SqlStorage>,
@@ -1285,6 +1928,30 @@ export function sql<
 
   Object.defineProperty(builder, 'raw', {
     value: rawFactory,
+    enumerable: true,
+    configurable: false,
+  });
+
+  Object.defineProperty(builder, 'insert', {
+    value: (table: TableRef, values: Record<string, ParamPlaceholder>) => {
+      return new InsertBuilderImpl<TContract, CodecTypes>(options, table, values);
+    },
+    enumerable: true,
+    configurable: false,
+  });
+
+  Object.defineProperty(builder, 'update', {
+    value: (table: TableRef, set: Record<string, ParamPlaceholder>) => {
+      return new UpdateBuilderImpl<TContract, CodecTypes>(options, table, set);
+    },
+    enumerable: true,
+    configurable: false,
+  });
+
+  Object.defineProperty(builder, 'delete', {
+    value: (table: TableRef) => {
+      return new DeleteBuilderImpl<TContract, CodecTypes>(options, table);
+    },
     enumerable: true,
     configurable: false,
   });

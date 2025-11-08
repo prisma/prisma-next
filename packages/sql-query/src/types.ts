@@ -19,17 +19,21 @@ export type {
   StorageTable,
 } from '@prisma-next/sql-target';
 
+import type { Plan, PlanRefs } from '@prisma-next/contract/types';
 import type {
   Adapter,
   ArgSpec,
+  ColumnRef,
+  Direction,
+  LoweredStatement,
   LoweringSpec,
+  ParamRef,
+  QueryAst,
   ReturnSpec,
   SqlContract,
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-target';
-
-export type Direction = 'asc' | 'desc';
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';
@@ -109,22 +113,7 @@ export interface JoinOnPredicate {
   readonly right: ColumnBuilder<string, StorageColumn, unknown>;
 }
 
-export interface TableRef {
-  readonly kind: 'table';
-  readonly name: string;
-}
-
-export interface ColumnRef {
-  readonly kind: 'col';
-  readonly table: string;
-  readonly column: string;
-}
-
-export interface ParamRef {
-  readonly kind: 'param';
-  readonly index: number;
-  readonly name?: string;
-}
+export type Expr = ColumnRef | ParamRef;
 
 export interface LiteralExpr {
   readonly kind: 'literal';
@@ -139,99 +128,6 @@ export interface OperationExpr {
   readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr>;
   readonly returns: ReturnSpec;
   readonly lowering: LoweringSpec;
-}
-
-export type Expr = ColumnRef | ParamRef | OperationExpr;
-
-export interface BinaryExpr {
-  readonly kind: 'bin';
-  readonly op: 'eq';
-  readonly left: ColumnRef | OperationExpr;
-  readonly right: ParamRef;
-}
-
-export type JoinOnExpr = {
-  readonly kind: 'eqCol';
-  readonly left: ColumnRef;
-  readonly right: ColumnRef;
-};
-
-export interface JoinAst {
-  readonly kind: 'join';
-  readonly joinType: 'inner' | 'left' | 'right' | 'full';
-  readonly table: TableRef;
-  readonly on: JoinOnExpr;
-}
-
-export interface IncludeRef {
-  readonly kind: 'includeRef';
-  readonly alias: string;
-}
-
-export interface IncludeAst {
-  readonly kind: 'includeMany';
-  readonly alias: string;
-  readonly child: {
-    readonly table: TableRef;
-    readonly on: JoinOnExpr;
-    readonly where?: BinaryExpr;
-    readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
-    readonly limit?: number;
-    readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
-  };
-}
-
-export interface SelectAst {
-  readonly kind: 'select';
-  readonly from: TableRef;
-  readonly joins?: ReadonlyArray<JoinAst>;
-  readonly includes?: ReadonlyArray<IncludeAst>;
-  readonly project: ReadonlyArray<{
-    alias: string;
-    expr: ColumnRef | IncludeRef | OperationExpr;
-  }>;
-  readonly where?: BinaryExpr;
-  readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
-  readonly limit?: number;
-}
-
-export interface ParamDescriptor {
-  readonly index?: number;
-  readonly name?: string;
-  readonly type?: string;
-  readonly nullable?: boolean;
-  readonly source: 'dsl' | 'raw';
-  readonly refs?: { table: string; column: string };
-}
-
-export interface PlanRefs {
-  readonly tables?: readonly string[];
-  readonly columns?: ReadonlyArray<{ table: string; column: string }>;
-  readonly indexes?: ReadonlyArray<{
-    readonly table: string;
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  }>;
-}
-
-export interface PlanMeta {
-  readonly target: string;
-  readonly targetFamily?: string;
-  readonly coreHash: string;
-  readonly profileHash?: string;
-  readonly lane: string;
-  readonly annotations?: {
-    codecs?: Record<string, string>; // alias/param → codec id ('ns/name@v')
-    [key: string]: unknown;
-  };
-  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
-  readonly refs?: PlanRefs;
-  readonly projection?: Record<string, string> | ReadonlyArray<string>;
-  /**
-   * Optional mapping of projection alias → column type ID (fully qualified ns/name@version).
-   * Used for codec resolution when AST+refs don't provide enough type info.
-   */
-  readonly projectionTypes?: Record<string, string>;
 }
 
 /**
@@ -482,6 +378,23 @@ export type InferNestedProjectionRow<
 };
 
 /**
+ * Infers Row type from a tuple of ColumnBuilders used in returning() clause.
+ * Extracts column name and JsType from each ColumnBuilder and creates a Record.
+ */
+export type InferReturningRow<Columns extends readonly ColumnBuilder[]> = Columns extends readonly [
+  infer First,
+  ...infer Rest,
+]
+  ? First extends ColumnBuilder<infer Name, infer _Meta, infer JsType>
+    ? Name extends string
+      ? Rest extends readonly ColumnBuilder[]
+        ? { [K in Name]: JsType } & InferReturningRow<Rest>
+        : { [K in Name]: JsType }
+      : never
+    : never
+  : Record<string, never>;
+
+/**
  * Utility type to check if a contract has the required capabilities for includeMany.
  * Requires both `lateral` and `jsonAgg` to be `true` in the contract's capabilities for the target.
  * Capabilities are nested by target: `{ [target]: { lateral: true, jsonAgg: true } }`
@@ -499,11 +412,40 @@ export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>
       : false
     : false;
 
+// Re-export Plan types from contract for backward compatibility
+export type { ParamDescriptor, PlanMeta, PlanRefs, ResultType } from '@prisma-next/contract/types';
+
+// Re-export AST types from sql-target for backward compatibility
+export type {
+  BinaryExpr,
+  ColumnRef,
+  DeleteAst,
+  Direction,
+  ExistsExpr,
+  IncludeAst,
+  IncludeRef,
+  InsertAst,
+  JoinAst,
+  JoinOnExpr,
+  LoweredStatement,
+  ParamRef,
+  QueryAst,
+  SelectAst,
+  TableRef,
+  UpdateAst,
+} from '@prisma-next/sql-target';
+
 /**
- * Utility type to extract the Row type from a Plan.
- * Example: `type Row = ResultType<typeof plan>`
+ * SQL-specific Plan type that refines the ast field to use QueryAst.
+ * This is the type used by SQL query builders.
  */
-export type ResultType<P> = P extends Plan<infer R> ? R : never;
+export type SqlPlan<Row = unknown> = Omit<Plan<Row>, 'ast'> & {
+  readonly ast?: QueryAst;
+};
+
+// Re-export Plan as SqlPlan for backward compatibility
+// Also export as Plan for compatibility with existing code
+export type { Plan } from '@prisma-next/contract/types';
 
 /**
  * Helper types for extracting contract structure.
@@ -568,13 +510,6 @@ export type ColumnsOf<
     : never
   : never;
 
-export interface Plan<_Row = unknown> {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-  readonly ast?: SelectAst;
-  readonly meta: PlanMeta;
-}
-
 export interface RawTemplateOptions {
   readonly refs?: PlanRefs;
   readonly annotations?: Record<string, unknown>;
@@ -593,12 +528,6 @@ export type RawTemplateFactory = (
 export interface RawFactory extends RawTemplateFactory {
   (text: string, options: RawFunctionOptions): Plan;
   with(options: RawTemplateOptions): RawTemplateFactory;
-}
-
-export interface LoweredStatement {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-  readonly annotations?: Record<string, unknown>;
 }
 
 export interface RuntimeError extends Error {
@@ -624,6 +553,6 @@ export interface SqlBuilderOptions<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > {
   readonly contract: TContract;
-  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
+  readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly codecTypes?: CodecTypes;
 }

@@ -530,6 +530,154 @@ const fixtureContract = validateContract<Contract>(contractJson);
 - Avoids linting errors about `require()` and undefined globals
 - Better type safety and module resolution
 
+## Query Patterns
+
+**Pattern**: Export `tables` from `query.ts` and import directly for better DX. See `.cursor/rules/query-patterns.mdc` for comprehensive query patterns.
+
+**✅ CORRECT: Export tables from query.ts**
+
+```typescript
+// src/prisma/query.ts
+export const tables = schema.tables;
+
+// In query files
+import { sql, tables } from '../prisma/query';
+
+const plan = sql
+  .from(tables.user)
+  .select({ id: tables.user.columns.id })
+  .build();
+```
+
+**✅ CORRECT: Extract variables for reuse**
+
+```typescript
+const userTable = tables.user;
+const userColumns = userTable.columns;
+
+const plan = sql
+  .from(userTable)
+  .select({ id: userColumns.id })
+  .build();
+```
+
+See `.cursor/rules/query-patterns.mdc` for full details on query patterns, type inference, and common usage patterns.
+
+## Type Safety is Non-Negotiable
+
+**CRITICAL RULE**: Never disable type checking with `@ts-expect-error` or type assertions to work around broken types. Type safety is one of the most important characteristics of this codebase, especially for the ORM implementation. If types aren't working, you haven't done your job - fix the type definitions, not the usage.
+
+**❌ WRONG: Suppressing type errors instead of fixing them**
+
+```typescript
+// @ts-expect-error - Plan type is complex, runtime works correctly
+const result = await runtime.execute(plan);
+```
+
+**✅ CORRECT: Fix the type by properly typing the plan**
+
+```typescript
+import type { Plan } from '@prisma-next/contract/types';
+
+const plan = orm.user().create({ email }) as Plan<number>;
+const result = runtime.execute(plan);
+```
+
+**Why this matters:**
+- Type safety is a core feature that users rely on
+- Suppressing errors hides real type problems
+- Broken types indicate incomplete implementation
+- Users deserve full type safety, not workarounds
+
+**When type inference fails:**
+1. Check if the return type is correctly defined in the interface
+2. Use explicit type assertions (`as Plan<number>`) if the type is correct but inference fails
+3. Fix the type definitions if they're incorrect
+4. Never use `@ts-expect-error` to silence type errors in production code
+
+## Type Assertions in Test Files
+
+**Pattern**: Use `@ts-expect-error` comments for intentional type assertions in test files when working with dynamic proxy objects or complex type scenarios. This is ONLY acceptable in test files, never in production code.
+
+**❌ WRONG: Adding type assertions without explanation**
+
+```typescript
+const builderWithInclude: unknown = (
+  builder as {
+    include: {
+      posts: (child: unknown) => unknown;
+    };
+  }
+).include.posts((child) => { /* ... */ });
+```
+
+**✅ CORRECT: Use `@ts-expect-error` with explanation**
+
+```typescript
+// @ts-expect-error - intentionally using type assertions in test
+const builderWithInclude: unknown = (
+  builder as {
+    include: {
+      posts: (child: unknown) => unknown;
+    };
+  }
+).include.posts((child) => { /* ... */ });
+```
+
+**When to use `@ts-expect-error`:**
+- When working with dynamic proxy objects (e.g., ORM model registry) in test files only
+- When intentionally testing invalid inputs or error cases
+- When TypeScript can't infer complex dynamic types correctly in test contexts
+- Always include a comment explaining why the assertion is needed
+
+**CRITICAL: Never use `@ts-expect-error` to suppress type errors in production code or to work around broken types. Type safety is a core feature of this codebase. If types aren't working, fix the type definitions, not the usage.**
+
+**Handling Implicit `any` in Test Callbacks:**
+
+**❌ WRONG: Implicit `any` in callback parameters**
+
+```typescript
+const plan = o.user().include.posts((child) => {
+  // child is implicitly any
+  return child.select((p) => { /* ... */ });
+});
+```
+
+**✅ CORRECT: Explicit `unknown` annotations**
+
+```typescript
+const plan = o.user().include.posts((child: unknown) => {
+  const childBuilder = child as {
+    select: (fn: (model: unknown) => unknown) => unknown;
+  };
+  return childBuilder.select((p: unknown) => {
+    const model = p as { id: unknown; title: unknown };
+    return { id: model.id, title: model.title };
+  });
+});
+```
+
+**Type Assertions for Dynamic Proxy Objects:**
+
+**Pattern**: When working with dynamic proxy objects (e.g., ORM model registry), cast to `unknown` first, then to the specific shape.
+
+**❌ WRONG: Direct type assertion**
+
+```typescript
+const builder = (o as { user: () => unknown }).user();
+```
+
+**✅ CORRECT: Cast to `unknown` first**
+
+```typescript
+const builder = (o as unknown as { user: () => unknown }).user();
+```
+
+**Why?**
+- Dynamic proxy objects have complex types that TypeScript can't always infer correctly
+- Casting to `unknown` first allows TypeScript to accept the subsequent type assertion
+- This pattern is common when working with Proxy-based APIs
+
 ## DRY Test Patterns
 
 **Pattern**: Common patterns in test files should be extracted into helper functions with JSDoc comments explaining their purpose.

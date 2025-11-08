@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:84bfb187760304609f1f5de730012912f965af5ebf052275a256678bb5095625",
+  "coreHash": "sha256:fe36df04c46796e6b3768a2fa19a84f6f19bfe137b1bc9ec8ae08a70bb3a89ec",
   "profileHash": "sha256:68910bb2d84a7097a239982d21995ededbf540f12044b0da051b272ce9b32b80",
   "models": {
     "Post": {
@@ -93,6 +93,36 @@
   "extensions": {
     "postgres": {
       "version": "15.0.0"
+    }
+  },
+  "relations": {
+    "post": {
+      "user": {
+        "cardinality": "N:1",
+        "on": {
+          "childCols": [
+            "id"
+          ],
+          "parentCols": [
+            "userId"
+          ]
+        },
+        "to": "User"
+      }
+    },
+    "user": {
+      "posts": {
+        "cardinality": "1:N",
+        "on": {
+          "childCols": [
+            "userId"
+          ],
+          "parentCols": [
+            "id"
+          ]
+        },
+        "to": "Post"
+      }
     }
   }
 }

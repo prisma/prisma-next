@@ -3,9 +3,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import type { ResultType } from '@prisma-next/contract/types';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { ResultType } from '@prisma-next/sql-query/types';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 

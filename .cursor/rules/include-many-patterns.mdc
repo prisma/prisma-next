@@ -59,29 +59,36 @@ When using boolean `true` to mark include references in projections:
 
 ## Capability Gating
 
-When gating features by capabilities:
+When gating features by capabilities (used by `includeMany` and DML `returning()`):
 
-**Pattern**: Check capabilities at both runtime and type level:
+**Pattern**: Check capabilities at runtime in builder methods:
 
+```typescript
+// Runtime check in builder method
+returning<const Columns extends readonly ColumnBuilder[]>(
+  ...columns: Columns
+): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+  // Runtime capability check
+  const target = this.contract.target;
+  const capabilities = this.contract.capabilities;
+  if (!capabilities || !capabilities[target]) {
+    throw planInvalid('returning() requires returning capability');
+  }
+  const targetCapabilities = capabilities[target];
+  if (targetCapabilities['returning'] !== true) {
+    throw planInvalid('returning() requires returning capability to be true');
+  }
+
+  // Continue with implementation...
+}
+```
+
+**For multiple capabilities** (like `includeMany`):
 ```typescript
 // Runtime check
 if (targetCapabilities['lateral'] !== true || targetCapabilities['jsonAgg'] !== true) {
   throw planInvalid('includeMany requires lateral and jsonAgg capabilities');
 }
-
-// Type-level gating
-export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>> =
-  TContract extends { capabilities: infer C; target: infer T }
-    ? T extends string
-      ? C extends Record<string, Record<string, boolean>>
-        ? C extends { [K in T]: infer TargetCaps }
-          ? TargetCaps extends { lateral: true; jsonAgg: true }
-            ? true
-            : false
-          : false
-        : false
-      : false
-    : false;
 ```
 
-**Why**: Runtime checks prevent execution errors, type-level gating prevents compilation errors and provides better developer experience.
+**Why**: Runtime checks prevent execution errors when capabilities are missing or false. This pattern ensures consistent behavior across all capability-gated features (`includeMany`, DML `returning()`, etc.).

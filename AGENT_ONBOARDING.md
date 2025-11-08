@@ -155,7 +155,59 @@ interface Extension {
 
 **Adapter as Extension**: Adapters are treated as extensions (provide codecs via `profile.codecs()`). The adapter is automatically included in the context when creating it.
 
+**Capability Gating**:
+- Some features are capability-gated and require specific capabilities in the contract
+- **`includeMany`**: Requires both `lateral: true` and `jsonAgg: true` in contract capabilities
+- **`returning()` on DML operations**: Requires `returning: true` in contract capabilities
+- Capability checks happen at runtime in builder methods - missing or false capabilities throw errors
+- PostgreSQL supports `returning`, `lateral`, and `jsonAgg`; MySQL does not support `returning`
+- Follows the same pattern: check `contract.capabilities[target][capability] === true` before allowing feature use
+
 ### Query DSL Pattern
+
+**Standard Practice**: Export `tables` from your `query.ts` file as a convenience export for better DX:
+
+```typescript
+// src/prisma/query.ts
+import { schema as schemaBuilder } from '@prisma-next/sql-query/schema';
+import { sql as sqlBuilder } from '@prisma-next/sql-query/sql';
+import { adapter } from './adapter';
+import type { CodecTypes, Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+const contract = validateContract<Contract>(contractJson);
+
+export const sql = sqlBuilder<Contract, CodecTypes>({ contract, adapter });
+export const schema = schemaBuilder<Contract, CodecTypes>(contract);
+export const tables = schema.tables;  // Convenience export for better DX
+```
+
+**Usage Pattern**: Import `tables` directly and optionally extract table/column variables for reuse:
+
+```typescript
+import { sql, tables } from '../prisma/query';
+import type { ResultType } from '@prisma-next/sql-query/types';
+
+// Option 1: Direct access (shorter, more readable)
+const plan = sql
+  .from(tables.user)
+  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
+  .build();
+
+// Option 2: Extract variables for reuse (common pattern)
+const userTable = tables.user;
+const userColumns = userTable.columns;
+
+const plan = sql
+  .from(userTable)
+  .select({ id: userColumns.id, email: userColumns.email })
+  .build();
+
+// Extract row type from plan
+type UserRow = ResultType<typeof plan>;
+```
+
+**Full Example**:
 
 ```typescript
 import { sql, schema, param } from '@prisma-next/sql-query/sql';
@@ -196,12 +248,42 @@ const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
 // Extract row type from plan
 type UserRow = ResultType<typeof plan>;
 type JoinedRow = ResultType<typeof joinedPlan>;
+
+// DML operations (INSERT, UPDATE, DELETE)
+const insertPlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .insert(tables.user, {
+    email: param('email'),
+    createdAt: param('createdAt'),
+  })
+  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .build({ params: { email: 'test@example.com', createdAt: new Date() } });
+
+const updatePlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .update(tables.user, {
+    email: param('newEmail'),
+  })
+  .where(t.user.id.eq(param('userId')))
+  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .build({ params: { newEmail: 'updated@example.com', userId: 1 } });
+
+const deletePlan = sql<Contract, CodecTypes>({ contract, adapter })
+  .delete(tables.user)
+  .where(t.user.id.eq(param('userId')))
+  .returning(t.user.id, t.user.email)  // Capability-gated: requires returning: true
+  .build({ params: { userId: 1 } });
+
+// Extract row types from DML plans
+type InsertRow = ResultType<typeof insertPlan>;  // { id: number; email: string }
+type UpdateRow = ResultType<typeof updatePlan>;  // { id: number; email: string }
+type DeleteRow = ResultType<typeof deletePlan>;  // { id: number; email: string }
 ```
 
 **Key points:**
 - Builder methods (`from()`, `where()`, `select()`, etc.) return new builder instances - always chain them
 - Access columns via `table.columns[fieldName]` or `table['columns'][fieldName]` to avoid conflicts with table properties like `name`
 - Use `ResultType<typeof plan>` to extract the inferred row type
+- **DML operations**: `insert()`, `update()`, `delete()` support `returning()` method for returning affected rows
+- **Capability gating**: `returning()` requires `returning: true` in contract capabilities (PostgreSQL supports this, MySQL does not)
 
 **Joins:**
 - Explicit join methods: `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`
@@ -222,6 +304,135 @@ type JoinedRow = ResultType<typeof joinedPlan>;
     })
     .build({ params: { active: true } });
   ```
+
+### ORM Lane Pattern
+
+The ORM lane provides a model-centric API that compiles to SQL lane primitives. It optimizes for discoverability and relationship traversal.
+
+**Entrypoint**: Use `orm()` factory function to create a model registry proxy:
+
+```typescript
+import { orm } from '@prisma-next/sql-query/orm';
+import { validateContract } from '@prisma-next/sql-query/schema';
+import type { Contract, CodecTypes } from './contract.d';
+import contractJson from './contract.json' assert { type: 'json' };
+
+const contract = validateContract<Contract>(contractJson);
+const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+
+// Model registry proxy: orm.user(), orm.post(), etc.
+const builder = o.user();
+```
+
+**Read Operations**:
+- `findMany()`: Returns multiple rows
+- `findFirst()`: Returns first row (equivalent to `where(...).take(1).findMany()`)
+- `findUnique()`: Returns single row by unique constraint (not yet implemented)
+
+**Chained Methods**:
+- `.where(predicate)`: Filter rows using model column accessor
+- `.orderBy(column)`: Sort results
+- `.take(n)`: Limit number of rows
+- `.skip(n)`: Skip number of rows
+- `.select(projection)`: Project specific fields
+
+**Relation Filters**:
+- `where.related.<relation>.some(predicate)`: EXISTS subquery - at least one related row matches
+- `where.related.<relation>.none(predicate)`: NOT EXISTS subquery - no related rows match
+- `where.related.<relation>.every(predicate)`: NOT EXISTS subquery with negated predicate - all related rows match
+
+```typescript
+// Find users who have at least one published post
+const plan = o.user()
+  .where((u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return o.user().where.related.posts.some((p) => {
+      const postModel = p as { published: { eq: (v: boolean) => unknown } };
+      return postModel.published.eq(true);
+    });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown };
+    return { id: model.id, email: model.email };
+  })
+  .findMany();
+```
+
+**Includes**:
+- `include.<relation>(child => ...)`: Include related data as nested arrays
+- Capability-gated: Requires both `lateral: true` and `jsonAgg: true` in contract capabilities
+- Child builder supports: `where()`, `orderBy()`, `take()`, `select()`
+
+```typescript
+// Include posts with filtering and ordering
+const plan = o.user()
+  .include.posts((child) => {
+    const childBuilder = child as {
+      where: (fn: (model: unknown) => unknown) => unknown;
+      orderBy: (fn: (model: unknown) => unknown) => unknown;
+      select: (fn: (model: unknown) => unknown) => unknown;
+    };
+    return childBuilder
+      .where((p) => {
+        const model = p as { published: { eq: (v: boolean) => unknown } };
+        return model.published.eq(true);
+      })
+      .orderBy((p) => {
+        const model = p as { createdAt: { desc: () => unknown } };
+        return model.createdAt.desc();
+      })
+      .select((p) => {
+        const model = p as { id: unknown; title: unknown };
+        return { id: model.id, title: model.title };
+      });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown; posts: boolean };
+    return { id: model.id, email: model.email, posts: true };
+  })
+  .findMany();
+```
+
+**Base-Model Writes**:
+- `create(data)`: Insert a new row, returns affected row count
+- `update(where, data)`: Update rows matching predicate, returns affected row count
+- `delete(where)`: Delete rows matching predicate, returns affected row count
+- Model field names are automatically mapped to column names using contract mappings
+
+```typescript
+// Create a new user
+const createPlan = o.user().create({
+  email: 'alice@example.com',
+  name: 'Alice',
+});
+
+// Update user by ID
+const updatePlan = o.user().update(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { email: 'newemail@example.com' },
+  { params: { userId: 1 } },
+);
+
+// Delete user by ID
+const deletePlan = o.user().delete(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { params: { userId: 1 } },
+);
+```
+
+**Key Points**:
+- ORM lane compiles to SQL lane primitives (EXISTS subqueries, includeMany, DML operations)
+- Model registry proxy provides discoverable entrypoint (`orm.user()`, `orm.post()`)
+- Relation filters compile to EXISTS/NOT EXISTS subqueries
+- Includes compile to SQL lane `includeMany()` (capability-gated)
+- Writes use model-to-column mapping from contract mappings
+- All ORM plans have `meta.lane = 'orm'` and appropriate annotations
 
 ### Plan Model
 
@@ -809,19 +1020,20 @@ test('Type IDs are literal types', () => {
 23. **No Target Branches** - **CRITICAL**: Never branch on `target` (e.g., `if (target === 'postgres')`) in core packages. Target-specific logic belongs in adapters or extension packs. See `.cursor/rules/no-target-branches.mdc` for details.
 24. **No Global Registry Pattern** - The emitter accepts `targetFamily: TargetFamilyHook` as a direct parameter to `emit()`. Authoring surfaces determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry, auto-registration, or hidden state. Dependencies are explicit and passed as parameters.
 25. **SQL Types Import Path** - **CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) must be imported from `@prisma-next/sql-target`, **not** from `@prisma-next/contract/types`. See `.cursor/rules/sql-types-imports.mdc` for details.
-26. **Node.js Globals Restriction** - `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files, `packages/node-utils`, and `packages/cli`. Other packages should not use these globals directly. If needed, use `// biome-ignore lint: <reason>` with a comment explaining why.
-27. **Generated File Metadata** - `contract.json` files include a `_generated` metadata field to indicate they're generated artifacts. This field is excluded from canonicalization/hashing. `contract.d.ts` files include warning header comments. Both are generated by `prisma-next emit` and should not be edited manually.
-28. **Avoid Unnecessary Type Casts** - **CRITICAL**: Always check the actual type signature before adding type casts (`as unknown as T`) or optional chaining (`?.`). Unnecessary casts are a code smell that indicates the actual type already supports what you're trying to do. For example, if a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
-29. **Use Dot Notation for Guaranteed Values** - When accessing values that are guaranteed to exist (e.g., in test fixtures, constants), use dot notation (`.`) instead of optional chaining (`?.`). Optional chaining should only be used for values that might not exist (e.g., user input, API responses). Similarly, don't include `| undefined` in type assertions when values are guaranteed to exist. See `.cursor/rules/typescript-patterns.mdc` for details.
-30. **Biome Ignore Comments** - If you need to disable a rule for more than a couple of lines in a file, use a file-level ignore comment at the top of the file instead of many inline comments. Example: `// biome-ignore lint: test file with type assertions`
-31. **Unused Variables Pattern** - Variables that are only used as types should be prefixed with `_` to indicate they're intentionally unused. Biome's `noUnusedVariables` rule is configured to ignore variables starting with `_`. Example: `const _plan = sql(...).build(); type Row = ResultType<typeof _plan>;`
-32. **Empty Object Types** - Use `Record<string, never>` instead of `{}` for empty object types in type definitions. This provides better type safety.
-33. **JSON Imports** - Use `import` statements with `assert { type: 'json' }` instead of `require()` for JSON files. Example: `import contractJson from './fixtures/contract.json' assert { type: 'json' };`
-34. **Type Constraint Fixes** - When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements. Don't use `unknown` for type parameters that have specific constraints (e.g., `string`, `Record<...>`). Use the actual constraint types from the interface definition.
-35. **DRY Test Patterns** - Common patterns in test files (like executing plans) should be extracted into helper functions with JSDoc comments explaining their purpose. This reduces code duplication and makes tests more maintainable.
-36. **Biome Config File** - Biome config file is `biome.json` at the root. All package lint scripts explicitly specify the config file using `--config-path ../../biome.json`.
-37. **Test File Size Limits** - Test files should be kept under 500 lines. Split large files by functionality, feature area, or test type. Use descriptive file names following the pattern `{base}.{category}.test.ts` (e.g., `codecs.registry.test.ts`, `runtime.joins.test.ts`). See `.cursor/rules/test-file-organization.mdc` for details.
-38. **Test Assertion Patterns** - Prefer object comparison (`expect(row).toEqual({ ... })`) over piece-by-piece property checks. Use `toMatchObject` for partial comparisons and `expect.any()` for type-only checks. For plan structure assertions, compare entire AST structures rather than checking individual properties. This improves maintainability, readability, type safety, and reduces brittleness. See `.cursor/rules/test-file-organization.mdc` for details.
+26. **DML `returning()` Capability Gating** - The `returning()` method on DML operations (INSERT, UPDATE, DELETE) is capability-gated and requires `returning: true` in contract capabilities. Calling `returning()` without the capability will throw an error. PostgreSQL supports RETURNING clauses; MySQL does not. This follows the same pattern as `includeMany` capability gating.
+27. **Node.js Globals Restriction** - `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files, `packages/node-utils`, and `packages/cli`. Other packages should not use these globals directly. If needed, use `// biome-ignore lint: <reason>` with a comment explaining why.
+28. **Generated File Metadata** - `contract.json` files include a `_generated` metadata field to indicate they're generated artifacts. This field is excluded from canonicalization/hashing. `contract.d.ts` files include warning header comments. Both are generated by `prisma-next emit` and should not be edited manually.
+29. **Avoid Unnecessary Type Casts** - **CRITICAL**: Always check the actual type signature before adding type casts (`as unknown as T`) or optional chaining (`?.`). Unnecessary casts are a code smell that indicates the actual type already supports what you're trying to do. For example, if a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
+30. **Use Dot Notation for Guaranteed Values** - When accessing values that are guaranteed to exist (e.g., in test fixtures, constants), use dot notation (`.`) instead of optional chaining (`?.`). Optional chaining should only be used for values that might not exist (e.g., user input, API responses). Similarly, don't include `| undefined` in type assertions when values are guaranteed to exist. See `.cursor/rules/typescript-patterns.mdc` for details.
+31. **Biome Ignore Comments** - If you need to disable a rule for more than a couple of lines in a file, use a file-level ignore comment at the top of the file instead of many inline comments. Example: `// biome-ignore lint: test file with type assertions`
+32. **Unused Variables Pattern** - Variables that are only used as types should be prefixed with `_` to indicate they're intentionally unused. Biome's `noUnusedVariables` rule is configured to ignore variables starting with `_`. Example: `const _plan = sql(...).build(); type Row = ResultType<typeof _plan>;`
+33. **Empty Object Types** - Use `Record<string, never>` instead of `{}` for empty object types in type definitions. This provides better type safety.
+34. **JSON Imports** - Use `import` statements with `assert { type: 'json' }` instead of `require()` for JSON files. Example: `import contractJson from './fixtures/contract.json' assert { type: 'json' };`
+35. **Type Constraint Fixes** - When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements. Don't use `unknown` for type parameters that have specific constraints (e.g., `string`, `Record<...>`). Use the actual constraint types from the interface definition.
+36. **DRY Test Patterns** - Common patterns in test files (like executing plans) should be extracted into helper functions with JSDoc comments explaining their purpose. This reduces code duplication and makes tests more maintainable.
+37. **Biome Config File** - Biome config file is `biome.json` at the root. All package lint scripts explicitly specify the config file using `--config-path ../../biome.json`.
+38. **Test File Size Limits** - Test files should be kept under 500 lines. Split large files by functionality, feature area, or test type. Use descriptive file names following the pattern `{base}.{category}.test.ts` (e.g., `codecs.registry.test.ts`, `runtime.joins.test.ts`). See `.cursor/rules/test-file-organization.mdc` for details.
+39. **Test Assertion Patterns** - Prefer object comparison (`expect(row).toEqual({ ... })`) over piece-by-piece property checks. Use `toMatchObject` for partial comparisons and `expect.any()` for type-only checks. For plan structure assertions, compare entire AST structures rather than checking individual properties. This improves maintainability, readability, type safety, and reduces brittleness. See `.cursor/rules/test-file-organization.mdc` for details.
 
 ## 📖 Documentation Location
 
@@ -1029,31 +1241,33 @@ pnpm test:coverage:packages
 
 ### Recent Implementation (Completed)
 
-1. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL target family SPI (`sqlTargetFamilyHook`) lives in `sql-target` package. Adapters treated identically to extension packs.
-2. **Type Canonicalization at Authoring Time** - Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission or validation. Emitter only validates type IDs come from referenced extensions.
-3. **Removed Canonicalization from validateContract** - `validateContract()` no longer performs canonicalization. Contracts must always have fully qualified type IDs (`pg/int4@1`, not `int4`). This enforces the design principle that canonicalization happens at authoring time, not during validation.
-4. **Removed canonicalScalarMap** - Extension pack manifests no longer include `canonicalScalarMap`. Type canonicalization happens at authoring time using extension manifests, not via a scalar map. This keeps manifests focused on type imports for code generation.
-5. **No Target-Specific Branches** - Removed target-specific branching (`if (target === 'postgres')`) from core packages. Target-specific logic belongs in adapters or extension packs. See `.cursor/rules/no-target-branches.mdc` for details.
-6. **Emitter I/O Decoupling** - Emitter returns strings (`contractJson`, `contractDts`); caller handles all file I/O. Enables testing without file system dependencies and flexible build system integration.
-7. **SQL Contract Types Migration** - Moved SQL contract types (`SqlContract`, `SqlStorage`, etc.) from `sql-query` to `sql-target` to break circular dependency. All SQL-specific types now live in `sql-target`.
-8. **Package Rename** - Renamed `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose as query builder.
-9. **Node Utils Package** - Created `@prisma-next/node-utils` package for file I/O utilities (`readJsonFile`, `readTextFile`). Extracted from emitter to keep I/O concerns separate.
-10. **Unified Type Identifiers** - All column types are fully qualified type IDs (`ns/name@version`). Canonicalization happens at authoring time.
-11. **Simplified Type Inference** - `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` using `CodecTypes[typeId].output`. No fallbacks or scalar mappings.
-12. **Runtime Simplification** - Removed target-specific logic from runtime. Codec resolution uses type IDs directly.
-13. **Interface-Based Design** - Refactored codec system to export interfaces and factory functions (`createCodecRegistry()`, `defineCodecs()`) instead of classes. Implementation classes are private.
-14. **Type Preservation** - Fixed generic type system to preserve literal string types (e.g., `'pg/text@1'`) through mapped types and careful constraints. Removed index signatures from generic parameters.
-15. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
-16. **E2E Tests Package** - Created `@prisma-next/e2e-tests` package that tests the full flow: CLI emission → contract validation → runtime execution → type verification. Tests emit contracts via CLI, spin up dev Postgres DB, execute queries, and verify both runtime results and compile-time types.
-17. **Shared Test Utilities Package** - Created `@prisma-next/test-utils` package to centralize common test patterns across all test suites. Provides helpers for database management, plan execution, runtime creation, contract management, and E2E testing. Refactored e2e tests to use shared utilities, reducing duplication by 28% (1219 → 882 lines). E2E tests now load contracts from committed fixtures rather than emitting on every test run, with a single test verifying contract emission correctness. The `executePlanAndCollect` function now properly infers return types from plans using `ResultType<P>[]`, preserving full type information. Contract loading uses a generic type parameter pattern (`loadContractFromDisk<Contract>`) to enable compile-time type checking with emitted contract types. See "E2E Test Patterns" section above for usage examples.
-18. **Test Utilities Dependency Refactoring** - Broke circular dependency between `test-utils` and `runtime` by moving runtime-specific utilities (`executePlanAndCollect`, `drainPlanExecution`, `setupTestDatabase`, `writeTestContractMarker`, `createTestRuntime`, `createTestRuntimeFromClient`, `setupE2EDatabase`) to `runtime/test/utils.ts`. Removed all dependencies from `test-utils` on other `@prisma-next/*` packages by moving contract-related functions (`loadContractFromDisk`, `emitAndVerifyContract`) to `e2e-tests/test/utils.ts`. `test-utils` now has zero dependencies on other `@prisma-next/*` packages, allowing it to be used by all packages without circular dependencies. Runtime-specific utilities are in `@prisma-next/runtime/test/utils`, and contract helpers are in `e2e-tests/test/utils.ts` (local to e2e-tests).
-19. **SQL Types Import Correction** - Fixed incorrect imports of SQL types from `@prisma-next/contract/types` to use `@prisma-next/sql-target` instead. SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`) must be imported from `@prisma-next/sql-target`. See `.cursor/rules/sql-types-imports.mdc` for details.
-20. **GitHub Actions CI Workflow** - Set up comprehensive CI workflow with separate jobs for typecheck, lint, build, test, e2e tests, and coverage. Workflow includes concurrency control, Postgres service configuration, coverage artifact uploads, and optional Codecov integration. All jobs run in parallel where possible for faster feedback.
-21. **Generated File Metadata** - Added `_generated` metadata field to `contract.json` files to indicate they're generated artifacts. This field is excluded from canonicalization/hashing to ensure determinism. Added warning header comments to `contract.d.ts` files. Both prevent accidental manual edits and guide users to regenerate using `prisma-next emit`.
-22. **Node.js Globals Restriction** - Restricted Node.js globals (`console`, `process`, `__dirname`, `__filename`, `URL`) to only be permitted in test files, `packages/node-utils`, and `packages/cli` via Biome configuration. This enforces better separation of concerns and prevents accidental use of Node.js-specific APIs in core packages.
-23. **Avoiding Unnecessary Type Casts and Optional Chaining** - Added guidance on avoiding unnecessary type casts and optional chaining. Always check the actual type signature before adding casts. Use dot notation (`.`) instead of optional chaining (`?.`) when values are guaranteed to exist. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
-24. **Test File Organization** - Established 500-line limit for test files. Large test files should be split by functionality (basic, errors, structure, generation), feature area (joins, projections, includes), or test type (unit, integration, edge-cases). Use descriptive file names following the pattern `{base}.{category}.test.ts` (e.g., `codecs.registry.test.ts`, `runtime.joins.test.ts`, `driver.errors.test.ts`). Split files at natural boundaries (describe blocks, functional groups) and ensure each new file has all necessary imports and setup. See `.cursor/rules/test-file-organization.mdc` for detailed guidelines.
-25. **Test Assertion Patterns** - Refactored brittle test patterns to use object comparison (`expect(row).toEqual({ ... })`) instead of piece-by-piece property checks. Use `toMatchObject` for partial comparisons, `expect.any()` for type-only checks, and `expect.not.objectContaining()` for absence checks. For plan structure assertions, compare entire AST structures rather than checking individual properties. This improves maintainability, readability, type safety, and reduces brittleness. See `.cursor/rules/test-file-organization.mdc` for details.
+1. **Query Patterns Standard Practice** - Established standard practice of exporting `tables` from `query.ts` as a convenience export (`export const tables = schema.tables`). This improves DX by making code shorter and more readable (`tables.user` instead of `schema.tables.user`). Users can import `tables` directly and optionally extract table/column variables for reuse. Pattern documented in `.cursor/rules/query-patterns.mdc` and updated in `AGENT_ONBOARDING.md`.
+2. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL target family SPI (`sqlTargetFamilyHook`) lives in `sql-target` package. Adapters treated identically to extension packs.
+3. **Type Canonicalization at Authoring Time** - Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission or validation. Emitter only validates type IDs come from referenced extensions.
+4. **Removed Canonicalization from validateContract** - `validateContract()` no longer performs canonicalization. Contracts must always have fully qualified type IDs (`pg/int4@1`, not `int4`). This enforces the design principle that canonicalization happens at authoring time, not during validation.
+5. **Removed canonicalScalarMap** - Extension pack manifests no longer include `canonicalScalarMap`. Type canonicalization happens at authoring time using extension manifests, not via a scalar map. This keeps manifests focused on type imports for code generation.
+6. **No Target-Specific Branches** - Removed target-specific branching (`if (target === 'postgres')`) from core packages. Target-specific logic belongs in adapters or extension packs. See `.cursor/rules/no-target-branches.mdc` for details.
+7. **Emitter I/O Decoupling** - Emitter returns strings (`contractJson`, `contractDts`); caller handles all file I/O. Enables testing without file system dependencies and flexible build system integration.
+8. **SQL Contract Types Migration** - Moved SQL contract types (`SqlContract`, `SqlStorage`, etc.) from `sql-query` to `sql-target` to break circular dependency. All SQL-specific types now live in `sql-target`.
+9. **Package Rename** - Renamed `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose as query builder.
+10. **Node Utils Package** - Created `@prisma-next/node-utils` package for file I/O utilities (`readJsonFile`, `readTextFile`). Extracted from emitter to keep I/O concerns separate.
+11. **Unified Type Identifiers** - All column types are fully qualified type IDs (`ns/name@version`). Canonicalization happens at authoring time.
+12. **Simplified Type Inference** - `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` using `CodecTypes[typeId].output`. No fallbacks or scalar mappings.
+13. **Runtime Simplification** - Removed target-specific logic from runtime. Codec resolution uses type IDs directly.
+14. **Interface-Based Design** - Refactored codec system to export interfaces and factory functions (`createCodecRegistry()`, `defineCodecs()`) instead of classes. Implementation classes are private.
+15. **Type Preservation** - Fixed generic type system to preserve literal string types (e.g., `'pg/text@1'`) through mapped types and careful constraints. Removed index signatures from generic parameters.
+16. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
+17. **E2E Tests Package** - Created `@prisma-next/e2e-tests` package that tests the full flow: CLI emission → contract validation → runtime execution → type verification. Tests emit contracts via CLI, spin up dev Postgres DB, execute queries, and verify both runtime results and compile-time types.
+18. **Shared Test Utilities Package** - Created `@prisma-next/test-utils` package to centralize common test patterns across all test suites. Provides helpers for database management, plan execution, runtime creation, contract management, and E2E testing. Refactored e2e tests to use shared utilities, reducing duplication by 28% (1219 → 882 lines). E2E tests now load contracts from committed fixtures rather than emitting on every test run, with a single test verifying contract emission correctness. The `executePlanAndCollect` function now properly infers return types from plans using `ResultType<P>[]`, preserving full type information. Contract loading uses a generic type parameter pattern (`loadContractFromDisk<Contract>`) to enable compile-time type checking with emitted contract types. See "E2E Test Patterns" section above for usage examples.
+19. **Test Utilities Dependency Refactoring** - Broke circular dependency between `test-utils` and `runtime` by moving runtime-specific utilities (`executePlanAndCollect`, `drainPlanExecution`, `setupTestDatabase`, `writeTestContractMarker`, `createTestRuntime`, `createTestRuntimeFromClient`, `setupE2EDatabase`) to `runtime/test/utils.ts`. Removed all dependencies from `test-utils` on other `@prisma-next/*` packages by moving contract-related functions (`loadContractFromDisk`, `emitAndVerifyContract`) to `e2e-tests/test/utils.ts`. `test-utils` now has zero dependencies on other `@prisma-next/*` packages, allowing it to be used by all packages without circular dependencies. Runtime-specific utilities are in `@prisma-next/runtime/test/utils`, and contract helpers are in `e2e-tests/test/utils.ts` (local to e2e-tests).
+20. **SQL Types Import Correction** - Fixed incorrect imports of SQL types from `@prisma-next/contract/types` to use `@prisma-next/sql-target` instead. SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`) must be imported from `@prisma-next/sql-target`. See `.cursor/rules/sql-types-imports.mdc` for details.
+21. **GitHub Actions CI Workflow** - Set up comprehensive CI workflow with separate jobs for typecheck, lint, build, test, e2e tests, and coverage. Workflow includes concurrency control, Postgres service configuration, coverage artifact uploads, and optional Codecov integration. All jobs run in parallel where possible for faster feedback.
+22. **Generated File Metadata** - Added `_generated` metadata field to `contract.json` files to indicate they're generated artifacts. This field is excluded from canonicalization/hashing to ensure determinism. Added warning header comments to `contract.d.ts` files. Both prevent accidental manual edits and guide users to regenerate using `prisma-next emit`.
+23. **Node.js Globals Restriction** - Restricted Node.js globals (`console`, `process`, `__dirname`, `__filename`, `URL`) to only be permitted in test files, `packages/node-utils`, and `packages/cli` via Biome configuration. This enforces better separation of concerns and prevents accidental use of Node.js-specific APIs in core packages.
+24. **Avoiding Unnecessary Type Casts and Optional Chaining** - Added guidance on avoiding unnecessary type casts and optional chaining. Always check the actual type signature before adding casts. Use dot notation (`.`) instead of optional chaining (`?.`) when values are guaranteed to exist. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
+25. **Test File Organization** - Established 500-line limit for test files. Large test files should be split by functionality (basic, errors, structure, generation), feature area (joins, projections, includes), or test type (unit, integration, edge-cases). Use descriptive file names following the pattern `{base}.{category}.test.ts` (e.g., `codecs.registry.test.ts`, `runtime.joins.test.ts`, `driver.errors.test.ts`). Split files at natural boundaries (describe blocks, functional groups) and ensure each new file has all necessary imports and setup. See `.cursor/rules/test-file-organization.mdc` for detailed guidelines.
+26. **Test Assertion Patterns** - Refactored brittle test patterns to use object comparison (`expect(row).toEqual({ ... })`) instead of piece-by-piece property checks. Use `toMatchObject` for partial comparisons, `expect.any()` for type-only checks, and `expect.not.objectContaining()` for absence checks. For plan structure assertions, compare entire AST structures rather than checking individual properties. This improves maintainability, readability, type safety, and reduces brittleness. See `.cursor/rules/test-file-organization.mdc` for details.
+27. **ORM Lane Implementation** - Implemented model-centric ORM lane with discoverable entrypoint (`orm.<model>()`), relation filters (`where.related.<relation>.some/none/every`), includes (`include.<relation>(child => ...)`), and base-model writes (`create()`, `update()`, `delete()`). ORM lane compiles to SQL lane primitives (EXISTS subqueries, includeMany, DML operations). Model-to-column mapping for writes uses contract mappings. Relation filters compile to EXISTS/NOT EXISTS subqueries. Includes are capability-gated (requires `lateral: true` and `jsonAgg: true`). File organization: ORM implementation split into `orm.ts` (entrypoint), `orm-types.ts` (types), `orm-builder.ts` (main builder), `orm-relation-filter.ts` (relation filters), `orm-include-child.ts` (include child builder).
 
 ### Future Work
 
@@ -1093,31 +1307,44 @@ const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
 **Create a query:**
 ```typescript
-import { sql, schema, param } from '@prisma-next/sql-query/sql';
-import { createRuntimeContext } from '@prisma-next/runtime';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+// Standard practice: Export tables from query.ts
+// src/prisma/query.ts
+export const tables = schema.tables;
 
-// Create context (includes adapter codecs and any extensions)
-const context = createRuntimeContext({ adapter, extensions: [] });
+// In your query files
+import { sql, tables, param } from '../prisma/query';
+import type { ResultType } from '@prisma-next/sql-query/types';
 
-// Get tables from schema (pass context for operations registry)
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
-
-// Basic query
-const plan = sql<Contract, CodecTypes>({ contract, adapter })
+// Option 1: Direct access
+const plan = sql
   .from(tables.user)
   .select({ id: tables.user.columns.id, email: tables.user.columns.email })
   .build();
 
+// Option 2: Extract variables for reuse (common pattern)
+const userTable = tables.user;
+const userColumns = userTable.columns;
+
+const plan = sql
+  .from(userTable)
+  .select({ id: userColumns.id, email: userColumns.email })
+  .build();
+
+// Extract row type
+type UserRow = ResultType<typeof plan>;
+
 // Query with join
-const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
-  .from(tables.user)
-  .innerJoin(tables.post, (on) => on.eqCol(tables.user.columns.id, tables.post.columns.userId))
-  .where(tables.user.columns.active.eq(param('active')))
+const userTable = tables.user;
+const postTable = tables.post;
+
+const joinedPlan = sql
+  .from(userTable)
+  .innerJoin(postTable, (on) => on.eqCol(userTable.columns.id, postTable.columns.userId))
+  .where(userTable.columns.active.eq(param('active')))
   .select({
-    userId: tables.user.columns.id,
-    postId: tables.post.columns.id,
-    title: tables.post.columns.title,
+    userId: userTable.columns.id,
+    postId: postTable.columns.id,
+    title: postTable.columns.title,
   })
   .build({ params: { active: true } });
 ```
@@ -1173,6 +1400,76 @@ const joinedPlan = sql<Contract, CodecTypes>({ contract, adapter })
   .build();
 
 type JoinedRow = ResultType<typeof joinedPlan>;  // { userId: number; postId: number; title: string }
+```
+
+**ORM Lane Usage:**
+```typescript
+import { orm } from '@prisma-next/sql-query/orm';
+import { param } from '@prisma-next/sql-query/param';
+import type { ResultType } from '@prisma-next/sql-query/types';
+import type { Contract, CodecTypes } from './contract.d';
+
+const contract = validateContract<Contract>(contractJson);
+const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+
+// Read with relation filter
+const plan = o.user()
+  .where((u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return o.user().where.related.posts.some((p) => {
+      const postModel = p as { published: { eq: (v: boolean) => unknown } };
+      return postModel.published.eq(true);
+    });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown };
+    return { id: model.id, email: model.email };
+  })
+  .findMany();
+
+// Read with include
+const planWithInclude = o.user()
+  .include.posts((child) => {
+    const childBuilder = child as {
+      select: (fn: (model: unknown) => unknown) => unknown;
+    };
+    return childBuilder.select((p) => {
+      const model = p as { id: unknown; title: unknown };
+      return { id: model.id, title: model.title };
+    });
+  })
+  .select((u) => {
+    const model = u as { id: unknown; email: unknown; posts: boolean };
+    return { id: model.id, email: model.email, posts: true };
+  })
+  .findMany();
+
+// Write operations
+const createPlan = o.user().create({
+  email: 'alice@example.com',
+  name: 'Alice',
+});
+
+const updatePlan = o.user().update(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { email: 'newemail@example.com' },
+  { params: { userId: 1 } },
+);
+
+const deletePlan = o.user().delete(
+  (u) => {
+    const model = u as { id: { eq: (p: unknown) => unknown } };
+    return model.id.eq(param('userId'));
+  },
+  { params: { userId: 1 } },
+);
+
+// Extract row types
+type UserRow = ResultType<typeof plan>;
+type UserWithPosts = ResultType<typeof planWithInclude>;
 ```
 
 **Contract column types:**
@@ -1355,6 +1652,38 @@ if (typeof projectionValue === 'string' && projectionValue.startsWith('include:'
 - Convert `NULL` to empty arrays `[]` for consistency
 - Exclude include aliases from codec assignments (they're JSON arrays, not scalars)
 - Handle both string and already-parsed array values from drivers
+
+### Capability Gating Pattern
+
+When implementing capability-gated features, follow the same pattern used by `includeMany` and `returning()`:
+
+**Pattern:**
+```typescript
+// Runtime capability check in builder method
+returning<const Columns extends readonly ColumnBuilder[]>(
+  ...columns: Columns
+): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+  // Runtime capability check
+  const target = this.contract.target;
+  const capabilities = this.contract.capabilities;
+  if (!capabilities || !capabilities[target]) {
+    throw planInvalid('returning() requires returning capability');
+  }
+  const targetCapabilities = capabilities[target];
+  if (targetCapabilities['returning'] !== true) {
+    throw planInvalid('returning() requires returning capability to be true');
+  }
+
+  // Continue with implementation...
+}
+```
+
+**Key points:**
+- Check capabilities at runtime in builder methods, not at build time
+- Verify both that capabilities exist and that the specific capability is `true`
+- Throw descriptive errors when capabilities are missing or false
+- Follow the same pattern across all capability-gated features for consistency
+- Adapters declare capabilities in their `defaultCapabilities` (e.g., `returning: true` for PostgreSQL)
 
 ---
 

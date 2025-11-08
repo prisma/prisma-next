@@ -126,13 +126,34 @@ type BuildModelFields<Fields extends Record<string, string>> = {
 type ExtractModelFields<T extends ModelBuilderState<string, string, Record<string, string>>> =
   T extends ModelBuilderState<string, string, infer F> ? F : never;
 
+type ExtractModelRelations<
+  T extends ModelBuilderState<
+    string,
+    string,
+    Record<string, string>,
+    Record<string, RelationDefinition>
+  >,
+> = T extends ModelBuilderState<string, string, Record<string, string>, infer R> ? R : never;
+
 type BuildModels<
-  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>>,
+  Models extends Record<
+    string,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  >,
 > = {
   readonly [K in keyof Models]: {
     readonly storage: { readonly table: Models[K]['table'] };
     readonly fields: BuildModelFields<ExtractModelFields<Models[K]>>;
   };
+};
+
+type BuildRelations<
+  Models extends Record<
+    string,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  >,
+> = {
+  readonly [K in keyof Models as Models[K]['table']]: ExtractModelRelations<Models[K]>;
 };
 
 interface ColumnBuilderState<
@@ -160,14 +181,30 @@ interface TableBuilderState<
   readonly primaryKey?: PrimaryKey;
 }
 
+type RelationDefinition = {
+  readonly to: string; // Target model name
+  readonly cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
+  readonly on: {
+    readonly parentCols: readonly string[];
+    readonly childCols: readonly string[];
+  };
+  readonly through?: {
+    readonly table: string;
+    readonly parentCols: readonly string[];
+    readonly childCols: readonly string[];
+  };
+};
+
 interface ModelBuilderState<
   Name extends string = string,
   Table extends string = string,
   Fields extends Record<string, string> = Record<string, string>,
+  Relations extends Record<string, RelationDefinition> = Record<string, RelationDefinition>,
 > {
   readonly name: Name;
   readonly table: Table;
   readonly fields: Fields;
+  readonly relations: Relations;
 }
 
 export interface ColumnBuilder<
@@ -305,32 +342,157 @@ class ModelBuilder<
   Name extends string,
   Table extends string,
   Fields extends Record<string, string> = Record<string, never>,
+  Relations extends Record<string, RelationDefinition> = Record<string, never>,
 > {
   private readonly _name: Name;
   private readonly _table: Table;
   private readonly _fields: Fields;
+  private readonly _relations: Relations;
 
-  constructor(name: Name, table: Table, fields: Fields = {} as Fields) {
+  constructor(
+    name: Name,
+    table: Table,
+    fields: Fields = {} as Fields,
+    relations: Relations = {} as Relations,
+  ) {
     this._name = name;
     this._table = table;
     this._fields = fields;
+    this._relations = relations;
   }
 
   field<FieldName extends string, ColumnName extends string>(
     fieldName: FieldName,
     columnName: ColumnName,
-  ): ModelBuilder<Name, Table, Fields & Record<FieldName, ColumnName>> {
-    return new ModelBuilder(this._name, this._table, {
-      ...this._fields,
-      [fieldName]: columnName,
-    } as Fields & Record<FieldName, ColumnName>);
+  ): ModelBuilder<Name, Table, Fields & Record<FieldName, ColumnName>, Relations> {
+    return new ModelBuilder(
+      this._name,
+      this._table,
+      {
+        ...this._fields,
+        [fieldName]: columnName,
+      } as Fields & Record<FieldName, ColumnName>,
+      this._relations,
+    );
   }
 
-  build(): ModelBuilderState<Name, Table, Fields> {
+  relation<RelationName extends string, ToModel extends string, ToTable extends string>(
+    name: RelationName,
+    options: {
+      toModel: ToModel;
+      toTable: ToTable;
+      cardinality: '1:1' | '1:N' | 'N:1';
+      on: {
+        parentTable: Table;
+        parentColumns: readonly string[];
+        childTable: ToTable;
+        childColumns: readonly string[];
+      };
+    },
+  ): ModelBuilder<Name, Table, Fields, Relations & Record<RelationName, RelationDefinition>>;
+  relation<
+    RelationName extends string,
+    ToModel extends string,
+    ToTable extends string,
+    JunctionTable extends string,
+  >(
+    name: RelationName,
+    options: {
+      toModel: ToModel;
+      toTable: ToTable;
+      cardinality: 'N:M';
+      through: {
+        table: JunctionTable;
+        parentColumns: readonly string[];
+        childColumns: readonly string[];
+      };
+      on: {
+        parentTable: Table;
+        parentColumns: readonly string[];
+        childTable: JunctionTable;
+        childColumns: readonly string[];
+      };
+    },
+  ): ModelBuilder<Name, Table, Fields, Relations & Record<RelationName, RelationDefinition>>;
+  relation<
+    RelationName extends string,
+    ToModel extends string,
+    ToTable extends string,
+    JunctionTable extends string = never,
+  >(
+    name: RelationName,
+    options: {
+      toModel: ToModel;
+      toTable: ToTable;
+      cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
+      through?: {
+        table: JunctionTable;
+        parentColumns: readonly string[];
+        childColumns: readonly string[];
+      };
+      on: {
+        parentTable: Table;
+        parentColumns: readonly string[];
+        childTable: ToTable | JunctionTable;
+        childColumns: readonly string[];
+      };
+    },
+  ): ModelBuilder<Name, Table, Fields, Relations & Record<RelationName, RelationDefinition>> {
+    // Validate parentTable matches model's table
+    if (options.on.parentTable !== this._table) {
+      throw new Error(
+        `Relation "${name}" parentTable "${options.on.parentTable}" does not match model table "${this._table}"`,
+      );
+    }
+
+    // Validate childTable matches toTable (for non-N:M) or through.table (for N:M)
+    if (options.cardinality === 'N:M') {
+      if (!options.through) {
+        throw new Error(`Relation "${name}" with cardinality "N:M" requires through field`);
+      }
+      if (options.on.childTable !== options.through.table) {
+        throw new Error(
+          `Relation "${name}" childTable "${options.on.childTable}" does not match through.table "${options.through.table}"`,
+        );
+      }
+    } else {
+      if (options.on.childTable !== options.toTable) {
+        throw new Error(
+          `Relation "${name}" childTable "${options.on.childTable}" does not match toTable "${options.toTable}"`,
+        );
+      }
+    }
+
+    const relationDef: RelationDefinition = {
+      to: options.toModel,
+      cardinality: options.cardinality,
+      on: {
+        parentCols: options.on.parentColumns,
+        childCols: options.on.childColumns,
+      },
+      ...(options.through
+        ? {
+            through: {
+              table: options.through.table,
+              parentCols: options.through.parentColumns,
+              childCols: options.through.childColumns,
+            },
+          }
+        : undefined),
+    };
+
+    return new ModelBuilder(this._name, this._table, this._fields, {
+      ...this._relations,
+      [name]: relationDef,
+    } as Relations & Record<RelationName, RelationDefinition>);
+  }
+
+  build(): ModelBuilderState<Name, Table, Fields, Relations> {
     return {
       name: this._name,
       table: this._table,
       fields: this._fields,
+      relations: this._relations,
     };
   }
 }
@@ -379,10 +541,10 @@ class ContractBuilder<
       readonly string[] | undefined
     >
   > = Record<string, never>,
-  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>> = Record<
+  Models extends Record<
     string,
-    never
-  >,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  > = Record<string, never>,
   CoreHash extends string | undefined = undefined,
   Extensions extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
@@ -476,11 +638,18 @@ class ContractBuilder<
   model<
     ModelName extends string,
     TableName extends string,
-    M extends ModelBuilder<ModelName, TableName, Record<string, string>>,
+    M extends ModelBuilder<
+      ModelName,
+      TableName,
+      Record<string, string>,
+      Record<string, RelationDefinition>
+    >,
   >(
     name: ModelName,
     table: TableName,
-    callback: (m: ModelBuilder<ModelName, TableName>) => M | undefined,
+    callback: (
+      m: ModelBuilder<ModelName, TableName, Record<string, string>, Record<string, never>>,
+    ) => M | undefined,
   ): ContractBuilder<
     CodecTypes,
     Target,
@@ -559,7 +728,7 @@ class ContractBuilder<
       ? SqlContract<
           BuildStorage<Tables, Target & string>,
           BuildModels<Models>,
-          Record<string, never>,
+          BuildRelations<Models>,
           SqlMappings
         > & {
           readonly schemaVersion: '1';
@@ -675,10 +844,48 @@ class ContractBuilder<
       };
     }
 
+    // Build relations object - organized by table name
+    const relationsPartial: Partial<Record<string, Record<string, RelationDefinition>>> = {};
+
+    // Iterate over models to collect relations
+    for (const modelName in this.state.models) {
+      const modelState = this.state.models[modelName];
+      if (!modelState) continue;
+
+      const modelStateTyped = modelState as unknown as {
+        name: string;
+        table: string;
+        fields: Record<string, string>;
+        relations: Record<string, RelationDefinition>;
+      };
+
+      const tableName = modelStateTyped.table;
+      if (!tableName) continue;
+
+      // Initialize relations object for this table if not exists
+      if (!relationsPartial[tableName]) {
+        relationsPartial[tableName] = {};
+      }
+
+      // Add relations from this model to the table's relations
+      if (modelStateTyped.relations) {
+        const tableRelations = relationsPartial[tableName];
+        if (tableRelations) {
+          for (const relationName in modelStateTyped.relations) {
+            const relation = modelStateTyped.relations[relationName];
+            if (relation) {
+              tableRelations[relationName] = relation;
+            }
+          }
+        }
+      }
+    }
+
     // Type assertions to preserve literal types from generics
     // The type system knows these match BuildStorage/BuildModels from the generics
     const storage = { tables: storageTables } as unknown as BuildStorage<Tables, Target & string>;
     const models = modelsPartial as unknown as BuildModels<Models>;
+    const relations = relationsPartial as unknown as BuildRelations<Models>;
 
     const mappings = computeMappings(
       models as unknown as Record<string, ModelDefinition>,
@@ -693,7 +900,7 @@ class ContractBuilder<
       targetFamily: 'sql' as const,
       coreHash: this.state.coreHash || 'sha256:ts-builder-placeholder',
       models,
-      relations: {},
+      relations,
       storage,
       mappings,
       ...(this.state.extensions ? { extensions: this.state.extensions } : {}),

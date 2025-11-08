@@ -18,7 +18,10 @@
     "arktype": "^2.1.25"
   },
   "devDependencies": {
+    "@prisma-next/runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.11.5",
     "ts-toolbelt": "^9.6.0",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
@@ -40,6 +43,10 @@
     "./param": {
       "types": "./dist/exports/param.d.ts",
       "import": "./dist/exports/param.js"
+    },
+    "./orm": {
+      "types": "./dist/exports/orm.d.ts",
+      "import": "./dist/exports/orm.js"
     },
     "./types": {
       "types": "./dist/exports/types.d.ts",

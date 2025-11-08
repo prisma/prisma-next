@@ -162,3 +162,18 @@ const users = await orm.user()
 - Operation registry for pack-defined operators and parameterized types (vector/geospatial).
 
 
+### Note re nesting includes
+
+- API: The ORM brief’s include.<relation>(...) is designed to be chainable; nothing in the API forbids multiple includes or nested includes (include children that themselves include their children).
+- Lowering:
+  - Postgres: nested LATERAL subqueries with nested json_build_object/json_agg are feasible; complexity and performance need care.
+  - MySQL/MariaDB: nested correlated JSON_ARRAYAGG/JSON_OBJECT is possible but can get heavy; still feasible for 1–2 levels.
+  - SQL Server/Oracle: nested APPLY + FOR JSON/JSON_ARRAYAGG also feasible, with careful aliasing.
+  - SQLite/D1: single-statement nested includes aren’t feasible; rely on stitch/flat fallbacks.
+
+- Recommendation for MVP:
+  - Support multiple sibling includes at the same level (e.g., user.include.posts(...).include.comments(...)).
+  - Defer multi-level nested includes (child includes its own children) to a follow-up slice; keep the API shape but gate deeper nesting behind a feature flag or emit a clear PLAN.UNSUPPORTED if attempted.
+  - Document that fallback policies (stitch/flat) will materialize nested arrays at runtime to match types even where single-statement lowering isn’t possible.
+
+If you want, I can add a note to the ORM brief clarifying: “multiple sibling includes supported; nested includes beyond one level are planned; behavior depends on adapter lowering and policy (single-statement vs stitch).”

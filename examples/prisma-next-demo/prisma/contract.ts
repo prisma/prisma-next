@@ -20,14 +20,39 @@ export const contract = defineContract<CodecTypes>()
       .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),
   )
   .model('User', 'user', (m) =>
-    m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
+    m
+      .field('id', 'id')
+      .field('email', 'email')
+      .field('createdAt', 'createdAt')
+      .relation('posts', {
+        toModel: 'Post',
+        toTable: 'post',
+        cardinality: '1:N',
+        on: {
+          parentTable: 'user',
+          parentColumns: ['id'],
+          childTable: 'post',
+          childColumns: ['userId'],
+        },
+      }),
   )
   .model('Post', 'post', (m) =>
     m
       .field('id', 'id')
       .field('title', 'title')
       .field('userId', 'userId')
-      .field('createdAt', 'createdAt'),
+      .field('createdAt', 'createdAt')
+      .relation('user', {
+        toModel: 'User',
+        toTable: 'user',
+        cardinality: 'N:1',
+        on: {
+          parentTable: 'post',
+          parentColumns: ['userId'],
+          childTable: 'user',
+          childColumns: ['id'],
+        },
+      }),
   )
   .extensions({
     postgres: {

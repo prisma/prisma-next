@@ -1,29 +1,33 @@
-import type { Adapter, AdapterProfile, LowererContext } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
-import { codecDefinitions } from './codecs';
 import type {
+  Adapter,
+  AdapterProfile,
   BinaryExpr,
   ColumnRef,
+  DeleteAst,
+  ExistsExpr,
+  IncludeRef,
+  InsertAst,
   JoinAst,
-  LiteralExpr,
-  OperationExpr,
+  LowererContext,
   ParamRef,
-  PostgresAdapterOptions,
-  PostgresContract,
-  PostgresLoweredStatement,
+  QueryAst,
   SelectAst,
-} from './types';
+  UpdateAst,
+} from '@prisma-next/sql-target';
+import type { LiteralExpr, OperationExpr } from '@prisma-next/sql-query/types';
+import { createCodecRegistry } from '@prisma-next/sql-target';
+import { codecDefinitions } from './codecs';
+import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({
   postgres: {
     orderBy: true,
     limit: true,
+    returning: true,
   },
 });
 
-class PostgresAdapterImpl
-  implements Adapter<SelectAst, PostgresContract, PostgresLoweredStatement>
-{
+class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement> {
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecRegistry = (() => {
     const registry = createCodecRegistry();
@@ -42,9 +46,21 @@ class PostgresAdapterImpl
     });
   }
 
-  lower(ast: SelectAst, context: LowererContext<PostgresContract>) {
-    const sql = renderSelect(ast);
+  lower(ast: QueryAst, context: LowererContext<PostgresContract>) {
+    let sql: string;
     const params = context.params ? [...context.params] : [];
+
+    if (ast.kind === 'select') {
+      sql = renderSelect(ast);
+    } else if (ast.kind === 'insert') {
+      sql = renderInsert(ast);
+    } else if (ast.kind === 'update') {
+      sql = renderUpdate(ast);
+    } else if (ast.kind === 'delete') {
+      sql = renderDelete(ast);
+    } else {
+      throw new Error(`Unsupported AST kind: ${(ast as { kind: string }).kind}`);
+    }
 
     return Object.freeze({
       profileId: this.profile.id,
@@ -62,14 +78,14 @@ function renderSelect(ast: SelectAst): string {
     ? ast.includes.map((include) => renderInclude(include)).join(' ')
     : '';
 
-  const whereClause = ast.where ? ` WHERE ${renderBinary(ast.where)}` : '';
+  const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where)}` : '';
   const orderClause = ast.orderBy?.length
     ? ` ORDER BY ${ast.orderBy
         .map((order) => {
           const expr =
-            order.expr.kind === 'operation'
-              ? renderOperation(order.expr)
-              : renderColumn(order.expr);
+            (order.expr as ColumnRef | OperationExpr).kind === 'operation'
+              ? renderOperation(order.expr as unknown as OperationExpr)
+              : renderColumn(order.expr as ColumnRef);
           return `${expr} ${order.dir.toUpperCase()}`;
         })
         .join(', ')}`
@@ -83,29 +99,41 @@ function renderSelect(ast: SelectAst): string {
 function renderProjection(ast: SelectAst): string {
   return ast.project
     .map((item) => {
-      if (item.expr.kind === 'includeRef') {
+      const expr = item.expr as ColumnRef | IncludeRef | OperationExpr;
+      if (expr.kind === 'includeRef') {
         // For include references, select the column from the LATERAL join alias
         // The LATERAL subquery returns a single column (the JSON array) with the alias
         // The table is aliased as {alias}_lateral, and the column inside is aliased as the include alias
         // We select it using table_alias.column_alias
-        const tableAlias = `${item.expr.alias}_lateral`;
-        return `${quoteIdentifier(tableAlias)}.${quoteIdentifier(item.expr.alias)} AS ${quoteIdentifier(item.alias)}`;
+        const tableAlias = `${expr.alias}_lateral`;
+        return `${quoteIdentifier(tableAlias)}.${quoteIdentifier(expr.alias)} AS ${quoteIdentifier(item.alias)}`;
       }
-      if (item.expr.kind === 'operation') {
-        const operation = renderOperation(item.expr);
+      if (expr.kind === 'operation') {
+        const operation = renderOperation(expr);
         const alias = quoteIdentifier(item.alias);
         return `${operation} AS ${alias}`;
       }
-      const column = renderColumn(item.expr);
+      const column = renderColumn(expr as ColumnRef);
       const alias = quoteIdentifier(item.alias);
       return `${column} AS ${alias}`;
     })
     .join(', ');
 }
 
+function renderWhere(expr: BinaryExpr | ExistsExpr): string {
+  if (expr.kind === 'exists') {
+    const notKeyword = expr.not ? 'NOT ' : '';
+    const subquery = renderSelect(expr.subquery);
+    return `${notKeyword}EXISTS (${subquery})`;
+  }
+  return renderBinary(expr);
+}
+
 function renderBinary(expr: BinaryExpr): string {
   const left =
-    expr.left.kind === 'operation' ? renderOperation(expr.left) : renderColumn(expr.left);
+    (expr.left as ColumnRef | OperationExpr).kind === 'operation'
+      ? renderOperation(expr.left as unknown as OperationExpr)
+      : renderColumn(expr.left as ColumnRef);
   const right = renderParam(expr.right);
   return `(${left}) = ${right}`;
 }
@@ -129,14 +157,14 @@ function renderLiteral(expr: LiteralExpr): string {
     return 'NULL';
   }
   if (Array.isArray(expr.value)) {
-    return `ARRAY[${expr.value.map((v) => renderLiteral({ kind: 'literal', value: v })).join(', ')}]`;
+    return `ARRAY[${expr.value.map((v: unknown) => renderLiteral({ kind: 'literal', value: v })).join(', ')}]`;
   }
   return JSON.stringify(expr.value);
 }
 
 function renderOperation(expr: OperationExpr): string {
   const self = renderColumn(expr.self);
-  const args = expr.args.map((arg, _index) => {
+  const args = expr.args.map((arg: ColumnRef | ParamRef | LiteralExpr) => {
     if (arg.kind === 'col') {
       return renderColumn(arg);
     }
@@ -198,7 +226,7 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
   // Build WHERE clause: combine ON condition with any additional WHERE clauses
   let whereClause = ` WHERE ${onCondition}`;
   if (include.child.where) {
-    whereClause += ` AND ${renderBinary(include.child.where)}`;
+    whereClause += ` AND ${renderWhere(include.child.where)}`;
   }
 
   // Add ORDER BY if present - it goes inside json_agg() call
@@ -269,6 +297,60 @@ function renderInclude(include: NonNullable<SelectAst['includes']>[number]): str
 
 function quoteIdentifier(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function renderInsert(ast: InsertAst): string {
+  const table = quoteIdentifier(ast.table.name);
+  const columns = Object.keys(ast.values).map((col) => quoteIdentifier(col));
+  const values = Object.values(ast.values).map((val) => {
+    if (val.kind === 'param') {
+      return `$${val.index}`;
+    }
+    if (val.kind === 'col') {
+      return `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
+    }
+    throw new Error(`Unsupported value kind in INSERT: ${(val as { kind: string }).kind}`);
+  });
+
+  const insertClause = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')})`;
+  const returningClause = ast.returning?.length
+    ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
+    : '';
+
+  return `${insertClause}${returningClause}`;
+}
+
+function renderUpdate(ast: UpdateAst): string {
+  const table = quoteIdentifier(ast.table.name);
+  const setClauses = Object.entries(ast.set).map(([col, val]) => {
+    const column = quoteIdentifier(col);
+    let value: string;
+    if (val.kind === 'param') {
+      value = `$${val.index}`;
+    } else if (val.kind === 'col') {
+      value = `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
+    } else {
+      throw new Error(`Unsupported value kind in UPDATE: ${(val as { kind: string }).kind}`);
+    }
+    return `${column} = ${value}`;
+  });
+
+  const whereClause = ` WHERE ${renderBinary(ast.where)}`;
+  const returningClause = ast.returning?.length
+    ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
+    : '';
+
+  return `UPDATE ${table} SET ${setClauses.join(', ')}${whereClause}${returningClause}`;
+}
+
+function renderDelete(ast: DeleteAst): string {
+  const table = quoteIdentifier(ast.table.name);
+  const whereClause = ` WHERE ${renderBinary(ast.where)}`;
+  const returningClause = ast.returning?.length
+    ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
+    : '';
+
+  return `DELETE FROM ${table}${whereClause}${returningClause}`;
 }
 
 export function createPostgresAdapter(options?: PostgresAdapterOptions) {

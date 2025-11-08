@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { Plan, ResultType } from '@prisma-next/sql-query/types';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { CodecTypes, Contract } from '../../sql-query/test/fixtures/contract.d';

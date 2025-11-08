@@ -11,6 +11,7 @@ Core PostgreSQL capabilities managed by the adapter.
 |------------|------|-------------|-----------|
 | `lateral` | boolean | Supports LATERAL joins | Stable |
 | `jsonAgg` | boolean | Supports JSON aggregation functions | Stable |
+| `returning` | boolean | Supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE) | Stable |
 | `partialIndex` | boolean | Supports partial/filtered indexes | Stable |
 | `deferrableConstraints` | boolean | Supports DEFERRABLE constraints | Stable |
 | `savepoints` | boolean | Supports savepoint transactions | Stable |

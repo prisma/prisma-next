@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/sql-query/types';
+import type { Plan } from '@prisma-next/contract/types';
 import type { Codec } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';

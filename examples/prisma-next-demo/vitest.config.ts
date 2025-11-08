@@ -12,7 +12,7 @@ export default defineConfig({
         singleThread: true,
       },
     },
-    testTimeout: timeouts.default,
-    hookTimeout: timeouts.default,
+    testTimeout: timeouts.typeScriptCompilation,
+    hookTimeout: timeouts.typeScriptCompilation,
   },
 });

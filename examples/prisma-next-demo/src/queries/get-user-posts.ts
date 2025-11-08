@@ -1,11 +1,11 @@
 import { param } from '@prisma-next/sql-query/param';
-import { schema, sql } from '../prisma/query';
+import { sql, tables } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
 import { collect } from './utils';
 
 export async function getUserPosts(userId: number) {
   const runtime = getRuntime();
-  const postTable = schema.tables.post;
+  const postTable = tables.post;
 
   const plan = sql
     .from(postTable)

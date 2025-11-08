@@ -1,5 +1,5 @@
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { SelectAst } from '@prisma-next/sql-query/types';
+import type { DeleteAst, InsertAst, SelectAst, UpdateAst } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '../src/adapter';
@@ -330,6 +330,166 @@ describe('createPostgresAdapter', () => {
 
       expect(result.body.sql).toContain('"posts"');
       expect(result.body.sql).toContain('AS "posts"');
+    });
+  });
+
+  describe('DML lowering', () => {
+    describe('insert', () => {
+      it('lowers insert AST into canonical SQL', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          values: {
+            email: { kind: 'param', index: 1, name: 'email' },
+            createdAt: { kind: 'param', index: 2, name: 'createdAt' },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['test@example.com', new Date('2024-01-01')],
+        });
+
+        expect(lowered.body).toEqual({
+          sql: 'INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2)',
+          params: ['test@example.com', new Date('2024-01-01')],
+        });
+      });
+
+      it('lowers insert AST with returning clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          values: {
+            email: { kind: 'param', index: 1, name: 'email' },
+            createdAt: { kind: 'param', index: 2, name: 'createdAt' },
+          },
+          returning: [
+            { kind: 'col', table: 'user', column: 'id' },
+            { kind: 'col', table: 'user', column: 'email' },
+          ],
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['test@example.com', new Date('2024-01-01')],
+        });
+
+        expect(lowered.body).toEqual({
+          sql: 'INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2) RETURNING "user"."id", "user"."email"',
+          params: ['test@example.com', new Date('2024-01-01')],
+        });
+      });
+    });
+
+    describe('update', () => {
+      it('lowers update AST into canonical SQL', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: UpdateAst = {
+          kind: 'update',
+          table: { kind: 'table', name: 'user' },
+          set: {
+            email: { kind: 'param', index: 1, name: 'newEmail' },
+          },
+          where: {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: { kind: 'param', index: 2, name: 'userId' },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: ['updated@example.com', 1] });
+
+        expect(lowered.body).toEqual({
+          sql: 'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2',
+          params: ['updated@example.com', 1],
+        });
+      });
+
+      it('lowers update AST with returning clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: UpdateAst = {
+          kind: 'update',
+          table: { kind: 'table', name: 'user' },
+          set: {
+            email: { kind: 'param', index: 1, name: 'newEmail' },
+          },
+          where: {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: { kind: 'param', index: 2, name: 'userId' },
+          },
+          returning: [
+            { kind: 'col', table: 'user', column: 'id' },
+            { kind: 'col', table: 'user', column: 'email' },
+          ],
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: ['updated@example.com', 1] });
+
+        expect(lowered.body).toEqual({
+          sql: 'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."id", "user"."email"',
+          params: ['updated@example.com', 1],
+        });
+      });
+    });
+
+    describe('delete', () => {
+      it('lowers delete AST into canonical SQL', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: DeleteAst = {
+          kind: 'delete',
+          table: { kind: 'table', name: 'user' },
+          where: {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: { kind: 'param', index: 1, name: 'userId' },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [1] });
+
+        expect(lowered.body).toEqual({
+          sql: 'DELETE FROM "user" WHERE "user"."id" = $1',
+          params: [1],
+        });
+      });
+
+      it('lowers delete AST with returning clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: DeleteAst = {
+          kind: 'delete',
+          table: { kind: 'table', name: 'user' },
+          where: {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: { kind: 'param', index: 1, name: 'userId' },
+          },
+          returning: [
+            { kind: 'col', table: 'user', column: 'id' },
+            { kind: 'col', table: 'user', column: 'email' },
+          ],
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [1] });
+
+        expect(lowered.body).toEqual({
+          sql: 'DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id", "user"."email"',
+          params: [1],
+        });
+      });
     });
   });
 });
