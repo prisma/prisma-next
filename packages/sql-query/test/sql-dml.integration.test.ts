@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 import {
+  createTestContext,
   createTestRuntime,
   executePlanAndCollect,
   setupTestDatabase,
@@ -54,8 +55,9 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
   const adapter = createPostgresAdapter();
-  const tables = schema(fixtureContract).tables;
-  const builder = sql({ contract: fixtureContract, adapter });
+  const context = createTestContext(fixtureContract, adapter);
+  const tables = schema(context).tables;
+  const builder = sql({ context });
 
   beforeAll(async () => {
     database = await createDevDatabase({

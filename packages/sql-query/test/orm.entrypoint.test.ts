@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { orm } from '../src/orm';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { Contract } from './fixtures/contract.d';
+import { createTestContext } from '../../runtime/test/utils';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -41,17 +42,17 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 describe('orm entrypoint', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
-  const codecTypes = {} as CodecTypes;
+  const context = createTestContext(contract, adapter);
 
   it('exposes valid model names as properties', () => {
-    const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+    const o = orm<Contract>({ context });
 
     expect(o).toHaveProperty('user');
     expect(typeof (o as unknown as { user: () => unknown }).user).toBe('function');
   });
 
   it('returns OrmModelBuilder when accessing model', () => {
-    const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+    const o = orm<Contract>({ context });
 
     const builder = (o as unknown as { user: () => unknown }).user();
 
@@ -62,7 +63,7 @@ describe('orm entrypoint', () => {
   });
 
   it('throws error when accessing invalid model at runtime', () => {
-    const o = orm<Contract, CodecTypes>({ contract, adapter, codecTypes });
+    const o = orm<Contract>({ context });
 
     expect(() => {
       (o as unknown as { invalidModel: () => unknown }).invalidModel();

@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { rawOptions as exportedRawOptions, sql as exportedSql } from '../src/exports/sql';
 import { rawOptions } from '../src/raw';
 import { sql } from '../src/sql';
-import type { Adapter, LoweredStatement, ParamDescriptor, PlanMeta, SelectAst } from '../src/types';
+import type { ParamDescriptor, PlanMeta } from '../src/types';
+import { createTestContext, createStubAdapter } from '../../runtime/test/utils';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -19,30 +19,11 @@ function loadContract(name: string): SqlContract<SqlStorage> {
   return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
 
-function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
-  return {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
-    },
-  };
-}
-
 describe('raw lane', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
-  const root = sql({ contract, adapter });
+  const context = createTestContext(contract, adapter);
+  const root = sql({ context });
 
   it('compiles template literals to positional placeholders with stable params', () => {
     const userId = 42;

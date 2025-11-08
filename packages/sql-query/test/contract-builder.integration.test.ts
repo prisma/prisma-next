@@ -1,34 +1,14 @@
 import type { ModelDefinition, SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
 import { validateContract } from '../src/contract';
 import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Adapter, LoweredStatement, ResultType, SelectAst } from '../src/types';
+import type { ResultType } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
-
-function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
-  return {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
-    },
-  };
-}
+import { createTestContext, createStubAdapter } from '../../runtime/test/utils';
 
 describe('builder integration', () => {
   it('builds a contract matching fixture structure', () => {

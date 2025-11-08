@@ -14,6 +14,7 @@ import { budgets } from '../src/plugins/budgets';
 import { lints } from '../src/plugins/lints';
 import {
   createDevDatabase,
+  createTestContext,
   createTestRuntime,
   drainPlanExecution,
   executePlanAndCollect,
@@ -22,11 +23,12 @@ import {
 } from './utils';
 
 const fixtureContract = loadContractFixture();
-const tables = schema(fixtureContract).tables;
 const adapter = createPostgresAdapter();
+const context = createTestContext(fixtureContract, adapter);
+const tables = schema(context).tables;
 const userTable = tables['user']!;
 const userColumns = userTable.columns;
-const builder = sql({ contract: fixtureContract, adapter });
+const builder = sql({ context });
 const plan = builder
   .from(userTable)
   .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -110,7 +112,7 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+    const rawPlan = sql({ context }).raw`
       select * from "user"
     `;
 
@@ -133,7 +135,7 @@ describe('runtime execute integration', () => {
       plugins: [lints(), budgets()],
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+    const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
 
@@ -151,7 +153,7 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw(
+    const rawPlan = sql({ context }).raw(
       'select id from "user" where email = $1 limit $2',
       {
         params: ['ada@example.com', 1],
@@ -177,7 +179,7 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw(
+    const rawPlan = sql({ context }).raw(
       'insert into "user" (email) values ($1)',
       {
         params: ['read-only@example.com'],
@@ -204,7 +206,7 @@ describe('runtime execute integration', () => {
       mode: 'permissive',
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+    const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
 
@@ -226,7 +228,7 @@ describe('runtime execute integration', () => {
       mode: 'permissive',
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+    const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
 
@@ -242,7 +244,7 @@ describe('runtime execute integration', () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    const planOne = sql({ contract: fixtureContract, adapter }).raw(
+    const planOne = sql({ context }).raw(
       'select id from "user" where email = \'ada@example.com\' limit 1',
       { params: [] },
     );
@@ -250,7 +252,7 @@ describe('runtime execute integration', () => {
     await drainPlanExecution(runtime, planOne);
     const fingerprintOne = runtime.telemetry()?.fingerprint;
 
-    const planTwo = sql({ contract: fixtureContract, adapter }).raw(
+    const planTwo = sql({ context }).raw(
       'select id from "user" where email = \'tess@example.com\' limit 1',
       { params: [] },
     );

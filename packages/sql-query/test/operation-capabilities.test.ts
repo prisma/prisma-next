@@ -4,9 +4,11 @@ import {
   createOperationRegistry,
   type OperationSignature,
 } from '@prisma-next/sql-target';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
+import { createStubAdapter } from '../../runtime/test/utils';
 
 describe('Operation capability gating', () => {
   it('exposes operation with required capability when capability is present', () => {
@@ -49,7 +51,17 @@ describe('Operation capability gating', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
@@ -94,7 +106,17 @@ describe('Operation capability gating', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
@@ -138,7 +160,17 @@ describe('Operation capability gating', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
@@ -187,7 +219,17 @@ describe('Operation capability gating', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];

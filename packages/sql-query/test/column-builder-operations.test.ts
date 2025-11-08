@@ -4,10 +4,12 @@ import {
   createOperationRegistry,
   type OperationSignature,
 } from '@prisma-next/sql-target';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
+import { createStubAdapter } from '../../runtime/test/utils';
 
 describe('ColumnBuilder operations', () => {
   const contract = validateContract<SqlContract<SqlStorage>>({
@@ -46,7 +48,17 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => Array.from(registry.values()),
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
@@ -72,7 +84,17 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => Array.from(registry.values()),
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const idColumn = userTable.columns['id'];
@@ -109,7 +131,17 @@ describe('ColumnBuilder operations', () => {
     registry.register(signature1);
     registry.register(signature2);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => Array.from(registry.values()),
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
@@ -135,7 +167,17 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => Array.from(registry.values()),
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
@@ -162,7 +204,17 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => Array.from(registry.values()),
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
@@ -189,7 +241,17 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => Array.from(registry.values()),
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
@@ -218,7 +280,17 @@ describe('ColumnBuilder operations', () => {
     };
     registry.register(signature);
 
-    const tables = schema(contract, { operations: registry, codecs: createCodecRegistry() }).tables;
+    const adapter = createStubAdapter();
+    const context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [
+        {
+          operations: () => Array.from(registry.values()),
+        },
+      ],
+    });
+    const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
     const vectorColumn = userTable.columns['vector'];
