@@ -261,25 +261,29 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
   });
 
   describe('Guardrail: unbounded findMany should trigger budget error', () => {
-    it('throws BUDGET.ROWS_EXCEEDED for unbounded select without limit', async () => {
-      // Create many users to exceed budget
-      for (let i = 0; i < 20; i++) {
-        await createUser(prismaPN, {
-          id: `test-${i}`,
-          email: `test${i}@example.com`,
-          name: `Test User ${i}`,
-        });
-      }
+    it(
+      'throws BUDGET.ROWS_EXCEEDED for unbounded select without limit',
+      async () => {
+        // Create many users to exceed budget
+        for (let i = 0; i < 20; i++) {
+          await createUser(prismaPN, {
+            id: `test-${i}`,
+            email: `test${i}@example.com`,
+            name: `Test User ${i}`,
+          });
+        }
 
-      // Runtime should have budgets enabled by default
-      // For MVP, we'll test that findMany without take throws when budgets are enabled
-      // Note: This test may need adjustment based on actual budget configuration
-      await expect(prismaPN.user.findMany()).resolves.toBeDefined();
+        // Runtime should have budgets enabled by default
+        // For MVP, we'll test that findMany without take throws when budgets are enabled
+        // Note: This test may need adjustment based on actual budget configuration
+        await expect(prismaPN.user.findMany()).resolves.toBeDefined();
 
-      // With take, it should work
-      const results = await prismaPN.user.findMany({ take: 10 });
-      expect(results.length).toBeLessThanOrEqual(10);
-    });
+        // With take, it should work
+        const results = await prismaPN.user.findMany({ take: 10 });
+        expect(results.length).toBeLessThanOrEqual(10);
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('Contract drift handling', () => {
