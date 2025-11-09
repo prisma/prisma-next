@@ -76,9 +76,12 @@ export function getContext() {
 export async function closeRuntime() {
   if (runtime) {
     await runtime.close();
+    runtime = undefined;
   }
   // Pool is closed by runtime.close() -> driver.close(), so we just clear the reference
   if (pool) {
     pool = undefined;
   }
+  // Clear context reference as well
+  context = undefined;
 }
