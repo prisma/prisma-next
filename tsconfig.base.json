@@ -48,6 +48,7 @@
       "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
       "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
       "@prisma-next/sql-orm-lane": ["packages/sql/lanes/orm-lane/src/index.ts"],
+      "@prisma-next/sql-contract-ts/*": ["packages/sql/authoring/sql-contract-ts/src/exports/*.ts"],
       "@prisma-next/runtime-core": ["packages/runtime/core/src/index.ts"],
       "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/index.ts"]
     }
@@ -72,6 +73,7 @@
     { "path": "./packages/sql/lanes/relational-core" },
     { "path": "./packages/sql/lanes/sql-lane" },
     { "path": "./packages/sql/lanes/orm-lane" },
+    { "path": "./packages/sql/authoring/sql-contract-ts" },
     { "path": "./packages/runtime/core" },
     { "path": "./packages/sql/sql-runtime" }
   ]

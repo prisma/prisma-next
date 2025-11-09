@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { Command } from 'commander';

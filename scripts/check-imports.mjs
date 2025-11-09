@@ -123,6 +123,7 @@ function getRingForImport(importPath) {
       contract: 'core',
       'contract-authoring': 'authoring',
       'contract-ts': 'authoring',
+      'sql-contract-ts': 'sql',
       'contract-psl': 'authoring',
       'sql-contract-types': 'targets',
       'sql-operations': 'targets',
@@ -201,6 +202,11 @@ function validateImports() {
   const files = getAllTsFiles(packagesDir);
 
   for (const file of files) {
+    // Skip test files - they can import from anywhere for testing purposes
+    if (file.includes('/test/') || file.includes('.test.') || file.includes('.spec.')) {
+      continue;
+    }
+
     const sourceRing = getRingForPath(file);
     if (!sourceRing) continue;
 

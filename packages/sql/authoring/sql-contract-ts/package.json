@@ -1,0 +1,49 @@
+{
+  "name": "@prisma-next/sql-contract-ts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "SQL-specific TypeScript contract authoring surface for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "clean": "node ../../../../scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/sql-target": "workspace:*",
+    "arktype": "^2.1.25",
+    "ts-toolbelt": "^9.6.0"
+  },
+  "devDependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/sql-query": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.11.5",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.1"
+  },
+  "files": [
+    "dist",
+    "schemas"
+  ],
+  "exports": {
+    "./contract-builder": {
+      "types": "./dist/exports/contract-builder.d.ts",
+      "import": "./dist/exports/contract-builder.js"
+    },
+    "./contract": {
+      "types": "./dist/exports/contract.d.ts",
+      "import": "./dist/exports/contract.js"
+    },
+    "./schema-sql": "./schemas/data-contract-sql-v1.json"
+  }
+}
+
