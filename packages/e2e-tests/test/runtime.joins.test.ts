@@ -94,339 +94,355 @@ describe('end-to-end JOIN queries', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('LEFT JOIN returns all users including those without posts', async () => {
-    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+  it(
+    'LEFT JOIN returns all users including those without posts',
+    async () => {
+      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-    await withDevDatabase(
-      async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
-              'ada@example.com',
-              'tess@example.com',
-              'mike@example.com',
-            ]);
-            await c.query('insert into "post" ("userId", title) values ($1, $2)', [
-              1,
-              'First Post',
-            ]);
+      await withDevDatabase(
+        async ({ connectionString }: { connectionString: string }) => {
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await setupE2EDatabase(client, contract, async (c: typeof client) => {
+              await c.query('drop table if exists "comment"');
+              await c.query('drop table if exists "post"');
+              await c.query('drop table if exists "user"');
+              await c.query('create table "user" (id serial primary key, email text not null)');
+              await c.query(
+                'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+              );
+              await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
+                'ada@example.com',
+                'tess@example.com',
+                'mike@example.com',
+              ]);
+              await c.query('insert into "post" ("userId", title) values ($1, $2)', [
+                1,
+                'First Post',
+              ]);
+            });
+
+            const adapter = createPostgresAdapter();
+            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            try {
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema<Contract>(context).tables;
+              const user = tables.user!;
+              const post = tables.post!;
+              const plan = sql({ context })
+                .from(user)
+                .leftJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+                .select({
+                  userId: user.columns.id!,
+                  email: user.columns.email!,
+                  postId: post.columns.id!,
+                  title: post.columns.title!,
+                })
+                .build();
+
+              const rows = await executePlanAndCollect(runtime, plan);
+
+              expect(rows.length).toBe(3);
+              const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
+              const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
+              const mikeRow = rows.find((r: (typeof rows)[0]) => r.email === 'mike@example.com');
+
+              expect(adaRow).toMatchObject({
+                email: 'ada@example.com',
+                postId: expect.anything(),
+                title: expect.anything(),
+              });
+
+              expect(tessRow).toMatchObject({
+                email: 'tess@example.com',
+                postId: null,
+                title: null,
+              });
+
+              expect(mikeRow).toMatchObject({
+                email: 'mike@example.com',
+                postId: null,
+                title: null,
+              });
+
+              expect(plan.meta.refs?.tables).toContain('user');
+              expect(plan.meta.refs?.tables).toContain('post');
+            } finally {
+              await runtime.close();
+            }
           });
+        },
+        { acceleratePort: 54040, databasePort: 54041, shadowDatabasePort: 54042 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-          const adapter = createPostgresAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client, adapter);
-          try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const tables = schema<Contract>(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
-            const plan = sql({ context })
-              .from(user)
-              .leftJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
-              .select({
-                userId: user.columns.id!,
-                email: user.columns.email!,
-                postId: post.columns.id!,
-                title: post.columns.title!,
-              })
-              .build();
+  it(
+    'RIGHT JOIN returns all posts including those without users',
+    async () => {
+      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-            const rows = await executePlanAndCollect(runtime, plan);
-
-            expect(rows.length).toBe(3);
-            const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
-            const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
-            const mikeRow = rows.find((r: (typeof rows)[0]) => r.email === 'mike@example.com');
-
-            expect(adaRow).toMatchObject({
-              email: 'ada@example.com',
-              postId: expect.anything(),
-              title: expect.anything(),
+      await withDevDatabase(
+        async ({ connectionString }: { connectionString: string }) => {
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await setupE2EDatabase(client, contract, async (c: typeof client) => {
+              await c.query('drop table if exists "comment"');
+              await c.query('drop table if exists "post"');
+              await c.query('drop table if exists "user"');
+              await c.query('create table "user" (id serial primary key, email text not null)');
+              await c.query(
+                'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+              );
+              await c.query('insert into "user" (email) values ($1)', ['ada@example.com']);
+              await c.query('insert into "post" ("userId", title) values ($1, $2), ($3, $4)', [
+                1,
+                'First Post',
+                999,
+                'Orphan Post',
+              ]);
             });
 
-            expect(tessRow).toMatchObject({
-              email: 'tess@example.com',
-              postId: null,
-              title: null,
-            });
+            const adapter = createPostgresAdapter();
+            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            try {
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema<Contract>(context).tables;
+              const user = tables.user!;
+              const post = tables.post!;
+              const plan = sql({ context })
+                .from(user)
+                .rightJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+                .select({
+                  userId: user.columns.id!,
+                  email: user.columns.email!,
+                  postId: post.columns.id!,
+                  title: post.columns.title!,
+                })
+                .build();
 
-            expect(mikeRow).toMatchObject({
-              email: 'mike@example.com',
-              postId: null,
-              title: null,
-            });
+              const rows = await executePlanAndCollect(runtime, plan);
 
-            expect(plan.meta.refs?.tables).toContain('user');
-            expect(plan.meta.refs?.tables).toContain('post');
-          } finally {
-            await runtime.close();
-          }
-        });
-      },
-      { acceleratePort: 54040, databasePort: 54041, shadowDatabasePort: 54042 },
-    );
-  }, timeouts.spinUpPpgDev);
+              expect(rows.length).toBe(2);
+              const firstPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'First Post');
+              const orphanPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
 
-  it('RIGHT JOIN returns all posts including those without users', async () => {
-    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+              expect(firstPostRow).toMatchObject({
+                title: 'First Post',
+                userId: expect.anything(),
+                email: expect.anything(),
+              });
 
-    await withDevDatabase(
-      async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
-            await c.query('insert into "user" (email) values ($1)', ['ada@example.com']);
-            await c.query('insert into "post" ("userId", title) values ($1, $2), ($3, $4)', [
-              1,
-              'First Post',
-              999,
-              'Orphan Post',
-            ]);
+              expect(orphanPostRow).toMatchObject({
+                title: 'Orphan Post',
+                userId: null,
+                email: null,
+              });
+
+              expect(plan.meta.refs?.tables).toContain('user');
+              expect(plan.meta.refs?.tables).toContain('post');
+            } finally {
+              await runtime.close();
+            }
           });
+        },
+        { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-          const adapter = createPostgresAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client, adapter);
-          try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const tables = schema<Contract>(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
-            const plan = sql({ context })
-              .from(user)
-              .rightJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
-              .select({
-                userId: user.columns.id!,
-                email: user.columns.email!,
-                postId: post.columns.id!,
-                title: post.columns.title!,
-              })
-              .build();
+  it(
+    'FULL JOIN returns all users and posts',
+    async () => {
+      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-            const rows = await executePlanAndCollect(runtime, plan);
-
-            expect(rows.length).toBe(2);
-            const firstPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'First Post');
-            const orphanPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
-
-            expect(firstPostRow).toMatchObject({
-              title: 'First Post',
-              userId: expect.anything(),
-              email: expect.anything(),
+      await withDevDatabase(
+        async ({ connectionString }: { connectionString: string }) => {
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await setupE2EDatabase(client, contract, async (c: typeof client) => {
+              await c.query('drop table if exists "comment"');
+              await c.query('drop table if exists "post"');
+              await c.query('drop table if exists "user"');
+              await c.query('create table "user" (id serial primary key, email text not null)');
+              await c.query(
+                'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+              );
+              await c.query('insert into "user" (email) values ($1), ($2)', [
+                'ada@example.com',
+                'tess@example.com',
+              ]);
+              await c.query('insert into "post" ("userId", title) values ($1, $2), ($3, $4)', [
+                1,
+                'First Post',
+                999,
+                'Orphan Post',
+              ]);
             });
 
-            expect(orphanPostRow).toMatchObject({
-              title: 'Orphan Post',
-              userId: null,
-              email: null,
-            });
+            const adapter = createPostgresAdapter();
+            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            try {
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema<Contract>(context).tables;
+              const user = tables.user!;
+              const post = tables.post!;
+              const plan = sql({ context })
+                .from(user)
+                .fullJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+                .select({
+                  userId: user.columns.id!,
+                  email: user.columns.email!,
+                  postId: post.columns.id!,
+                  title: post.columns.title!,
+                })
+                .build();
 
-            expect(plan.meta.refs?.tables).toContain('user');
-            expect(plan.meta.refs?.tables).toContain('post');
-          } finally {
-            await runtime.close();
-          }
-        });
-      },
-      { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
-    );
-  }, timeouts.spinUpPpgDev);
+              const rows = await executePlanAndCollect(runtime, plan);
 
-  it('FULL JOIN returns all users and posts', async () => {
-    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+              expect(rows.length).toBe(3);
+              const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
+              const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
+              const orphanRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
 
-    await withDevDatabase(
-      async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-            await c.query('insert into "post" ("userId", title) values ($1, $2), ($3, $4)', [
-              1,
-              'First Post',
-              999,
-              'Orphan Post',
-            ]);
+              expect(adaRow).toMatchObject({
+                email: 'ada@example.com',
+                postId: expect.anything(),
+              });
+
+              expect(tessRow).toMatchObject({
+                email: 'tess@example.com',
+                postId: null,
+              });
+
+              expect(orphanRow).toMatchObject({
+                title: 'Orphan Post',
+                userId: null,
+                email: null,
+              });
+
+              expect(plan.meta.refs?.tables).toContain('user');
+              expect(plan.meta.refs?.tables).toContain('post');
+            } finally {
+              await runtime.close();
+            }
           });
+        },
+        { acceleratePort: 54060, databasePort: 54061, shadowDatabasePort: 54062 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-          const adapter = createPostgresAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client, adapter);
-          try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const tables = schema<Contract>(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
-            const plan = sql({ context })
-              .from(user)
-              .fullJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
-              .select({
-                userId: user.columns.id!,
-                email: user.columns.email!,
-                postId: post.columns.id!,
-                title: post.columns.title!,
-              })
-              .build();
+  it(
+    'chained joins (user -> post -> comment) returns correct results',
+    async () => {
+      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-            const rows = await executePlanAndCollect(runtime, plan);
-
-            expect(rows.length).toBe(3);
-            const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
-            const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
-            const orphanRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
-
-            expect(adaRow).toMatchObject({
-              email: 'ada@example.com',
-              postId: expect.anything(),
+      await withDevDatabase(
+        async ({ connectionString }: { connectionString: string }) => {
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await setupE2EDatabase(client, contract, async (c: typeof client) => {
+              await c.query('drop table if exists "comment"');
+              await c.query('drop table if exists "post"');
+              await c.query('drop table if exists "user"');
+              await c.query('create table "user" (id serial primary key, email text not null)');
+              await c.query(
+                'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+              );
+              await c.query(
+                'create table "comment" (id serial primary key, "postId" int4 not null, content text not null)',
+              );
+              await c.query('insert into "user" (email) values ($1), ($2)', [
+                'ada@example.com',
+                'tess@example.com',
+              ]);
+              await c.query('insert into "post" ("userId", title) values ($1, $2), ($1, $3)', [
+                1,
+                'First Post',
+                'Second Post',
+              ]);
+              await c.query('insert into "comment" ("postId", content) values ($1, $2), ($1, $3)', [
+                1,
+                'First Comment',
+                'Second Comment',
+              ]);
             });
 
-            expect(tessRow).toMatchObject({
-              email: 'tess@example.com',
-              postId: null,
-            });
+            const adapter = createPostgresAdapter();
+            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            try {
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema(context).tables;
+              const user = tables.user!;
+              const post = tables.post!;
+              const comment = tables.comment!;
+              const plan = sql({ context })
+                .from(user)
+                .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+                .leftJoin(comment, (on) => on.eqCol(post.columns.id!, comment.columns.postId!))
+                .select({
+                  userId: user.columns.id!,
+                  email: user.columns.email!,
+                  postId: post.columns.id!,
+                  title: post.columns.title!,
+                  commentId: comment.columns.id!,
+                  content: comment.columns.content!,
+                })
+                .build();
 
-            expect(orphanRow).toMatchObject({
-              title: 'Orphan Post',
-              userId: null,
-              email: null,
-            });
+              const ast = plan.ast as SelectAst | undefined;
+              expect(ast?.joins).toMatchObject([
+                {
+                  kind: 'join',
+                  joinType: 'inner',
+                  table: { kind: 'table', name: 'post' },
+                },
+                {
+                  kind: 'join',
+                  joinType: 'left',
+                  table: { kind: 'table', name: 'comment' },
+                },
+              ]);
 
-            expect(plan.meta.refs?.tables).toContain('user');
-            expect(plan.meta.refs?.tables).toContain('post');
-          } finally {
-            await runtime.close();
-          }
-        });
-      },
-      { acceleratePort: 54060, databasePort: 54061, shadowDatabasePort: 54062 },
-    );
-  }, timeouts.spinUpPpgDev);
+              const rows = await executePlanAndCollect(runtime, plan);
 
-  it('chained joins (user -> post -> comment) returns correct results', async () => {
-    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+              expect(rows.length).toBe(3);
+              const firstPostRow = rows.find(
+                (r: (typeof rows)[0]) => r.title === 'First Post' && r.commentId !== null,
+              );
+              const secondPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Second Post');
 
-    await withDevDatabase(
-      async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
-            await c.query(
-              'create table "comment" (id serial primary key, "postId" int4 not null, content text not null)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-            await c.query('insert into "post" ("userId", title) values ($1, $2), ($1, $3)', [
-              1,
-              'First Post',
-              'Second Post',
-            ]);
-            await c.query('insert into "comment" ("postId", content) values ($1, $2), ($1, $3)', [
-              1,
-              'First Comment',
-              'Second Comment',
-            ]);
+              expect(firstPostRow).toMatchObject({
+                title: 'First Post',
+                commentId: expect.anything(),
+                content: expect.anything(),
+              });
+
+              expect(secondPostRow).toMatchObject({
+                title: 'Second Post',
+                commentId: null,
+                content: null,
+              });
+
+              expect(plan.meta.refs?.tables).toContain('user');
+              expect(plan.meta.refs?.tables).toContain('post');
+              expect(plan.meta.refs?.tables).toContain('comment');
+              expect(plan.meta.refs?.columns).toEqual(
+                expect.arrayContaining([
+                  { table: 'user', column: 'id' },
+                  { table: 'post', column: 'userId' },
+                  { table: 'post', column: 'id' },
+                  { table: 'comment', column: 'postId' },
+                ]),
+              );
+            } finally {
+              await runtime.close();
+            }
           });
-
-          const adapter = createPostgresAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client, adapter);
-          try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const tables = schema(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
-            const comment = tables.comment!;
-            const plan = sql({ context })
-              .from(user)
-              .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
-              .leftJoin(comment, (on) => on.eqCol(post.columns.id!, comment.columns.postId!))
-              .select({
-                userId: user.columns.id!,
-                email: user.columns.email!,
-                postId: post.columns.id!,
-                title: post.columns.title!,
-                commentId: comment.columns.id!,
-                content: comment.columns.content!,
-              })
-              .build();
-
-            const ast = plan.ast as SelectAst | undefined;
-            expect(ast?.joins).toMatchObject([
-              {
-                kind: 'join',
-                joinType: 'inner',
-                table: { kind: 'table', name: 'post' },
-              },
-              {
-                kind: 'join',
-                joinType: 'left',
-                table: { kind: 'table', name: 'comment' },
-              },
-            ]);
-
-            const rows = await executePlanAndCollect(runtime, plan);
-
-            expect(rows.length).toBe(3);
-            const firstPostRow = rows.find(
-              (r: (typeof rows)[0]) => r.title === 'First Post' && r.commentId !== null,
-            );
-            const secondPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Second Post');
-
-            expect(firstPostRow).toMatchObject({
-              title: 'First Post',
-              commentId: expect.anything(),
-              content: expect.anything(),
-            });
-
-            expect(secondPostRow).toMatchObject({
-              title: 'Second Post',
-              commentId: null,
-              content: null,
-            });
-
-            expect(plan.meta.refs?.tables).toContain('user');
-            expect(plan.meta.refs?.tables).toContain('post');
-            expect(plan.meta.refs?.tables).toContain('comment');
-            expect(plan.meta.refs?.columns).toEqual(
-              expect.arrayContaining([
-                { table: 'user', column: 'id' },
-                { table: 'post', column: 'userId' },
-                { table: 'post', column: 'id' },
-                { table: 'comment', column: 'postId' },
-              ]),
-            );
-          } finally {
-            await runtime.close();
-          }
-        });
-      },
-      { acceleratePort: 54070, databasePort: 54071, shadowDatabasePort: 54072 },
-    );
-  }, timeouts.spinUpPpgDev);
+        },
+        { acceleratePort: 54070, databasePort: 54071, shadowDatabasePort: 54072 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
