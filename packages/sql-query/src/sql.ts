@@ -1,4 +1,22 @@
 import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
+import { planInvalid } from '@prisma-next/sql-relational-core/errors';
+import type {
+  AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyOrderBuilder,
+  BinaryBuilder,
+  BuildOptions,
+  CodecTypes as CodecTypesMap,
+  InferNestedProjectionRow,
+  InferReturningRow,
+  JoinOnBuilder,
+  JoinOnPredicate,
+  NestedProjection,
+  OrderBuilder,
+  ParamPlaceholder,
+  RawFactory,
+  SqlBuilderOptions,
+} from '@prisma-next/sql-relational-core/types';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -19,25 +37,7 @@ import type {
   TableRef,
   UpdateAst,
 } from '@prisma-next/sql-target';
-import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
-import type {
-  AnyBinaryBuilder,
-  AnyColumnBuilder,
-  AnyOrderBuilder,
-  BinaryBuilder,
-  BuildOptions,
-  CodecTypes as CodecTypesMap,
-  InferNestedProjectionRow,
-  InferReturningRow,
-  JoinOnBuilder,
-  JoinOnPredicate,
-  NestedProjection,
-  OrderBuilder,
-  ParamPlaceholder,
-  RawFactory,
-  SqlBuilderOptions,
-} from './types';
 
 /**
  * Recursively extracts the base ColumnRef from an OperationExpr.

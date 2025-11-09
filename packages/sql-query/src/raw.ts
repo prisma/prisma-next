@@ -1,12 +1,12 @@
 import type { ParamDescriptor, Plan, PlanMeta, PlanRefs } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { planInvalid } from './errors';
+import { planInvalid } from '@prisma-next/sql-relational-core/errors';
 import type {
   RawFactory,
   RawFunctionOptions,
   RawTemplateFactory,
   RawTemplateOptions,
-} from './types';
+} from '@prisma-next/sql-relational-core/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 const POSTGRES_TARGET = 'postgres';
 

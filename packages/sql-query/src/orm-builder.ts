@@ -1,29 +1,8 @@
 import type { Plan } from '@prisma-next/contract/types';
 import type { RuntimeContext } from '@prisma-next/runtime';
-import type {
-  BinaryExpr,
-  ColumnRef,
-  ExistsExpr,
-  SelectAst,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  TableRef,
-} from '@prisma-next/sql-target';
-import { planInvalid } from './errors';
-import { OrmIncludeChildBuilderImpl } from './orm-include-child';
-import { OrmRelationFilterBuilderImpl } from './orm-relation-filter';
-import type {
-  ModelColumnAccessor,
-  OrmBuilderOptions,
-  OrmIncludeAccessor,
-  OrmModelBuilder,
-  OrmRelationFilterBuilder,
-  OrmWhereProperty,
-} from './orm-types';
-import { param } from './param';
-import { schema } from './schema';
-import { createJoinOnBuilder, sql } from './sql';
+import { planInvalid } from '@prisma-next/sql-relational-core/errors';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
@@ -34,7 +13,28 @@ import type {
   NestedProjection,
   OrderBuilder,
   ParamPlaceholder,
-} from './types';
+} from '@prisma-next/sql-relational-core/types';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  ExistsExpr,
+  SelectAst,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  TableRef,
+} from '@prisma-next/sql-target';
+import { OrmIncludeChildBuilderImpl } from './orm-include-child';
+import { OrmRelationFilterBuilderImpl } from './orm-relation-filter';
+import type {
+  ModelColumnAccessor,
+  OrmBuilderOptions,
+  OrmIncludeAccessor,
+  OrmModelBuilder,
+  OrmRelationFilterBuilder,
+  OrmWhereProperty,
+} from './orm-types';
+import { createJoinOnBuilder, sql } from './sql';
 
 interface RelationFilter {
   relationName: string;

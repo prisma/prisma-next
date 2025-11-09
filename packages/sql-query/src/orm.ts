@@ -1,5 +1,5 @@
+import { planInvalid } from '@prisma-next/sql-relational-core/errors';
 import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { planInvalid } from './errors';
 import { OrmModelBuilderImpl } from './orm-builder';
 import type { OrmBuilderOptions, OrmRegistry } from './orm-types';
 

@@ -3,6 +3,11 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
+    'exports/schema': 'src/exports/schema.ts',
+    'exports/param': 'src/exports/param.ts',
+    'exports/types': 'src/exports/types.ts',
+    'exports/operations-registry': 'src/exports/operations-registry.ts',
+    'exports/errors': 'src/exports/errors.ts',
   },
   outDir: 'dist',
   format: ['esm'],

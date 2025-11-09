@@ -16,6 +16,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/runtime": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-target": "workspace:*",
     "arktype": "^2.1.25"
   },

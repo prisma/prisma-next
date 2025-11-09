@@ -1,6 +1,11 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { ResultType } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { schema } from '@prisma-next/sql-query/schema';
+import type {
+  HasIncludeManyCapabilities,
+  InferNestedProjectionRow,
+} from '@prisma-next/sql-query/types';
 import type {
   Adapter,
   LoweredStatement,
@@ -11,9 +16,7 @@ import type {
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { expectTypeOf, test } from 'vitest';
 import { createTestContext } from '../../runtime/test/utils';
-import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { HasIncludeManyCapabilities, InferNestedProjectionRow } from '../src/types';
 
 // Test contracts with different capability configurations
 type ContractWithCapabilities = SqlContract<SqlStorage> & {

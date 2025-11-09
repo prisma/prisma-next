@@ -1,5 +1,5 @@
+import type { OperationsForTypeId } from '@prisma-next/sql-query/types';
 import { expectTypeOf, test } from 'vitest';
-import type { OperationsForTypeId } from '../src/types';
 
 test('defines type-level operation registry', () => {
   type TestOperations = {

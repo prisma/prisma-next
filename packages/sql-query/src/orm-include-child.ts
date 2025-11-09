@@ -1,15 +1,15 @@
 import type { RuntimeContext } from '@prisma-next/runtime';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { planInvalid } from './errors';
-import type { ModelColumnAccessor, OrmBuilderOptions } from './orm-types';
-import { schema } from './schema';
+import { planInvalid } from '@prisma-next/sql-relational-core/errors';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
   InferNestedProjectionRow,
   NestedProjection,
-} from './types';
+} from '@prisma-next/sql-relational-core/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { ModelColumnAccessor, OrmBuilderOptions } from './orm-types';
 
 export interface OrmIncludeChildBuilder<
   TContract extends SqlContract<SqlStorage>,

@@ -19,7 +19,7 @@ Provide SQL query authoring surfaces that compile to immutable Plans. Support mu
 - **Raw SQL**: Raw SQL escape hatch with required annotations and verification
 - **Plan Factories**: Compile declarative inputs into deterministic Plans
 
-**Note**: Contract authoring (`defineContract`, `validateContract`) has been moved to `@prisma-next/sql-contract-ts`. This package re-exports them for backward compatibility during the migration.
+**Note**: Contract authoring (`defineContract`, `validateContract`) has been moved to `@prisma-next/sql-contract-ts`. This package re-exports them for backward compatibility during the migration. The re-exports will be removed in Slice 7 once all callers have migrated.
 
 **Non-goals:**
 - Execution or runtime behavior (runtime)

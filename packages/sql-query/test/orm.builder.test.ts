@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { param } from '@prisma-next/sql-query/param';
 import type {
   Adapter,
   LoweredStatement,
@@ -14,7 +15,6 @@ import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createTestContext } from '../../runtime/test/utils';
 import { orm } from '../src/orm';
-import { param } from '../src/param';
 import type { Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');

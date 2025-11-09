@@ -1,5 +1,5 @@
+import { planUnsupported } from '@prisma-next/sql-query/errors';
 import { describe, expect, it } from 'vitest';
-import { planUnsupported } from '../src/errors';
 
 describe('planUnsupported', () => {
   it('creates error with message', () => {
