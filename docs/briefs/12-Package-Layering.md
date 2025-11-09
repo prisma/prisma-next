@@ -128,6 +128,22 @@ Each arrow is one-way. ESLint + tsconfig path groups will enforce that inner rin
 
 ---
 
+### Execution Slices
+
+Each stage above has its own brief so individual agents can execute slices independently while keeping tests green between steps:
+
+1. [Slice 1 — Scaffold Rings & Guardrails](package-layering/01-Scaffold-Rings-and-Guardrails.md)
+2. [Slice 2 — Extract Contract Authoring](package-layering/02-Extract-Contract-Authoring.md)
+3. [Slice 3 — Stand Up Relational Core](package-layering/03-Stand-Up-Relational-Core.md)
+4. [Slice 4 — Split SQL Lanes](package-layering/04-Split-SQL-Lanes.md)
+5. [Slice 5 — Restructure SQL Target & Operations Core](package-layering/05-Restructure-SQL-Target-and-Operations-Core.md)
+6. [Slice 6 — Runtime Core & SQL Runtime Split](package-layering/06-Runtime-Core-and-SQL-Runtime-Split.md)
+7. [Slice 7 — Remove Legacy Packages & Clean Up](package-layering/07-Remove-Legacy-Packages.md)
+
+Each brief includes context, goals, explicit out-of-scope items, and verification steps.
+
+---
+
 ### Guardrails & Tooling
 - **Import graph checks** – Add a CI step (madge or custom script) that fails if any package in an inner ring imports an outer ring.
 - **Path aliases** – Define `@core/*`, `@authoring/*`, `@targets/*`, `@lanes/*`, `@runtime/*`, `@adapters/*` in `tsconfig.base.json` to nudge developers toward the correct modules.
@@ -143,10 +159,8 @@ Each arrow is one-way. ESLint + tsconfig path groups will enforce that inner rin
 
 ---
 
-### Open Questions
-1. Do any internal tools need temporary compatibility exports, or can we delete the legacy `@prisma-next/sql-query` package as soon as callers migrate?
-2. Do we want a similar `lanes/document-*` structure now, or wait until another target family lands?
-3. Can we auto-generate the dependency graph check from `turbo.json` to avoid maintaining a separate configuration?
-4. When do we officially flip the runtime APIs to target-family-neutral types so we can advertise true multi-target support?
-
-Answering these will finalize the scope for the initial refactor and clarify how aggressively we deprecate the previous imports.
+### Open Questions → Resolutions
+1. **Compatibility exports?** No internal tools require long-lived shims. Transitional re-exports may exist during a slice, but Slice 7 must remove them before completion.
+2. **Document-family lanes now or later?** We will scaffold the `packages/document` folder (empty) during Slice 1 to signal the structure, but defer creating actual packages until the document target project kicks off.
+3. **Automated dependency graph check?** Yes—Slice 1 adds a `pnpm lint:deps` command powered by `madge` (or `dependency-cruiser`) so CI enforces the import direction. No manual checks after that.
+4. **When to declare runtime target-agnostic?** After Slice 6 lands and `@prisma-next/runtime-core` + `@prisma-next/sql-runtime` are in use by all call sites, the runtime APIs can be documented as target-neutral. We will add a smoke test that wires a mock (non-SQL) family into runtime-core before making the announcement.
