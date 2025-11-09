@@ -67,8 +67,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
       await c.query(`
         CREATE TABLE "user" (
           id SERIAL PRIMARY KEY,
-          email TEXT NOT NULL,
-          "createdAt" TIMESTAMPTZ NOT NULL
+          email TEXT NOT NULL
         )
       `);
     });
@@ -90,13 +89,11 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
     const insertPlan = builder
       .insert(userTable, {
         email: param('email'),
-        createdAt: param('createdAt'),
       })
       .returning(userColumns.id, userColumns.email)
       .build({
         params: {
           email: 'e2e@example.com',
-          createdAt: new Date('2024-01-01T00:00:00Z'),
         },
       });
 

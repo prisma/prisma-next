@@ -144,17 +144,23 @@ describe('end-to-end JOIN queries', () => {
             const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
             const mikeRow = rows.find((r: (typeof rows)[0]) => r.email === 'mike@example.com');
 
-            expect(adaRow).toBeDefined();
-            expect(adaRow?.postId).not.toBeNull();
-            expect(adaRow?.title).not.toBeNull();
+            expect(adaRow).toMatchObject({
+              email: 'ada@example.com',
+              postId: expect.anything(),
+              title: expect.anything(),
+            });
 
-            expect(tessRow).toBeDefined();
-            expect(tessRow?.postId).toBeNull();
-            expect(tessRow?.title).toBeNull();
+            expect(tessRow).toMatchObject({
+              email: 'tess@example.com',
+              postId: null,
+              title: null,
+            });
 
-            expect(mikeRow).toBeDefined();
-            expect(mikeRow?.postId).toBeNull();
-            expect(mikeRow?.title).toBeNull();
+            expect(mikeRow).toMatchObject({
+              email: 'mike@example.com',
+              postId: null,
+              title: null,
+            });
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -214,13 +220,17 @@ describe('end-to-end JOIN queries', () => {
             const firstPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'First Post');
             const orphanPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
 
-            expect(firstPostRow).toBeDefined();
-            expect(firstPostRow?.userId).not.toBeNull();
-            expect(firstPostRow?.email).not.toBeNull();
+            expect(firstPostRow).toMatchObject({
+              title: 'First Post',
+              userId: expect.anything(),
+              email: expect.anything(),
+            });
 
-            expect(orphanPostRow).toBeDefined();
-            expect(orphanPostRow?.userId).toBeNull();
-            expect(orphanPostRow?.email).toBeNull();
+            expect(orphanPostRow).toMatchObject({
+              title: 'Orphan Post',
+              userId: null,
+              email: null,
+            });
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -284,15 +294,21 @@ describe('end-to-end JOIN queries', () => {
             const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
             const orphanRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
 
-            expect(adaRow).toBeDefined();
-            expect(adaRow?.postId).not.toBeNull();
+            expect(adaRow).toMatchObject({
+              email: 'ada@example.com',
+              postId: expect.anything(),
+            });
 
-            expect(tessRow).toBeDefined();
-            expect(tessRow?.postId).toBeNull();
+            expect(tessRow).toMatchObject({
+              email: 'tess@example.com',
+              postId: null,
+            });
 
-            expect(orphanRow).toBeDefined();
-            expect(orphanRow?.userId).toBeNull();
-            expect(orphanRow?.email).toBeNull();
+            expect(orphanRow).toMatchObject({
+              title: 'Orphan Post',
+              userId: null,
+              email: null,
+            });
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');
@@ -361,7 +377,7 @@ describe('end-to-end JOIN queries', () => {
               .build();
 
             const ast = plan.ast as SelectAst | undefined;
-            expect(ast?.joins).toEqual([
+            expect(ast?.joins).toMatchObject([
               {
                 kind: 'join',
                 joinType: 'inner',
@@ -382,13 +398,17 @@ describe('end-to-end JOIN queries', () => {
             );
             const secondPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Second Post');
 
-            expect(firstPostRow).toBeDefined();
-            expect(firstPostRow?.commentId).not.toBeNull();
-            expect(firstPostRow?.content).not.toBeNull();
+            expect(firstPostRow).toMatchObject({
+              title: 'First Post',
+              commentId: expect.anything(),
+              content: expect.anything(),
+            });
 
-            expect(secondPostRow).toBeDefined();
-            expect(secondPostRow?.commentId).toBeNull();
-            expect(secondPostRow?.content).toBeNull();
+            expect(secondPostRow).toMatchObject({
+              title: 'Second Post',
+              commentId: null,
+              content: null,
+            });
 
             expect(plan.meta.refs?.tables).toContain('user');
             expect(plan.meta.refs?.tables).toContain('post');

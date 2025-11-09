@@ -93,30 +93,25 @@ describe('end-to-end includeMany and leftJoin queries', () => {
               expect(rows.length).toBe(3);
 
               const adaRow = rows.find((r: Row) => r.email === 'ada@example.com');
-              expect(adaRow).toBeDefined();
-              expect(adaRow!.posts).toBeDefined();
-              expect(Array.isArray(adaRow!.posts)).toBe(true);
-              expect(adaRow!.posts.length).toBe(2);
-              expect(adaRow!.posts[0]).toHaveProperty('id');
-              expect(adaRow!.posts[0]).toHaveProperty('title');
-              expect(adaRow!.posts[0]!.id).toBe(1);
-              expect(adaRow!.posts[0]!.title).toBe('Ada Post 1');
-              expect(adaRow!.posts[1]!.id).toBe(2);
-              expect(adaRow!.posts[1]!.title).toBe('Ada Post 2');
+              expect(adaRow).toMatchObject({
+                email: 'ada@example.com',
+                posts: [
+                  { id: 1, title: 'Ada Post 1' },
+                  { id: 2, title: 'Ada Post 2' },
+                ],
+              });
 
               const tessRow = rows.find((r: Row) => r.email === 'tess@example.com');
-              expect(tessRow).toBeDefined();
-              expect(tessRow!.posts).toBeDefined();
-              expect(Array.isArray(tessRow!.posts)).toBe(true);
-              expect(tessRow!.posts.length).toBe(1);
-              expect(tessRow!.posts[0]!.id).toBe(3);
-              expect(tessRow!.posts[0]!.title).toBe('Tess Post 1');
+              expect(tessRow).toMatchObject({
+                email: 'tess@example.com',
+                posts: [{ id: 3, title: 'Tess Post 1' }],
+              });
 
               const mikeRow = rows.find((r: Row) => r.email === 'mike@example.com');
-              expect(mikeRow).toBeDefined();
-              expect(mikeRow!.posts).toBeDefined();
-              expect(Array.isArray(mikeRow!.posts)).toBe(true);
-              expect(mikeRow!.posts.length).toBe(0);
+              expect(mikeRow).toMatchObject({
+                email: 'mike@example.com',
+                posts: [],
+              });
 
               expectTypeOf<Row['posts']>().toEqualTypeOf<Array<{ id: number; title: string }>>();
             } finally {
@@ -246,19 +241,25 @@ describe('end-to-end includeMany and leftJoin queries', () => {
             expect(rows.length).toBe(3);
 
             const adaPost1 = rows.find((r: Row) => r.postTitle === 'Ada Post 1');
-            expect(adaPost1).toBeDefined();
-            expect(adaPost1!.userId).toBe(1);
-            expect(adaPost1!.userEmail).toBe('ada@example.com');
+            expect(adaPost1).toMatchObject({
+              postTitle: 'Ada Post 1',
+              userId: 1,
+              userEmail: 'ada@example.com',
+            });
 
             const adaPost2 = rows.find((r: Row) => r.postTitle === 'Ada Post 2');
-            expect(adaPost2).toBeDefined();
-            expect(adaPost2!.userId).toBe(1);
-            expect(adaPost2!.userEmail).toBe('ada@example.com');
+            expect(adaPost2).toMatchObject({
+              postTitle: 'Ada Post 2',
+              userId: 1,
+              userEmail: 'ada@example.com',
+            });
 
             const tessPost1 = rows.find((r: Row) => r.postTitle === 'Tess Post 1');
-            expect(tessPost1).toBeDefined();
-            expect(tessPost1!.userId).toBe(2);
-            expect(tessPost1!.userEmail).toBe('tess@example.com');
+            expect(tessPost1).toMatchObject({
+              postTitle: 'Tess Post 1',
+              userId: 2,
+              userEmail: 'tess@example.com',
+            });
           } finally {
             await runtime.close();
           }

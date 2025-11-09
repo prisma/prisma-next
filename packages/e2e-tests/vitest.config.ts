@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['test/**/*.e2e.test.ts', 'test/**/*.test-d.ts'],
+    include: ['test/**/*.test.ts', 'test/**/*.test-d.ts'],
     fileParallelism: false,
     maxConcurrency: 1,
     coverage: {
