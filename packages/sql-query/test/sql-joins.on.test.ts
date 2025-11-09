@@ -14,6 +14,10 @@ type ContractWithPosts = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; nullable: false };
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly post: {
         readonly columns: {
@@ -21,6 +25,10 @@ type ContractWithPosts = SqlContract<
           readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
           readonly title: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
     };
   },
