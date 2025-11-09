@@ -96,17 +96,18 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
   let client: Client;
   let prismaPN: PrismaClient;
 
-  beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 54000,
-      databasePort: 54001,
-      shadowDatabasePort: 54002,
-    });
-    client = new Client({ connectionString: database.connectionString });
-    await client.connect();
+  beforeAll(
+    async () => {
+      database = await createDevDatabase({
+        acceleratePort: 54000,
+        databasePort: 54001,
+        shadowDatabasePort: 54002,
+      });
+      client = new Client({ connectionString: database.connectionString });
+      await client.connect();
 
-    // Create test table (shared for both implementations)
-    await client.query(`
+      // Create test table (shared for both implementations)
+      await client.query(`
         DROP TABLE IF EXISTS "user";
         CREATE TABLE "user" (
           id TEXT PRIMARY KEY,
@@ -116,37 +117,39 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
         );
       `);
 
-    // Use the same client connection to avoid multiple connections to dev database
-    const driver = createPostgresDriverFromOptions({
-      connect: { client },
-      cursor: { disabled: true },
-    });
+      // Use the same client connection to avoid multiple connections to dev database
+      const driver = createPostgresDriverFromOptions({
+        connect: { client },
+        cursor: { disabled: true },
+      });
 
-    // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
-    const validatedContract = validateContract(testContract);
+      // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
+      const validatedContract = validateContract(testContract);
 
-    const adapter = createPostgresAdapter();
-    const context = createRuntimeContext({
-      contract: validatedContract,
-      adapter,
-      extensions: [],
-    });
+      const adapter = createPostgresAdapter();
+      const context = createRuntimeContext({
+        contract: validatedContract,
+        adapter,
+        extensions: [],
+      });
 
-    const runtime = createRuntime({
-      adapter,
-      driver,
-      context,
-      verify: {
-        mode: 'onFirstUse',
-        requireMarker: false,
-      },
-    });
+      const runtime = createRuntime({
+        adapter,
+        driver,
+        context,
+        verify: {
+          mode: 'onFirstUse',
+          requireMarker: false,
+        },
+      });
 
-    prismaPN = new PrismaClient({
-      contract: validatedContract,
-      runtime,
-    });
-  }, timeouts.spinUpPpgDev);
+      prismaPN = new PrismaClient({
+        contract: validatedContract,
+        runtime,
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   afterAll(async () => {
     try {
