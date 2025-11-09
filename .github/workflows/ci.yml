@@ -159,8 +159,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
-      - name: Generate coverage
-        run: pnpm test:coverage:packages
+      - name: Generate coverage and report
+        run: node scripts/coverage-report.mjs
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:
