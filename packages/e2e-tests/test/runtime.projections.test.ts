@@ -278,100 +278,104 @@ describe('end-to-end nested projection queries', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('mixed leaves and nested objects in projection returns flat rows', async () => {
-    const contract = await loadContractFromDisk<Contract>(contractJsonPath);
+  it(
+    'mixed leaves and nested objects in projection returns flat rows',
+    async () => {
+      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-    await withDevDatabase(
-      async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-          });
+      await withDevDatabase(
+        async ({ connectionString }: { connectionString: string }) => {
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await setupE2EDatabase(client, contract, async (c: typeof client) => {
+              await c.query('drop table if exists "user"');
+              await c.query('create table "user" (id serial primary key, email text not null)');
+              await c.query('insert into "user" (email) values ($1), ($2)', [
+                'ada@example.com',
+                'tess@example.com',
+              ]);
+            });
 
-          const adapter = createPostgresAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client, adapter);
-          try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const tables = schema(context).tables;
-            const user = tables.user!;
-            const plan = sql({ context })
-              .from(user)
-              .select({
-                id: user.columns.id!,
-                post: {
-                  title: user.columns.email!,
-                  author: {
-                    name: user.columns.id!,
+            const adapter = createPostgresAdapter();
+            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            try {
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema(context).tables;
+              const user = tables.user!;
+              const plan = sql({ context })
+                .from(user)
+                .select({
+                  id: user.columns.id!,
+                  post: {
+                    title: user.columns.email!,
+                    author: {
+                      name: user.columns.id!,
+                    },
                   },
+                  email: user.columns.email!,
+                })
+                .build();
+
+              const rows = await executePlanAndCollect(runtime, plan);
+
+              expect(rows.length).toBe(2);
+              expect(rows[0]).toMatchObject({
+                id: expect.any(Number),
+                post_title: expect.any(String),
+                post_author_name: expect.any(Number),
+                email: expect.any(String),
+              });
+              expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
+
+              type Row = ResultType<typeof plan>;
+              expectTypeOf<Row>().toExtend<{
+                id: number;
+                post: { title: string; author: { name: number } };
+                email: string;
+              }>();
+              expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+              expectTypeOf<Row['post']>().toEqualTypeOf<{
+                title: string;
+                author: { name: number };
+              }>();
+              expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+              expectTypeOf<Row['post']['author']>().toEqualTypeOf<{
+                name: number;
+              }>();
+              expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
+              expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+              const flatRow0 = rows[0] as Record<string, unknown>;
+              expect(flatRow0['id']).toBe(1);
+              expect(flatRow0['post_title']).toBe('ada@example.com');
+              expect(flatRow0['post_author_name']).toBe(1);
+              expect(flatRow0['email']).toBe('ada@example.com');
+              expect({
+                id: flatRow0['id'],
+                post: {
+                  title: flatRow0['post_title'],
+                  author: { name: flatRow0['post_author_name'] },
                 },
-                email: user.columns.email!,
-              })
-              .build();
+                email: flatRow0['email'],
+              }).toEqual({
+                id: 1,
+                post: { title: 'ada@example.com', author: { name: 1 } },
+                email: 'ada@example.com',
+              });
 
-            const rows = await executePlanAndCollect(runtime, plan);
-
-            expect(rows.length).toBe(2);
-            expect(rows[0]).toMatchObject({
-              id: expect.any(Number),
-              post_title: expect.any(String),
-              post_author_name: expect.any(Number),
-              email: expect.any(String),
-            });
-            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
-
-            type Row = ResultType<typeof plan>;
-            expectTypeOf<Row>().toExtend<{
-              id: number;
-              post: { title: string; author: { name: number } };
-              email: string;
-            }>();
-            expectTypeOf<Row['id']>().toEqualTypeOf<number>();
-            expectTypeOf<Row['post']>().toEqualTypeOf<{
-              title: string;
-              author: { name: number };
-            }>();
-            expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
-            expectTypeOf<Row['post']['author']>().toEqualTypeOf<{
-              name: number;
-            }>();
-            expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
-            expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-
-            const flatRow0 = rows[0] as Record<string, unknown>;
-            expect(flatRow0['id']).toBe(1);
-            expect(flatRow0['post_title']).toBe('ada@example.com');
-            expect(flatRow0['post_author_name']).toBe(1);
-            expect(flatRow0['email']).toBe('ada@example.com');
-            expect({
-              id: flatRow0['id'],
-              post: {
-                title: flatRow0['post_title'],
-                author: { name: flatRow0['post_author_name'] },
-              },
-              email: flatRow0['email'],
-            }).toEqual({
-              id: 1,
-              post: { title: 'ada@example.com', author: { name: 1 } },
-              email: 'ada@example.com',
-            });
-
-            expect(plan.meta.projection).toEqual({
-              id: 'user.id',
-              post_title: 'user.email',
-              post_author_name: 'user.id',
-              email: 'user.email',
-            });
-          } finally {
-            await runtime.close();
-          }
-        });
-      },
-      { acceleratePort: 54110, databasePort: 54111, shadowDatabasePort: 54112 },
-    );
-  }, timeouts.spinUpPpgDev);
+              expect(plan.meta.projection).toEqual({
+                id: 'user.id',
+                post_title: 'user.email',
+                post_author_name: 'user.id',
+                email: 'user.email',
+              });
+            } finally {
+              await runtime.close();
+            }
+          });
+        },
+        { acceleratePort: 54110, databasePort: 54111, shadowDatabasePort: 54112 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
