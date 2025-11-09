@@ -1,29 +1,32 @@
 import { expectTypeOf, test } from 'vitest';
-import type { orm } from '../src/orm';
-import type { ModelColumnAccessor, OrmModelBuilder } from '../src/orm-types';
+import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { ModelColumnAccessor, OrmModelBuilder, OrmRegistry } from '../src/orm-types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import type {
   CodecTypes as CodecTypesWithRelations,
   Contract as ContractWithRelations,
 } from './fixtures/contract-with-relations.d';
 
+// Helper type to get OrmRegistry type for a contract
+type OrmRegistryFor<TContract extends SqlContract<SqlStorage>> = OrmRegistry<TContract, ExtractCodecTypes<TContract>>;
+
 // Test with contract without relations
 test('OrmRegistry exposes model names', () => {
-  type Registry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type Registry = OrmRegistryFor<Contract>;
 
   expectTypeOf<Registry>().toHaveProperty('User');
   expectTypeOf<Registry>().not.toHaveProperty('InvalidModel');
 });
 
 test('OrmRegistry exposes lowercase model names', () => {
-  type Registry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type Registry = OrmRegistryFor<Contract>;
 
   expectTypeOf<Registry>().toHaveProperty('user');
   expectTypeOf<Registry['user']>().toEqualTypeOf<Registry['User']>();
 });
 
 test('OrmModelBuilder has all required methods', () => {
-  type Registry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type Registry = OrmRegistryFor<Contract>;
   type UserBuilder = ReturnType<Registry['User']>;
 
   expectTypeOf<UserBuilder>().toHaveProperty('where');
@@ -52,7 +55,7 @@ test('ModelColumnAccessor provides column builders for model fields', () => {
 });
 
 test('where() is callable function', () => {
-  type Registry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type Registry = OrmRegistryFor<Contract>;
   type UserBuilder = ReturnType<Registry['User']>;
   type WhereProperty = UserBuilder['where'];
 
@@ -60,7 +63,7 @@ test('where() is callable function', () => {
 });
 
 test('where.related is empty when contract has no relations', () => {
-  type Registry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type Registry = OrmRegistryFor<Contract>;
   type UserBuilder = ReturnType<Registry['User']>;
   type WhereProperty = UserBuilder['where'];
 
@@ -69,7 +72,7 @@ test('where.related is empty when contract has no relations', () => {
 });
 
 test('include is empty when contract has no relations', () => {
-  type Registry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type Registry = OrmRegistryFor<Contract>;
   type UserBuilder = ReturnType<Registry['User']>;
   type IncludeAccessor = UserBuilder['include'];
 
@@ -79,7 +82,7 @@ test('include is empty when contract has no relations', () => {
 
 // Test with contract with relations
 test('where.related exposes relations when contract has relations', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type UserBuilder = ReturnType<Registry['User']>;
   type WhereProperty = UserBuilder['where'];
 
@@ -91,7 +94,7 @@ test('where.related exposes relations when contract has relations', () => {
 });
 
 test('where.related.posts.some returns OrmModelBuilder', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type UserBuilder = ReturnType<Registry['User']>;
   type WhereProperty = UserBuilder['where'];
   type PostsRelationAccessor = WhereProperty['related']['posts'];
@@ -104,7 +107,7 @@ test('where.related.posts.some returns OrmModelBuilder', () => {
 });
 
 test('where.related.posts.some is callable function', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type UserBuilder = ReturnType<Registry['User']>;
   type WhereProperty = UserBuilder['where'];
   type PostsRelationAccessor = WhereProperty['related']['posts'];
@@ -114,7 +117,7 @@ test('where.related.posts.some is callable function', () => {
 });
 
 test('include exposes relations when contract has relations', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type UserBuilder = ReturnType<Registry['User']>;
   type IncludeAccessor = UserBuilder['include'];
 
@@ -123,7 +126,7 @@ test('include exposes relations when contract has relations', () => {
 });
 
 test('include.posts is callable function', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type UserBuilder = ReturnType<Registry['User']>;
   type IncludeAccessor = UserBuilder['include'];
   type PostsIncludeFn = IncludeAccessor['posts'];
@@ -132,7 +135,7 @@ test('include.posts is callable function', () => {
 });
 
 test('include.posts returns OrmModelBuilder', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type UserBuilder = ReturnType<Registry['User']>;
   type IncludeAccessor = UserBuilder['include'];
   type PostsIncludeFn = IncludeAccessor['posts'];
@@ -143,7 +146,7 @@ test('include.posts returns OrmModelBuilder', () => {
 });
 
 test('select() infers row type from projection', () => {
-  type Registry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type Registry = OrmRegistryFor<Contract>;
   type UserBuilder = ReturnType<Registry['User']>;
   type SelectFn = UserBuilder['select'];
 
@@ -154,7 +157,7 @@ test('select() infers row type from projection', () => {
 });
 
 test('OrmWhereProperty is callable and has related property', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type UserBuilder = ReturnType<Registry['User']>;
   type WhereProperty = UserBuilder['where'];
 
@@ -163,7 +166,7 @@ test('OrmWhereProperty is callable and has related property', () => {
 });
 
 test('OrmIncludeAccessor is object type, not empty, when relations exist', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type UserBuilder = ReturnType<Registry['User']>;
   type IncludeAccessor = UserBuilder['include'];
 
@@ -173,7 +176,7 @@ test('OrmIncludeAccessor is object type, not empty, when relations exist', () =>
 });
 
 test('Post model has user relation accessor', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type PostBuilder = ReturnType<Registry['Post']>;
   type WhereProperty = PostBuilder['where'];
 
@@ -184,7 +187,7 @@ test('Post model has user relation accessor', () => {
 });
 
 test('Post model has user include accessor', () => {
-  type Registry = ReturnType<typeof orm<ContractWithRelations, CodecTypesWithRelations>>;
+  type Registry = OrmRegistryFor<ContractWithRelations>;
   type PostBuilder = ReturnType<Registry['Post']>;
   type IncludeAccessor = PostBuilder['include'];
 

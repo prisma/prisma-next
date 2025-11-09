@@ -457,6 +457,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
             readonly id: { readonly type: 'pg/int4@1'; nullable: false };
             readonly email: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
           readonly uniques: readonly never[];
           readonly indexes: readonly never[];
           readonly foreignKeys: readonly never[];
@@ -467,6 +468,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
             readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
             readonly title: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
           readonly uniques: readonly never[];
           readonly indexes: readonly never[];
           readonly foreignKeys: readonly never[];
@@ -682,6 +684,7 @@ test('nested projection with joins infers nested Row type', () => {
             readonly id: { readonly type: 'pg/int4@1'; nullable: false };
             readonly email: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
           readonly uniques: readonly never[];
           readonly indexes: readonly never[];
           readonly foreignKeys: readonly never[];
@@ -692,6 +695,7 @@ test('nested projection with joins infers nested Row type', () => {
             readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
             readonly title: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
           readonly uniques: readonly never[];
           readonly indexes: readonly never[];
           readonly foreignKeys: readonly never[];

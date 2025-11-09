@@ -6,6 +6,7 @@ import type {
   DeleteAst,
   InsertAst,
   LoweredStatement,
+  SelectAst,
   SqlContract,
   SqlStorage,
   UpdateAst,
@@ -57,7 +58,7 @@ function createStubAdapter(): Adapter<
 describe('orm writes', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter() as Adapter<
-    import('../src/types').SelectAst | InsertAst | UpdateAst | DeleteAst,
+    SelectAst | InsertAst | UpdateAst | DeleteAst,
     Contract,
     LoweredStatement
   >;

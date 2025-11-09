@@ -1,4 +1,5 @@
 import type { Plan, ResultType } from '@prisma-next/contract/types';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
@@ -53,29 +54,28 @@ test('ResultType inference works identically to fixture contract', () => {
 
   const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof validatedBuilderContract>(validatedBuilderContract).tables;
-  const userTable = tables.user;
+  const context = createRuntimeContext({ contract: validatedBuilderContract, adapter, extensions: [] });
+  const tables = schema(context).tables;
+  const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
 
-  const _plan = sql<typeof validatedBuilderContract, CodecTypes>({
-    contract: validatedBuilderContract,
-    adapter,
-  })
+  const _plan = sql({ context })
     .from(userTable)
     .select({
-      id: userTable.columns.id!,
-      email: userTable.columns.email!,
-      createdAt: userTable.columns.createdAt!,
+      id: userTable.columns['id']!,
+      email: userTable.columns['email']!,
+      createdAt: userTable.columns['createdAt']!,
     })
     .build();
 
   type BuilderRow = ResultType<typeof _plan>;
 
   const _fixtureContract = validateContract<Contract>(contractJson);
-  const fixtureTables = schema<Contract>(_fixtureContract).tables;
+  const fixtureContext = createRuntimeContext({ contract: _fixtureContract, adapter, extensions: [] });
+  const fixtureTables = schema(fixtureContext).tables;
   const fixtureUserTable = fixtureTables.user;
   if (!fixtureUserTable) throw new Error('fixture user table not found');
-  const _fixturePlan = sql<Contract, CodecTypes>({ contract: _fixtureContract, adapter })
+  const _fixturePlan = sql({ context: fixtureContext })
     .from(fixtureUserTable)
     .select({
       id: fixtureUserTable.columns.id!,
@@ -111,16 +111,17 @@ test('codec type inference via type option', () => {
 
   const validated = validateContract<typeof contract>(contract);
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof validated>(validated).tables;
-  const userTable = tables.user;
+  const context = createRuntimeContext({ contract: validated, adapter, extensions: [] });
+  const tables = schema(context).tables;
+  const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
 
-  const _plan = sql<typeof validated, CodecTypes>({ contract: validated, adapter })
+  const _plan = sql({ context })
     .from(userTable)
     .select({
-      id: userTable.columns.id!,
-      email: userTable.columns.email!,
-      createdAt: userTable.columns.createdAt!,
+      id: userTable.columns['id']!,
+      email: userTable.columns['email']!,
+      createdAt: userTable.columns['createdAt']!,
     })
     .build();
 

@@ -6,6 +6,7 @@ import type {
   DeleteAst,
   InsertAst,
   LoweredStatement,
+  SelectAst,
   SqlContract,
   SqlStorage,
   UpdateAst,
@@ -29,7 +30,7 @@ function loadContract(name: string): Contract {
 }
 
 function createStubAdapter(): Adapter<
-  InsertAst | UpdateAst | DeleteAst,
+  SelectAst | InsertAst | UpdateAst | DeleteAst,
   SqlContract<SqlStorage>,
   LoweredStatement
 > {
@@ -43,7 +44,7 @@ function createStubAdapter(): Adapter<
       },
     },
     lower(
-      ast: InsertAst | UpdateAst | DeleteAst,
+      ast: SelectAst | InsertAst | UpdateAst | DeleteAst,
       ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] },
     ) {
       const sqlText = JSON.stringify(ast);

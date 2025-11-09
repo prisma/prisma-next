@@ -3,7 +3,6 @@
 // without namespace collisions. Each contract can have its own namespace name.
 
 import type { SqlContract } from '@prisma-next/sql-target';
-import type { TableDef, ModelDef } from '../../src/types';
 import type { CodecTypes, ScalarToJs } from '@prisma-next/adapter-postgres/codec-types';
 
 // Contract type representing the contract data structure
@@ -17,6 +16,7 @@ export type Contract = SqlContract<
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: ReadonlyArray<never>;
         readonly indexes: ReadonlyArray<never>;
         readonly foreignKeys: ReadonlyArray<never>;
@@ -24,49 +24,22 @@ export type Contract = SqlContract<
     };
   },
   {
-    readonly User: ModelDef<'User'> & {
-      readonly id: number;
-      readonly email: string;
-      readonly createdAt: string;
+    readonly User: {
+      readonly storage: { readonly table: 'user' };
+      readonly fields: {
+        readonly id: { readonly column: 'id' };
+        readonly email: { readonly column: 'email' };
+        readonly createdAt: { readonly column: 'createdAt' };
+      };
+      readonly relations: Record<string, never>;
     };
   },
   {},
   {
-    readonly modelToTable: {
-      readonly User: 'user';
-    };
-    readonly tableToModel: {
-      readonly user: 'User';
-    };
-    readonly fieldToColumn: {
-      readonly User: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-      };
-    };
-    readonly columnToField: {
-      readonly user: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-      };
-    };
-    readonly scalarToJs: ScalarToJs;
     readonly codecTypes: CodecTypes;
     readonly operationTypes: OperationTypes;
   }
-> & {
-  readonly storage: {
-    readonly tables: {
-      readonly user: TableDef<'user'> & {
-        readonly id: number;
-        readonly email: string;
-        readonly createdAt: string; // timestamptz maps to string in MVP
-      };
-    };
-  };
-};
+>;
 
 // Codec type map and scalar mapping imported from adapter - used for type inference in lanes
 export type { CodecTypes, ScalarToJs };

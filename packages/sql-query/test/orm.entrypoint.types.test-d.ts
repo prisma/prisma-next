@@ -1,16 +1,20 @@
 import { expectTypeOf, test } from 'vitest';
-import type { orm } from '../src/orm';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { OrmRegistry } from '../src/orm-types';
+import type { Contract } from './fixtures/contract.d';
+
+// Helper type to get OrmRegistry type for a contract
+type OrmRegistryFor<TContract extends SqlContract<SqlStorage>> = OrmRegistry<TContract, ExtractCodecTypes<TContract>>;
 
 test('orm exposes only valid model names', () => {
-  type OrmRegistry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type OrmRegistry = OrmRegistryFor<Contract>;
 
   expectTypeOf<OrmRegistry>().toHaveProperty('User');
   expectTypeOf<OrmRegistry>().not.toHaveProperty('invalidModel');
 });
 
 test('model access returns OrmModelBuilder', () => {
-  type OrmRegistry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type OrmRegistry = OrmRegistryFor<Contract>;
   type UserBuilder = ReturnType<OrmRegistry['User']>;
 
   expectTypeOf<UserBuilder>().toHaveProperty('where');
@@ -21,8 +25,7 @@ test('model access returns OrmModelBuilder', () => {
 });
 
 test('invalid model access rejected at compile time', () => {
-  type OrmRegistry = ReturnType<typeof orm<Contract, CodecTypes>>;
+  type OrmRegistry = OrmRegistryFor<Contract>;
 
-  // @ts-expect-error - invalidModel should not exist
-  type _InvalidAccess = OrmRegistry['invalidModel'];
+  expectTypeOf<OrmRegistry>().not.toHaveProperty('invalidModel');
 });

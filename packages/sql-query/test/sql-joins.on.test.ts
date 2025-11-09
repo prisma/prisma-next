@@ -34,7 +34,10 @@ type ContractWithPosts = SqlContract<
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  {
+    readonly codecTypes: Record<string, never>;
+    readonly operationTypes: Record<string, Record<string, unknown>>;
+  }
 >;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
@@ -69,7 +72,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 });
 
 describe('JoinOnBuilder', () => {

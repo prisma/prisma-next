@@ -68,9 +68,11 @@ describe('contract builder normalization', () => {
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
 
-    expect(contract.models.User.relations).toEqual({});
-    expect(typeof contract.models.User.relations).toBe('object');
-    expect(Array.isArray(contract.models.User.relations)).toBe(false);
+    expect(contract.models.User).toHaveProperty('relations');
+    const userModel = contract.models.User as { relations?: Record<string, unknown> };
+    expect(userModel.relations).toEqual({});
+    expect(typeof userModel.relations).toBe('object');
+    expect(Array.isArray(userModel.relations)).toBe(false);
   });
 
   it('normalizes all required fields in a complete contract', () => {
@@ -101,8 +103,10 @@ describe('contract builder normalization', () => {
     expect(contract.storage.tables.post.foreignKeys).toEqual([]);
 
     // Verify all models have normalized relations
-    expect(contract.models.User.relations).toEqual({});
-    expect(contract.models.Post.relations).toEqual({});
+    const userModel = contract.models.User as { relations?: Record<string, unknown> };
+    const postModel = contract.models.Post as { relations?: Record<string, unknown> };
+    expect(userModel.relations).toEqual({});
+    expect(postModel.relations).toEqual({});
 
     // Verify nullable is normalized
     expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
