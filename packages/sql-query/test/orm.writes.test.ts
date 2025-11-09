@@ -104,6 +104,34 @@ describe('orm writes', () => {
     }).toThrow('Field invalidField does not exist on model User');
   });
 
+  it('handles create() with null field in model fields', () => {
+    const contractWithNullField = {
+      ...contract,
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          fields: {
+            ...contract.models.User.fields,
+            nullField: null as unknown as { column?: string },
+          },
+        },
+      },
+    };
+    const contextWithNullField = createTestContext(contractWithNullField, adapter);
+    const oWithNullField = orm<Contract>({ context: contextWithNullField });
+    const builder = (oWithNullField as unknown as { user: () => unknown }).user();
+
+    // Should not throw - should skip null field
+    expect(() => {
+      (builder as { create: (data: Record<string, unknown>) => unknown }).create({
+        id: 1,
+        email: 'test@example.com',
+        nullField: 'value',
+      });
+    }).not.toThrow();
+  });
+
   it('updates rows with update()', () => {
     const builder = (o as unknown as { user: () => unknown }).user();
     const plan = (
@@ -164,6 +192,45 @@ describe('orm writes', () => {
         { invalidField: 'value' },
       );
     }).toThrow('Field invalidField does not exist on model User');
+  });
+
+  it('handles update() with null field in model fields', () => {
+    const contractWithNullField = {
+      ...contract,
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          fields: {
+            ...contract.models.User.fields,
+            nullField: null as unknown as { column?: string },
+          },
+        },
+      },
+    };
+    const contextWithNullField = createTestContext(contractWithNullField, adapter);
+    const oWithNullField = orm<Contract>({ context: contextWithNullField });
+    const builder = (oWithNullField as unknown as { user: () => unknown }).user();
+
+    // Should not throw - should skip null field (Object.hasOwn check will skip it)
+    expect(() => {
+      (
+        builder as {
+          update: (
+            where: (model: unknown) => unknown,
+            data: Record<string, unknown>,
+            options?: { params?: Record<string, unknown> },
+          ) => unknown;
+        }
+      ).update(
+        (u) => {
+          const model = u as { id: { eq: (p: unknown) => unknown } };
+          return model.id.eq(param('userId'));
+        },
+        { email: 'updated@example.com' },
+        { params: { userId: 1 } },
+      );
+    }).not.toThrow();
   });
 
   it('deletes rows with delete()', () => {

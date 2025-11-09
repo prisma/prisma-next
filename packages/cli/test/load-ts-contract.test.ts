@@ -1,6 +1,6 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -41,6 +41,22 @@ describe('loadContractFromTs', () => {
     );
   });
 
+  it('rejects module with other exports but no contract', async () => {
+    const contractPath = join(fixturesDir, 'other-exports.ts');
+
+    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+      'Contract file must export a contract',
+    );
+  });
+
+  it('rejects empty module with no exports', async () => {
+    const contractPath = join(fixturesDir, 'empty-module.ts');
+
+    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+      'Contract file must export a contract',
+    );
+  });
+
   it('rejects non-object contract export', async () => {
     const contractPath = join(fixturesDir, 'function-export.ts');
 
@@ -61,5 +77,51 @@ describe('loadContractFromTs', () => {
     const invalidPath = join(fixturesDir, 'nonexistent-file.ts');
 
     await expect(loadContractFromTs(invalidPath)).rejects.toThrow();
+  });
+
+  it('rejects functions in contract export', async () => {
+    const contractPath = join(fixturesDir, 'function-in-object.ts');
+
+    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+      'Contract export contains function',
+    );
+  });
+
+  it('rejects circular references in contract', async () => {
+    const contractPath = join(fixturesDir, 'json-serialize-error.ts');
+
+    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+      'Contract export contains circular references',
+    );
+  });
+
+  it('uses custom allowlist when provided', async () => {
+    const contractPath = join(fixturesDir, 'custom-allowlist.ts');
+
+    const contract = await loadContractFromTs(contractPath, {
+      allowlist: ['@custom/package/*', '@prisma-next/*'],
+    });
+
+    expect(contract).toBeDefined();
+  });
+
+  it('rejects imports not in custom allowlist', async () => {
+    const contractPath = join(fixturesDir, 'disallowed-import.ts');
+
+    await expect(
+      loadContractFromTs(contractPath, {
+        allowlist: ['@other/package/*'],
+      }),
+    ).rejects.toThrow('Disallowed imports detected');
+  });
+
+  it('handles allowlist pattern matching exact prefix', async () => {
+    const contractPath = join(fixturesDir, 'exact-prefix-import.ts');
+
+    const contract = await loadContractFromTs(contractPath, {
+      allowlist: ['@prisma-next/*'],
+    });
+
+    expect(contract).toBeDefined();
   });
 });

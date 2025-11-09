@@ -217,6 +217,25 @@ describe('orm base builder', () => {
     }).not.toThrow();
   });
 
+  it('throws error when model is not found in mappings', () => {
+    const contractWithMissingModel = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        modelToTable: {
+          ...contract.mappings.modelToTable,
+          User: undefined,
+        },
+      },
+    };
+    const contextWithMissingModel = createTestContext(contractWithMissingModel, adapter);
+    const o = orm<Contract>({ context: contextWithMissingModel });
+
+    expect(() => {
+      (o as unknown as { user: () => unknown }).user();
+    }).toThrow('Model User not found in mappings');
+  });
+
   it('throws error when table is not found in schema', () => {
     const contractWithMissingTable = {
       ...contract,
@@ -230,17 +249,9 @@ describe('orm base builder', () => {
     };
     const contextWithMissingTable = createTestContext(contractWithMissingTable, adapter);
     const o = orm<Contract>({ context: contextWithMissingTable });
-    const builder = (o as unknown as { user: () => unknown }).user();
 
     expect(() => {
-      (
-        builder as {
-          where: (fn: (m: unknown) => unknown) => unknown;
-        }
-      ).where((m: unknown) => {
-        const model = m as { id: { eq: (p: unknown) => unknown } };
-        return model.id.eq(param('userId'));
-      });
+      (o as unknown as { user: () => unknown }).user();
     }).toThrow('Table nonexistent not found in schema');
   });
 
@@ -270,5 +281,110 @@ describe('orm base builder', () => {
         return model.id.eq(param('userId'));
       });
     }).toThrow('Model User does not have fields');
+  });
+
+  it('handles field mapping to non-existent column', () => {
+    const contractWithNonExistentColumn = {
+      ...contract,
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          fields: {
+            ...contract.models.User.fields,
+            nonExistentField: {
+              column: 'nonExistentColumn',
+            } as { column?: string },
+          },
+        },
+      },
+    };
+    const contextWithNonExistentColumn = createTestContext(contractWithNonExistentColumn, adapter);
+    const o = orm<Contract>({ context: contextWithNonExistentColumn });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Should not throw - field should not be in accessor if column doesn't exist
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { id: { eq: (p: unknown) => unknown } };
+        return model.id.eq(param('userId'));
+      });
+    }).not.toThrow();
+  });
+
+  it('handles field mapping with fieldToColumn taking precedence over field.column', () => {
+    const contractWithBothMappings = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        fieldToColumn: {
+          ...contract.mappings.fieldToColumn,
+          User: {
+            ...contract.mappings.fieldToColumn?.User,
+            email: 'email',
+          },
+        },
+      },
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          fields: {
+            ...contract.models.User.fields,
+            email: {
+              column: 'email_address',
+            } as { column?: string },
+          },
+        },
+      },
+    };
+    const contextWithBothMappings = createTestContext(contractWithBothMappings, adapter);
+    const o = orm<Contract>({ context: contextWithBothMappings });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Should not throw - fieldToColumn should take precedence
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { email: { eq: (p: unknown) => unknown } };
+        return model.email.eq(param('email'));
+      });
+    }).not.toThrow();
+  });
+
+  it('returns empty include accessor when relations are missing', () => {
+    const contractWithNoRelations = {
+      ...contract,
+      relations: {},
+    };
+    const contextWithNoRelations = createTestContext(contractWithNoRelations, adapter);
+    const o = orm<Contract>({ context: contextWithNoRelations });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Include should be empty object when relations are missing
+    const include = (builder as { include: unknown }).include;
+    expect(include).toEqual({});
+  });
+
+  it('returns empty related accessor when relations are missing', () => {
+    const contractWithNoRelations = {
+      ...contract,
+      relations: {},
+    };
+    const contextWithNoRelations = createTestContext(contractWithNoRelations, adapter);
+    const o = orm<Contract>({ context: contextWithNoRelations });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Related should be empty object when relations are missing
+    const where = (builder as { where: unknown }).where;
+    const related = (where as { related: unknown }).related;
+    expect(related).toEqual({});
   });
 });

@@ -6,6 +6,7 @@ import type { SelectAst as SelectAstType } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
+import { orm } from '../src/orm';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
@@ -364,5 +365,126 @@ describe('sql DSL builder', () => {
         post_title: 'pg/int4@1',
       });
     });
+  });
+
+  it('schema table proxy allows direct column access', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const schemaHandle = schema(context);
+    const userTable = schemaHandle.tables.user;
+
+    // Access column directly on table (via proxy)
+    const idColumn = (userTable as unknown as { id: unknown }).id;
+    expect(idColumn).toBeDefined();
+    expect((idColumn as { kind: string }).kind).toBe('column');
+
+    // Access non-existent property returns undefined
+    const invalidColumn = (userTable as unknown as { invalidColumn: unknown }).invalidColumn;
+    expect(invalidColumn).toBeUndefined();
+
+    // Access table properties (name, kind, columns) works
+    expect(userTable.name).toBe('user');
+    expect(userTable.kind).toBe('table');
+    expect(userTable.columns).toBeDefined();
+  });
+
+  it('throws error when column.eq() is called with invalid value', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const idColumn = tables.user.columns.id;
+
+    expect(() => {
+      (idColumn as { eq: (value: unknown) => unknown }).eq({ kind: 'invalid' } as unknown);
+    }).toThrow('Parameter placeholder required for column comparison');
+  });
+
+  it('handles column builder __jsType getter', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const idColumn = tables.user.columns.id;
+
+    // Access __jsType getter (type-level helper, returns undefined at runtime)
+    const jsType = (idColumn as { __jsType: unknown }).__jsType;
+    expect(jsType).toBeUndefined();
+  });
+
+  it('uses fieldToColumn mapping when available', () => {
+    const contract = loadContract('contract');
+    const contractWithMapping = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        fieldToColumn: {
+          ...contract.mappings.fieldToColumn,
+          User: {
+            ...contract.mappings.fieldToColumn?.User,
+            email: 'email',
+          },
+        },
+      },
+    };
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithMapping, adapter);
+    const o = orm<Contract>({ context });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Should not throw - should use fieldToColumn mapping
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { email: { eq: (p: unknown) => unknown } };
+        return model.email.eq(param('email'));
+      });
+    }).not.toThrow();
+  });
+
+  it('uses field.column when fieldToColumn mapping is missing', () => {
+    const contract = loadContract('contract');
+    const contractWithFieldColumn = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        fieldToColumn: {
+          ...contract.mappings.fieldToColumn,
+          User: {},
+        },
+      },
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          fields: {
+            ...contract.models.User.fields,
+            email: {
+              column: 'email',
+            } as { column?: string },
+          },
+        },
+      },
+    };
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithFieldColumn, adapter);
+    const o = orm<Contract>({ context });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Should not throw - should use field.column
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { email: { eq: (p: unknown) => unknown } };
+        return model.email.eq(param('email'));
+      });
+    }).not.toThrow();
   });
 });

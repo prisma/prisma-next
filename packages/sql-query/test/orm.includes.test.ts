@@ -265,4 +265,94 @@ describe('orm includes', () => {
       (builderWithInclude as { findMany: () => unknown }).findMany();
     }).toThrow('Child projection must be specified');
   });
+
+  it('throws error when capabilities are missing for target', () => {
+    const contractWithoutTargetCaps = {
+      ...contract,
+      capabilities: {
+        postgres: {},
+      },
+    } as RelationsContract;
+    const adapterWithoutCaps = createStubAdapter();
+    const contextWithoutCaps = createTestContext(contractWithoutTargetCaps, adapterWithoutCaps);
+    const oWithoutCaps = orm<RelationsContract>({ context: contextWithoutCaps });
+    const builder = (oWithoutCaps as unknown as { user: () => unknown }).user();
+    const builderWithInclude = (
+      builder as {
+        include: {
+          posts: (child: unknown) => unknown;
+        };
+      }
+    ).include.posts((child: unknown) => {
+      const childBuilder = child as {
+        select: (fn: (model: unknown) => unknown) => unknown;
+      };
+      return childBuilder.select((p: unknown) => {
+        const model = p as { id: unknown };
+        return { id: model.id };
+      });
+    });
+
+    expect(() => {
+      (builderWithInclude as { findMany: () => unknown }).findMany();
+    }).toThrow('includeMany requires lateral and jsonAgg capabilities');
+  });
+
+  it('throws error when capabilities are false instead of true', () => {
+    const contractWithFalseCaps = {
+      ...contract,
+      capabilities: {
+        postgres: {
+          lateral: false,
+          jsonAgg: false,
+        },
+      },
+    } as RelationsContract;
+    const adapterWithFalseCaps = createStubAdapter();
+    const contextWithFalseCaps = createTestContext(contractWithFalseCaps, adapterWithFalseCaps);
+    const oWithFalseCaps = orm<RelationsContract>({ context: contextWithFalseCaps });
+    const builder = (oWithFalseCaps as unknown as { user: () => unknown }).user();
+    const builderWithInclude = (
+      builder as {
+        include: {
+          posts: (child: unknown) => unknown;
+        };
+      }
+    ).include.posts((child: unknown) => {
+      const childBuilder = child as {
+        select: (fn: (model: unknown) => unknown) => unknown;
+      };
+      return childBuilder.select((p: unknown) => {
+        const model = p as { id: unknown };
+        return { id: model.id };
+      });
+    });
+
+    expect(() => {
+      (builderWithInclude as { findMany: () => unknown }).findMany();
+    }).toThrow('includeMany requires lateral and jsonAgg capabilities to be true');
+  });
+
+  it('throws error when child projection has only boolean values', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const builderWithInclude = (
+      builder as {
+        include: {
+          posts: (child: unknown) => unknown;
+        };
+      }
+    ).include.posts((child: unknown) => {
+      const childBuilder = child as {
+        select: (fn: (model: unknown) => unknown) => unknown;
+      };
+      // Return projection with only boolean values (should be filtered out)
+      return childBuilder.select(() => {
+        return { id: true, title: false };
+      });
+    });
+
+    expect(() => {
+      (builderWithInclude as { findMany: () => unknown }).findMany();
+    }).toThrow('Child projection must not be empty after filtering boolean values');
+  });
 });

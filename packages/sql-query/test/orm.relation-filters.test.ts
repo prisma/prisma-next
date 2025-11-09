@@ -138,6 +138,58 @@ describe('orm relation filters', () => {
     expect(builderWithFilter).toBeDefined();
   });
 
+  it('chains where.related.<relation>.none() with where() on child', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const builderWithFilter = (
+      builder as {
+        where: {
+          related: {
+            posts: {
+              none: (fn: (child: unknown) => unknown) => unknown;
+            };
+          };
+        };
+      }
+    ).where.related.posts.none((child: unknown) => {
+      const filterBuilder = child as {
+        where: (fn: (model: unknown) => unknown) => unknown;
+      };
+      return filterBuilder.where((model: unknown) => {
+        const m = model as { id: { eq: (p: unknown) => unknown } };
+        return m.id.eq(param('postId'));
+      });
+    });
+
+    expect(builderWithFilter).toBeDefined();
+    expect(typeof (builderWithFilter as { findMany: () => unknown }).findMany).toBe('function');
+  });
+
+  it('chains where.related.<relation>.every() with where() on child', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const builderWithFilter = (
+      builder as {
+        where: {
+          related: {
+            posts: {
+              every: (fn: (child: unknown) => unknown) => unknown;
+            };
+          };
+        };
+      }
+    ).where.related.posts.every((child: unknown) => {
+      const filterBuilder = child as {
+        where: (fn: (model: unknown) => unknown) => unknown;
+      };
+      return filterBuilder.where((model: unknown) => {
+        const m = model as { id: { eq: (p: unknown) => unknown } };
+        return m.id.eq(param('postId'));
+      });
+    });
+
+    expect(builderWithFilter).toBeDefined();
+    expect(typeof (builderWithFilter as { findMany: () => unknown }).findMany).toBe('function');
+  });
+
   it('builds plan with where.related.some() filter', () => {
     const builder = (o as unknown as { post: () => unknown }).post();
     const builderWithFilter = (
@@ -272,6 +324,17 @@ describe('orm relation filters', () => {
         throw new Error('Should not be called');
       });
     }).toThrow();
+  });
+
+  it('returns undefined for non-string property access in related proxy', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const where = (builder as { where: unknown }).where;
+    const related = (where as { related: unknown }).related;
+
+    // Access with symbol should return undefined
+    const symbolProp = Symbol('test');
+    const result = (related as Record<symbol, unknown>)[symbolProp];
+    expect(result).toBeUndefined();
   });
 
   it('throws error when model not found in mappings', () => {
@@ -501,7 +564,7 @@ describe('orm relation filters', () => {
 
   it('combines multiple relation filters', () => {
     const builder = (o as unknown as { user: () => unknown }).user();
-    const builderWithFirstFilter = (
+    const builderWithFilter1 = (
       builder as {
         where: {
           related: {
@@ -513,10 +576,10 @@ describe('orm relation filters', () => {
       }
     ).where.related.posts.some((child: unknown) => {
       const model = child as { id: { eq: (p: unknown) => unknown } };
-      return model.id.eq(param('postId'));
+      return model.id.eq(param('postId1'));
     });
-    const builderWithSecondFilter = (
-      builderWithFirstFilter as {
+    const builderWithFilter2 = (
+      builderWithFilter1 as {
         where: {
           related: {
             posts: {
@@ -526,16 +589,74 @@ describe('orm relation filters', () => {
         };
       }
     ).where.related.posts.some((child: unknown) => {
-      const model = child as { title: { eq: (p: unknown) => unknown } };
-      return model.title.eq(param('title'));
+      const model = child as { id: { eq: (p: unknown) => unknown } };
+      return model.id.eq(param('postId2'));
     });
     const plan = (
-      builderWithSecondFilter as {
+      builderWithFilter2 as {
         findMany: (options?: { params?: Record<string, unknown> }) => unknown;
       }
-    ).findMany({ params: { postId: 1, title: 'test' } });
+    ).findMany({ params: { postId1: 1, postId2: 2 } });
 
     expect(plan).toBeDefined();
     expect((plan as { meta: { lane: string } }).meta.lane).toBe('orm');
+    expect((plan as { ast: { kind: string } }).ast?.kind).toBe('select');
+  });
+
+  it('combines main where clause with multiple relation filters', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const builderWithWhere = (
+      builder as {
+        where: (fn: (model: unknown) => unknown) => {
+          where: {
+            related: {
+              posts: {
+                some: (fn: (child: unknown) => unknown) => unknown;
+              };
+            };
+          };
+        };
+      }
+    ).where((model: unknown) => {
+      const m = model as { id: { eq: (p: unknown) => unknown } };
+      return m.id.eq(param('userId'));
+    });
+    const builderWithFilter1 = (
+      builderWithWhere as {
+        where: {
+          related: {
+            posts: {
+              some: (fn: (child: unknown) => unknown) => unknown;
+            };
+          };
+        };
+      }
+    ).where.related.posts.some((child: unknown) => {
+      const model = child as { id: { eq: (p: unknown) => unknown } };
+      return model.id.eq(param('postId1'));
+    });
+    const builderWithFilter2 = (
+      builderWithFilter1 as {
+        where: {
+          related: {
+            posts: {
+              some: (fn: (child: unknown) => unknown) => unknown;
+            };
+          };
+        };
+      }
+    ).where.related.posts.some((child: unknown) => {
+      const model = child as { id: { eq: (p: unknown) => unknown } };
+      return model.id.eq(param('postId2'));
+    });
+    const plan = (
+      builderWithFilter2 as {
+        findMany: (options?: { params?: Record<string, unknown> }) => unknown;
+      }
+    ).findMany({ params: { userId: 1, postId1: 1, postId2: 2 } });
+
+    expect(plan).toBeDefined();
+    expect((plan as { meta: { lane: string } }).meta.lane).toBe('orm');
+    expect((plan as { ast: { kind: string } }).ast?.kind).toBe('select');
   });
 });
