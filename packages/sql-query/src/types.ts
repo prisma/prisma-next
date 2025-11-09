@@ -256,10 +256,16 @@ export type ComputeColumnJsType<
  * Extracts the pre-computed JsType from each ColumnBuilder in the projection.
  */
 /**
- * Extracts JsType from a ColumnBuilder.
- * Directly accesses the __jsType property.
+ * Extracts the inferred JsType carried by a ColumnBuilder.
  */
-type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB['__jsType'];
+type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends ColumnBuilder<
+  string,
+  StorageColumn,
+  infer JsType,
+  infer _Ops extends OperationTypes
+>
+  ? JsType
+  : never;
 
 export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
   [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;

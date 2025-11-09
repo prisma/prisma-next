@@ -123,7 +123,7 @@ class TableBuilderImpl<
 
 function buildColumns<
   Contract extends SqlContract<SqlStorage>,
-  TableName extends string,
+  TableName extends keyof Contract['storage']['tables'] & string,
   CodecTypes extends CodecTypesType,
   Operations extends OperationTypes,
 >(
@@ -293,7 +293,9 @@ export function schema<Contract extends SqlContract<SqlStorage>>(
 
   const operationRegistry = context.operations;
 
-  for (const tableName in storage.tables) {
+  for (const tableName of Object.keys(storage.tables) as Array<
+    keyof Contract['storage']['tables'] & string
+  >) {
     const columns = buildColumns<Contract, typeof tableName, CodecTypes, Operations>(
       tableName,
       storage,

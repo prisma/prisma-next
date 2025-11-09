@@ -8,7 +8,10 @@ import type {
 } from './fixtures/contract-with-relations.d';
 
 // Helper type to get OrmRegistry type for a contract
-type OrmRegistryFor<TContract extends SqlContract<SqlStorage>> = OrmRegistry<TContract, ExtractCodecTypes<TContract>>;
+type OrmRegistryFor<TContract extends SqlContract<SqlStorage>> = OrmRegistry<
+  TContract,
+  ExtractCodecTypes<TContract>
+>;
 
 // Test with contract without relations
 test('OrmRegistry exposes model names', () => {

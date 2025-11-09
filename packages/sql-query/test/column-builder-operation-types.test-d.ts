@@ -49,8 +49,8 @@ test('ColumnBuilder does not include operations for different typeId', () => {
     TestOperations
   >;
 
-  // Type check: cosineDistance should not be in the keys for a different typeId
-  expectTypeOf<TestColumnBuilder['cosineDistance']>().toEqualTypeOf<never>();
+  type CosineDistanceMethod = TestColumnBuilder extends { cosineDistance: infer M } ? M : never;
+  expectTypeOf<CosineDistanceMethod>().toEqualTypeOf<never>();
 });
 
 test('ColumnBuilder handles empty operations', () => {
@@ -63,6 +63,6 @@ test('ColumnBuilder handles empty operations', () => {
     EmptyOperations
   >;
 
-  // Type check: cosineDistance should not be in the keys for a different typeId
-  expectTypeOf<TestColumnBuilder['cosineDistance']>().toEqualTypeOf<never>();
+  type CosineDistanceMethod = TestColumnBuilder extends { cosineDistance: infer M } ? M : never;
+  expectTypeOf<CosineDistanceMethod>().toEqualTypeOf<never>();
 });

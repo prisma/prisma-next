@@ -43,12 +43,7 @@ export function createEmitCommand(): Command {
           // This ensures consistency between CLI emit and programmatic emit
           const contract = validateContract<SqlContract<SqlStorage>>(contractRaw);
 
-          let targetFamily: typeof sqlTargetFamilyHook | undefined;
-          if (contract.targetFamily === 'sql') {
-            targetFamily = sqlTargetFamilyHook;
-          } else {
-            throw new Error(`Unsupported target family: ${contract.targetFamily}`);
-          }
+          const targetFamily = sqlTargetFamilyHook;
 
           // Strip mappings before emitting - mappings are not part of ContractIR
           // They are computed at runtime and should not be persisted to contract.json

@@ -7,6 +7,7 @@ import { validateContract } from '../src/contract';
 import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
+import type { ComputeColumnJsType } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -27,6 +28,8 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
+
     // Runtime checks
     expect(contract.schemaVersion).toBe('1');
     expect(contract.target).toBe('postgres');
@@ -38,6 +41,19 @@ describe('builder integration', () => {
     expect(userTable?.columns).toHaveProperty('id');
     expect(userTable?.columns).toHaveProperty('email');
     expect(userTable?.columns).toHaveProperty('createdAt');
+    expectTypeOf<keyof typeof contract.storage.tables>().toEqualTypeOf<'user'>();
+    type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
+    type IntCodecOutput = ContractCodecTypes['pg/int4@1']['output'];
+    expectTypeOf<IntCodecOutput>().toEqualTypeOf<number>();
+    type ColumnMeta = (typeof contract)['storage']['tables']['user']['columns']['id'];
+    type JsType = ComputeColumnJsType<
+      typeof contract,
+      'user',
+      'id',
+      ColumnMeta,
+      ContractCodecTypes
+    >;
+    expectTypeOf<JsType>().toEqualTypeOf<number>();
 
     expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
@@ -77,6 +93,8 @@ describe('builder integration', () => {
 
     // Verify model storage table is literal 'user'
     expectTypeOf(contract.models.User.storage.table).toEqualTypeOf<'user'>();
+
+    expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
 
     // Verify model field names are literal types
     expectTypeOf(contract.models.User.fields).toHaveProperty('id');
@@ -128,6 +146,9 @@ describe('builder integration', () => {
     expect(userTable?.columns).toHaveProperty('id');
     expect(userTable?.columns).toHaveProperty('email');
     expect(userTable?.columns).toHaveProperty('createdAt');
+    type IdColumn = NonNullable<typeof userTable>['columns']['id'];
+    type IdJsType = IdColumn extends { __jsType: infer Js } ? Js : never;
+    expectTypeOf<IdJsType>().toEqualTypeOf<number>();
   });
 
   it('contract works with sql() function', () => {
@@ -145,6 +166,8 @@ describe('builder integration', () => {
       )
       .coreHash('sha256:test-core')
       .build();
+
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
