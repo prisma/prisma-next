@@ -54,7 +54,11 @@ test('ResultType inference works identically to fixture contract', () => {
 
   const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
   const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({ contract: validatedBuilderContract, adapter, extensions: [] });
+  const context = createRuntimeContext({
+    contract: validatedBuilderContract,
+    adapter,
+    extensions: [],
+  });
   const tables = schema(context).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
@@ -71,7 +75,11 @@ test('ResultType inference works identically to fixture contract', () => {
   type BuilderRow = ResultType<typeof _plan>;
 
   const _fixtureContract = validateContract<Contract>(contractJson);
-  const fixtureContext = createRuntimeContext({ contract: _fixtureContract, adapter, extensions: [] });
+  const fixtureContext = createRuntimeContext({
+    contract: _fixtureContract,
+    adapter,
+    extensions: [],
+  });
   const fixtureTables = schema(fixtureContext).tables;
   const fixtureUserTable = fixtureTables.user;
   if (!fixtureUserTable) throw new Error('fixture user table not found');

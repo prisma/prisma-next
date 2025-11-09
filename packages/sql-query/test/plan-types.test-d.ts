@@ -7,7 +7,7 @@ import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { TableKey, TablesOf } from '../src/types';
-import type { Contract, CodecTypes } from './fixtures/contract.d';
+import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 // Helper to simulate execute signature

@@ -239,14 +239,7 @@ class TableBuilder<
   ): TableBuilder<
     Name,
     Columns &
-      Record<
-        ColName,
-        ColumnBuilderState<
-          ColName,
-          Nullable extends true ? true : false,
-          TypeId
-        >
-      >,
+      Record<ColName, ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>>,
     PrimaryKey
   > {
     if (!options.type || typeof options.type !== 'string' || !options.type.includes('@')) {
@@ -262,10 +255,7 @@ class TableBuilder<
     return new TableBuilder(
       this._name,
       { ...this._columns, [name]: columnState } as Columns &
-        Record<
-          ColName,
-          ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>
-        >,
+        Record<ColName, ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>>,
       this._primaryKey,
     );
   }

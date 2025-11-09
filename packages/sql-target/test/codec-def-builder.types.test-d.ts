@@ -42,7 +42,6 @@ test('CodecTypes structure matches expected types with correct literal IDs', () 
   expectTypeOf<(typeof _codecs.CodecTypes)['pg/bool@1']['output']>().toEqualTypeOf<boolean>();
 });
 
-
 test('literal types are preserved (not widened to string)', () => {
   const textCodec = codec<'pg/text@1', string, string>({
     typeId: 'pg/text@1',
@@ -122,7 +121,6 @@ test('builder chain preserves literal types and aggregates correctly', () => {
   expectTypeOf<Builder2TextOutput>().toExtend<string>();
   expectTypeOf<Builder2IntInput>().toExtend<number>();
   expectTypeOf<Builder2IntOutput>().toExtend<number>();
-
 });
 
 test('dataTypes preserves literal type IDs', () => {

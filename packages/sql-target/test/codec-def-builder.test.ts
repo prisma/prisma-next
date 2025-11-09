@@ -55,7 +55,6 @@ describe('CodecDefBuilder interface', () => {
       expect(builder.CodecTypes['test/codectypes@1']).toHaveProperty('input');
       expect(builder.CodecTypes['test/codectypes@1']).toHaveProperty('output');
     });
-
   });
 
   describe('add() method', () => {

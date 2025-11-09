@@ -1975,13 +1975,13 @@ class DeleteBuilderImpl<
 
 export function sql<
   TContract extends SqlContract<SqlStorage>,
-  CodecTypesOverride extends Record<string, { readonly output: unknown }> = ExtractCodecTypes<TContract>,
->(options: SqlBuilderOptions<TContract>): SelectBuilder<
-  TContract,
-  unknown,
-  CodecTypesOverride,
-  ExtractOperationTypes<TContract>
-> {
+  CodecTypesOverride extends Record<
+    string,
+    { readonly output: unknown }
+  > = ExtractCodecTypes<TContract>,
+>(
+  options: SqlBuilderOptions<TContract>,
+): SelectBuilder<TContract, unknown, CodecTypesOverride, ExtractOperationTypes<TContract>> {
   type CodecTypes = CodecTypesOverride;
   type Operations = ExtractOperationTypes<TContract>;
   const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(

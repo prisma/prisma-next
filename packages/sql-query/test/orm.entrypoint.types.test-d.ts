@@ -1,10 +1,13 @@
-import { expectTypeOf, test } from 'vitest';
 import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { expectTypeOf, test } from 'vitest';
 import type { OrmRegistry } from '../src/orm-types';
 import type { Contract } from './fixtures/contract.d';
 
 // Helper type to get OrmRegistry type for a contract
-type OrmRegistryFor<TContract extends SqlContract<SqlStorage>> = OrmRegistry<TContract, ExtractCodecTypes<TContract>>;
+type OrmRegistryFor<TContract extends SqlContract<SqlStorage>> = OrmRegistry<
+  TContract,
+  ExtractCodecTypes<TContract>
+>;
 
 test('orm exposes only valid model names', () => {
   type OrmRegistry = OrmRegistryFor<Contract>;

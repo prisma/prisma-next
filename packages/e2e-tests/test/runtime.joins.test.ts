@@ -1,6 +1,5 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SelectAst } from '@prisma-next/sql-target';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import {
@@ -10,6 +9,7 @@ import {
 } from '@prisma-next/runtime/test/utils';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
+import type { SelectAst } from '@prisma-next/sql-target';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';

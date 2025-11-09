@@ -455,7 +455,10 @@ export type Relations = Contract['relations'];
         const { to, cardinality, on, through } = relValue as {
           readonly to?: string;
           readonly cardinality?: string;
-          readonly on?: { readonly parentCols?: readonly string[]; readonly childCols?: readonly string[] };
+          readonly on?: {
+            readonly parentCols?: readonly string[];
+            readonly childCols?: readonly string[];
+          };
           readonly through?: {
             readonly table: string;
             readonly parentCols: readonly string[];
@@ -470,7 +473,7 @@ export type Relations = Contract['relations'];
         if (cardinality) {
           parts.push(`readonly cardinality: '${cardinality}'`);
         }
-        if (on && on.parentCols && on.childCols) {
+        if (on?.parentCols && on.childCols) {
           const parentCols = on.parentCols.map((c) => `'${c}'`).join(', ');
           const childCols = on.childCols.map((c) => `'${c}'`).join(', ');
           parts.push(
