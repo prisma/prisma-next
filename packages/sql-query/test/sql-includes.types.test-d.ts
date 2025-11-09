@@ -410,6 +410,9 @@ test('includeMany with multiple includes preserves all types', () => {
             readonly id: { readonly type: 'pg/int4@1'; nullable: false };
             readonly email: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
         readonly post: {
           readonly columns: {
@@ -417,6 +420,9 @@ test('includeMany with multiple includes preserves all types', () => {
             readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
             readonly title: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
         readonly comment: {
           readonly columns: {
@@ -424,12 +430,18 @@ test('includeMany with multiple includes preserves all types', () => {
             readonly postId: { readonly type: 'pg/int4@1'; nullable: false };
             readonly content: { readonly type: 'pg/text@1'; nullable: false };
           };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
       };
     },
     Record<string, never>,
     Record<string, never>,
-    Record<string, never>
+    {
+      readonly codecTypes: CodecTypes;
+      readonly operationTypes: Record<string, Record<string, unknown>>;
+    }
   > & {
     readonly capabilities: {
       readonly postgres: {
@@ -451,6 +463,9 @@ test('includeMany with multiple includes preserves all types', () => {
             id: { type: 'pg/int4@1', nullable: false },
             email: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
         post: {
           columns: {
@@ -458,6 +473,9 @@ test('includeMany with multiple includes preserves all types', () => {
             userId: { type: 'pg/int4@1', nullable: false },
             title: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
         comment: {
           columns: {
@@ -465,12 +483,18 @@ test('includeMany with multiple includes preserves all types', () => {
             postId: { type: 'pg/int4@1', nullable: false },
             content: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },
     models: {},
     relations: {},
-    mappings: {},
+    mappings: {
+      codecTypes: {} as CodecTypes,
+      operationTypes: {},
+    },
     capabilities: {
       postgres: {
         lateral: true,
@@ -479,15 +503,13 @@ test('includeMany with multiple includes preserves all types', () => {
     },
   });
 
-  const tablesWithComments = schema<ContractWithComments>(contractWithComments).tables;
+  const contextWithComments = createTestContext(contractWithComments, adapter);
+  const tablesWithComments = schema<ContractWithComments>(contextWithComments).tables;
   const userTable = tablesWithComments['user']!;
   const postTable = tablesWithComments['post']!;
   const commentTable = tablesWithComments['comment']!;
 
-  const _plan = sql<ContractWithComments, CodecTypes>({
-    contract: contractWithComments,
-    adapter,
-  })
+  const _plan = sql<ContractWithComments, CodecTypes>({ context: contextWithComments })
     .from(userTable)
     .includeMany(
       postTable,
