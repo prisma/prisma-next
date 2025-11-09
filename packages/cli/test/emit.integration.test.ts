@@ -60,100 +60,112 @@ describe('emit integration', () => {
     }
   });
 
-  it('loads TS contract, emits artifacts, and uses them with lanes', async () => {
-    const contractPath = join(fixturesDir, 'valid-contract.ts');
-    const adapterPath = resolve(__dirname, '../../adapter-postgres');
+  it(
+    'loads TS contract, emits artifacts, and uses them with lanes',
+    async () => {
+      const contractPath = join(fixturesDir, 'valid-contract.ts');
+      const adapterPath = resolve(__dirname, '../../adapter-postgres');
 
-    const contract = await loadContractFromTs(contractPath);
-    const packs = loadExtensionPacks(adapterPath, []);
+      const contract = await loadContractFromTs(contractPath);
+      const packs = loadExtensionPacks(adapterPath, []);
 
-    const result = await emit(
-      contract,
-      {
-        outputDir,
-        packs,
-      },
-      sqlTargetFamilyHook,
-    );
+      const result = await emit(
+        contract,
+        {
+          outputDir,
+          packs,
+        },
+        sqlTargetFamilyHook,
+      );
 
-    const contractJsonPath = join(outputDir, 'contract.json');
-    const contractDtsPath = join(outputDir, 'contract.d.ts');
+      const contractJsonPath = join(outputDir, 'contract.json');
+      const contractDtsPath = join(outputDir, 'contract.d.ts');
 
-    writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
-    writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
+      writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
+      writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
 
-    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
-    const validatedContract = validateContract(contractJson);
+      const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+      const validatedContract = validateContract(contractJson);
 
-    const adapter = createStubAdapter();
+      const adapter = createStubAdapter();
 
-    const context = createRuntimeContext({ contract: validatedContract, adapter, extensions: [] });
-    const tables = schema(context).tables;
-    const userTable = tables['user'];
-    if (!userTable) {
-      throw new Error('User table not found');
-    }
-    const idColumn = userTable.columns['id'];
-    const emailColumn = userTable.columns['email'];
-    if (!idColumn || !emailColumn) {
-      throw new Error('Columns not found');
-    }
-    const plan = sql({ context })
-      .from(userTable)
-      .select({ id: idColumn, email: emailColumn })
-      .build();
+      const context = createRuntimeContext({
+        contract: validatedContract,
+        adapter,
+        extensions: [],
+      });
+      const tables = schema(context).tables;
+      const userTable = tables['user'];
+      if (!userTable) {
+        throw new Error('User table not found');
+      }
+      const idColumn = userTable.columns['id'];
+      const emailColumn = userTable.columns['email'];
+      if (!idColumn || !emailColumn) {
+        throw new Error('Columns not found');
+      }
+      const plan = sql({ context })
+        .from(userTable)
+        .select({ id: idColumn, email: emailColumn })
+        .build();
 
-    expect(plan).toMatchObject({
-      sql: expect.anything(),
-      params: expect.anything(),
-      meta: expect.objectContaining({
-        coreHash: result.coreHash,
-      }),
-    });
+      expect(plan).toMatchObject({
+        sql: expect.anything(),
+        params: expect.anything(),
+        meta: expect.objectContaining({
+          coreHash: result.coreHash,
+        }),
+      });
 
-    type UserRow = ResultType<typeof plan>;
-    expectTypeOf<UserRow>().toHaveProperty('id');
-    expectTypeOf<UserRow>().toHaveProperty('email');
-  }, timeouts.typeScriptCompilation);
+      type UserRow = ResultType<typeof plan>;
+      expectTypeOf<UserRow>().toHaveProperty('id');
+      expectTypeOf<UserRow>().toHaveProperty('email');
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)', async () => {
-    const contractPath = join(fixturesDir, 'valid-contract.ts');
-    const adapterPath = resolve(__dirname, '../../adapter-postgres');
+  it(
+    'round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)',
+    async () => {
+      const contractPath = join(fixturesDir, 'valid-contract.ts');
+      const adapterPath = resolve(__dirname, '../../adapter-postgres');
 
-    const contract1 = await loadContractFromTs(contractPath);
-    const packs = loadExtensionPacks(adapterPath, []);
+      const contract1 = await loadContractFromTs(contractPath);
+      const packs = loadExtensionPacks(adapterPath, []);
 
-    const result1 = await emit(
-      contract1,
-      {
-        outputDir,
-        packs,
-      },
-      sqlTargetFamilyHook,
-    );
+      const result1 = await emit(
+        contract1,
+        {
+          outputDir,
+          packs,
+        },
+        sqlTargetFamilyHook,
+      );
 
-    // Parse JSON and validate/normalize it (normal way to load contract JSON)
-    // This ensures all required fields are present (nullable, uniques, indexes, foreignKeys, etc.)
-    const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
-    const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson1);
+      // Parse JSON and validate/normalize it (normal way to load contract JSON)
+      // This ensures all required fields are present (nullable, uniques, indexes, foreignKeys, etc.)
+      const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
+      const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson1);
 
-    // SqlContract has all required ContractIR fields (validateContract normalizes them)
-    // The cast is needed because SqlContract has a 'mappings' field that ContractIR doesn't have
-    const contract2 = validatedContract as unknown as ContractIR;
+      // SqlContract has all required ContractIR fields (validateContract normalizes them)
+      // The cast is needed because SqlContract has a 'mappings' field that ContractIR doesn't have
+      const contract2 = validatedContract as unknown as ContractIR;
 
-    const result2 = await emit(
-      contract2,
-      {
-        outputDir,
-        packs,
-      },
-      sqlTargetFamilyHook,
-    );
+      const result2 = await emit(
+        contract2,
+        {
+          outputDir,
+          packs,
+        },
+        sqlTargetFamilyHook,
+      );
 
-    const json1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
-    const json2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
+      const json1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
+      const json2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
 
-    expect(JSON.stringify(json1, null, 2)).toBe(JSON.stringify(json2, null, 2));
-    expect(result1.coreHash).toBe(result2.coreHash);
-  }, timeouts.typeScriptCompilation);
+      expect(JSON.stringify(json1, null, 2)).toBe(JSON.stringify(json2, null, 2));
+      expect(result1.coreHash).toBe(result2.coreHash);
+    },
+    timeouts.typeScriptCompilation,
+  );
 });
