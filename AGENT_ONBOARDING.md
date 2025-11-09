@@ -61,9 +61,10 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 
 ### Package Organization Principles
 
-- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-target/src/contract-types.ts` (moved from `sql-query` to break circular dependency)
-- **SQL contract authoring** (`defineContract`, `validateContract`) lives in `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`)
 - **Core contract types** (`ContractBase`) live in `@prisma-next/contract`
+- **Target-agnostic contract authoring** (builder state types, builder classes, type helpers) lives in `@prisma-next/contract-authoring` in the authoring ring (`packages/authoring/contract-authoring`)
+- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-target/src/contract-types.ts` (moved from `sql-query` to break circular dependency)
+- **SQL contract authoring** (`defineContract`, `validateContract`) lives in `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`). It composes `@prisma-next/contract-authoring` with SQL-specific types.
 - **Emitter is hook-based**: Target family hooks (e.g., SQL) extend emission with family-specific validation and type generation
 - **Adapters are extension packs**: Adapters and extension packs use the same manifest structure and are treated identically
 - **Package layering**: Packages follow a ring-based architecture (core → authoring → targets → lanes → runtime) with unidirectional dependencies enforced by tooling
@@ -496,6 +497,7 @@ const deletePlan = o.user().delete(
 - **Prefer code over comments** - Code should express intent
 - **No backwards-compat exports** unless explicitly requested
 - **Test descriptions**: Omit "should" - `it("returns correct value")` not `it("should return correct value")`
+- **Test imports**: Tests within a package should import from source files (`../src/...`), not from package exports. Integration tests and fixtures should use package exports. See `.cursor/rules/test-import-patterns.mdc` for details.
 - **Node.js globals restriction**: `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`), `packages/node-utils/**/*.ts`, and `packages/cli/**/*.ts`. Other packages should not use these globals directly.
 - **Index signature property access**: When TypeScript requires it (e.g., `TS4111` error), use bracket notation: `contract['targetFamily']` instead of `contract.targetFamily`. This is required when accessing properties from index signatures.
 - **Unsafe assignments in tests**: When working with `JSON.parse()` results or dynamic imports in tests, prefer using `toMatchObject` for assertions instead of type casts. Only use type assertions when constructing typed objects from parsed JSON (e.g., `ContractIR` from `contractJson`). For assertions, use `expect(parsed).toMatchObject({ ... })` instead of `const json = JSON.parse(content) as Record<string, unknown>; expect(json['key']).toBe(...)`
@@ -1323,7 +1325,7 @@ pnpm coverage:packages
 7. **Emitter I/O Decoupling** - Emitter returns strings (`contractJson`, `contractDts`); caller handles all file I/O. Enables testing without file system dependencies and flexible build system integration.
 8. **SQL Contract Types Migration** - Moved SQL contract types (`SqlContract`, `SqlStorage`, etc.) from `sql-query` to `sql-target` to break circular dependency. All SQL-specific types now live in `sql-target`.
 9. **Package Rename** - Renamed `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose as query builder.
-10. **Contract Authoring Extraction (Phase 1)** - Moved SQL contract authoring code (`defineContract`, `validateContract`) from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`). This package is part of the package layering migration and will have its target-agnostic core extracted in Phase 2. Integration tests that depend on both `sql-contract-ts` and `sql-query` were moved to `@prisma-next/integration-tests` to avoid cyclic dependencies. `@prisma-next/sql-query` maintains backward compatibility through re-exports.
+10. **Contract Authoring Extraction (Phase 1 & 2)** - Moved SQL contract authoring code (`defineContract`, `validateContract`) from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`). Phase 2 extracted the target-agnostic contract authoring core to `@prisma-next/contract-authoring` in the authoring ring (`packages/authoring/contract-authoring`). `@prisma-next/sql-contract-ts` now composes `@prisma-next/contract-authoring` with SQL-specific types. Integration tests that depend on both `sql-contract-ts` and `sql-query` were moved to `@prisma-next/integration-tests` to avoid cyclic dependencies. `@prisma-next/sql-query` maintains backward compatibility through re-exports (will be removed in Slice 7). Duplicate implementation files were removed from `@prisma-next/sql-query` after migration.
 11. **Node Utils Package** - Created `@prisma-next/node-utils` package for file I/O utilities (`readJsonFile`, `readTextFile`). Extracted from emitter to keep I/O concerns separate.
 12. **Unified Type Identifiers** - All column types are fully qualified type IDs (`ns/name@version`). Canonicalization happens at authoring time.
 13. **Simplified Type Inference** - `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` using `CodecTypes[typeId].output`. No fallbacks or scalar mappings.

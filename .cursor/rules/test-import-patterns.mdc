@@ -1,0 +1,150 @@
+---
+description: Test import patterns and conventions
+alwaysApply: false
+---
+
+# Test Import Patterns
+
+## Core Principle
+
+**Tests should import from source files directly, not from package exports.**
+
+When writing tests within a package, import from the source files (`../src/...`) rather than from package exports (`@prisma-next/package-name/...`). This ensures tests run against the actual implementation code, not the built dist files.
+
+## Import Patterns
+
+### Within-Package Tests
+
+**✅ CORRECT: Import from source files**
+
+```typescript
+// packages/sql-query/test/contract.test.ts
+import { validateContract } from '../src/contract';
+import { defineContract } from '../src/exports/contract-builder';
+```
+
+**❌ WRONG: Import from package exports**
+
+```typescript
+// packages/sql-query/test/contract.test.ts
+import { validateContract } from '@prisma-next/sql-query/contract';
+import { defineContract } from '@prisma-next/sql-query/contract-builder';
+```
+
+**Why?**
+- Tests run against source code, not dist files
+- Avoids Vitest resolution issues with workspace dependencies
+- Ensures tests catch issues in source code before building
+- No need for special Vitest resolve aliases
+
+### Cross-Package Tests
+
+**✅ CORRECT: Import from package exports**
+
+```typescript
+// packages/integration-tests/test/contract.test.ts
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+```
+
+**Why?**
+- Integration tests verify the public API works correctly
+- Tests the actual package exports that consumers will use
+- Ensures the built package works as expected
+
+### Test Fixtures
+
+**✅ CORRECT: Use package exports in fixtures**
+
+```typescript
+// packages/cli/test/fixtures/valid-contract.ts
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+```
+
+**Why?**
+- Fixtures represent real consumer code
+- Should use the same imports that consumers would use
+- Verifies the public API is correct
+
+## The `exports/` Folder
+
+The `exports/` folder contains the public API surface (what gets built and published). Tests should import from source files directly, not from the `exports/` folder.
+
+**Structure:**
+- `src/contract-builder.ts` - The actual implementation
+- `src/exports/contract-builder.ts` - Thin re-export for public API
+
+**Test imports:**
+```typescript
+// ✅ CORRECT: Import from source
+import { defineContract } from '../src/contract-builder';
+
+// ❌ WRONG: Import from exports folder
+import { defineContract } from '../src/exports/contract-builder';
+```
+
+## Vitest Configuration
+
+When tests import from source files, Vitest doesn't need special resolve aliases for workspace dependencies. The standard Vitest configuration is sufficient:
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    // No resolve aliases needed when tests import from source
+  },
+});
+```
+
+**Only add resolve aliases if:**
+- Tests import from package exports (dist files) that have workspace dependencies
+- Integration tests that need to resolve workspace dependencies from dist files
+
+## Package Extraction Patterns
+
+When extracting code from one package to another:
+
+1. **Move tests with the code** - Tests should move to the new package
+2. **Remove duplicate tests** - Don't keep duplicate test files in both packages
+3. **Update imports** - Update all imports to use the new package
+4. **Delete old implementation files** - Remove old source files after migration
+5. **Keep transitional re-exports** - Re-exports stay until Slice 7 (per brief)
+
+**Example:**
+- Old: `packages/sql-query/src/contract-builder.ts` (885 lines)
+- New: `packages/sql/authoring/sql-contract-ts/src/contract-builder.ts`
+- Action: Delete old file, update all imports, remove duplicate tests
+
+## Common Mistakes
+
+### Importing from Package Exports in Same-Package Tests
+
+**❌ WRONG:**
+```typescript
+// packages/sql-query/test/contract.test.ts
+import { validateContract } from '@prisma-next/sql-query/contract';
+```
+
+**Problem:** This resolves to the dist file, which may have workspace dependencies that Vitest can't resolve. Also, tests should run against source code.
+
+**✅ CORRECT:**
+```typescript
+// packages/sql-query/test/contract.test.ts
+import { validateContract } from '../src/contract';
+```
+
+### Keeping Duplicate Test Files
+
+**❌ WRONG:** Keeping the same test file in both old and new packages
+
+**✅ CORRECT:** Move tests to the new package and delete duplicates from the old package
+
+### Not Deleting Old Implementation Files
+
+**❌ WRONG:** Leaving old implementation files after migration
+
+**✅ CORRECT:** Delete old source files after verifying all imports are updated

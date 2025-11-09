@@ -17,8 +17,8 @@ This document defines the relationship between the repository directory layout a
 - `packages/core/operations` → `@prisma-next/operations`
 
 - `packages/authoring/contract-authoring` → `@prisma-next/contract-authoring`
-- `packages/authoring/contract-ts` → `@prisma-next/contract-ts`
 - `packages/authoring/contract-psl` → `@prisma-next/contract-psl`
+- `packages/sql/authoring/sql-contract-ts` → `@prisma-next/sql-contract-ts`
 
 - `packages/targets/sql/contract-types` → `@prisma-next/sql-contract-types`
 - `packages/targets/sql/operations` → `@prisma-next/sql-operations`
@@ -50,8 +50,8 @@ Use published package names as canonical import specifiers. Map them to `src/` e
       "@prisma-next/operations": ["packages/core/operations/src/index.ts"],
 
       "@prisma-next/contract-authoring": ["packages/authoring/contract-authoring/src/index.ts"],
-      "@prisma-next/contract-ts": ["packages/authoring/contract-ts/src/index.ts"],
       "@prisma-next/contract-psl": ["packages/authoring/contract-psl/src/index.ts"],
+      "@prisma-next/sql-contract-ts": ["packages/sql/authoring/sql-contract-ts/src/index.ts"],
 
       "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
       "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],

@@ -305,12 +305,14 @@ The package layering structure has been scaffolded with placeholder packages:
 - Import validation script created (`scripts/check-imports.mjs`)
 - `pnpm lint:deps` script added to root package.json
 
-**Migration Status:** ✅ Phase 1 Complete (Slice 2)
+**Migration Status:** ✅ Phase 2 Complete (Slice 2)
 
 - **Contract Authoring (Phase 1)**: SQL contract authoring code moved from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`)
+- **Contract Authoring (Phase 2)**: Target-agnostic contract authoring core extracted to `@prisma-next/contract-authoring` in the authoring ring (`packages/authoring/contract-authoring`)
+- `@prisma-next/sql-contract-ts` now composes `@prisma-next/contract-authoring` with SQL-specific types
 - Integration tests that depend on both `sql-contract-ts` and `sql-query` moved to `@prisma-next/integration-tests` to avoid cyclic dependencies
-- `@prisma-next/sql-query` maintains backward compatibility through re-exports
-- Phase 2 will extract the target-agnostic core into `@prisma-next/contract-authoring`
+- `@prisma-next/sql-query` maintains backward compatibility through re-exports (will be removed in Slice 7)
+- Duplicate implementation files removed from `@prisma-next/sql-query` after migration
 
 During migration from the old structure:
 
