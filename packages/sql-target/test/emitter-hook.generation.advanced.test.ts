@@ -179,7 +179,7 @@ describe('sql-target-family-hook', () => {
 
   it('generates mappings type when models is undefined', () => {
     const ir = createContractIR({
-      models: undefined,
+      models: {},
       storage: {
         tables: {
           user: {
@@ -222,7 +222,7 @@ describe('sql-target-family-hook', () => {
     ];
 
     const ir = createContractIR({
-      models: undefined,
+      models: {},
       storage: {
         tables: {
           user: {

@@ -42,11 +42,14 @@ describe('budgets plugin', () => {
     close: vi.fn().mockResolvedValue(undefined),
   });
 
-  const createMockContext = (driver: SqlDriver): PluginContext => ({
+  const createMockContext = (
+    driver: SqlDriver,
+    mode: 'strict' | 'permissive' = 'permissive',
+  ): PluginContext => ({
     contract: mockContract,
     adapter: createPostgresAdapter(),
     driver,
-    mode: 'permissive',
+    mode,
     now: () => Date.now(),
     log: {
       info: vi.fn(),
@@ -105,8 +108,7 @@ describe('budgets plugin', () => {
       };
 
       const driver = createMockDriver();
-      const ctx = createMockContext(driver);
-      ctx.mode = 'strict';
+      const ctx = createMockContext(driver, 'strict');
 
       await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'BUDGET.ROWS_EXCEEDED',
@@ -171,8 +173,7 @@ describe('budgets plugin', () => {
       };
 
       const driver = createMockDriver();
-      const ctx = createMockContext(driver);
-      ctx.mode = 'strict';
+      const ctx = createMockContext(driver, 'strict');
 
       await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'BUDGET.ROWS_EXCEEDED',
@@ -229,8 +230,7 @@ describe('budgets plugin', () => {
       driver.explain = vi.fn().mockResolvedValue({
         rows: [{ 'Plan Rows': 200 }],
       });
-      const ctx = createMockContext(driver);
-      ctx.mode = 'strict';
+      const ctx = createMockContext(driver, 'strict');
 
       await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'BUDGET.ROWS_EXCEEDED',
@@ -283,8 +283,7 @@ describe('budgets plugin', () => {
       };
 
       const driver = createMockDriver();
-      const ctx = createMockContext(driver);
-      ctx.mode = 'strict';
+      const ctx = createMockContext(driver, 'strict');
 
       await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'BUDGET.ROWS_EXCEEDED',
@@ -411,8 +410,7 @@ describe('budgets plugin', () => {
       };
 
       const driver = createMockDriver();
-      const ctx = createMockContext(driver);
-      ctx.mode = 'strict';
+      const ctx = createMockContext(driver, 'strict');
 
       await expect(
         plugin.afterExecute?.(plan, { rowCount: 1, latencyMs: 200, completed: true }, ctx),

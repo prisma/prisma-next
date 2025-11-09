@@ -1,6 +1,6 @@
 const obj: Record<string, unknown> = {};
 const circular = { obj };
-obj.circular = circular;
+obj['circular'] = circular;
 
 export const contract = {
   data: obj,

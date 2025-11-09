@@ -105,7 +105,7 @@ describe('assembleOperationRegistry', () => {
           {
             for: 'pg/text@1',
             method: 'test',
-            args: [{ kind: 'invalid' as 'typeId' }],
+            args: [{ kind: 'invalid' as 'typeId', type: 'pg/text@1' }],
             returns: { kind: 'builtin', type: 'string' },
             lowering: {
               targetFamily: 'sql',
@@ -133,7 +133,7 @@ describe('assembleOperationRegistry', () => {
           {
             for: 'pg/text@1',
             method: 'test',
-            args: [{ kind: 'typeId' } as { kind: 'typeId'; type?: string }],
+            args: [{ kind: 'typeId' } as { kind: 'typeId'; type: string }],
             returns: { kind: 'builtin', type: 'string' },
             lowering: {
               targetFamily: 'sql',
@@ -250,7 +250,7 @@ describe('assembleOperationRegistry', () => {
             for: 'pg/text@1',
             method: 'test',
             args: [],
-            returns: { kind: 'invalid' as 'builtin' },
+            returns: { kind: 'invalid' as 'builtin', type: 'string' },
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',

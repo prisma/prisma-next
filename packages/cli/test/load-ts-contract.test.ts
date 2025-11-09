@@ -1,6 +1,6 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

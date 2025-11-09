@@ -1,7 +1,7 @@
-const contract: Record<string, unknown> = {
+const contractData: Record<string, unknown> = {
   foo: 'bar',
 };
 
-contract.self = contract;
+contractData['self'] = contractData;
 
-export const contract = contract;
+export const contract = contractData;

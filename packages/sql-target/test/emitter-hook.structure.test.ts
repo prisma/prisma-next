@@ -717,7 +717,7 @@ describe('sql-target-family-hook', () => {
     });
 
     // Delete the table after creating the proxy
-    delete originalStorage.tables.user;
+    delete originalStorage.tables['user'];
     tableDeleted = true;
 
     // Replace storage with proxied version
@@ -761,7 +761,7 @@ describe('sql-target-family-hook', () => {
     });
 
     // Manually delete the referenced table after creating the IR to test the redundant check
-    delete (ir.storage as { tables: Record<string, unknown> }).tables.user;
+    delete (ir.storage as { tables: Record<string, unknown> }).tables['user'];
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -770,7 +770,7 @@ describe('sql-target-family-hook', () => {
 
   it('validates structure without models', () => {
     const ir = createContractIR({
-      models: undefined,
+      models: {},
       storage: {
         tables: {
           user: {
@@ -793,7 +793,7 @@ describe('sql-target-family-hook', () => {
 
   it('validates structure with table without primary key when no models', () => {
     const ir = createContractIR({
-      models: undefined,
+      models: {},
       storage: {
         tables: {
           user: {
