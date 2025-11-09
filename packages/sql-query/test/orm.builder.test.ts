@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { RuntimeContext } from '@prisma-next/runtime';
 import type {
   Adapter,
   LoweredStatement,
@@ -43,6 +44,12 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
       };
     },
   };
+}
+
+function createOrmWithContext<TContract extends SqlContract<SqlStorage>>(
+  context: RuntimeContext<SqlContract<SqlStorage>>,
+): ReturnType<typeof orm<TContract>> {
+  return orm<TContract>({ context: context as unknown as RuntimeContext<TContract> });
 }
 
 describe('orm base builder', () => {
@@ -170,7 +177,7 @@ describe('orm base builder', () => {
       },
     };
     const contextWithMissingMapping = createTestContext(contractWithMissingMapping, adapter);
-    const o = orm<Contract>({ context: contextWithMissingMapping });
+    const o = createOrmWithContext<Contract>(contextWithMissingMapping);
     const builder = (o as unknown as { user: () => unknown }).user();
 
     // Should not throw - should use fieldName as fallback
@@ -228,8 +235,11 @@ describe('orm base builder', () => {
         },
       },
     };
-    const contextWithMissingModel = createTestContext(contractWithMissingModel, adapter);
-    const o = orm<Contract>({ context: contextWithMissingModel });
+    const contextWithMissingModel = createTestContext(
+      contractWithMissingModel as unknown as SqlContract<SqlStorage>,
+      adapter,
+    );
+    const o = createOrmWithContext<Contract>(contextWithMissingModel);
 
     expect(() => {
       (o as unknown as { user: () => unknown }).user();
@@ -248,7 +258,7 @@ describe('orm base builder', () => {
       },
     };
     const contextWithMissingTable = createTestContext(contractWithMissingTable, adapter);
-    const o = orm<Contract>({ context: contextWithMissingTable });
+    const o = createOrmWithContext<Contract>(contextWithMissingTable);
 
     expect(() => {
       (o as unknown as { user: () => unknown }).user();
@@ -343,7 +353,7 @@ describe('orm base builder', () => {
       },
     };
     const contextWithBothMappings = createTestContext(contractWithBothMappings, adapter);
-    const o = orm<Contract>({ context: contextWithBothMappings });
+    const o = createOrmWithContext<Contract>(contextWithBothMappings);
     const builder = (o as unknown as { user: () => unknown }).user();
 
     // Should not throw - fieldToColumn should take precedence
