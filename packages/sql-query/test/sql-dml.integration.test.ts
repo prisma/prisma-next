@@ -3,7 +3,7 @@ import { param } from '@prisma-next/sql-query/param';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
+import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
@@ -53,7 +53,7 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
 };
 const fixtureContract = validateContract(fixtureContractRaw);
 
-describe('DML Integration Tests', { timeout: 30000 }, () => {
+describe('DML Integration Tests', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
@@ -71,7 +71,7 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
       connect: { client },
       cursor: { disabled: true },
     });
-  });
+  }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
     try {
@@ -80,7 +80,7 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
     } catch {
       // Ignore cleanup errors
     }
-  });
+  }, timeouts.spinUpPpgDev);
 
   beforeEach(async () => {
     await setupTestDatabase(client, fixtureContract, async (c: typeof client) => {
@@ -93,11 +93,11 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         )
       `);
     });
-  });
+  }, timeouts.spinUpPpgDev);
 
   afterEach(async () => {
     await teardownTestDatabase(client, ['user']);
-  });
+  }, timeouts.spinUpPpgDev);
 
   describe('insert', () => {
     it('inserts a row and returns it with returning clause', async () => {
@@ -191,7 +191,7 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         'original@example.com',
         new Date('2024-01-01T00:00:00Z'),
       ]);
-    });
+    }, timeouts.spinUpPpgDev);
 
     it('updates a row and returns it with returning clause', async () => {
       const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
@@ -288,7 +288,7 @@ describe('DML Integration Tests', { timeout: 30000 }, () => {
         'delete2@example.com',
         new Date('2024-01-02T00:00:00Z'),
       ]);
-    });
+    }, timeouts.spinUpPpgDev);
 
     it('deletes a row and returns it with returning clause', async () => {
       const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
