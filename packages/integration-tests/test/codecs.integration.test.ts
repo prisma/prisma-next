@@ -131,9 +131,10 @@ describe('Codecs Integration Tests', () => {
     expect(rows.length).toBeGreaterThan(0);
 
     const row = rows[0]!;
-    expect(row['created_at']).toBeDefined();
+    expect(row).toMatchObject({
+      created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
+    });
     expect(typeof row['created_at']).toBe('string');
-    expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('decodes timestamptz to ISO string', async () => {
@@ -165,7 +166,9 @@ describe('Codecs Integration Tests', () => {
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
-    expect(row['created_at']).toBe('2024-01-15T10:30:00.000Z');
+    expect(row).toMatchObject({
+      created_at: '2024-01-15T10:30:00.000Z',
+    });
     expect(typeof row['created_at']).toBe('string');
   });
 
@@ -195,8 +198,10 @@ describe('Codecs Integration Tests', () => {
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
+    expect(row).toMatchObject({
+      score: 95.5,
+    });
     expect(typeof row['score']).toBe('number');
-    expect(row['score']).toBe(95.5);
   });
 
   it('round-trips strings correctly', async () => {
@@ -225,8 +230,10 @@ describe('Codecs Integration Tests', () => {
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
+    expect(row).toMatchObject({
+      name: 'Test User',
+    });
     expect(typeof row['name']).toBe('string');
-    expect(row['name']).toBe('Test User');
   });
 
   it('uses codec override via annotations.codecs', async () => {
@@ -269,7 +276,9 @@ describe('Codecs Integration Tests', () => {
     expect(rows.length).toBe(1);
 
     const row = rows[0]! as Record<string, unknown>;
-    expect(row['created_at']).toBeDefined();
+    expect(row).toMatchObject({
+      created_at: expect.anything(),
+    });
     expect(typeof row['created_at']).toBe('string');
   });
 
@@ -333,12 +342,14 @@ describe('Codecs Integration Tests', () => {
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
+    expect(row).toMatchObject({
+      name: 'Test User',
+      score: 95.5,
+      created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
+    });
     expect(typeof row['name']).toBe('string');
     expect(typeof row['score']).toBe('number');
     expect(typeof row['created_at']).toBe('string');
-    expect(row['name']).toBe('Test User');
-    expect(row['score']).toBe(95.5);
-    expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('uses codec assignments from contract column types', async () => {
@@ -374,10 +385,12 @@ describe('Codecs Integration Tests', () => {
     expect(rows.length).toBe(1);
 
     const row = rows[0]!;
+    expect(row).toMatchObject({
+      name: 'Test User',
+      created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
+    });
     expect(typeof row['name']).toBe('string');
     expect(typeof row['created_at']).toBe('string');
-    expect(row['name']).toBe('Test User');
-    expect(row['created_at']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('uses codec assignments from contract column types for WHERE clause parameters', async () => {

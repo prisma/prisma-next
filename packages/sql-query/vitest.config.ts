@@ -14,6 +14,7 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        '**/orm-types.ts', // Types-only file
       ],
       thresholds: {
         lines: 90,

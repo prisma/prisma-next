@@ -74,4 +74,16 @@ describe('orm entrypoint', () => {
       (o as unknown as { invalidModel: () => unknown }).invalidModel();
     }).toThrow();
   });
+
+  it('returns undefined for non-string property access', () => {
+    const o = orm<Contract>({ context });
+
+    expect((o as unknown as Record<symbol, unknown>)[Symbol('test')]).toBeUndefined();
+  });
+
+  it('returns false for non-string property in has check', () => {
+    const o = orm<Contract>({ context });
+
+    expect(Symbol('test') in (o as unknown as Record<symbol, unknown>)).toBe(false);
+  });
 });

@@ -145,4 +145,75 @@ describe('orm base builder', () => {
     expect((plan as { meta: { lane: string } }).meta.lane).toBe('orm');
     expect((plan as { ast: { limit: number } }).ast?.limit).toBe(1);
   });
+
+  it('uses fieldName as fallback when fieldToColumn and field.column are missing', () => {
+    const contractWithMissingMapping = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        fieldToColumn: {
+          ...contract.mappings.fieldToColumn,
+          User: {},
+        },
+      },
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          fields: {
+            ...contract.models.User.fields,
+            email: {
+              // Omit column property
+            } as { column?: string },
+          },
+        },
+      },
+    };
+    const contextWithMissingMapping = createTestContext(contractWithMissingMapping, adapter);
+    const o = orm<Contract>({ context: contextWithMissingMapping });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Should not throw - should use fieldName as fallback
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { email: { eq: (p: unknown) => unknown } };
+        return model.email.eq(param('email'));
+      });
+    }).not.toThrow();
+  });
+
+  it('handles null field in model fields', () => {
+    const contractWithNullField = {
+      ...contract,
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          fields: {
+            ...contract.models.User.fields,
+            nullField: null as unknown as { column?: string },
+          },
+        },
+      },
+    };
+    const contextWithNullField = createTestContext(contractWithNullField, adapter);
+    const o = orm<Contract>({ context: contextWithNullField });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Should not throw - should skip null field
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { id: { eq: (p: unknown) => unknown } };
+        return model.id.eq(param('userId'));
+      });
+    }).not.toThrow();
+  });
 });

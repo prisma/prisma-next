@@ -96,11 +96,13 @@ describe('canonicalization', () => {
     });
     // Required top-level fields (capabilities, extensions, meta, relations, sources) are preserved even when empty
     // because they are required by ContractIR and needed for round-trip tests
-    expect(parsed).toHaveProperty('capabilities');
-    expect(parsed).toHaveProperty('extensions');
-    expect(parsed).toHaveProperty('meta');
-    expect(parsed).toHaveProperty('relations');
-    expect(parsed).toHaveProperty('sources');
+    expect(parsed).toMatchObject({
+      capabilities: expect.anything(),
+      extensions: expect.anything(),
+      meta: expect.anything(),
+      relations: expect.anything(),
+      sources: expect.anything(),
+    });
   });
 
   it('preserves semantic array order for column lists', () => {

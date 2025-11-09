@@ -330,16 +330,24 @@ describe('ColumnBuilder operations', () => {
 
     // Verify the outer operation (cosineDistance) has the inner operation (normalize) as its self
     const outerOp = distanceWithExpr._operationExpr;
-    expect(outerOp?.kind).toBe('operation');
-    expect(outerOp?.method).toBe('cosineDistance');
-    expect(outerOp?.self.kind).toBe('operation');
+    expect(outerOp).toMatchObject({
+      kind: 'operation',
+      method: 'cosineDistance',
+      self: expect.objectContaining({
+        kind: 'operation',
+      }),
+    });
 
     // Verify the inner operation (normalize) has the column as its self
     const innerOp = outerOp?.self as import('@prisma-next/sql-target').OperationExpr;
-    expect(innerOp.kind).toBe('operation');
-    expect(innerOp.method).toBe('normalize');
-    expect(innerOp.self.kind).toBe('col');
-    expect((innerOp.self as { table: string; column: string }).table).toBe('user');
-    expect((innerOp.self as { table: string; column: string }).column).toBe('vector');
+    expect(innerOp).toMatchObject({
+      kind: 'operation',
+      method: 'normalize',
+      self: {
+        kind: 'col',
+        table: 'user',
+        column: 'vector',
+      },
+    });
   });
 });

@@ -192,11 +192,12 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
         name: 'Test User',
       });
 
-      expect(result).toBeDefined();
-      expect(result['id']).toBe('test-1');
-      expect(result['email']).toBe('test@example.com');
-      expect(result['name']).toBe('Test User');
-      expect(result['createdAt']).toBeDefined();
+      expect(result).toMatchObject({
+        id: 'test-1',
+        email: 'test@example.com',
+        name: 'Test User',
+        createdAt: expect.anything(),
+      });
     });
 
     it('finds a unique user by id', async () => {
@@ -209,10 +210,11 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
 
       const result = await readUserById(prismaPN, 'test-1');
 
-      expect(result).toBeDefined();
-      expect(result?.['id']).toBe('test-1');
-      expect(result?.['email']).toBe('test@example.com');
-      expect(result?.['name']).toBe('Test User');
+      expect(result).toMatchObject({
+        id: 'test-1',
+        email: 'test@example.com',
+        name: 'Test User',
+      });
     });
 
     it('returns null for findUnique when not found', async () => {
@@ -252,8 +254,9 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
         where: { email: 'test@example.com' },
       });
 
-      expect(result).toBeDefined();
-      expect(result?.['email']).toBe('test@example.com');
+      expect(result).toMatchObject({
+        email: 'test@example.com',
+      });
     });
   });
 

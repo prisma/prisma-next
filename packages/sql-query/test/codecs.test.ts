@@ -37,11 +37,13 @@ describe('DSL Lane Codec Type Stamping', () => {
 
     expect(plan.meta.paramDescriptors.length).toBeGreaterThan(0);
     const paramDesc = plan.meta.paramDescriptors[0];
-    expect(paramDesc).toBeDefined();
-    expect(paramDesc?.type).toBeDefined();
-    expect(paramDesc?.refs).toBeDefined();
-    expect(paramDesc?.refs?.table).toBe('user');
-    expect(paramDesc?.refs?.column).toBe('id');
+    expect(paramDesc).toMatchObject({
+      type: expect.anything(),
+      refs: {
+        table: 'user',
+        column: 'id',
+      },
+    });
   });
 
   it('stamps projectionTypes mapping alias → scalar type', () => {
@@ -98,12 +100,10 @@ describe('DSL Lane Codec Type Stamping', () => {
     expect(plan.meta.projectionTypes).toBeDefined();
     const projectionTypes = plan.meta.projectionTypes!;
 
-    expect(projectionTypes['userId']).toBeDefined();
-    expect(projectionTypes['userEmail']).toBeDefined();
-
-    // Verify types match the column types from contract
-    expect(typeof projectionTypes['userId']).toBe('string');
-    expect(typeof projectionTypes['userEmail']).toBe('string');
+    expect(projectionTypes).toMatchObject({
+      userId: expect.any(String),
+      userEmail: expect.any(String),
+    });
   });
 
   it('includes nullable in paramDescriptors', () => {
@@ -201,9 +201,11 @@ describe('DSL Lane Codec Type Stamping', () => {
       .build();
 
     const projectionTypes = plan.meta.projectionTypes!;
-    expect(projectionTypes['id']).toBeDefined();
-    expect(projectionTypes['email']).toBeDefined();
-    expect(projectionTypes['createdAt']).toBeDefined();
+    expect(projectionTypes).toMatchObject({
+      id: expect.anything(),
+      email: expect.anything(),
+      createdAt: expect.anything(),
+    });
   });
 
   it('maintains projectionTypes order matching projection', () => {

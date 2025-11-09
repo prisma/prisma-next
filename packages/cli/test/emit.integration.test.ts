@@ -102,11 +102,13 @@ describe('emit integration', () => {
       .select({ id: idColumn, email: emailColumn })
       .build();
 
-    expect(plan).toBeDefined();
-    expect(plan.sql).toBeDefined();
-    expect(plan.params).toBeDefined();
-    expect(plan.meta).toBeDefined();
-    expect(plan.meta.coreHash).toBe(result.coreHash);
+    expect(plan).toMatchObject({
+      sql: expect.anything(),
+      params: expect.anything(),
+      meta: expect.objectContaining({
+        coreHash: result.coreHash,
+      }),
+    });
 
     type UserRow = ResultType<typeof plan>;
     expectTypeOf<UserRow>().toHaveProperty('id');

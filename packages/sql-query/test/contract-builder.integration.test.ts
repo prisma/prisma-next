@@ -31,16 +31,24 @@ describe('builder integration', () => {
     expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
 
     // Runtime checks
-    expect(contract.schemaVersion).toBe('1');
-    expect(contract.target).toBe('postgres');
-    expect(contract.targetFamily).toBe('sql');
-    expect(contract.coreHash).toBe('sha256:test-core');
-    expect(contract.storage.tables).toHaveProperty('user');
+    expect(contract).toMatchObject({
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test-core',
+      storage: {
+        tables: expect.objectContaining({
+          user: expect.anything(),
+        }),
+      },
+    });
     const userTable = contract.storage.tables.user;
     expect(userTable).toBeDefined();
-    expect(userTable?.columns).toHaveProperty('id');
-    expect(userTable?.columns).toHaveProperty('email');
-    expect(userTable?.columns).toHaveProperty('createdAt');
+    expect(userTable?.columns).toMatchObject({
+      id: expect.anything(),
+      email: expect.anything(),
+      createdAt: expect.anything(),
+    });
     expectTypeOf<keyof typeof contract.storage.tables>().toEqualTypeOf<'user'>();
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     type IntCodecOutput = ContractCodecTypes['pg/int4@1']['output'];
@@ -57,12 +65,17 @@ describe('builder integration', () => {
 
     expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
-    expect(contract.models).toHaveProperty('User');
     const userModel = contract.models.User;
-    expect(userModel.storage.table).toBe('user');
-    expect(userModel.fields).toHaveProperty('id');
-    expect(userModel.fields).toHaveProperty('email');
-    expect(userModel.fields).toHaveProperty('createdAt');
+    expect(userModel).toMatchObject({
+      storage: {
+        table: 'user',
+      },
+      fields: expect.objectContaining({
+        id: expect.anything(),
+        email: expect.anything(),
+        createdAt: expect.anything(),
+      }),
+    });
 
     // Type checks - verify literal types are preserved
     expectTypeOf(contract.target).toEqualTypeOf<'postgres'>();
@@ -143,9 +156,11 @@ describe('builder integration', () => {
     const tables = schema<typeof contract>(context).tables;
     const userTable = tables.user;
     expect(userTable).toBeDefined();
-    expect(userTable?.columns).toHaveProperty('id');
-    expect(userTable?.columns).toHaveProperty('email');
-    expect(userTable?.columns).toHaveProperty('createdAt');
+    expect(userTable?.columns).toMatchObject({
+      id: expect.anything(),
+      email: expect.anything(),
+      createdAt: expect.anything(),
+    });
     type IdColumn = NonNullable<typeof userTable>['columns']['id'];
     type IdJsType = IdColumn extends { __jsType: infer Js } ? Js : never;
     expectTypeOf<IdJsType>().toEqualTypeOf<number>();
