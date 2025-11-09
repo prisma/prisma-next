@@ -165,3 +165,4 @@ LoweringSpec (SQL MVP)
   - Document that fallback policies (stitch/flat) will materialize nested arrays at runtime to match types even where single-statement lowering isn’t possible.
 
 If you want, I can add a note to the ORM brief clarifying: “multiple sibling includes supported; nested includes beyond one level are planned; behavior depends on adapter lowering and policy (single-statement vs stitch).”
+
