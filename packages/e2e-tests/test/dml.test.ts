@@ -12,7 +12,7 @@ import {
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
+import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
@@ -50,7 +50,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
       connect: { client },
       cursor: { disabled: true },
     });
-  });
+  }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
     try {

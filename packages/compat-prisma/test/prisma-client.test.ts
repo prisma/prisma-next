@@ -157,7 +157,7 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
     } catch {
       // Ignore cleanup errors
     }
-  });
+  }, timeouts.spinUpPpgDev);
 
   beforeEach(async () => {
     // Reset schema between tests
@@ -182,7 +182,7 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
       canonicalVersion: 1,
     });
     await client.query(write.insert.sql, [...write.insert.params]);
-  });
+  }, timeouts.spinUpPpgDev);
 
   describe('PN + compatibility layer', () => {
     it('creates a user and returns the created record', async () => {

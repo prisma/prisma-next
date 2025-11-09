@@ -44,7 +44,7 @@ beforeAll(async () => {
   writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
 
   contract = validateContract<Contract>(contractJson);
-});
+}, timeouts.typeScriptCompilation);
 
 describe('runtime execute integration', () => {
   it(
