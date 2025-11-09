@@ -91,6 +91,21 @@ function createImportAllowlistPlugin(allowlist: ReadonlyArray<string>, entryPath
   };
 }
 
+/**
+ * Loads a contract from a TypeScript file and returns it as ContractIR.
+ *
+ * **Responsibility: Parsing Only**
+ * This function loads and parses a TypeScript contract file. It does NOT normalize the contract.
+ * The contract should already be normalized if it was built using the contract builder.
+ *
+ * Normalization must happen in the contract builder when the contract is created.
+ * This function only validates that the contract is JSON-serializable and returns it as-is.
+ *
+ * @param entryPath - Path to the TypeScript contract file
+ * @param options - Optional configuration (import allowlist)
+ * @returns The contract as ContractIR (should already be normalized)
+ * @throws Error if the contract cannot be loaded or is not JSON-serializable
+ */
 export async function loadContractFromTs(
   entryPath: string,
   options?: LoadTsContractOptions,

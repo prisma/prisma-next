@@ -1,4 +1,4 @@
-import type { ParamDescriptor, Plan } from '@prisma-next/sql-query/types';
+import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
 
 /**

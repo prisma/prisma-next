@@ -3,6 +3,8 @@ export {
   validateCodecRegistryCompleteness,
   validateContractCodecMappings,
 } from '../codecs/validation';
+export type { Extension, RuntimeContext } from '../context';
+export { createRuntimeContext } from '../context';
 export type { SqlStatement } from '../marker';
 export {
   ensureSchemaStatement,

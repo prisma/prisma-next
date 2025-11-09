@@ -60,3 +60,60 @@ export interface DocumentContract extends ContractBase {
   readonly targetFamily: string;
   readonly storage: DocumentStorage;
 }
+
+// Plan types - target-family agnostic execution types
+export interface ParamDescriptor {
+  readonly index?: number;
+  readonly name?: string;
+  readonly type?: string;
+  readonly nullable?: boolean;
+  readonly source: 'dsl' | 'raw';
+  readonly refs?: { table: string; column: string };
+}
+
+export interface PlanRefs {
+  readonly tables?: readonly string[];
+  readonly columns?: ReadonlyArray<{ table: string; column: string }>;
+  readonly indexes?: ReadonlyArray<{
+    readonly table: string;
+    readonly columns: ReadonlyArray<string>;
+    readonly name?: string;
+  }>;
+}
+
+export interface PlanMeta {
+  readonly target: string;
+  readonly targetFamily?: string;
+  readonly coreHash: string;
+  readonly profileHash?: string;
+  readonly lane: string;
+  readonly annotations?: {
+    codecs?: Record<string, string>; // alias/param → codec id ('ns/name@v')
+    [key: string]: unknown;
+  };
+  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
+  readonly refs?: PlanRefs;
+  readonly projection?: Record<string, string> | ReadonlyArray<string>;
+  /**
+   * Optional mapping of projection alias → column type ID (fully qualified ns/name@version).
+   * Used for codec resolution when AST+refs don't provide enough type info.
+   */
+  readonly projectionTypes?: Record<string, string>;
+}
+
+/**
+ * Plan interface - target-family agnostic execution plan.
+ * The `ast` field is `unknown` here; SQL-specific implementations will refine it to `QueryAst`.
+ */
+export interface Plan<_Row = unknown> {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+  readonly ast?: unknown; // SQL-specific AST will be refined in sql-query package
+  readonly meta: PlanMeta;
+}
+
+/**
+ * Utility type to extract the Row type from a Plan.
+ * Example: `type Row = ResultType<typeof plan>`
+ */
+export type ResultType<P> = P extends Plan<infer R> ? R : never;

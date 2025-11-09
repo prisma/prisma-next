@@ -6,7 +6,7 @@ alwaysApply: true
 - Use pnpm not npm!
 - We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
 - When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc` commands from scratch
-- When you want to test, use the local `pnpm test` scripts. For coverage, use `pnpm test:coverage` (all packages) or `pnpm test:coverage:packages` (packages only, excludes examples)
+- When you want to test, use the local `pnpm test` scripts. For coverage, use `pnpm test:coverage` (all packages) or `pnpm coverage:packages` (packages only, excludes examples)
 - Use arktype instead of zod
 - Never add file extensions to imports in TypeScript
 - Don't add comments if avoidable, prefer code which expresses its intent

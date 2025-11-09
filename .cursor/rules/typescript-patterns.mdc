@@ -6,6 +6,79 @@ alwaysApply: false
 
 This document covers important TypeScript patterns and architectural principles used in this codebase.
 
+## Generic Parameter Defaults
+
+**CRITICAL RULE**: Generic types or interfaces should **not** provide defaults unless the type actually makes sense with non-specific values. Most of the time, we need a generic parameter to be provided or it's not worth having.
+
+### The Problem
+
+Default generic parameters can create a false sense of flexibility. If a type is useless without specific values, defaults are misleading and add unnecessary complexity.
+
+### When Defaults Are Appropriate
+
+**✅ CORRECT: Default makes sense - type is useful with default value**
+
+```typescript
+// Array is useful even with unknown element type
+interface Array<T = unknown> {
+  length: number;
+  [index: number]: T;
+}
+
+// Optional generic with sensible default
+interface EventEmitter<T = unknown> {
+  emit(event: string, data: T): void;
+}
+```
+
+### When Defaults Are NOT Appropriate
+
+**❌ WRONG: Type is useless without specific values**
+
+```typescript
+// This type is useless without specific Name, Nullable, Type values
+interface ColumnBuilderState<
+  Name extends string = string,
+  Nullable extends boolean = boolean,
+  Type extends string = string,
+> {
+  readonly name: Name;
+  readonly nullable: Nullable;
+  readonly type: Type;
+}
+```
+
+**✅ CORRECT: Remove defaults - type requires specific values**
+
+```typescript
+// Type requires specific values to be useful
+interface ColumnBuilderState<
+  Name extends string,
+  Nullable extends boolean,
+  Type extends string,
+> {
+  readonly name: Name;
+  readonly nullable: Nullable;
+  readonly type: Type;
+}
+```
+
+### Why This Matters
+
+1. **Clarity**: Makes it clear that specific values are required
+2. **Type Safety**: Prevents accidental use with default (often too-broad) types
+3. **Simplicity**: Removes unused defaults that add noise
+4. **Intent**: Signals that the type is designed for specific use cases, not generic ones
+
+### Pattern
+
+**Before adding defaults, ask:**
+- Does this type make sense with the default values?
+- Would someone ever want to use this type with defaults?
+- Are the defaults just there "in case" or do they serve a real purpose?
+
+**If the answer is "no" or "just in case", remove the defaults.**
+
 ## Interface-Based Design with Factory Functions
 
 **Pattern**: Export interfaces and factory functions, keep classes as private implementation details.
@@ -89,6 +162,57 @@ export function createColumnBuilder(): ColumnBuilder {
   return new ColumnBuilderImpl();
 }
 ```
+
+## Runtime Values Cannot Be Type Parameters
+
+**CRITICAL RULE**: TypeScript cannot use runtime values as type parameters. When iterating over object properties in a loop, you cannot use the loop variable as a type parameter.
+
+### The Problem
+
+TypeScript's type system operates at compile time, while runtime values exist at execution time. You cannot use a runtime value (like a loop variable) as a type parameter.
+
+**❌ WRONG: Using runtime value as type parameter**
+
+```typescript
+type Columns = Contract['storage']['tables'][TableName]['columns'];
+for (const columnName in table.columns) {
+  const columnNameKey = columnName as keyof Columns;
+  // Error: 'columnNameKey' refers to a value, but is being used as a type
+  const columnBuilder = new ColumnBuilderImpl<columnNameKey & string, Columns[columnNameKey]>(...);
+}
+```
+
+### The Solution
+
+Use generic types (`string`, `StorageColumn`) in runtime code and rely on mapped types in the return type to preserve exact literal types:
+
+**✅ CORRECT: Use generic types in runtime code**
+
+```typescript
+for (const columnName in table.columns) {
+  const columnDef = table.columns[columnName];
+  // Use generic types in runtime code
+  const columnBuilder = new ColumnBuilderImpl<string, StorageColumn>(
+    tableName,
+    columnName,
+    columnDef,
+  );
+  // Type system preserves exact types via mapped types in return type
+}
+```
+
+**Key Point:** The return type uses mapped types (`{ readonly [K in keyof Columns]: ... }`) that preserve exact column names and types at the type level, even though the runtime code uses generic types.
+
+### When This Pattern Applies
+
+- When iterating over object properties in a loop
+- When building dynamic structures from runtime data
+- When you need to preserve exact literal types in the return type
+- When the type system needs to infer types from the structure, not from runtime values
+
+### Related Pattern
+
+This is related to the "Type Preservation in Generics" pattern below, which covers preserving literal types through mapped types.
 
 ## Type Preservation in Generics
 
@@ -530,6 +654,154 @@ const fixtureContract = validateContract<Contract>(contractJson);
 - Avoids linting errors about `require()` and undefined globals
 - Better type safety and module resolution
 
+## Query Patterns
+
+**Pattern**: Export `tables` from `query.ts` and import directly for better DX. See `.cursor/rules/query-patterns.mdc` for comprehensive query patterns.
+
+**✅ CORRECT: Export tables from query.ts**
+
+```typescript
+// src/prisma/query.ts
+export const tables = schema.tables;
+
+// In query files
+import { sql, tables } from '../prisma/query';
+
+const plan = sql
+  .from(tables.user)
+  .select({ id: tables.user.columns.id })
+  .build();
+```
+
+**✅ CORRECT: Extract variables for reuse**
+
+```typescript
+const userTable = tables.user;
+const userColumns = userTable.columns;
+
+const plan = sql
+  .from(userTable)
+  .select({ id: userColumns.id })
+  .build();
+```
+
+See `.cursor/rules/query-patterns.mdc` for full details on query patterns, type inference, and common usage patterns.
+
+## Type Safety is Non-Negotiable
+
+**CRITICAL RULE**: Never disable type checking with `@ts-expect-error` or type assertions to work around broken types. Type safety is one of the most important characteristics of this codebase, especially for the ORM implementation. If types aren't working, you haven't done your job - fix the type definitions, not the usage.
+
+**❌ WRONG: Suppressing type errors instead of fixing them**
+
+```typescript
+// @ts-expect-error - Plan type is complex, runtime works correctly
+const result = await runtime.execute(plan);
+```
+
+**✅ CORRECT: Fix the type by properly typing the plan**
+
+```typescript
+import type { Plan } from '@prisma-next/contract/types';
+
+const plan = orm.user().create({ email }) as Plan<number>;
+const result = runtime.execute(plan);
+```
+
+**Why this matters:**
+- Type safety is a core feature that users rely on
+- Suppressing errors hides real type problems
+- Broken types indicate incomplete implementation
+- Users deserve full type safety, not workarounds
+
+**When type inference fails:**
+1. Check if the return type is correctly defined in the interface
+2. Use explicit type assertions (`as Plan<number>`) if the type is correct but inference fails
+3. Fix the type definitions if they're incorrect
+4. Never use `@ts-expect-error` to silence type errors in production code
+
+## Type Assertions in Test Files
+
+**Pattern**: Use `@ts-expect-error` comments for intentional type assertions in test files when working with dynamic proxy objects or complex type scenarios. This is ONLY acceptable in test files, never in production code.
+
+**❌ WRONG: Adding type assertions without explanation**
+
+```typescript
+const builderWithInclude: unknown = (
+  builder as {
+    include: {
+      posts: (child: unknown) => unknown;
+    };
+  }
+).include.posts((child) => { /* ... */ });
+```
+
+**✅ CORRECT: Use `@ts-expect-error` with explanation**
+
+```typescript
+// @ts-expect-error - intentionally using type assertions in test
+const builderWithInclude: unknown = (
+  builder as {
+    include: {
+      posts: (child: unknown) => unknown;
+    };
+  }
+).include.posts((child) => { /* ... */ });
+```
+
+**When to use `@ts-expect-error`:**
+- When working with dynamic proxy objects (e.g., ORM model registry) in test files only
+- When intentionally testing invalid inputs or error cases
+- When TypeScript can't infer complex dynamic types correctly in test contexts
+- Always include a comment explaining why the assertion is needed
+
+**CRITICAL: Never use `@ts-expect-error` to suppress type errors in production code or to work around broken types. Type safety is a core feature of this codebase. If types aren't working, fix the type definitions, not the usage.**
+
+**Handling Implicit `any` in Test Callbacks:**
+
+**❌ WRONG: Implicit `any` in callback parameters**
+
+```typescript
+const plan = o.user().include.posts((child) => {
+  // child is implicitly any
+  return child.select((p) => { /* ... */ });
+});
+```
+
+**✅ CORRECT: Explicit `unknown` annotations**
+
+```typescript
+const plan = o.user().include.posts((child: unknown) => {
+  const childBuilder = child as {
+    select: (fn: (model: unknown) => unknown) => unknown;
+  };
+  return childBuilder.select((p: unknown) => {
+    const model = p as { id: unknown; title: unknown };
+    return { id: model.id, title: model.title };
+  });
+});
+```
+
+**Type Assertions for Dynamic Proxy Objects:**
+
+**Pattern**: When working with dynamic proxy objects (e.g., ORM model registry), cast to `unknown` first, then to the specific shape.
+
+**❌ WRONG: Direct type assertion**
+
+```typescript
+const builder = (o as { user: () => unknown }).user();
+```
+
+**✅ CORRECT: Cast to `unknown` first**
+
+```typescript
+const builder = (o as unknown as { user: () => unknown }).user();
+```
+
+**Why?**
+- Dynamic proxy objects have complex types that TypeScript can't always infer correctly
+- Casting to `unknown` first allows TypeScript to accept the subsequent type assertion
+- This pattern is common when working with Proxy-based APIs
+
 ## DRY Test Patterns
 
 **Pattern**: Common patterns in test files should be extracted into helper functions with JSDoc comments explaining their purpose.
@@ -601,3 +873,97 @@ function createStubAdapter(): Adapter<...> {
 - Helper characteristics (hide implementation, express intent, reduce lines)
 - Common helper patterns from the codebase
 - Testing anti-patterns and solutions
+
+## RuntimeContext and Extension Pattern
+
+**Pattern**: Use `RuntimeContext` to decouple codec and operations registries from `Runtime`, allowing them to be passed to schema/query builders.
+
+### Why?
+
+This decouples registries from the runtime, enabling:
+- Better separation of concerns (registries can be used independently)
+- Easier testing (can create context without runtime)
+- Flexibility to pass context to schema/query builders
+- Clear ownership (context owns registries, runtime uses them)
+
+### Implementation
+
+**✅ CORRECT: Create context separately and pass to runtime and schema**
+
+```typescript
+import { createRuntimeContext, createRuntime } from '@prisma-next/runtime';
+import { schema } from '@prisma-next/sql-query/schema';
+import pgVector from '@prisma/extension-pg-vector';
+
+// Create context with adapter and extensions
+const context = createRuntimeContext({
+  adapter,
+  extensions: [pgVector()],  // Programmatic extension registration
+});
+
+// Pass context to runtime
+const runtime = createRuntime({
+  contract,
+  adapter,
+  driver,
+  context,  // Pass context to runtime
+});
+
+// Pass context to schema (for operations registry)
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
+```
+
+**❌ WRONG: Don't assemble registries in runtime**
+
+```typescript
+// Don't do this - registries are coupled to runtime
+const runtime = createRuntime({
+  contract,
+  adapter,
+  driver,
+  extensions: [...],  // Runtime assembles registries internally
+});
+
+// Can't use registries independently
+const tables = schema(contract, undefined, runtime.operations());
+```
+
+### Extension Interface
+
+Extensions provide `codecs?()` and `operations?()` methods programmatically. No file I/O at runtime - everything is bundled:
+
+```typescript
+interface Extension {
+  codecs?(): CodecRegistry;
+  operations?(): ReadonlyArray<OperationSignature>;
+}
+```
+
+**Adapter as Extension**: Adapters are treated as extensions (provide codecs via `profile.codecs()`). The adapter is automatically included in the context when creating it.
+
+### Schema API
+
+**✅ CORRECT: Pass context to schema (codecTypes is generic only)**
+
+```typescript
+// codecTypes is a generic type parameter (compile-time only)
+const tables = schema<Contract, CodecTypes>(contract, context).tables;
+```
+
+**❌ WRONG: Don't pass codecTypes as runtime parameter**
+
+```typescript
+// Don't do this - codecTypes is not a runtime parameter
+const tables = schema(contract, codecTypes, context).tables;
+```
+
+**Removed `makeT()`**: Use `schema().tables` instead. The `makeT()` function was redundant.
+
+### Key Points
+
+- **RuntimeContext** encapsulates `OperationRegistry` and `CodecRegistry`
+- **Extensions** are registered programmatically (no file I/O at runtime)
+- **Adapters** are treated as extensions (provide codecs via `profile.codecs()`)
+- **Schema API** accepts `context` (optional) for operations registry
+- **codecTypes** is a generic type parameter only (compile-time), not a runtime parameter
+- **No file I/O at runtime** - everything is bundled by the user's bundler

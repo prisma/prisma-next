@@ -17,6 +17,9 @@ describe('validateContract structure validation', () => {
             email: { type: 'pg/text@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },
@@ -36,7 +39,9 @@ describe('validateContract structure validation', () => {
   it('throws on wrong targetFamily', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, targetFamily: 'document' } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/targetFamily/);
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /Unsupported target family/,
+    );
   });
 
   it('throws on missing target', () => {

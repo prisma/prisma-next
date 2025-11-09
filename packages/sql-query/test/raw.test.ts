@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
+import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { rawOptions as exportedRawOptions, sql as exportedSql } from '../src/exports/sql';
 import { rawOptions } from '../src/raw';
 import { sql } from '../src/sql';
-import type { Adapter, LoweredStatement, ParamDescriptor, PlanMeta, SelectAst } from '../src/types';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -19,30 +19,11 @@ function loadContract(name: string): SqlContract<SqlStorage> {
   return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
 
-function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
-  return {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
-    },
-  };
-}
-
 describe('raw lane', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
-  const root = sql({ contract, adapter });
+  const context = createTestContext(contract, adapter);
+  const root = sql({ context });
 
   it('compiles template literals to positional placeholders with stable params', () => {
     const userId = 42;
@@ -118,7 +99,7 @@ describe('raw lane', () => {
   });
 
   it('exposes raw via the package export surface', () => {
-    const exportedRoot = exportedSql({ contract, adapter });
+    const exportedRoot = exportedSql({ context });
     expect(typeof exportedRoot.raw).toBe('function');
 
     const plan = exportedRoot.raw('select 1', { params: [] });
@@ -153,5 +134,73 @@ describe('raw lane', () => {
     expect(plan.sql).toContain('where id = $1');
     expect(plan.params).toEqual([userId]);
     expect(plan.meta.annotations).toEqual({ limit: 10 });
+  });
+
+  it('throws error when target is not postgres', () => {
+    const invalidContract = {
+      ...contract,
+      target: 'mysql' as 'postgres',
+    };
+    const invalidContext = createTestContext(invalidContract, adapter);
+
+    expect(() => {
+      sql({ context: invalidContext });
+    }).toThrow('Raw lane currently supports only postgres target');
+  });
+
+  it('throws error when function form is called without params option', () => {
+    expect(() => {
+      (root.raw as unknown as (first: string, ...rest: unknown[]) => unknown)(
+        'select 1' as unknown as string,
+      );
+    }).toThrow('Function form requires params option');
+  });
+
+  it('throws error when function form params is not an array', () => {
+    expect(() => {
+      root.raw('select 1', { params: 'not-an-array' as unknown as unknown[] });
+    }).toThrow('Function form params must be an array');
+  });
+
+  it('handles splitTemplateValues with empty values', () => {
+    const plan = root.raw`select 1`;
+    expect(plan.sql).toBe('select 1');
+    expect(plan.params).toEqual([]);
+  });
+
+  it('handles splitTemplateValues with options sentinel', () => {
+    const plan = root.raw`
+      select 1
+      ${rawOptions({ annotations: { test: true } })}
+    `;
+    expect(plan.meta.annotations).toEqual({ test: true });
+  });
+
+  it('handles raw with refs containing indexes', () => {
+    const plan = root.raw('select 1', {
+      params: [],
+      refs: {
+        tables: ['user'],
+        columns: [{ table: 'user', column: 'id' }],
+        indexes: [
+          { table: 'user', columns: ['id'], name: 'user_id_idx' },
+          { table: 'user', columns: ['email'] },
+        ],
+      },
+    });
+
+    expect(plan.meta.refs?.indexes).toBeDefined();
+    if (plan.meta.refs?.indexes) {
+      expect(plan.meta.refs.indexes.length).toBe(2);
+      expect(plan.meta.refs.indexes[0]).toMatchObject({
+        table: 'user',
+        columns: ['id'],
+        name: 'user_id_idx',
+      });
+      expect(plan.meta.refs.indexes[1]).toMatchObject({
+        table: 'user',
+        columns: ['email'],
+      });
+    }
   });
 });

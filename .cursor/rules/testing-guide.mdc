@@ -53,6 +53,7 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - `teardownTestDatabase(client, tables?)`: Tears down test database
 
 **Available Helpers in `@prisma-next/runtime/test/utils`:**
+- `createTestContext(contract, adapter, options?)`: Creates a runtime context with standard test configuration. Accepts optional `extensions` parameter to register operations and codecs programmatically.
 - `executePlanAndCollect<P extends Plan>(runtime, plan)`: Executes a plan and collects all results
 - `drainPlanExecution(runtime, plan)`: Drains plan execution without collecting
 - `setupTestDatabase(client, contract, setupFn)`: Sets up database schema and writes contract marker
@@ -228,7 +229,7 @@ expect(rows[0]).toEqual({ id: 1, name: 'Test User' });
 expect(rows[0]).toMatchObject({ id: expect.any(Number), email: expect.any(String) });
 ```
 
-**❌ WRONG: Piece-by-piece property checks**
+**❌ WRONG: Piece-by-piece property checks with type casts**
 
 ```typescript
 expect(rows[0]).toHaveProperty('id');
@@ -238,7 +239,67 @@ expect(typeof rows[0]?.['id']).toBe('number');
 
 **Why?** Object comparison is more maintainable, readable, type-safe, and less brittle.
 
+### JSON Parsing and Object Matching
+
+**✅ CORRECT: Use `toMatchObject` for parsed JSON without type casts**
+
+```typescript
+const contractJson = JSON.parse(result.contractJson);
+expect(contractJson).toMatchObject({
+  schemaVersion: '1',
+  targetFamily: 'sql',
+  target: 'postgres',
+  storage: {
+    tables: {
+      user: expect.anything(),
+    },
+  },
+});
+```
+
+**❌ WRONG: Individual assertions with nested type casts**
+
+```typescript
+const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+expect(contractJson['schemaVersion']).toBe('1');
+expect(contractJson['targetFamily']).toBe('sql');
+expect((contractJson['storage'] as Record<string, unknown>)['tables']).toBeDefined();
+expect(
+  ((contractJson['storage'] as Record<string, unknown>)['tables'] as Record<string, unknown>)[
+    'user'
+  ],
+).toBeDefined();
+```
+
+**Why?** `toMatchObject` eliminates the need for type casts, makes nested structure clear, and is more maintainable. Use `expect.anything()` for nested objects when you only need to verify existence.
+
 ## Common Mistakes and Corrections
+
+### Manual Operation Registry Creation in Tests
+
+**❌ WRONG: Manually creating operation registries and spreading context**
+```typescript
+const baseContext = createTestContext(contract, adapter);
+const operationRegistry = createOperationRegistry();
+operationRegistry.register(signature);
+const context = {
+  ...baseContext,
+  operations: operationRegistry,
+};
+```
+
+**✅ CORRECT: Use extension mechanism via `createTestContext`**
+```typescript
+const context = createTestContext(contract, adapter, {
+  extensions: [
+    {
+      operations: () => [signature],
+    },
+  ],
+});
+```
+
+**Why?** The extension mechanism is the canonical way to register operations and codecs. It's consistent with production code using `createRuntimeContext`, avoids unused variables, and reduces boilerplate.
 
 ### Importing from `@prisma-next/test-utils` directly
 
@@ -286,9 +347,20 @@ export default defineConfig({
 
 ### Test timeout configuration
 
-**Issue:** Database setup in tests can take time, causing timeout errors.
+**Issue:** Database setup in tests can take time, causing timeout errors. Tests that perform TypeScript compilation can also timeout.
 
-**Solution:** Scope timeouts as narrowly as possible - only to the specific hooks or tests that need them, not to the entire `describe` block:
+**Solution:** Use centralized timeout values from `@prisma-next/test-utils` and pass them directly to hooks/tests that need them. Do NOT set `hookTimeout` or `testTimeout` in vitest config files.
+
+**❌ WRONG: Setting timeout in vitest config**
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    hookTimeout: timeouts.spinUpPpgDev,  // Don't do this
+    testTimeout: timeouts.typeScriptCompilation,  // Don't do this
+  },
+});
+```
 
 **❌ WRONG: Setting timeout on describe block**
 ```typescript
@@ -298,19 +370,48 @@ describe('test suite', { timeout: timeouts.spinUpPpgDev }, () => {
 });
 ```
 
-**✅ CORRECT: Set timeout only on the hook that needs it**
+**✅ CORRECT: Pass timeout directly to hooks/tests that need them**
 ```typescript
+import { timeouts } from '@prisma-next/test-utils';
+
 describe('test suite', () => {
   beforeAll(async () => {
     // Database setup that needs increased timeout
   }, timeouts.spinUpPpgDev);
+
+  it('compiles TypeScript', async () => {
+    // TypeScript compilation that needs increased timeout
+  }, timeouts.typeScriptCompilation);
 
   // Tests use default timeout
   it('test', async () => { /* ... */ });
 });
 ```
 
-**Why?** Scoping timeouts narrowly ensures only the operations that actually need more time (like spinning up a database) get the increased timeout. This prevents unnecessary timeouts on fast operations and makes test failures more precise.
+**Why?**
+- Timeout parameters passed to hooks/tests override config values, so they work correctly
+- Scoping timeouts narrowly ensures only operations that need more time get increased timeouts
+- Vitest config timeouts are defaults, not caps - timeout parameters override them
+- Turbo requires explicit `env` configuration in `turbo.json` to pass environment variables to child processes
+
+**Turbo Configuration:**
+Environment variables like `TEST_TIMEOUT_MULTIPLIER` must be explicitly passed through in `turbo.json`:
+```json
+{
+  "tasks": {
+    "test": {
+      "env": ["TEST_TIMEOUT_MULTIPLIER"]
+    }
+  }
+}
+```
+
+**Available Timeouts:**
+- `timeouts.spinUpPpgDev`: For hooks that spin up ppg-dev (PostgreSQL dev server)
+- `timeouts.typeScriptCompilation`: For tests that perform TypeScript compilation
+- `timeouts.default`: Default timeout for general tests
+
+All timeouts respect the `TEST_TIMEOUT_MULTIPLIER` environment variable, which is set to `3` in CI.
 
 ### SQL table name quoting
 
@@ -330,6 +431,46 @@ await client.query(`drop table if exists "${table}"`);
 **Issue:** Type-level tests that verify literal type preservation may fail due to TypeScript limitations.
 
 **Solution:** These tests can be commented out with a note explaining the limitation, as the runtime behavior is still correct.
+
+### Context Creation in Tests
+
+**Issue:** Creating `RuntimeContext` at module level causes initialization/timing issues. The context may be undefined when `sql({ context })` is called, leading to "Cannot read properties of undefined" errors.
+
+**Solution:** Always create context inside each test function, not at module level:
+
+**❌ WRONG: Creating context at module level**
+```typescript
+const adapter = createPostgresAdapter();
+const context = createTestContext(fixtureContract, adapter);
+const tables = schema(context).tables;
+const builder = sql({ context });
+
+describe('tests', () => {
+  it('test', () => {
+    const plan = builder.from(tables.user).select(...).build();
+  });
+});
+```
+
+**✅ CORRECT: Creating context inside each test**
+```typescript
+const adapter = createPostgresAdapter();
+
+describe('tests', () => {
+  it('test', () => {
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
+    const builder = sql({ context });
+    const plan = builder.from(tables.user).select(...).build();
+  });
+});
+```
+
+**Why?** Creating context inside each test ensures:
+- Fresh context per test (no shared state)
+- Adapter is fully initialized
+- No timing/initialization issues
+- Tests are isolated and independent
 
 ## Testing Anti-Patterns
 

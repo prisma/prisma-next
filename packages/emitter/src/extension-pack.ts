@@ -9,6 +9,31 @@ const TypesImportSpecSchema = type({
   alias: 'string',
 });
 
+const ArgSpecManifestSchema = type({
+  kind: "'typeId' | 'param' | 'literal'",
+  'type?': 'string',
+});
+
+const ReturnSpecManifestSchema = type({
+  kind: "'typeId' | 'builtin'",
+  'type?': 'string',
+});
+
+const LoweringSpecManifestSchema = type({
+  targetFamily: "'sql'",
+  strategy: "'infix' | 'function'",
+  template: 'string',
+});
+
+const OperationManifestSchema = type({
+  for: 'string',
+  method: 'string',
+  args: ArgSpecManifestSchema.array(),
+  returns: ReturnSpecManifestSchema,
+  lowering: LoweringSpecManifestSchema,
+  'capabilities?': 'string[]',
+});
+
 const ExtensionPackManifestSchema = type({
   id: 'string',
   version: 'string',
@@ -18,7 +43,11 @@ const ExtensionPackManifestSchema = type({
     'codecTypes?': type({
       import: TypesImportSpecSchema,
     }),
+    'operationTypes?': type({
+      import: TypesImportSpecSchema,
+    }),
   }),
+  'operations?': OperationManifestSchema.array(),
 });
 
 export function loadExtensionPackManifest(packPath: string): ExtensionPackManifest {
@@ -31,7 +60,7 @@ export function loadExtensionPackManifest(packPath: string): ExtensionPackManife
     throw new Error(`Invalid manifest structure at ${manifestPath}: ${messages}`);
   }
 
-  return result;
+  return result as ExtensionPackManifest;
 }
 
 export function loadExtensionPacks(

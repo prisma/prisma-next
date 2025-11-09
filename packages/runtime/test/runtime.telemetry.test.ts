@@ -1,10 +1,9 @@
-import { validateContract } from '@prisma-next/sql-query/schema';
-import type { Plan } from '@prisma-next/sql-query/types';
+import type { Plan } from '@prisma-next/contract/types';
 import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
 import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createRuntime } from '../src/runtime';
-import { drainPlanExecution } from './utils';
+import { createTestContext, createTestContract, drainPlanExecution } from './utils';
 
 describe('Runtime class', () => {
   const mockContractRaw: SqlContract<SqlStorage> = {
@@ -20,14 +19,20 @@ describe('Runtime class', () => {
             id: { type: 'pg/int4@1', nullable: false },
             email: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },
     models: {},
     relations: {},
-    mappings: {},
+    mappings: {
+      codecTypes: {},
+      operationTypes: {},
+    },
   };
-  const mockContract = validateContract(mockContractRaw);
+  const mockContract = createTestContract(mockContractRaw);
 
   const mockPlan: Plan = {
     sql: 'SELECT id, email FROM "user" LIMIT 1',
@@ -64,8 +69,9 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -94,8 +100,9 @@ describe('Runtime class', () => {
         throw new Error('Driver error');
       });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -116,8 +123,9 @@ describe('Runtime class', () => {
 
       mockDriver.query = vi.fn().mockResolvedValue({ rows: [] });
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -141,8 +149,9 @@ describe('Runtime class', () => {
       const mockDriver = createMockDriver();
       const adapter = createPostgresAdapter();
 
+      const context = createTestContext(mockContract, adapter);
       const runtime = createRuntime({
-        contract: mockContract,
+        context,
         adapter,
         driver: mockDriver,
         verify: { mode: 'onFirstUse', requireMarker: false },

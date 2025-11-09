@@ -1,0 +1,41 @@
+# Type Extraction from Contract
+
+## Pattern
+
+`CodecTypes` and `OperationTypes` are stored in `SqlMappings` (non-optional, compile-time only). They are extracted from the contract using helper types:
+
+```typescript
+type CodecTypes = ExtractCodecTypes<Contract>;
+type OperationTypes = ExtractOperationTypes<Contract>;
+```
+
+## Helper Types
+
+- `ExtractCodecTypes<Contract>`: Extracts `Contract['mappings']['codecTypes']` with fallback to `Record<string, never>`
+- `ExtractOperationTypes<Contract>`: Extracts `Contract['mappings']['operationTypes']` with fallback to `Record<string, never>`
+
+## Usage
+
+- Never pass `CodecTypes` or `Operations` as separate type parameters to `schema()`, `sql()`, or `orm()`
+- Always extract types from contract using the helper types
+- Contract must be validated before passing to `createRuntimeContext()`
+- Types flow automatically through the system from contract → context → builders
+
+## Example
+
+```typescript
+import { validateContract } from '@prisma-next/sql-query/schema';
+import { createRuntimeContext } from '@prisma-next/runtime';
+import { schema } from '@prisma-next/sql-query/schema';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+// Validate contract first
+const contract = validateContract<Contract>(contractJson);
+
+// Create context (contract is stored here)
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
+
+// Types are extracted automatically from contract.mappings
+const tables = schema(context).tables;  // No CodecTypes parameter needed
+```

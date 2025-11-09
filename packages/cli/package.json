@@ -23,8 +23,10 @@
     "esbuild": "^0.19.0"
   },
   "devDependencies": {
+    "@prisma-next/runtime": "workspace:*",
     "@prisma-next/sql-query": "workspace:*",
     "@prisma-next/sql-target": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
     "@types/node": "^20.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",

@@ -1,37 +1,26 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { timeouts } from '@prisma-next/test-utils';
-import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
-import { budgets } from '../src/plugins/budgets';
-import { lints } from '../src/plugins/lints';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import { budgets, lints } from '@prisma-next/runtime';
 import {
-  createDevDatabase,
+  createTestContext,
   createTestRuntime,
   drainPlanExecution,
   executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
-} from './utils';
+} from '@prisma-next/runtime/test/utils';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const fixtureContract = loadContractFixture();
-const tables = schema(fixtureContract).tables;
 const adapter = createPostgresAdapter();
-const userTable = tables['user']!;
-const userColumns = userTable.columns;
-const builder = sql({ contract: fixtureContract, adapter });
-const plan = builder
-  .from(userTable)
-  .select({ id: userColumns['id']!, email: userColumns['email']! })
-  .limit(5)
-  .build();
 
 describe('runtime execute integration', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -83,6 +72,16 @@ describe('runtime execute integration', () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const plan = sql({ context })
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .limit(5)
+      .build();
+
     const rows = await executePlanAndCollect(runtime, plan);
 
     expect(rows.length).toBeGreaterThan(0);
@@ -99,6 +98,16 @@ describe('runtime execute integration', () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const plan = sql({ context })
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .limit(5)
+      .build();
+
     await expect(async () => {
       await drainPlanExecution(runtime, plan);
     }).rejects.toMatchObject({ code: 'PLAN.HASH_MISMATCH' });
@@ -110,7 +119,8 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+    const context = createTestContext(fixtureContract, adapter);
+    const rawPlan = sql({ context }).raw`
       select * from "user"
     `;
 
@@ -133,7 +143,8 @@ describe('runtime execute integration', () => {
       plugins: [lints(), budgets()],
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+    const context = createTestContext(fixtureContract, adapter);
+    const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
 
@@ -151,17 +162,15 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw(
-      'select id from "user" where email = $1 limit $2',
-      {
-        params: ['ada@example.com', 1],
-        refs: {
-          tables: ['user'],
-          columns: [{ table: 'user', column: 'email' }],
-          indexes: [],
-        },
+    const context = createTestContext(fixtureContract, adapter);
+    const rawPlan = sql({ context }).raw('select id from "user" where email = $1 limit $2', {
+      params: ['ada@example.com', 1],
+      refs: {
+        tables: ['user'],
+        columns: [{ table: 'user', column: 'email' }],
+        indexes: [],
       },
-    );
+    });
 
     const rows = await executePlanAndCollect(runtime, rawPlan);
 
@@ -177,13 +186,11 @@ describe('runtime execute integration', () => {
       plugins: [lints()],
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw(
-      'insert into "user" (email) values ($1)',
-      {
-        params: ['read-only@example.com'],
-        annotations: { intent: 'report' },
-      },
-    );
+    const context = createTestContext(fixtureContract, adapter);
+    const rawPlan = sql({ context }).raw('insert into "user" (email) values ($1)', {
+      params: ['read-only@example.com'],
+      annotations: { intent: 'report' },
+    });
 
     await expect(async () => {
       await drainPlanExecution(runtime, rawPlan);
@@ -204,7 +211,8 @@ describe('runtime execute integration', () => {
       mode: 'permissive',
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+    const context = createTestContext(fixtureContract, adapter);
+    const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
 
@@ -226,7 +234,8 @@ describe('runtime execute integration', () => {
       mode: 'permissive',
     });
 
-    const rawPlan = sql({ contract: fixtureContract, adapter }).raw`
+    const context = createTestContext(fixtureContract, adapter);
+    const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
 
@@ -242,7 +251,8 @@ describe('runtime execute integration', () => {
       verify: { mode: 'onFirstUse', requireMarker: true },
     });
 
-    const planOne = sql({ contract: fixtureContract, adapter }).raw(
+    const context = createTestContext(fixtureContract, adapter);
+    const planOne = sql({ context }).raw(
       'select id from "user" where email = \'ada@example.com\' limit 1',
       { params: [] },
     );
@@ -250,7 +260,7 @@ describe('runtime execute integration', () => {
     await drainPlanExecution(runtime, planOne);
     const fingerprintOne = runtime.telemetry()?.fingerprint;
 
-    const planTwo = sql({ contract: fixtureContract, adapter }).raw(
+    const planTwo = sql({ context }).raw(
       'select id from "user" where email = \'tess@example.com\' limit 1',
       { params: [] },
     );

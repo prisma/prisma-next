@@ -1,10 +1,16 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type {
+  Adapter,
+  LoweredStatement,
+  SelectAst,
+  SqlContract,
+  SqlStorage,
+} from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
+import { createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type with capabilities
@@ -16,6 +22,10 @@ type ContractWithCapabilities = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; nullable: false };
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly post: {
         readonly columns: {
@@ -24,12 +34,16 @@ type ContractWithCapabilities = SqlContract<
           readonly title: { readonly type: 'pg/text@1'; nullable: false };
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
     };
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  { readonly codecTypes: CodecTypes; readonly operationTypes: Record<string, never> }
 > & {
   readonly capabilities: {
     readonly postgres: {
@@ -48,6 +62,10 @@ type ContractWithoutCapabilities = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; nullable: false };
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly post: {
         readonly columns: {
@@ -55,12 +73,16 @@ type ContractWithoutCapabilities = SqlContract<
           readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
           readonly title: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
     };
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  { readonly codecTypes: CodecTypes; readonly operationTypes: Record<string, never> }
 > & {
   readonly capabilities?: {
     readonly postgres?: {
@@ -82,6 +104,10 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -90,12 +116,19 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
           title: { type: 'pg/text@1', nullable: false },
           createdAt: { type: 'pg/timestamptz@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
   capabilities: {
     postgres: {
       lateral: true,
@@ -116,6 +149,10 @@ const contractWithoutCapabilities = validateContract<ContractWithoutCapabilities
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -123,12 +160,19 @@ const contractWithoutCapabilities = validateContract<ContractWithoutCapabilities
           userId: { type: 'pg/int4@1', nullable: false },
           title: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
   capabilities: {},
 });
 
@@ -153,15 +197,15 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 }
 
 describe('SQL builder includeMany', () => {
-  const adapter = createStubAdapter();
-
   it('throws error when child projection is empty', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+      sql<ContractWithCapabilities, CodecTypes>({ context })
         .from(tables.user)
         .includeMany(
           tables.post,
@@ -178,12 +222,14 @@ describe('SQL builder includeMany', () => {
   });
 
   it('throws error on alias collision', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+      sql<ContractWithCapabilities, CodecTypes>({ context })
         .from(tables.user)
         .includeMany(
           tables.post,
@@ -200,12 +246,14 @@ describe('SQL builder includeMany', () => {
   });
 
   it('throws error when ON condition uses same table', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithCapabilities, CodecTypes>({ contract: contractWithCapabilities, adapter })
+      sql<ContractWithCapabilities, CodecTypes>({ context })
         .from(tables.user)
         .includeMany(
           tables.post,
@@ -222,17 +270,14 @@ describe('SQL builder includeMany', () => {
   });
 
   it('throws error when capabilities are missing at runtime', () => {
-    const tables = schema<ContractWithoutCapabilities, CodecTypes>(
-      contractWithoutCapabilities,
-    ).tables;
+    const adapterWithoutCaps = createStubAdapter();
+    const contextWithoutCaps = createTestContext(contractWithoutCapabilities, adapterWithoutCaps);
+    const tables = schema<ContractWithoutCapabilities>(contextWithoutCaps).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     expect(() => {
-      sql<ContractWithoutCapabilities, CodecTypes>({
-        contract: contractWithoutCapabilities,
-        adapter,
-      })
+      sql<ContractWithoutCapabilities, CodecTypes>({ context: contextWithoutCaps })
         .from(tables.user)
         .includeMany(
           tables.post,
@@ -249,14 +294,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('includes child table in meta.refs.tables', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -275,14 +319,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('includes child columns in meta.refs.columns', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -304,14 +347,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('marks include alias in meta.projection with special marker', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -332,14 +374,13 @@ describe('SQL builder includeMany', () => {
   });
 
   it('does not add codec entries for includes in meta.annotations.codecs', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,

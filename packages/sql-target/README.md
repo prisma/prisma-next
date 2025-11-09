@@ -22,6 +22,7 @@ Provide SQL target family abstraction, emitter hook implementation, and SQL-spec
 - **Contract Types**: Define SQL-specific contract types (`SqlContract`, `SqlStorage`, etc.)
 - **Adapter SPI**: Define adapter interfaces for SQL lowering and execution
 - **Codec Infrastructure**: Define codec interfaces and registry types
+- **Operations Registry**: Define operation registry for extension pack operations on value types
 
 **Non-goals:**
 - Query compilation or execution (sql-query, runtime)
@@ -69,8 +70,10 @@ flowchart TD
 
 ### Emitter Hook (`emitter-hook.ts`)
 - Implements `TargetFamilyHook` for SQL target family
-- Validates type IDs and contract structure
-- Generates `contract.d.ts` with SQL-specific types
+- **Responsibility: Validation and Type Generation Only** - This hook validates type IDs and contract structure, and generates `contract.d.ts` with SQL-specific types. It does NOT normalize contracts. The contract IR passed to this hook must already be normalized (all required fields present). Normalization must happen in the contract builder when the contract is created.
+- **Type Generation**: `generateMappingsType()` includes `codecTypes` and `operationTypes` in generated mappings
+  - These are generated as intersections from extension pack imports (e.g., `codecTypes: CodecTypes & ExtensionCodecTypes`)
+  - Both are required (non-optional) in `SqlMappings` type
 - Includes warning header comments in generated `contract.d.ts` files to indicate they're generated artifacts
 
 ### Contract Types (`contract-types.ts`)
@@ -80,7 +83,10 @@ flowchart TD
   - `StorageColumn`: Column definition with type and nullability
   - `StorageTable`: Table definition with columns, constraints, indexes
   - `ModelDefinition`: Model structure with fields and storage mapping
-  - `SqlMappings`: Model-to-table and field-to-column mappings
+  - `SqlMappings`: Model-to-table and field-to-column mappings, plus type-only fields:
+    - `codecTypes: Record<string, { readonly output: unknown }>` - Required, compile-time only (not in contract.json)
+    - `operationTypes: Record<string, Record<string, unknown>>` - Required, compile-time only (not in contract.json)
+    - Types-only fields generated in `contract.d.ts` as intersections from extension pack imports
 
 ### Adapter SPI (`sql-target.ts`)
 - Adapter interfaces for SQL lowering and execution
@@ -93,6 +99,12 @@ flowchart TD
 - Codec interface definitions
 - Codec registry types
 - Codec factory functions
+
+### Operations Registry (`operations-registry.ts`)
+- Operation registry interface and implementation
+- Operation signature types (`ArgSpec`, `ReturnSpec`, `LoweringSpec`)
+- `createOperationRegistry()`: Create a new operation registry
+- `assembleOperationRegistry()`: Assemble registry from extension pack manifests
 
 ## Dependencies
 
@@ -131,5 +143,4 @@ const result = await emit(ir, options, sqlTargetFamilyHook);
 
 ## Exports
 
-- `.`: SQL target types, adapter SPI, codec infrastructure, and emitter hook
-
+- `.`: SQL target types, adapter SPI, codec infrastructure, operations registry, and emitter hook

@@ -197,7 +197,7 @@ pnpm generate && pnpm start
 - `pnpm test:packages` - Test only packages (exclude examples)
 - `pnpm test:examples` - Test only examples
 - `pnpm test:coverage` - Run tests with coverage
-- `pnpm test:coverage:packages` - Coverage for packages only
+- `pnpm coverage:packages` - Coverage for packages only
 
 **Type Checking:**
 - `pnpm typecheck` - Type check all packages

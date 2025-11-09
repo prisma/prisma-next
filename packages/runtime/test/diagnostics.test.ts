@@ -33,9 +33,10 @@ describe('diagnostics', () => {
 
       const result = freezeDiagnostics({ lints: [lint], budgets: [] });
 
-      expect(result.lints).toHaveLength(1);
-      expect(result.lints[0]).toEqual(lint);
-      expect(result.budgets).toEqual([]);
+      expect(result).toMatchObject({
+        lints: [lint],
+        budgets: [],
+      });
       expect(Object.isFrozen(result)).toBe(true);
       expect(Object.isFrozen(result.lints)).toBe(true);
       expect(Object.isFrozen(result.lints[0])).toBe(true);
@@ -51,9 +52,10 @@ describe('diagnostics', () => {
 
       const result = freezeDiagnostics({ lints: [], budgets: [budget] });
 
-      expect(result.lints).toEqual([]);
-      expect(result.budgets).toHaveLength(1);
-      expect(result.budgets[0]).toEqual(budget);
+      expect(result).toMatchObject({
+        lints: [],
+        budgets: [budget],
+      });
       expect(Object.isFrozen(result)).toBe(true);
       expect(Object.isFrozen(result.lints)).toBe(true);
       expect(Object.isFrozen(result.budgets)).toBe(true);
@@ -92,12 +94,10 @@ describe('diagnostics', () => {
         budgets: [budget1, budget2],
       });
 
-      expect(result.lints).toHaveLength(2);
-      expect(result.budgets).toHaveLength(2);
-      expect(result.lints[0]).toEqual(lint1);
-      expect(result.lints[1]).toEqual(lint2);
-      expect(result.budgets[0]).toEqual(budget1);
-      expect(result.budgets[1]).toEqual(budget2);
+      expect(result).toMatchObject({
+        lints: [lint1, lint2],
+        budgets: [budget1, budget2],
+      });
       expect(Object.isFrozen(result)).toBe(true);
       expect(Object.isFrozen(result.lints)).toBe(true);
       expect(Object.isFrozen(result.budgets)).toBe(true);
@@ -125,8 +125,10 @@ describe('diagnostics', () => {
 
       expect(result.lints[0]).not.toBe(input.lints[0]);
       expect(result.budgets[0]).not.toBe(input.budgets[0]);
-      expect(result.lints[0]).toEqual(input.lints[0]);
-      expect(result.budgets[0]).toEqual(input.budgets[0]);
+      expect(result).toMatchObject({
+        lints: [input.lints[0]],
+        budgets: [input.budgets[0]],
+      });
     });
   });
 });

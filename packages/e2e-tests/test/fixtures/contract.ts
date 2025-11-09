@@ -5,23 +5,23 @@ export const contract = defineContract<CodecTypes>()
   .target('postgres')
   .table('user', (t) =>
     t
-      .column('id', 'int4', { nullable: false })
-      .column('email', 'text', { nullable: false })
+      .column('id', { type: 'pg/int4@1', nullable: false })
+      .column('email', { type: 'pg/text@1', nullable: false })
       .primaryKey(['id']),
   )
   .table('post', (t) =>
     t
-      .column('id', 'int4', { nullable: false })
-      .column('userId', 'int4', { nullable: false })
-      .column('title', 'text', { nullable: false })
-      .column('published', 'bool', { nullable: false })
+      .column('id', { type: 'pg/int4@1', nullable: false })
+      .column('userId', { type: 'pg/int4@1', nullable: false })
+      .column('title', { type: 'pg/text@1', nullable: false })
+      .column('published', { type: 'pg/bool@1', nullable: false })
       .primaryKey(['id']),
   )
   .table('comment', (t) =>
     t
-      .column('id', 'int4', { nullable: false })
-      .column('postId', 'int4', { nullable: false })
-      .column('content', 'text', { nullable: false })
+      .column('id', { type: 'pg/int4@1', nullable: false })
+      .column('postId', { type: 'pg/int4@1', nullable: false })
+      .column('content', { type: 'pg/text@1', nullable: false })
       .primaryKey(['id']),
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
@@ -39,6 +39,7 @@ export const contract = defineContract<CodecTypes>()
     postgres: {
       lateral: true,
       jsonAgg: true,
+      returning: true,
     },
   })
   .build();

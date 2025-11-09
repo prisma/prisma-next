@@ -4,63 +4,51 @@ import type {
   SqlContract,
   SqlMappings,
   SqlStorage,
-  StorageColumn,
-  StorageTable,
 } from '@prisma-next/sql-target';
 import { computeMappings } from './contract';
 
-export interface ColumnOptions<TType extends string = string> {
-  nullable?: boolean;
-  type?: TType;
-}
+/**
+ * Type-level mappings structure for contracts built via `defineContract()`.
+ *
+ * Compile-time type helper (not a runtime object) that ensures mappings match what the builder
+ * produces. `codecTypes` uses the generic `CodecTypes` parameter; `operationTypes` is always
+ * empty since operations are added via extensions at runtime.
+ *
+ * **Difference from RuntimeContext**: This is a compile-time type for contract construction.
+ * `RuntimeContext` is a runtime object with populated registries for query execution.
+ *
+ * @template C - The `CodecTypes` generic parameter passed to `defineContract<CodecTypes>()`
+ */
+type ContractBuilderMappings<C extends Record<string, { output: unknown }>> = Omit<
+  SqlMappings,
+  'codecTypes' | 'operationTypes'
+> & {
+  readonly codecTypes: C;
+  readonly operationTypes: Record<string, never>;
+};
 
-type CanonicalizeType<
-  Scalar extends string,
-  Target extends string,
-> = Scalar extends `pg/${infer _Scalar}@${infer _Version}`
-  ? Scalar
-  : Target extends 'postgres'
-    ? `pg/${Scalar}@1`
-    : Scalar;
-
-type BuildStorageColumn<
-  Scalar extends string,
-  Nullable extends boolean,
-  Type extends string | undefined,
-  Target extends string,
-> = {
-  readonly type: Type extends string ? Type : CanonicalizeType<Scalar, Target>;
+type BuildStorageColumn<Nullable extends boolean, Type extends string> = {
+  readonly type: Type;
   readonly nullable: Nullable;
 };
 
 type BuildStorageTable<
   _TableName extends string,
-  Columns extends Record<string, { scalar: string; nullable: boolean; type?: unknown }>,
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
   PK extends readonly string[] | undefined,
-  Target extends string,
 > = {
   readonly columns: {
-    readonly [K in keyof Columns]: Columns[K] extends { type: infer TType }
-      ? TType extends string
-        ? BuildStorageColumn<
-            Columns[K]['scalar'] & string,
-            Columns[K]['nullable'] & boolean,
-            TType,
-            Target
-          >
-        : BuildStorageColumn<
-            Columns[K]['scalar'] & string,
-            Columns[K]['nullable'] & boolean,
-            undefined,
-            Target
-          >
-      : BuildStorageColumn<
-          Columns[K]['scalar'] & string,
-          Columns[K]['nullable'] & boolean,
-          undefined,
-          Target
-        >;
+    readonly [K in keyof Columns]: Columns[K] extends ColumnBuilderState<
+      string,
+      infer Null,
+      infer TType
+    >
+      ? BuildStorageColumn<Null & boolean, TType>
+      : never;
   };
+  readonly uniques: ReadonlyArray<never>;
+  readonly indexes: ReadonlyArray<never>;
+  readonly foreignKeys: ReadonlyArray<never>;
 } & (PK extends readonly string[]
   ? { readonly primaryKey: { readonly columns: PK } }
   : Record<string, never>);
@@ -68,7 +56,7 @@ type BuildStorageTable<
 type ExtractColumns<
   T extends TableBuilderState<
     string,
-    Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+    Record<string, ColumnBuilderState<string, boolean, string>>,
     readonly string[] | undefined
   >,
 > = T extends TableBuilderState<string, infer C, readonly string[] | undefined> ? C : never;
@@ -76,55 +64,86 @@ type ExtractColumns<
 type ExtractPrimaryKey<
   T extends TableBuilderState<
     string,
-    Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+    Record<string, ColumnBuilderState<string, boolean, string>>,
     readonly string[] | undefined
   >,
 > = T extends TableBuilderState<
   string,
-  Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+  Record<string, ColumnBuilderState<string, boolean, string>>,
   infer PK
 >
   ? PK
   : never;
-
-type NormalizeColumns<
-  C extends Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
-> = {
-  [K in keyof C]: C[K] extends ColumnBuilderState<string, infer S, infer Null, infer TType>
-    ? { scalar: S & string; nullable: Null & boolean; type: TType }
-    : never;
-};
 
 type BuildStorage<
   Tables extends Record<
     string,
     TableBuilderState<
       string,
-      Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
   >,
-  Target extends string,
 > = {
   readonly tables: {
     readonly [K in keyof Tables]: BuildStorageTable<
       K & string,
-      NormalizeColumns<ExtractColumns<Tables[K]>>,
-      ExtractPrimaryKey<Tables[K]>,
-      Target
+      ExtractColumns<Tables[K]>,
+      ExtractPrimaryKey<Tables[K]>
     >;
   };
+};
+
+type BuildStorageTables<
+  Tables extends Record<
+    string,
+    TableBuilderState<
+      string,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
+      readonly string[] | undefined
+    >
+  >,
+> = {
+  readonly [K in keyof Tables]: BuildStorageTable<
+    K & string,
+    ExtractColumns<Tables[K]>,
+    ExtractPrimaryKey<Tables[K]>
+  >;
+};
+
+type Mutable<T> = {
+  -readonly [K in keyof T]-?: T[K];
 };
 
 type BuildModelFields<Fields extends Record<string, string>> = {
   readonly [K in keyof Fields]: { readonly column: Fields[K] };
 };
 
-type ExtractModelFields<T extends ModelBuilderState<string, string, Record<string, string>>> =
-  T extends ModelBuilderState<string, string, infer F> ? F : never;
+type ExtractModelFields<
+  T extends ModelBuilderState<
+    string,
+    string,
+    Record<string, string>,
+    Record<string, RelationDefinition>
+  >,
+> = T extends ModelBuilderState<string, string, infer F, Record<string, RelationDefinition>>
+  ? F
+  : never;
+
+type ExtractModelRelations<
+  T extends ModelBuilderState<
+    string,
+    string,
+    Record<string, string>,
+    Record<string, RelationDefinition>
+  >,
+> = T extends ModelBuilderState<string, string, Record<string, string>, infer R> ? R : never;
 
 type BuildModels<
-  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>>,
+  Models extends Record<
+    string,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  >,
 > = {
   readonly [K in keyof Models]: {
     readonly storage: { readonly table: Models[K]['table'] };
@@ -132,58 +151,69 @@ type BuildModels<
   };
 };
 
-interface ColumnBuilderState<
-  Name extends string = string,
-  Scalar extends string = string,
-  Nullable extends boolean = boolean,
-  Type extends string | undefined = string | undefined,
-> {
+type BuildRelations<
+  Models extends Record<
+    string,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  >,
+> = {
+  readonly [K in keyof Models as Models[K]['table']]: ExtractModelRelations<Models[K]>;
+};
+
+interface ColumnBuilderState<Name extends string, Nullable extends boolean, Type extends string> {
   readonly name: Name;
-  readonly scalar: Scalar;
   readonly nullable: Nullable;
   readonly type: Type;
 }
 
 interface TableBuilderState<
-  Name extends string = string,
-  Columns extends Record<
-    string,
-    ColumnBuilderState<string, string, boolean, string | undefined>
-  > = Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
-  PrimaryKey extends readonly string[] | undefined = undefined,
+  Name extends string,
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
+  PrimaryKey extends readonly string[] | undefined,
 > {
   readonly name: Name;
   readonly columns: Columns;
   readonly primaryKey?: PrimaryKey;
 }
 
+type RelationDefinition = {
+  readonly to: string; // Target model name
+  readonly cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
+  readonly on: {
+    readonly parentCols: readonly string[];
+    readonly childCols: readonly string[];
+  };
+  readonly through?: {
+    readonly table: string;
+    readonly parentCols: readonly string[];
+    readonly childCols: readonly string[];
+  };
+};
+
 interface ModelBuilderState<
-  Name extends string = string,
-  Table extends string = string,
-  Fields extends Record<string, string> = Record<string, string>,
+  Name extends string,
+  Table extends string,
+  Fields extends Record<string, string>,
+  Relations extends Record<string, RelationDefinition>,
 > {
   readonly name: Name;
   readonly table: Table;
   readonly fields: Fields;
+  readonly relations: Relations;
 }
 
-export interface ColumnBuilder<
-  Name extends string,
-  Scalar extends string,
-  Nullable extends boolean = false,
-  Type extends string | undefined = undefined,
-> {
-  nullable<Value extends boolean>(value?: Value): ColumnBuilder<Name, Scalar, Value, Type>;
-  type<Id extends string>(id: Id): ColumnBuilder<Name, Scalar, Nullable, Id>;
-  build(): ColumnBuilderState<Name, Scalar, Nullable, Type>;
+export interface ColumnBuilder<Name extends string, Nullable extends boolean, Type extends string> {
+  nullable<Value extends boolean>(value?: Value): ColumnBuilder<Name, Value, Type>;
+  type<Id extends string>(id: Id): ColumnBuilder<Name, Nullable, Id>;
+  build(): ColumnBuilderState<Name, Nullable, Type>;
 }
 
 class TableBuilder<
   Name extends string,
-  Columns extends Record<
-    string,
-    ColumnBuilderState<string, string, boolean, string | undefined>
-  > = Record<string, never>,
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>> = Record<
+    never,
+    ColumnBuilderState<string, boolean, string>
+  >,
   PrimaryKey extends readonly string[] | undefined = undefined,
 > {
   private readonly _name: Name;
@@ -198,70 +228,34 @@ class TableBuilder<
 
   column<
     ColName extends string,
-    Scalar extends string,
-    TOptions extends { nullable?: boolean; type?: string } | undefined = undefined,
+    TypeId extends string,
+    Nullable extends boolean | undefined = undefined,
   >(
     name: ColName,
-    scalar: Scalar,
-    options?: TOptions,
+    options: {
+      type: TypeId;
+      nullable?: Nullable;
+    },
   ): TableBuilder<
     Name,
     Columns &
-      Record<
-        ColName,
-        ColumnBuilderState<
-          ColName,
-          Scalar,
-          TOptions extends { nullable: true } ? true : false,
-          TOptions extends { type: infer TType }
-            ? TType extends string
-              ? TType
-              : undefined
-            : undefined
-        >
-      >,
+      Record<ColName, ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>>,
     PrimaryKey
   > {
-    if (options?.type) {
-      if (typeof options.type !== 'string' || !options.type.includes('@')) {
-        throw new Error(`type must be in format "namespace/name@version", got "${options.type}"`);
-      }
+    if (!options.type || typeof options.type !== 'string' || !options.type.includes('@')) {
+      throw new Error(`type must be in format "namespace/name@version", got "${options.type}"`);
     }
-    const nullable = (options?.nullable ?? false) as TOptions extends { nullable: true }
-      ? true
-      : false;
-    const type = options?.type;
+    const nullable = (options.nullable ?? false) as Nullable extends true ? true : false;
+    const type = options.type;
     const columnState = {
       name,
-      scalar,
       nullable,
       type,
-    } as ColumnBuilderState<
-      ColName,
-      Scalar,
-      TOptions extends { nullable: true } ? true : false,
-      TOptions extends { type: infer TType }
-        ? TType extends string
-          ? TType
-          : undefined
-        : undefined
-    >;
+    } as ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>;
     return new TableBuilder(
       this._name,
       { ...this._columns, [name]: columnState } as Columns &
-        Record<
-          ColName,
-          ColumnBuilderState<
-            ColName,
-            Scalar,
-            TOptions extends { nullable: true } ? true : false,
-            TOptions extends { type: infer TType }
-              ? TType extends string
-                ? TType
-                : undefined
-              : undefined
-          >
-        >,
+        Record<ColName, ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>>,
       this._primaryKey,
     );
   }
@@ -301,33 +295,158 @@ class TableBuilder<
 class ModelBuilder<
   Name extends string,
   Table extends string,
-  Fields extends Record<string, string> = Record<string, never>,
+  Fields extends Record<string, string> = Record<never, never>,
+  Relations extends Record<string, RelationDefinition> = Record<never, never>,
 > {
   private readonly _name: Name;
   private readonly _table: Table;
   private readonly _fields: Fields;
+  private readonly _relations: Relations;
 
-  constructor(name: Name, table: Table, fields: Fields = {} as Fields) {
+  constructor(
+    name: Name,
+    table: Table,
+    fields: Fields = {} as Fields,
+    relations: Relations = {} as Relations,
+  ) {
     this._name = name;
     this._table = table;
     this._fields = fields;
+    this._relations = relations;
   }
 
   field<FieldName extends string, ColumnName extends string>(
     fieldName: FieldName,
     columnName: ColumnName,
-  ): ModelBuilder<Name, Table, Fields & Record<FieldName, ColumnName>> {
-    return new ModelBuilder(this._name, this._table, {
-      ...this._fields,
-      [fieldName]: columnName,
-    } as Fields & Record<FieldName, ColumnName>);
+  ): ModelBuilder<Name, Table, Fields & Record<FieldName, ColumnName>, Relations> {
+    return new ModelBuilder(
+      this._name,
+      this._table,
+      {
+        ...this._fields,
+        [fieldName]: columnName,
+      } as Fields & Record<FieldName, ColumnName>,
+      this._relations,
+    );
   }
 
-  build(): ModelBuilderState<Name, Table, Fields> {
+  relation<RelationName extends string, ToModel extends string, ToTable extends string>(
+    name: RelationName,
+    options: {
+      toModel: ToModel;
+      toTable: ToTable;
+      cardinality: '1:1' | '1:N' | 'N:1';
+      on: {
+        parentTable: Table;
+        parentColumns: readonly string[];
+        childTable: ToTable;
+        childColumns: readonly string[];
+      };
+    },
+  ): ModelBuilder<Name, Table, Fields, Relations & Record<RelationName, RelationDefinition>>;
+  relation<
+    RelationName extends string,
+    ToModel extends string,
+    ToTable extends string,
+    JunctionTable extends string,
+  >(
+    name: RelationName,
+    options: {
+      toModel: ToModel;
+      toTable: ToTable;
+      cardinality: 'N:M';
+      through: {
+        table: JunctionTable;
+        parentColumns: readonly string[];
+        childColumns: readonly string[];
+      };
+      on: {
+        parentTable: Table;
+        parentColumns: readonly string[];
+        childTable: JunctionTable;
+        childColumns: readonly string[];
+      };
+    },
+  ): ModelBuilder<Name, Table, Fields, Relations & Record<RelationName, RelationDefinition>>;
+  relation<
+    RelationName extends string,
+    ToModel extends string,
+    ToTable extends string,
+    JunctionTable extends string = never,
+  >(
+    name: RelationName,
+    options: {
+      toModel: ToModel;
+      toTable: ToTable;
+      cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
+      through?: {
+        table: JunctionTable;
+        parentColumns: readonly string[];
+        childColumns: readonly string[];
+      };
+      on: {
+        parentTable: Table;
+        parentColumns: readonly string[];
+        childTable: ToTable | JunctionTable;
+        childColumns: readonly string[];
+      };
+    },
+  ): ModelBuilder<Name, Table, Fields, Relations & Record<RelationName, RelationDefinition>> {
+    // Validate parentTable matches model's table
+    if (options.on.parentTable !== this._table) {
+      throw new Error(
+        `Relation "${name}" parentTable "${options.on.parentTable}" does not match model table "${this._table}"`,
+      );
+    }
+
+    // Validate childTable matches toTable (for non-N:M) or through.table (for N:M)
+    if (options.cardinality === 'N:M') {
+      if (!options.through) {
+        throw new Error(`Relation "${name}" with cardinality "N:M" requires through field`);
+      }
+      if (options.on.childTable !== options.through.table) {
+        throw new Error(
+          `Relation "${name}" childTable "${options.on.childTable}" does not match through.table "${options.through.table}"`,
+        );
+      }
+    } else {
+      if (options.on.childTable !== options.toTable) {
+        throw new Error(
+          `Relation "${name}" childTable "${options.on.childTable}" does not match toTable "${options.toTable}"`,
+        );
+      }
+    }
+
+    const relationDef: RelationDefinition = {
+      to: options.toModel,
+      cardinality: options.cardinality,
+      on: {
+        parentCols: options.on.parentColumns,
+        childCols: options.on.childColumns,
+      },
+      ...(options.through
+        ? {
+            through: {
+              table: options.through.table,
+              parentCols: options.through.parentColumns,
+              childCols: options.through.childColumns,
+            },
+          }
+        : undefined),
+    };
+
+    return new ModelBuilder(this._name, this._table, this._fields, {
+      ...this._relations,
+      [name]: relationDef,
+    } as Relations & Record<RelationName, RelationDefinition>);
+  }
+
+  build(): ModelBuilderState<Name, Table, Fields, Relations> {
     return {
       name: this._name,
       table: this._table,
       fields: this._fields,
+      relations: this._relations,
     };
   }
 }
@@ -338,20 +457,23 @@ interface ContractBuilderState<
     string,
     TableBuilderState<
       string,
-      Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
   > = Record<
-    string,
+    never,
     TableBuilderState<
       string,
-      Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
   >,
-  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>> = Record<
+  Models extends Record<
     string,
-    ModelBuilderState<string, string, Record<string, string>>
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  > = Record<
+    never,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   >,
   CoreHash extends string | undefined = string | undefined,
   Extensions extends Record<string, unknown> | undefined = undefined,
@@ -372,14 +494,14 @@ class ContractBuilder<
     string,
     TableBuilderState<
       string,
-      Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
-  > = Record<string, never>,
-  Models extends Record<string, ModelBuilderState<string, string, Record<string, string>>> = Record<
+  > = Record<never, never>,
+  Models extends Record<
     string,
-    never
-  >,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  > = Record<never, never>,
   CoreHash extends string | undefined = undefined,
   Extensions extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
@@ -435,7 +557,7 @@ class ContractBuilder<
     TableName extends string,
     T extends TableBuilder<
       TableName,
-      Record<string, ColumnBuilderState<string, string, boolean, string | undefined>>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >,
   >(
@@ -473,11 +595,18 @@ class ContractBuilder<
   model<
     ModelName extends string,
     TableName extends string,
-    M extends ModelBuilder<ModelName, TableName, Record<string, string>>,
+    M extends ModelBuilder<
+      ModelName,
+      TableName,
+      Record<string, string>,
+      Record<string, RelationDefinition>
+    >,
   >(
     name: ModelName,
     table: TableName,
-    callback: (m: ModelBuilder<ModelName, TableName>) => M | undefined,
+    callback: (
+      m: ModelBuilder<ModelName, TableName, Record<string, string>, Record<never, never>>,
+    ) => M | undefined,
   ): ContractBuilder<
     CodecTypes,
     Target,
@@ -516,12 +645,29 @@ class ContractBuilder<
     });
   }
 
+  /**
+   * Builds and normalizes the contract.
+   *
+   * **Responsibility: Normalization**
+   * This method is responsible for normalizing the contract IR by setting default values
+   * for all required fields:
+   * - `nullable`: defaults to `false` if not provided
+   * - `uniques`: defaults to `[]` (empty array)
+   * - `indexes`: defaults to `[]` (empty array)
+   * - `foreignKeys`: defaults to `[]` (empty array)
+   * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
+   *
+   * The contract builder is the **only** place where normalization should occur.
+   * Validators, parsers, and emitters should assume the contract is already normalized.
+   *
+   * @returns A normalized SqlContract with all required fields present
+   */
   build(): Target extends string
     ? SqlContract<
-        BuildStorage<Tables, Target & string>,
+        BuildStorage<Tables>,
         BuildModels<Models>,
-        Record<string, never>,
-        SqlMappings
+        BuildRelations<Models>,
+        ContractBuilderMappings<CodecTypes>
       > & {
         readonly schemaVersion: '1';
         readonly target: Target;
@@ -537,10 +683,10 @@ class ContractBuilder<
     // Type helper to ensure literal types are preserved in return type
     type BuiltContract = Target extends string
       ? SqlContract<
-          BuildStorage<Tables, Target & string>,
+          BuildStorage<Tables>,
           BuildModels<Models>,
-          Record<string, never>,
-          SqlMappings
+          BuildRelations<Models>,
+          ContractBuilderMappings<CodecTypes>
         > & {
           readonly schemaVersion: '1';
           readonly target: Target;
@@ -559,61 +705,59 @@ class ContractBuilder<
 
     const target = this.state.target as Target & string;
 
-    // Build storage tables - construct as partial first, then assert full type
-    const storageTables: Partial<BuildStorage<Tables, Target & string>['tables']> = {};
+    const storageTables = {} as Partial<Mutable<BuildStorageTables<Tables>>>;
 
-    // Iterate over tables - TypeScript will see keys as string, but type assertion preserves literals
-    for (const tableName in this.state.tables) {
+    for (const tableName of Object.keys(this.state.tables) as Array<keyof Tables & string>) {
       const tableState = this.state.tables[tableName];
       if (!tableState) continue;
 
-      const tableStateTyped = tableState as unknown as {
-        name: string;
-        columns: Record<string, ColumnBuilderState>;
-        primaryKey?: readonly string[] | { columns: readonly string[] };
-      };
+      type TableKey = typeof tableName;
+      type ColumnDefs = ExtractColumns<Tables[TableKey]>;
+      type PrimaryKey = ExtractPrimaryKey<Tables[TableKey]>;
 
-      // Build columns object
-      const columns: Partial<Record<string, StorageColumn>> = {};
+      const columns = {} as Partial<{
+        [K in keyof ColumnDefs]: BuildStorageColumn<
+          ColumnDefs[K]['nullable'] & boolean,
+          ColumnDefs[K]['type']
+        >;
+      }>;
 
-      // Iterate over columns
-      for (const columnName in tableStateTyped.columns) {
-        const columnState = tableStateTyped.columns[columnName];
+      for (const columnName in tableState.columns) {
+        const columnState = tableState.columns[columnName];
         if (!columnState) continue;
-
-        const scalar = columnState.scalar;
-        const type =
-          columnState.type ||
-          (scalar.includes('/') && scalar.includes('@') ? scalar : `pg/${scalar}@1`);
-        const column: StorageColumn = {
-          type: type,
-          nullable: columnState.nullable ?? false,
-        };
-        columns[columnName] = column;
+        columns[columnName as keyof ColumnDefs] = {
+          type: columnState.type,
+          nullable: (columnState.nullable ?? false) as ColumnDefs[keyof ColumnDefs]['nullable'] &
+            boolean,
+        } as BuildStorageColumn<
+          ColumnDefs[keyof ColumnDefs]['nullable'] & boolean,
+          ColumnDefs[keyof ColumnDefs]['type']
+        >;
       }
 
-      const primaryKeyColumns = tableStateTyped.primaryKey
-        ? Array.isArray(tableStateTyped.primaryKey)
-          ? tableStateTyped.primaryKey
-          : 'columns' in tableStateTyped.primaryKey
-            ? tableStateTyped.primaryKey.columns
-            : undefined
-        : undefined;
-
-      const table: StorageTable = {
-        columns: columns as Record<string, StorageColumn>,
-        ...(primaryKeyColumns
+      const table = {
+        columns: columns as {
+          [K in keyof ColumnDefs]: BuildStorageColumn<
+            ColumnDefs[K]['nullable'] & boolean,
+            ColumnDefs[K]['type']
+          >;
+        },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+        ...(tableState.primaryKey
           ? {
               primaryKey: {
-                columns: primaryKeyColumns,
+                columns: tableState.primaryKey,
               },
             }
           : {}),
-      };
+      } as unknown as BuildStorageTable<TableKey & string, ColumnDefs, PrimaryKey>;
 
-      // Assign to storage tables - type assertion preserves literal keys
-      (storageTables as Record<string, StorageTable>)[tableName] = table;
+      (storageTables as Mutable<BuildStorageTables<Tables>>)[tableName] = table;
     }
+
+    const storage = { tables: storageTables as BuildStorageTables<Tables> } as BuildStorage<Tables>;
 
     // Build models - construct as partial first, then assert full type
     const modelsPartial: Partial<BuildModels<Models>> = {};
@@ -643,40 +787,94 @@ class ContractBuilder<
       }
 
       // Assign to models - type assertion preserves literal keys
-      (modelsPartial as Record<string, ModelDefinition>)[modelName] = {
+      (modelsPartial as unknown as Record<string, ModelDefinition>)[modelName] = {
         storage: {
           table: modelStateTyped.table,
         },
         fields: fields as Record<string, ModelField>,
+        relations: {},
       };
     }
 
-    // Type assertions to preserve literal types from generics
-    // The type system knows these match BuildStorage/BuildModels from the generics
-    const storage = { tables: storageTables } as unknown as BuildStorage<Tables, Target & string>;
+    // Build relations object - organized by table name
+    const relationsPartial: Partial<Record<string, Record<string, RelationDefinition>>> = {};
+
+    // Iterate over models to collect relations
+    for (const modelName in this.state.models) {
+      const modelState = this.state.models[modelName];
+      if (!modelState) continue;
+
+      const modelStateTyped = modelState as unknown as {
+        name: string;
+        table: string;
+        fields: Record<string, string>;
+        relations: Record<string, RelationDefinition>;
+      };
+
+      const tableName = modelStateTyped.table;
+      if (!tableName) continue;
+
+      // Only initialize relations object for this table if it has relations
+      if (modelStateTyped.relations && Object.keys(modelStateTyped.relations).length > 0) {
+        if (!relationsPartial[tableName]) {
+          relationsPartial[tableName] = {};
+        }
+
+        // Add relations from this model to the table's relations
+        const tableRelations = relationsPartial[tableName];
+        if (tableRelations) {
+          for (const relationName in modelStateTyped.relations) {
+            const relation = modelStateTyped.relations[relationName];
+            if (relation) {
+              tableRelations[relationName] = relation;
+            }
+          }
+        }
+      }
+    }
+
     const models = modelsPartial as unknown as BuildModels<Models>;
 
-    const mappings = computeMappings(
-      models as Record<string, ModelDefinition>,
+    const baseMappings = computeMappings(
+      models as unknown as Record<string, ModelDefinition>,
       storage as SqlStorage,
     );
 
+    const mappings = {
+      ...baseMappings,
+      codecTypes: {} as CodecTypes,
+      operationTypes: {} as Record<string, never>,
+    } as ContractBuilderMappings<CodecTypes>;
+
     // Construct contract with explicit type that matches the generic parameters
     // This ensures TypeScript infers literal types from the generics, not runtime values
+    // Always include relations, even if empty (normalized to empty object)
     const contract = {
       schemaVersion: '1' as const,
       target,
       targetFamily: 'sql' as const,
       coreHash: this.state.coreHash || 'sha256:ts-builder-placeholder',
       models,
-      relations: {},
+      relations: relationsPartial,
       storage,
       mappings,
-      ...(this.state.extensions ? { extensions: this.state.extensions } : {}),
-      ...(this.state.capabilities ? { capabilities: this.state.capabilities } : {}),
+      extensions: this.state.extensions || {},
+      capabilities: this.state.capabilities || {},
+      meta: {},
+      sources: {},
     } as unknown as BuiltContract;
 
-    return contract as BuiltContract;
+    return contract as unknown as ReturnType<
+      ContractBuilder<
+        CodecTypes,
+        Target,
+        Tables,
+        Models,
+        CoreHash,
+        Extensions,
+        Capabilities
+      >['build']
+    >;
   }
 }
 

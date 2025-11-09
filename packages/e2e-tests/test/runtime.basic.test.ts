@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import {
   createTestRuntimeFromClient,
   executePlanAndCollect,
@@ -24,10 +24,20 @@ describe('end-to-end basic queries', () => {
   const contractTsPath = resolve(__dirname, 'fixtures/contract.ts');
   const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-  it('emits contract and verifies it matches on-disk artifacts', async () => {
-    const outputDir = resolve(__dirname, '../.tmp-output');
-    await emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, contractJsonPath);
-  });
+  it(
+    'emits contract and verifies it matches on-disk artifacts',
+    async () => {
+      const outputDir = resolve(__dirname, '../.tmp-output');
+      await emitAndVerifyContract(
+        cliPath,
+        contractTsPath,
+        adapterPath,
+        outputDir,
+        contractJsonPath,
+      );
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'returns multiple rows with correct types',
@@ -48,11 +58,12 @@ describe('end-to-end basic queries', () => {
             });
 
             const adapter = createPostgresAdapter();
+            const context = createRuntimeContext({ contract, adapter, extensions: [] });
             const runtime = createTestRuntimeFromClient(contract, client, adapter);
             try {
-              const tables = schema<Contract, CodecTypes>(contract).tables;
+              const tables = schema<Contract>(context).tables;
               const user = tables.user!;
-              const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              const plan = sql({ context })
                 .from(user)
                 .select({ id: user.columns.id!, email: user.columns.email! })
                 .build();

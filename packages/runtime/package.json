@@ -13,8 +13,8 @@
     "clean": "node ../../scripts/clean.mjs"
   },
   "dependencies": {
+    "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/sql-query": "workspace:*",
     "@prisma-next/sql-target": "workspace:*",
     "arktype": "^2.1.25"
   },

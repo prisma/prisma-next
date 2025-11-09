@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     sql: 'src/exports/sql.ts',
+    orm: 'src/exports/orm.ts',
     schema: 'src/exports/schema.ts',
     param: 'src/exports/param.ts',
     types: 'src/exports/types.ts',

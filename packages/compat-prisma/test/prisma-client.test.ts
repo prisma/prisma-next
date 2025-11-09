@@ -4,6 +4,7 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import {
   createRuntime,
+  createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
@@ -54,12 +55,18 @@ const testContract: SqlContract<SqlStorage> = {
           name: { type: 'pg/text@1', nullable: false },
           createdAt: { type: 'pg/timestamptz@1', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 };
 
 // Shared query module that accepts a client with used methods
@@ -118,10 +125,17 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
     // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
     const validatedContract = validateContract(testContract);
 
-    const runtime = createRuntime({
+    const adapter = createPostgresAdapter();
+    const context = createRuntimeContext({
       contract: validatedContract,
-      adapter: createPostgresAdapter(),
+      adapter,
+      extensions: [],
+    });
+
+    const runtime = createRuntime({
+      adapter,
       driver,
+      context,
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,
@@ -143,7 +157,7 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
     } catch {
       // Ignore cleanup errors
     }
-  });
+  }, timeouts.spinUpPpgDev);
 
   beforeEach(async () => {
     // Reset schema between tests
@@ -168,7 +182,7 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
       canonicalVersion: 1,
     });
     await client.query(write.insert.sql, [...write.insert.params]);
-  });
+  }, timeouts.spinUpPpgDev);
 
   describe('PN + compatibility layer', () => {
     it('creates a user and returns the created record', async () => {
@@ -178,11 +192,12 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
         name: 'Test User',
       });
 
-      expect(result).toBeDefined();
-      expect(result['id']).toBe('test-1');
-      expect(result['email']).toBe('test@example.com');
-      expect(result['name']).toBe('Test User');
-      expect(result['createdAt']).toBeDefined();
+      expect(result).toMatchObject({
+        id: 'test-1',
+        email: 'test@example.com',
+        name: 'Test User',
+        createdAt: expect.anything(),
+      });
     });
 
     it('finds a unique user by id', async () => {
@@ -195,10 +210,11 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
 
       const result = await readUserById(prismaPN, 'test-1');
 
-      expect(result).toBeDefined();
-      expect(result?.['id']).toBe('test-1');
-      expect(result?.['email']).toBe('test@example.com');
-      expect(result?.['name']).toBe('Test User');
+      expect(result).toMatchObject({
+        id: 'test-1',
+        email: 'test@example.com',
+        name: 'Test User',
+      });
     });
 
     it('returns null for findUnique when not found', async () => {
@@ -238,31 +254,36 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
         where: { email: 'test@example.com' },
       });
 
-      expect(result).toBeDefined();
-      expect(result?.['email']).toBe('test@example.com');
+      expect(result).toMatchObject({
+        email: 'test@example.com',
+      });
     });
   });
 
   describe('Guardrail: unbounded findMany should trigger budget error', () => {
-    it('throws BUDGET.ROWS_EXCEEDED for unbounded select without limit', async () => {
-      // Create many users to exceed budget
-      for (let i = 0; i < 20; i++) {
-        await createUser(prismaPN, {
-          id: `test-${i}`,
-          email: `test${i}@example.com`,
-          name: `Test User ${i}`,
-        });
-      }
+    it(
+      'throws BUDGET.ROWS_EXCEEDED for unbounded select without limit',
+      async () => {
+        // Create many users to exceed budget
+        for (let i = 0; i < 20; i++) {
+          await createUser(prismaPN, {
+            id: `test-${i}`,
+            email: `test${i}@example.com`,
+            name: `Test User ${i}`,
+          });
+        }
 
-      // Runtime should have budgets enabled by default
-      // For MVP, we'll test that findMany without take throws when budgets are enabled
-      // Note: This test may need adjustment based on actual budget configuration
-      await expect(prismaPN.user.findMany()).resolves.toBeDefined();
+        // Runtime should have budgets enabled by default
+        // For MVP, we'll test that findMany without take throws when budgets are enabled
+        // Note: This test may need adjustment based on actual budget configuration
+        await expect(prismaPN.user.findMany()).resolves.toBeDefined();
 
-      // With take, it should work
-      const results = await prismaPN.user.findMany({ take: 10 });
-      expect(results.length).toBeLessThanOrEqual(10);
-    });
+        // With take, it should work
+        const results = await prismaPN.user.findMany({ take: 10 });
+        expect(results.length).toBeLessThanOrEqual(10);
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('Contract drift handling', () => {

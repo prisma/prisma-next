@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/sql-query/types';
+import type { Plan } from '@prisma-next/contract/types';
 import { describe, expect, it, vi } from 'vitest';
 import { lints } from '../src/plugins/lints';
 import type { PluginContext } from '../src/plugins/types';
@@ -130,7 +130,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createMockContext();
       const plan: Plan = {
-        sql: 'SELECT id FROM "user" WHERE email = $1',
+        sql: 'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
         params: ['test@example.com'],
         meta: {
           target: 'postgres',

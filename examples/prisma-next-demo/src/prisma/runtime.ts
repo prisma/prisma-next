@@ -1,13 +1,20 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { budgets, createRuntime } from '@prisma-next/runtime';
+import {
+  budgets,
+  createRuntime,
+  createRuntimeContext,
+  type Runtime,
+  type RuntimeContext,
+} from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-query/schema';
-import { Client } from 'pg';
+import { Pool } from 'pg';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-let runtime: ReturnType<typeof createRuntime> | undefined;
-let client: Client | undefined;
+let runtime: Runtime | undefined;
+let context: RuntimeContext<Contract> | undefined;
+let pool: Pool | undefined;
 
 export function getRuntime() {
   if (!runtime) {
@@ -18,21 +25,31 @@ export function getRuntime() {
 
     const contract = validateContract<Contract>(contractJson);
 
-    client = new Client({ connectionString });
+    pool = new Pool({ connectionString });
 
     const driver = createPostgresDriverFromOptions({
-      connect: { client },
+      connect: { pool },
       cursor: { disabled: true },
     });
 
-    runtime = createRuntime({
+    const adapter = createPostgresAdapter();
+
+    // Create context with contract and adapter (adapter provides codecs via profile.codecs())
+    // Extensions can be added programmatically when available
+    context = createRuntimeContext({
       contract,
-      adapter: createPostgresAdapter(),
+      adapter,
+      extensions: [],
+    });
+
+    runtime = createRuntime({
+      adapter,
       driver,
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,
       },
+      context,
       plugins: [
         budgets({
           maxRows: 10_000,
@@ -46,13 +63,25 @@ export function getRuntime() {
   return runtime;
 }
 
+export function getContext() {
+  if (!context) {
+    getRuntime();
+  }
+  if (!context) {
+    throw new Error('Context not initialized');
+  }
+  return context;
+}
+
 export async function closeRuntime() {
   if (runtime) {
     await runtime.close();
     runtime = undefined;
   }
-  if (client) {
-    await client.end();
-    client = undefined;
+  // Pool is closed by runtime.close() -> driver.close(), so we just clear the reference
+  if (pool) {
+    pool = undefined;
   }
+  // Clear context reference as well
+  context = undefined;
 }

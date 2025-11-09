@@ -2,8 +2,8 @@ import type { ContractBase } from '@prisma-next/contract/types';
 
 // SQL family types
 export type StorageColumn = {
-  readonly type?: string;
-  readonly nullable?: boolean;
+  readonly type: string;
+  readonly nullable: boolean;
 };
 
 export type PrimaryKey = {
@@ -35,9 +35,9 @@ export type ForeignKey = {
 export type StorageTable = {
   readonly columns: Record<string, StorageColumn>;
   readonly primaryKey?: PrimaryKey;
-  readonly uniques?: ReadonlyArray<UniqueConstraint>;
-  readonly indexes?: ReadonlyArray<Index>;
-  readonly foreignKeys?: ReadonlyArray<ForeignKey>;
+  readonly uniques: ReadonlyArray<UniqueConstraint>;
+  readonly indexes: ReadonlyArray<Index>;
+  readonly foreignKeys: ReadonlyArray<ForeignKey>;
 };
 
 export type SqlStorage = {
@@ -55,7 +55,7 @@ export type ModelStorage = {
 export type ModelDefinition = {
   readonly storage: ModelStorage;
   readonly fields: Record<string, ModelField>;
-  readonly relations?: Record<string, unknown>;
+  readonly relations: Record<string, unknown>;
 };
 
 export type SqlMappings = {
@@ -64,11 +64,17 @@ export type SqlMappings = {
   readonly fieldToColumn?: Record<string, Record<string, string>>;
   readonly columnToField?: Record<string, Record<string, string>>;
   /**
-   * Types-only scalar to JavaScript type mapping.
-   * Provided via contract.d.ts imports from adapter exports.
+   * Types-only codec type mapping.
+   * Provided via contract.d.ts imports from adapter/extension exports.
    * Not present in contract.json; compile-time only.
    */
-  readonly scalarToJs?: Record<string, unknown>;
+  readonly codecTypes: Record<string, { readonly output: unknown }>;
+  /**
+   * Types-only operation type mapping.
+   * Provided via contract.d.ts imports from adapter/extension exports.
+   * Not present in contract.json; compile-time only.
+   */
+  readonly operationTypes: Record<string, Record<string, unknown>>;
 };
 
 export type SqlContract<
@@ -83,3 +89,9 @@ export type SqlContract<
   readonly relations: R;
   readonly mappings: Map;
 };
+
+export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =
+  TContract['mappings']['codecTypes'];
+
+export type ExtractOperationTypes<TContract extends SqlContract<SqlStorage>> =
+  TContract['mappings']['operationTypes'];

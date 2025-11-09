@@ -1,5 +1,5 @@
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { SelectAst } from '@prisma-next/sql-query/types';
+import type { SelectAst } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/adapter';
 import type { PostgresContract } from '../src/types';
@@ -17,6 +17,9 @@ const contract = Object.freeze(
             id: { type: 'pg/int4@1', nullable: false },
             email: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
         post: {
           columns: {
@@ -24,6 +27,9 @@ const contract = Object.freeze(
             userId: { type: 'pg/int4@1', nullable: false },
             title: { type: 'pg/text@1', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },

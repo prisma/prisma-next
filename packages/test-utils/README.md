@@ -62,6 +62,27 @@ flowchart TD
 - `collectAsync(iterable)`: Collects all values from an async iterable
 - `drainAsyncIterable(iterable)`: Drains an async iterable without collecting
 
+### Timeout Configuration
+
+Centralized timeout values with environment variable support. All timeouts respect the `TEST_TIMEOUT_MULTIPLIER` environment variable (set to `3` in CI).
+
+- `timeouts.spinUpPpgDev`: Timeout for hooks that spin up ppg-dev (PostgreSQL dev server). Base: 15000ms
+- `timeouts.typeScriptCompilation`: Timeout for tests that perform TypeScript compilation. Base: 8000ms
+- `timeouts.default`: Default timeout for general tests. Base: 100ms
+
+**Usage:**
+```typescript
+import { timeouts } from '@prisma-next/test-utils';
+
+beforeAll(async () => {
+  // Database setup
+}, timeouts.spinUpPpgDev);
+
+it('compiles TypeScript', async () => {
+  // TypeScript compilation
+}, timeouts.typeScriptCompilation);
+```
+
 **Note**: For runtime-specific utilities (plan execution, runtime creation, contract markers), see `@prisma-next/runtime/test/utils`. For contract-related utilities (contract loading, emission verification), see `e2e-tests/test/utils.ts`.
 
 ## Dependencies

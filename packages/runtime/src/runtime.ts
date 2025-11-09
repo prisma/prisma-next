@@ -1,5 +1,12 @@
-import type { Adapter, LoweredStatement, Plan, SelectAst } from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
+import type { Plan } from '@prisma-next/contract/types';
+import type {
+  Adapter,
+  LoweredStatement,
+  SelectAst,
+  SqlContract,
+  SqlDriver,
+  SqlStorage,
+} from '@prisma-next/sql-target';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow, readContractMarker } from './marker';
 
@@ -18,19 +25,20 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-import { type CodecRegistry, createCodecRegistry } from '@prisma-next/sql-target';
+import type { CodecRegistry, OperationRegistry } from '@prisma-next/sql-target';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
+import type { RuntimeContext } from './context';
 import type { Plugin } from './plugins/types';
 
 export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
-  readonly contract: TContract;
   readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
+  readonly context: RuntimeContext<TContract>;
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: import('./plugins/types').Log;
@@ -40,6 +48,7 @@ export interface Runtime {
   execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
+  operations(): OperationRegistry;
 }
 
 interface RuntimeErrorEnvelope extends Error {
@@ -59,6 +68,7 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
   private readonly codecRegistry: CodecRegistry;
+  private readonly operationRegistry: OperationRegistry;
   private readonly pluginContext: import('./plugins/types').PluginContext;
 
   private verified: boolean;
@@ -67,8 +77,8 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { driver, contract, adapter } = options;
-    this.contract = contract;
+    const { driver, adapter, context } = options;
+    this.contract = context.contract;
     this.adapter = adapter;
     this.driver = driver;
     this.plugins = options.plugins ?? [];
@@ -80,16 +90,9 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
     this._telemetry = null;
     this.codecRegistryValidated = false;
 
-    // Compose codec registry from adapter codecs
-    const registry = createCodecRegistry();
-    const adapterRegistry = this.adapter.profile.codecs();
-
-    // Register all adapter codecs
-    for (const codec of adapterRegistry.values()) {
-      registry.register(codec);
-    }
-
-    this.codecRegistry = registry;
+    // Use registries from context
+    this.codecRegistry = context.codecs;
+    this.operationRegistry = context.operations;
 
     this.pluginContext = {
       contract: this.contract,
@@ -289,6 +292,10 @@ class RuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlSto
 
   telemetry(): RuntimeTelemetryEvent | null {
     return this._telemetry;
+  }
+
+  operations(): OperationRegistry {
+    return this.operationRegistry;
   }
 
   close(): Promise<void> {

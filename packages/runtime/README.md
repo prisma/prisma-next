@@ -8,6 +8,8 @@ The runtime is the executable core of Prisma Next. It orchestrates query executi
 
 The runtime follows a "thin core, fat targets" philosophy: it contains no dialect-specific logic, no transport/pooling code, and no policy enforcement. Instead, it coordinates adapters, drivers, and plugins to deliver deterministic behavior with tight feedback loops.
 
+**Target-Agnostic Design**: The runtime must remain target-agnostic and must not depend on lane-specific packages (e.g., `@prisma-next/sql-query`). Runtime works with generic interfaces from `@prisma-next/sql-target` to enable extensibility across target families (SQL, Document, Graph, etc.).
+
 ## Purpose
 
 Execute query Plans with deterministic verification, guardrails, and feedback. Provide a unified execution surface that works across all query lanes (DSL, ORM, Raw SQL, TypedSQL).
@@ -17,7 +19,6 @@ Execute query Plans with deterministic verification, guardrails, and feedback. P
 - **Contract Verification**: Verify loaded contract against database marker (`coreHash` and `profileHash`)
 - **Plan Execution**: Execute Plans through adapters and drivers
 - **Plugin Pipeline**: Apply guardrails (lints, budgets, telemetry) before and during execution
-- **Codec Composition**: Compose codec registries from adapters and extension packs
 - **Result Streaming**: Stream results as `AsyncIterable<Row>` for efficient processing
 - **Error Mapping**: Map driver errors to stable `RuntimeError` envelope
 
@@ -28,6 +29,20 @@ Execute query Plans with deterministic verification, guardrails, and feedback. P
 - Policy definition (plugins)
 
 ## Architecture
+
+### Target-Agnostic Design
+
+**CRITICAL**: The runtime must remain **target-agnostic** and must not depend on lane-specific packages (e.g., `@prisma-next/sql-query`). This follows the "thin core, fat targets" philosophy:
+
+- **Runtime works with generic interfaces**: Runtime uses generic interfaces from `@prisma-next/sql-target` (e.g., `Adapter`, `SqlContract`, `CodecRegistry`, `OperationRegistry`) but does not depend on lane-specific query builders
+- **No lane-specific dependencies**: Runtime must not import from `@prisma-next/sql-query` in source code. The SQL query package is only in `devDependencies` for tests
+- **Adapter abstraction**: Runtime coordinates with adapters through generic interfaces, not lane-specific types
+- **Enables extensibility**: This design allows adding new target families (e.g., Document, Graph) without modifying the runtime
+
+**Dependency Rules:**
+- ✅ **Allowed**: `@prisma-next/sql-target` (generic SQL target family interfaces)
+- ✅ **Allowed**: `@prisma-next/contract` (core contract types)
+- ❌ **Forbidden**: `@prisma-next/sql-query` (SQL lane-specific query builders) - only in `devDependencies` for tests
 
 ```mermaid
 flowchart TD
@@ -77,7 +92,18 @@ flowchart TD
 ### Runtime (`runtime.ts`)
 - Main orchestrator for query execution
 - Manages contract verification, plugin lifecycle, and result streaming
-- Coordinates adapters, drivers, and codecs
+- Coordinates adapters, drivers, codecs, and operations registry
+- Uses `RuntimeContext` for codec and operations registries (decoupled from runtime)
+
+### RuntimeContext (`context.ts`)
+- Encapsulates `SqlContract`, `OperationRegistry`, and `CodecRegistry`
+- Decouples contract and registries from `Runtime`, allowing them to be passed to schema/query builders
+- Composes codecs and operations from adapters and extensions programmatically
+- **Contract Storage**: Contract is stored in context (caller validates before passing)
+- **Extension Interface**: Extensions provide `codecs?()` and `operations?()` methods
+- **Adapter as Extension**: Adapters are treated as extensions (provide codecs via `profile.codecs()`)
+- **Signature**: `createRuntimeContext({ contract, adapter, extensions })` - contract must be validated before passing
+- No file I/O at runtime - everything is bundled
 
 ### Codecs (`codecs/`)
 - **Encoding**: Encode JavaScript values to wire format for parameters
@@ -92,6 +118,7 @@ flowchart TD
 
 ### Guardrails (`guardrails/`)
 - **Raw**: Guardrails for raw SQL execution
+  - **Unindexed Predicate Detection**: Warns when raw SQL plans have predicate columns but no supporting indexes. If no indexes are provided at all, all predicates are flagged as unindexed.
 
 ### Diagnostics (`diagnostics.ts`)
 - Error taxonomy and mapping
@@ -106,9 +133,17 @@ flowchart TD
 
 ## Dependencies
 
-- **`@prisma-next/sql-query`**: Plan types and SQL contract types
-- **`@prisma-next/sql-target`**: Adapter SPI, codec interfaces, SQL contract types
-- **`@prisma-next/driver-postgres`**: Postgres driver implementation
+### Runtime Dependencies
+
+- **`@prisma-next/contract`**: Core contract types (`ContractBase`, `Plan`, `PlanRefs`)
+- **`@prisma-next/sql-target`**: Generic SQL target family interfaces (`Adapter`, `SqlContract`, `CodecRegistry`, `OperationRegistry`, `SqlStorage`)
+- **`@prisma-next/driver-postgres`**: Postgres driver implementation (target-specific, but runtime uses generic driver interface)
+
+### Test Dependencies
+
+- **`@prisma-next/sql-query`**: SQL lane query builders (only in `devDependencies` for tests, **not imported in source code**)
+
+**Important**: Runtime source code must not import from `@prisma-next/sql-query`. This package is only available in tests to enable test utilities. Runtime works with generic interfaces from `@prisma-next/sql-target` to remain target-agnostic.
 
 ## Related Subsystems
 
@@ -131,19 +166,40 @@ flowchart TD
 ## Usage
 
 ```typescript
-import { createRuntime } from '@prisma-next/runtime';
+import { createRuntime, createRuntimeContext } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
-import contract from './contract.json';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import pgVector from '@prisma/extension-pg-vector';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
 
+// Validate contract first (caller is responsible for validation)
+const contract = validateContract<Contract>(contractJson);
+
+// Create adapter
+const adapter = createPostgresAdapter();
+
+// Create context with validated contract, adapter, and extensions (programmatic registration)
+const context = createRuntimeContext({
+  contract,  // Contract is stored in context
+  adapter,
+  extensions: [pgVector()],  // Extensions provide codecs and operations programmatically
+});
+
+// Create runtime with context (contract comes from context)
 const runtime = createRuntime({
-  contract,
-  adapter: createPostgresAdapter(),
+  adapter,
   driver: createPostgresDriver({ connectionString: process.env.DATABASE_URL }),
+  verify: { mode: 'onFirstUse', requireMarker: false },
+  context,  // Pass context to runtime (includes contract)
   plugins: [
     // Add lints, budgets, telemetry plugins
   ],
 });
+
+// Use context in schema (types extracted automatically from contract)
+const tables = schema(context).tables;
 
 // Execute a plan
 for await (const row of runtime.execute(plan)) {
@@ -151,9 +207,22 @@ for await (const row of runtime.execute(plan)) {
 }
 ```
 
+### Extension Interface
+
+Extensions provide `codecs?()` and `operations?()` methods programmatically. No file I/O at runtime - everything is bundled:
+
+```typescript
+interface Extension {
+  codecs?(): CodecRegistry;
+  operations?(): ReadonlyArray<OperationSignature>;
+}
+```
+
+**Adapter as Extension**: Adapters are treated as extensions (provide codecs via `profile.codecs()`). The adapter is automatically included in the context when creating it.
+
 ## Exports
 
-- `.`: Main runtime API (`createRuntime`, types)
+- `.`: Main runtime API (`createRuntime`, `createRuntimeContext`, `RuntimeContext`, `Extension`, types)
 - `./test/utils`: Runtime-specific test utilities
 
 ### Test Utilities
@@ -161,12 +230,32 @@ for await (const row of runtime.execute(plan)) {
 Runtime-specific test utilities are located in `runtime/test/utils.ts`. These utilities import generic helpers from `@prisma-next/test-utils` and provide runtime-specific functionality:
 
 **Available Utilities:**
+- `createTestContext(contract, adapter, options?)`: Creates a runtime context with standard test configuration. Accepts optional `extensions` parameter to register operations and codecs programmatically.
 - `executePlanAndCollect<P extends Plan>(runtime, plan)`: Executes a plan and collects all results into an array. The return type is automatically inferred from the plan's type parameter using `ResultType<P>[]`.
 - `drainPlanExecution(runtime, plan)`: Drains a plan execution, consuming all results without collecting them.
 - `executeStatement(client, statement)`: Executes a SQL statement on a database client.
 - `setupTestDatabase(client, contract, setupFn)`: Sets up database schema and data, then writes the contract marker.
 - `writeTestContractMarker(client, contract)`: Writes a contract marker to the database.
 - `createTestRuntime(contract, adapter, driver, options?)`: Creates a runtime with standard test configuration.
+
+**Using Extensions in Tests:**
+```typescript
+import { createTestContext } from '@prisma-next/runtime/test/utils';
+
+const signature: OperationSignature = {
+  forTypeId: 'pgvector/vector@1',
+  method: 'cosineDistance',
+  // ... operation definition
+};
+
+const context = createTestContext(contract, adapter, {
+  extensions: [
+    {
+      operations: () => [signature],
+    },
+  ],
+});
+```
 - `createTestRuntimeFromClient(contract, client, adapter, options?)`: Creates a runtime with the given contract and database client.
 - `setupE2EDatabase(client, contract, setupFn)`: Sets up E2E test database (wrapper around `setupTestDatabase`).
 

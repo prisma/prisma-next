@@ -1,3 +1,5 @@
+import type { Plan, ResultType } from '@prisma-next/contract/types';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
@@ -5,7 +7,6 @@ import { validateContract } from '../src/contract';
 import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Plan, ResultType } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -14,9 +15,9 @@ test('builder contract types match fixture contract types', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', 'int4', { nullable: false })
-        .column('email', 'text', { nullable: false })
-        .column('createdAt', 'timestamptz', { nullable: false })
+        .column('id', { type: 'pg/int4@1', nullable: false })
+        .column('email', { type: 'pg/text@1', nullable: false })
+        .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
         .primaryKey(['id']),
     )
     .model('User', 'user', (m) =>
@@ -40,9 +41,9 @@ test('ResultType inference works identically to fixture contract', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', 'int4', { nullable: false })
-        .column('email', 'text', { nullable: false })
-        .column('createdAt', 'timestamptz', { nullable: false })
+        .column('id', { type: 'pg/int4@1', nullable: false })
+        .column('email', { type: 'pg/text@1', nullable: false })
+        .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
         .primaryKey(['id']),
     )
     .model('User', 'user', (m) =>
@@ -53,31 +54,36 @@ test('ResultType inference works identically to fixture contract', () => {
 
   const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof validatedBuilderContract, CodecTypes>(
-    validatedBuilderContract,
-  ).tables;
-  const userTable = tables.user;
-  if (!userTable) throw new Error('user table not found');
-
-  const _plan = sql<typeof validatedBuilderContract, CodecTypes>({
+  const context = createRuntimeContext({
     contract: validatedBuilderContract,
     adapter,
-  })
+    extensions: [],
+  });
+  const tables = schema(context).tables;
+  const userTable = tables['user'];
+  if (!userTable) throw new Error('user table not found');
+
+  const _plan = sql({ context })
     .from(userTable)
     .select({
-      id: userTable.columns.id!,
-      email: userTable.columns.email!,
-      createdAt: userTable.columns.createdAt!,
+      id: userTable.columns['id']!,
+      email: userTable.columns['email']!,
+      createdAt: userTable.columns['createdAt']!,
     })
     .build();
 
   type BuilderRow = ResultType<typeof _plan>;
 
   const _fixtureContract = validateContract<Contract>(contractJson);
-  const fixtureTables = schema<Contract, CodecTypes>(_fixtureContract).tables;
+  const fixtureContext = createRuntimeContext({
+    contract: _fixtureContract,
+    adapter,
+    extensions: [],
+  });
+  const fixtureTables = schema(fixtureContext).tables;
   const fixtureUserTable = fixtureTables.user;
   if (!fixtureUserTable) throw new Error('fixture user table not found');
-  const _fixturePlan = sql<Contract, CodecTypes>({ contract: _fixtureContract, adapter })
+  const _fixturePlan = sql({ context: fixtureContext })
     .from(fixtureUserTable)
     .select({
       id: fixtureUserTable.columns.id!,
@@ -102,9 +108,9 @@ test('codec type inference via type option', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', 'int4', { nullable: false, type: dataTypes.int4 })
-        .column('email', 'text', { nullable: false, type: dataTypes.text })
-        .column('createdAt', 'timestamptz', { nullable: false, type: dataTypes.timestamptz }),
+        .column('id', { type: dataTypes.int4, nullable: false })
+        .column('email', { type: dataTypes.text, nullable: false })
+        .column('createdAt', { type: dataTypes.timestamptz, nullable: false }),
     )
     .model('User', 'user', (m) =>
       m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
@@ -113,16 +119,17 @@ test('codec type inference via type option', () => {
 
   const validated = validateContract<typeof contract>(contract);
   const adapter = createPostgresAdapter();
-  const tables = schema<typeof validated, CodecTypes>(validated).tables;
-  const userTable = tables.user;
+  const context = createRuntimeContext({ contract: validated, adapter, extensions: [] });
+  const tables = schema(context).tables;
+  const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
 
-  const _plan = sql<typeof validated, CodecTypes>({ contract: validated, adapter })
+  const _plan = sql({ context })
     .from(userTable)
     .select({
-      id: userTable.columns.id!,
-      email: userTable.columns.email!,
-      createdAt: userTable.columns.createdAt!,
+      id: userTable.columns['id']!,
+      email: userTable.columns['email']!,
+      createdAt: userTable.columns['createdAt']!,
     })
     .build();
 
@@ -145,7 +152,9 @@ test('contract structure type matches SqlContract', () => {
   const contract = defineContract<CodecTypes>()
     .target('postgres')
     .table('user', (t) =>
-      t.column('id', 'int4', { nullable: false }).column('email', 'text', { nullable: false }),
+      t
+        .column('id', { type: 'pg/int4@1', nullable: false })
+        .column('email', { type: 'pg/text@1', nullable: false }),
     )
     .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
     .build();

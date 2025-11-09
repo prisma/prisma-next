@@ -1,34 +1,15 @@
-import type { ModelDefinition, SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
+import type { ResultType } from '@prisma-next/contract/types';
+import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-target';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
+import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { defineContract } from '../src/contract-builder';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Adapter, LoweredStatement, ResultType, SelectAst } from '../src/types';
+import type { ComputeColumnJsType } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
-
-function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
-  return {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
-    },
-  };
-}
 
 describe('builder integration', () => {
   it('builds a contract matching fixture structure', () => {
@@ -36,9 +17,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false } as const)
+          .column('email', { type: 'pg/text@1', nullable: false } as const)
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false } as const)
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -47,24 +28,54 @@ describe('builder integration', () => {
       .coreHash('sha256:test-core')
       .build();
 
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
+
     // Runtime checks
-    expect(contract.schemaVersion).toBe('1');
-    expect(contract.target).toBe('postgres');
-    expect(contract.targetFamily).toBe('sql');
-    expect(contract.coreHash).toBe('sha256:test-core');
-    expect(contract.storage.tables).toHaveProperty('user');
+    expect(contract).toMatchObject({
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test-core',
+      storage: {
+        tables: expect.objectContaining({
+          user: expect.anything(),
+        }),
+      },
+    });
     const userTable = contract.storage.tables.user;
     expect(userTable).toBeDefined();
-    expect(userTable?.columns).toHaveProperty('id');
-    expect(userTable?.columns).toHaveProperty('email');
-    expect(userTable?.columns).toHaveProperty('createdAt');
+    expect(userTable?.columns).toMatchObject({
+      id: expect.anything(),
+      email: expect.anything(),
+      createdAt: expect.anything(),
+    });
+    expectTypeOf<keyof typeof contract.storage.tables>().toEqualTypeOf<'user'>();
+    type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
+    type IntCodecOutput = ContractCodecTypes['pg/int4@1']['output'];
+    expectTypeOf<IntCodecOutput>().toEqualTypeOf<number>();
+    type ColumnMeta = (typeof contract)['storage']['tables']['user']['columns']['id'];
+    type JsType = ComputeColumnJsType<
+      typeof contract,
+      'user',
+      'id',
+      ColumnMeta,
+      ContractCodecTypes
+    >;
+    expectTypeOf<JsType>().toEqualTypeOf<number>();
+
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
-    expect(contract.models).toHaveProperty('User');
     const userModel = contract.models.User;
-    expect(userModel.storage.table).toBe('user');
-    expect(userModel.fields).toHaveProperty('id');
-    expect(userModel.fields).toHaveProperty('email');
-    expect(userModel.fields).toHaveProperty('createdAt');
+    expect(userModel).toMatchObject({
+      storage: {
+        table: 'user',
+      },
+      fields: expect.objectContaining({
+        id: expect.anything(),
+        email: expect.anything(),
+        createdAt: expect.anything(),
+      }),
+    });
 
     // Type checks - verify literal types are preserved
     expectTypeOf(contract.target).toEqualTypeOf<'postgres'>();
@@ -96,6 +107,8 @@ describe('builder integration', () => {
     // Verify model storage table is literal 'user'
     expectTypeOf(contract.models.User.storage.table).toEqualTypeOf<'user'>();
 
+    expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
+
     // Verify model field names are literal types
     expectTypeOf(contract.models.User.fields).toHaveProperty('id');
     expectTypeOf(contract.models.User.fields).toHaveProperty('email');
@@ -107,9 +120,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -127,33 +140,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) =>
-        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-      )
-      .coreHash('sha256:test-core')
-      .build();
-
-    const tables = schema<typeof contract, CodecTypes>(contract).tables;
-    const userTable = tables.user;
-    expect(userTable).toBeDefined();
-    expect(userTable?.columns).toHaveProperty('id');
-    expect(userTable?.columns).toHaveProperty('email');
-    expect(userTable?.columns).toHaveProperty('createdAt');
-  });
-
-  it('contract works with sql() function', () => {
-    const contract = defineContract<CodecTypes>()
-      .target('postgres')
-      .table('user', (t) =>
-        t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -163,11 +152,45 @@ describe('builder integration', () => {
       .build();
 
     const adapter = createStubAdapter();
-    const tables = schema<typeof contract, CodecTypes>(contract).tables;
+    const context = createTestContext(contract, adapter);
+    const tables = schema<typeof contract>(context).tables;
+    const userTable = tables.user;
+    expect(userTable).toBeDefined();
+    expect(userTable?.columns).toMatchObject({
+      id: expect.anything(),
+      email: expect.anything(),
+      createdAt: expect.anything(),
+    });
+    type IdColumn = NonNullable<typeof userTable>['columns']['id'];
+    type IdJsType = IdColumn extends { __jsType: infer Js } ? Js : never;
+    expectTypeOf<IdJsType>().toEqualTypeOf<number>();
+  });
+
+  it('contract works with sql() function', () => {
+    const contract = defineContract<CodecTypes>()
+      .target('postgres')
+      .table('user', (t) =>
+        t
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
+          .primaryKey(['id']),
+      )
+      .model('User', 'user', (m) =>
+        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
+      )
+      .coreHash('sha256:test-core')
+      .build();
+
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema<typeof contract>(context).tables;
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract, CodecTypes>({ contract, adapter })
+    const _plan = sql<typeof contract, CodecTypes>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
@@ -177,7 +200,7 @@ describe('builder integration', () => {
 
     // Runtime checks
     expect(_plan.ast).toBeDefined();
-    expect(_plan.ast?.kind).toBe('select');
+    expect((_plan.ast as { kind: string })?.kind).toBe('select');
     expect(_plan.meta.coreHash).toBe('sha256:test-core');
 
     // Type checks - verify plan types are specific
@@ -196,9 +219,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -208,11 +231,12 @@ describe('builder integration', () => {
       .build();
 
     const adapter = createStubAdapter();
-    const tables = schema<typeof contract, CodecTypes>(contract).tables;
+    const context = createTestContext(contract, adapter);
+    const tables = schema<typeof contract>(context).tables;
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract, CodecTypes>({ contract, adapter })
+    const _plan = sql<typeof contract, CodecTypes>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
@@ -242,9 +266,9 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false })
-          .column('email', 'text', { nullable: false })
-          .column('createdAt', 'timestamptz', { nullable: false })
+          .column('id', { type: 'pg/int4@1', nullable: false })
+          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) =>
@@ -295,8 +319,8 @@ describe('builder integration', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', 'int4', { nullable: false, type: dataTypes.int4 })
-          .column('email', 'text', { nullable: false, type: dataTypes.text }),
+          .column('id', { type: dataTypes.int4, nullable: false })
+          .column('email', { type: dataTypes.text, nullable: false }),
       )
       .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
       .build();
@@ -310,8 +334,294 @@ describe('builder integration', () => {
     expect(() => {
       defineContract<CodecTypes>()
         .target('postgres')
-        .table('user', (t) => t.column('id', 'int4', { type: 'invalid' }))
+        .table('user', (t) => t.column('id', { type: 'invalid' }))
         .build();
     }).toThrow(/type must be in format/);
+  });
+
+  describe('relation builder', () => {
+    it('builds a contract with 1:N relation', () => {
+      const contract = defineContract<CodecTypes>()
+        .target('postgres')
+        .table('user', (t) =>
+          t
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('email', { type: 'pg/text@1', nullable: false })
+            .primaryKey(['id']),
+        )
+        .table('post', (t) =>
+          t
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('userId', { type: 'pg/int4@1', nullable: false })
+            .column('title', { type: 'pg/text@1', nullable: false })
+            .primaryKey(['id']),
+        )
+        .model('User', 'user', (m) =>
+          m
+            .field('id', 'id')
+            .field('email', 'email')
+            .relation('posts', {
+              toModel: 'Post',
+              toTable: 'post',
+              cardinality: '1:N',
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'post',
+                childColumns: ['userId'],
+              },
+            }),
+        )
+        .model('Post', 'post', (m) =>
+          m
+            .field('id', 'id')
+            .field('userId', 'userId')
+            .field('title', 'title')
+            .relation('user', {
+              toModel: 'User',
+              toTable: 'user',
+              cardinality: 'N:1',
+              on: {
+                parentTable: 'post',
+                parentColumns: ['userId'],
+                childTable: 'user',
+                childColumns: ['id'],
+              },
+            }),
+        )
+        .coreHash('sha256:test-core')
+        .build();
+
+      // Runtime checks
+      expect(contract.relations).toBeDefined();
+      const relations = contract.relations as Record<string, Record<string, unknown>>;
+      const userRelations = relations['user'] as Record<string, unknown>;
+      const postRelations = relations['post'] as Record<string, unknown>;
+      expect(userRelations).toBeDefined();
+      expect(userRelations['posts']).toBeDefined();
+      const userPosts = userRelations['posts'] as {
+        to: string;
+        cardinality: string;
+        on: { parentCols: readonly string[]; childCols: readonly string[] };
+      };
+      expect(userPosts.to).toBe('Post');
+      expect(userPosts.cardinality).toBe('1:N');
+      expect(userPosts.on.parentCols).toEqual(['id']);
+      expect(userPosts.on.childCols).toEqual(['userId']);
+
+      expect(postRelations).toBeDefined();
+      expect(postRelations['user']).toBeDefined();
+      const postUser = postRelations['user'] as {
+        to: string;
+        cardinality: string;
+        on: { parentCols: readonly string[]; childCols: readonly string[] };
+      };
+      expect(postUser.to).toBe('User');
+      expect(postUser.cardinality).toBe('N:1');
+      expect(postUser.on.parentCols).toEqual(['userId']);
+      expect(postUser.on.childCols).toEqual(['id']);
+    });
+
+    it('builds a contract with N:M relation', () => {
+      const contract = defineContract<CodecTypes>()
+        .target('postgres')
+        .table('user', (t) =>
+          t
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('email', { type: 'pg/text@1', nullable: false })
+            .primaryKey(['id']),
+        )
+        .table('role', (t) =>
+          t
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('name', { type: 'pg/text@1', nullable: false })
+            .primaryKey(['id']),
+        )
+        .table('userRole', (t) =>
+          t
+            .column('userId', { type: 'pg/int4@1', nullable: false })
+            .column('roleId', { type: 'pg/int4@1', nullable: false })
+            .primaryKey(['userId', 'roleId']),
+        )
+        .model('User', 'user', (m) =>
+          m
+            .field('id', 'id')
+            .field('email', 'email')
+            .relation('roles', {
+              toModel: 'Role',
+              toTable: 'role',
+              cardinality: 'N:M',
+              through: {
+                table: 'userRole',
+                parentColumns: ['id'],
+                childColumns: ['userId'],
+              },
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'userRole',
+                childColumns: ['userId'],
+              },
+            }),
+        )
+        .model('Role', 'role', (m) =>
+          m
+            .field('id', 'id')
+            .field('name', 'name')
+            .relation('users', {
+              toModel: 'User',
+              toTable: 'user',
+              cardinality: 'N:M',
+              through: {
+                table: 'userRole',
+                parentColumns: ['id'],
+                childColumns: ['roleId'],
+              },
+              on: {
+                parentTable: 'role',
+                parentColumns: ['id'],
+                childTable: 'userRole',
+                childColumns: ['roleId'],
+              },
+            }),
+        )
+        .coreHash('sha256:test-core')
+        .build();
+
+      // Runtime checks
+      const relations = contract.relations as Record<string, Record<string, unknown>>;
+      const userRelations = relations['user'] as Record<string, unknown>;
+      const roleRelations = relations['role'] as Record<string, unknown>;
+      expect(userRelations).toBeDefined();
+      expect(userRelations['roles']).toBeDefined();
+      const userRoles = userRelations['roles'] as {
+        to: string;
+        cardinality: string;
+        through?: { table: string; parentCols: readonly string[]; childCols: readonly string[] };
+      };
+      expect(userRoles.to).toBe('Role');
+      expect(userRoles.cardinality).toBe('N:M');
+      expect(userRoles.through).toBeDefined();
+      expect(userRoles.through?.table).toBe('userRole');
+      expect(userRoles.through?.parentCols).toEqual(['id']);
+      expect(userRoles.through?.childCols).toEqual(['userId']);
+
+      expect(roleRelations).toBeDefined();
+      expect(roleRelations['users']).toBeDefined();
+      const roleUsers = roleRelations['users'] as {
+        to: string;
+        cardinality: string;
+        through?: { table: string; parentCols: readonly string[]; childCols: readonly string[] };
+      };
+      expect(roleUsers.to).toBe('User');
+      expect(roleUsers.cardinality).toBe('N:M');
+      expect(roleUsers.through).toBeDefined();
+      expect(roleUsers.through?.table).toBe('userRole');
+      expect(roleUsers.through?.parentCols).toEqual(['id']);
+      expect(roleUsers.through?.childCols).toEqual(['roleId']);
+    });
+
+    it('validates parentTable matches model table', () => {
+      expect(() => {
+        defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('post', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .model('User', 'user', (m) =>
+            m.relation('posts', {
+              toModel: 'Post',
+              toTable: 'post',
+              cardinality: '1:N',
+              on: {
+                parentTable: 'wrongTable' as 'user',
+                parentColumns: ['id'],
+                childTable: 'post',
+                childColumns: ['userId'],
+              },
+            } as unknown as Parameters<typeof m.relation>[1]),
+          )
+          .build();
+      }).toThrow(/parentTable.*does not match model table/);
+    });
+
+    it('validates childTable matches toTable for non-N:M relations', () => {
+      expect(() => {
+        defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('post', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .model('User', 'user', (m) =>
+            m.relation('posts', {
+              toModel: 'Post',
+              toTable: 'post',
+              cardinality: '1:N',
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'wrongTable',
+                childColumns: ['userId'],
+              },
+            }),
+          )
+          .build();
+      }).toThrow(/childTable.*does not match toTable/);
+    });
+
+    it('validates N:M relations require through field', () => {
+      expect(() => {
+        defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('role', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .model('User', 'user', (m) => {
+            // Intentionally omit through to test validation
+            const invalidRelation = {
+              toModel: 'Role' as const,
+              toTable: 'role' as const,
+              cardinality: 'N:M' as const,
+              on: {
+                parentTable: 'user' as const,
+                parentColumns: ['id'] as const,
+                childTable: 'userRole' as const,
+                childColumns: ['userId'] as const,
+              },
+            };
+            return m.relation(
+              'roles',
+              invalidRelation as unknown as Parameters<typeof m.relation>[1],
+            );
+          })
+          .build();
+      }).toThrow(/cardinality "N:M" requires through field/);
+    });
+
+    it('validates childTable matches through.table for N:M relations', () => {
+      expect(() => {
+        defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('role', (t) => t.column('id', { type: 'pg/int4@1', nullable: false }))
+          .table('userRole', (t) => t.column('userId', { type: 'pg/int4@1', nullable: false }))
+          .model('User', 'user', (m) =>
+            m.relation('roles', {
+              toModel: 'Role',
+              toTable: 'role',
+              cardinality: 'N:M',
+              through: {
+                table: 'userRole',
+                parentColumns: ['id'],
+                childColumns: ['userId'],
+              },
+              on: {
+                parentTable: 'user',
+                parentColumns: ['id'],
+                childTable: 'wrongTable',
+                childColumns: ['userId'],
+              },
+            }),
+          )
+          .build();
+      }).toThrow(/childTable.*does not match through.table/);
+    });
   });
 });

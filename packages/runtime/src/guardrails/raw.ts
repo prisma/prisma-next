@@ -1,4 +1,4 @@
-import type { Plan, PlanMeta, PlanRefs } from '@prisma-next/sql-query/types';
+import type { Plan, PlanMeta, PlanRefs } from '@prisma-next/contract/types';
 
 import type { BudgetFinding, BudgetSeverity, LintFinding } from '../diagnostics';
 
@@ -90,6 +90,22 @@ function evaluateIndexCoverage(refs: PlanRefs, lints: LintFinding[]) {
   }
 
   const indexes = refs.indexes ?? [];
+
+  // If there are no indexes at all, all predicates are unindexed
+  if (indexes.length === 0) {
+    lints.push(
+      createLint(
+        'LINT.UNINDEXED_PREDICATE',
+        'warn',
+        'Raw SQL plan predicates lack supporting indexes',
+        {
+          predicates: predicateColumns,
+        },
+      ),
+    );
+    return;
+  }
+
   const hasSupportingIndex = predicateColumns.every((column) =>
     indexes.some(
       (index) =>

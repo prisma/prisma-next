@@ -1,17 +1,21 @@
+import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import type {
   Adapter,
   LoweredStatement,
-  Plan,
-  ResultType,
   SelectAst,
-} from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
+  SqlContract,
+  SqlDriver,
+  SqlStorage,
+} from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
+import type { RuntimeContext } from '../src/context';
 import type { Log, Plugin, SqlStatement } from '../src/exports';
 import {
   createRuntime,
+  createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
@@ -106,6 +110,24 @@ export interface CreateTestRuntimeOptions {
 }
 
 /**
+ * Creates a runtime context with standard test configuration.
+ * This helper DRYs up the common pattern of context creation in tests.
+ */
+export function createTestContext<TContract extends SqlContract<SqlStorage>>(
+  contract: TContract,
+  adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+  options?: {
+    extensions?: ReadonlyArray<import('../src/context').Extension>;
+  },
+): RuntimeContext<TContract> {
+  return createRuntimeContext<TContract>({
+    contract,
+    adapter,
+    extensions: options?.extensions ?? [],
+  });
+}
+
+/**
  * Creates a runtime with standard test configuration.
  * This helper DRYs up the common pattern of runtime creation in tests.
  */
@@ -124,22 +146,23 @@ export function createTestRuntime(
         requireMarker: options.verify.requireMarker ?? false,
       }
     : { mode: 'onFirstUse', requireMarker: false };
+  const context = createTestContext(contract, adapter);
   const runtimeOptions: {
-    contract: SqlContract<SqlStorage>;
     adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
     driver: SqlDriver;
     verify: {
       mode: 'onFirstUse' | 'startup' | 'always';
       requireMarker: boolean;
     };
+    context: RuntimeContext<SqlContract<SqlStorage>>;
     plugins?: readonly Plugin[];
     mode?: 'strict' | 'permissive';
     log?: Log;
   } = {
-    contract,
     adapter,
     driver,
     verify,
+    context,
   };
   if (options?.plugins) {
     runtimeOptions.plugins = options.plugins;
@@ -183,6 +206,46 @@ export async function setupE2EDatabase(
   setupFn: (client: Client) => Promise<void>,
 ): Promise<void> {
   await setupTestDatabase(client, contract, setupFn);
+}
+
+/**
+ * Creates a stub adapter for testing.
+ * This helper DRYs up the common pattern of adapter creation in tests.
+ */
+export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
+  return {
+    profile: {
+      id: 'stub-profile',
+      target: 'postgres',
+      capabilities: {},
+      codecs() {
+        return createCodecRegistry();
+      },
+    },
+    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
+      const sqlText = JSON.stringify(ast);
+      return {
+        profileId: this.profile.id,
+        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
+      };
+    },
+  };
+}
+
+/**
+ * Creates a valid test contract without using validateContract.
+ * Ensures mappings are present and returns the contract with proper typing.
+ * This helper allows tests to create contracts without depending on sql-query.
+ */
+export function createTestContract<T extends SqlContract<SqlStorage>>(contract: T): T {
+  // Ensure mappings are present
+  if (!contract.mappings) {
+    return {
+      ...contract,
+      mappings: { codecTypes: {}, operationTypes: {} },
+    } as T;
+  }
+  return contract;
 }
 
 // Re-export generic utilities from test-utils

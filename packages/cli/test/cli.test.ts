@@ -1,6 +1,11 @@
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('CLI entry point', () => {
   let originalExit: typeof process.exit;
@@ -59,5 +64,12 @@ describe('CLI entry point', () => {
     program.name('prisma-next').description('Prisma Next CLI').version('0.0.1');
 
     expect(program.version()).toBe('0.0.1');
+  });
+
+  it('imports CLI module without errors', async () => {
+    const cliPath = join(__dirname, '../src/cli.ts');
+    const cliContent = await readFile(cliPath, 'utf-8');
+    expect(cliContent).toContain('prisma-next');
+    expect(cliContent).toContain('createEmitCommand');
   });
 });

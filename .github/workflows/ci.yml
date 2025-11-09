@@ -1,9 +1,10 @@
 name: ci
 
-on: [push, pull_request]
+on:
+  pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
@@ -159,8 +160,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
-      - name: Generate coverage
-        run: pnpm test:coverage:packages
+      - name: Generate coverage and report
+        run: node scripts/coverage-report.mjs
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:

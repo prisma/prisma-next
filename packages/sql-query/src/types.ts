@@ -1,27 +1,17 @@
-export type {
-  Adapter,
-  AdapterProfile,
-  AdapterTarget,
-  LoweredPayload,
-  Lowerer,
-  LowererContext,
-  ModelDefinition,
-  ModelField,
-  ModelStorage,
+import type { Plan, PlanRefs } from '@prisma-next/contract/types';
+import type {
+  ArgSpec,
+  ColumnRef,
+  Direction,
+  LoweringSpec,
+  OperationExpr,
+  ParamRef,
+  QueryAst,
+  ReturnSpec,
   SqlContract,
-  SqlDriver,
-  SqlExecuteRequest,
-  SqlExplainResult,
-  SqlMappings,
-  SqlQueryResult,
   SqlStorage,
   StorageColumn,
-  StorageTable,
 } from '@prisma-next/sql-target';
-
-import type { Adapter, SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
-
-export type Direction = 'asc' | 'desc';
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';
@@ -34,15 +24,20 @@ export interface OrderBuilder<
   JsType = unknown,
 > {
   readonly kind: 'order';
-  readonly expr: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
+  readonly expr: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly dir: Direction;
 }
 
-export interface ColumnBuilder<
+/**
+ * ColumnBuilder with optional operation methods based on the column's typeId.
+ * When Operations is provided and the column's typeId matches, operation methods are included.
+ */
+export type ColumnBuilder<
   ColumnName extends string = string,
   ColumnMeta extends StorageColumn = StorageColumn,
   JsType = unknown,
-> {
+  Operations extends OperationTypes = Record<string, never>,
+> = {
   readonly kind: 'column';
   readonly table: string;
   readonly column: ColumnName;
@@ -50,7 +45,16 @@ export interface ColumnBuilder<
   eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
-}
+  // Helper property for type extraction (not used at runtime)
+  readonly __jsType: JsType;
+} & (ColumnMeta['type'] extends keyof Operations
+  ? OperationMethods<
+      OperationsForTypeId<ColumnMeta['type'], Operations>,
+      ColumnName,
+      StorageColumn,
+      JsType
+    >
+  : Record<string, never>);
 
 export interface BinaryBuilder<
   ColumnName extends string = string,
@@ -59,132 +63,26 @@ export interface BinaryBuilder<
 > {
   readonly kind: 'binary';
   readonly op: 'eq';
-  readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
+  readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly right: ParamPlaceholder;
 }
 
+// Helper aliases for usage sites where the specific column parameters are irrelevant
+export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, OperationTypes>;
+export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
+export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
+
 export interface JoinOnBuilder {
-  eqCol(
-    left: ColumnBuilder<string, StorageColumn, unknown>,
-    right: ColumnBuilder<string, StorageColumn, unknown>,
-  ): JoinOnPredicate;
+  eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate;
 }
 
 export interface JoinOnPredicate {
   readonly kind: 'join-on';
-  readonly left: ColumnBuilder<string, StorageColumn, unknown>;
-  readonly right: ColumnBuilder<string, StorageColumn, unknown>;
-}
-
-export interface TableRef {
-  readonly kind: 'table';
-  readonly name: string;
-}
-
-export interface ColumnRef {
-  readonly kind: 'col';
-  readonly table: string;
-  readonly column: string;
-}
-
-export interface ParamRef {
-  readonly kind: 'param';
-  readonly index: number;
-  readonly name?: string;
+  readonly left: AnyColumnBuilder;
+  readonly right: AnyColumnBuilder;
 }
 
 export type Expr = ColumnRef | ParamRef;
-
-export interface BinaryExpr {
-  readonly kind: 'bin';
-  readonly op: 'eq';
-  readonly left: ColumnRef;
-  readonly right: ParamRef;
-}
-
-export type JoinOnExpr = {
-  readonly kind: 'eqCol';
-  readonly left: ColumnRef;
-  readonly right: ColumnRef;
-};
-
-export interface JoinAst {
-  readonly kind: 'join';
-  readonly joinType: 'inner' | 'left' | 'right' | 'full';
-  readonly table: TableRef;
-  readonly on: JoinOnExpr;
-}
-
-export interface IncludeRef {
-  readonly kind: 'includeRef';
-  readonly alias: string;
-}
-
-export interface IncludeAst {
-  readonly kind: 'includeMany';
-  readonly alias: string;
-  readonly child: {
-    readonly table: TableRef;
-    readonly on: JoinOnExpr;
-    readonly where?: BinaryExpr;
-    readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
-    readonly limit?: number;
-    readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
-  };
-}
-
-export interface SelectAst {
-  readonly kind: 'select';
-  readonly from: TableRef;
-  readonly joins?: ReadonlyArray<JoinAst>;
-  readonly includes?: ReadonlyArray<IncludeAst>;
-  readonly project: ReadonlyArray<{
-    alias: string;
-    expr: ColumnRef | IncludeRef;
-  }>;
-  readonly where?: BinaryExpr;
-  readonly orderBy?: ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
-  readonly limit?: number;
-}
-
-export interface ParamDescriptor {
-  readonly index?: number;
-  readonly name?: string;
-  readonly type?: string;
-  readonly nullable?: boolean;
-  readonly source: 'dsl' | 'raw';
-  readonly refs?: { table: string; column: string };
-}
-
-export interface PlanRefs {
-  readonly tables?: readonly string[];
-  readonly columns?: ReadonlyArray<{ table: string; column: string }>;
-  readonly indexes?: ReadonlyArray<{
-    readonly table: string;
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  }>;
-}
-
-export interface PlanMeta {
-  readonly target: string;
-  readonly targetFamily?: string;
-  readonly coreHash: string;
-  readonly profileHash?: string;
-  readonly lane: string;
-  readonly annotations?: {
-    codecs?: Record<string, string>; // alias/param → codec id ('ns/name@v')
-    [key: string]: unknown;
-  };
-  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
-  readonly refs?: PlanRefs;
-  readonly projection?: Record<string, string> | ReadonlyArray<string>;
-  /**
-   * Optional mapping of projection alias → column type ID (fully qualified ns/name@version).
-   * Used for codec resolution when AST+refs don't provide enough type info.
-   */
-  readonly projectionTypes?: Record<string, string>;
-}
 
 /**
  * Helper type to extract codec output type from CodecTypes.
@@ -192,12 +90,138 @@ export interface PlanMeta {
  */
 type ExtractCodecOutputType<
   CodecId extends string,
-  CodecTypes extends Record<string, { output: unknown }>,
+  CodecTypes extends Record<string, { readonly output: unknown }>,
 > = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId] extends { output: infer Output }
+  ? CodecTypes[CodecId] extends { readonly output: infer Output }
     ? Output
     : never
   : never;
+
+/**
+ * Type-level operation signature.
+ * Represents an operation at the type level, similar to OperationSignature at runtime.
+ */
+export type OperationTypeSignature = {
+  readonly args: ReadonlyArray<ArgSpec>;
+  readonly returns: ReturnSpec;
+  readonly lowering: LoweringSpec;
+  readonly capabilities?: ReadonlyArray<string>;
+};
+
+/**
+ * Type-level operation registry.
+ * Maps typeId → operations, where operations is a record of method name → operation signature.
+ *
+ * Example:
+ * ```typescript
+ * type MyOperations: OperationTypes = {
+ *   'pgvector/vector@1': {
+ *     cosineDistance: {
+ *       args: [{ kind: 'typeId'; type: 'pgvector/vector@1' }];
+ *       returns: { kind: 'builtin'; type: 'number' };
+ *       lowering: { targetFamily: 'sql'; strategy: 'function'; template: '...' };
+ *     };
+ *   };
+ * };
+ * ```
+ */
+export type OperationTypes = Record<string, Record<string, OperationTypeSignature>>;
+
+/**
+ * CodecTypes represents a map of typeId to codec definitions.
+ * Each codec definition must have an `output` property indicating the JavaScript type.
+ *
+ * Example:
+ * ```typescript
+ * type MyCodecTypes: CodecTypes = {
+ *   'pg/int4@1': { output: number };
+ *   'pg/text@1': { output: string };
+ * };
+ * ```
+ */
+export type CodecTypes = Record<string, { readonly output: unknown }>;
+
+/**
+ * Extracts operations for a given typeId from the operation registry.
+ * Returns an empty record if the typeId is not found.
+ *
+ * @example
+ * ```typescript
+ * type Ops = OperationsForTypeId<'pgvector/vector@1', MyOperations>;
+ * // Ops = { cosineDistance: { ... }, l2Distance: { ... } }
+ * ```
+ */
+export type OperationsForTypeId<
+  TypeId extends string,
+  Operations extends OperationTypes,
+> = Operations extends Record<string, never>
+  ? Record<string, never>
+  : TypeId extends keyof Operations
+    ? Operations[TypeId]
+    : Record<string, never>;
+
+/**
+ * Maps operation signatures to method signatures on ColumnBuilder.
+ * Each operation becomes a method that returns a ColumnBuilder or BinaryBuilder
+ * based on the return type.
+ */
+type OperationMethods<
+  Ops extends Record<string, OperationTypeSignature>,
+  ColumnName extends string,
+  ColumnMeta extends StorageColumn,
+  JsType,
+> = {
+  [K in keyof Ops]: Ops[K] extends OperationTypeSignature
+    ? (
+        ...args: OperationArgs<Ops[K]['args']>
+      ) => OperationReturn<Ops[K]['returns'], ColumnName, ColumnMeta, JsType>
+    : never;
+};
+
+/**
+ * Maps operation argument specs to TypeScript argument types.
+ * - typeId args: ColumnBuilder (accepts base columns or operation results)
+ * - param args: ParamPlaceholder
+ * - literal args: unknown (could be more specific in future)
+ */
+type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly [
+  infer First,
+  ...infer Rest,
+]
+  ? First extends ArgSpec
+    ? [ArgToType<First>, ...(Rest extends ReadonlyArray<ArgSpec> ? OperationArgs<Rest> : [])]
+    : []
+  : [];
+
+type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
+  ? AnyColumnBuilder
+  : Arg extends { kind: 'param' }
+    ? ParamPlaceholder
+    : Arg extends { kind: 'literal' }
+      ? unknown
+      : never;
+
+/**
+ * Maps operation return spec to return type.
+ * - builtin types: ColumnBuilder with appropriate JsType (matches runtime behavior)
+ * - typeId types: ColumnBuilder (for now, could be more specific in future)
+ */
+type OperationReturn<
+  Returns extends ReturnSpec,
+  ColumnName extends string,
+  ColumnMeta extends StorageColumn,
+  _JsType,
+> = Returns extends { kind: 'builtin'; type: infer T }
+  ? T extends 'number'
+    ? ColumnBuilder<ColumnName, ColumnMeta, number>
+    : T extends 'boolean'
+      ? ColumnBuilder<ColumnName, ColumnMeta, boolean>
+      : T extends 'string'
+        ? ColumnBuilder<ColumnName, ColumnMeta, string>
+        : ColumnBuilder<ColumnName, ColumnMeta, unknown>
+  : Returns extends { kind: 'typeId' }
+    ? AnyColumnBuilder
+    : ColumnBuilder<ColumnName, ColumnMeta, unknown>;
 
 /**
  * Computes JavaScript type for a column at column creation time.
@@ -212,7 +236,7 @@ export type ComputeColumnJsType<
   _TableName extends string,
   _ColumnName extends string,
   ColumnMeta extends StorageColumn,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }>,
 > = ColumnMeta extends { type: infer T; nullable: infer N }
   ? T extends string
     ? ExtractCodecOutputType<T, CodecTypes> extends infer CodecOutput
@@ -231,10 +255,20 @@ export type ComputeColumnJsType<
  *
  * Extracts the pre-computed JsType from each ColumnBuilder in the projection.
  */
-export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
-  [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
-    ? JsType
-    : never;
+/**
+ * Extracts the inferred JsType carried by a ColumnBuilder.
+ */
+type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends ColumnBuilder<
+  string,
+  StorageColumn,
+  infer JsType,
+  infer _Ops extends OperationTypes
+>
+  ? JsType
+  : never;
+
+export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
+  [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;
 };
 
 /**
@@ -242,13 +276,13 @@ export type InferProjectionRow<P extends Record<string, ColumnBuilder>> = {
  */
 export type NestedProjection = Record<
   string,
-  | ColumnBuilder
+  | AnyColumnBuilder
   | Record<
       string,
-      | ColumnBuilder
+      | AnyColumnBuilder
       | Record<
           string,
-          ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
+          AnyColumnBuilder | Record<string, AnyColumnBuilder | Record<string, AnyColumnBuilder>>
         >
     >
 >;
@@ -271,41 +305,38 @@ type ExtractIncludeType<
  * by looking up the include alias in the Includes type map.
  */
 export type InferNestedProjectionRow<
-  P extends Record<
-    string,
-    | ColumnBuilder
-    | boolean
-    | Record<
-        string,
-        | ColumnBuilder
-        | Record<
-            string,
-            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-          >
-      >
-  >,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  P extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > = {
-  [K in keyof P]: P[K] extends ColumnBuilder<infer _Name, infer _Meta, infer JsType>
-    ? JsType
+  [K in keyof P]: P[K] extends AnyColumnBuilder
+    ? ExtractJsTypeFromColumnBuilder<P[K]>
     : P[K] extends true
       ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
-      : P[K] extends Record<
-            string,
-            | ColumnBuilder
-            | Record<
-                string,
-                | ColumnBuilder
-                | Record<
-                    string,
-                    ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-                  >
-              >
-          >
+      : P[K] extends NestedProjection
         ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
         : never;
 };
+
+/**
+ * Infers Row type from a tuple of ColumnBuilders used in returning() clause.
+ * Extracts column name and JsType from each ColumnBuilder and creates a Record.
+ */
+export type InferReturningRow<Columns extends readonly AnyColumnBuilder[]> =
+  Columns extends readonly [infer First, ...infer Rest]
+    ? First extends ColumnBuilder<
+        infer Name,
+        infer _Meta,
+        infer JsType,
+        infer _Ops extends OperationTypes
+      >
+      ? Name extends string
+        ? Rest extends readonly AnyColumnBuilder[]
+          ? { [K in Name]: JsType } & InferReturningRow<Rest>
+          : { [K in Name]: JsType }
+        : never
+      : never
+    : Record<string, never>;
 
 /**
  * Utility type to check if a contract has the required capabilities for includeMany.
@@ -326,10 +357,12 @@ export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>
     : false;
 
 /**
- * Utility type to extract the Row type from a Plan.
- * Example: `type Row = ResultType<typeof plan>`
+ * SQL-specific Plan type that refines the ast field to use QueryAst.
+ * This is the type used by SQL query builders.
  */
-export type ResultType<P> = P extends Plan<infer R> ? R : never;
+export type SqlPlan<Row = unknown> = Omit<Plan<Row>, 'ast'> & {
+  readonly ast?: QueryAst;
+};
 
 /**
  * Helper types for extracting contract structure.
@@ -394,13 +427,6 @@ export type ColumnsOf<
     : never
   : never;
 
-export interface Plan<_Row = unknown> {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-  readonly ast?: SelectAst;
-  readonly meta: PlanMeta;
-}
-
 export interface RawTemplateOptions {
   readonly refs?: PlanRefs;
   readonly annotations?: Record<string, unknown>;
@@ -419,12 +445,6 @@ export type RawTemplateFactory = (
 export interface RawFactory extends RawTemplateFactory {
   (text: string, options: RawFunctionOptions): Plan;
   with(options: RawTemplateOptions): RawTemplateFactory;
-}
-
-export interface LoweredStatement {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-  readonly annotations?: Record<string, unknown>;
 }
 
 export interface RuntimeError extends Error {
@@ -447,9 +467,6 @@ export interface BuildOptions {
 
 export interface SqlBuilderOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 > {
-  readonly contract: TContract;
-  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
-  readonly codecTypes?: CodecTypes;
+  readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
 }

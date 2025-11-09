@@ -9,9 +9,12 @@ describe('canonicalization', () => {
       target: 'postgres',
       schemaVersion: '1',
       models: {},
+      relations: {},
       storage: { tables: {} },
+      extensions: {},
       capabilities: { postgres: { jsonAgg: true } },
       meta: { source: 'test' },
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -38,6 +41,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -48,6 +54,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -66,26 +76,42 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
       models: {},
+      relations: {},
       storage: { tables: {} },
-      capabilities: {},
       extensions: {},
+      capabilities: {},
       meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
-    const parsed = JSON.parse(result) as Record<string, unknown>;
-    expect(parsed['models']).toBeDefined();
-    expect((parsed['storage'] as Record<string, unknown>)['tables']).toBeDefined();
-    expect(parsed['capabilities']).toBeUndefined();
-    expect(parsed['extensions']).toBeUndefined();
-    expect(parsed['meta']).toBeUndefined();
+    const parsed = JSON.parse(result);
+    expect(parsed).toMatchObject({
+      models: expect.anything(),
+      storage: {
+        tables: expect.anything(),
+      },
+    });
+    // Required top-level fields (capabilities, extensions, meta, relations, sources) are preserved even when empty
+    // because they are required by ContractIR and needed for round-trip tests
+    expect(parsed).toMatchObject({
+      capabilities: expect.anything(),
+      extensions: expect.anything(),
+      meta: expect.anything(),
+      relations: expect.anything(),
+      sources: expect.anything(),
+    });
   });
 
   it('preserves semantic array order for column lists', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -99,6 +125,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result1 = canonicalizeContract(ir);
@@ -106,6 +136,9 @@ describe('canonicalization', () => {
     const ir2: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -119,6 +152,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result2 = canonicalizeContract(ir2);
@@ -130,6 +167,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -143,6 +183,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -159,6 +203,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -170,6 +217,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -186,11 +237,18 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
+      storage: { tables: {} },
       extensions: {
         pgvector: { version: '1.0.0' },
         postgres: { version: '15.0.0' },
         another: { version: '1.0.0' },
       },
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);
@@ -204,6 +262,9 @@ describe('canonicalization', () => {
     const ir: ContractIR = {
       targetFamily: 'sql',
       target: 'postgres',
+      schemaVersion: '1',
+      models: {},
+      relations: {},
       storage: {
         tables: {
           user: {
@@ -213,6 +274,10 @@ describe('canonicalization', () => {
           },
         },
       },
+      extensions: {},
+      capabilities: {},
+      meta: {},
+      sources: {},
     };
 
     const result = canonicalizeContract(ir);

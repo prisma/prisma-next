@@ -1,20 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
+import type { ParamDescriptor } from '@prisma-next/contract/types';
+import type { RuntimeContext } from '@prisma-next/runtime';
+import type { SelectAst as SelectAstType, SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
+import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
+import { orm } from '../src/orm';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type {
-  Adapter,
-  ColumnBuilder,
-  LoweredStatement,
-  ParamDescriptor,
-  SelectAst,
-} from '../src/types';
+import type { ColumnBuilder } from '../src/types';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -26,35 +23,22 @@ function loadContract(name: string): Contract {
   return validateContract<Contract>(contractJson);
 }
 
-function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
-  return {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
-    },
-  };
+function createOrmWithContext<TContract extends SqlContract<SqlStorage>>(
+  context: RuntimeContext<SqlContract<SqlStorage>>,
+): ReturnType<typeof orm<TContract>> {
+  return orm<TContract>({ context: context as unknown as RuntimeContext<TContract> });
 }
 
 describe('sql DSL builder', () => {
   const contract = loadContract('contract');
-  const tables = schema<Contract, CodecTypes>(contract).tables;
   const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
+  const tables = schema<Contract>(context).tables;
 
   it('builds a select plan with projection, where, order, and limit', () => {
     const userColumns = tables.user.columns;
 
-    const plan = sql<Contract, CodecTypes>({ contract, adapter })
+    const plan = sql<Contract, CodecTypes>({ context })
       .from(tables.user)
       .select({
         id: userColumns.id,
@@ -116,11 +100,7 @@ describe('sql DSL builder', () => {
   });
 
   it('throws PLAN.INVALID when selecting an invalid column', () => {
-    const builder = sql<Contract, CodecTypes>({
-      contract,
-      adapter,
-      codecTypes: {} as CodecTypes,
-    }).from(tables.user);
+    const builder = sql<Contract, CodecTypes>({ context }).from(tables.user);
 
     // Invalid: passing something that's not a ColumnBuilder or nested object
     expect(() => builder.select({ invalid: null as unknown as ColumnBuilder })).toThrowError(
@@ -131,7 +111,7 @@ describe('sql DSL builder', () => {
   it('throws PLAN.INVALID when parameter value is missing', () => {
     const userColumns = tables.user.columns;
 
-    const builder = sql<Contract, CodecTypes>({ contract, adapter, codecTypes: {} as CodecTypes })
+    const builder = sql<Contract, CodecTypes>({ context })
       .from(tables.user)
       .select({
         id: userColumns.id,
@@ -164,9 +144,10 @@ describe('sql DSL builder', () => {
       };
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
-      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
-        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
+      const contextWithCodecs = createTestContext(contractValidated, adapter);
+      const userColumns = schema<Contract>(contextWithCodecs).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ context: contextWithCodecs })
+        .from(schema<Contract>(contextWithCodecs).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -182,9 +163,10 @@ describe('sql DSL builder', () => {
 
     it('encodes codec assignments from column types for WHERE parameters', () => {
       const contractValidated = validateContract<Contract>(contract);
-      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
-        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
+      const contextValidated = createTestContext(contractValidated, adapter);
+      const userColumns = schema<Contract>(contextValidated).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ context: contextValidated })
+        .from(schema<Contract>(contextValidated).tables.user)
         .select({
           email: userColumns.email,
         })
@@ -220,9 +202,10 @@ describe('sql DSL builder', () => {
       };
 
       const contractValidated = validateContract<Contract>(contractWithCodecs);
-      const userColumns = schema<Contract, CodecTypes>(contractValidated).tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract: contractValidated, adapter })
-        .from(schema<Contract, CodecTypes>(contractValidated).tables.user)
+      const contextWithCodecs = createTestContext(contractValidated, adapter);
+      const userColumns = schema<Contract>(contextWithCodecs).tables.user.columns;
+      const plan = sql<Contract, CodecTypes>({ context: contextWithCodecs })
+        .from(schema<Contract>(contextWithCodecs).tables.user)
         .select({
           id: userColumns.id,
           email: userColumns.email,
@@ -241,7 +224,7 @@ describe('sql DSL builder', () => {
     it('includes codec annotations from column types', () => {
       // Contract fixture has column types as pg/*@1 IDs
       const userColumns = tables.user.columns;
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           id: userColumns.id,
@@ -261,7 +244,7 @@ describe('sql DSL builder', () => {
     it('flattens single-level nested projection', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           name: userColumns.email,
@@ -271,7 +254,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'id' } },
       ]);
@@ -285,7 +268,7 @@ describe('sql DSL builder', () => {
     it('flattens multi-level nested projection', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           a: {
@@ -296,7 +279,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'a_b_c', expr: { kind: 'col', table: 'user', column: 'id' } },
       ]);
 
@@ -308,7 +291,7 @@ describe('sql DSL builder', () => {
     it('handles mixed leaves and nested objects', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           id: userColumns.id,
@@ -322,7 +305,7 @@ describe('sql DSL builder', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
         { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
         { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_author_name', expr: { kind: 'col', table: 'user', column: 'id' } },
@@ -340,7 +323,7 @@ describe('sql DSL builder', () => {
     it('throws PLAN.INVALID on alias collision', () => {
       const userColumns = tables.user.columns;
 
-      const builder = sql<Contract, CodecTypes>({ contract, adapter }).from(tables.user);
+      const builder = sql<Contract, CodecTypes>({ context }).from(tables.user);
 
       expect(() =>
         builder.select({
@@ -355,7 +338,7 @@ describe('sql DSL builder', () => {
     it('includes projectionTypes for nested projections', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           name: userColumns.email,
@@ -374,7 +357,7 @@ describe('sql DSL builder', () => {
     it('includes codec annotations for nested projections', () => {
       const userColumns = tables.user.columns;
 
-      const plan = sql<Contract, CodecTypes>({ contract, adapter })
+      const plan = sql<Contract, CodecTypes>({ context })
         .from(tables.user)
         .select({
           name: userColumns.email,
@@ -389,5 +372,126 @@ describe('sql DSL builder', () => {
         post_title: 'pg/int4@1',
       });
     });
+  });
+
+  it('schema table proxy allows direct column access', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const schemaHandle = schema(context);
+    const userTable = schemaHandle.tables.user;
+
+    // Access column directly on table (via proxy)
+    const idColumn = (userTable as unknown as { id: unknown }).id;
+    expect(idColumn).toBeDefined();
+    expect((idColumn as { kind: string }).kind).toBe('column');
+
+    // Access non-existent property returns undefined
+    const invalidColumn = (userTable as unknown as { invalidColumn: unknown }).invalidColumn;
+    expect(invalidColumn).toBeUndefined();
+
+    // Access table properties (name, kind, columns) works
+    expect(userTable.name).toBe('user');
+    expect(userTable.kind).toBe('table');
+    expect(userTable.columns).toBeDefined();
+  });
+
+  it('throws error when column.eq() is called with invalid value', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const idColumn = tables.user.columns.id;
+
+    expect(() => {
+      (idColumn as { eq: (value: unknown) => unknown }).eq({ kind: 'invalid' } as unknown);
+    }).toThrow('Parameter placeholder required for column comparison');
+  });
+
+  it('handles column builder __jsType getter', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const idColumn = tables.user.columns.id;
+
+    // Access __jsType getter (type-level helper, returns undefined at runtime)
+    const jsType = (idColumn as { __jsType: unknown }).__jsType;
+    expect(jsType).toBeUndefined();
+  });
+
+  it('uses fieldToColumn mapping when available', () => {
+    const contract = loadContract('contract');
+    const contractWithMapping = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        fieldToColumn: {
+          ...contract.mappings.fieldToColumn,
+          User: {
+            ...contract.mappings.fieldToColumn?.User,
+            email: 'email',
+          },
+        },
+      },
+    };
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithMapping, adapter);
+    const o = createOrmWithContext<Contract>(context);
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Should not throw - should use fieldToColumn mapping
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { email: { eq: (p: unknown) => unknown } };
+        return model.email.eq(param('email'));
+      });
+    }).not.toThrow();
+  });
+
+  it('uses field.column when fieldToColumn mapping is missing', () => {
+    const contract = loadContract('contract');
+    const contractWithFieldColumn = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        fieldToColumn: {
+          ...contract.mappings.fieldToColumn,
+          User: {},
+        },
+      },
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          fields: {
+            ...contract.models.User.fields,
+            email: {
+              column: 'email',
+            } as { column?: string },
+          },
+        },
+      },
+    };
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithFieldColumn, adapter);
+    const o = createOrmWithContext<Contract>(context);
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    // Should not throw - should use field.column
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { email: { eq: (p: unknown) => unknown } };
+        return model.email.eq(param('email'));
+      });
+    }).not.toThrow();
   });
 });

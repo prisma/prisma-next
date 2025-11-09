@@ -40,3 +40,12 @@ export function isDocumentContract(contract: unknown): contract is DocumentContr
     contract.targetFamily === 'document'
   );
 }
+
+// Plan types - target-family agnostic execution types
+export type {
+  ParamDescriptor,
+  Plan,
+  PlanMeta,
+  PlanRefs,
+  ResultType,
+} from '../types';

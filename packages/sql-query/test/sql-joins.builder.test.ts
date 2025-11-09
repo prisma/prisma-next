@@ -1,11 +1,17 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type {
+  Adapter,
+  LoweredStatement,
+  SelectAst,
+  SqlContract,
+  SqlStorage,
+} from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
+import { createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type for this test
@@ -17,6 +23,10 @@ type ContractWithPosts = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; nullable: false };
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly post: {
         readonly columns: {
@@ -24,6 +34,10 @@ type ContractWithPosts = SqlContract<
           readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
           readonly title: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly comment: {
         readonly columns: {
@@ -31,12 +45,19 @@ type ContractWithPosts = SqlContract<
           readonly postId: { readonly type: 'pg/int4@1'; nullable: false };
           readonly content: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
     };
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  {
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: Record<string, Record<string, unknown>>;
+  }
 >;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
@@ -51,6 +72,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -58,6 +83,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           userId: { type: 'pg/int4@1', nullable: false },
           title: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       comment: {
         columns: {
@@ -65,12 +94,19 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           postId: { type: 'pg/int4@1', nullable: false },
           content: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
 });
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
@@ -94,14 +130,14 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 }
 
 describe('SQL builder joins', () => {
-  const adapter = createStubAdapter();
-
   it('builds a plan with a single inner join', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ context })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .select({
@@ -112,7 +148,7 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-    expect(plan.ast?.joins).toEqual([
+    expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toEqual([
       {
         kind: 'join',
         joinType: 'inner',
@@ -127,12 +163,14 @@ describe('SQL builder joins', () => {
   });
 
   it('builds a plan with chained joins', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
     const commentColumns = tables.comment.columns;
 
-    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ context })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .leftJoin(tables.comment, (on) => on.eqCol(postColumns.id, commentColumns.postId))
@@ -143,8 +181,10 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-    expect(plan.ast?.joins).toBeDefined();
-    expect(plan.ast?.joins).toEqual([
+    expect(
+      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+    ).toBeDefined();
+    expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toEqual([
       {
         kind: 'join',
         joinType: 'inner',
@@ -169,12 +209,14 @@ describe('SQL builder joins', () => {
   });
 
   it('preserves join order across multiple chained joins', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
     const commentColumns = tables.comment.columns;
 
-    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ context })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .leftJoin(tables.comment, (on) => on.eqCol(postColumns.id, commentColumns.postId))
@@ -185,7 +227,12 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-    expect(plan.ast?.joins?.map((j) => ({ kind: j.kind, joinType: j.joinType }))).toEqual([
+    expect(
+      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins?.map((j) => ({
+        kind: j.kind,
+        joinType: j.joinType,
+      })),
+    ).toEqual([
       { kind: 'join', joinType: 'inner' },
       { kind: 'join', joinType: 'left' },
       { kind: 'join', joinType: 'right' },
@@ -194,11 +241,13 @@ describe('SQL builder joins', () => {
   });
 
   it('works with where clause alongside joins', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ context })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .where(userColumns.id.eq(param('userId')))
@@ -208,20 +257,24 @@ describe('SQL builder joins', () => {
       })
       .build({ params: { userId: 42 } });
 
-    expect(plan.ast?.joins).toBeDefined();
-    expect(plan.ast?.joins).toHaveLength(1);
-    expect(plan.ast?.where).toBeDefined();
+    expect(
+      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+    ).toBeDefined();
+    expect(
+      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+    ).toHaveLength(1);
+    const ast = plan.ast as SelectAst;
+    expect(ast?.where).toBeDefined();
     expect(plan.params).toEqual([42]);
   });
 
   it('throws PLAN.INVALID when joining unknown table', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
 
-    const builder = sql<ContractWithPosts, CodecTypes>({
-      contract: contractWithPosts,
-      adapter,
-    }).from(tables.user);
+    const builder = sql<ContractWithPosts, CodecTypes>({ context }).from(tables.user);
 
     expect(() =>
       builder.innerJoin({ kind: 'table', name: 'unknown' }, (on) =>
@@ -231,13 +284,12 @@ describe('SQL builder joins', () => {
   });
 
   it('throws PLAN.INVALID when attempting self-join', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
 
-    const builder = sql<ContractWithPosts, CodecTypes>({
-      contract: contractWithPosts,
-      adapter,
-    }).from(tables.user);
+    const builder = sql<ContractWithPosts, CodecTypes>({ context }).from(tables.user);
 
     expect(() =>
       builder.innerJoin(tables.user, (on) => on.eqCol(userColumns.id, userColumns.id)),
@@ -245,17 +297,16 @@ describe('SQL builder joins', () => {
   });
 
   it('supports all join types', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
     const joinTypes = ['inner', 'left', 'right', 'full'] as const;
 
     for (const joinType of joinTypes) {
-      const builder = sql<ContractWithPosts, CodecTypes>({
-        contract: contractWithPosts,
-        adapter,
-      }).from(tables.user);
+      const builder = sql<ContractWithPosts, CodecTypes>({ context }).from(tables.user);
 
       const plan =
         joinType === 'inner'
@@ -268,16 +319,21 @@ describe('SQL builder joins', () => {
 
       const builtPlan = plan.select({ userId: userColumns.id }).build();
 
-      expect(builtPlan.ast?.joins?.[0]?.joinType).toBe(joinType);
+      expect(
+        (builtPlan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins?.[0]
+          ?.joinType,
+      ).toBe(joinType);
     }
   });
 
   it('includes joined tables in meta refs', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ context })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .select({
@@ -292,11 +348,13 @@ describe('SQL builder joins', () => {
   });
 
   it('includes ON columns in meta refs', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ context })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .select({
@@ -313,11 +371,13 @@ describe('SQL builder joins', () => {
   });
 
   it('includes all referenced columns in meta refs (projection, where, orderBy, joins)', () => {
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+    const plan = sql<ContractWithPosts, CodecTypes>({ context })
       .from(tables.user)
       .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
       .where(userColumns.email.eq(param('email')))
@@ -340,11 +400,13 @@ describe('SQL builder joins', () => {
 
   describe('nested projections with joins', () => {
     it('flattens nested projection over joined columns', () => {
-      const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+      const adapter = createStubAdapter();
+      const context = createTestContext(contractWithPosts, adapter);
+      const tables = schema<ContractWithPosts>(context).tables;
       const userColumns = tables.user.columns;
       const postColumns = tables.post.columns;
 
-      const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+      const plan = sql<ContractWithPosts, CodecTypes>({ context })
         .from(tables.user)
         .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
         .select({
@@ -356,9 +418,12 @@ describe('SQL builder joins', () => {
         })
         .build();
 
-      expect(plan.ast?.joins).toBeDefined();
-      expect(plan.ast?.joins?.length).toBe(1);
-      expect(plan.ast?.project).toEqual([
+      const selectAst = plan.ast as import('@prisma-next/sql-target').SelectAst | undefined;
+      expect(selectAst?.joins).toBeDefined();
+      expect(selectAst?.joins?.length).toBe(1);
+      expect(
+        (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project,
+      ).toEqual([
         { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_title', expr: { kind: 'col', table: 'post', column: 'title' } },
         { alias: 'post_id', expr: { kind: 'col', table: 'post', column: 'id' } },
@@ -372,11 +437,13 @@ describe('SQL builder joins', () => {
     });
 
     it('includes all referenced columns in meta refs for nested projections with joins', () => {
-      const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+      const adapter = createStubAdapter();
+      const context = createTestContext(contractWithPosts, adapter);
+      const tables = schema<ContractWithPosts>(context).tables;
       const userColumns = tables.user.columns;
       const postColumns = tables.post.columns;
 
-      const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+      const plan = sql<ContractWithPosts, CodecTypes>({ context })
         .from(tables.user)
         .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
         .select({
@@ -401,11 +468,13 @@ describe('SQL builder joins', () => {
     });
 
     it('handles multi-level nested projection with joins', () => {
-      const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+      const adapter = createStubAdapter();
+      const context = createTestContext(contractWithPosts, adapter);
+      const tables = schema<ContractWithPosts>(context).tables;
       const userColumns = tables.user.columns;
       const postColumns = tables.post.columns;
 
-      const plan = sql<ContractWithPosts, CodecTypes>({ contract: contractWithPosts, adapter })
+      const plan = sql<ContractWithPosts, CodecTypes>({ context })
         .from(tables.user)
         .innerJoin(tables.post, (on) => on.eqCol(userColumns.id, postColumns.userId))
         .select({
@@ -422,7 +491,9 @@ describe('SQL builder joins', () => {
         })
         .build();
 
-      expect(plan.ast?.project).toEqual([
+      expect(
+        (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project,
+      ).toEqual([
         { alias: 'user_id', expr: { kind: 'col', table: 'user', column: 'id' } },
         { alias: 'user_email', expr: { kind: 'col', table: 'user', column: 'email' } },
         { alias: 'post_info_title', expr: { kind: 'col', table: 'post', column: 'title' } },

@@ -1,11 +1,15 @@
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { expectTypeOf, test } from 'vitest';
+import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-const schemaHandle = schema<Contract, CodecTypes>(contract);
+const adapter = createPostgresAdapter();
+const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const schemaHandle = schema(context);
 
 // These assignments MUST be at module level (not inside test blocks)
 // to trigger compile-time type checking. If these fail, the type tests will fail to compile.
@@ -52,7 +56,8 @@ test('schema returns correct SchemaHandle type', () => {
 
 test('schema works with inferred contract type', () => {
   // Test that schema works when Contract type is inferred from the contract object
-  const inferredSchema = schema(contract);
+  const inferredContext = createRuntimeContext({ contract, adapter, extensions: [] });
+  const inferredSchema = schema(inferredContext);
 
   // Should still have literal keys
   type InferredTableKeys = keyof typeof inferredSchema.tables;
@@ -63,11 +68,11 @@ test('schema works with inferred contract type', () => {
   expectTypeOf(_userTable).not.toBeUndefined();
 });
 
-test('schema handles optional CodecTypes parameter', () => {
-  // Test schema without CodecTypes parameter
-  const schemaWithoutCodecTypes = schema(contract);
+test('schema extracts CodecTypes automatically from contract', () => {
+  // Test that schema automatically extracts CodecTypes from contract
+  const schemaHandle = schema(context);
 
   // Should still work correctly
-  expectTypeOf(schemaWithoutCodecTypes.tables).toHaveProperty('user');
-  expectTypeOf(schemaWithoutCodecTypes.tables.user.columns).toHaveProperty('id');
+  expectTypeOf(schemaHandle.tables).toHaveProperty('user');
+  expectTypeOf(schemaHandle.tables.user.columns).toHaveProperty('id');
 });

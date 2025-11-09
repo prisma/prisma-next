@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import type { ResultType } from '@prisma-next/contract/types';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { ResultType } from '@prisma-next/sql-query/types';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 
@@ -20,9 +20,10 @@ test('inferred row types are correct', () => {
   const contract = validateContract<Contract>(contractJson);
 
   const adapter = createPostgresAdapter();
-  const tables = schema<Contract, CodecTypes>(contract).tables;
+  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const tables = schema<Contract>(context).tables;
   const user = tables.user!;
-  const plan = sql<Contract, CodecTypes>({ contract, adapter })
+  const plan = sql({ context })
     .from(user)
     .select({ id: user.columns.id!, email: user.columns.email! })
     .build();

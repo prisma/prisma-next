@@ -4,6 +4,30 @@ export interface TypesImportSpec {
   readonly alias: string;
 }
 
+export type ArgSpecManifest =
+  | { readonly kind: 'typeId'; readonly type: string }
+  | { readonly kind: 'param' }
+  | { readonly kind: 'literal' };
+
+export type ReturnSpecManifest =
+  | { readonly kind: 'typeId'; readonly type: string }
+  | { readonly kind: 'builtin'; readonly type: 'number' | 'boolean' | 'string' };
+
+export interface LoweringSpecManifest {
+  readonly targetFamily: 'sql';
+  readonly strategy: 'infix' | 'function';
+  readonly template: string;
+}
+
+export interface OperationManifest {
+  readonly for: string;
+  readonly method: string;
+  readonly args: ReadonlyArray<ArgSpecManifest>;
+  readonly returns: ReturnSpecManifest;
+  readonly lowering: LoweringSpecManifest;
+  readonly capabilities?: ReadonlyArray<string>;
+}
+
 export interface ExtensionPackManifest {
   readonly id: string;
   readonly version: string;
@@ -13,7 +37,11 @@ export interface ExtensionPackManifest {
     readonly codecTypes?: {
       readonly import: TypesImportSpec;
     };
+    readonly operationTypes?: {
+      readonly import: TypesImportSpec;
+    };
   };
+  readonly operations?: ReadonlyArray<OperationManifest>;
 }
 
 export interface ExtensionPack {
@@ -22,16 +50,16 @@ export interface ExtensionPack {
 }
 
 export interface ContractIR {
-  readonly schemaVersion?: string;
+  readonly schemaVersion: string;
   readonly targetFamily: string;
   readonly target: string;
-  readonly models?: Record<string, unknown>;
-  readonly relations?: Record<string, unknown>;
-  readonly storage?: Record<string, unknown>;
-  readonly extensions?: Record<string, unknown>;
-  readonly capabilities?: Record<string, Record<string, boolean>>;
-  readonly meta?: Record<string, unknown>;
-  readonly sources?: Record<string, unknown>;
+  readonly models: Record<string, unknown>;
+  readonly relations: Record<string, unknown>;
+  readonly storage: Record<string, unknown>;
+  readonly extensions: Record<string, unknown>;
+  readonly capabilities: Record<string, Record<string, boolean>>;
+  readonly meta: Record<string, unknown>;
+  readonly sources: Record<string, unknown>;
 }
 
 export interface EmitOptions {

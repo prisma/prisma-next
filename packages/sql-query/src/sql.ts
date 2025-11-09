@@ -1,26 +1,96 @@
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-target';
+import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  DeleteAst,
+  Direction,
+  ExtractCodecTypes,
+  ExtractOperationTypes,
+  IncludeRef,
+  InsertAst,
+  LiteralExpr,
+  LoweredStatement,
+  OperationExpr,
+  ParamRef,
+  SelectAst,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  TableRef,
+  UpdateAst,
+} from '@prisma-next/sql-target';
 import { planInvalid } from './errors';
 import { createRawFactory } from './raw';
 import type {
+  AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyOrderBuilder,
   BinaryBuilder,
-  BinaryExpr,
   BuildOptions,
-  ColumnBuilder,
-  ColumnRef,
-  Direction,
-  IncludeRef,
+  CodecTypes as CodecTypesMap,
   InferNestedProjectionRow,
+  InferReturningRow,
   JoinOnBuilder,
   JoinOnPredicate,
-  LoweredStatement,
-  ParamDescriptor,
-  Plan,
-  PlanMeta,
+  NestedProjection,
+  OrderBuilder,
+  ParamPlaceholder,
   RawFactory,
-  SelectAst,
   SqlBuilderOptions,
-  TableRef,
 } from './types';
+
+/**
+ * Recursively extracts the base ColumnRef from an OperationExpr.
+ * If the expression is already a ColumnRef, it is returned directly.
+ */
+function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef {
+  if (expr.kind === 'col') {
+    return expr;
+  }
+  return extractBaseColumnRef(expr.self);
+}
+
+/**
+ * Recursively collects all ColumnRef nodes from an expression tree.
+ * Handles nested OperationExpr structures by traversing both self and args.
+ */
+function collectColumnRefs(expr: ColumnRef | ParamRef | LiteralExpr | OperationExpr): ColumnRef[] {
+  if (expr.kind === 'col') {
+    return [expr];
+  }
+  if (expr.kind === 'operation') {
+    const refs: ColumnRef[] = collectColumnRefs(expr.self);
+    for (const arg of expr.args) {
+      refs.push(...collectColumnRefs(arg));
+    }
+    return refs;
+  }
+  return [];
+}
+
+/**
+ * Type predicate to check if an expression is an OperationExpr.
+ */
+function isOperationExpr(expr: AnyColumnBuilder | OperationExpr): expr is OperationExpr {
+  return typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'operation';
+}
+
+/**
+ * Helper to extract table and column from a ColumnBuilder or OperationExpr.
+ * For OperationExpr, recursively unwraps to find the base ColumnRef.
+ */
+function getColumnInfo(expr: AnyColumnBuilder | OperationExpr): {
+  table: string;
+  column: string;
+} {
+  if (isOperationExpr(expr)) {
+    const baseCol = extractBaseColumnRef(expr);
+    return { table: baseCol.table, column: baseCol.column };
+  }
+  // expr is ColumnBuilder - TypeScript can't narrow properly
+  const colBuilder = expr as unknown as { table: string; column: string };
+  return { table: colBuilder.table, column: colBuilder.column };
+}
 
 interface JoinState {
   readonly joinType: 'inner' | 'left' | 'right' | 'full';
@@ -33,8 +103,8 @@ interface IncludeState {
   readonly table: TableRef;
   readonly on: JoinOnPredicate;
   readonly childProjection: ProjectionState;
-  readonly childWhere?: BinaryBuilder;
-  readonly childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+  readonly childWhere?: AnyBinaryBuilder;
+  readonly childOrderBy?: AnyOrderBuilder;
   readonly childLimit?: number;
 }
 
@@ -43,15 +113,17 @@ interface BuilderState {
   joins?: ReadonlyArray<JoinState>;
   includes?: ReadonlyArray<IncludeState>;
   projection?: ProjectionState;
-  where?: BinaryBuilder;
-  orderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+  where?: AnyBinaryBuilder;
+  orderBy?: AnyOrderBuilder;
   limit?: number;
 }
 
 interface ProjectionState {
   readonly aliases: string[];
-  readonly columns: ColumnBuilder[];
+  readonly columns: AnyColumnBuilder[];
 }
+
+type ProjectionInput = Record<string, AnyColumnBuilder | boolean | NestedProjection>;
 
 function generateAlias(path: string[]): string {
   if (path.length === 0) {
@@ -87,26 +159,26 @@ class AliasTracker {
 }
 
 class JoinOnBuilderImpl implements JoinOnBuilder {
-  eqCol(
-    left: ColumnBuilder<string, StorageColumn, unknown>,
-    right: ColumnBuilder<string, StorageColumn, unknown>,
-  ): JoinOnPredicate {
-    if (!left || left.kind !== 'column') {
+  eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate {
+    if (!left || !isColumnBuilder(left)) {
       throw planInvalid('Join ON left operand must be a column');
     }
 
-    if (!right || right.kind !== 'column') {
+    if (!right || !isColumnBuilder(right)) {
       throw planInvalid('Join ON right operand must be a column');
     }
 
-    if (left.table === right.table) {
+    // TypeScript can't narrow ColumnBuilder properly, so we assert
+    const leftCol = left as unknown as { table: string; column: string };
+    const rightCol = right as unknown as { table: string; column: string };
+    if (leftCol.table === rightCol.table) {
       throw planInvalid('Self-joins are not supported in MVP');
     }
 
     return {
       kind: 'join-on',
-      left,
-      right,
+      left: left as AnyColumnBuilder,
+      right: right as AnyColumnBuilder,
     };
   }
 }
@@ -117,7 +189,7 @@ export function createJoinOnBuilder(): JoinOnBuilder {
 
 class IncludeChildBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends CodecTypesMap = CodecTypesMap,
   ChildRow = unknown,
 > {
   private readonly contract: TContract;
@@ -125,7 +197,7 @@ class IncludeChildBuilderImpl<
   private readonly table: TableRef;
   private childProjection?: ProjectionState;
   private childWhere?: BinaryBuilder;
-  private childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+  private childOrderBy?: OrderBuilder;
   private childLimit?: number;
 
   constructor(contract: TContract, codecTypes: CodecTypes, table: TableRef) {
@@ -134,20 +206,7 @@ class IncludeChildBuilderImpl<
     this.table = table;
   }
 
-  select<
-    P extends Record<
-      string,
-      | ColumnBuilder
-      | Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >
-        >
-    >,
-  >(
+  select<P extends NestedProjection>(
     projection: P,
   ): IncludeChildBuilderImpl<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>> {
     const projectionState = buildProjectionState(this.table, projection);
@@ -169,7 +228,7 @@ class IncludeChildBuilderImpl<
     return builder;
   }
 
-  where(expr: BinaryBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
+  where(expr: AnyBinaryBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
@@ -188,9 +247,7 @@ class IncludeChildBuilderImpl<
     return builder;
   }
 
-  orderBy(
-    order: ReturnType<ColumnBuilder['asc']>,
-  ): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
+  orderBy(order: AnyOrderBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
@@ -234,8 +291,8 @@ class IncludeChildBuilderImpl<
 
   getState(): {
     childProjection: ProjectionState;
-    childWhere?: BinaryBuilder<string, StorageColumn, unknown>;
-    childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+    childWhere?: AnyBinaryBuilder;
+    childOrderBy?: AnyOrderBuilder;
     childLimit?: number;
   } {
     if (!this.childProjection) {
@@ -243,8 +300,8 @@ class IncludeChildBuilderImpl<
     }
     const state: {
       childProjection: ProjectionState;
-      childWhere?: BinaryBuilder<string, StorageColumn, unknown>;
-      childOrderBy?: ReturnType<ColumnBuilder<string, StorageColumn>['asc']>;
+      childWhere?: AnyBinaryBuilder;
+      childOrderBy?: AnyOrderBuilder;
       childLimit?: number;
     } = {
       childProjection: this.childProjection,
@@ -264,47 +321,38 @@ class IncludeChildBuilderImpl<
 
 export interface IncludeChildBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   ChildRow = unknown,
 > {
-  select<
-    P extends Record<
-      string,
-      | ColumnBuilder
-      | Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >
-        >
-    >,
-  >(
+  select<P extends NestedProjection>(
     projection: P,
   ): IncludeChildBuilder<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>>;
-  where(expr: BinaryBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
-  orderBy(
-    order: ReturnType<ColumnBuilder['asc']>,
-  ): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
+  where(expr: AnyBinaryBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
+  orderBy(order: AnyOrderBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
   limit(count: number): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
 }
 
 class SelectBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > {
   private readonly contract: TContract;
-  private readonly adapter: SqlBuilderOptions<TContract, CodecTypes>['adapter'];
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    import('@prisma-next/sql-target').QueryAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
   private readonly codecTypes: CodecTypes;
+  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
   private state: BuilderState = {};
 
-  constructor(options: SqlBuilderOptions<TContract, CodecTypes>, state?: BuilderState) {
-    this.contract = options.contract;
-    this.adapter = options.adapter;
-    this.codecTypes = options.codecTypes ?? ({} as CodecTypes);
+  constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
+    this.context = options.context;
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     if (state) {
       this.state = state;
     }
@@ -313,9 +361,7 @@ class SelectBuilderImpl<
   from(table: TableRef): SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>> {
     return new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(
       {
-        contract: this.contract,
-        adapter: this.adapter,
-        codecTypes: this.codecTypes,
+        context: this.context,
       },
       { ...this.state, from: table },
     );
@@ -350,18 +396,7 @@ class SelectBuilderImpl<
   }
 
   includeMany<
-    ChildProjection extends Record<
-      string,
-      | ColumnBuilder
-      | Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >
-        >
-    >,
+    ChildProjection extends NestedProjection,
     ChildRow = InferNestedProjectionRow<ChildProjection, CodecTypes>,
     AliasName extends string = string,
   >(
@@ -391,7 +426,10 @@ class SelectBuilderImpl<
     const onPredicate = on(joinOnBuilder);
 
     // Validate ON uses column equality
-    if (onPredicate.left.table === onPredicate.right.table) {
+    // TypeScript can't narrow ColumnBuilder properly, so we assert
+    const onLeft = onPredicate.left as { table: string; column: string };
+    const onRight = onPredicate.right as { table: string; column: string };
+    if (onLeft.table === onRight.table) {
       throw planInvalid('Self-joins are not supported in MVP');
     }
 
@@ -453,9 +491,7 @@ class SelectBuilderImpl<
 
     return new SelectBuilderImpl<TContract, Row, CodecTypes, NewIncludes>(
       {
-        contract: this.contract,
-        adapter: this.adapter,
-        codecTypes: this.codecTypes,
+        context: this.context,
       },
       { ...this.state, includes: newIncludes },
     );
@@ -490,40 +526,22 @@ class SelectBuilderImpl<
 
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
-        contract: this.contract,
-        adapter: this.adapter,
-        codecTypes: this.codecTypes,
+        context: this.context,
       },
       { ...this.state, joins: newJoins },
     );
   }
 
-  where(expr: BinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+  where(expr: AnyBinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
-        contract: this.contract,
-        adapter: this.adapter,
-        codecTypes: this.codecTypes,
+        context: this.context,
       },
       { ...this.state, where: expr },
     );
   }
 
-  select<
-    P extends Record<
-      string,
-      | ColumnBuilder
-      | boolean
-      | Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-            >
-        >
-    >,
-  >(
+  select<P extends ProjectionInput>(
     projection: P,
   ): SelectBuilderImpl<
     TContract,
@@ -541,22 +559,16 @@ class SelectBuilderImpl<
       Includes
     >(
       {
-        contract: this.contract,
-        adapter: this.adapter,
-        codecTypes: this.codecTypes,
+        context: this.context,
       },
       { ...this.state, projection: projectionState },
     );
   }
 
-  orderBy(
-    order: ReturnType<ColumnBuilder['asc']>,
-  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+  orderBy(order: AnyOrderBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
-        contract: this.contract,
-        adapter: this.adapter,
-        codecTypes: this.codecTypes,
+        context: this.context,
       },
       { ...this.state, orderBy: order },
     );
@@ -569,9 +581,7 @@ class SelectBuilderImpl<
 
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
-        contract: this.contract,
-        adapter: this.adapter,
-        codecTypes: this.codecTypes,
+        context: this.context,
       },
       { ...this.state, limit: count },
     );
@@ -602,49 +612,76 @@ class SelectBuilderImpl<
     }
 
     const orderByClause = this.state.orderBy
-      ? ([
-          {
-            expr: {
-              kind: 'col',
-              table: this.state.orderBy.expr.table,
-              column: this.state.orderBy.expr.column,
+      ? (() => {
+          const orderBy = this.state.orderBy as OrderBuilder<string, StorageColumn, unknown>;
+          const orderExpr = orderBy.expr;
+          return [
+            {
+              expr: isOperationExpr(orderExpr)
+                ? orderExpr
+                : {
+                    kind: 'col' as const,
+                    table: (orderExpr as { table: string; column: string }).table,
+                    column: (orderExpr as { table: string; column: string }).column,
+                  },
+              dir: orderBy.dir,
             },
-            dir: this.state.orderBy.dir,
-          },
-        ] as ReadonlyArray<{ expr: ColumnRef; dir: Direction }>)
+          ] as ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
+        })()
       : undefined;
 
-    const joins = this.state.joins?.map((join) => ({
-      kind: 'join' as const,
-      joinType: join.joinType,
-      table: { kind: 'table' as const, name: join.table.name },
-      on: {
-        kind: 'eqCol' as const,
-        left: {
-          kind: 'col' as const,
-          table: join.on.left.table,
-          column: join.on.left.column,
+    const joins = this.state.joins?.map((join) => {
+      // TypeScript can't narrow ColumnBuilder properly, so we assert
+      const onLeft = join.on.left as { table: string; column: string };
+      const onRight = join.on.right as { table: string; column: string };
+      return {
+        kind: 'join' as const,
+        joinType: join.joinType,
+        table: { kind: 'table' as const, name: join.table.name },
+        on: {
+          kind: 'eqCol' as const,
+          left: {
+            kind: 'col' as const,
+            table: onLeft.table,
+            column: onLeft.column,
+          },
+          right: {
+            kind: 'col' as const,
+            table: onRight.table,
+            column: onRight.column,
+          },
         },
-        right: {
-          kind: 'col' as const,
-          table: join.on.right.table,
-          column: join.on.right.column,
-        },
-      },
-    }));
+      };
+    });
 
     const includes = this.state.includes?.map((include) => {
       const childOrderBy = include.childOrderBy
-        ? ([
-            {
-              expr: {
-                kind: 'col' as const,
-                table: include.childOrderBy.expr.table,
-                column: include.childOrderBy.expr.column,
+        ? (() => {
+            const orderBy = include.childOrderBy as OrderBuilder<string, StorageColumn, unknown>;
+            const orderExpr = orderBy.expr;
+            return [
+              {
+                expr: (() => {
+                  if (isOperationExpr(orderExpr)) {
+                    const baseCol = extractBaseColumnRef(orderExpr);
+                    return {
+                      kind: 'col' as const,
+                      table: baseCol.table,
+                      column: baseCol.column,
+                    };
+                  }
+                  // orderExpr is ColumnBuilder - TypeScript can't narrow properly
+                  const colBuilder = orderExpr as { table: string; column: string };
+                  return {
+                    kind: 'col' as const,
+                    table: colBuilder.table,
+                    column: colBuilder.column,
+                  };
+                })(),
+                dir: orderBy.dir,
               },
-              dir: include.childOrderBy.dir,
-            },
-          ] as ReadonlyArray<{ expr: ColumnRef; dir: Direction }>)
+            ] as ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
+          })()
         : undefined;
 
       let childWhere: BinaryExpr | undefined;
@@ -667,13 +704,13 @@ class SelectBuilderImpl<
             kind: 'eqCol' as const,
             left: {
               kind: 'col' as const,
-              table: include.on.left.table,
-              column: include.on.left.column,
+              table: (include.on.left as { table: string; column: string }).table,
+              column: (include.on.left as { table: string; column: string }).column,
             },
             right: {
               kind: 'col' as const,
-              table: include.on.right.table,
-              column: include.on.right.column,
+              table: (include.on.right as { table: string; column: string }).table,
+              column: (include.on.right as { table: string; column: string }).column,
             },
           },
           ...(childWhere ? { where: childWhere } : {}),
@@ -684,12 +721,14 @@ class SelectBuilderImpl<
             if (!column || !alias) {
               throw planInvalid(`Missing column for alias ${alias ?? 'unknown'} at index ${idx}`);
             }
+            // TypeScript can't narrow ColumnBuilder properly
+            const col = column as { table: string; column: string };
             return {
               alias,
               expr: {
                 kind: 'col' as const,
-                table: column.table,
-                column: column.column,
+                table: col.table,
+                column: col.column,
               },
             };
           }),
@@ -697,8 +736,9 @@ class SelectBuilderImpl<
       };
     });
 
-    // Build projection with support for includeRef
-    const projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef }> = [];
+    // Build projection with support for includeRef and OperationExpr
+    const projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }> =
+      [];
     for (let i = 0; i < projection.aliases.length; i++) {
       const alias = projection.aliases[i];
       if (!alias) {
@@ -718,20 +758,31 @@ class SelectBuilderImpl<
           expr: { kind: 'includeRef', alias },
         });
       } else {
-        // This is a regular column
-        const tableName = column.table;
-        const columnName = column.column;
-        if (!tableName || !columnName) {
-          throw planInvalid(`Invalid column for alias ${alias} at index ${i}`);
+        // Check if this column has an operation expression
+        const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+        if (operationExpr) {
+          projectEntries.push({
+            alias,
+            expr: operationExpr,
+          });
+        } else {
+          // This is a regular column
+          // TypeScript can't narrow ColumnBuilder properly
+          const col = column as { table: string; column: string };
+          const tableName = col.table;
+          const columnName = col.column;
+          if (!tableName || !columnName) {
+            throw planInvalid(`Invalid column for alias ${alias} at index ${i}`);
+          }
+          projectEntries.push({
+            alias,
+            expr: {
+              kind: 'col',
+              table: tableName,
+              column: columnName,
+            },
+          });
         }
-        projectEntries.push({
-          alias,
-          expr: {
-            kind: 'col',
-            table: tableName,
-            column: columnName,
-          },
-        });
       }
     }
 
@@ -796,12 +847,7 @@ class SelectBuilderImpl<
     descriptors: ParamDescriptor[],
     values: unknown[],
   ): {
-    expr: {
-      readonly kind: 'bin';
-      readonly op: 'eq';
-      readonly left: { kind: 'col'; table: string; column: string };
-      readonly right: { kind: 'param'; index: number; name?: string };
-    };
+    expr: BinaryExpr;
     codecId?: string;
     paramName: string;
   } {
@@ -815,30 +861,45 @@ class SelectBuilderImpl<
     const value = paramsMap[paramName];
     const index = values.push(value);
 
-    const meta = (where.left.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+    let leftExpr: ColumnRef | OperationExpr;
+    let codecId: string | undefined;
 
-    descriptors.push({
-      name: paramName,
-      source: 'dsl',
-      refs: { table: where.left.table, column: where.left.column },
-      ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
-      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
-    });
+    const operationExpr = (where.left as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      leftExpr = operationExpr;
+    } else {
+      // where.left is ColumnBuilder - TypeScript can't narrow properly
+      const colBuilder = where.left as unknown as {
+        table: string;
+        column: string;
+        columnMeta?: { type?: string; nullable?: boolean };
+      };
+      const meta = (colBuilder.columnMeta ?? {}) as { type?: string; nullable?: boolean };
 
-    // Get codec ID from column metadata type (already canonicalized)
-    const contractTable = this.contract.storage.tables[where.left.table];
-    const columnMeta = contractTable?.columns[where.left.column];
-    const codecId = columnMeta?.type;
+      descriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: colBuilder.table, column: colBuilder.column },
+        ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+        ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+      });
+
+      const contractTable = this.contract.storage.tables[colBuilder.table];
+      const columnMeta = contractTable?.columns[colBuilder.column];
+      codecId = columnMeta?.type;
+
+      leftExpr = {
+        kind: 'col',
+        table: colBuilder.table,
+        column: colBuilder.column,
+      };
+    }
 
     return {
       expr: {
         kind: 'bin',
         op: 'eq',
-        left: {
-          kind: 'col',
-          table: where.left.table,
-          column: where.left.column,
-        },
+        left: leftExpr,
         right: {
           kind: 'param',
           index,
@@ -851,7 +912,7 @@ class SelectBuilderImpl<
   }
 }
 
-function isColumnBuilder(value: unknown): value is ColumnBuilder {
+function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -861,23 +922,12 @@ function isColumnBuilder(value: unknown): value is ColumnBuilder {
 }
 
 function flattenProjection(
-  projection: Record<
-    string,
-    | ColumnBuilder
-    | Record<
-        string,
-        | ColumnBuilder
-        | Record<
-            string,
-            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-          >
-      >
-  >,
+  projection: NestedProjection,
   tracker: AliasTracker,
   currentPath: string[] = [],
-): { aliases: string[]; columns: ColumnBuilder[] } {
+): { aliases: string[]; columns: AnyColumnBuilder[] } {
   const aliases: string[] = [];
-  const columns: ColumnBuilder[] = [];
+  const columns: AnyColumnBuilder[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     const path = [...currentPath, key];
@@ -887,22 +937,7 @@ function flattenProjection(
       aliases.push(alias);
       columns.push(value);
     } else if (typeof value === 'object' && value !== null) {
-      const nested = flattenProjection(
-        value as Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              | ColumnBuilder
-              | Record<
-                  string,
-                  ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-                >
-            >
-        >,
-        tracker,
-        path,
-      );
+      const nested = flattenProjection(value, tracker, path);
       aliases.push(...nested.aliases);
       columns.push(...nested.columns);
     } else {
@@ -917,24 +952,12 @@ function flattenProjection(
 
 function buildProjectionState(
   _table: TableRef,
-  projection: Record<
-    string,
-    | ColumnBuilder
-    | boolean
-    | Record<
-        string,
-        | ColumnBuilder
-        | Record<
-            string,
-            ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-          >
-      >
-  >,
+  projection: ProjectionInput,
   includes?: ReadonlyArray<IncludeState>,
 ): ProjectionState {
   const tracker = new AliasTracker();
   const aliases: string[] = [];
-  const columns: ColumnBuilder[] = [];
+  const columns: AnyColumnBuilder[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     if (value === true) {
@@ -955,28 +978,13 @@ function buildProjectionState(
         table: matchingInclude.table.name,
         column: '',
         columnMeta: { type: 'core/json@1', nullable: true },
-      } as ColumnBuilder);
+      } as AnyColumnBuilder);
     } else if (isColumnBuilder(value)) {
       const alias = tracker.register([key]);
       aliases.push(alias);
       columns.push(value);
     } else if (typeof value === 'object' && value !== null) {
-      const nested = flattenProjection(
-        value as Record<
-          string,
-          | ColumnBuilder
-          | Record<
-              string,
-              | ColumnBuilder
-              | Record<
-                  string,
-                  ColumnBuilder | Record<string, ColumnBuilder | Record<string, ColumnBuilder>>
-                >
-            >
-        >,
-        tracker,
-        [key],
-      );
+      const nested = flattenProjection(value as NestedProjection, tracker, [key]);
       aliases.push(...nested.aliases);
       columns.push(...nested.columns);
     } else {
@@ -1000,7 +1008,7 @@ interface MetaBuildArgs {
   readonly joins?: ReadonlyArray<JoinState>;
   readonly includes?: ReadonlyArray<IncludeState>;
   readonly where?: BinaryBuilder;
-  readonly orderBy?: ReturnType<ColumnBuilder['asc']>;
+  readonly orderBy?: OrderBuilder;
   readonly paramDescriptors: ParamDescriptor[];
   readonly paramCodecs?: Record<string, string>;
 }
@@ -1010,22 +1018,40 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsTables = new Set<string>([args.table.name]);
 
   for (const column of args.projection.columns) {
-    refsColumns.set(`${column.table}.${column.column}`, {
-      table: column.table,
-      column: column.column,
-    });
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      const allRefs = collectColumnRefs(operationExpr);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
+        });
+      }
+    } else {
+      // column is ColumnBuilder - TypeScript can't narrow properly
+      const col = column as unknown as { table?: string; column?: string };
+      if (col.table && col.column) {
+        refsColumns.set(`${col.table}.${col.column}`, {
+          table: col.table,
+          column: col.column,
+        });
+      }
+    }
   }
 
   if (args.joins) {
     for (const join of args.joins) {
       refsTables.add(join.table.name);
-      refsColumns.set(`${join.on.left.table}.${join.on.left.column}`, {
-        table: join.on.left.table,
-        column: join.on.left.column,
+      // TypeScript can't narrow ColumnBuilder properly
+      const onLeft = join.on.left as unknown as { table: string; column: string };
+      const onRight = join.on.right as unknown as { table: string; column: string };
+      refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
+        table: onLeft.table,
+        column: onLeft.column,
       });
-      refsColumns.set(`${join.on.right.table}.${join.on.right.column}`, {
-        table: join.on.right.table,
-        column: join.on.right.column,
+      refsColumns.set(`${onRight.table}.${onRight.column}`, {
+        table: onRight.table,
+        column: onRight.column,
       });
     }
   }
@@ -1034,52 +1060,101 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     for (const include of args.includes) {
       refsTables.add(include.table.name);
       // Add ON condition columns
-      refsColumns.set(`${include.on.left.table}.${include.on.left.column}`, {
-        table: include.on.left.table,
-        column: include.on.left.column,
-      });
-      refsColumns.set(`${include.on.right.table}.${include.on.right.column}`, {
-        table: include.on.right.table,
-        column: include.on.right.column,
-      });
+      // JoinOnPredicate.left and .right are always ColumnBuilder
+      const onLeft = include.on.left as unknown as { table: string; column: string };
+      const onRight = include.on.right as unknown as { table: string; column: string };
+      if (onLeft.table && onLeft.column && onRight.table && onRight.column) {
+        refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
+          table: onLeft.table,
+          column: onLeft.column,
+        });
+        refsColumns.set(`${onRight.table}.${onRight.column}`, {
+          table: onRight.table,
+          column: onRight.column,
+        });
+      }
       // Add child projection columns
       for (const column of include.childProjection.columns) {
-        if (column.table && column.column) {
-          refsColumns.set(`${column.table}.${column.column}`, {
-            table: column.table,
-            column: column.column,
+        const col = column as unknown as { table?: string; column?: string };
+        if (col.table && col.column) {
+          refsColumns.set(`${col.table}.${col.column}`, {
+            table: col.table,
+            column: col.column,
           });
         }
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
-        refsColumns.set(`${include.childWhere.left.table}.${include.childWhere.left.column}`, {
-          table: include.childWhere.left.table,
-          column: include.childWhere.left.column,
+        const colInfo = getColumnInfo(include.childWhere.left);
+        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+          table: colInfo.table,
+          column: colInfo.column,
         });
       }
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
-        refsColumns.set(`${include.childOrderBy.expr.table}.${include.childOrderBy.expr.column}`, {
-          table: include.childOrderBy.expr.table,
-          column: include.childOrderBy.expr.column,
-        });
+        const orderBy = include.childOrderBy as unknown as {
+          expr?: AnyColumnBuilder | OperationExpr;
+        };
+        if (orderBy.expr) {
+          const colInfo = getColumnInfo(orderBy.expr);
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
+          });
+        }
       }
     }
   }
 
   if (args.where) {
-    refsColumns.set(`${args.where.left.table}.${args.where.left.column}`, {
-      table: args.where.left.table,
-      column: args.where.left.column,
-    });
+    const whereLeft = args.where.left;
+    const operationExpr = (whereLeft as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      const allRefs = collectColumnRefs(operationExpr);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
+        });
+      }
+    } else {
+      // whereLeft is ColumnBuilder - TypeScript can't narrow properly
+      const colBuilder = whereLeft as unknown as { table?: string; column?: string };
+      if (colBuilder.table && colBuilder.column) {
+        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
+          table: colBuilder.table,
+          column: colBuilder.column,
+        });
+      }
+    }
   }
 
   if (args.orderBy) {
-    refsColumns.set(`${args.orderBy.expr.table}.${args.orderBy.expr.column}`, {
-      table: args.orderBy.expr.table,
-      column: args.orderBy.expr.column,
-    });
+    const orderBy = args.orderBy as unknown as {
+      expr?: AnyColumnBuilder | OperationExpr;
+    };
+    const orderByExpr = orderBy.expr;
+    if (orderByExpr) {
+      if (isOperationExpr(orderByExpr)) {
+        const allRefs = collectColumnRefs(orderByExpr);
+        for (const ref of allRefs) {
+          refsColumns.set(`${ref.table}.${ref.column}`, {
+            table: ref.table,
+            column: ref.column,
+          });
+        }
+      } else {
+        // orderByExpr is ColumnBuilder - TypeScript can't narrow properly
+        const colBuilder = orderByExpr as unknown as { table?: string; column?: string };
+        if (colBuilder.table && colBuilder.column) {
+          refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
+            table: colBuilder.table,
+            column: colBuilder.column,
+          });
+        }
+      }
+    }
   }
 
   // Build projection map - mark include aliases with special marker
@@ -1094,11 +1169,21 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
       if (!column) {
         throw planInvalid(`Missing column for alias ${alias} at index ${index}`);
       }
-      if (!column.table || !column.column) {
+      // TypeScript can't narrow ColumnBuilder properly
+      const col = column as unknown as {
+        table?: string;
+        column?: string;
+        _operationExpr?: OperationExpr;
+      };
+      if (!col.table || !col.column) {
         // This is a placeholder column for an include - skip it
         return [alias, `include:${alias}`];
       }
-      return [alias, `${column.table}.${column.column}`];
+      const operationExpr = col._operationExpr;
+      if (operationExpr) {
+        return [alias, `operation:${operationExpr.method}`];
+      }
+      return [alias, `${col.table}.${col.column}`];
     }),
   );
 
@@ -1114,9 +1199,20 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    const columnMeta = column.columnMeta;
-    if (columnMeta?.type) {
-      projectionTypes[alias] = columnMeta.type;
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      if (operationExpr.returns.kind === 'typeId') {
+        projectionTypes[alias] = operationExpr.returns.type;
+      } else if (operationExpr.returns.kind === 'builtin') {
+        projectionTypes[alias] = operationExpr.returns.type;
+      }
+    } else {
+      // TypeScript can't narrow ColumnBuilder properly
+      const col = column as unknown as { columnMeta?: { type?: string } };
+      const columnMeta = col.columnMeta;
+      if (columnMeta?.type) {
+        projectionTypes[alias] = columnMeta.type;
+      }
     }
   }
 
@@ -1132,10 +1228,19 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    // Use columnMeta.type directly as typeId (already canonicalized)
-    const columnMeta = column.columnMeta;
-    if (columnMeta?.type) {
-      projectionCodecs[alias] = columnMeta.type;
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      if (operationExpr.returns.kind === 'typeId') {
+        projectionCodecs[alias] = operationExpr.returns.type;
+      }
+    } else {
+      // Use columnMeta.type directly as typeId (already canonicalized)
+      // TypeScript can't narrow ColumnBuilder properly
+      const col = column as unknown as { columnMeta?: { type?: string } };
+      const columnMeta = col.columnMeta;
+      if (columnMeta?.type) {
+        projectionCodecs[alias] = columnMeta.type;
+      }
     }
   }
 
@@ -1167,25 +1272,749 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
 export type SelectBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > = SelectBuilderImpl<TContract, Row, CodecTypes, Includes> & {
   readonly raw: RawFactory;
+  insert(
+    table: TableRef,
+    values: Record<string, ParamPlaceholder>,
+  ): InsertBuilder<TContract, CodecTypes>;
+  update(
+    table: TableRef,
+    set: Record<string, ParamPlaceholder>,
+  ): UpdateBuilder<TContract, CodecTypes>;
+  delete(table: TableRef): DeleteBuilder<TContract, CodecTypes>;
 };
+
+export interface InsertBuilder<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
+  Row = unknown,
+> {
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
+    ...columns: Columns
+  ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
+}
+
+export interface UpdateBuilder<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
+  Row = unknown,
+> {
+  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row>;
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
+    ...columns: Columns
+  ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
+}
+
+export interface DeleteBuilder<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
+  Row = unknown,
+> {
+  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row>;
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
+    ...columns: Columns
+  ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
+  build(options?: BuildOptions): Plan<Row>;
+}
+
+class InsertBuilderImpl<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
+  Row = unknown,
+> implements InsertBuilder<TContract, CodecTypes, Row>
+{
+  private readonly contract: TContract;
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    import('@prisma-next/sql-target').QueryAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
+  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  private readonly table: TableRef;
+  private readonly values: Record<string, ParamPlaceholder>;
+  private returningColumns: AnyColumnBuilder[] = [];
+
+  constructor(
+    options: SqlBuilderOptions<TContract>,
+    table: TableRef,
+    values: Record<string, ParamPlaceholder>,
+  ) {
+    this.context = options.context;
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.table = table;
+    this.values = values;
+  }
+
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
+    ...columns: Columns
+  ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
+    const builder = new InsertBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
+      {
+        context: this.context,
+      },
+      this.table,
+      this.values,
+    );
+    builder.returningColumns = [...this.returningColumns, ...columns];
+    return builder;
+  }
+
+  build(options?: BuildOptions): Plan<Row> {
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const contractTable = this.contract.storage.tables[this.table.name];
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${this.table.name}`);
+    }
+
+    const values: Record<string, ColumnRef | ParamRef> = {};
+    for (const [columnName, placeholder] of Object.entries(this.values)) {
+      if (!contractTable.columns[columnName]) {
+        throw planInvalid(`Unknown column ${columnName} in table ${this.table.name}`);
+      }
+
+      const paramName = placeholder.name;
+      if (!Object.hasOwn(paramsMap, paramName)) {
+        throw planInvalid(`Missing value for parameter ${paramName}`);
+      }
+
+      const value = paramsMap[paramName];
+      const index = paramValues.push(value);
+
+      const columnMeta = contractTable.columns[columnName];
+      const codecId = columnMeta?.type;
+      if (codecId && paramName) {
+        paramCodecs[paramName] = codecId;
+      }
+
+      paramDescriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: this.table.name, column: columnName },
+        ...(codecId ? { type: codecId } : {}),
+        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+      });
+
+      values[columnName] = {
+        kind: 'param',
+        index,
+        name: paramName,
+      };
+    }
+
+    const returning: ColumnRef[] = this.returningColumns.map((col) => {
+      // TypeScript can't narrow ColumnBuilder properly
+      const c = col as unknown as { table: string; column: string };
+      return {
+        kind: 'col',
+        table: c.table,
+        column: c.column,
+      };
+    });
+
+    const ast: InsertAst = {
+      kind: 'insert',
+      table: { kind: 'table', name: this.table.name },
+      values,
+      ...(returning.length > 0 ? { returning } : {}),
+    };
+
+    const lowered = this.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    const returningProjection: ProjectionState = {
+      aliases: this.returningColumns.map((col) => {
+        // TypeScript can't narrow ColumnBuilder properly
+        const c = col as unknown as { column: string };
+        return c.column;
+      }),
+      columns: this.returningColumns,
+    };
+
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table: this.table,
+      projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+    });
+
+    const plan: Plan<Row> = Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
+      meta: {
+        ...planMeta,
+        lane: 'dsl',
+        annotations: {
+          ...planMeta.annotations,
+          intent: 'write',
+          isMutation: true,
+        },
+      },
+    });
+
+    return plan;
+  }
+}
+
+class UpdateBuilderImpl<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
+  Row = unknown,
+> implements UpdateBuilder<TContract, CodecTypes, Row>
+{
+  private readonly contract: TContract;
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    import('@prisma-next/sql-target').QueryAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
+  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  private readonly table: TableRef;
+  private readonly set: Record<string, ParamPlaceholder>;
+  private wherePredicate?: BinaryBuilder;
+  private returningColumns: AnyColumnBuilder[] = [];
+
+  constructor(
+    options: SqlBuilderOptions<TContract>,
+    table: TableRef,
+    set: Record<string, ParamPlaceholder>,
+  ) {
+    this.context = options.context;
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.table = table;
+    this.set = set;
+  }
+
+  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row> {
+    const builder = new UpdateBuilderImpl<TContract, CodecTypes, Row>(
+      {
+        context: this.context,
+      },
+      this.table,
+      this.set,
+    );
+    builder.wherePredicate = predicate;
+    builder.returningColumns = [...this.returningColumns];
+    return builder;
+  }
+
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
+    ...columns: Columns
+  ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
+    const builder = new UpdateBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
+      {
+        context: this.context,
+      },
+      this.table,
+      this.set,
+    );
+    if (this.wherePredicate) {
+      builder.wherePredicate = this.wherePredicate;
+    }
+    builder.returningColumns = [...this.returningColumns, ...columns];
+    return builder;
+  }
+
+  build(options?: BuildOptions): Plan<Row> {
+    if (!this.wherePredicate) {
+      throw planInvalid('where() must be called before building an UPDATE query');
+    }
+
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const contractTable = this.contract.storage.tables[this.table.name];
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${this.table.name}`);
+    }
+
+    const set: Record<string, ColumnRef | ParamRef> = {};
+    for (const [columnName, placeholder] of Object.entries(this.set)) {
+      if (!contractTable.columns[columnName]) {
+        throw planInvalid(`Unknown column ${columnName} in table ${this.table.name}`);
+      }
+
+      const paramName = placeholder.name;
+      if (!Object.hasOwn(paramsMap, paramName)) {
+        throw planInvalid(`Missing value for parameter ${paramName}`);
+      }
+
+      const value = paramsMap[paramName];
+      const index = paramValues.push(value);
+
+      const columnMeta = contractTable.columns[columnName];
+      const codecId = columnMeta?.type;
+      if (codecId && paramName) {
+        paramCodecs[paramName] = codecId;
+      }
+
+      paramDescriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: this.table.name, column: columnName },
+        ...(codecId ? { type: codecId } : {}),
+        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+      });
+
+      set[columnName] = {
+        kind: 'param',
+        index,
+        name: paramName,
+      };
+    }
+
+    const whereResult = this._buildWhereExpr(
+      this.wherePredicate,
+      paramsMap,
+      paramDescriptors,
+      paramValues,
+    );
+    const whereExpr = whereResult?.expr;
+    if (!whereExpr) {
+      throw planInvalid('Failed to build WHERE clause');
+    }
+
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
+
+    const returning: ColumnRef[] = this.returningColumns.map((col) => {
+      // TypeScript can't narrow ColumnBuilder properly
+      const c = col as unknown as { table: string; column: string };
+      return {
+        kind: 'col',
+        table: c.table,
+        column: c.column,
+      };
+    });
+
+    const ast: UpdateAst = {
+      kind: 'update',
+      table: { kind: 'table', name: this.table.name },
+      set,
+      where: whereExpr,
+      ...(returning.length > 0 ? { returning } : {}),
+    };
+
+    const lowered = this.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    const returningProjection: ProjectionState = {
+      aliases: this.returningColumns.map((col) => {
+        // TypeScript can't narrow ColumnBuilder properly
+        const c = col as unknown as { column: string };
+        return c.column;
+      }),
+      columns: this.returningColumns,
+    };
+
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table: this.table,
+      projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      where: this.wherePredicate,
+    });
+
+    const plan: Plan<Row> = Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
+      meta: {
+        ...planMeta,
+        lane: 'dsl',
+        annotations: {
+          ...planMeta.annotations,
+          intent: 'write',
+          isMutation: true,
+          hasWhere: true,
+        },
+      },
+    });
+
+    return plan;
+  }
+
+  private _buildWhereExpr(
+    where: BinaryBuilder,
+    paramsMap: Record<string, unknown>,
+    descriptors: ParamDescriptor[],
+    values: unknown[],
+  ): {
+    expr: BinaryExpr;
+    codecId?: string;
+    paramName: string;
+  } {
+    const placeholder = where.right;
+    const paramName = placeholder.name;
+
+    if (!Object.hasOwn(paramsMap, paramName)) {
+      throw planInvalid(`Missing value for parameter ${paramName}`);
+    }
+
+    const value = paramsMap[paramName];
+    const index = values.push(value);
+
+    let leftExpr: ColumnRef | OperationExpr;
+    let codecId: string | undefined;
+
+    const operationExpr = (where.left as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      leftExpr = operationExpr;
+    } else {
+      // where.left is ColumnBuilder - TypeScript can't narrow properly
+      const colBuilder = where.left as unknown as {
+        table: string;
+        column: string;
+        columnMeta?: { type?: string; nullable?: boolean };
+      };
+      const meta = (colBuilder.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+
+      descriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: colBuilder.table, column: colBuilder.column },
+        ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+        ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+      });
+
+      const contractTable = this.contract.storage.tables[colBuilder.table];
+      const columnMeta = contractTable?.columns[colBuilder.column];
+      codecId = columnMeta?.type;
+
+      leftExpr = {
+        kind: 'col',
+        table: colBuilder.table,
+        column: colBuilder.column,
+      };
+    }
+
+    return {
+      expr: {
+        kind: 'bin',
+        op: 'eq',
+        left: leftExpr,
+        right: {
+          kind: 'param',
+          index,
+          name: paramName,
+        },
+      },
+      ...(codecId ? { codecId } : {}),
+      paramName,
+    };
+  }
+}
+
+class DeleteBuilderImpl<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  Row = unknown,
+> implements DeleteBuilder<TContract, CodecTypes, Row>
+{
+  private readonly contract: TContract;
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    import('@prisma-next/sql-target').QueryAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
+  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  private readonly table: TableRef;
+  private wherePredicate?: BinaryBuilder;
+  private returningColumns: AnyColumnBuilder[] = [];
+
+  constructor(options: SqlBuilderOptions<TContract>, table: TableRef) {
+    this.context = options.context;
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.table = table;
+  }
+
+  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row> {
+    const builder = new DeleteBuilderImpl<TContract, CodecTypes, Row>(
+      {
+        context: this.context,
+      },
+      this.table,
+    );
+    builder.wherePredicate = predicate;
+    builder.returningColumns = [...this.returningColumns];
+    return builder;
+  }
+
+  returning<const Columns extends readonly AnyColumnBuilder[]>(
+    ...columns: Columns
+  ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>> {
+    // Runtime capability check
+    const target = this.contract.target;
+    const capabilities = this.contract.capabilities;
+    if (!capabilities || !capabilities[target]) {
+      throw planInvalid('returning() requires returning capability');
+    }
+    const targetCapabilities = capabilities[target];
+    if (targetCapabilities['returning'] !== true) {
+      throw planInvalid('returning() requires returning capability to be true');
+    }
+
+    const builder = new DeleteBuilderImpl<TContract, CodecTypes, InferReturningRow<Columns>>(
+      {
+        context: this.context,
+      },
+      this.table,
+    );
+    if (this.wherePredicate) {
+      builder.wherePredicate = this.wherePredicate;
+    }
+    builder.returningColumns = [...this.returningColumns, ...columns];
+    return builder;
+  }
+
+  build(options?: BuildOptions): Plan<Row> {
+    if (!this.wherePredicate) {
+      throw planInvalid('where() must be called before building a DELETE query');
+    }
+
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const contractTable = this.contract.storage.tables[this.table.name];
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${this.table.name}`);
+    }
+
+    const whereResult = this._buildWhereExpr(
+      this.wherePredicate,
+      paramsMap,
+      paramDescriptors,
+      paramValues,
+    );
+    const whereExpr = whereResult?.expr;
+    if (!whereExpr) {
+      throw planInvalid('Failed to build WHERE clause');
+    }
+
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
+
+    const returning: ColumnRef[] = this.returningColumns.map((col) => {
+      // TypeScript can't narrow ColumnBuilder properly
+      const c = col as unknown as { table: string; column: string };
+      return {
+        kind: 'col',
+        table: c.table,
+        column: c.column,
+      };
+    });
+
+    const ast: DeleteAst = {
+      kind: 'delete',
+      table: { kind: 'table', name: this.table.name },
+      where: whereExpr,
+      ...(returning.length > 0 ? { returning } : {}),
+    };
+
+    const lowered = this.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    const returningProjection: ProjectionState = {
+      aliases: this.returningColumns.map((col) => {
+        // TypeScript can't narrow ColumnBuilder properly
+        const c = col as unknown as { column: string };
+        return c.column;
+      }),
+      columns: this.returningColumns,
+    };
+
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table: this.table,
+      projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      where: this.wherePredicate,
+    });
+
+    const plan: Plan<Row> = Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
+      meta: {
+        ...planMeta,
+        lane: 'dsl',
+        annotations: {
+          ...planMeta.annotations,
+          intent: 'write',
+          isMutation: true,
+          hasWhere: true,
+        },
+      },
+    });
+
+    return plan;
+  }
+
+  private _buildWhereExpr(
+    where: BinaryBuilder,
+    paramsMap: Record<string, unknown>,
+    descriptors: ParamDescriptor[],
+    values: unknown[],
+  ): {
+    expr: BinaryExpr;
+    codecId?: string;
+    paramName: string;
+  } {
+    const placeholder = where.right;
+    const paramName = placeholder.name;
+
+    if (!Object.hasOwn(paramsMap, paramName)) {
+      throw planInvalid(`Missing value for parameter ${paramName}`);
+    }
+
+    const value = paramsMap[paramName];
+    const index = values.push(value);
+
+    let leftExpr: ColumnRef | OperationExpr;
+    let codecId: string | undefined;
+
+    const operationExpr = (where.left as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      leftExpr = operationExpr;
+    } else {
+      // where.left is ColumnBuilder - TypeScript can't narrow properly
+      const colBuilder = where.left as unknown as {
+        table: string;
+        column: string;
+        columnMeta?: { type?: string; nullable?: boolean };
+      };
+      const meta = (colBuilder.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+
+      descriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: colBuilder.table, column: colBuilder.column },
+        ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+        ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+      });
+
+      const contractTable = this.contract.storage.tables[colBuilder.table];
+      const columnMeta = contractTable?.columns[colBuilder.column];
+      codecId = columnMeta?.type;
+
+      leftExpr = {
+        kind: 'col',
+        table: colBuilder.table,
+        column: colBuilder.column,
+      };
+    }
+
+    return {
+      expr: {
+        kind: 'bin',
+        op: 'eq',
+        left: leftExpr,
+        right: {
+          kind: 'param',
+          index,
+          name: paramName,
+        },
+      },
+      ...(codecId ? { codecId } : {}),
+      paramName,
+    };
+  }
+}
 
 export function sql<
   TContract extends SqlContract<SqlStorage>,
-  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  CodecTypesOverride extends Record<
+    string,
+    { readonly output: unknown }
+  > = ExtractCodecTypes<TContract>,
 >(
-  options: SqlBuilderOptions<TContract, CodecTypes>,
-): SelectBuilder<TContract, unknown, CodecTypes, Record<string, never>> {
+  options: SqlBuilderOptions<TContract>,
+): SelectBuilder<TContract, unknown, CodecTypesOverride, ExtractOperationTypes<TContract>> {
+  type CodecTypes = CodecTypesOverride;
+  type Operations = ExtractOperationTypes<TContract>;
   const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(
     options,
-  ) as SelectBuilder<TContract, unknown, CodecTypes, Record<string, never>>;
-  const rawFactory = createRawFactory(options.contract);
+  ) as SelectBuilder<TContract, unknown, CodecTypes, Operations>;
+  const rawFactory = createRawFactory(options.context.contract);
 
   Object.defineProperty(builder, 'raw', {
     value: rawFactory,
+    enumerable: true,
+    configurable: false,
+  });
+
+  Object.defineProperty(builder, 'insert', {
+    value: (table: TableRef, values: Record<string, ParamPlaceholder>) => {
+      return new InsertBuilderImpl<TContract, CodecTypes>(options, table, values);
+    },
+    enumerable: true,
+    configurable: false,
+  });
+
+  Object.defineProperty(builder, 'update', {
+    value: (table: TableRef, set: Record<string, ParamPlaceholder>) => {
+      return new UpdateBuilderImpl<TContract, CodecTypes>(options, table, set);
+    },
+    enumerable: true,
+    configurable: false,
+  });
+
+  Object.defineProperty(builder, 'delete', {
+    value: (table: TableRef) => {
+      return new DeleteBuilderImpl<TContract, CodecTypes>(options, table);
+    },
     enumerable: true,
     configurable: false,
   });

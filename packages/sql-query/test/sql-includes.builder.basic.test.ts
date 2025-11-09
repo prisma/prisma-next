@@ -1,11 +1,17 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type {
+  Adapter,
+  LoweredStatement,
+  SelectAst,
+  SqlContract,
+  SqlStorage,
+} from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
+import { createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
-import type { Adapter, LoweredStatement, SelectAst } from '../src/types';
 import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type with capabilities
@@ -17,6 +23,9 @@ type ContractWithCapabilities = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; nullable: false };
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly post: {
         readonly columns: {
@@ -25,12 +34,18 @@ type ContractWithCapabilities = SqlContract<
           readonly title: { readonly type: 'pg/text@1'; nullable: false };
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
         };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
     };
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  {
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: Record<string, Record<string, unknown>>;
+  }
 > & {
   readonly capabilities: {
     readonly postgres: {
@@ -52,6 +67,10 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -60,12 +79,19 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
           title: { type: 'pg/text@1', nullable: false },
           createdAt: { type: 'pg/timestamptz@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
   capabilities: {
     postgres: {
       lateral: true,
@@ -95,17 +121,14 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 }
 
 describe('SQL builder includeMany', () => {
-  const adapter = createStubAdapter();
-
   it('builds a plan with includeMany using default alias', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -119,23 +142,23 @@ describe('SQL builder includeMany', () => {
       })
       .build();
 
-    expect(plan.ast?.includes).toBeDefined();
-    expect(plan.ast?.includes?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.kind).toBe('includeMany');
-    expect(plan.ast?.includes?.[0]?.alias).toBe('post');
-    expect(plan.ast?.includes?.[0]?.child.table.name).toBe('post');
-    expect(plan.ast?.includes?.[0]?.child.project.length).toBe(2);
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes).toBeDefined();
+    expect(ast?.includes?.length).toBe(1);
+    expect(ast?.includes?.[0]?.kind).toBe('includeMany');
+    expect(ast?.includes?.[0]?.alias).toBe('post');
+    expect(ast?.includes?.[0]?.child.table.name).toBe('post');
+    expect(ast?.includes?.[0]?.child.project.length).toBe(2);
   });
 
   it('builds a plan with includeMany using custom alias', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -150,20 +173,20 @@ describe('SQL builder includeMany', () => {
       })
       .build();
 
-    expect(plan.ast?.includes).toBeDefined();
-    expect(plan.ast?.includes?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.alias).toBe('posts');
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes).toBeDefined();
+    expect(ast?.includes?.length).toBe(1);
+    expect(ast?.includes?.[0]?.alias).toBe('posts');
   });
 
   it('builds a plan with includeMany with child where clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -180,19 +203,19 @@ describe('SQL builder includeMany', () => {
       })
       .build({ params: { title: 'Test' } });
 
-    expect(plan.ast?.includes?.[0]?.child.where).toBeDefined();
-    expect(plan.ast?.includes?.[0]?.child.where?.kind).toBe('bin');
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes?.[0]?.child.where).toBeDefined();
+    expect(ast?.includes?.[0]?.child.where?.kind).toBe('bin');
   });
 
   it('builds a plan with includeMany with child orderBy clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -209,20 +232,20 @@ describe('SQL builder includeMany', () => {
       })
       .build();
 
-    expect(plan.ast?.includes?.[0]?.child.orderBy).toBeDefined();
-    expect(plan.ast?.includes?.[0]?.child.orderBy?.length).toBe(1);
-    expect(plan.ast?.includes?.[0]?.child.orderBy?.[0]?.dir).toBe('desc');
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes?.[0]?.child.orderBy).toBeDefined();
+    expect(ast?.includes?.[0]?.child.orderBy?.length).toBe(1);
+    expect(ast?.includes?.[0]?.child.orderBy?.[0]?.dir).toBe('desc');
   });
 
   it('builds a plan with includeMany with child limit clause', () => {
-    const tables = schema<ContractWithCapabilities, CodecTypes>(contractWithCapabilities).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({
-      contract: contractWithCapabilities,
-      adapter,
-    })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -236,6 +259,7 @@ describe('SQL builder includeMany', () => {
       })
       .build();
 
-    expect(plan.ast?.includes?.[0]?.child.limit).toBe(10);
+    const ast = plan.ast as SelectAst;
+    expect(ast?.includes?.[0]?.child.limit).toBe(10);
   });
 });

@@ -1,6 +1,8 @@
 export type { Codec, CodecDefBuilder, CodecInput, CodecOutput, CodecRegistry } from '../codecs';
 export { codec, createCodecRegistry, defineCodecs } from '../codecs';
 export type {
+  ExtractCodecTypes,
+  ExtractOperationTypes,
   ForeignKey,
   ForeignKeyReferences,
   Index,
@@ -16,15 +18,42 @@ export type {
   UniqueConstraint,
 } from '../contract-types';
 export { sqlTargetFamilyHook } from '../emitter-hook';
+export type {
+  ArgSpec,
+  LoweringSpec,
+  OperationRegistry,
+  OperationSignature,
+  ReturnSpec,
+} from '../operations-registry';
+export { assembleOperationRegistry, createOperationRegistry } from '../operations-registry';
 export {
   Adapter,
   AdapterProfile,
   AdapterTarget,
+  BinaryExpr,
+  ColumnRef,
+  DeleteAst,
+  Direction,
+  ExistsExpr,
+  IncludeAst,
+  IncludeRef,
+  InsertAst,
+  isOperationExpr,
+  JoinAst,
+  JoinOnExpr,
+  LiteralExpr,
   LoweredPayload,
+  LoweredStatement,
   Lowerer,
   LowererContext,
+  OperationExpr,
+  ParamRef,
+  QueryAst,
+  SelectAst,
   SqlDriver,
   SqlExecuteRequest,
   SqlExplainResult,
   SqlQueryResult,
+  TableRef,
+  UpdateAst,
 } from '../sql-target';

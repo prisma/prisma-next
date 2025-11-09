@@ -11,6 +11,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 003 | One Query One Statement | Ensures Plans map to single SQL statements for predictability and guardrails | [ADR 003 - One Query One Statement.md](adrs/ADR%20003%20-%20One%20Query%20One%20Statement.md) |
 | 004 | Core Hash vs Profile Hash | Separates logical schema hash (coreHash) from physical profile hash (profileHash) | [ADR 004 - Core Hash vs Profile Hash.md](adrs/ADR%20004%20-%20Core%20Hash%20vs%20Profile%20Hash.md) |
 | 005 | Thin Core Fat Targets | Keeps core minimal while pushing target-specific behavior into adapters | [ADR 005 - Thin Core Fat Targets.md](adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md) |
+| 140 | Package Layering & Target-Family Namespacing | Establishes ring-based package layout and per-family namespaces; introduces target-agnostic runtime core and family runtimes | [ADR 140 - Package Layering & Target-Family Namespacing.md](adrs/ADR%20140%20-%20Package%20Layering%20%26%20Target-Family%20Namespacing.md) |
 
 ## Contract & Schema
 

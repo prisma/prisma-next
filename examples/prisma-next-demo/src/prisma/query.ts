@@ -1,14 +1,18 @@
-import { schema as schemaBuilder, validateContract } from '@prisma-next/sql-query/schema';
+import { orm as ormBuilder } from '@prisma-next/sql-query/orm';
+import { schema as schemaBuilder } from '@prisma-next/sql-query/schema';
 import { sql as sqlBuilder } from '@prisma-next/sql-query/sql';
-import { adapter } from './adapter';
-import type { CodecTypes, Contract } from './contract.d';
-import contractJson from './contract.json' with { type: 'json' };
+import type { Contract } from './contract.d';
+import { getContext } from './runtime';
 
-const contract = validateContract<Contract>(contractJson);
+const context = getContext();
 
-export const sql = sqlBuilder<Contract, CodecTypes>({
-  contract,
-  adapter,
+export const sql = sqlBuilder<Contract>({
+  context,
 });
 
-export const schema = schemaBuilder<Contract, CodecTypes>(contract);
+export const schema = schemaBuilder<Contract>(context);
+export const tables = schema.tables;
+
+export const orm = ormBuilder<Contract>({
+  context,
+});

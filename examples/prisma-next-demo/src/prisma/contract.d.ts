@@ -12,6 +12,7 @@ import type {
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
+export type OperationTypes = Record<string, never>;
 
 export type Contract = SqlContract<
   {
@@ -23,6 +24,9 @@ export type Contract = SqlContract<
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; readonly nullable: false };
         };
         primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
       };
       readonly post: {
         columns: {
@@ -32,6 +36,9 @@ export type Contract = SqlContract<
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; readonly nullable: false };
         };
         primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
       };
     };
   },
@@ -54,7 +61,28 @@ export type Contract = SqlContract<
       };
     };
   },
-  Record<string, never>,
+  {
+    readonly user: {
+      readonly posts: {
+        readonly to: 'Post';
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly parentCols: readonly ['id'];
+          readonly childCols: readonly ['userId'];
+        };
+      };
+    };
+    readonly post: {
+      readonly user: {
+        readonly to: 'User';
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly parentCols: readonly ['userId'];
+          readonly childCols: readonly ['id'];
+        };
+      };
+    };
+  },
   {
     modelToTable: { readonly User: 'user'; readonly Post: 'post' };
     tableToModel: { readonly user: 'User'; readonly post: 'Post' };
@@ -84,6 +112,8 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
+    codecTypes: PgTypes;
+    operationTypes: Record<string, never>;
   }
 >;
 

@@ -841,7 +841,7 @@ pnpm --filter @prisma-next/runtime test --watch
 
 ```bash
 # Run tests with coverage for all packages (excluding examples)
-pnpm test:coverage:packages
+pnpm coverage:packages
 
 # Run tests with coverage for a specific package
 pnpm --filter @prisma-next/runtime test:coverage

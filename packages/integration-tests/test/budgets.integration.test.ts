@@ -1,20 +1,20 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { timeouts } from '@prisma-next/test-utils';
-import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { budgets } from '../src/plugins/budgets';
+import { budgets } from '@prisma-next/runtime';
 import {
-  createDevDatabase,
+  createTestContext,
   createTestRuntime,
   drainPlanExecution,
   executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
-} from './utils';
+} from '@prisma-next/runtime/test/utils';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { Client } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -29,12 +29,18 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
           id: { type: 'pg/text@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 };
 const fixtureContract = validateContract(fixtureContractRaw);
 
@@ -97,10 +103,11 @@ describe('budgets plugin integration', () => {
       ],
     });
 
-    const tables = schema(fixtureContract).tables;
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter });
+    const builder = sql({ context });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -128,10 +135,11 @@ describe('budgets plugin integration', () => {
       ],
     });
 
-    const tables = schema(fixtureContract).tables;
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter });
+    const builder = sql({ context });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -156,10 +164,11 @@ describe('budgets plugin integration', () => {
       ],
     });
 
-    const tables = schema(fixtureContract).tables;
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter });
+    const builder = sql({ context });
     // Use LIMIT that's within heuristic but exceeds streaming budget
     const plan = builder
       .from(userTable)
@@ -187,7 +196,8 @@ describe('budgets plugin integration', () => {
       ],
     });
 
-    const { raw } = sql({ contract: fixtureContract, adapter });
+    const context = createTestContext(fixtureContract, adapter);
+    const { raw } = sql({ context });
     const plan = raw`SELECT id, email FROM "user"`;
 
     // Unbounded raw SELECT should be blocked pre-exec
@@ -210,7 +220,8 @@ describe('budgets plugin integration', () => {
       ],
     });
 
-    const { raw } = sql({ contract: fixtureContract, adapter });
+    const context = createTestContext(fixtureContract, adapter);
+    const { raw } = sql({ context });
     const plan = raw.with({ annotations: { limit: 5 } })`SELECT id, email FROM "user" LIMIT 5`;
 
     // Raw SELECT with limit annotation should pass
@@ -240,10 +251,11 @@ describe('budgets plugin integration', () => {
       },
     });
 
-    const tables = schema(fixtureContract).tables;
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter });
+    const builder = sql({ context });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -276,10 +288,11 @@ describe('budgets plugin integration', () => {
       ],
     });
 
-    const tables = schema(fixtureContract).tables;
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter });
+    const builder = sql({ context });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -316,10 +329,11 @@ describe('budgets plugin integration', () => {
       },
     });
 
-    const tables = schema(fixtureContract).tables;
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter });
+    const builder = sql({ context });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })
@@ -357,10 +371,11 @@ describe('budgets plugin integration', () => {
       },
     });
 
-    const tables = schema(fixtureContract).tables;
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
     const userTable = tables['user']!;
     const userColumns = userTable.columns;
-    const builder = sql({ contract: fixtureContract, adapter });
+    const builder = sql({ context });
     const plan = builder
       .from(userTable)
       .select({ id: userColumns['id']!, email: userColumns['email']! })

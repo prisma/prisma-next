@@ -16,6 +16,7 @@
     "@prisma-next/emitter": "workspace:*"
   },
   "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
     "ts-toolbelt": "^9.6.0",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",

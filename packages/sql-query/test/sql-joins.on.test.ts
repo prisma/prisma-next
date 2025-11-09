@@ -1,9 +1,9 @@
 import type { SqlContract } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
+import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { createJoinOnBuilder } from '../src/sql';
-import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type for this test
 type ContractWithPosts = SqlContract<
@@ -14,6 +14,10 @@ type ContractWithPosts = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; nullable: false };
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly post: {
         readonly columns: {
@@ -21,12 +25,19 @@ type ContractWithPosts = SqlContract<
           readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
           readonly title: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
     };
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  {
+    readonly codecTypes: Record<string, never>;
+    readonly operationTypes: Record<string, Record<string, unknown>>;
+  }
 >;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
@@ -41,6 +52,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -48,18 +63,27 @@ const contractWithPosts = validateContract<ContractWithPosts>({
           userId: { type: 'pg/int4@1', nullable: false },
           title: { type: 'pg/text@1', nullable: false },
         },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 });
 
 describe('JoinOnBuilder', () => {
   it('creates a join ON predicate from two columns', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
@@ -74,7 +98,9 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when left operand is not a column', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const postColumns = tables.post.columns;
 
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -90,7 +116,9 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when right operand is not a column', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
 
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -106,7 +134,9 @@ describe('JoinOnBuilder', () => {
 
   it('throws PLAN.INVALID when both columns are from the same table (self-join)', () => {
     const on = createJoinOnBuilder();
-    const tables = schema<ContractWithPosts, CodecTypes>(contractWithPosts).tables;
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithPosts, adapter);
+    const tables = schema<ContractWithPosts>(context).tables;
     const userColumns = tables.user.columns;
 
     expect(() => on.eqCol(userColumns.id, userColumns.id)).toThrowError(

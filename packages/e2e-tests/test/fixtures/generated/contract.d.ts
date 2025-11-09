@@ -12,6 +12,7 @@ import type {
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
+export type OperationTypes = Record<string, never>;
 
 export type Contract = SqlContract<
   {
@@ -22,6 +23,9 @@ export type Contract = SqlContract<
           readonly email: { readonly type: 'pg/text@1'; readonly nullable: false };
         };
         primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
       };
       readonly post: {
         columns: {
@@ -31,6 +35,9 @@ export type Contract = SqlContract<
           readonly published: { readonly type: 'pg/bool@1'; readonly nullable: false };
         };
         primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
       };
       readonly comment: {
         columns: {
@@ -39,6 +46,9 @@ export type Contract = SqlContract<
           readonly content: { readonly type: 'pg/text@1'; readonly nullable: false };
         };
         primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
       };
     };
   },
@@ -89,6 +99,8 @@ export type Contract = SqlContract<
         readonly content: 'content';
       };
     };
+    codecTypes: PgTypes;
+    operationTypes: Record<string, never>;
   }
 >;
 
