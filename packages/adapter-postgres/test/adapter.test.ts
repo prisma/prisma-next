@@ -387,6 +387,45 @@ describe('createPostgresAdapter', () => {
           params: ['test@example.com', new Date('2024-01-01')],
         });
       });
+
+      it('lowers insert AST with column reference in values', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          values: {
+            email: { kind: 'param', index: 1, name: 'email' },
+            copyFrom: { kind: 'col', table: 'user', column: 'otherColumn' },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['test@example.com'],
+        });
+
+        expect(lowered.body).toEqual({
+          sql: 'INSERT INTO "user" ("email", "copyFrom") VALUES ($1, "user"."otherColumn")',
+          params: ['test@example.com'],
+        });
+      });
+
+      it('throws error for unsupported value kind in INSERT', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast = {
+          kind: 'insert' as const,
+          table: { kind: 'table' as const, name: 'user' },
+          values: {
+            email: { kind: 'invalid' as 'param', index: 1 },
+          },
+        } as InsertAst;
+
+        expect(() => {
+          adapter.lower(ast, { contract, params: ['test@example.com'] });
+        }).toThrow('Unsupported value kind in INSERT');
+      });
     });
 
     describe('update', () => {
@@ -442,6 +481,54 @@ describe('createPostgresAdapter', () => {
           sql: 'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."id", "user"."email"',
           params: ['updated@example.com', 1],
         });
+      });
+
+      it('lowers update AST with column reference in set', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: UpdateAst = {
+          kind: 'update',
+          table: { kind: 'table', name: 'user' },
+          set: {
+            email: { kind: 'param', index: 1, name: 'newEmail' },
+            copyFrom: { kind: 'col', table: 'user', column: 'otherColumn' },
+          },
+          where: {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: { kind: 'param', index: 2, name: 'userId' },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: ['updated@example.com', 1] });
+
+        expect(lowered.body).toEqual({
+          sql: 'UPDATE "user" SET "email" = $1, "copyFrom" = "user"."otherColumn" WHERE "user"."id" = $2',
+          params: ['updated@example.com', 1],
+        });
+      });
+
+      it('throws error for unsupported value kind in UPDATE', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast = {
+          kind: 'update' as const,
+          table: { kind: 'table' as const, name: 'user' },
+          set: {
+            email: { kind: 'invalid' as 'param', index: 1 },
+          },
+          where: {
+            kind: 'bin' as const,
+            op: 'eq' as const,
+            left: { kind: 'col' as const, table: 'user', column: 'id' },
+            right: { kind: 'param' as const, index: 1 },
+          },
+        } as UpdateAst;
+
+        expect(() => {
+          adapter.lower(ast, { contract, params: ['test@example.com'] });
+        }).toThrow('Unsupported value kind in UPDATE');
       });
     });
 

@@ -77,6 +77,241 @@ describe('sql-target-family-hook', () => {
     );
   });
 
+  it('generates relations type with through table', () => {
+    const ir = createContractIR({
+      relations: {
+        user: {
+          posts: {
+            to: 'Post',
+            cardinality: '1:N',
+            on: {
+              parentCols: ['id'],
+              childCols: ['userId'],
+            },
+            through: {
+              table: 'user_post',
+              parentCols: ['userId'],
+              childCols: ['postId'],
+            },
+          },
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
+    expect(types).toContain('export type Relations');
+    expect(types).toContain('readonly user: {');
+    expect(types).toContain('readonly posts: {');
+    expect(types).toContain('readonly through:');
+    expect(types).toContain("readonly table: 'user_post'");
+  });
+
+  it('generates relations type with non-object relation value', () => {
+    const ir = createContractIR({
+      relations: {
+        user: {
+          posts: null as unknown,
+          comments: 'invalid' as unknown,
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
+    expect(types).toContain('export type Relations');
+    expect(types).toContain('readonly user: {');
+    expect(types).toContain('readonly posts: unknown');
+    expect(types).toContain('readonly comments: unknown');
+  });
+
+  it('generates relations type with relation having no properties', () => {
+    const ir = createContractIR({
+      relations: {
+        user: {
+          posts: {},
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
+    expect(types).toContain('export type Relations');
+    expect(types).toContain('readonly user: {');
+    expect(types).toContain('readonly posts: unknown');
+  });
+
+  it('generates mappings type when models is undefined', () => {
+    const ir = createContractIR({
+      models: undefined,
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
+    expect(types).toContain('SqlMappings');
+    expect(types).toContain('codecTypes: Record<string, never>');
+    expect(types).toContain('operationTypes: Record<string, never>');
+  });
+
+  it('generates mappings type when models is undefined with codecTypes', () => {
+    const packs = [
+      {
+        manifest: {
+          id: 'test-adapter',
+          version: '1.0.0',
+          types: {
+            codecTypes: {
+              import: {
+                package: '@test/adapter/codec-types',
+                named: 'CodecTypes',
+                alias: 'TestTypes',
+              },
+            },
+          },
+        },
+        path: '/path/to/pack',
+      },
+    ];
+
+    const ir = createContractIR({
+      models: undefined,
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, packs);
+    expect(types).toContain('SqlMappings');
+    expect(types).toContain('codecTypes: TestTypes');
+    expect(types).toContain('operationTypes: Record<string, never>');
+  });
+
+  it('generates mappings type when models is undefined with codecTypes', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const packs = [
+      {
+        manifest: {
+          id: 'test-adapter',
+          version: '1.0.0',
+          types: {
+            codecTypes: {
+              import: {
+                package: '@test/adapter/codec-types',
+                named: 'CodecTypes',
+                alias: 'TestTypes',
+              },
+            },
+          },
+        },
+        path: '/path/to/pack',
+      },
+    ];
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, packs);
+    expect(types).toContain('SqlMappings');
+    expect(types).toContain('codecTypes: TestTypes');
+    expect(types).toContain('operationTypes: Record<string, never>');
+  });
+
+  it('generates relations type with non-object table relations value', () => {
+    const ir = createContractIR({
+      relations: {
+        user: null as unknown,
+        post: 'invalid' as unknown,
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
+    expect(types).toContain('export type Relations');
+    expect(types).toContain('Record<string, never>');
+  });
+
   it('generates relations type from models', () => {
     const ir = createContractIR({
       models: {
@@ -346,5 +581,38 @@ describe('sql-target-family-hook', () => {
     const operationImports = sqlTargetFamilyHook.getOperationTypesImports(packs);
     const imports = [...codecImports, ...operationImports];
     expect(imports.length).toBe(0);
+  });
+
+  it('gets types imports using getTypesImports', () => {
+    const packs = [
+      {
+        manifest: {
+          id: 'test-adapter',
+          version: '1.0.0',
+          types: {
+            codecTypes: {
+              import: {
+                package: '@test/adapter/codec-types',
+                named: 'CodecTypes',
+                alias: 'TestTypes',
+              },
+            },
+            operationTypes: {
+              import: {
+                package: '@test/adapter/operation-types',
+                named: 'OperationTypes',
+                alias: 'TestOps',
+              },
+            },
+          },
+        },
+        path: '/path/to/pack',
+      },
+    ];
+
+    const imports = sqlTargetFamilyHook.getTypesImports(packs);
+    expect(imports.length).toBe(2);
+    expect(imports[0]?.package).toBe('@test/adapter/codec-types');
+    expect(imports[1]?.package).toBe('@test/adapter/operation-types');
   });
 });
