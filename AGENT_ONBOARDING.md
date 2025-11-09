@@ -705,6 +705,10 @@ export class CodecRegistry { ... }
 - `Runtime` → `createRuntime()`
 - `PostgresDriver` → `createPostgresDriverFromOptions()`
 
+**Exception: Classes with Private Properties in Exported Types**
+
+When a class with private properties is part of an exported type (e.g., returned from `schema()`), the class must be explicitly exported from the exports file. Otherwise, TypeScript treats it as an anonymous class type, which cannot have private or protected properties. See `.cursor/rules/typescript-patterns.mdc` for details.
+
 ### Type Preservation in Generics
 
 **Challenge**: Preserving literal string types (e.g., `'pg/text@1'`) through complex generic type manipulations.
@@ -818,6 +822,48 @@ const runtime = createRuntime({ contract: testContract, adapter });
 ```
 
 **Important**: `validateContract()` does not perform canonicalization. It expects all types to already be fully qualified type IDs (`pg/int4@1`, not `int4`). Type canonicalization happens at authoring time (PSL parser or TS builder), not during validation.
+
+### Test Fixtures Should Be Adapter-Agnostic
+
+**CRITICAL**: Test fixtures (e.g., `test/fixtures/contract.d.ts`) should not depend on specific adapters (e.g., `@prisma-next/adapter-postgres`). This prevents cyclic dependencies and keeps tests adapter-agnostic.
+
+**❌ WRONG: Test fixture depends on specific adapter**
+
+```typescript
+// test/fixtures/contract.d.ts
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+
+export type Contract = SqlContract<...>;
+```
+
+This creates a dependency on `adapter-postgres`, which can cause cyclic dependency issues if the adapter depends on the package being tested.
+
+**✅ CORRECT: Define CodecTypes inline in test fixture**
+
+```typescript
+// test/fixtures/contract.d.ts
+import type { SqlContract } from '@prisma-next/sql-target';
+
+// Minimal CodecTypes for testing - matches adapter-postgres structure
+type CodecTypes = {
+  readonly 'pg/int4@1': { readonly output: number };
+  readonly 'pg/text@1': { readonly output: string };
+  readonly 'pg/timestamptz@1': { readonly output: string };
+};
+
+export type Contract = SqlContract<...>;
+```
+
+**Why this matters:**
+- Prevents cyclic dependencies between packages
+- Keeps test fixtures adapter-agnostic
+- Allows tests to work with any adapter implementation
+- Makes it easier to test with different adapters or stubs
+
+**When to use this pattern:**
+- In test fixtures that define contract types
+- When creating test contracts that need CodecTypes
+- When you need adapter-agnostic test utilities
 
 ### Test Port Management
 
