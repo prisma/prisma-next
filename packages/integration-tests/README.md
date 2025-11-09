@@ -16,18 +16,23 @@ This package contains integration tests that verify the complete flow from contr
 ## Structure
 
 - `test/*.integration.test.ts` - Integration test files
-- `test/fixtures/` - Optional minimal fixtures/schemas (if needed)
+- `test/*.test-d.ts` - Type-only test files (for testing TypeScript types)
+- `test/fixtures/` - Test fixtures (contract JSON, type definitions)
+
+**Note**: Integration tests that depend on multiple packages (e.g., both `sql-contract-ts` and `sql-query`) are placed here to avoid cyclic dependencies. For example, `contract-builder.integration.test.ts` tests the integration between contract authoring and query building.
 
 ## Dependencies
 
 This package depends on all packages under test via workspace protocol:
+- `@prisma-next/adapter-postgres` - Postgres adapter
+- `@prisma-next/cli` - CLI for contract emission
+- `@prisma-next/contract` - Contract types
+- `@prisma-next/driver-postgres` - Postgres driver
 - `@prisma-next/emitter` - Contract emission
+- `@prisma-next/runtime` - Execution runtime
+- `@prisma-next/sql-contract-ts` - SQL contract authoring (for integration tests)
 - `@prisma-next/sql-query` - Query builders
 - `@prisma-next/sql-target` - SQL target family
-- `@prisma-next/runtime` - Execution runtime
-- `@prisma-next/adapter-postgres` - Postgres adapter
-- `@prisma-next/driver-postgres` - Postgres driver
-- `@prisma-next/contract` - Contract types
 
 ## Running Tests
 
