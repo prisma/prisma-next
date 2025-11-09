@@ -61,7 +61,28 @@ export type Contract = SqlContract<
       };
     };
   },
-  Record<string, never>,
+  {
+    readonly user: {
+      readonly posts: {
+        readonly to: 'Post';
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly parentCols: readonly ['id'];
+          readonly childCols: readonly ['userId'];
+        };
+      };
+    };
+    readonly post: {
+      readonly user: {
+        readonly to: 'User';
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly parentCols: readonly ['userId'];
+          readonly childCols: readonly ['id'];
+        };
+      };
+    };
+  },
   {
     modelToTable: { readonly User: 'user'; readonly Post: 'post' };
     tableToModel: { readonly user: 'User'; readonly post: 'Post' };

@@ -251,7 +251,7 @@ export const sqlTargetFamilyHook = {
 
     const storageType = this.generateStorageType(storage);
     const modelsType = this.generateModelsType(models, storage);
-    const relationsType = this.generateRelationsType(models);
+    const relationsType = this.generateRelationsType(ir.relations);
     const mappingsType = this.generateMappingsType(models, storage, codecTypes, operationTypes);
 
     return `// ⚠️  GENERATED FILE - DO NOT EDIT
@@ -435,23 +435,66 @@ export type Relations = Contract['relations'];
     return `{ ${modelTypes.join('; ')} }`;
   },
 
-  generateRelationsType(models: Record<string, ModelDefinition> | undefined): string {
-    if (!models) {
+  generateRelationsType(relations: Record<string, unknown> | undefined): string {
+    if (!relations || Object.keys(relations).length === 0) {
       return 'Record<string, never>';
     }
 
-    const relationTypes: string[] = [];
-    for (const [modelName, model] of Object.entries(models)) {
-      for (const [relName] of Object.entries(model.relations)) {
-        relationTypes.push(`readonly ${modelName}.${relName}: unknown`);
+    const tableEntries: string[] = [];
+    for (const [tableName, relsValue] of Object.entries(relations)) {
+      if (typeof relsValue !== 'object' || relsValue === null) {
+        continue;
       }
+      const rels = relsValue as Record<string, unknown>;
+      const relationEntries: string[] = [];
+      for (const [relName, relValue] of Object.entries(rels)) {
+        if (typeof relValue !== 'object' || relValue === null) {
+          relationEntries.push(`readonly ${relName}: unknown`);
+          continue;
+        }
+        const { to, cardinality, on, through } = relValue as {
+          readonly to?: string;
+          readonly cardinality?: string;
+          readonly on?: { readonly parentCols?: readonly string[]; readonly childCols?: readonly string[] };
+          readonly through?: {
+            readonly table: string;
+            readonly parentCols: readonly string[];
+            readonly childCols: readonly string[];
+          };
+        };
+
+        const parts: string[] = [];
+        if (to) {
+          parts.push(`readonly to: '${to}'`);
+        }
+        if (cardinality) {
+          parts.push(`readonly cardinality: '${cardinality}'`);
+        }
+        if (on && on.parentCols && on.childCols) {
+          const parentCols = on.parentCols.map((c) => `'${c}'`).join(', ');
+          const childCols = on.childCols.map((c) => `'${c}'`).join(', ');
+          parts.push(
+            `readonly on: { readonly parentCols: readonly [${parentCols}]; readonly childCols: readonly [${childCols}] }`,
+          );
+        }
+        if (through) {
+          const parentCols = through.parentCols.map((c) => `'${c}'`).join(', ');
+          const childCols = through.childCols.map((c) => `'${c}'`).join(', ');
+          parts.push(
+            `readonly through: { readonly table: '${through.table}'; readonly parentCols: readonly [${parentCols}]; readonly childCols: readonly [${childCols}] }`,
+          );
+        }
+
+        relationEntries.push(
+          parts.length > 0
+            ? `readonly ${relName}: { ${parts.join('; ')} }`
+            : `readonly ${relName}: unknown`,
+        );
+      }
+      tableEntries.push(`readonly ${tableName}: { ${relationEntries.join('; ')} }`);
     }
 
-    if (relationTypes.length === 0) {
-      return 'Record<string, never>';
-    }
-
-    return `{ ${relationTypes.join('; ')} }`;
+    return `{ ${tableEntries.join('; ')} }`;
   },
 
   generateMappingsType(
