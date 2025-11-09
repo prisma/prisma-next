@@ -406,6 +406,9 @@ importers:
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../runtime
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../sql/authoring/sql-contract-ts
       '@prisma-next/sql-query':
         specifier: workspace:*
         version: link:../sql-query

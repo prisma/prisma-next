@@ -1,12 +1,12 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { dataTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { createRuntimeContext } from '@prisma-next/runtime';
-import { expectTypeOf, test } from 'vitest';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
-import { dataTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
+import { expectTypeOf, test } from 'vitest';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -110,7 +110,8 @@ test('codec type inference via type option', () => {
       t
         .column('id', { type: dataTypes.int4, nullable: false })
         .column('email', { type: dataTypes.text, nullable: false })
-        .column('createdAt', { type: dataTypes.timestamptz, nullable: false }),
+        .column('createdAt', { type: dataTypes.timestamptz, nullable: false })
+        .primaryKey(['id']),
     )
     .model('User', 'user', (m) =>
       m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),

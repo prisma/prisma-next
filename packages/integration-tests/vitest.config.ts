@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['test/**/*.integration.test.ts'],
+    include: ['test/**/*.integration.test.ts', 'test/**/*.test-d.ts'],
     /**
      * Set hookTimeout to match the timeout used in beforeAll hooks that spin up ppg-dev.
      * Vitest's default hookTimeout is 10000ms, which caps hook timeouts even when a higher
