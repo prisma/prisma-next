@@ -125,7 +125,10 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
   capabilities: {
     postgres: {
       lateral: true,
@@ -166,7 +169,10 @@ const contractWithoutCapabilities = validateContract<ContractWithoutCapabilities
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
   capabilities: {},
 });
 

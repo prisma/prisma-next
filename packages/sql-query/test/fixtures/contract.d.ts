@@ -36,6 +36,22 @@ export type Contract = SqlContract<
   },
   {},
   {
+    readonly modelToTable: { readonly User: 'user' };
+    readonly tableToModel: { readonly user: 'User' };
+    readonly fieldToColumn: {
+      readonly User: {
+        readonly id: 'id';
+        readonly email: 'email';
+        readonly createdAt: 'createdAt';
+      };
+    };
+    readonly columnToField: {
+      readonly user: {
+        readonly id: 'id';
+        readonly email: 'email';
+        readonly createdAt: 'createdAt';
+      };
+    };
     readonly codecTypes: CodecTypes;
     readonly operationTypes: OperationTypes;
   }

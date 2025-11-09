@@ -1,5 +1,5 @@
 import type { ResultType } from '@prisma-next/contract/types';
-import type { ModelDefinition } from '@prisma-next/sql-target';
+import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-target';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { dataTypes } from '../../adapter-postgres/src/exports/codec-types';
 import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
@@ -38,6 +38,8 @@ describe('builder integration', () => {
     expect(userTable?.columns).toHaveProperty('id');
     expect(userTable?.columns).toHaveProperty('email');
     expect(userTable?.columns).toHaveProperty('createdAt');
+
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
     expect(contract.models).toHaveProperty('User');
     const userModel = contract.models.User;

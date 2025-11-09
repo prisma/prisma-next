@@ -129,7 +129,10 @@ describe('OperationExpr', () => {
       },
     };
 
-    expect(ast.where?.left.kind).toBe('operation');
+    expect(ast.where?.kind).toBe('bin');
+    if (ast.where?.kind === 'bin') {
+      expect(ast.where.left.kind).toBe('operation');
+    }
   });
 
   it('defines OperationExpr in orderBy clause', () => {

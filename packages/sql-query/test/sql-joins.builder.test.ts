@@ -54,7 +54,10 @@ type ContractWithPosts = SqlContract<
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  {
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: Record<string, Record<string, unknown>>;
+  }
 >;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
@@ -100,7 +103,10 @@ const contractWithPosts = validateContract<ContractWithPosts>({
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
 });
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
@@ -257,7 +263,7 @@ describe('SQL builder joins', () => {
     expect(
       (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
     ).toHaveLength(1);
-    const ast = plan.ast as import('../src/types').SelectAst;
+    const ast = plan.ast as SelectAst;
     expect(ast?.where).toBeDefined();
     expect(plan.params).toEqual([42]);
   });

@@ -9,6 +9,26 @@ import type {
 } from '@prisma-next/sql-target';
 import { computeMappings } from './contract';
 
+/**
+ * Type-level mappings structure for contracts built via `defineContract()`.
+ *
+ * Compile-time type helper (not a runtime object) that ensures mappings match what the builder
+ * produces. `codecTypes` uses the generic `CodecTypes` parameter; `operationTypes` is always
+ * empty since operations are added via extensions at runtime.
+ *
+ * **Difference from RuntimeContext**: This is a compile-time type for contract construction.
+ * `RuntimeContext` is a runtime object with populated registries for query execution.
+ *
+ * @template C - The `CodecTypes` generic parameter passed to `defineContract<CodecTypes>()`
+ */
+type ContractBuilderMappings<C extends Record<string, { output: unknown }>> = Omit<
+  SqlMappings,
+  'codecTypes' | 'operationTypes'
+> & {
+  readonly codecTypes: C;
+  readonly operationTypes: Record<string, never>;
+};
+
 type BuildStorageColumn<Nullable extends boolean, Type extends string> = {
   readonly type: Type;
   readonly nullable: Nullable;
@@ -641,7 +661,7 @@ class ContractBuilder<
         BuildStorage<Tables>,
         BuildModels<Models>,
         BuildRelations<Models>,
-        SqlMappings
+        ContractBuilderMappings<CodecTypes>
       > & {
         readonly schemaVersion: '1';
         readonly target: Target;
@@ -660,7 +680,7 @@ class ContractBuilder<
           BuildStorage<Tables>,
           BuildModels<Models>,
           BuildRelations<Models>,
-          SqlMappings
+          ContractBuilderMappings<CodecTypes>
         > & {
           readonly schemaVersion: '1';
           readonly target: Target;
@@ -818,10 +838,16 @@ class ContractBuilder<
     const storage = { tables: storageTables } as unknown as BuildStorage<Tables>;
     const models = modelsPartial as unknown as BuildModels<Models>;
 
-    const mappings = computeMappings(
+    const baseMappings = computeMappings(
       models as unknown as Record<string, ModelDefinition>,
       storage as SqlStorage,
     );
+
+    const mappings = {
+      ...baseMappings,
+      codecTypes: {} as CodecTypes,
+      operationTypes: {} as Record<string, never>,
+    } as ContractBuilderMappings<CodecTypes>;
 
     // Construct contract with explicit type that matches the generic parameters
     // This ensures TypeScript infers literal types from the generics, not runtime values

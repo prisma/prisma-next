@@ -9,6 +9,7 @@ import type {
 } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { expectTypeOf, test } from 'vitest';
+import { createTestContext } from '../../runtime/test/utils';
 import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
@@ -122,6 +123,9 @@ type TestContractWithCapabilities = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; nullable: false };
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly post: {
         readonly columns: {
@@ -130,12 +134,18 @@ type TestContractWithCapabilities = SqlContract<
           readonly title: { readonly type: 'pg/text@1'; nullable: false };
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
         };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
     };
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  {
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: Record<string, Record<string, unknown>>;
+  }
 > & {
   readonly capabilities: {
     readonly postgres: {
@@ -157,6 +167,9 @@ const testContractWithCapabilities = validateContract<TestContractWithCapabiliti
           id: { type: 'pg/int4@1', nullable: false },
           email: { type: 'pg/text@1', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
@@ -165,12 +178,18 @@ const testContractWithCapabilities = validateContract<TestContractWithCapabiliti
           title: { type: 'pg/text@1', nullable: false },
           createdAt: { type: 'pg/timestamptz@1', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
   capabilities: {
     postgres: {
       lateral: true,
@@ -202,14 +221,12 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 // Type tests for includeMany result types
 test('ResultType yields Array<ChildShape> for includeMany', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
+  const context = createTestContext(testContractWithCapabilities, adapter);
+  const tables = schema<TestContractWithCapabilities>(context).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
-  const _plan = sql<TestContractWithCapabilities, CodecTypes>({
-    contract: testContractWithCapabilities,
-    adapter,
-  })
+  const _plan = sql<TestContractWithCapabilities, CodecTypes>({ context })
     .from(user)
     .includeMany(
       post,
@@ -241,14 +258,12 @@ test('ResultType yields Array<ChildShape> for includeMany', () => {
 
 test('Array element types match child projection types', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
+  const context = createTestContext(testContractWithCapabilities, adapter);
+  const tables = schema<TestContractWithCapabilities>(context).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
-  const _plan = sql<TestContractWithCapabilities, CodecTypes>({
-    contract: testContractWithCapabilities,
-    adapter,
-  })
+  const _plan = sql<TestContractWithCapabilities, CodecTypes>({ context })
     .from(user)
     .includeMany(
       post,
@@ -278,14 +293,12 @@ test('Array element types match child projection types', () => {
 
 test('Empty array type when no children', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
+  const context = createTestContext(testContractWithCapabilities, adapter);
+  const tables = schema<TestContractWithCapabilities>(context).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
-  const _plan = sql<TestContractWithCapabilities, CodecTypes>({
-    contract: testContractWithCapabilities,
-    adapter,
-  })
+  const _plan = sql<TestContractWithCapabilities, CodecTypes>({ context })
     .from(user)
     .includeMany(
       post,
@@ -312,14 +325,12 @@ test('Empty array type when no children', () => {
 
 test('includeMany with default alias uses table name', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
+  const context = createTestContext(testContractWithCapabilities, adapter);
+  const tables = schema<TestContractWithCapabilities>(context).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
-  const _plan = sql<TestContractWithCapabilities, CodecTypes>({
-    contract: testContractWithCapabilities,
-    adapter,
-  })
+  const _plan = sql<TestContractWithCapabilities, CodecTypes>({ context })
     .from(user)
     .includeMany(
       post,
@@ -350,14 +361,12 @@ test('includeMany with default alias uses table name', () => {
 
 test('includeMany preserves parent column types alongside includes', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
+  const context = createTestContext(testContractWithCapabilities, adapter);
+  const tables = schema<TestContractWithCapabilities>(context).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
-  const _plan = sql<TestContractWithCapabilities, CodecTypes>({
-    contract: testContractWithCapabilities,
-    adapter,
-  })
+  const _plan = sql<TestContractWithCapabilities, CodecTypes>({ context })
     .from(user)
     .includeMany(
       post,
@@ -525,14 +534,12 @@ test('includeMany with multiple includes preserves all types', () => {
 
 test('includeMany with nested child projection infers nested array element types', () => {
   const adapter = createStubAdapter();
-  const tables = schema<TestContractWithCapabilities>(testContractWithCapabilities).tables;
+  const context = createTestContext(testContractWithCapabilities, adapter);
+  const tables = schema<TestContractWithCapabilities>(context).tables;
   const user = tables['user']!;
   const post = tables['post']!;
 
-  const _plan = sql<TestContractWithCapabilities, CodecTypes>({
-    contract: testContractWithCapabilities,
-    adapter,
-  })
+  const _plan = sql<TestContractWithCapabilities, CodecTypes>({ context })
     .from(user)
     .includeMany(
       post,

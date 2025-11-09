@@ -23,6 +23,9 @@ type ContractWithCapabilities = SqlContract<
           readonly id: { readonly type: 'pg/int4@1'; nullable: false };
           readonly email: { readonly type: 'pg/text@1'; nullable: false };
         };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
       readonly post: {
         readonly columns: {
@@ -31,12 +34,18 @@ type ContractWithCapabilities = SqlContract<
           readonly title: { readonly type: 'pg/text@1'; nullable: false };
           readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
         };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
       };
     };
   },
   Record<string, never>,
   Record<string, never>,
-  Record<string, never>
+  {
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: Record<string, Record<string, unknown>>;
+  }
 > & {
   readonly capabilities: {
     readonly postgres: {
@@ -79,7 +88,10 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
   },
   models: {},
   relations: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {} as CodecTypes,
+    operationTypes: {},
+  },
   capabilities: {
     postgres: {
       lateral: true,

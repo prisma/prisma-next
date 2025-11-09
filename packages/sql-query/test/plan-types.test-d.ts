@@ -298,15 +298,19 @@ test('generic contract types are preserved', () => {
 test('Contract namespace types are available', () => {
   // Verify Tables namespace is accessible
   type UserTable = Contract['storage']['tables']['user'];
-  expectTypeOf<UserTable>().toHaveProperty('id');
-  expectTypeOf<UserTable>().toHaveProperty('email');
-  expectTypeOf<UserTable>().toHaveProperty('createdAt');
+  expectTypeOf<UserTable>().toHaveProperty('columns');
+  type UserColumns = UserTable['columns'];
+  expectTypeOf<UserColumns>().toHaveProperty('id');
+  expectTypeOf<UserColumns>().toHaveProperty('email');
+  expectTypeOf<UserColumns>().toHaveProperty('createdAt');
 
   // Verify Models namespace is accessible
   type UserModel = Contract['models']['User'];
-  expectTypeOf<UserModel>().toHaveProperty('id');
-  expectTypeOf<UserModel>().toHaveProperty('email');
-  expectTypeOf<UserModel>().toHaveProperty('createdAt');
+  expectTypeOf<UserModel>().toHaveProperty('fields');
+  type UserFields = UserModel['fields'];
+  expectTypeOf<UserFields>().toHaveProperty('id');
+  expectTypeOf<UserFields>().toHaveProperty('email');
+  expectTypeOf<UserFields>().toHaveProperty('createdAt');
 
   // Verify mappings work correctly
   type UserTableName = Contract['mappings'] extends { modelToTable: infer MT }
