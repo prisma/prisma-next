@@ -3,7 +3,7 @@
 // without namespace collisions. Each contract can have its own namespace name.
 
 import type { SqlContract } from '@prisma-next/sql-target';
-import type { CodecTypes, ScalarToJs } from '@prisma-next/adapter-postgres/codec-types';
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
 // Contract type representing the contract data structure
 // This type matches the structure of contract.json and can be used as a return type
@@ -58,7 +58,7 @@ export type Contract = SqlContract<
 >;
 
 // Codec type map and scalar mapping imported from adapter - used for type inference in lanes
-export type { CodecTypes, ScalarToJs };
+export type { CodecTypes };
 
 // Operation types (empty for now, can be extended by extension packs)
 export type OperationTypes = Record<string, never>;

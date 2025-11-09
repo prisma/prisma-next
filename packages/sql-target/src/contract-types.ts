@@ -64,12 +64,6 @@ export type SqlMappings = {
   readonly fieldToColumn?: Record<string, Record<string, string>>;
   readonly columnToField?: Record<string, Record<string, string>>;
   /**
-   * Types-only scalar to JavaScript type mapping.
-   * Provided via contract.d.ts imports from adapter exports.
-   * Not present in contract.json; compile-time only.
-   */
-  readonly scalarToJs?: Record<string, unknown>;
-  /**
    * Types-only codec type mapping.
    * Provided via contract.d.ts imports from adapter/extension exports.
    * Not present in contract.json; compile-time only.

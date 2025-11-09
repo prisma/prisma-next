@@ -7,7 +7,7 @@ import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { TableKey, TablesOf } from '../src/types';
-import type { Contract, ScalarToJs } from './fixtures/contract.d';
+import type { Contract, CodecTypes } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 // Helper to simulate execute signature
@@ -361,22 +361,17 @@ test('sql() preserves contract generic through builder chain', () => {
   expectTypeOf(builderAfterFrom).toExtend<ReturnType<ReturnType<typeof sql<Contract>>['from']>>();
 });
 
-test('ScalarToJs mapping resolves scalar types correctly', () => {
-  // Create a contract without extension decorations to test ScalarToJs fallback
-  const contractWithoutCodecs = {
-    ...contractJson,
-    extensions: {},
-  };
-  const contract = validateContract<Contract>(contractWithoutCodecs);
+test('codec mapping resolves scalar types correctly', () => {
+  const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
   if (!userTable) throw new Error('user table not found');
   const userColumns = getTableColumns(userTable);
-  const idColumn = userColumns.id; // int4
-  const emailColumn = userColumns.email; // text
-  const createdAtColumn = userColumns.createdAt; // timestamptz
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  const createdAtColumn = userColumns.createdAt;
   if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
 
   const _plan = sql({ context })
@@ -390,23 +385,12 @@ test('ScalarToJs mapping resolves scalar types correctly', () => {
 
   type Row = ResultType<typeof _plan>;
 
-  // Verify ScalarToJs mapping: int4 → number, text → string, timestamptz → string
-  // Strict checks: verify fields are NOT never
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
   expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
 
-  // Also verify the overall structure
-  expectTypeOf<Row>().toExtend<{
-    id: number; // int4 → number via ScalarToJs
-    email: string; // text → string via ScalarToJs
-    createdAt: string; // timestamptz → string via ScalarToJs
-  }>();
-
-  // Verify ScalarToJs is from adapter
-  // Contract should have scalarToJs in mappings (types-only)
-  type ContractScalarToJs = Contract['mappings'] extends { scalarToJs: infer S } ? S : never;
-  expectTypeOf<ContractScalarToJs>().toExtend<ScalarToJs>();
+  type ContractCodecTypes = Contract['mappings'] extends { codecTypes: infer C } ? C : never;
+  expectTypeOf<ContractCodecTypes>().toExtend<CodecTypes>();
 });
 
 // Note: Nullable column test removed - runtime-modified contracts are not supported.

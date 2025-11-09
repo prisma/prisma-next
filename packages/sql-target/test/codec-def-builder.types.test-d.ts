@@ -42,41 +42,6 @@ test('CodecTypes structure matches expected types with correct literal IDs', () 
   expectTypeOf<(typeof _codecs.CodecTypes)['pg/bool@1']['output']>().toEqualTypeOf<boolean>();
 });
 
-test('ScalarToJs structure matches expected types with correct JS types', () => {
-  const textCodec = codec<'pg/text@1', string, string>({
-    typeId: 'pg/text@1',
-    targetTypes: ['text'],
-    encode: (value: string) => value,
-    decode: (wire: string) => wire,
-  });
-
-  const intCodec = codec<'pg/int4@1', number, number>({
-    typeId: 'pg/int4@1',
-    targetTypes: ['int4'],
-    encode: (value: number) => value,
-    decode: (wire: number) => wire,
-  });
-
-  const dateCodec = codec<'pg/date@1', string, Date>({
-    typeId: 'pg/date@1',
-    targetTypes: ['date'],
-    encode: (value: Date): string => value.toISOString(),
-    decode: (wire: string): Date => new Date(wire),
-  });
-
-  const _codecs = defineCodecs()
-    .add('text', textCodec)
-    .add('int4', intCodec)
-    .add('date', dateCodec);
-
-  // Verify literal scalar names are preserved as keys
-  expectTypeOf<keyof typeof _codecs.ScalarToJs>().toEqualTypeOf<'text' | 'int4' | 'date'>();
-
-  // Verify JS types are correctly aggregated
-  expectTypeOf<(typeof _codecs.ScalarToJs)['text']>().toEqualTypeOf<string>();
-  expectTypeOf<(typeof _codecs.ScalarToJs)['int4']>().toEqualTypeOf<number>();
-  expectTypeOf<(typeof _codecs.ScalarToJs)['date']>().toEqualTypeOf<Date>();
-});
 
 test('literal types are preserved (not widened to string)', () => {
   const textCodec = codec<'pg/text@1', string, string>({
@@ -114,21 +79,6 @@ test('ExtractCodecTypes extracts correct types from builder', () => {
   expectTypeOf<(typeof _codecs.CodecTypes)['pg/text@1']['output']>().toEqualTypeOf<string>();
 });
 
-test('ExtractScalarToJs extracts correct types from builder', () => {
-  const textCodec = codec<'pg/text@1', string, string>({
-    typeId: 'pg/text@1',
-    targetTypes: ['text'],
-    encode: (value: string) => value,
-    decode: (wire: string) => wire,
-  });
-
-  const _codecs = defineCodecs().add('text', textCodec);
-
-  type ScalarToJs = typeof _codecs.ScalarToJs;
-
-  expectTypeOf<ScalarToJs>().toHaveProperty('text');
-});
-
 test('builder chain preserves literal types and aggregates correctly', () => {
   const textCodec = codec<'pg/text@1', string, string>({
     typeId: 'pg/text@1',
@@ -149,8 +99,6 @@ test('builder chain preserves literal types and aggregates correctly', () => {
 
   type Builder1Types = typeof builder1.CodecTypes;
   type Builder2Types = typeof _builder2.CodecTypes;
-  type Builder1ScalarToJs = typeof builder1.ScalarToJs;
-  type Builder2ScalarToJs = typeof _builder2.ScalarToJs;
 
   // Verify literal IDs are preserved through chain
   type Builder1Keys = keyof Builder1Types;
@@ -175,21 +123,6 @@ test('builder chain preserves literal types and aggregates correctly', () => {
   expectTypeOf<Builder2IntInput>().toExtend<number>();
   expectTypeOf<Builder2IntOutput>().toExtend<number>();
 
-  // Verify ScalarToJs is correctly aggregated
-  type Builder1ScalarKeys = keyof Builder1ScalarToJs;
-  type Builder2ScalarKeys = keyof Builder2ScalarToJs;
-  expectTypeOf<Builder1ScalarKeys>().toEqualTypeOf<'text'>();
-  expectTypeOf<Builder2ScalarKeys>().toExtend<'text' | 'int4'>();
-  expectTypeOf<'text' | 'int4'>().toExtend<Builder2ScalarKeys>();
-
-  type Builder1TextJs = Builder1ScalarToJs['text'];
-  type Builder2TextJs = Builder2ScalarToJs['text'];
-  type Builder2IntJs = Builder2ScalarToJs['int4'];
-
-  // Verify these types match the expected types
-  expectTypeOf<Builder1TextJs>().toExtend<string>();
-  expectTypeOf<Builder2TextJs>().toExtend<string>();
-  expectTypeOf<Builder2IntJs>().toExtend<number>();
 });
 
 test('dataTypes preserves literal type IDs', () => {

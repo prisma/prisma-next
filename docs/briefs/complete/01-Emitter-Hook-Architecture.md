@@ -73,7 +73,7 @@ File: `packages/sql-target/src/emitter-hook.ts` (or `packages/emitter/src/famili
 - validateStructure: SQL PK/UK/IDX/FK checks (mirror core SQL validation in `@prisma-next/sql`).
 - generateContractTypes:
   - Import `SqlContract`, `TableDef`, `ModelDef` from `@prisma-next/sql/contract-types`.
-  - Import `CodecTypes` (and optionally `ScalarToJs` if needed) from adapter/packs.
+  - Import `CodecTypes` from adapter/packs.
   - Emit `export type CodecTypes = PgTypes /* & ExtTypes */` and `export type LaneCodecTypes = CodecTypes`.
   - Emit `export type Contract = SqlContract<Storage, Models, Relations, Mappings>` with:
     - Storage: tables/columns literal types with canonical typeIds and nullability.
@@ -127,4 +127,3 @@ The caller is responsible for all file I/O operations.
 - Integration: IR → artifacts → lanes (`schema(contract, LaneCodecTypes)` + `sql({ contract, adapter, codecTypes: LaneCodecTypes })`) → plan built/executed; assert SQL/params/meta and `ResultType`.
 - **Integration Test (Round-Trip)**: IR → JSON (emit) → IR (parse JSON) → compare with original IR → JSON (emit again) → compare with first emit. Both JSON outputs must be identical (byte-for-byte), proving canonicalization and determinism.
 - Parity: TS-only loader path and (later) PSL path must yield identical plans/types.
-

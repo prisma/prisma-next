@@ -14,7 +14,6 @@ describe('defineCodecs() function', () => {
     expect(Object.keys(codecDefinitions).length).toBe(0);
     expect(Object.keys(builder.dataTypes).length).toBe(0);
     expect(Object.keys(builder.CodecTypes).length).toBe(0);
-    expect(Object.keys(builder.ScalarToJs).length).toBe(0);
   });
 });
 
@@ -57,19 +56,6 @@ describe('CodecDefBuilder interface', () => {
       expect(builder.CodecTypes['test/codectypes@1']).toHaveProperty('output');
     });
 
-    it('populates ScalarToJs property correctly', () => {
-      const testCodec = codec({
-        typeId: 'test/scalartojs@1',
-        targetTypes: ['scalartojs'],
-        encode: (value: string) => value,
-        decode: (wire: string) => wire,
-      });
-
-      const builder = defineCodecs().add('scalartojs', testCodec);
-      expect(builder.ScalarToJs).toBeDefined();
-      expect('scalartojs' in builder.ScalarToJs).toBe(true);
-      expect(Object.keys(builder.ScalarToJs)).toContain('scalartojs');
-    });
   });
 
   describe('add() method', () => {
@@ -366,64 +352,5 @@ describe('CodecDefBuilder interface', () => {
     });
   });
 
-  describe('ScalarToJs property', () => {
-    it('is populated in constructor', () => {
-      const testCodec = codec({
-        typeId: 'test/scalartojs@1',
-        targetTypes: ['scalartojs'],
-        encode: (value: string) => value,
-        decode: (wire: string) => wire,
-      });
-
-      const builder = defineCodecs().add('scalartojs', testCodec);
-      expect(builder.ScalarToJs).toBeDefined();
-      expect(Object.keys(builder.ScalarToJs).length).toBeGreaterThan(0);
-    });
-
-    it('contains all scalar names as keys', () => {
-      const codec1 = codec({
-        typeId: 'test/scalar1@1',
-        targetTypes: ['scalar1'],
-        encode: (value: string) => value,
-        decode: (wire: string) => wire,
-      });
-
-      const codec2 = codec({
-        typeId: 'test/scalar2@1',
-        targetTypes: ['scalar2'],
-        encode: (value: number) => value,
-        decode: (wire: number) => wire,
-      });
-
-      const builder = defineCodecs().add('scalar1', codec1).add('scalar2', codec2);
-
-      expect('scalar1' in builder.ScalarToJs).toBe(true);
-      expect('scalar2' in builder.ScalarToJs).toBe(true);
-      expect(Object.keys(builder.ScalarToJs)).toContain('scalar1');
-      expect(Object.keys(builder.ScalarToJs)).toContain('scalar2');
-    });
-
-    it('each entry has correct JS type', () => {
-      const stringCodec = codec({
-        typeId: 'test/string@1',
-        targetTypes: ['string'],
-        encode: (value: string) => value,
-        decode: (wire: string) => wire,
-      });
-
-      const numberCodec = codec({
-        typeId: 'test/number@1',
-        targetTypes: ['number'],
-        encode: (value: number) => value,
-        decode: (wire: number) => wire,
-      });
-
-      const builder = defineCodecs().add('string', stringCodec).add('number', numberCodec);
-
-      expect('string' in builder.ScalarToJs).toBe(true);
-      expect('number' in builder.ScalarToJs).toBe(true);
-      expect(Object.keys(builder.ScalarToJs)).toContain('string');
-      expect(Object.keys(builder.ScalarToJs)).toContain('number');
-    });
-  });
+  // Scalar-to-JS mappings are derived directly from codec outputs now.
 });

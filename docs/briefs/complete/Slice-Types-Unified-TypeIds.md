@@ -9,7 +9,6 @@ Simplify the model by making every column `type` a fully qualified type identifi
 - JSON contract stores storage scalars in `storage.tables.*.columns.*.type` (e.g., `int4`, `text`). Some work-in-progress fixtures also include codec decorations under `extensions.<ns>.decorations.columns[].payload.typeId`.
 - Core `@prisma-next/sql` types (`packages/sql/src/types.ts`) infer projection types via:
   - `mappings.columnToCodec[table][column]` + `mappings.codecTypes[codecId].output` (preferred)
-  - fallback `ContractScalarToJsType` for scalars (hardcoded in core)
 - Contract validation (`packages/sql/src/contract.ts`) currently requires `mappings.columnToCodec` and `mappings.codecTypes` and validates every column is mapped.
 - Plan builder encodes codec IDs into `plan.meta.annotations.codecs` by reading `contract.mappings.columnToCodec`.
 
@@ -52,7 +51,6 @@ Adopt a unified type model:
 - Update `InferColumnType` to:
   - Read `columnMeta.type` as a `typeId` string literal.
   - Infer `CodecTypes[typeId].output` (preserving `nullable` by unioning `null` when true).
-  - Remove usage of `ContractScalarToJsType` and remove reliance on `mappings.columnToCodec` + `mappings.codecTypes`.
 - Update `InferProjectionRow` accordingly; no other logic changes.
 
 5) Plan Annotations for Codecs
@@ -109,5 +107,4 @@ export type CodecTypes = {
 - Query Lanes: result typing rules and plan metadata
 - ADR 131: Codec typing separation (emit-time types, lane compile-time, runtime registry)
 - No-Emit Workflow: TS-only builder generics for types without emit
-
 

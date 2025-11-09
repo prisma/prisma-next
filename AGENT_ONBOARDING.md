@@ -107,7 +107,7 @@ SqlContract<
   SqlStorage,           // { tables: Record<string, StorageTable> }
   Models,               // { User: ModelDef & { id: number, ... } }
   Relations,            // { user: { posts: RelationDef } }
-  Mappings              // { ModelToTable, TableToModel, FieldToColumn, ColumnToField, scalarToJs, codecTypes, operationTypes }
+  Mappings              // { ModelToTable, TableToModel, FieldToColumn, ColumnToField, codecTypes, operationTypes }
 >
 ```
 
@@ -1940,4 +1940,3 @@ const ir2: ContractIR = {
 ---
 
 **Remember**: This is a prototype. Some design docs describe future state. Focus on the MVP spec and the briefs marked "complete" for implemented features.
-

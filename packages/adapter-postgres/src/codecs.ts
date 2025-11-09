@@ -6,10 +6,9 @@
  * - Type IDs
  * - Codec implementations (runtime)
  * - Type information (compile-time)
- * - JS type mappings
  *
  * This structure is used both at runtime (to populate the registry) and
- * at compile time (to derive CodecTypes and ScalarToJs types).
+ * at compile time (to derive CodecTypes).
  */
 
 import { codec, defineCodecs } from '@prisma-next/sql-target';
@@ -112,4 +111,3 @@ export const dataTypes = codecs.dataTypes;
 
 // Export types derived from codecs builder
 export type CodecTypes = typeof codecs.CodecTypes;
-export type ScalarToJs = typeof codecs.ScalarToJs;

@@ -177,15 +177,6 @@ type ExtractCodecTypes<
 };
 
 /**
- * Type helper to extract scalar-to-JS type mapping from builder instance.
- */
-export type ExtractScalarToJs<
-  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> },
-> = {
-  readonly [K in keyof ScalarNames]: CodecOutput<ScalarNames[K]>;
-};
-
-/**
  * Type helper to extract data type IDs from builder instance.
  * Uses ExtractCodecTypes which preserves literal types as keys.
  * Since ExtractCodecTypes<Record<K, ScalarNames[K]>> has exactly one key (the Id),
@@ -207,7 +198,6 @@ export interface CodecDefBuilder<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
 > {
   readonly CodecTypes: ExtractCodecTypes<ScalarNames>;
-  readonly ScalarToJs: ExtractScalarToJs<ScalarNames>;
 
   add<ScalarName extends string, CodecImpl extends Codec<string>>(
     scalarName: ScalarName,
@@ -246,7 +236,6 @@ class CodecDefBuilderImpl<
   private readonly _codecs: ScalarNames;
 
   public readonly CodecTypes: ExtractCodecTypes<ScalarNames>;
-  public readonly ScalarToJs: ExtractScalarToJs<ScalarNames>;
   public readonly dataTypes: {
     readonly [K in keyof ScalarNames]: {
       readonly [Id in keyof ExtractCodecTypes<Record<K, ScalarNames[K]>>]: Id;
@@ -266,14 +255,6 @@ class CodecDefBuilderImpl<
       };
     }
     this.CodecTypes = codecTypes as ExtractCodecTypes<ScalarNames>;
-
-    // Populate ScalarToJs from codecs
-    const scalarToJs: Record<string, unknown> = {};
-    for (const [scalarName, codecImpl] of Object.entries(this._codecs)) {
-      const _codecImplTyped = codecImpl as Codec<string>;
-      scalarToJs[scalarName] = undefined as unknown as CodecOutput<typeof _codecImplTyped>;
-    }
-    this.ScalarToJs = scalarToJs as ExtractScalarToJs<ScalarNames>;
 
     // Populate dataTypes from codecs - extract id property from each codec
     // Build object preserving keys from ScalarNames

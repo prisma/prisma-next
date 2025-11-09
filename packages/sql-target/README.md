@@ -86,7 +86,7 @@ flowchart TD
   - `SqlMappings`: Model-to-table and field-to-column mappings, plus type-only fields:
     - `codecTypes: Record<string, { readonly output: unknown }>` - Required, compile-time only (not in contract.json)
     - `operationTypes: Record<string, Record<string, unknown>>` - Required, compile-time only (not in contract.json)
-    - Similar to `scalarToJs`, these are types-only fields generated in `contract.d.ts` as intersections from extension pack imports
+    - Types-only fields generated in `contract.d.ts` as intersections from extension pack imports
 
 ### Adapter SPI (`sql-target.ts`)
 - Adapter interfaces for SQL lowering and execution
@@ -144,4 +144,3 @@ const result = await emit(ir, options, sqlTargetFamilyHook);
 ## Exports
 
 - `.`: SQL target types, adapter SPI, codec infrastructure, operations registry, and emitter hook
-
