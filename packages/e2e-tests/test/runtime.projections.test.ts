@@ -208,10 +208,11 @@ describe('end-to-end nested projection queries', () => {
             const adapter = createPostgresAdapter();
             const runtime = createTestRuntimeFromClient(contract, client, adapter);
             try {
-              const tables = schema<Contract, CodecTypes>(contract).tables;
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema(context).tables;
               const user = tables.user!;
               const post = tables.post!;
-              const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              const plan = sql({ context })
                 .from(user)
                 .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
                 .select({
@@ -295,9 +296,10 @@ describe('end-to-end nested projection queries', () => {
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const tables = schema(context).tables;
             const user = tables.user!;
-            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            const plan = sql({ context })
               .from(user)
               .select({
                 id: user.columns.id!,

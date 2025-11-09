@@ -1,41 +1,44 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import { createRuntimeContext } from '@prisma-next/runtime';
 import {
   createTestRuntime,
   executePlanAndCollect,
   setupTestDatabase,
 } from '@prisma-next/runtime/test/utils';
 import { param } from '@prisma-next/sql-query/param';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createDevDatabase, teardownTestDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Contract } from './fixtures/generated/contract.d';
+import { loadContractFromDisk } from './utils';
 
-const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
-
-function loadContract(name: string): SqlContract<SqlStorage> {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract<SqlContract<SqlStorage>>(contractJson);
-}
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 describe('DML E2E Tests', { timeout: 30000 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
-  const contract = loadContract('contract');
-  const adapter = createPostgresAdapter();
-  const tables = schema(contract).tables;
-  const builder = sql({ contract, adapter });
+  let contract: Contract;
+  let adapter: ReturnType<typeof createPostgresAdapter>;
+  let context: ReturnType<typeof createRuntimeContext<Contract>>;
+  let tables: ReturnType<typeof schema<Contract>>['tables'];
+  let builder: ReturnType<typeof sql<Contract>>;
 
   beforeAll(async () => {
+    contract = await loadContractFromDisk<Contract>(contractJsonPath);
+    adapter = createPostgresAdapter();
+    context = createRuntimeContext({ contract, adapter, extensions: [] });
+    tables = schema(context).tables;
+    builder = sql({ context });
+
     database = await createDevDatabase({
       acceleratePort: 54030,
       databasePort: 54031,
@@ -104,7 +107,10 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
       email: 'e2e@example.com',
     });
 
-    const userId = (insertRows[0] as { id: number }).id;
+    const userId = insertRows[0]?.id;
+    if (userId === undefined) {
+      throw new Error('Expected insert to return id');
+    }
 
     // Update
     const updatePlan = builder

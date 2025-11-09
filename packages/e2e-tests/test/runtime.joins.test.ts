@@ -1,5 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { SelectAst } from '@prisma-next/sql-target';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import {
@@ -49,10 +50,11 @@ describe('end-to-end JOIN queries', () => {
             const adapter = createPostgresAdapter();
             const runtime = createTestRuntimeFromClient(contract, client, adapter);
             try {
-              const tables = schema<Contract, CodecTypes>(contract).tables;
+              const context = createRuntimeContext({ contract, adapter, extensions: [] });
+              const tables = schema(context).tables;
               const user = tables.user!;
               const post = tables.post!;
-              const plan = sql<Contract, CodecTypes>({ contract, adapter })
+              const plan = sql({ context })
                 .from(user)
                 .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
                 .select({
@@ -339,11 +341,12 @@ describe('end-to-end JOIN queries', () => {
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client, adapter);
           try {
-            const tables = schema<Contract, CodecTypes>(contract).tables;
+            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const tables = schema(context).tables;
             const user = tables.user!;
             const post = tables.post!;
             const comment = tables.comment!;
-            const plan = sql<Contract, CodecTypes>({ contract, adapter })
+            const plan = sql({ context })
               .from(user)
               .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
               .leftJoin(comment, (on) => on.eqCol(post.columns.id!, comment.columns.postId!))
@@ -357,7 +360,8 @@ describe('end-to-end JOIN queries', () => {
               })
               .build();
 
-            expect(plan.ast?.joins).toEqual([
+            const ast = plan.ast as SelectAst | undefined;
+            expect(ast?.joins).toEqual([
               {
                 kind: 'join',
                 joinType: 'inner',

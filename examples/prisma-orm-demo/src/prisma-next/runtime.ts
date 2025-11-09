@@ -1,6 +1,6 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { budgets, createRuntime } from '@prisma-next/runtime';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import { Client } from 'pg';
 import contractJson from './contract.json' with { type: 'json' };
@@ -23,11 +23,13 @@ export function getPrismaNextRuntime() {
       cursor: { disabled: true },
     });
 
+    const contract = validateContract(contractJson);
+    const adapter = createPostgresAdapter();
+    const context = createRuntimeContext({ contract, adapter, extensions: [] });
+
     runtime = createRuntime({
-      context: {
-        contract: validateContract(contractJson),
-      },
-      adapter: createPostgresAdapter(),
+      context,
+      adapter,
       driver,
       verify: {
         mode: 'onFirstUse',
