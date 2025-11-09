@@ -3,7 +3,12 @@
 // without namespace collisions. Each contract can have its own namespace name.
 
 import type { SqlContract } from '@prisma-next/sql-target';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+// Minimal CodecTypes for testing - matches adapter-postgres structure
+type CodecTypes = {
+  readonly 'pg/int4@1': { output: number };
+  readonly 'pg/text@1': { output: string };
+  readonly 'pg/timestamptz@1': { output: string };
+};
 
 // Contract type representing the contract data structure
 // This type matches the structure of contract.json and can be used as a return type

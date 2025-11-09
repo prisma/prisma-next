@@ -564,15 +564,9 @@ importers:
         specifier: ^9.6.0
         version: 9.6.0
     devDependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../../adapter-postgres
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../../../runtime
-      '@prisma-next/sql-query':
-        specifier: workspace:*
-        version: link:../../../sql-query
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test-utils

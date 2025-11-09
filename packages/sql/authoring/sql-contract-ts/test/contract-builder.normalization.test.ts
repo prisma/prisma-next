@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { describe, expect, it } from 'vitest';
 import type { CodecTypes } from './fixtures/contract.d';
 
 describe('contract builder normalization', () => {

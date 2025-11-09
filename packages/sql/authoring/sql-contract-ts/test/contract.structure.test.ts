@@ -1,6 +1,6 @@
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 
 describe('validateContract structure validation', () => {
   const validContractInput = {
