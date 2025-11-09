@@ -30,11 +30,18 @@
     "@types/node": "^24.7.2",
     "@vitest/coverage-v8": "^2.1.1",
     "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
     "turbo": "^2.3.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.1"
   },
   "engines": {
     "node": ">=20"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,jsonc}": [
+      "biome format --write",
+      "biome check --write"
+    ]
   }
 }
