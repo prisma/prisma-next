@@ -41,36 +41,40 @@ describe('@prisma-next/driver-postgres', () => {
     }).toThrow('PostgresDriver requires a pool or client');
   });
 
-  it('falls back to buffered mode when cursor execution fails', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+  it(
+    'falls back to buffered mode when cursor execution fails',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as import('pg').Pool },
-      cursor: { batchSize: 1 },
-    });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as import('pg').Pool },
+        cursor: { batchSize: 1 },
+      });
 
-    cleanup = async () => {
-      await driver.close();
-    };
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
 
-    // Force cursor to fail by using invalid SQL that pg-mem might handle differently
-    // The driver should fall back to buffered mode
-    const rows: Array<{ id: number; name: string }> = [];
-    for await (const row of driver.execute<{ id: number; name: string }>({
-      sql: 'select id, name from items order by id asc',
-    })) {
-      rows.push(row);
-    }
+      // Force cursor to fail by using invalid SQL that pg-mem might handle differently
+      // The driver should fall back to buffered mode
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from items order by id asc',
+      })) {
+        rows.push(row);
+      }
 
-    // Should still get results via buffered fallback
-    expect(rows.length).toBeGreaterThan(0);
-  }, timeouts.spinUpPpgDev);
+      // Should still get results via buffered fallback
+      expect(rows.length).toBeGreaterThan(0);
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('handles non-Error exceptions in cursor path', async () => {
     const db = newDb();
