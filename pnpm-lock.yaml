@@ -535,6 +535,9 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../sql/authoring/sql-contract-ts
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../sql/lanes/relational-core
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
@@ -647,6 +650,9 @@ importers:
         specifier: workspace:*
         version: link:../../../sql-target
     devDependencies:
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../authoring/sql-contract-ts
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test-utils

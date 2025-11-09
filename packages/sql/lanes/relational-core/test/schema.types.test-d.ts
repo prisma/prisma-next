@@ -1,5 +1,4 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createStubAdapter, createTestContext } from '@prisma-next/runtime/test/utils';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { expectTypeOf, test } from 'vitest';
 import { schema } from '../src/schema';
@@ -7,8 +6,8 @@ import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const adapter = createStubAdapter();
+const context = createTestContext(contract, adapter, { extensions: [] });
 const schemaHandle = schema(context);
 
 // These assignments MUST be at module level (not inside test blocks)
@@ -56,7 +55,7 @@ test('schema returns correct SchemaHandle type', () => {
 
 test('schema works with inferred contract type', () => {
   // Test that schema works when Contract type is inferred from the contract object
-  const inferredContext = createRuntimeContext({ contract, adapter, extensions: [] });
+  const inferredContext = createTestContext(contract, adapter, { extensions: [] });
   const inferredSchema = schema(inferredContext);
 
   // Should still have literal keys

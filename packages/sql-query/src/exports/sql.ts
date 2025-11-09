@@ -1,5 +1,3 @@
-export { rawOptions } from '../raw';
-export { SelectBuilder, sql } from '../sql';
 export type {
   ColumnsOf,
   RawFactory,
@@ -8,4 +6,6 @@ export type {
   SqlBuilderOptions,
   TableKey,
   TablesOf,
-} from '../types';
+} from '@prisma-next/sql-relational-core/types';
+export { rawOptions } from '../raw';
+export { SelectBuilder, sql } from '../sql';

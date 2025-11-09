@@ -1,2 +1,6 @@
-export type { SchemaHandle } from '../schema';
-export { schema } from '../schema';
+export type {
+  ColumnBuilderImpl as Column,
+  SchemaHandle,
+  TableBuilderImpl as Table,
+} from '../schema';
+export { ColumnBuilderImpl, schema, TableBuilderImpl } from '../schema';

@@ -38,7 +38,7 @@ type ColumnBuilders<
   >;
 };
 
-class ColumnBuilderImpl<
+export class ColumnBuilderImpl<
   ColumnName extends string,
   ColumnMeta extends StorageColumn,
   JsType = unknown,
@@ -97,7 +97,7 @@ class ColumnBuilderImpl<
   }
 }
 
-class TableBuilderImpl<
+export class TableBuilderImpl<
   Contract extends SqlContract<SqlStorage>,
   TableName extends string,
   Columns extends Record<string, StorageColumn>,

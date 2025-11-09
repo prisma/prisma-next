@@ -19,6 +19,7 @@
     "@prisma-next/sql-target": "workspace:*"
   },
   "devDependencies": {
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
