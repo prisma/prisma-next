@@ -189,10 +189,8 @@ describe('emit command', () => {
       expect(error).toBeDefined();
     }
 
-    // validateContract throws "Contract structural validation failed" when targetFamily is not 'sql'
-    expect(consoleErrors.some((msg) => msg.includes('Contract structural validation failed'))).toBe(
-      true,
-    );
+    // validateContract throws "Unsupported target family" when targetFamily is not 'sql'
+    expect(consoleErrors.some((msg) => msg.includes('Unsupported target family'))).toBe(true);
   });
 
   it('handles extension paths', async () => {

@@ -36,11 +36,13 @@ beforeAll(async () => {
 
   mkdirSync(outputDir, { recursive: true });
 
-  const contractJson = validateContract<Contract>(JSON.parse(result.contractJson));
-
-  writeFileSync(join(outputDir, 'contract.json'), JSON.stringify(contractJson, null, 2), 'utf-8');
+  // Write emitted JSON directly - do not call validateContract here as it adds mappings
+  // The emitted JSON should not contain mappings (they are computed at runtime)
+  writeFileSync(join(outputDir, 'contract.json'), result.contractJson, 'utf-8');
   writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
 
+  // Validate contract for use in tests (this adds mappings at runtime, which is correct)
+  const contractJson = JSON.parse(result.contractJson);
   contract = validateContract<Contract>(contractJson);
 }, timeouts.typeScriptCompilation);
 

@@ -114,6 +114,12 @@ const SqlContractSchema = type({
 function validateContractStructure<T extends SqlContract<SqlStorage>>(
   value: unknown,
 ): O.Overwrite<T, { targetFamily: 'sql' }> {
+  // Check targetFamily first to provide a clear error message for unsupported target families
+  const rawValue = value as { targetFamily?: string };
+  if (rawValue.targetFamily !== undefined && rawValue.targetFamily !== 'sql') {
+    throw new Error(`Unsupported target family: ${rawValue.targetFamily}`);
+  }
+
   const contractResult = SqlContractSchema(value);
 
   if (contractResult instanceof type.errors) {
