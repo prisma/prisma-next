@@ -17,6 +17,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-target';
 import { createCodecRegistry, sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
 
@@ -113,7 +114,7 @@ describe('emit integration', () => {
     type UserRow = ResultType<typeof plan>;
     expectTypeOf<UserRow>().toHaveProperty('id');
     expectTypeOf<UserRow>().toHaveProperty('email');
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)', async () => {
     const contractPath = join(fixturesDir, 'valid-contract.ts');
@@ -154,5 +155,5 @@ describe('emit integration', () => {
 
     expect(JSON.stringify(json1, null, 2)).toBe(JSON.stringify(json2, null, 2));
     expect(result1.coreHash).toBe(result2.coreHash);
-  });
+  }, timeouts.typeScriptCompilation);
 });

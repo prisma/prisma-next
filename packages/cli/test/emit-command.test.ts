@@ -120,7 +120,7 @@ describe('emit command', () => {
     if (existsSync(newOutputDir)) {
       rmSync(newOutputDir, { recursive: true, force: true });
     }
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('handles missing contract option', async () => {
     const command = createEmitCommand();
@@ -219,7 +219,7 @@ describe('emit command', () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     expect(existsSync(contractJsonPath)).toBe(true);
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('handles single string extension path', async () => {
     const command = createEmitCommand();
@@ -242,7 +242,7 @@ describe('emit command', () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     expect(existsSync(contractJsonPath)).toBe(true);
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('handles multiple extension paths', async () => {
     const command = createEmitCommand();
@@ -267,7 +267,7 @@ describe('emit command', () => {
 
     const contractJsonPath = join(outputDir, 'contract.json');
     expect(existsSync(contractJsonPath)).toBe(true);
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('outputs profileHash when present', async () => {
     const command = createEmitCommand();
@@ -290,7 +290,7 @@ describe('emit command', () => {
     expect(existsSync(contractJsonPath)).toBe(true);
     const hasProfileHash = consoleOutput.some((msg) => msg.includes('profileHash'));
     expect(hasProfileHash).toBeDefined();
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('handles errors and exits with code 1', async () => {
     const command = createEmitCommand();

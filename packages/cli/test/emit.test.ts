@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
 
@@ -66,7 +67,7 @@ describe('emit command functionality', () => {
     const contractDts = readFileSync(contractDtsPath, 'utf-8');
     expect(contractDts).toContain('export type Contract');
     expect(contractDts).toContain('CodecTypes');
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('emits contract with correct coreHash', async () => {
     const contractPath = join(fixturesDir, 'valid-contract.ts');
@@ -85,7 +86,7 @@ describe('emit command functionality', () => {
     );
 
     expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('creates output directory if it does not exist', async () => {
     const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
@@ -118,5 +119,5 @@ describe('emit command functionality', () => {
     if (existsSync(newOutputDir)) {
       rmSync(newOutputDir, { recursive: true, force: true });
     }
-  });
+  }, timeouts.typeScriptCompilation);
 });
