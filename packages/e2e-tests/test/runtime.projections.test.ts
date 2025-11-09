@@ -373,5 +373,5 @@ describe('end-to-end nested projection queries', () => {
       },
       { acceleratePort: 54110, databasePort: 54111, shadowDatabasePort: 54112 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 });

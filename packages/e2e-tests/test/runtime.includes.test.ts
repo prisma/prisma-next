@@ -191,7 +191,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
       },
       { acceleratePort: 54060, databasePort: 54061, shadowDatabasePort: 54062 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('leftJoin returns one row per child with parent data (many-to-one)', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -267,7 +267,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
       },
       { acceleratePort: 54070, databasePort: 54071, shadowDatabasePort: 54072 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('leftJoin with where filters parent data (many-to-one with filter)', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -334,5 +334,5 @@ describe('end-to-end includeMany and leftJoin queries', () => {
       },
       { acceleratePort: 54080, databasePort: 54081, shadowDatabasePort: 54082 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 });

@@ -27,7 +27,7 @@ describe('end-to-end basic queries', () => {
   it('emits contract and verifies it matches on-disk artifacts', async () => {
     const outputDir = resolve(__dirname, '../.tmp-output');
     await emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, contractJsonPath);
-  });
+  }, timeouts.typeScriptCompilation);
 
   it(
     'returns multiple rows with correct types',
