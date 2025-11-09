@@ -1,13 +1,19 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { budgets, createRuntime, createRuntimeContext, RuntimeContext } from '@prisma-next/runtime';
+import {
+  budgets,
+  createRuntime,
+  createRuntimeContext,
+  type Runtime,
+  type RuntimeContext,
+} from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import { Pool } from 'pg';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-let runtime: ReturnType<typeof createRuntime>;
-let context: RuntimeContext<Contract>;
+let runtime: Runtime | undefined;
+let context: RuntimeContext<Contract> | undefined;
 let pool: Pool | undefined;
 
 export function getRuntime() {
@@ -70,7 +76,6 @@ export function getContext() {
 export async function closeRuntime() {
   if (runtime) {
     await runtime.close();
-    runtime = undefined;
   }
   // Pool is closed by runtime.close() -> driver.close(), so we just clear the reference
   if (pool) {
