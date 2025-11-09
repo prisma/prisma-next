@@ -17,10 +17,9 @@ Provide SQL query authoring surfaces that compile to immutable Plans. Support mu
 - **Query DSL**: Relational DSL that compiles to Plans with AST, SQL, and metadata
 - **ORM Lane**: Model-centric ORM API that compiles to SQL lane primitives (EXISTS subqueries, includeMany, DML operations)
 - **Raw SQL**: Raw SQL escape hatch with required annotations and verification
-- **Contract Types**: SQL-specific contract types (`SqlContract`, `SqlStorage`, etc.)
-- **Contract Validation**: Structural validation for SQL contracts using Arktype
-- **Contract Builder**: TypeScript builder for creating SQL contracts programmatically
 - **Plan Factories**: Compile declarative inputs into deterministic Plans
+
+**Note**: Contract authoring (`defineContract`, `validateContract`) has been moved to `@prisma-next/sql-contract-ts`. This package re-exports them for backward compatibility during the migration.
 
 **Non-goals:**
 - Execution or runtime behavior (runtime)
@@ -43,10 +42,10 @@ flowchart TD
         RAW_FACT[Raw Factory]
     end
 
-    subgraph "Contract"
-        CT[Contract Types]
-        VAL[Validation]
-        BUILDER[Contract Builder]
+    subgraph "Contract (Re-exported)"
+        CT[Contract Types from sql-target]
+        VAL[Validation from sql-contract-ts]
+        BUILDER[Contract Builder from sql-contract-ts]
     end
 
     subgraph "Output"
@@ -112,6 +111,9 @@ flowchart TD
 - `validateContract<TContract>()` requires a fully-typed contract type `TContract` (from `contract.d.ts`), NOT a generic `SqlContract<SqlStorage>`. Using a generic type will cause all subsequent type inference to fail. See function documentation for details.
 
 ### Contract Builder (`contract-builder.ts`)
+
+**Location**: `@prisma-next/sql-contract-ts/contract-builder` (re-exported here for backward compatibility)
+
 - TypeScript builder for creating SQL contracts programmatically
 - Fluent API for defining tables, columns, constraints
 - **Responsibility: Normalization** - The builder normalizes contracts by setting default values for all required fields:
@@ -340,7 +342,7 @@ type DeleteRow = ResultType<typeof deletePlan>;  // { id: number; email: string 
 ### Contract Validation
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' assert { type: 'json' };
 
@@ -455,7 +457,7 @@ type UserWithPosts = ResultType<typeof planWithInclude>;
 - `./param`: Parameter builder
 - `./types`: Plan types and utility types
 - `./errors`: SQL-specific error types
-- `./contract-types`: SQL contract types (re-exported)
-- `./contract-builder`: Contract builder API
-- `./schema-sql`: SQL contract JSON Schema
+- `./contract-types`: SQL contract types (re-exported from `@prisma-next/sql-target`)
+- `./contract-builder`: Contract builder API (re-exported from `@prisma-next/sql-contract-ts/contract-builder` for backward compatibility)
+- `./schema-sql`: SQL contract JSON Schema (re-exported from `@prisma-next/sql-contract-ts/schema-sql` for backward compatibility)
 

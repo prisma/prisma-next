@@ -77,15 +77,19 @@ Target-family specific contract types and emitter hooks.
 
 **Dependency Rules:** Can import from `core/*` and `authoring/*` only.
 
-### Lanes Ring (SQL Family)
+### SQL Family Namespace
 
-Query lane implementations. SQL lanes live under `packages/sql/lanes/` to keep SQL family cohesion.
+SQL-specific packages that live in the SQL family namespace (`packages/sql/`) to keep SQL family cohesion.
 
+**Authoring:**
+- `packages/sql/authoring/sql-contract-ts/` → `@prisma-next/sql-contract-ts` - SQL-specific TypeScript contract authoring surface (`defineContract`, `validateContract`)
+
+**Lanes:**
 - `packages/sql/lanes/relational-core/` → `@prisma-next/sql-relational-core` - Schema + column builders, operation attachment, AST types
 - `packages/sql/lanes/sql-lane/` → `@prisma-next/sql-lane` - Relational DSL + raw SQL helpers
 - `packages/sql/lanes/orm-lane/` → `@prisma-next/sql-orm-lane` - ORM builder, include compilation, relation filters
 
-**Dependency Rules:** Can import from `core/*`, `authoring/*`, `targets/sql/*` only.
+**Dependency Rules:** Can import from `core/*`, `authoring/*`, `targets/sql/*`, and other SQL family packages.
 
 ### Runtime Ring
 
@@ -300,6 +304,13 @@ The package layering structure has been scaffolded with placeholder packages:
 - TypeScript path aliases and project references added (`tsconfig.base.json`)
 - Import validation script created (`scripts/check-imports.mjs`)
 - `pnpm lint:deps` script added to root package.json
+
+**Migration Status:** ✅ Phase 1 Complete (Slice 2)
+
+- **Contract Authoring (Phase 1)**: SQL contract authoring code moved from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`)
+- Integration tests that depend on both `sql-contract-ts` and `sql-query` moved to `@prisma-next/integration-tests` to avoid cyclic dependencies
+- `@prisma-next/sql-query` maintains backward compatibility through re-exports
+- Phase 2 will extract the target-agnostic core into `@prisma-next/contract-authoring`
 
 During migration from the old structure:
 
