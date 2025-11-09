@@ -1,4 +1,5 @@
 import { newDb } from 'pg-mem';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createPostgresDriverFromOptions } from '../src/postgres-driver';
@@ -69,7 +70,7 @@ describe('@prisma-next/driver-postgres', () => {
 
     // Should still get results via buffered fallback
     expect(rows.length).toBeGreaterThan(0);
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('handles non-Error exceptions in cursor path', async () => {
     const db = newDb();

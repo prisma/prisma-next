@@ -1,4 +1,5 @@
 import { newDb } from 'pg-mem';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createPostgresDriver, createPostgresDriverFromOptions } from '../src/postgres-driver';
@@ -42,7 +43,7 @@ describe('@prisma-next/driver-postgres', () => {
       { id: 1, name: 'a' },
       { id: 2, name: 'b' },
     ]);
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('streams rows using cursor mode when enabled', async () => {
     const db = newDb();
