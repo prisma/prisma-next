@@ -1,5 +1,5 @@
-import { newDb } from 'pg-mem';
 import { timeouts } from '@prisma-next/test-utils';
+import { newDb } from 'pg-mem';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createPostgresDriver, createPostgresDriverFromOptions } from '../src/postgres-driver';
