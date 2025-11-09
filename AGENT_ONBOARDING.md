@@ -479,11 +479,13 @@ const deletePlan = o.user().delete(
 
 - **Use `pnpm`** (not npm) - Workspace monorepo
 - **Use `turbo`** for builds - `pnpm build` delegates to turborepo
+- **Turbo environment variables**: Turbo does not automatically pass environment variables to child processes. Environment variables must be explicitly declared in `turbo.json` using the `env` field in task configuration.
 - **Typecheck**: Use `pnpm typecheck` scripts, not raw `tsc`
 - **No file extensions in imports** - `import { x } from './file'` not `'./file.ts'`
 - **ESM only** - All packages use `"type": "module"`
 - **Biome config**: Biome config file is `biome.json` at the root. All package lint scripts explicitly specify the config file using `--config-path ../../biome.json`.
 - **Type constraints**: When fixing type errors by replacing `any` with `unknown`, ensure the constraints match the actual interface requirements. For example, `TableBuilderState<unknown, unknown, unknown>` won't work - use the actual constraint types like `TableBuilderState<string, Record<string, ColumnBuilderState<...>>, readonly string[] | undefined>`.
+- **Vitest timeout configuration**: Do NOT set `hookTimeout` or `testTimeout` in vitest config files. Pass timeout parameters directly to hooks/tests that need them using `timeouts` from `@prisma-next/test-utils`.
 
 ### Code Style
 
@@ -1200,6 +1202,7 @@ The workflow consists of separate jobs that run in parallel where possible:
    - Depends on `build` job
    - Requires Postgres service (PostgreSQL 15)
    - Uses `pnpm test:packages` and `pnpm test:examples`
+   - Sets `TEST_TIMEOUT_MULTIPLIER=3` environment variable for slower CI environments
 
 5. **test-e2e** - Runs end-to-end tests
    - Depends on `build` job
@@ -1220,6 +1223,52 @@ The workflow consists of separate jobs that run in parallel where possible:
 - **Postgres service**: Configured for test, test-e2e, and coverage jobs with health checks
 - **Parallel execution**: typecheck, lint, and build run in parallel; test jobs run in parallel after build completes
 - **Coverage reporting**: Coverage reports are uploaded as artifacts and optionally sent to Codecov
+- **Timeout configuration**: CI sets `TEST_TIMEOUT_MULTIPLIER=3` to scale all test timeouts for slower CI environments
+
+### Turbo Configuration
+
+**Important**: Turbo does not automatically pass environment variables to child processes. Environment variables must be explicitly declared in `turbo.json`:
+
+```json
+{
+  "tasks": {
+    "test": {
+      "env": ["TEST_TIMEOUT_MULTIPLIER"]
+    }
+  }
+}
+```
+
+This ensures that environment variables set at the job level (e.g., in GitHub Actions) are available to all test processes run by Turbo.
+
+### Test Timeout Configuration
+
+**Key Principle**: Do NOT set `hookTimeout` or `testTimeout` in vitest config files. Instead, pass timeout parameters directly to hooks/tests that need them.
+
+**Why?**
+- Timeout parameters passed to hooks/tests override config values, so they work correctly
+- Vitest config timeouts are defaults, not caps - timeout parameters override them
+- Scoping timeouts narrowly ensures only operations that need more time get increased timeouts
+
+**Usage:**
+```typescript
+import { timeouts } from '@prisma-next/test-utils';
+
+beforeAll(async () => {
+  // Database setup
+}, timeouts.spinUpPpgDev);
+
+it('compiles TypeScript', async () => {
+  // TypeScript compilation
+}, timeouts.typeScriptCompilation);
+```
+
+**Available Timeouts:**
+- `timeouts.spinUpPpgDev`: For hooks that spin up ppg-dev (base: 15000ms)
+- `timeouts.typeScriptCompilation`: For tests that perform TypeScript compilation (base: 8000ms)
+- `timeouts.default`: Default timeout for general tests (base: 100ms)
+
+All timeouts respect the `TEST_TIMEOUT_MULTIPLIER` environment variable, which is set to `3` in CI.
 
 ### Running CI Locally
 
