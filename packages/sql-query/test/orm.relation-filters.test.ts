@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type {
   Adapter,
   LoweredStatement,
@@ -11,7 +12,6 @@ import type {
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createTestContext } from '../../runtime/test/utils';
-import { validateContract } from '../src/contract';
 import { orm } from '../src/orm';
 import { param } from '../src/param';
 import type { Contract } from './fixtures/contract-with-relations.d';

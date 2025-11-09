@@ -1,9 +1,9 @@
 import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { createRuntimeContext } from '@prisma-next/runtime';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract } from '@prisma-next/sql-target';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';
 import type { TableKey, TablesOf } from '../src/types';

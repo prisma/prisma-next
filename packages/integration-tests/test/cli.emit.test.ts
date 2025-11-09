@@ -24,7 +24,7 @@ describe('CLI emit command', () => {
     contractPath = join(testDir, 'contract.ts');
     outputDir = join(testDir, 'output');
 
-    const contractContent = `import { defineContract } from '@prisma-next/sql-query/contract-builder';
+    const contractContent = `import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
 export const contract = defineContract<CodecTypes>()

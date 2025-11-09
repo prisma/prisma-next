@@ -1,3 +1,4 @@
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type {
   Adapter,
   LoweredStatement,
@@ -8,7 +9,6 @@ import type {
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createTestContext } from '../../runtime/test/utils';
-import { validateContract } from '../src/contract';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { sql } from '../src/sql';

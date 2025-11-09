@@ -1,7 +1,7 @@
 import { createRuntimeContext } from '@prisma-next/runtime';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { validateContract } from '../src/contract';
 import { schema } from '../src/schema';
 import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
