@@ -286,7 +286,8 @@ describe('orm relation filters', () => {
       },
     };
     const invalidContext = createTestContext(invalidContract, adapter);
-    const invalidO = orm<Contract>({ context: invalidContext });
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    const invalidO = orm<Contract>({ context: invalidContext as any });
     const builder = (invalidO as unknown as { user: () => unknown }).user();
 
     expect(() => {
@@ -318,7 +319,8 @@ describe('orm relation filters', () => {
       },
     };
     const invalidContext = createTestContext(invalidContract, adapter);
-    const invalidO = orm<Contract>({ context: invalidContext });
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    const invalidO = orm<Contract>({ context: invalidContext as any });
     const builder = (invalidO as unknown as { user: () => unknown }).user();
 
     expect(() => {
@@ -396,7 +398,8 @@ describe('orm relation filters', () => {
       },
     };
     const contextWithMissingMapping = createTestContext(contractWithMissingMapping, adapter);
-    const o = orm<Contract>({ context: contextWithMissingMapping });
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    const o = orm<Contract>({ context: contextWithMissingMapping as any });
     const builder = (o as unknown as { user: () => unknown }).user();
 
     // Should not throw - should use fieldName as fallback

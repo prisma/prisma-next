@@ -216,6 +216,29 @@ describe('emit command', () => {
     expect(existsSync(contractJsonPath)).toBe(true);
   });
 
+  it('handles single string extension path', async () => {
+    const command = createEmitCommand();
+    const contractPath = join(fixturesDir, 'valid-contract.ts');
+    const adapterPath = resolve(__dirname, '../../adapter-postgres');
+
+    await command.parseAsync([
+      'node',
+      'cli.js',
+      'emit',
+      '--contract',
+      contractPath,
+      '--out',
+      outputDir,
+      '--adapter',
+      adapterPath,
+      '--extensions',
+      adapterPath,
+    ]);
+
+    const contractJsonPath = join(outputDir, 'contract.json');
+    expect(existsSync(contractJsonPath)).toBe(true);
+  });
+
   it('handles multiple extension paths', async () => {
     const command = createEmitCommand();
     const contractPath = join(fixturesDir, 'valid-contract.ts');

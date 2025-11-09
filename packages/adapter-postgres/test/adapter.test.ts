@@ -1,5 +1,5 @@
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { DeleteAst, InsertAst, SelectAst, UpdateAst } from '@prisma-next/sql-target';
+import type { DeleteAst, InsertAst, QueryAst, SelectAst, UpdateAst } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '../src/adapter';
@@ -579,6 +579,169 @@ describe('createPostgresAdapter', () => {
           sql: 'DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id", "user"."email"',
           params: [1],
         });
+      });
+    });
+
+    describe('error handling', () => {
+      it('throws error for unsupported AST kind', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast = {
+          kind: 'invalid' as 'select',
+        } as QueryAst;
+
+        expect(() => {
+          adapter.lower(ast, { contract, params: [] });
+        }).toThrow('Unsupported AST kind: invalid');
+      });
+    });
+
+    describe('WHERE clause expressions', () => {
+      it('lowers SELECT with EXISTS expression in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'exists',
+            not: false,
+            subquery: {
+              kind: 'select',
+              from: { kind: 'table', name: 'post' },
+              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+              where: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'post', column: 'userId' },
+                right: { kind: 'param', index: 1, name: 'userId' },
+              },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [42] });
+
+        expect(lowered.body.sql).toContain('EXISTS');
+        expect(lowered.body.sql).toContain('SELECT "post"."id" AS "id" FROM "post"');
+        expect(lowered.body.sql).toContain('WHERE "post"."userId" = $1');
+      });
+
+      it('lowers SELECT with NOT EXISTS expression in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'exists',
+            not: true,
+            subquery: {
+              kind: 'select',
+              from: { kind: 'table', name: 'post' },
+              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+              where: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'post', column: 'userId' },
+                right: { kind: 'param', index: 1, name: 'userId' },
+              },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [42] });
+
+        expect(lowered.body.sql).toContain('NOT EXISTS');
+        expect(lowered.body.sql).toContain('SELECT "post"."id" AS "id" FROM "post"');
+        expect(lowered.body.sql).toContain('WHERE "post"."userId" = $1');
+      });
+    });
+
+    describe('operation expressions', () => {
+      it('lowers SELECT with operation expression in projection', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [
+            {
+              alias: 'normalized',
+              expr: {
+                kind: 'operation',
+                method: 'normalize',
+                forTypeId: 'pg/vector@1',
+                self: { kind: 'col', table: 'user', column: 'vector' },
+                args: [],
+                returns: { kind: 'typeId', type: 'pg/vector@1' },
+                lowering: {
+                  targetFamily: 'sql',
+                  strategy: 'function',
+                  // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+                  template: 'normalize(${self})',
+                },
+              },
+            },
+          ],
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [] });
+
+        expect(lowered.body.sql).toContain('normalize("user"."vector")');
+        expect(lowered.body.sql).toContain('AS "normalized"');
+      });
+
+      it('lowers SELECT with operation expression in include ORDER BY', () => {
+        const adapter = createPostgresAdapter();
+
+        const operationExpr = {
+          kind: 'operation' as const,
+          method: 'normalize',
+          forTypeId: 'pg/vector@1',
+          self: { kind: 'col' as const, table: 'post', column: 'vector' },
+          args: [],
+          returns: { kind: 'typeId' as const, type: 'pg/vector@1' },
+          lowering: {
+            targetFamily: 'sql' as const,
+            strategy: 'function' as const,
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+            template: 'normalize(${self})',
+          },
+        };
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          includes: [
+            {
+              kind: 'includeMany',
+              alias: 'posts',
+              child: {
+                table: { kind: 'table', name: 'post' },
+                on: {
+                  kind: 'eqCol',
+                  left: { kind: 'col', table: 'user', column: 'id' },
+                  right: { kind: 'col', table: 'post', column: 'userId' },
+                },
+                project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+                orderBy: [{ expr: operationExpr, dir: 'asc' }],
+              },
+            },
+          ],
+          project: [
+            { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+            { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
+          ],
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [] });
+
+        expect(lowered.body.sql).toContain('ORDER BY');
+        expect(lowered.body.sql).toContain('normalize("post"."vector")');
+        expect(lowered.body.sql).toContain('ASC');
       });
     });
   });

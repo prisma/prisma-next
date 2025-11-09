@@ -56,4 +56,10 @@ describe('loadContractFromTs', () => {
       'Contract export contains getter/setter',
     );
   });
+
+  it('handles bundling errors', async () => {
+    const invalidPath = join(fixturesDir, 'nonexistent-file.ts');
+
+    await expect(loadContractFromTs(invalidPath)).rejects.toThrow();
+  });
 });

@@ -216,4 +216,59 @@ describe('orm base builder', () => {
       });
     }).not.toThrow();
   });
+
+  it('throws error when table is not found in schema', () => {
+    const contractWithMissingTable = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        modelToTable: {
+          ...contract.mappings.modelToTable,
+          User: 'nonexistent',
+        },
+      },
+    };
+    const contextWithMissingTable = createTestContext(contractWithMissingTable, adapter);
+    const o = orm<Contract>({ context: contextWithMissingTable });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { id: { eq: (p: unknown) => unknown } };
+        return model.id.eq(param('userId'));
+      });
+    }).toThrow('Table nonexistent not found in schema');
+  });
+
+  it('throws error when model does not have fields property', () => {
+    const contractWithMissingFields = {
+      ...contract,
+      models: {
+        ...contract.models,
+        User: {
+          storage: contract.models.User.storage,
+          relations: contract.models.User.relations,
+          // Omit fields property entirely
+        } as typeof contract.models.User,
+      },
+    };
+    const contextWithMissingFields = createTestContext(contractWithMissingFields, adapter);
+    const o = orm<Contract>({ context: contextWithMissingFields });
+    const builder = (o as unknown as { user: () => unknown }).user();
+
+    expect(() => {
+      (
+        builder as {
+          where: (fn: (m: unknown) => unknown) => unknown;
+        }
+      ).where((m: unknown) => {
+        const model = m as { id: { eq: (p: unknown) => unknown } };
+        return model.id.eq(param('userId'));
+      });
+    }).toThrow('Model User does not have fields');
+  });
 });
