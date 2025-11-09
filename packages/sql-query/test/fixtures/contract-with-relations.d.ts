@@ -76,6 +76,34 @@ export type Contract = SqlContract<
     };
   },
   {
+    readonly modelToTable: { readonly User: 'user'; readonly Post: 'post' };
+    readonly tableToModel: { readonly user: 'User'; readonly post: 'Post' };
+    readonly fieldToColumn: {
+      readonly User: {
+        readonly id: 'id';
+        readonly email: 'email';
+        readonly createdAt: 'createdAt';
+      };
+      readonly Post: {
+        readonly id: 'id';
+        readonly title: 'title';
+        readonly userId: 'userId';
+        readonly createdAt: 'createdAt';
+      };
+    };
+    readonly columnToField: {
+      readonly user: {
+        readonly id: 'id';
+        readonly email: 'email';
+        readonly createdAt: 'createdAt';
+      };
+      readonly post: {
+        readonly id: 'id';
+        readonly title: 'title';
+        readonly userId: 'userId';
+        readonly createdAt: 'createdAt';
+      };
+    };
     readonly codecTypes: CodecTypes;
     readonly operationTypes: OperationTypes;
   }
