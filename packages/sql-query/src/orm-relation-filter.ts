@@ -1,5 +1,5 @@
+import { planInvalid } from '@prisma-next/plan';
 import type { RuntimeContext } from '@prisma-next/runtime';
-import { planInvalid } from '@prisma-next/sql-relational-core/errors';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyBinaryBuilder, AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';

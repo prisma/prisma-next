@@ -1,5 +1,5 @@
 import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
-import { planInvalid } from '@prisma-next/sql-relational-core/errors';
+import { planInvalid } from '@prisma-next/plan';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,

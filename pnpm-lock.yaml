@@ -314,6 +314,9 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
 
   packages/driver-postgres:
     dependencies:
@@ -529,6 +532,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../contract
+      '@prisma-next/plan':
+        specifier: workspace:*
+        version: link:../core/plan
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -643,6 +649,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../contract
+      '@prisma-next/plan':
+        specifier: workspace:*
+        version: link:../../../core/plan
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../../../runtime

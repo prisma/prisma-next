@@ -1,4 +1,4 @@
-import { planUnsupported } from '@prisma-next/sql-query/errors';
+import { planUnsupported } from '@prisma-next/plan';
 import { describe, expect, it } from 'vitest';
 
 describe('planUnsupported', () => {

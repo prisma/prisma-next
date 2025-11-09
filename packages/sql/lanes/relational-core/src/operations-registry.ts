@@ -1,3 +1,4 @@
+import { planInvalid } from '@prisma-next/plan';
 import type {
   ColumnRef,
   LiteralExpr,
@@ -7,7 +8,6 @@ import type {
   ParamRef,
   StorageColumn,
 } from '@prisma-next/sql-target';
-import { planInvalid } from './errors';
 import type { AnyColumnBuilder, ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
 
 function isParamPlaceholder(value: unknown): value is ParamPlaceholder {

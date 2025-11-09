@@ -1,4 +1,4 @@
-import { planInvalid } from './errors';
+import { planInvalid } from '@prisma-next/plan';
 import type { ParamPlaceholder } from './types';
 
 export type Parameter = ParamPlaceholder;

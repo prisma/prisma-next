@@ -1,4 +1,6 @@
 // TODO: Slice 6 will clean up RuntimeContext dependency
+
+import { planInvalid } from '@prisma-next/plan';
 import type { RuntimeContext } from '@prisma-next/runtime';
 import type {
   ExtractCodecTypes,
@@ -9,7 +11,6 @@ import type {
   StorageColumn,
   TableRef,
 } from '@prisma-next/sql-target';
-import { planInvalid } from './errors';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type {
   BinaryBuilder,
