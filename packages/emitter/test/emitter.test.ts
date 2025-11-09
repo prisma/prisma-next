@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
@@ -69,63 +70,67 @@ export type Contract = unknown;
 };
 
 describe('emitter', () => {
-  it('emits contract.json and contract.d.ts', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-          },
-          relations: {},
-        },
-      },
-      relations: {},
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: false },
+  it(
+    'emits contract.json and contract.d.ts',
+    async () => {
+      const ir: ContractIR = {
+        schemaVersion: '1',
+        targetFamily: 'sql',
+        target: 'postgres',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            relations: {},
           },
         },
-      },
-      extensions: {
-        postgres: {
-          version: '15.0.0',
+        relations: {},
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { type: 'pg/int4@1', nullable: false },
+                email: { type: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
         },
-        pg: {},
-      },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+        extensions: {
+          postgres: {
+            version: '15.0.0',
+          },
+          pg: {},
+        },
+        capabilities: {},
+        meta: {},
+        sources: {},
+      };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
-    const options: EmitOptions = {
-      outputDir: '',
-      packs,
-    };
+      const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+      const options: EmitOptions = {
+        outputDir: '',
+        packs,
+      };
 
-    const result = await emit(ir, options, mockSqlHook);
-    expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-    expect(result.contractDts).toContain('export type Contract');
-    expect(result.contractDts).toContain('CodecTypes');
+      const result = await emit(ir, options, mockSqlHook);
+      expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.contractDts).toContain('export type Contract');
+      expect(result.contractDts).toContain('CodecTypes');
 
-    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
-    const storage = contractJson['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
-    expect(tables).toBeDefined();
-  });
+      const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+      const storage = contractJson['storage'] as Record<string, unknown>;
+      const tables = storage['tables'] as Record<string, unknown>;
+      expect(tables).toBeDefined();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('validates type IDs come from referenced extensions', async () => {
     const ir: ContractIR = {

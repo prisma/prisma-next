@@ -16,6 +16,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-target';
 import { createCodecRegistry, sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
@@ -50,94 +51,98 @@ describe('emitter → lanes integration', () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  it('emits contract and uses it with lanes', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      extensions: {
-        postgres: { version: '15.0.0' },
-        pg: {},
-      },
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-          },
-          relations: {},
+  it(
+    'emits contract and uses it with lanes',
+    async () => {
+      const ir: ContractIR = {
+        schemaVersion: '1',
+        targetFamily: 'sql',
+        target: 'postgres',
+        extensions: {
+          postgres: { version: '15.0.0' },
+          pg: {},
         },
-      },
-      relations: {},
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: false },
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            relations: {},
           },
         },
-      },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+        relations: {},
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { type: 'pg/int4@1', nullable: false },
+                email: { type: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        capabilities: {},
+        meta: {},
+        sources: {},
+      };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
-    const options: EmitOptions = {
-      outputDir: testDir,
-      packs,
-    };
+      const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+      const options: EmitOptions = {
+        outputDir: testDir,
+        packs,
+      };
 
-    const result = await emit(ir, options, sqlTargetFamilyHook);
+      const result = await emit(ir, options, sqlTargetFamilyHook);
 
-    const contractJsonPath = join(testDir, 'contract.json');
-    const contractDtsPath = join(testDir, 'contract.d.ts');
+      const contractJsonPath = join(testDir, 'contract.json');
+      const contractDtsPath = join(testDir, 'contract.d.ts');
 
-    await writeFile(contractJsonPath, result.contractJson);
-    await writeFile(contractDtsPath, result.contractDts);
+      await writeFile(contractJsonPath, result.contractJson);
+      await writeFile(contractDtsPath, result.contractDts);
 
-    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
-    const contract = validateContract(contractJson);
-    expect(contract.targetFamily).toBe('sql');
-    expect(contract.target).toBe('postgres');
-    expect(contract.storage).toBeDefined();
+      const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+      const contract = validateContract(contractJson);
+      expect(contract.targetFamily).toBe('sql');
+      expect(contract.target).toBe('postgres');
+      expect(contract.storage).toBeDefined();
 
-    const contractDtsContent = result.contractDts;
+      const contractDtsContent = result.contractDts;
 
-    expect(contractDtsContent).toContain('export type CodecTypes');
-    expect(contractDtsContent).toContain('export type LaneCodecTypes');
-    expect(contractDtsContent).toContain('export type Contract');
+      expect(contractDtsContent).toContain('export type CodecTypes');
+      expect(contractDtsContent).toContain('export type LaneCodecTypes');
+      expect(contractDtsContent).toContain('export type Contract');
 
-    const adapter = createStubAdapter();
-    const context = createRuntimeContext({ contract, adapter, extensions: [] });
-    const tables = schema(context).tables;
-    const userTable = tables['user'];
-    if (!userTable) throw new Error('user table not found');
+      const adapter = createStubAdapter();
+      const context = createRuntimeContext({ contract, adapter, extensions: [] });
+      const tables = schema(context).tables;
+      const userTable = tables['user'];
+      if (!userTable) throw new Error('user table not found');
 
-    const plan = sql({ context })
-      .from(userTable)
-      .select({
-        id: userTable.columns['id']!,
-        email: userTable.columns['email']!,
-      })
-      .limit(10)
-      .build();
+      const plan = sql({ context })
+        .from(userTable)
+        .select({
+          id: userTable.columns['id']!,
+          email: userTable.columns['email']!,
+        })
+        .limit(10)
+        .build();
 
-    expect(plan.sql).toBeTruthy();
-    expect(plan.meta.coreHash).toBe(result.coreHash);
-    expect(plan.meta.lane).toBe('dsl');
+      expect(plan.sql).toBeTruthy();
+      expect(plan.meta.coreHash).toBe(result.coreHash);
+      expect(plan.meta.lane).toBe('dsl');
 
-    type UserRow = ResultType<typeof plan>;
-    expectTypeOf<UserRow>().toHaveProperty('id');
-    expectTypeOf<UserRow>().toHaveProperty('email');
-  });
+      type UserRow = ResultType<typeof plan>;
+      expectTypeOf<UserRow>().toHaveProperty('id');
+      expectTypeOf<UserRow>().toHaveProperty('email');
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('emits contract with nullable fields and infers types correctly', async () => {
     const ir: ContractIR = {

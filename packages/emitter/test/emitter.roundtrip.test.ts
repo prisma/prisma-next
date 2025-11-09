@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
@@ -70,63 +71,67 @@ export type Contract = unknown;
 };
 
 describe('emitter round-trip', () => {
-  it('round-trip with minimal IR', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      relations: {},
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+  it(
+    'round-trip with minimal IR',
+    async () => {
+      const ir: ContractIR = {
+        schemaVersion: '1',
+        targetFamily: 'sql',
+        target: 'postgres',
+        models: {},
+        relations: {},
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { type: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
-      },
-      extensions: {
-        postgres: { version: '15.0.0' },
-        pg: {},
-      },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+        extensions: {
+          postgres: { version: '15.0.0' },
+          pg: {},
+        },
+        capabilities: {},
+        meta: {},
+        sources: {},
+      };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
-    const options: EmitOptions = {
-      outputDir: '',
-      packs,
-    };
+      const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+      const options: EmitOptions = {
+        outputDir: '',
+        packs,
+      };
 
-    const result1 = await emit(ir, options, mockSqlHook);
-    const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
+      const result1 = await emit(ir, options, mockSqlHook);
+      const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2: ContractIR = {
-      schemaVersion: contractJson1['schemaVersion'] as string,
-      targetFamily: contractJson1['targetFamily'] as string,
-      target: contractJson1['target'] as string,
-      models: contractJson1['models'] as Record<string, unknown>,
-      relations: (contractJson1['relations'] as Record<string, unknown>) || {},
-      storage: contractJson1['storage'] as Record<string, unknown>,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
-      capabilities:
-        (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
-      meta: (contractJson1['meta'] as Record<string, unknown>) || {},
-      sources: (contractJson1['sources'] as Record<string, unknown>) || {},
-    };
+      const ir2: ContractIR = {
+        schemaVersion: contractJson1['schemaVersion'] as string,
+        targetFamily: contractJson1['targetFamily'] as string,
+        target: contractJson1['target'] as string,
+        models: contractJson1['models'] as Record<string, unknown>,
+        relations: (contractJson1['relations'] as Record<string, unknown>) || {},
+        storage: contractJson1['storage'] as Record<string, unknown>,
+        extensions: contractJson1['extensions'] as Record<string, unknown>,
+        capabilities:
+          (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
+        meta: (contractJson1['meta'] as Record<string, unknown>) || {},
+        sources: (contractJson1['sources'] as Record<string, unknown>) || {},
+      };
 
-    const result2 = await emit(ir2, options, mockSqlHook);
+      const result2 = await emit(ir2, options, mockSqlHook);
 
-    expect(result1.contractJson).toBe(result2.contractJson);
-    expect(result1.coreHash).toBe(result2.coreHash);
-  });
+      expect(result1.contractJson).toBe(result2.contractJson);
+      expect(result1.coreHash).toBe(result2.coreHash);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('round-trip with complex IR', async () => {
     const ir: ContractIR = {

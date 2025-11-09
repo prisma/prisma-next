@@ -24,10 +24,20 @@ describe('end-to-end basic queries', () => {
   const contractTsPath = resolve(__dirname, 'fixtures/contract.ts');
   const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-  it('emits contract and verifies it matches on-disk artifacts', async () => {
-    const outputDir = resolve(__dirname, '../.tmp-output');
-    await emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, contractJsonPath);
-  });
+  it(
+    'emits contract and verifies it matches on-disk artifacts',
+    async () => {
+      const outputDir = resolve(__dirname, '../.tmp-output');
+      await emitAndVerifyContract(
+        cliPath,
+        contractTsPath,
+        adapterPath,
+        outputDir,
+        contractJsonPath,
+      );
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'returns multiple rows with correct types',

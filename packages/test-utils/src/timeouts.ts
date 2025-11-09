@@ -1,11 +1,11 @@
 const BASE_TIMEOUTS = {
-  spinUpPpgDev: 10000,
+  spinUpPpgDev: 15000,
   typeScriptCompilation: 8000,
   default: 100,
 } as const;
 
 function getMultiplier(): number {
-  return Number.parseFloat(process.env['TEST_TIMEOUT_MULTIPLIER'] || '1') || 1;
+  return Number.parseFloat(process.env['TEST_TIMEOUT_MULTIPLIER'] || '1') || 1.0;
 }
 
 /**

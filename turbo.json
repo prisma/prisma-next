@@ -12,12 +12,14 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "dist/**"]
+      "inputs": ["src/**", "test/**", "dist/**"],
+      "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },
     "test:coverage": {
       "dependsOn": ["^build"],
       "inputs": ["src/**", "test/**", "dist/**"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**"],
+      "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },
     "typecheck": {
       "dependsOn": ["^build"],
