@@ -15,6 +15,7 @@ describe('sql-target', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: 'test(${self})',
         },
       };
@@ -33,4 +34,3 @@ describe('sql-target', () => {
     });
   });
 });
-

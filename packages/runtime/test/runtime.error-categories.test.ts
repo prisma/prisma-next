@@ -1,5 +1,5 @@
 import type { Plan } from '@prisma-next/contract/types';
-import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlDriver } from '@prisma-next/sql-target';
 import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createRuntime } from '../src/runtime';
@@ -118,4 +118,3 @@ describe('Runtime error categories', () => {
     expect(operations).toBeDefined();
   });
 });
-

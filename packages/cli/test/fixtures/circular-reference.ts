@@ -5,4 +5,3 @@ const contract: Record<string, unknown> = {
 contract.self = contract;
 
 export const contract = contract;
-

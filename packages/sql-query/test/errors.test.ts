@@ -27,16 +27,10 @@ describe('planUnsupported', () => {
   });
 
   it('creates error with all properties', () => {
-    const error = planUnsupported(
-      'Test error',
-      { key: 'value' },
-      ['hint1'],
-      ['doc1'],
-    );
+    const error = planUnsupported('Test error', { key: 'value' }, ['hint1'], ['doc1']);
     expect(error.message).toBe('Test error');
     expect(error.details).toEqual({ key: 'value' });
     expect(error.hints).toEqual(['hint1']);
     expect(error.docs).toEqual(['doc1']);
   });
 });
-

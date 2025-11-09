@@ -1,6 +1,5 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { defineContract } from '@prisma-next/sql-query/contract-builder';
-import type { SomeType } from '@custom/package/types';
 
 const contractObj = defineContract<CodecTypes>()
   .target('postgres')
@@ -22,4 +21,3 @@ export const contract = {
     pg: {},
   },
 };
-

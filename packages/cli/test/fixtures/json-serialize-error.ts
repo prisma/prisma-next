@@ -8,4 +8,3 @@ export const contract = {
     throw new Error('Custom toJSON error');
   },
 };
-

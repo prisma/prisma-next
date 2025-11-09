@@ -110,6 +110,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: 'test(${self})',
             },
           },
@@ -137,6 +138,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: 'test(${self})',
             },
           },
@@ -164,6 +166,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: 'test(${self}, ${arg0}, ${arg1})',
             },
           },
@@ -192,6 +195,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: 'normalize(${self})',
             },
           },
@@ -220,6 +224,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: 'test(${self})',
             },
             capabilities: ['test.capability'],
@@ -249,6 +254,7 @@ describe('assembleOperationRegistry', () => {
             lowering: {
               targetFamily: 'sql',
               strategy: 'function',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
               template: 'test(${self})',
             },
           },

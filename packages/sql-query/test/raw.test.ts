@@ -9,7 +9,6 @@ import { validateContract } from '../src/contract';
 import { rawOptions as exportedRawOptions, sql as exportedSql } from '../src/exports/sql';
 import { rawOptions } from '../src/raw';
 import { sql } from '../src/sql';
-import type { TemplateStringsArray } from '../src/raw';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -152,7 +151,7 @@ describe('raw lane', () => {
   it('throws error when function form is called without params option', () => {
     expect(() => {
       (root.raw as unknown as (first: string, ...rest: unknown[]) => unknown)(
-        'select 1' as unknown as TemplateStringsArray,
+        'select 1' as unknown as string,
       );
     }).toThrow('Function form requires params option');
   });
@@ -204,5 +203,4 @@ describe('raw lane', () => {
       });
     }
   });
-
 });

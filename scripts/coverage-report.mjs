@@ -40,8 +40,15 @@ async function runCoverage(packageName) {
       });
 
       const output = stdout + stderr;
-      const testFailed = /FAIL\s+\d+/.test(output) || /Tests\s+\d+\s+failed/.test(output) || /Test Files\s+\d+\s+failed/.test(output);
-      const coverageFailed = /Coverage threshold/.test(output) || /coverage threshold/.test(output) || /Thresholds not met/.test(output) || (/Coverage for/.test(output) && /does not meet/.test(output));
+      const testFailed =
+        /FAIL\s+\d+/.test(output) ||
+        /Tests\s+\d+\s+failed/.test(output) ||
+        /Test Files\s+\d+\s+failed/.test(output);
+      const coverageFailed =
+        /Coverage threshold/.test(output) ||
+        /coverage threshold/.test(output) ||
+        /Thresholds not met/.test(output) ||
+        (/Coverage for/.test(output) && /does not meet/.test(output));
 
       const coverageReport = await parseCoverageReport(packageDir).catch(() => null);
 
@@ -54,8 +61,15 @@ async function runCoverage(packageName) {
       };
     } catch (error) {
       const output = (error.stdout || '') + (error.stderr || '');
-      const testFailed = /FAIL\s+\d+/.test(output) || /Tests\s+\d+\s+failed/.test(output) || /Test Files\s+\d+\s+failed/.test(output);
-      const coverageFailed = /Coverage threshold/.test(output) || /coverage threshold/.test(output) || /Thresholds not met/.test(output) || (/Coverage for/.test(output) && /does not meet/.test(output));
+      const testFailed =
+        /FAIL\s+\d+/.test(output) ||
+        /Tests\s+\d+\s+failed/.test(output) ||
+        /Test Files\s+\d+\s+failed/.test(output);
+      const coverageFailed =
+        /Coverage threshold/.test(output) ||
+        /coverage threshold/.test(output) ||
+        /Thresholds not met/.test(output) ||
+        (/Coverage for/.test(output) && /does not meet/.test(output));
 
       const coverageReport = await parseCoverageReport(packageDir).catch(() => null);
 
@@ -164,7 +178,9 @@ function checkThresholds(fileCoverage, thresholds) {
     const fileFailures = [];
 
     if (thresholds.statements && file.statements.pct < thresholds.statements) {
-      fileFailures.push(`statements: ${file.statements.pct.toFixed(2)}% < ${thresholds.statements}%`);
+      fileFailures.push(
+        `statements: ${file.statements.pct.toFixed(2)}% < ${thresholds.statements}%`,
+      );
     }
     if (thresholds.branches && file.branches.pct < thresholds.branches) {
       fileFailures.push(`branches: ${file.branches.pct.toFixed(2)}% < ${thresholds.branches}%`);
@@ -340,13 +356,19 @@ async function formatResults(results) {
       console.log(`  • ${item.package}`);
       console.log(`    Current coverage:`);
       if (item.suggestions.statements) {
-        console.log(`      statements: ${item.overallCoverage.statements.pct.toFixed(2)}% (threshold: ${item.suggestions.statements.current}%)`);
+        console.log(
+          `      statements: ${item.overallCoverage.statements.pct.toFixed(2)}% (threshold: ${item.suggestions.statements.current}%)`,
+        );
       }
       if (item.suggestions.branches) {
-        console.log(`      branches: ${item.overallCoverage.branches.pct.toFixed(2)}% (threshold: ${item.suggestions.branches.current}%)`);
+        console.log(
+          `      branches: ${item.overallCoverage.branches.pct.toFixed(2)}% (threshold: ${item.suggestions.branches.current}%)`,
+        );
       }
       if (item.suggestions.functions) {
-        console.log(`      functions: ${item.overallCoverage.functions.pct.toFixed(2)}% (threshold: ${item.suggestions.functions.current}%)`);
+        console.log(
+          `      functions: ${item.overallCoverage.functions.pct.toFixed(2)}% (threshold: ${item.suggestions.functions.current}%)`,
+        );
       }
       console.log(`    Suggested thresholds:`);
       const suggestedThresholds = [];
@@ -374,7 +396,9 @@ async function formatResults(results) {
   }
 
   console.log('='.repeat(80));
-  console.log(`Total: ${results.length} | Passed: ${passed.length} | Test Failures: ${testFailures.length} | Coverage Failures: ${coverageFailures.length} | Threshold Suggestions: ${thresholdSuggestions.length} | Skipped: ${skipped.length}`);
+  console.log(
+    `Total: ${results.length} | Passed: ${passed.length} | Test Failures: ${testFailures.length} | Coverage Failures: ${coverageFailures.length} | Threshold Suggestions: ${thresholdSuggestions.length} | Skipped: ${skipped.length}`,
+  );
   console.log('='.repeat(80) + '\n');
 
   return {
@@ -418,4 +442,3 @@ main().catch((error) => {
   console.error('Error running coverage report:', error);
   process.exit(1);
 });
-

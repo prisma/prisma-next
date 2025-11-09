@@ -1,6 +1,7 @@
+import type { OperationSignature } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import type { Extension, OperationSignature } from '../src/context';
+import type { Extension } from '../src/context';
 import { createRuntimeContext } from '../src/exports';
 import { createTestContract } from './utils';
 
@@ -40,6 +41,7 @@ describe('createRuntimeContext with extensions', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'test(${self})',
       },
     };
@@ -72,4 +74,3 @@ describe('createRuntimeContext with extensions', () => {
     expect(context.operations.byType('pg/text@1')).toEqual([]);
   });
 });
-

@@ -1,5 +1,5 @@
 import type { Plan } from '@prisma-next/contract/types';
-import type { SqlContract, SqlDriver, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlDriver } from '@prisma-next/sql-target';
 import { describe, expect, it, vi } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { budgets } from '../src/plugins/budgets';
@@ -378,11 +378,7 @@ describe('budgets plugin', () => {
       const driver = createMockDriver();
       const ctx = createMockContext(driver);
 
-      await plugin.afterExecute?.(
-        plan,
-        { rowCount: 1, latencyMs: 200, completed: true },
-        ctx,
-      );
+      await plugin.afterExecute?.(plan, { rowCount: 1, latencyMs: 200, completed: true }, ctx);
 
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -494,4 +490,3 @@ describe('budgets plugin', () => {
     });
   });
 });
-
