@@ -245,7 +245,7 @@ describe('end-to-end JOIN queries', () => {
             }
           });
         },
-        { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
+        { acceleratePort: 54130, databasePort: 54131, shadowDatabasePort: 54132 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -327,7 +327,7 @@ describe('end-to-end JOIN queries', () => {
             }
           });
         },
-        { acceleratePort: 54060, databasePort: 54061, shadowDatabasePort: 54062 },
+        { acceleratePort: 54140, databasePort: 54141, shadowDatabasePort: 54142 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -440,7 +440,7 @@ describe('end-to-end JOIN queries', () => {
             }
           });
         },
-        { acceleratePort: 54070, databasePort: 54071, shadowDatabasePort: 54072 },
+        { acceleratePort: 54150, databasePort: 54151, shadowDatabasePort: 54152 },
       );
     },
     timeouts.spinUpPpgDev,

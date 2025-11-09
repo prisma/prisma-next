@@ -422,110 +422,114 @@ describe('runtime execute integration', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('includeMany returns users with nested posts array', async () => {
-    await withDevDatabase(async ({ connectionString }) => {
-      const adapter = createPostgresAdapter();
-      const pool = new Pool({ connectionString });
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool },
-        cursor: { disabled: true },
-      });
-      const context = createRuntimeContext({ contract, adapter, extensions: [] });
-      const runtime = createRuntime({
-        context,
-        adapter,
-        driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        plugins: [
-          budgets({
-            maxRows: 10_000,
-            defaultTableRows: 10_000,
-            tableRows: { user: 10_000, post: 10_000 },
-          }),
-        ],
-      });
-
-      try {
-        await stampMarker({
-          connectionString,
-          coreHash: contract.coreHash,
-          profileHash: contract.profileHash ?? contract.coreHash,
+  it(
+    'includeMany returns users with nested posts array',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        const adapter = createPostgresAdapter();
+        const pool = new Pool({ connectionString });
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool },
+          cursor: { disabled: true },
+        });
+        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const runtime = createRuntime({
+          context,
+          adapter,
+          driver,
+          verify: { mode: 'onFirstUse', requireMarker: false },
+          plugins: [
+            budgets({
+              maxRows: 10_000,
+              defaultTableRows: 10_000,
+              tableRows: { user: 10_000, post: 10_000 },
+            }),
+          ],
         });
 
-        await withClient(connectionString, async (client) => {
-          await client.query(
-            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-          );
-          await client.query(
-            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-          );
-          await client.query('truncate table "post", "user" restart identity cascade');
-          await client.query(
-            'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
-            ['alice@example.com', 'bob@example.com'],
-          );
-          await client.query(
-            'insert into "post" (title, "userId", "createdAt") values ($1, $2, now()), ($3, $2, now()), ($4, $5, now())',
-            ['First Post', 1, 'Second Post', 'Third Post', 2],
-          );
-        });
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+          });
 
-        const tables = schema(context).tables;
-        const userTable = tables['user']!;
-        const postTable = tables['post']!;
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query(
+              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+            );
+            await client.query('truncate table "post", "user" restart identity cascade');
+            await client.query(
+              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
+              ['alice@example.com', 'bob@example.com'],
+            );
+            await client.query(
+              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now()), ($3, $2, now()), ($4, $5, now())',
+              ['First Post', 1, 'Second Post', 'Third Post', 2],
+            );
+          });
 
-        const plan = sql({ context })
-          .from(userTable)
-          .includeMany(
-            postTable,
-            (on) => on.eqCol(userTable.columns['id']!, postTable.columns['userId']!),
-            (child) =>
-              child
-                .select({
-                  id: postTable.columns['id']!,
-                  title: postTable.columns['title']!,
-                  createdAt: postTable.columns['createdAt']!,
-                })
-                .orderBy(postTable.columns['createdAt']!.desc()),
-            { alias: 'posts' },
-          )
-          .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
-            createdAt: userTable.columns['createdAt']!,
-            posts: true,
-          })
-          .limit(10)
-          .build();
+          const tables = schema(context).tables;
+          const userTable = tables['user']!;
+          const postTable = tables['post']!;
 
-        type Row = ResultType<typeof plan>;
-        const rows: Row[] = [];
-        for await (const row of runtime.execute(plan)) {
-          rows.push(row);
+          const plan = sql({ context })
+            .from(userTable)
+            .includeMany(
+              postTable,
+              (on) => on.eqCol(userTable.columns['id']!, postTable.columns['userId']!),
+              (child) =>
+                child
+                  .select({
+                    id: postTable.columns['id']!,
+                    title: postTable.columns['title']!,
+                    createdAt: postTable.columns['createdAt']!,
+                  })
+                  .orderBy(postTable.columns['createdAt']!.desc()),
+              { alias: 'posts' },
+            )
+            .select({
+              id: userTable.columns['id']!,
+              email: userTable.columns['email']!,
+              createdAt: userTable.columns['createdAt']!,
+              posts: true,
+            })
+            .limit(10)
+            .build();
+
+          type Row = ResultType<typeof plan>;
+          const rows: Row[] = [];
+          for await (const row of runtime.execute(plan)) {
+            rows.push(row);
+          }
+
+          expect(rows).toHaveLength(2);
+          expect(rows[0]).toHaveProperty('id');
+          expect(rows[0]).toHaveProperty('email');
+          expect(rows[0]).toHaveProperty('posts');
+          expect(Array.isArray(rows[0]!.posts)).toBe(true);
+
+          const alice = rows.find((r) => r.email === 'alice@example.com');
+          expect(alice).toBeDefined();
+          expect(alice!.posts).toHaveLength(2);
+          expect(alice!.posts[0]).toHaveProperty('id');
+          expect(alice!.posts[0]).toHaveProperty('title');
+          expect(alice!.posts[0]).toHaveProperty('createdAt');
+          expect(typeof alice!.posts[0]!.id).toBe('number');
+          expect(typeof alice!.posts[0]!.title).toBe('string');
+
+          const bob = rows.find((r) => r.email === 'bob@example.com');
+          expect(bob).toBeDefined();
+          expect(bob!.posts).toHaveLength(1);
+          expect(bob!.posts[0]!.title).toBe('Third Post');
+        } finally {
+          await runtime.close();
         }
-
-        expect(rows).toHaveLength(2);
-        expect(rows[0]).toHaveProperty('id');
-        expect(rows[0]).toHaveProperty('email');
-        expect(rows[0]).toHaveProperty('posts');
-        expect(Array.isArray(rows[0]!.posts)).toBe(true);
-
-        const alice = rows.find((r) => r.email === 'alice@example.com');
-        expect(alice).toBeDefined();
-        expect(alice!.posts).toHaveLength(2);
-        expect(alice!.posts[0]).toHaveProperty('id');
-        expect(alice!.posts[0]).toHaveProperty('title');
-        expect(alice!.posts[0]).toHaveProperty('createdAt');
-        expect(typeof alice!.posts[0]!.id).toBe('number');
-        expect(typeof alice!.posts[0]!.title).toBe('string');
-
-        const bob = rows.find((r) => r.email === 'bob@example.com');
-        expect(bob).toBeDefined();
-        expect(bob!.posts).toHaveLength(1);
-        expect(bob!.posts[0]!.title).toBe('Third Post');
-      } finally {
-        await runtime.close();
-      }
-    }, {});
-  });
+      }, {});
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
