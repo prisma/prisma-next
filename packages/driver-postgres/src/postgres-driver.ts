@@ -101,7 +101,11 @@ class PostgresDriverImpl implements SqlDriver {
 
   async close(): Promise<void> {
     if (this.pool) {
-      await this.pool.end();
+      // Check if pool is already closed to avoid "Called end on pool more than once" error
+      // pg Pool has an 'ended' property that indicates if the pool has been closed
+      if (!(this.pool as { ended?: boolean }).ended) {
+        await this.pool.end();
+      }
     }
   }
 
