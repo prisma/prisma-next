@@ -166,249 +166,261 @@ describe('runtime execute integration', () => {
     timeouts.typeScriptCompilation * 2,
   );
 
-  it('infers correct types from query plans', async () => {
-    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-      const adapter = createPostgresAdapter();
-      const pool = new Pool({ connectionString });
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool },
-        cursor: { disabled: true },
-      });
-      const context = createRuntimeContext({ contract, adapter, extensions: [] });
-      const runtime = createRuntime({
-        context,
-        adapter,
-        driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        plugins: [
-          budgets({
-            maxRows: 10_000,
-            defaultTableRows: 10_000,
-            tableRows: { user: 10_000, post: 10_000 },
-          }),
-        ],
-      });
-
-      try {
-        await stampMarker({
-          connectionString,
-          coreHash: contract.coreHash,
-          profileHash: contract.profileHash ?? contract.coreHash,
+  it(
+    'infers correct types from query plans',
+    async () => {
+      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        const adapter = createPostgresAdapter();
+        const pool = new Pool({ connectionString });
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool },
+          cursor: { disabled: true },
+        });
+        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const runtime = createRuntime({
+          context,
+          adapter,
+          driver,
+          verify: { mode: 'onFirstUse', requireMarker: false },
+          plugins: [
+            budgets({
+              maxRows: 10_000,
+              defaultTableRows: 10_000,
+              tableRows: { user: 10_000, post: 10_000 },
+            }),
+          ],
         });
 
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await client.query(
-            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-          );
-          await client.query(
-            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-          );
-          await client.query('truncate table "post", "user" restart identity cascade');
-          await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-            'alice@example.com',
-          ]);
-          await client.query(
-            'insert into "post" (title, "userId", "createdAt") values ($1, $2, now())',
-            ['First Post', 1],
-          );
-        });
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+          });
 
-        const tables = schema(context).tables;
-        const userTable = tables['user']!;
-        const postTable = tables['post']!;
-
-        const userPlan = sql({ context })
-          .from(userTable)
-          .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
-            createdAt: userTable.columns['createdAt']!,
-          })
-          .limit(10)
-          .build();
-
-        type UserRow = ResultType<typeof userPlan>;
-
-        const postPlan = sql({ context })
-          .from(postTable)
-          .where(postTable.columns['userId']!.eq(param('userId')))
-          .select({
-            id: postTable.columns['id']!,
-            title: postTable.columns['title']!,
-            userId: postTable.columns['userId']!,
-            createdAt: postTable.columns['createdAt']!,
-          })
-          .build({ params: { userId: 1 } });
-
-        type PostRow = ResultType<typeof postPlan>;
-
-        const userRows: UserRow[] = [];
-        for await (const row of runtime.execute(userPlan)) {
-          userRows.push(row);
-        }
-        expect(userRows).toHaveLength(1);
-        expect(userRows[0]).toMatchObject({ email: 'alice@example.com' });
-
-        const postRows: PostRow[] = [];
-        for await (const row of runtime.execute(postPlan)) {
-          postRows.push(row);
-        }
-        expect(postRows).toHaveLength(1);
-        expect(postRows[0]).toMatchObject({ title: 'First Post', userId: 1 });
-      } finally {
-        await runtime.close();
-      }
-    }, {});
-  });
-
-  it('enforces row budget on unbounded queries', async () => {
-    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-      const adapter = createPostgresAdapter();
-      const pool = new Pool({ connectionString });
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool },
-        cursor: { disabled: true },
-      });
-      const context = createRuntimeContext({ contract, adapter, extensions: [] });
-      const runtime = createRuntime({
-        context,
-        adapter,
-        driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        plugins: [
-          budgets({
-            maxRows: 50,
-            defaultTableRows: 10_000,
-            tableRows: { user: 10_000, post: 10_000 },
-          }),
-        ],
-      });
-
-      try {
-        await stampMarker({
-          connectionString,
-          coreHash: contract.coreHash,
-          profileHash: contract.profileHash ?? contract.coreHash,
-        });
-
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await client.query(
-            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-          );
-          await client.query('truncate table "user" restart identity');
-          for (let i = 0; i < 100; i++) {
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query(
+              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+            );
+            await client.query('truncate table "post", "user" restart identity cascade');
             await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              `user${i}@example.com`,
+              'alice@example.com',
             ]);
+            await client.query(
+              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now())',
+              ['First Post', 1],
+            );
+          });
+
+          const tables = schema(context).tables;
+          const userTable = tables['user']!;
+          const postTable = tables['post']!;
+
+          const userPlan = sql({ context })
+            .from(userTable)
+            .select({
+              id: userTable.columns['id']!,
+              email: userTable.columns['email']!,
+              createdAt: userTable.columns['createdAt']!,
+            })
+            .limit(10)
+            .build();
+
+          type UserRow = ResultType<typeof userPlan>;
+
+          const postPlan = sql({ context })
+            .from(postTable)
+            .where(postTable.columns['userId']!.eq(param('userId')))
+            .select({
+              id: postTable.columns['id']!,
+              title: postTable.columns['title']!,
+              userId: postTable.columns['userId']!,
+              createdAt: postTable.columns['createdAt']!,
+            })
+            .build({ params: { userId: 1 } });
+
+          type PostRow = ResultType<typeof postPlan>;
+
+          const userRows: UserRow[] = [];
+          for await (const row of runtime.execute(userPlan)) {
+            userRows.push(row);
           }
-        });
+          expect(userRows).toHaveLength(1);
+          expect(userRows[0]).toMatchObject({ email: 'alice@example.com' });
 
-        const tables = schema(context).tables;
-        const userTable = tables['user']!;
-        const unboundedPlan = sql({ context })
-          .from(tables['user']!)
-          .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
-          })
-          .build();
-
-        await expect(async () => {
-          for await (const _row of runtime.execute(unboundedPlan)) {
-            // Should not reach here
+          const postRows: PostRow[] = [];
+          for await (const row of runtime.execute(postPlan)) {
+            postRows.push(row);
           }
-        }).rejects.toMatchObject({
-          code: 'BUDGET.ROWS_EXCEEDED',
-          category: 'BUDGET',
-        });
-
-        const boundedPlan = sql({ context })
-          .from(tables['user']!)
-          .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
-          })
-          .limit(10)
-          .build();
-
-        type BoundedPlanRow = ResultType<typeof boundedPlan>;
-        const rows: BoundedPlanRow[] = [];
-        for await (const row of runtime.execute(boundedPlan)) {
-          rows.push(row);
+          expect(postRows).toHaveLength(1);
+          expect(postRows[0]).toMatchObject({ title: 'First Post', userId: 1 });
+        } finally {
+          await runtime.close();
         }
-        expect(rows.length).toBeLessThanOrEqual(10);
-      } finally {
-        await runtime.close();
-      }
-    }, {});
-  });
+      }, {});
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-  it('enforces streaming row budget', async () => {
-    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-      const adapter = createPostgresAdapter();
-      const pool = new Pool({ connectionString });
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool },
-        cursor: { disabled: true },
-      });
-      const context = createRuntimeContext({ contract, adapter, extensions: [] });
-      const runtime = createRuntime({
-        context,
-        adapter,
-        driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        plugins: [
-          budgets({
-            maxRows: 10,
-            defaultTableRows: 10_000,
-            tableRows: { user: 10_000, post: 10_000 },
-          }),
-        ],
-      });
-
-      try {
-        await stampMarker({
-          connectionString,
-          coreHash: contract.coreHash,
-          profileHash: contract.profileHash ?? contract.coreHash,
+  it(
+    'enforces row budget on unbounded queries',
+    async () => {
+      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        const adapter = createPostgresAdapter();
+        const pool = new Pool({ connectionString });
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool },
+          cursor: { disabled: true },
+        });
+        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const runtime = createRuntime({
+          context,
+          adapter,
+          driver,
+          verify: { mode: 'onFirstUse', requireMarker: false },
+          plugins: [
+            budgets({
+              maxRows: 50,
+              defaultTableRows: 10_000,
+              tableRows: { user: 10_000, post: 10_000 },
+            }),
+          ],
         });
 
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await client.query(
-            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-          );
-          await client.query('truncate table "user" restart identity');
-          for (let i = 0; i < 50; i++) {
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              `user${i}@example.com`,
-            ]);
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+          });
+
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query('truncate table "user" restart identity');
+            for (let i = 0; i < 100; i++) {
+              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+                `user${i}@example.com`,
+              ]);
+            }
+          });
+
+          const tables = schema(context).tables;
+          const userTable = tables['user']!;
+          const unboundedPlan = sql({ context })
+            .from(tables['user']!)
+            .select({
+              id: userTable.columns['id']!,
+              email: userTable.columns['email']!,
+            })
+            .build();
+
+          await expect(async () => {
+            for await (const _row of runtime.execute(unboundedPlan)) {
+              // Should not reach here
+            }
+          }).rejects.toMatchObject({
+            code: 'BUDGET.ROWS_EXCEEDED',
+            category: 'BUDGET',
+          });
+
+          const boundedPlan = sql({ context })
+            .from(tables['user']!)
+            .select({
+              id: userTable.columns['id']!,
+              email: userTable.columns['email']!,
+            })
+            .limit(10)
+            .build();
+
+          type BoundedPlanRow = ResultType<typeof boundedPlan>;
+          const rows: BoundedPlanRow[] = [];
+          for await (const row of runtime.execute(boundedPlan)) {
+            rows.push(row);
           }
+          expect(rows.length).toBeLessThanOrEqual(10);
+        } finally {
+          await runtime.close();
+        }
+      }, {});
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'enforces streaming row budget',
+    async () => {
+      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        const adapter = createPostgresAdapter();
+        const pool = new Pool({ connectionString });
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool },
+          cursor: { disabled: true },
+        });
+        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const runtime = createRuntime({
+          context,
+          adapter,
+          driver,
+          verify: { mode: 'onFirstUse', requireMarker: false },
+          plugins: [
+            budgets({
+              maxRows: 10,
+              defaultTableRows: 10_000,
+              tableRows: { user: 10_000, post: 10_000 },
+            }),
+          ],
         });
 
-        const tables = schema(context).tables;
-        const userTable = tables['user']!;
-        const plan = sql({ context })
-          .from(tables['user']!)
-          .select({
-            id: userTable.columns['id']!,
-            email: userTable.columns['email']!,
-          })
-          .limit(50)
-          .build();
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+          });
 
-        await expect(async () => {
-          for await (const _row of runtime.execute(plan)) {
-            // Will throw on 11th row
-          }
-        }).rejects.toMatchObject({
-          code: 'BUDGET.ROWS_EXCEEDED',
-          category: 'BUDGET',
-        });
-      } finally {
-        await runtime.close();
-      }
-    }, {});
-  });
+          await withClient(connectionString, async (client: import('pg').Client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query('truncate table "user" restart identity');
+            for (let i = 0; i < 50; i++) {
+              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+                `user${i}@example.com`,
+              ]);
+            }
+          });
+
+          const tables = schema(context).tables;
+          const userTable = tables['user']!;
+          const plan = sql({ context })
+            .from(tables['user']!)
+            .select({
+              id: userTable.columns['id']!,
+              email: userTable.columns['email']!,
+            })
+            .limit(50)
+            .build();
+
+          await expect(async () => {
+            for await (const _row of runtime.execute(plan)) {
+              // Will throw on 11th row
+            }
+          }).rejects.toMatchObject({
+            code: 'BUDGET.ROWS_EXCEEDED',
+            category: 'BUDGET',
+          });
+        } finally {
+          await runtime.close();
+        }
+      }, {});
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('includeMany returns users with nested posts array', async () => {
     await withDevDatabase(async ({ connectionString }) => {
