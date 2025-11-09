@@ -72,5 +72,6 @@ test('handles empty operations registry', () => {
   type EmptyOperations = Record<string, never>;
 
   type Ops = OperationsForTypeId<'pgvector/vector@1', EmptyOperations>;
+  // When Operations is empty, OperationsForTypeId should return Record<string, never>
   expectTypeOf<Ops>().toEqualTypeOf<Record<string, never>>();
 });

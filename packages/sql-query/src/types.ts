@@ -154,7 +154,11 @@ export type CodecTypes = Record<string, { readonly output: unknown }>;
 export type OperationsForTypeId<
   TypeId extends string,
   Operations extends OperationTypes,
-> = TypeId extends keyof Operations ? Operations[TypeId] : Record<string, never>;
+> = Operations extends Record<string, never>
+  ? Record<string, never>
+  : TypeId extends keyof Operations
+    ? Operations[TypeId]
+    : Record<string, never>;
 
 /**
  * Maps operation signatures to method signatures on ColumnBuilder.
