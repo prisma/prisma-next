@@ -2,8 +2,8 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:60e53034575a4c619943af54473ab8c52b4adb53d28a984f795af904fd7f54a6",
-  "profileHash": "sha256:bcd65c326924386127cf79793b812ad9134d4a3c61825fe338923dc6a46f9979",
+  "coreHash": "sha256:0b5bc570c00d6a3b92ee53427daf07c8507d4ce08246e78043ce45f65d7bb20c",
+  "profileHash": "sha256:5a8d9c14e9293be728f50dac2c2872f0873788bec000cde2cc745e2c92e33a72",
   "models": {
     "Comment": {
       "fields": {
@@ -124,7 +124,8 @@
   "capabilities": {
     "postgres": {
       "jsonAgg": true,
-      "lateral": true
+      "lateral": true,
+      "returning": true
     }
   },
   "extensions": {

@@ -136,8 +136,11 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain('export type Relations');
-    expect(types).toContain('readonly User.posts: unknown');
-    expect(types).toContain('readonly User.comments: unknown');
+    // Relations type is table-based, not model-based
+    // The test data doesn't include ir.relations, so Relations will be Record<string, never>
+    // But we can verify that relations are embedded in the Models type
+    expect(types).toContain('readonly posts: { readonly on:');
+    expect(types).toContain('readonly comments: { readonly on:');
   });
 
   it('generates relations type as empty when no relations', () => {
