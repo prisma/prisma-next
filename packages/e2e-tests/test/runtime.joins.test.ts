@@ -171,7 +171,7 @@ describe('end-to-end JOIN queries', () => {
       },
       { acceleratePort: 54040, databasePort: 54041, shadowDatabasePort: 54042 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('RIGHT JOIN returns all posts including those without users', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -241,7 +241,7 @@ describe('end-to-end JOIN queries', () => {
       },
       { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('FULL JOIN returns all users and posts', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -319,7 +319,7 @@ describe('end-to-end JOIN queries', () => {
       },
       { acceleratePort: 54060, databasePort: 54061, shadowDatabasePort: 54062 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('chained joins (user -> post -> comment) returns correct results', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -428,5 +428,5 @@ describe('end-to-end JOIN queries', () => {
       },
       { acceleratePort: 54070, databasePort: 54071, shadowDatabasePort: 54072 },
     );
-  });
+  }, timeouts.spinUpPpgDev);
 });
