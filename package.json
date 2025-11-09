@@ -21,13 +21,15 @@
     "typecheck:all": "turbo run typecheck --include-examples",
     "typecheck:packages": "turbo run typecheck --filter='!./examples/**'",
     "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.6",
     "@changesets/cli": "^2.27.8",
     "@types/node": "^24.7.2",
     "@vitest/coverage-v8": "^2.1.1",
+    "husky": "^9.1.7",
     "turbo": "^2.3.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.1"
