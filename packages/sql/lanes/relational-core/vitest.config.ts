@@ -1,10 +1,14 @@
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const workspaceRoot = resolve(__dirname, '../../..');
 
 export default defineConfig({
   resolve: {
     alias: {
-      '@prisma-next/plan': resolve(__dirname, '../../../core/plan/src/index.ts'),
+      '@prisma-next/plan': resolve(workspaceRoot, 'packages/core/plan/src/index.ts'),
     },
   },
   test: {
