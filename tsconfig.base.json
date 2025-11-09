@@ -36,7 +36,20 @@
       "@prisma-next/compat-prisma": ["packages/compat-prisma/src/exports/index.ts"],
       "@prisma-next/compat-prisma/*": ["packages/compat-prisma/src/exports/*.ts"],
       "@prisma-next/node-utils": ["packages/node-utils/src/exports/index.ts"],
-      "@prisma-next/node-utils/*": ["packages/node-utils/src/exports/*.ts"]
+      "@prisma-next/node-utils/*": ["packages/node-utils/src/exports/*.ts"],
+      "@prisma-next/plan": ["packages/core/plan/src/index.ts"],
+      "@prisma-next/operations": ["packages/core/operations/src/index.ts"],
+      "@prisma-next/contract-authoring": ["packages/authoring/contract-authoring/src/index.ts"],
+      "@prisma-next/contract-ts": ["packages/authoring/contract-ts/src/index.ts"],
+      "@prisma-next/contract-psl": ["packages/authoring/contract-psl/src/index.ts"],
+      "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
+      "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],
+      "@prisma-next/sql-contract-emitter": ["packages/targets/sql/emitter/src/index.ts"],
+      "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
+      "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
+      "@prisma-next/sql-orm-lane": ["packages/sql/lanes/orm-lane/src/index.ts"],
+      "@prisma-next/runtime-core": ["packages/runtime/core/src/index.ts"],
+      "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/index.ts"]
     }
   },
   "references": [
@@ -47,6 +60,19 @@
     { "path": "./packages/sql-query" },
     { "path": "./packages/schema-emitter" },
     { "path": "./packages/runtime" },
-    { "path": "./packages/cli" }
+    { "path": "./packages/cli" },
+    { "path": "./packages/core/plan" },
+    { "path": "./packages/core/operations" },
+    { "path": "./packages/authoring/contract-authoring" },
+    { "path": "./packages/authoring/contract-ts" },
+    { "path": "./packages/authoring/contract-psl" },
+    { "path": "./packages/targets/sql/contract-types" },
+    { "path": "./packages/targets/sql/operations" },
+    { "path": "./packages/targets/sql/emitter" },
+    { "path": "./packages/sql/lanes/relational-core" },
+    { "path": "./packages/sql/lanes/sql-lane" },
+    { "path": "./packages/sql/lanes/orm-lane" },
+    { "path": "./packages/runtime/core" },
+    { "path": "./packages/sql/sql-runtime" }
   ]
 }

@@ -83,7 +83,7 @@ Query lane implementations. SQL lanes live under `packages/sql/lanes/` to keep S
 
 - `packages/sql/lanes/relational-core/` → `@prisma-next/sql-relational-core` - Schema + column builders, operation attachment, AST types
 - `packages/sql/lanes/sql-lane/` → `@prisma-next/sql-lane` - Relational DSL + raw SQL helpers
-- `packages/sql/lanes/orm-lane/` → `@prisma-next/sql-orm-lane` - ORM builder, include lowering, relation filters
+- `packages/sql/lanes/orm-lane/` → `@prisma-next/sql-orm-lane` - ORM builder, include compilation, relation filters
 
 **Dependency Rules:** Can import from `core/*`, `authoring/*`, `targets/sql/*` only.
 
@@ -265,7 +265,7 @@ packages:
 Import dependencies are validated using `scripts/check-imports.mjs`:
 
 ```bash
-pnpm check-imports
+pnpm lint:deps
 ```
 
 This script:
@@ -273,6 +273,9 @@ This script:
 - Validates imports against ring and family rules
 - Reports violations with detailed context
 - Can be run locally or in CI
+- Enforces the dependency direction: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`
+
+**Status:** ✅ Scaffolding complete - Import validation script is active and enforces ring-based dependency rules.
 
 ## Adding New Packages
 
@@ -287,6 +290,16 @@ When adding a new package:
 7. **Run import check** to verify no violations
 
 ## Migration Notes
+
+**Scaffolding Status:** ✅ Complete (Slice 1)
+
+The package layering structure has been scaffolded with placeholder packages:
+- All ring directories created (`core/`, `authoring/`, `targets/`, `lanes/`, `runtime/`, `sql/`, `compat/`, `document/`)
+- Placeholder packages with basic structure (package.json, tsconfig.json, src/index.ts, tsup.config.ts, README.md)
+- Workspace configuration updated (`pnpm-workspace.yaml`)
+- TypeScript path aliases and project references added (`tsconfig.base.json`)
+- Import validation script created (`scripts/check-imports.mjs`)
+- `pnpm lint:deps` script added to root package.json
 
 During migration from the old structure:
 

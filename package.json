@@ -17,6 +17,7 @@
     "lint:fix": "pnpm biome check --write .",
     "lint:packages": "turbo run lint --filter='!./examples/**'",
     "lint:examples": "turbo run lint --filter='./examples/**'",
+    "lint:deps": "node scripts/check-imports.mjs",
     "typecheck": "turbo run typecheck",
     "typecheck:all": "turbo run typecheck --include-examples",
     "typecheck:packages": "turbo run typecheck --filter='!./examples/**'",

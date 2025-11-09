@@ -34,10 +34,10 @@ importers:
     dependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
-        version: link:../../packages/adapter-postgres
+        version: link:../../packages/sql/postgres/postgres-adapter
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../../packages/driver-postgres
+        version: link:../../packages/sql/postgres/postgres-driver
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -83,13 +83,13 @@ importers:
     dependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
-        version: link:../../packages/adapter-postgres
+        version: link:../../packages/sql/postgres/postgres-adapter
       '@prisma-next/compat-prisma':
         specifier: workspace:*
-        version: link:../../packages/compat-prisma
+        version: link:../../packages/compat/compat-prisma
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../../packages/driver-postgres
+        version: link:../../packages/sql/postgres/postgres-driver
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -156,6 +156,33 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
+  packages/authoring/contract-authoring:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/authoring/contract-psl:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/authoring/contract-ts:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/cli:
     dependencies:
       '@prisma-next/emitter':
@@ -197,13 +224,13 @@ importers:
     dependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
-        version: link:../adapter-postgres
+        version: link:../sql/postgres/postgres-adapter
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../driver-postgres
+        version: link:../sql/postgres/postgres-driver
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -233,7 +260,34 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
+  packages/compat/compat-prisma:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/contract:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/core/operations:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/core/plan:
     devDependencies:
       tsup:
         specifier: ^8.3.0
@@ -277,13 +331,13 @@ importers:
     dependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
-        version: link:../adapter-postgres
+        version: link:../sql/postgres/postgres-adapter
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../cli
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../driver-postgres
+        version: link:../sql/postgres/postgres-driver
       '@prisma-next/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -342,7 +396,7 @@ importers:
     dependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
-        version: link:../adapter-postgres
+        version: link:../sql/postgres/postgres-adapter
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../cli
@@ -351,7 +405,7 @@ importers:
         version: link:../contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../driver-postgres
+        version: link:../sql/postgres/postgres-driver
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
@@ -403,7 +457,7 @@ importers:
         version: link:../contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../driver-postgres
+        version: link:../sql/postgres/postgres-driver
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
@@ -432,6 +486,15 @@ importers:
       vitest:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
+
+  packages/runtime/core:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/sql-query:
     dependencies:
@@ -488,6 +551,87 @@ importers:
       vitest:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
+
+  packages/sql/lanes/orm-lane:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/sql/lanes/relational-core:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/sql/lanes/sql-lane:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/sql/postgres/postgres-adapter:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/sql/postgres/postgres-driver:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/sql/sql-runtime:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/targets/sql/contract-types:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/targets/sql/emitter:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/targets/sql/operations:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/test-utils:
     devDependencies:
