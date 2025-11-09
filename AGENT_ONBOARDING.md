@@ -963,7 +963,7 @@ See `packages/test-utils/README.md` for full documentation of generic helpers, `
 
 **Coverage Commands:**
 - `pnpm test:coverage` - Run tests with coverage for all packages (including examples)
-- `pnpm test:coverage:packages` - Run tests with coverage for packages only (excludes example apps)
+- `pnpm coverage:packages` - Run tests with coverage for packages only (excludes example apps)
 - `pnpm --filter <package-name> test:coverage` - Run tests with coverage for a specific package
 
 **Examples:**
@@ -975,7 +975,7 @@ pnpm test
 pnpm test:packages
 
 # Run coverage for all packages (excluding examples)
-pnpm test:coverage:packages
+pnpm coverage:packages
 
 # Run coverage for a specific package
 pnpm --filter @prisma-next/sql-query test:coverage
@@ -1143,14 +1143,14 @@ See `docs/briefs/06-SQL-Lane-Nested-Projection-Shaping.md` for the full implemen
 ### Coverage Commands
 
 **Check Coverage:**
-- `pnpm test:coverage:packages` - Run tests with coverage for all packages (excludes examples)
+- `pnpm coverage:packages` - Run tests with coverage for all packages (excludes examples)
 - `pnpm --filter <package-name> test:coverage` - Run tests with coverage for a specific package
 - `pnpm test:coverage` - Run tests with coverage for all packages including examples
 
 **Examples:**
 ```bash
 # Check coverage for all packages
-pnpm test:coverage:packages
+pnpm coverage:packages
 
 # Check coverage for a specific package
 pnpm --filter @prisma-next/sql-query test:coverage
@@ -1209,7 +1209,7 @@ The workflow consists of separate jobs that run in parallel where possible:
 6. **coverage** - Generates and reports test coverage
    - Depends on `build` job
    - Requires Postgres service (PostgreSQL 15)
-   - Uses `pnpm test:coverage:packages`
+   - Uses `pnpm coverage:packages`
    - Uploads coverage artifacts (retained for 7 days)
    - Optional Codecov integration (requires `CODECOV_TOKEN` secret)
 
@@ -1248,7 +1248,7 @@ pnpm test:examples
 pnpm --filter @prisma-next/e2e-tests test
 
 # Coverage (requires Postgres)
-pnpm test:coverage:packages
+pnpm coverage:packages
 ```
 
 ### CI Configuration
