@@ -31,7 +31,6 @@ The framework domain contains target-agnostic packages that work across all targ
 |-- tooling (migration plane)
 |   |-- @prisma-next/cli
 |   |-- @prisma-next/emitter
-|   |-- @prisma-next/node-utils
 |-- runtime-core (runtime plane)
     |-- @prisma-next/runtime-core
 ```
