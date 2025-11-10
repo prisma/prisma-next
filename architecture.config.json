@@ -1,0 +1,164 @@
+{
+  "packages": [
+    {
+      "glob": "packages/core/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/authoring/contract-authoring/**",
+      "domain": "framework",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/authoring/contract-ts/**",
+      "domain": "framework",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/authoring/contract-psl/**",
+      "domain": "framework",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/cli/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/emitter/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/runtime/core/**",
+      "domain": "framework",
+      "layer": "runtime-core",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/targets/sql/**",
+      "domain": "sql",
+      "layer": "targets",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/sql/authoring/**",
+      "domain": "sql",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/sql/lanes/**",
+      "domain": "sql",
+      "layer": "lanes",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/sql/sql-runtime/**",
+      "domain": "sql",
+      "layer": "runtime",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/sql/postgres/**",
+      "domain": "sql",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/compat/**",
+      "domain": "sql",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/adapter-postgres/**",
+      "domain": "sql",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/driver-postgres/**",
+      "domain": "sql",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/compat-prisma/**",
+      "domain": "sql",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/runtime/**",
+      "domain": "legacy",
+      "layer": "legacy",
+      "plane": "runtime",
+      "note": "Legacy runtime package (will be split in Slice 6)"
+    },
+    {
+      "glob": "packages/sql-query/**",
+      "domain": "legacy",
+      "layer": "legacy",
+      "plane": "runtime",
+      "note": "Legacy package (will be removed in Slice 7)"
+    },
+    {
+      "glob": "packages/sql-target/**",
+      "domain": "legacy",
+      "layer": "legacy",
+      "plane": "migration",
+      "note": "Legacy package (will be removed in Slice 7)"
+    },
+    {
+      "glob": "packages/contract/**",
+      "domain": "legacy",
+      "layer": "legacy",
+      "plane": "shared",
+      "note": "Legacy package (migrated to packages/core/contract)"
+    },
+    {
+      "glob": "packages/node-utils/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/test-utils/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/integration-tests/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/e2e-tests/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "shared"
+    }
+  ],
+  "rules": {
+    "sameLayer": "allow",
+    "downward": "allow",
+    "upward": "deny",
+    "crossDomain": "denyExceptFramework",
+    "migrationToRuntime": "deny",
+    "runtimeToMigration": "allowArtifactsOnly"
+  },
+  "layerOrder": {
+    "framework": ["core", "authoring", "tooling", "runtime-core"],
+    "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters"]
+  }
+}

@@ -18,7 +18,7 @@ This package provides SQL-specific contract type definitions, including storage 
 ## Dependencies
 
 - **Depends on**: None (pure type definitions)
-- **Depended on by**: 
+- **Depended on by**:
   - `@prisma-next/sql-contract-ts` (uses for contract authoring)
   - `@prisma-next/sql-contract-emitter` (uses for contract validation)
   - `@prisma-next/sql-relational-core` (uses for schema building)
@@ -32,15 +32,15 @@ flowchart TD
         CT[@prisma-next/sql-contract-types]
         EMITTER[@prisma-next/sql-contract-emitter]
     end
-    
+
     subgraph "Authoring Ring"
         SQL_TS[@prisma-next/sql-contract-ts]
     end
-    
+
     subgraph "Lanes Ring"
         REL_CORE[@prisma-next/sql-relational-core]
     end
-    
+
     CT --> SQL_TS
     CT --> EMITTER
     CT --> REL_CORE

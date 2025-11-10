@@ -1,4 +1,4 @@
-## Slice 3 — Stand Up Relational Core
+## Slice 3 — Stand Up Relational Core (Domain: SQL, Layer: lanes, Plane: runtime)
 
 ### Context
 - After Slice 2, contract authoring lives outside `@prisma-next/sql-query`, but all relational schema/column builders, parameter helpers, and operation-attachment logic still live inside `packages/sql-query/src`.

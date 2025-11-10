@@ -1,4 +1,4 @@
-## Slice 2 — Extract Contract Authoring
+## Slice 2 — Extract Contract Authoring (Domains/Layers/Planes)
 
 ### Context
 - Slice 1 created the directory skeleton + guardrails, but all contract-authoring code still lives inside `@prisma-next/sql-query`.
@@ -6,6 +6,10 @@
   1. A SQL-specific TypeScript authoring surface (builders with SQL storage assumptions, SQL contract types).
   2. A target-agnostic builder core (state machines, canonicalization helpers, schema emission helpers) that should eventually be shared by other families.
 - This slice is about untangling those responsibilities without breaking existing callers (CLI, tests, examples). We will move the SQL surface into the SQL family namespace first, then extract the neutral core into the authoring ring.
+
+Domain/Layer/Plane
+- Framework: authoring (migration plane) — `@prisma-next/contract-authoring`
+- SQL family: authoring (migration plane) — `@prisma-next/sql-contract-ts` (may depend on SQL Targets layer definitions)
 
 ### Goals
 1. **Phase 1 — Relocate the existing SQL authoring surface into the SQL family namespace**
@@ -30,7 +34,7 @@
 ### Non-goals
 - Changing builder semantics, emitted JSON schemas, or CLI wiring. Behavior must remain identical to the current implementation.
 - Moving runtime schema/table builders (those live in the lanes slices).
-- Introducing target-specific logic into the authoring ring—`@prisma-next/contract-authoring` must remain family neutral.
+- Introducing target-specific logic into the authoring layer—`@prisma-next/contract-authoring` must remain family neutral.
 - Removing transitional re-exports; that cleanup happens in Slice 7 once all callers migrate.
 
 ### Deliverables
@@ -101,7 +105,7 @@
 ### Non-goals
 - Changing builder behavior, schema formats, or CLI wiring.
 - Moving runtime schema/table builders (handled in later slices).
-- Introducing target-specific logic into authoring packages—the contract authoring ring must stay neutral and consume only core types plus extension manifests injected via options.
+- Introducing target-specific logic into authoring packages—the contract authoring layer must stay neutral and consume only core types plus extension manifests injected via options.
 - Removing the transitional re-export; that happens in Slice 7 once no callers remain.
 
 ### Deliverables
@@ -125,7 +129,7 @@
    - Decide where JSON schemas/validators live (core vs contract-ts) and update references.
    - Run test suites for both packages and downstream dependents (sql-query, CLI).
 
-3. Update docs/path aliases referencing contract authoring.
+3. Update docs/path aliases referencing contract authoring. Note: family authoring may depend on family targets to shape SQL storage/mappings; this remains within the domain’s downward direction.
 
 ### Testing / Verification
 - `pnpm --filter @prisma-next/contract-authoring test`

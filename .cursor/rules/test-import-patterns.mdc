@@ -148,7 +148,7 @@ When extracting code from one package to another:
 **Example:**
 - Old: `packages/sql-target/src/operations-registry.ts`
 - New: `packages/core/operations/src/index.ts` (core types) + `packages/targets/sql/operations/src/index.ts` (SQL-specific)
-- Action: 
+- Action:
   1. Move implementation to new packages
   2. Move tests to new packages with updated imports (`../src/index`)
   3. Add tests for re-exports in old package

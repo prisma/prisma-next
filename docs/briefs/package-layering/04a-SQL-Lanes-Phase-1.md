@@ -1,4 +1,4 @@
-## SQL Lanes Phase 1 — Shared AST Factories & Internal Refactor
+## SQL Lanes Phase 1 — Shared AST Factories & Internal Refactor (Domain: SQL, Layer: lanes, Plane: runtime)
 
 ### Context
 - Slice 4 requires `@prisma-next/sql-orm-lane` and `@prisma-next/sql-lane` to depend only on `@prisma-next/sql-relational-core`, but ORM still imports `sql()` and `createJoinOnBuilder()` from the SQL lane.

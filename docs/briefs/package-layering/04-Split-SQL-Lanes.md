@@ -1,4 +1,4 @@
-## Slice 4 — Split SQL Lanes
+## Slice 4 — Split SQL Lanes (Domain: SQL, Layer: lanes, Plane: runtime)
 
 ### Context
 - With Slice 3 complete, `@prisma-next/sql-relational-core` now provides shared table/column/param primitives. However, the actual SQL query lanes (relational DSL + raw helpers + ORM builder) are still bundled inside `@prisma-next/sql-query`.

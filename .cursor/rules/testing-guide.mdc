@@ -359,7 +359,7 @@ export default defineConfig({
 });
 ```
 
-**Why?** 
+**Why?**
 - Workspace packages should be imported, not bundled
 - External dependencies (especially CommonJS) should not be bundled into ESM bundles
 - Vite cannot parse mixed ESM/CommonJS bundles
@@ -368,7 +368,7 @@ export default defineConfig({
 
 **Issue:** Coverage reports show 0% for files that are imported from package exports instead of source files.
 
-**Solution:** 
+**Solution:**
 1. **Import from source in tests** - Test files should import from source (`../src/index`) not from package exports
 2. **Add explicit include in vitest config** - Add `include: ['src/**/*.ts']` to coverage configuration
 

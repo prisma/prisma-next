@@ -2,6 +2,12 @@
 
 PostgreSQL adapter for Prisma Next.
 
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: adapters
+- **Plane**: runtime
+
 ## Overview
 
 The PostgreSQL adapter implements the adapter SPI for PostgreSQL databases. It provides SQL lowering, capability discovery, codec definitions, and error mapping for PostgreSQL-specific behavior.

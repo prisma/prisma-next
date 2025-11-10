@@ -2,6 +2,14 @@
 
 Runtime execution engine that verifies contracts, executes queries, and applies guardrails.
 
+## Package Classification
+
+- **Domain**: framework
+- **Layer**: runtime-core (planned; currently legacy package that will be split in Slice 6)
+- **Plane**: runtime
+
+**Note**: This package will be split into `@prisma-next/runtime-core` (framework domain, runtime-core layer, runtime plane) and `@prisma-next/sql-runtime` (SQL domain, runtime layer, runtime plane) in Slice 6.
+
 ## Overview
 
 The runtime is the executable core of Prisma Next. It orchestrates query execution through a deterministic pipeline: contract verification, plugin guardrails, adapter lowering, and codec decoding. Every query is compiled into a Plan, and every Plan passes through verification and a plugin pipeline before execution.

@@ -20,7 +20,7 @@ This package provides target-neutral operation registry types and capability che
 ## Dependencies
 
 - **Depends on**: None (core ring package)
-- **Depended on by**: 
+- **Depended on by**:
   - `@prisma-next/sql-operations` (extends with SQL-specific lowering specs)
   - `@prisma-next/sql-relational-core` (uses for capability checking)
   - `@prisma-next/runtime` (uses for operation registry creation)
@@ -32,19 +32,19 @@ flowchart TD
     subgraph "Core Ring"
         OPS[@prisma-next/operations]
     end
-    
+
     subgraph "Targets Ring"
         SQL_OPS[@prisma-next/sql-operations]
     end
-    
+
     subgraph "Lanes Ring"
         REL_CORE[@prisma-next/sql-relational-core]
     end
-    
+
     subgraph "Runtime Ring"
         RT[@prisma-next/runtime]
     end
-    
+
     OPS --> SQL_OPS
     OPS --> REL_CORE
     OPS --> RT

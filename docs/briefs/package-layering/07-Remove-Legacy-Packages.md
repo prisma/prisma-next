@@ -1,9 +1,9 @@
-## Slice 7 — Remove Legacy Packages & Clean Up
+## Slice 7 — Remove Legacy Packages & Clean Up (Align to Domains/Layers/Planes)
 
 ### Context
 - By the end of Slice 6, every functional area has its own package, but we still have transitional shims (`@prisma-next/sql-query`, `@prisma-next/runtime`, legacy path aliases) kept around to avoid massive code churn mid-migration.
 - There are no external consumers, so we can safely delete those shims once all internal imports point to the new packages.
-- This slice also finalizes documentation: the README must explain the Clean Architecture rings (with a Mermaid diagram) so contributors immediately understand the structure.
+- This slice also finalizes documentation: the README must explain the Clean Architecture layers organized by domains and planes (with a Mermaid diagram) so contributors immediately understand the structure.
 - Think of this slice as the “stabilization” pass: remove dead code, update docs, and ensure lint/dependency guardrails see a clean graph.
 
 ### Goals
@@ -18,10 +18,10 @@
 
 3. **Update documentation**
    - Architecture Overview, ADR 140, Slice 12 brief, and any reference docs must mention only the new package names.
-   - Add a “Clean Architecture Rings” section to the root `README.md`:
+   - Add a "Clean Architecture Layers" section to the root `README.md`:
      - Brief explanation referencing Clean Architecture.
-     - Bulleted ring order (core → authoring → targets → lanes → runtime core → family runtime → adapters → compat).
-     - Mermaid diagram showing the rings and allowed dependency directions.
+     - Bulleted layer order (core → authoring → targets → lanes → runtime core → family runtime → adapters → compat).
+     - Mermaid diagram showing the layers organized by domains and planes, and allowed dependency directions.
      - Links to ADR 140 and the Package Layering doc.
 
 4. **Ensure tests/linting all pass in the final layout**
@@ -35,7 +35,7 @@
 ### Deliverables
 - Legacy packages removed (git history preserved via directory deletions).
 - Clean configuration files reflecting the new package names only.
-- README updated with the rings section + Mermaid diagram.
+- README updated with the layers section + Mermaid diagram.
 - Docs (Architecture Overview, ADR 140, Slice 12, reference guides) updated to mention the final structure.
 - Guardrail script (`pnpm lint:deps`) reports zero violations.
 
@@ -53,7 +53,7 @@
    - Ensure new packages remain in the workspace lists.
 
 4. **Documentation pass**
-   - Update README with the rings section + diagram.
+   - Update README with the layers section + diagram.
    - Update docs/briefs, ADR references, and any onboarding material to reflect the final package names.
 
 5. **Run verification commands**

@@ -1,9 +1,9 @@
-## Slice 6 — Runtime Core & SQL Runtime Split
+## Slice 6 — Runtime Core & SQL Runtime Split (Domains: framework+sql; Layers: framework runtime-core + sql runtime; Plane: runtime)
 
 ### Context
-- Runtime currently lives entirely inside `@prisma-next/runtime` and imports SQL-specific types (`SqlContract`, `SqlStorage`, SQL driver, adapter capability manifests). This violates the ring rule and prevents us from supporting additional target families.
+- Runtime currently lives entirely inside `@prisma-next/runtime` and imports SQL-specific types (`SqlContract`, `SqlStorage`, SQL driver, adapter capability manifests). This violates the layer rule and prevents us from supporting additional target families.
 - ADR 140 requires a two-layer runtime:
-  - `@prisma-next/runtime-core` (core ring): target-neutral kernel responsible for plan validation, marker verification, plugin lifecycle, telemetry, and the runtime SPI definition.
+  - `@prisma-next/runtime-core` (core layer): target-neutral kernel responsible for plan validation, marker verification, plugin lifecycle, telemetry, and the runtime SPI definition.
   - `@prisma-next/sql-runtime` (family runtime): SQL-specific implementation that composes runtime-core with SQL adapters/drivers/codecs.
 - This slice also needs a small mock-family smoke test to prove runtime-core can host a non-SQL runtime, even if no other family exists yet.
 
@@ -44,7 +44,7 @@
 
 ### Step Outline
 1. Scaffold `packages/runtime/core` (package.json/tsconfig/vitest) if not already present from Slice 1. Do the same for `packages/sql/sql-runtime`.
-2. Move target-neutral files into runtime-core (`runtime.ts` core pieces, `marker.ts`, plugin orchestration, telemetry helpers, context interfaces).
+2. Move target-neutral files into runtime-core (`runtime.ts` core pieces, `marker.ts`, plugin orchestration, telemetry helpers, context interfaces). Create `src/exports` mirroring the existing `@prisma-next/runtime` entry points that belong in the core.
 3. Define the runtime SPI: e.g., interfaces for adapters, driver hooks, codec registries. Ensure runtime-core exposes types used by family runtimes.
 4. Implement the SQL runtime by importing runtime-core and wiring in SQL adapters/drivers/codec registries. Ensure `createRuntimeContext` is split (core vs SQL) and exported from the SQL runtime package.
 5. Update all imports (CLI, examples, tests) to use `@prisma-next/sql-runtime`.

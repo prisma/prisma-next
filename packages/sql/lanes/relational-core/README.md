@@ -2,11 +2,17 @@
 
 Schema and column builders, operation attachment, and AST types for Prisma Next.
 
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: lanes
+- **Plane**: runtime
+
 ## Overview
 
 The relational core package provides the foundational primitives for building relational SQL queries. It includes table/column builders, parameter helpers, operation attachment logic, and type definitions that are shared across SQL query lanes (DSL, ORM, Raw).
 
-This package is part of the SQL lanes ring and provides the relational primitives that both the SQL DSL and ORM builder depend on.
+This package is part of the SQL lanes layer and provides the relational primitives that both the SQL DSL and ORM builder depend on.
 
 ## Purpose
 

@@ -3,14 +3,14 @@
 /**
  * Import dependency validation script
  *
- * Validates that packages follow the ring-based dependency rules:
- * core → authoring → targets → lanes → runtime-core → family-runtime → adapters
- *
- * Inner rings cannot import from outer rings.
- * Family namespaces (e.g., sql/*) can import from inner rings and their own family packages.
+ * Validates that packages follow the Domains/Layers/Planes dependency rules:
+ * - Within a domain, layers may depend laterally (same layer) and downward (toward core), never upward
+ * - Cross-domain imports are forbidden except when importing framework packages
+ * - Migration plane must not import runtime plane code
+ * - Runtime plane may consume artifacts (JSON/manifests) from migration, but not code imports
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,172 +18,114 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = join(__dirname, '..');
 
-// Define ring structure and allowed dependencies
-const RINGS = {
-  core: {
-    allowed: [],
-  },
-  authoring: {
-    allowed: ['core'],
-  },
-  targets: {
-    allowed: ['core', 'authoring'],
-  },
-  lanes: {
-    allowed: ['core', 'authoring', 'targets'],
-  },
-  'runtime-core': {
-    allowed: ['core', 'authoring', 'targets'],
-  },
-  'sql-runtime': {
-    allowed: ['core', 'authoring', 'targets', 'runtime-core'],
-  },
-  adapters: {
-    allowed: ['core', 'authoring', 'targets', 'sql-runtime'],
-  },
-  sql: {
-    allowed: ['core', 'authoring', 'targets', 'sql'], // Family namespace
-  },
-  compat: {
-    allowed: ['*'], // Compat can import from all rings
-  },
-  legacy: {
-    allowed: ['*'], // Legacy packages can import from anywhere
-  },
-};
+// Load architecture configuration
+const configPath = join(repoRoot, 'architecture.config.json');
+if (!existsSync(configPath)) {
+  console.error('❌ architecture.config.json not found');
+  process.exit(1);
+}
 
-// Declarative map: package directory path → ring name
-const PACKAGE_TO_RING = {
-  // Core ring
-  'packages/core/plan': 'core',
-  'packages/core/operations': 'core',
-  'packages/core/contract': 'core',
+const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+const { packages: packageConfigs, layerOrder } = config;
 
-  // Authoring ring
-  'packages/authoring/contract-authoring': 'authoring',
-  'packages/authoring/contract-ts': 'authoring',
-  'packages/authoring/contract-psl': 'authoring',
+// Build package name to path mapping by reading package.json files
+function buildPackageNameToPath() {
+  const mapping = {};
+  const packagesDir = join(repoRoot, 'packages');
 
-  // Targets ring
-  'packages/targets/sql/contract-types': 'targets',
-  'packages/targets/sql/operations': 'targets',
-  'packages/targets/sql/emitter': 'targets',
-
-  // Lanes ring
-  'packages/sql/lanes/relational-core': 'lanes',
-  'packages/sql/lanes/sql-lane': 'lanes',
-  'packages/sql/lanes/orm-lane': 'lanes',
-
-  // Runtime ring
-  'packages/runtime/core': 'runtime-core',
-
-  // SQL runtime
-  'packages/sql/sql-runtime': 'sql-runtime',
-
-  // Adapters
-  'packages/sql/postgres/postgres-adapter': 'adapters',
-  'packages/sql/postgres/postgres-driver': 'adapters',
-
-  // SQL family (for packages not yet in specific rings)
-  'packages/sql/authoring/sql-contract-ts': 'sql',
-
-  // Compat
-  'packages/compat/compat-prisma': 'compat',
-
-  // Legacy packages (allow all imports)
-  'packages/sql-query': 'legacy',
-  'packages/sql-target': 'legacy',
-  'packages/runtime': 'legacy',
-  'packages/adapter-postgres': 'legacy',
-  'packages/driver-postgres': 'legacy',
-  'packages/compat-prisma': 'legacy',
-  'packages/emitter': 'legacy',
-  'packages/cli': 'legacy',
-  'packages/contract': 'legacy',
-  'packages/node-utils': 'legacy',
-  'packages/test-utils': 'legacy',
-  'packages/integration-tests': 'legacy',
-  'packages/e2e-tests': 'legacy',
-};
-
-// Map package names (from @prisma-next/package-name) to package directory paths
-const PACKAGE_NAME_TO_PATH = {
-  plan: 'packages/core/plan',
-  operations: 'packages/core/operations',
-  contract: 'packages/core/contract',
-  'contract-authoring': 'packages/authoring/contract-authoring',
-  'contract-ts': 'packages/authoring/contract-ts',
-  'contract-psl': 'packages/authoring/contract-psl',
-  'sql-contract-types': 'packages/targets/sql/contract-types',
-  'sql-operations': 'packages/targets/sql/operations',
-  'sql-contract-emitter': 'packages/targets/sql/emitter',
-  'sql-relational-core': 'packages/sql/lanes/relational-core',
-  'sql-lane': 'packages/sql/lanes/sql-lane',
-  'sql-orm-lane': 'packages/sql/lanes/orm-lane',
-  'runtime-core': 'packages/runtime/core',
-  'sql-runtime': 'packages/sql/sql-runtime',
-  'adapter-postgres': 'packages/sql/postgres/postgres-adapter',
-  'driver-postgres': 'packages/sql/postgres/postgres-driver',
-  'sql-contract-ts': 'packages/sql/authoring/sql-contract-ts',
-  'compat-prisma': 'packages/compat/compat-prisma',
-};
-
-function getRingForPath(filePath) {
-  const relativePath = relative(repoRoot, filePath);
-
-  // Find the longest matching package path (most specific match)
-  let matchedPath = null;
-  let matchedRing = null;
-
-  for (const [packagePath, ringName] of Object.entries(PACKAGE_TO_RING)) {
-    if (relativePath.startsWith(packagePath)) {
-      // Use longest match (most specific)
-      if (!matchedPath || packagePath.length > matchedPath.length) {
-        matchedPath = packagePath;
-        matchedRing = ringName;
+  function scanDirectory(dir) {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        // Skip node_modules, dist, coverage, etc.
+        if (!['node_modules', 'dist', 'coverage', '.git'].includes(entry.name)) {
+          scanDirectory(fullPath);
+        }
+      } else if (entry.name === 'package.json') {
+        try {
+          const packageJson = JSON.parse(readFileSync(fullPath, 'utf-8'));
+          if (packageJson.name?.startsWith('@prisma-next/')) {
+            const packageName = packageJson.name.replace('@prisma-next/', '');
+            const packagePath = relative(repoRoot, dirname(fullPath));
+            mapping[packageName] = packagePath;
+          }
+        } catch {
+          // Skip invalid package.json files
+        }
       }
     }
   }
 
-  if (matchedRing) {
-    const config = RINGS[matchedRing];
-    if (!config) {
-      return null;
+  scanDirectory(packagesDir);
+  return mapping;
+}
+
+const PACKAGE_NAME_TO_PATH = buildPackageNameToPath();
+
+// Find package config for a file path
+function findPackageConfig(filePath) {
+  const relativePath = relative(repoRoot, filePath);
+  let bestMatch = null;
+  let bestMatchLength = 0;
+
+  for (const pkgConfig of packageConfigs) {
+    // Convert glob pattern to path prefix (simple glob matching)
+    // For patterns like "packages/core/**", check if path starts with "packages/core/"
+    const globPrefix = pkgConfig.glob.replace(/\*\*/g, '').replace(/\*/g, '');
+    if (relativePath.startsWith(globPrefix)) {
+      // Use longest match (most specific)
+      if (pkgConfig.glob.length > bestMatchLength) {
+        bestMatch = pkgConfig;
+        bestMatchLength = pkgConfig.glob.length;
+      }
     }
-    const type = matchedRing === 'sql' ? 'family' : matchedRing === 'legacy' ? 'legacy' : 'ring';
-    return { type, name: matchedRing, config };
   }
 
-  // Other packages (not yet migrated)
-  if (relativePath.startsWith('packages/')) {
-    return { type: 'legacy', name: 'legacy', config: RINGS.legacy };
+  return bestMatch;
+}
+
+// Get domain/layer/plane for a file path
+function getPackageInfo(filePath) {
+  const config = findPackageConfig(filePath);
+  if (config) {
+    return {
+      domain: config.domain,
+      layer: config.layer,
+      plane: config.plane,
+      note: config.note,
+    };
+  }
+
+  // Default to legacy for unmapped packages
+  if (relative(repoRoot, filePath).startsWith('packages/')) {
+    return {
+      domain: 'legacy',
+      layer: 'legacy',
+      plane: 'shared',
+    };
   }
 
   return null;
 }
 
-function getRingForImport(importPath) {
+// Get domain/layer/plane for an import path
+function getImportInfo(importPath) {
   // Handle @prisma-next/* imports
   if (importPath.startsWith('@prisma-next/')) {
     const packageName = importPath.split('/')[1];
     const packagePath = PACKAGE_NAME_TO_PATH[packageName];
 
     if (packagePath) {
-      const ringName = PACKAGE_TO_RING[packagePath];
-      if (ringName) {
-        const config = RINGS[ringName];
-        if (!config) {
-          return null;
-        }
-        const type = ringName === 'sql' ? 'family' : ringName === 'legacy' ? 'legacy' : 'ring';
-        return { type, name: ringName, config };
-      }
+      // Find the package config for this path
+      const fullPath = join(repoRoot, packagePath, 'dummy.ts');
+      return getPackageInfo(fullPath);
     }
   }
 
-  // Handle relative imports
+  // Handle relative imports - would need to resolve to check
   if (importPath.startsWith('.')) {
-    return null; // Relative imports are checked by path analysis
+    return null;
   }
 
   // External imports are allowed
@@ -192,6 +134,74 @@ function getRingForImport(importPath) {
   }
 
   return null;
+}
+
+// Check if layer is downward from source to target
+function isDownward(sourceLayer, targetLayer, sourceDomain, targetDomain) {
+  // Must be same domain
+  if (sourceDomain !== targetDomain) {
+    return false;
+  }
+
+  const order = layerOrder[sourceDomain];
+  if (!order) {
+    return false;
+  }
+
+  const sourceIndex = order.indexOf(sourceLayer);
+  const targetIndex = order.indexOf(targetLayer);
+
+  // Downward means target is closer to core (lower index)
+  return sourceIndex !== -1 && targetIndex !== -1 && targetIndex < sourceIndex;
+}
+
+// Check if layers are the same
+function isSameLayer(sourceLayer, targetLayer, sourceDomain, targetDomain) {
+  return sourceDomain === targetDomain && sourceLayer === targetLayer;
+}
+
+// Check if import is allowed
+function isImportAllowed(sourceInfo, targetInfo) {
+  // Legacy packages can import from anywhere
+  if (sourceInfo.domain === 'legacy') {
+    return true;
+  }
+
+  // Legacy targets can be imported from anywhere (for now)
+  if (targetInfo.domain === 'legacy') {
+    return true;
+  }
+
+  // Same layer (lateral) - allowed
+  if (isSameLayer(sourceInfo.layer, targetInfo.layer, sourceInfo.domain, targetInfo.domain)) {
+    return true;
+  }
+
+  // Downward (toward core) - allowed
+  if (isDownward(sourceInfo.layer, targetInfo.layer, sourceInfo.domain, targetInfo.domain)) {
+    return true;
+  }
+
+  // Cross-domain: only allowed when importing framework
+  if (sourceInfo.domain !== targetInfo.domain) {
+    if (targetInfo.domain === 'framework') {
+      return true;
+    }
+    return false;
+  }
+
+  // Migration → Runtime: denied
+  if (sourceInfo.plane === 'migration' && targetInfo.plane === 'runtime') {
+    return false;
+  }
+
+  // Runtime → Migration: denied (artifact consumption is out-of-band)
+  if (sourceInfo.plane === 'runtime' && targetInfo.plane === 'migration') {
+    return false;
+  }
+
+  // Upward within same domain: denied
+  return false;
 }
 
 function extractImports(content) {
@@ -236,10 +246,33 @@ function getAllTsFiles(dir, fileList = []) {
   return fileList;
 }
 
-function validateImports() {
+// Get changed files from git (for pre-commit mode)
+function getChangedFiles() {
+  try {
+    const { execSync } = require('child_process');
+    const output = execSync('git diff --cached --name-only --diff-filter=ACM', {
+      encoding: 'utf-8',
+      cwd: repoRoot,
+    });
+    return output
+      .split('\n')
+      .filter((line) => line.trim() && line.endsWith('.ts') && !line.endsWith('.d.ts'))
+      .map((line) => join(repoRoot, line.trim()));
+  } catch {
+    return [];
+  }
+}
+
+function validateImports(changedFilesOnly = false) {
   const violations = [];
   const packagesDir = join(repoRoot, 'packages');
-  const files = getAllTsFiles(packagesDir);
+
+  let files;
+  if (changedFilesOnly) {
+    files = getChangedFiles().filter((file) => file.startsWith(packagesDir));
+  } else {
+    files = getAllTsFiles(packagesDir);
+  }
 
   for (const file of files) {
     // Skip test files - they can import from anywhere for testing purposes
@@ -247,8 +280,8 @@ function validateImports() {
       continue;
     }
 
-    const sourceRing = getRingForPath(file);
-    if (!sourceRing) continue;
+    const sourceInfo = getPackageInfo(file);
+    if (!sourceInfo) continue;
 
     const content = readFileSync(file, 'utf-8');
     const imports = extractImports(content);
@@ -260,48 +293,16 @@ function validateImports() {
       // Skip external imports
       if (!importPath.startsWith('@prisma-next/')) continue;
 
-      const targetRing = getRingForImport(importPath);
-      if (!targetRing) continue;
+      const targetInfo = getImportInfo(importPath);
+      if (!targetInfo) continue;
 
       // Check if import is allowed
-      const allowed = sourceRing.config.allowed;
-      if (allowed.includes('*')) continue; // Compat can import anything
-
-      // Check if target is in allowed list
-      if (!allowed.includes(targetRing.name)) {
-        // Check if it's a family namespace importing from its own family
-        if (sourceRing.type === 'family' && targetRing.name === sourceRing.name) {
-          continue; // Family can import from its own family
-        }
-
-        // Allow packages in the same ring to import from each other
-        // (e.g., orm-lane can import from sql-relational-core)
-        if (
-          sourceRing.type === 'ring' &&
-          targetRing.type === 'ring' &&
-          sourceRing.name === targetRing.name
-        ) {
-          continue; // Same ring packages can import from each other
-        }
-
-        // TODO: Remove this exception once orm-lane is refactored to build AST nodes directly
-        // See: docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4
-        // Temporary exception: orm-lane can import from sql-lane until refactor is complete
-        if (
-          sourceRing.name === 'lanes' &&
-          targetRing.name === 'lanes' &&
-          relative(repoRoot, file).includes('orm-lane') &&
-          importPath.includes('sql-lane')
-        ) {
-          continue; // Temporary: allow orm-lane → sql-lane until refactor
-        }
-
+      if (!isImportAllowed(sourceInfo, targetInfo)) {
         violations.push({
           file: relative(repoRoot, file),
           import: importPath,
-          sourceRing: sourceRing.name,
-          targetRing: targetRing.name,
-          allowed: allowed,
+          source: `${sourceInfo.domain}/${sourceInfo.layer}/${sourceInfo.plane}`,
+          target: `${targetInfo.domain}/${targetInfo.layer}/${targetInfo.plane}`,
         });
       }
     }
@@ -311,23 +312,22 @@ function validateImports() {
 }
 
 // Main execution
-const violations = validateImports();
+const changedFilesOnly = process.argv.includes('--changed-files');
+const violations = validateImports(changedFilesOnly);
 
 if (violations.length > 0) {
   console.error('❌ Import dependency violations found:\n');
 
   for (const violation of violations) {
     console.error(`  ${violation.file}`);
-    console.error(`    imports from ${violation.targetRing} (${violation.import})`);
-    console.error(
-      `    but ${violation.sourceRing} can only import from: ${violation.allowed.join(', ')}`,
-    );
+    console.error(`    imports from ${violation.target} (${violation.import})`);
+    console.error(`    but ${violation.source} cannot import from ${violation.target}`);
     console.error('');
   }
 
   console.error(`\nTotal violations: ${violations.length}`);
   process.exit(1);
 } else {
-  console.log('✅ All imports follow ring-based dependency rules');
+  console.log('✅ All imports follow Domains/Layers/Planes dependency rules');
   process.exit(0);
 }

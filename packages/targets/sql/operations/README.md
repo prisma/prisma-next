@@ -19,10 +19,10 @@ This package provides SQL-specific operation logic, including operation assembly
 
 ## Dependencies
 
-- **Depends on**: 
+- **Depends on**:
   - `@prisma-next/operations` (core operation registry types)
   - `@prisma-next/emitter` (extension pack types)
-- **Depended on by**: 
+- **Depended on by**:
   - `@prisma-next/sql-relational-core` (uses for operation execution)
   - `@prisma-next/sql-target` (re-exports for backward compatibility)
 
@@ -33,16 +33,16 @@ flowchart TD
     subgraph "Core Ring"
         OPS[@prisma-next/operations]
     end
-    
+
     subgraph "Targets Ring"
         SQL_OPS[@prisma-next/sql-operations]
         EMITTER[@prisma-next/emitter]
     end
-    
+
     subgraph "Lanes Ring"
         REL_CORE[@prisma-next/sql-relational-core]
     end
-    
+
     OPS --> SQL_OPS
     EMITTER --> SQL_OPS
     SQL_OPS --> REL_CORE
