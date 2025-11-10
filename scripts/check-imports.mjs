@@ -161,7 +161,7 @@ function isSameLayer(sourceLayer, targetLayer, sourceDomain, targetDomain) {
 }
 
 // Check if import is allowed
-function isImportAllowed(sourceInfo, targetInfo) {
+function isImportAllowed(sourceInfo, targetInfo, sourceFilePath) {
   // Legacy packages can import from anywhere
   if (sourceInfo.domain === 'legacy') {
     return true;
@@ -187,19 +187,41 @@ function isImportAllowed(sourceInfo, targetInfo) {
     if (targetInfo.domain === 'framework') {
       return true;
     }
-    // Framework tooling can import from SQL targets (for hooks)
-    if (sourceInfo.domain === 'framework' && sourceInfo.layer === 'tooling' && targetInfo.domain === 'sql' && targetInfo.layer === 'targets') {
+    // CLI package can import from SQL targets (for hooks) - temporary exception
+    // TODO: Refactor CLI to be target-family-agnostic (use plugin system or dynamic loading)
+    // See: docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4
+    if (
+      sourceInfo.domain === 'framework' &&
+      sourceInfo.layer === 'tooling' &&
+      targetInfo.domain === 'sql' &&
+      targetInfo.layer === 'targets' &&
+      sourceFilePath &&
+      relative(repoRoot, sourceFilePath).startsWith('packages/cli/')
+    ) {
       return true;
     }
-    // Framework tooling can import from SQL authoring (for contract validation)
-    if (sourceInfo.domain === 'framework' && sourceInfo.layer === 'tooling' && targetInfo.domain === 'sql' && targetInfo.layer === 'authoring') {
+    // CLI package can import from SQL authoring (for contract validation) - temporary exception
+    // TODO: Refactor CLI to be target-family-agnostic (use plugin system or dynamic loading)
+    if (
+      sourceInfo.domain === 'framework' &&
+      sourceInfo.layer === 'tooling' &&
+      targetInfo.domain === 'sql' &&
+      targetInfo.layer === 'authoring' &&
+      sourceFilePath &&
+      relative(repoRoot, sourceFilePath).startsWith('packages/cli/')
+    ) {
       return true;
     }
     return false;
   }
 
   // Within same domain: SQL authoring can import from SQL targets
-  if (sourceInfo.domain === 'sql' && sourceInfo.layer === 'authoring' && targetInfo.domain === 'sql' && targetInfo.layer === 'targets') {
+  if (
+    sourceInfo.domain === 'sql' &&
+    sourceInfo.layer === 'authoring' &&
+    targetInfo.domain === 'sql' &&
+    targetInfo.layer === 'targets'
+  ) {
     return true;
   }
 
@@ -293,7 +315,11 @@ function validateImports(changedFilesOnly = false) {
     }
 
     // Skip config files - they can import from anywhere
-    if (file.endsWith('.config.ts') || file.endsWith('vitest.config.ts') || file.endsWith('tsup.config.ts')) {
+    if (
+      file.endsWith('.config.ts') ||
+      file.endsWith('vitest.config.ts') ||
+      file.endsWith('tsup.config.ts')
+    ) {
       continue;
     }
 
@@ -314,7 +340,7 @@ function validateImports(changedFilesOnly = false) {
       if (!targetInfo) continue;
 
       // Check if import is allowed
-      if (!isImportAllowed(sourceInfo, targetInfo)) {
+      if (!isImportAllowed(sourceInfo, targetInfo, file)) {
         violations.push({
           file: relative(repoRoot, file),
           import: importPath,
