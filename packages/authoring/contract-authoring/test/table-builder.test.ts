@@ -30,4 +30,24 @@ describe('TableBuilder', () => {
       builder.column('id', { type: 'invalid' });
     }).toThrow('type must be in format "namespace/name@version"');
   });
+
+  it('supports unique method', () => {
+    const builder = new TableBuilder('user');
+    const result = builder.column('email', { type: 'test/text@1' }).unique(['email']);
+    expect(result).toBeInstanceOf(TableBuilder);
+  });
+
+  it('supports index method', () => {
+    const builder = new TableBuilder('user');
+    const result = builder.column('email', { type: 'test/text@1' }).index(['email']);
+    expect(result).toBeInstanceOf(TableBuilder);
+  });
+
+  it('supports foreignKey method', () => {
+    const builder = new TableBuilder('post');
+    const result = builder
+      .column('userId', { type: 'test/int@1' })
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] });
+    expect(result).toBeInstanceOf(TableBuilder);
+  });
 });

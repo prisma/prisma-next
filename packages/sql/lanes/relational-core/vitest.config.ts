@@ -16,6 +16,9 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        '**/errors.ts', // Re-export file
+        '**/index.ts', // Re-export file
+        '**/types.ts', // Types-only file
       ],
       thresholds: {
         lines: 90,
