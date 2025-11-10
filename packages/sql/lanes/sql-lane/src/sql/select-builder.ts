@@ -67,7 +67,7 @@ export class SelectBuilderImpl<
     LoweredStatement
   >;
   private readonly codecTypes: CodecTypes;
-  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  private readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
   private state: BuilderState = {};
 
   constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {

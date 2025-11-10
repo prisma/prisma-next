@@ -1,16 +1,90 @@
 # @prisma-next/sql-runtime
 
-**Status:** Scaffolded placeholder package
+SQL runtime implementation for Prisma Next.
 
-This package will contain the SQL runtime implementation for Prisma Next.
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: runtime
+- **Plane**: runtime
 
 ## Overview
 
-This package is part of the SQL family runtime and will provide:
-- SQL-specific runtime implementation of the runtime SPI
-- Integration with SQL adapters and drivers
+The SQL runtime package implements the SQL family runtime by composing `@prisma-next/runtime-core` with SQL-specific adapters, drivers, and codecs. It provides the public runtime API for SQL-based databases.
 
-## Package Status
+## Purpose
 
-This package is currently a placeholder created during the package layering scaffolding phase. Implementation will be added in a future slice.
+Execute SQL query Plans with deterministic verification, guardrails, and feedback. Provide a unified execution surface that works across all SQL query lanes (DSL, ORM, Raw SQL).
 
+## Responsibilities
+
+- **SQL Context Creation**: Create runtime contexts with SQL contracts, adapters, and codecs
+- **SQL Marker Management**: Provide SQL statements for reading/writing contract markers
+- **Codec Encoding/Decoding**: Encode parameters and decode rows using SQL codec registries
+- **Codec Validation**: Validate that codec registries contain all required codecs
+- **SQL Family Adapter**: Implement `RuntimeFamilyAdapter` for SQL contracts
+- **SQL Runtime**: Compose runtime-core with SQL-specific logic
+
+## Dependencies
+
+- `@prisma-next/runtime-core` - Target-neutral runtime kernel
+- `@prisma-next/sql-contract-types` - SQL contract types
+- `@prisma-next/sql-target` - SQL target family interfaces (adapters, drivers, codecs)
+- `@prisma-next/operations` - Operation registry
+
+## Usage
+
+```typescript
+import { createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import { createPostgresDriver } from '@prisma-next/driver-postgres';
+
+const contract = validateContract<Contract>(contractJson);
+const adapter = createPostgresAdapter();
+
+const context = createRuntimeContext({
+  contract,
+  adapter,
+  extensions: [pgVector()],
+});
+
+const runtime = createRuntime({
+  adapter,
+  driver: createPostgresDriver({ connectionString: process.env.DATABASE_URL }),
+  verify: { mode: 'onFirstUse', requireMarker: false },
+  context,
+  plugins: [budgets(), lints()],
+});
+
+for await (const row of runtime.execute(plan)) {
+  console.log(row);
+}
+```
+
+## Exports
+
+- `createRuntime` - Create a SQL runtime instance
+- `createRuntimeContext` - Create a SQL runtime context
+- `RuntimeContext`, `Extension` - Context types
+- `budgets`, `lints` - SQL-compatible plugins (re-exported from runtime-core)
+- `readContractMarker`, `writeContractMarker` - SQL marker statements
+- `encodeParams`, `decodeRow` - Codec encoding/decoding utilities
+- `validateCodecRegistryCompleteness` - Codec validation
+
+## Architecture
+
+The SQL runtime composes runtime-core with SQL-specific implementations:
+
+1. **SqlFamilyAdapter**: Implements `RuntimeFamilyAdapter` for SQL contracts
+2. **SqlRuntime**: Wraps `RuntimeCore` and adds SQL-specific encoding/decoding
+3. **SqlContext**: Creates contexts with SQL contracts, adapters, and codecs
+4. **SqlMarker**: Provides SQL statements for marker management
+
+## Testing
+
+Unit tests verify:
+- Context creation with extensions
+- Codec encoding/decoding
+- Codec validation
+- Marker statement generation
+- Runtime execution with SQL adapters

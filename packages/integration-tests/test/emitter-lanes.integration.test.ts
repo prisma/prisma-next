@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { ResultType } from '@prisma-next/contract/types';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';

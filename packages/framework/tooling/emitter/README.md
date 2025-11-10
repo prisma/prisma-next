@@ -106,18 +106,26 @@ flowchart TD
 - **`@prisma-next/node-utils`**: File I/O utilities for loading extension packs
 - **`arktype`**: Runtime type validation for manifests
 
+## Package Location
+
+This package is part of the **framework domain**, **tooling layer**, **migration plane**:
+- **Domain**: framework (target-agnostic)
+- **Layer**: tooling
+- **Plane**: migration
+- **Path**: `packages/framework/tooling/emitter`
+
 ## Related Subsystems
 
-- **[Contract Emitter & Types](../../docs/architecture%20docs/subsystems/2.%20Contract%20Emitter%20&%20Types.md)**: Detailed subsystem specification
-- **[Data Contract](../../docs/architecture%20docs/subsystems/1.%20Data%20Contract.md)**: Contract structure and hashing
+- **[Contract Emitter & Types](../../../../docs/architecture%20docs/subsystems/2.%20Contract%20Emitter%20&%20Types.md)**: Detailed subsystem specification
+- **[Data Contract](../../../../docs/architecture%20docs/subsystems/1.%20Data%20Contract.md)**: Contract structure and hashing
 
 ## Related ADRs
 
-- [ADR 004 - Core Hash vs Profile Hash](../../docs/architecture%20docs/adrs/ADR%20004%20-%20Core%20Hash%20vs%20Profile%20Hash.md)
-- [ADR 006 - Dual Authoring Modes](../../docs/architecture%20docs/adrs/ADR%20006%20-%20Dual%20Authoring%20Modes.md)
-- [ADR 007 - Types Only Emission](../../docs/architecture%20docs/adrs/ADR%20007%20-%20Types%20Only%20Emission.md)
-- [ADR 010 - Canonicalization Rules](../../docs/architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)
-- [ADR 097 - Tooling runs on canonical JSON only](../../docs/architecture%20docs/adrs/ADR%20097%20-%20Tooling%20runs%20on%20canonical%20JSON%20only.md)
+- [ADR 004 - Core Hash vs Profile Hash](../../../../docs/architecture%20docs/adrs/ADR%20004%20-%20Core%20Hash%20vs%20Profile%20Hash.md)
+- [ADR 006 - Dual Authoring Modes](../../../../docs/architecture%20docs/adrs/ADR%20006%20-%20Dual%20Authoring%20Modes.md)
+- [ADR 007 - Types Only Emission](../../../../docs/architecture%20docs/adrs/ADR%20007%20-%20Types%20Only%20Emission.md)
+- [ADR 010 - Canonicalization Rules](../../../../docs/architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)
+- [ADR 097 - Tooling runs on canonical JSON only](../../../../docs/architecture%20docs/adrs/ADR%20097%20-%20Tooling%20runs%20on%20canonical%20JSON%20only.md)
 
 ## Usage
 

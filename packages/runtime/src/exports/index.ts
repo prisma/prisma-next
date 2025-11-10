@@ -1,27 +1,30 @@
+// TODO: Remove this transitional facade in Slice 7
+// This package is being split into @prisma-next/sql-runtime-core and @prisma-next/sql-runtime
+// All consumers should migrate to @prisma-next/sql-runtime
 export {
   extractTypeIds,
   validateCodecRegistryCompleteness,
   validateContractCodecMappings,
-} from '../codecs/validation';
-export type { Extension, RuntimeContext } from '../context';
-export { createRuntimeContext } from '../context';
-export type { SqlStatement } from '../marker';
+} from '@prisma-next/sql-runtime';
+export type { Extension, RuntimeContext } from '@prisma-next/sql-runtime';
+export { createRuntimeContext } from '@prisma-next/sql-runtime';
+export type { SqlStatement } from '@prisma-next/sql-runtime';
 export {
   ensureSchemaStatement,
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
-} from '../marker';
-export type { BudgetsOptions } from '../plugins/budgets';
-export { budgets } from '../plugins/budgets';
-export type { LintsOptions } from '../plugins/lints';
-export { lints } from '../plugins/lints';
-export type { AfterExecuteResult, Log, Plugin, PluginContext } from '../plugins/types';
+} from '@prisma-next/sql-runtime';
+export type { BudgetsOptions } from '@prisma-next/sql-runtime';
+export { budgets } from '@prisma-next/sql-runtime';
+export type { LintsOptions } from '@prisma-next/sql-runtime';
+export { lints } from '@prisma-next/sql-runtime';
+export type { AfterExecuteResult, Log, Plugin, PluginContext } from '@prisma-next/sql-runtime';
 export type {
   Runtime,
   RuntimeOptions,
   RuntimeTelemetryEvent,
   RuntimeVerifyOptions,
   TelemetryOutcome,
-} from '../runtime';
-export { createRuntime } from '../runtime';
+} from '@prisma-next/sql-runtime';
+export { createRuntime } from '@prisma-next/sql-runtime';

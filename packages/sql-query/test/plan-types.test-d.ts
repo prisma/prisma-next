@@ -1,5 +1,5 @@
 import type { Plan, ResultType } from '@prisma-next/contract/types';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract } from '@prisma-next/sql-contract-types';
 import { schema } from '@prisma-next/sql-query/schema';

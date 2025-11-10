@@ -2,12 +2,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { ResultType } from '@prisma-next/contract/types';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import {
   createTestRuntimeFromClient,
   executePlanAndCollect,
   setupE2EDatabase,
-} from '@prisma-next/runtime/test/utils';
+} from '@prisma-next/sql-runtime/test/utils';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';

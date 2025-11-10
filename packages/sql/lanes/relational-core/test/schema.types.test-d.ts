@@ -1,4 +1,4 @@
-import { createStubAdapter, createTestContext } from '@prisma-next/runtime/test/utils';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { expectTypeOf, test } from 'vitest';
 import { schema } from '../src/schema';

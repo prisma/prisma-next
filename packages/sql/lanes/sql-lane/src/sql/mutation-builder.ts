@@ -83,7 +83,7 @@ export class InsertBuilderImpl<
     SqlContract<SqlStorage>,
     LoweredStatement
   >;
-  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  private readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
   private readonly table: TableRef;
   private readonly values: Record<string, ParamPlaceholder>;
   private returningColumns: AnyColumnBuilder[] = [];
@@ -224,7 +224,7 @@ export class UpdateBuilderImpl<
     SqlContract<SqlStorage>,
     LoweredStatement
   >;
-  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  private readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
   private readonly table: TableRef;
   private readonly set: Record<string, ParamPlaceholder>;
   private wherePredicate?: BinaryBuilder;
@@ -405,7 +405,7 @@ export class DeleteBuilderImpl<
     SqlContract<SqlStorage>,
     LoweredStatement
   >;
-  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  private readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
   private readonly table: TableRef;
   private wherePredicate?: BinaryBuilder;
   private returningColumns: AnyColumnBuilder[] = [];

@@ -4,7 +4,7 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';

@@ -71,6 +71,14 @@ This package follows the standard `exports/` directory pattern:
 
 This enables subpath imports like `@prisma-next/plan/errors` and `@prisma-next/plan/types` if needed in the future.
 
+## Package Location
+
+This package is part of the **framework domain**, **core layer**, **shared plane**:
+- **Domain**: framework (target-agnostic)
+- **Layer**: core
+- **Plane**: shared
+- **Path**: `packages/framework/core-plan`
+
 ## Related Subsystems
 
 - **[Query Lanes](../../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)**: Uses plan errors during query construction

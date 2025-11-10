@@ -3,7 +3,7 @@ import {
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
-} from '@prisma-next/runtime';
+} from '@prisma-next/sql-runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract } from '@prisma-next/sql-target';
 import { Client } from 'pg';

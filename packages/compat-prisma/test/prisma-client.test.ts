@@ -8,7 +8,7 @@ import {
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
-} from '@prisma-next/runtime';
+} from '@prisma-next/sql-runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { validateContract } from '@prisma-next/sql-query/schema';
 import { timeouts } from '@prisma-next/test-utils';

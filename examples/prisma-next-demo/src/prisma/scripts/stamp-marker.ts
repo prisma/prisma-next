@@ -3,7 +3,7 @@ import {
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
-} from '@prisma-next/runtime';
+} from '@prisma-next/sql-runtime';
 import { Client } from 'pg';
 
 export interface StampMarkerOptions {

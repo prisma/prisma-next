@@ -4,11 +4,17 @@ Runtime execution engine that verifies contracts, executes queries, and applies 
 
 ## Package Classification
 
-- **Domain**: framework
-- **Layer**: runtime-core (planned; currently legacy package that will be split in Slice 6)
+- **Domain**: legacy (transitional facade)
+- **Layer**: legacy
 - **Plane**: runtime
 
-**Note**: This package will be split into `@prisma-next/runtime-core` (framework domain, runtime-core layer, runtime plane) and `@prisma-next/sql-runtime` (SQL domain, runtime layer, runtime plane) in Slice 6.
+**Status**: This package is now a transitional facade that re-exports from `@prisma-next/sql-runtime`. It will be removed in Slice 7.
+
+**Migration**: All consumers should migrate to `@prisma-next/sql-runtime` directly.
+
+The runtime has been split into:
+- `@prisma-next/runtime-core` (framework domain, runtime-core layer, runtime plane) - Target-neutral kernel
+- `@prisma-next/sql-runtime` (SQL domain, runtime layer, runtime plane) - SQL family runtime
 
 ## Overview
 

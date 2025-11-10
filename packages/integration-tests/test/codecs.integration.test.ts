@@ -7,7 +7,7 @@ import {
   executePlanAndCollect,
   setupTestDatabase,
   teardownTestDatabase,
-} from '@prisma-next/runtime/test/utils';
+} from '@prisma-next/sql-runtime/test/utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { param } from '@prisma-next/sql-query/param';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';

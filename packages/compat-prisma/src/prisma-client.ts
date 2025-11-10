@@ -5,7 +5,7 @@ import {
   createRuntimeContext,
   type Runtime,
   type RuntimeContext,
-} from '@prisma-next/runtime';
+} from '@prisma-next/sql-runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';

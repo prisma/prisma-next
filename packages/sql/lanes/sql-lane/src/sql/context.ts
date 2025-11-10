@@ -1,4 +1,4 @@
-import type { RuntimeContext } from '@prisma-next/runtime';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 
 export interface SqlContext<TContract extends SqlContract<SqlStorage>> {

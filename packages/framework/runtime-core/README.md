@@ -1,17 +1,83 @@
 # @prisma-next/runtime-core
 
-**Status:** Scaffolded placeholder package
+Target-agnostic runtime kernel for Prisma Next.
 
-This package will contain the target-agnostic runtime kernel for Prisma Next.
+## Package Classification
+
+- **Domain**: framework
+- **Layer**: runtime-core
+- **Plane**: runtime
 
 ## Overview
 
-This package is part of the runtime ring and will provide:
-- Plan verification
-- Plugin lifecycle management
-- Target-neutral runtime SPI
+The runtime-core package provides the target-neutral kernel responsible for plan validation, marker verification, plugin lifecycle, telemetry, and the runtime SPI definition. It is designed to work with any target family (SQL, document, graph, etc.) through the `RuntimeFamilyAdapter` interface.
 
-## Package Status
+## Purpose
 
-This package is currently a placeholder created during the package layering scaffolding phase. Implementation will be added in a future slice.
+Provide a target-agnostic runtime kernel that family runtimes (e.g., `@prisma-next/sql-runtime`) can compose with family-specific adapters, drivers, and codecs.
 
+## Responsibilities
+
+- **Plan Validation**: Verify plans against contracts (coreHash/profileHash checks)
+- **Marker Verification**: Read and parse contract markers from databases
+- **Plugin Orchestration**: Manage plugin lifecycle (beforeExecute, onRow, afterExecute hooks)
+- **Telemetry Recording**: Track execution metrics (lane, target, fingerprint, outcome, duration)
+- **Error Envelopes**: Provide consistent error formatting across families
+- **Runtime SPI**: Define the `RuntimeFamilyAdapter` interface that family runtimes implement
+
+## Key Abstractions
+
+### RuntimeFamilyAdapter
+
+Family runtimes implement this interface to provide:
+- `readMarkerStatement()` - Returns SQL/query statement to read marker
+- `validatePlan(plan, contract)` - Family-specific plan validation
+- `contract` - The family-specific contract type
+
+### RuntimeCore
+
+The target-neutral runtime implementation that:
+- Takes a `RuntimeFamilyAdapter` and driver
+- Executes plans through the family adapter
+- Orchestrates plugins
+- Records telemetry
+- Validates plans and markers
+
+## Dependencies
+
+- `@prisma-next/contract` - Plan types
+- `@prisma-next/operations` - Operation registry
+
+**No SQL-specific dependencies** - This package is target-agnostic.
+
+## Usage
+
+Family runtimes (e.g., `@prisma-next/sql-runtime`) compose runtime-core with family-specific implementations:
+
+```typescript
+import { createRuntimeCore } from '@prisma-next/runtime-core';
+import { SqlFamilyAdapter } from './sql-family-adapter';
+
+const familyAdapter = new SqlFamilyAdapter(contract);
+const core = createRuntimeCore({
+  familyAdapter,
+  driver,
+  verify: { mode: 'onFirstUse', requireMarker: false },
+  operationRegistry,
+  plugins: [budgets(), lints()],
+});
+```
+
+## Exports
+
+- `createRuntimeCore` - Create a target-neutral runtime instance
+- `RuntimeFamilyAdapter` - Interface for family runtimes
+- `MarkerReader` - Interface for marker reading
+- `budgets`, `lints` - Target-neutral plugins
+- `runtimeError` - Error envelope utilities
+- `computeSqlFingerprint` - SQL fingerprint computation
+- `parseContractMarkerRow` - Marker parsing utilities
+
+## Testing
+
+Includes a mock-family smoke test (`test/mock-family.test.ts`) that proves runtime-core can work without SQL dependencies.

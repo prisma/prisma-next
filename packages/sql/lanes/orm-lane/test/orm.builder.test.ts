@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { RuntimeContext } from '@prisma-next/runtime';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { param } from '@prisma-next/sql-relational-core/param';

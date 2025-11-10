@@ -1,5 +1,5 @@
 import type { Plan } from '@prisma-next/contract/types';
-import type { RuntimeContext } from '@prisma-next/runtime';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,

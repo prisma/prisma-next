@@ -2,7 +2,7 @@
 
 import type { OperationRegistry } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
-import type { RuntimeContext } from '@prisma-next/runtime';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,

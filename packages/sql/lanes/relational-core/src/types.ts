@@ -466,5 +466,5 @@ export interface BuildOptions {
 export interface SqlBuilderOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
-  readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
 }

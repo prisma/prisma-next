@@ -5,7 +5,7 @@ import { loadContractFromTs } from '@prisma-next/cli';
 import type { ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import { sql } from '@prisma-next/sql-lane';
