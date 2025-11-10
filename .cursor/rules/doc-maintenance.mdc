@@ -1,4 +1,5 @@
 ---
+description: Keep documentation and READMEs accurate and updated
 alwaysApply: true
 tags: [documentation, maintenance]
 appliesTo: ["**/*"]

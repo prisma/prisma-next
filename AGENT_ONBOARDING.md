@@ -60,7 +60,9 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers for building SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives in the SQL lanes ring
-- **`@prisma-next/sql-query`** - SQL query DSL (re-exports contract authoring from `@prisma-next/sql-contract-ts` for backward compatibility, will be removed in Slice 7)
+- **`@prisma-next/sql-lane`** - SQL DSL (relational DSL + raw SQL helpers)
+- **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives
+- **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries
 - **`@prisma-next/runtime`** - Execution engine, plugins (budgets, lints), contract verification
 - **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers (core ring)
 - **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly (targets ring)
@@ -215,8 +217,8 @@ interface Extension {
 
 ```typescript
 // src/prisma/query.ts
-import { schema as schemaBuilder } from '@prisma-next/sql-query/schema';
-import { sql as sqlBuilder } from '@prisma-next/sql-query/sql';
+import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
+import { sql as sqlBuilder } from '@prisma-next/sql-lane/sql';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { adapter } from './adapter';
@@ -235,7 +237,7 @@ export const tables = schema.tables;  // Convenience export for better DX
 
 ```typescript
 import { sql, tables } from '../prisma/query';
-import type { ResultType } from '@prisma-next/sql-query/types';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 
 // Option 1: Direct access (shorter, more readable)
 const plan = sql
@@ -259,8 +261,10 @@ type UserRow = ResultType<typeof plan>;
 **Full Example**:
 
 ```typescript
-import { sql, param } from '@prisma-next/sql-query/sql';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import { sql } from '@prisma-next/sql-lane/sql';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import contractJson from './contract.json' assert { type: 'json' };
@@ -363,7 +367,7 @@ The ORM lane provides a model-centric API that compiles to SQL lane primitives. 
 **Entrypoint**: Use `orm()` factory function to create a model registry proxy:
 
 ```typescript
-import { orm } from '@prisma-next/sql-query/orm';
+import { orm } from '@prisma-next/sql-orm-lane/orm';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
@@ -1608,7 +1612,7 @@ export const tables = schema.tables;
 
 // In your query files
 import { sql, tables, param } from '../prisma/query';
-import type { ResultType } from '@prisma-next/sql-query/types';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 
 // Option 1: Direct access
 const plan = sql
@@ -1674,7 +1678,7 @@ await writeFile('./contract.d.ts', result.contractDts);
 
 **Extract row type from plan:**
 ```typescript
-import type { ResultType } from '@prisma-next/sql-query/types';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 
 const plan = sql({ context })
   .from(tables.user)
@@ -1699,12 +1703,12 @@ type JoinedRow = ResultType<typeof joinedPlan>;  // { userId: number; postId: nu
 
 **ORM Lane Usage:**
 ```typescript
-import { orm } from '@prisma-next/sql-query/orm';
-import { param } from '@prisma-next/sql-query/param';
+import { orm } from '@prisma-next/sql-orm-lane/orm';
+import { param } from '@prisma-next/sql-relational-core/param';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
-import type { ResultType } from '@prisma-next/sql-query/types';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import type { Contract } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
