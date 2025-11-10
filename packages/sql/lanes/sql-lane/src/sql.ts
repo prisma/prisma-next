@@ -1,5 +1,19 @@
 import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createDeleteAst,
+  createInsertAst,
+  createJoin,
+  createJoinOnBuilder,
+  createJoinOnExpr,
+  createOrderByItem,
+  createParamRef,
+  createSelectAst,
+  createTableRef,
+  createUpdateAst,
+} from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
@@ -158,34 +172,7 @@ class AliasTracker {
   }
 }
 
-class JoinOnBuilderImpl implements JoinOnBuilder {
-  eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate {
-    if (!left || !isColumnBuilder(left)) {
-      throw planInvalid('Join ON left operand must be a column');
-    }
-
-    if (!right || !isColumnBuilder(right)) {
-      throw planInvalid('Join ON right operand must be a column');
-    }
-
-    // TypeScript can't narrow ColumnBuilder properly, so we assert
-    const leftCol = left as unknown as { table: string; column: string };
-    const rightCol = right as unknown as { table: string; column: string };
-    if (leftCol.table === rightCol.table) {
-      throw planInvalid('Self-joins are not supported in MVP');
-    }
-
-    return {
-      kind: 'join-on',
-      left: left as AnyColumnBuilder,
-      right: right as AnyColumnBuilder,
-    };
-  }
-}
-
-export function createJoinOnBuilder(): JoinOnBuilder {
-  return new JoinOnBuilderImpl();
-}
+export { createJoinOnBuilder } from '@prisma-next/sql-relational-core/ast';
 
 class IncludeChildBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
@@ -615,18 +602,13 @@ class SelectBuilderImpl<
       ? (() => {
           const orderBy = this.state.orderBy as OrderBuilder<string, StorageColumn, unknown>;
           const orderExpr = orderBy.expr;
-          return [
-            {
-              expr: isOperationExpr(orderExpr)
-                ? orderExpr
-                : {
-                    kind: 'col' as const,
-                    table: (orderExpr as { table: string; column: string }).table,
-                    column: (orderExpr as { table: string; column: string }).column,
-                  },
-              dir: orderBy.dir,
-            },
-          ] as ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
+          const expr: ColumnRef | OperationExpr = isOperationExpr(orderExpr)
+            ? orderExpr
+            : (() => {
+                const colBuilder = orderExpr as { table: string; column: string };
+                return createColumnRef(colBuilder.table, colBuilder.column);
+              })();
+          return [createOrderByItem(expr, orderBy.dir)];
         })()
       : undefined;
 
@@ -634,24 +616,10 @@ class SelectBuilderImpl<
       // TypeScript can't narrow ColumnBuilder properly, so we assert
       const onLeft = join.on.left as { table: string; column: string };
       const onRight = join.on.right as { table: string; column: string };
-      return {
-        kind: 'join' as const,
-        joinType: join.joinType,
-        table: { kind: 'table' as const, name: join.table.name },
-        on: {
-          kind: 'eqCol' as const,
-          left: {
-            kind: 'col' as const,
-            table: onLeft.table,
-            column: onLeft.column,
-          },
-          right: {
-            kind: 'col' as const,
-            table: onRight.table,
-            column: onRight.column,
-          },
-        },
-      };
+      const leftCol = createColumnRef(onLeft.table, onLeft.column);
+      const rightCol = createColumnRef(onRight.table, onRight.column);
+      const onExpr = createJoinOnExpr(leftCol, rightCol);
+      return createJoin(join.joinType, createTableRef(join.table.name), onExpr);
     });
 
     const includes = this.state.includes?.map((include) => {
@@ -659,28 +627,16 @@ class SelectBuilderImpl<
         ? (() => {
             const orderBy = include.childOrderBy as OrderBuilder<string, StorageColumn, unknown>;
             const orderExpr = orderBy.expr;
-            return [
-              {
-                expr: (() => {
-                  if (isOperationExpr(orderExpr)) {
-                    const baseCol = extractBaseColumnRef(orderExpr);
-                    return {
-                      kind: 'col' as const,
-                      table: baseCol.table,
-                      column: baseCol.column,
-                    };
-                  }
-                  // orderExpr is ColumnBuilder - TypeScript can't narrow properly
-                  const colBuilder = orderExpr as { table: string; column: string };
-                  return {
-                    kind: 'col' as const,
-                    table: colBuilder.table,
-                    column: colBuilder.column,
-                  };
-                })(),
-                dir: orderBy.dir,
-              },
-            ] as ReadonlyArray<{ expr: ColumnRef; dir: Direction }>;
+            const expr: ColumnRef | OperationExpr = (() => {
+              if (isOperationExpr(orderExpr)) {
+                const baseCol = extractBaseColumnRef(orderExpr);
+                return createColumnRef(baseCol.table, baseCol.column);
+              }
+              // orderExpr is ColumnBuilder - TypeScript can't narrow properly
+              const colBuilder = orderExpr as { table: string; column: string };
+              return createColumnRef(colBuilder.table, colBuilder.column);
+            })();
+            return [createOrderByItem(expr, orderBy.dir)];
           })()
         : undefined;
 
@@ -695,24 +651,18 @@ class SelectBuilderImpl<
         childWhere = whereResult?.expr;
       }
 
+      const onLeft = include.on.left as { table: string; column: string };
+      const onRight = include.on.right as { table: string; column: string };
+      const leftCol = createColumnRef(onLeft.table, onLeft.column);
+      const rightCol = createColumnRef(onRight.table, onRight.column);
+      const onExpr = createJoinOnExpr(leftCol, rightCol);
+
       return {
         kind: 'includeMany' as const,
         alias: include.alias,
         child: {
-          table: { kind: 'table' as const, name: include.table.name },
-          on: {
-            kind: 'eqCol' as const,
-            left: {
-              kind: 'col' as const,
-              table: (include.on.left as { table: string; column: string }).table,
-              column: (include.on.left as { table: string; column: string }).column,
-            },
-            right: {
-              kind: 'col' as const,
-              table: (include.on.right as { table: string; column: string }).table,
-              column: (include.on.right as { table: string; column: string }).column,
-            },
-          },
+          table: createTableRef(include.table.name),
+          on: onExpr,
           ...(childWhere ? { where: childWhere } : {}),
           ...(childOrderBy ? { orderBy: childOrderBy } : {}),
           ...(typeof include.childLimit === 'number' ? { limit: include.childLimit } : {}),
@@ -725,11 +675,7 @@ class SelectBuilderImpl<
             const col = column as { table: string; column: string };
             return {
               alias,
-              expr: {
-                kind: 'col' as const,
-                table: col.table,
-                column: col.column,
-              },
+              expr: createColumnRef(col.table, col.column),
             };
           }),
         },
@@ -776,26 +722,21 @@ class SelectBuilderImpl<
           }
           projectEntries.push({
             alias,
-            expr: {
-              kind: 'col',
-              table: tableName,
-              column: columnName,
-            },
+            expr: createColumnRef(tableName, columnName),
           });
         }
       }
     }
 
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: table.name },
+    const ast = createSelectAst({
+      from: createTableRef(table.name),
       ...(joins && joins.length > 0 ? { joins } : {}),
       ...(includes && includes.length > 0 ? { includes } : {}),
       project: projectEntries,
       ...(whereExpr ? { where: whereExpr } : {}),
       ...(orderByClause ? { orderBy: orderByClause } : {}),
       ...(typeof this.state.limit === 'number' ? { limit: this.state.limit } : {}),
-    };
+    });
 
     const lowered = this.adapter.lower(ast, {
       contract: this.contract,
@@ -1415,29 +1356,20 @@ class InsertBuilderImpl<
         ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
       });
 
-      values[columnName] = {
-        kind: 'param',
-        index,
-        name: paramName,
-      };
+      values[columnName] = createParamRef(index, paramName);
     }
 
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
       // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
-      return {
-        kind: 'col',
-        table: c.table,
-        column: c.column,
-      };
+      return createColumnRef(c.table, c.column);
     });
 
-    const ast: InsertAst = {
-      kind: 'insert',
-      table: { kind: 'table', name: this.table.name },
+    const ast = createInsertAst({
+      table: createTableRef(this.table.name),
       values,
       ...(returning.length > 0 ? { returning } : {}),
-    };
+    });
 
     const lowered = this.adapter.lower(ast, {
       contract: this.contract,
@@ -1595,11 +1527,7 @@ class UpdateBuilderImpl<
         ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
       });
 
-      set[columnName] = {
-        kind: 'param',
-        index,
-        name: paramName,
-      };
+      set[columnName] = createParamRef(index, paramName);
     }
 
     const whereResult = this._buildWhereExpr(
@@ -1620,20 +1548,15 @@ class UpdateBuilderImpl<
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
       // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
-      return {
-        kind: 'col',
-        table: c.table,
-        column: c.column,
-      };
+      return createColumnRef(c.table, c.column);
     });
 
-    const ast: UpdateAst = {
-      kind: 'update',
-      table: { kind: 'table', name: this.table.name },
+    const ast = createUpdateAst({
+      table: createTableRef(this.table.name),
       set,
       where: whereExpr,
       ...(returning.length > 0 ? { returning } : {}),
-    };
+    });
 
     const lowered = this.adapter.lower(ast, {
       contract: this.contract,
@@ -1845,19 +1768,14 @@ class DeleteBuilderImpl<
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
       // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
-      return {
-        kind: 'col',
-        table: c.table,
-        column: c.column,
-      };
+      return createColumnRef(c.table, c.column);
     });
 
-    const ast: DeleteAst = {
-      kind: 'delete',
-      table: { kind: 'table', name: this.table.name },
+    const ast = createDeleteAst({
+      table: createTableRef(this.table.name),
       where: whereExpr,
       ...(returning.length > 0 ? { returning } : {}),
-    };
+    });
 
     const lowered = this.adapter.lower(ast, {
       contract: this.contract,
@@ -1949,24 +1867,12 @@ class DeleteBuilderImpl<
       const columnMeta = contractTable?.columns[colBuilder.column];
       codecId = columnMeta?.type;
 
-      leftExpr = {
-        kind: 'col',
-        table: colBuilder.table,
-        column: colBuilder.column,
-      };
+      leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
     }
 
+    const rightParam = createParamRef(index, paramName);
     return {
-      expr: {
-        kind: 'bin',
-        op: 'eq',
-        left: leftExpr,
-        right: {
-          kind: 'param',
-          index,
-          name: paramName,
-        },
-      },
+      expr: createBinaryExpr('eq', leftExpr, rightParam),
       ...(codecId ? { codecId } : {}),
       paramName,
     };

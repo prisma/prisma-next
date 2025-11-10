@@ -69,6 +69,15 @@ export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, Ope
 export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
 export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
 
+export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'column'
+  );
+}
+
 export interface JoinOnBuilder {
   eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate;
 }

@@ -1,16 +1,28 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
 import type { RuntimeContext } from '@prisma-next/runtime';
-import { createJoinOnBuilder, sql } from '@prisma-next/sql-lane/sql';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createDeleteAst,
+  createInsertAst,
+  createJoinOnExpr,
+  createOrderByItem,
+  createParamRef,
+  createSelectAst,
+  createTableRef,
+  createUpdateAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
+  BinaryBuilder,
   BuildOptions,
-  ColumnBuilder,
   InferNestedProjectionRow,
+  JoinOnPredicate,
   NestedProjection,
   OrderBuilder,
   ParamPlaceholder,
@@ -19,6 +31,12 @@ import type {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
+  IncludeAst,
+  IncludeRef,
+  LiteralExpr,
+  LoweredStatement,
+  OperationExpr,
+  ParamRef,
   SelectAst,
   SqlContract,
   SqlStorage,
@@ -553,14 +571,34 @@ export class OrmModelBuilderImpl<
   }
 
   findMany(options?: BuildOptions): Plan<Row> {
-    const sqlBuilder = sql({ context: this.context });
-    let query = sqlBuilder.from(this.table);
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const contractTable = this.contract.storage.tables[this.table.name];
 
-    if (this.wherePredicate) {
-      query = query.where(this.wherePredicate);
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${this.table.name}`);
     }
 
-    // Compile includes to includeMany before other operations
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    // Build projection state
+    const projectionInput: ProjectionInput =
+      this.projection ??
+      (() => {
+        const modelAccessor = this._getModelAccessor();
+        const defaultProjection: Record<string, AnyColumnBuilder> = {};
+        for (const fieldName in modelAccessor) {
+          defaultProjection[fieldName] = modelAccessor[fieldName];
+        }
+        return defaultProjection;
+      })();
+
+    // Build includes state for buildMeta
+    const includesForMeta: IncludeState[] = [];
+    const includesAst: IncludeAst[] = [];
+
+    // Build includes AST
     for (const includeState of this.includes) {
       // Capability check
       const target = this.contract.target;
@@ -574,7 +612,6 @@ export class OrmModelBuilderImpl<
       }
 
       // Build join condition from relation metadata
-      const joinOnBuilder = createJoinOnBuilder();
       const parentTableName = this.contract.mappings.modelToTable?.[this.modelName];
       if (!parentTableName) {
         throw planInvalid(`Model ${this.modelName} not found in mappings`);
@@ -616,115 +653,265 @@ export class OrmModelBuilderImpl<
         );
       }
 
-      const onPredicate = joinOnBuilder.eqCol(parentCol, childCol);
+      // Build join ON expression
+      const leftCol = createColumnRef(parentTableName, parentColName);
+      const rightCol = createColumnRef(includeState.childTable.name, childColName);
+      const onExpr = createJoinOnExpr(leftCol, rightCol);
 
-      // Convert ORM child builder state to SQL lane IncludeChildBuilder
-      // We need to create an IncludeChildBuilder that applies the stored state
-      query = query.includeMany(
-        includeState.childTable,
-        () => onPredicate,
-        (child) => {
-          // Apply child where
-          let builtChild = child;
-          if (includeState.childWhere) {
-            builtChild = builtChild.where(includeState.childWhere);
-          }
-          // Apply child orderBy
-          if (includeState.childOrderBy) {
-            // Convert OrderBuilder to ReturnType<ColumnBuilder['asc']>
-            // OrderBuilder has expr and dir, which matches the SQL lane's orderBy signature
-            builtChild = builtChild.orderBy(
-              includeState.childOrderBy as ReturnType<ColumnBuilder['asc']>,
-            );
-          }
-          // Apply child limit
-          if (includeState.childLimit !== undefined) {
-            builtChild = builtChild.limit(includeState.childLimit);
-          }
-          // Apply child projection
-          // Validate child projection is non-empty
-          if (!includeState.childProjection) {
-            throw planInvalid('Child projection must be specified');
-          }
-          // Note: SQL lane's IncludeChildBuilder.select() doesn't accept boolean values
-          // The ORM's childProjection may have boolean values for include references,
-          // but those are handled at the parent level, not in child includes
-          // Filter out boolean values - they're not valid in child projections
-          const filteredProjection: Record<string, AnyColumnBuilder | NestedProjection> = {};
-          for (const [key, value] of Object.entries(includeState.childProjection)) {
-            if (value !== true && value !== false) {
-              filteredProjection[key] = value as AnyColumnBuilder | NestedProjection;
-            }
-          }
-          if (Object.keys(filteredProjection).length === 0) {
-            throw planInvalid('Child projection must not be empty after filtering boolean values');
-          }
-          builtChild = builtChild.select(filteredProjection as NestedProjection);
-          return builtChild;
-        },
-        { alias: includeState.alias },
-      );
-    }
-
-    if (this.orderByExpr) {
-      query = query.orderBy(
-        this.orderByExpr as ReturnType<ColumnBuilder<string, StorageColumn>['asc']>,
-      );
-    }
-
-    if (this.limitValue !== undefined) {
-      query = query.limit(this.limitValue);
-    }
-
-    // TODO: SQL lane doesn't support offset yet - skip implementation for now
-    // if (this.offsetValue !== undefined) {
-    //   query = query.skip(this.offsetValue);
-    // }
-
-    if (this.projection) {
-      query = query.select(this.projection);
-    } else {
-      // Default projection: select all columns
-      const modelAccessor = this._getModelAccessor();
-      const defaultProjection: Record<string, AnyColumnBuilder> = {};
-      for (const fieldName in modelAccessor) {
-        defaultProjection[fieldName] = modelAccessor[fieldName];
+      // Build child projection state
+      if (!includeState.childProjection) {
+        throw planInvalid('Child projection must be specified');
       }
-      query = query.select(defaultProjection);
+      const filteredProjection: Record<string, AnyColumnBuilder | NestedProjection> = {};
+      for (const [key, value] of Object.entries(includeState.childProjection)) {
+        if (value !== true && value !== false) {
+          filteredProjection[key] = value as AnyColumnBuilder | NestedProjection;
+        }
+      }
+      if (Object.keys(filteredProjection).length === 0) {
+        throw planInvalid('Child projection must not be empty after filtering boolean values');
+      }
+      const childProjectionState = buildProjectionState(
+        includeState.childTable,
+        filteredProjection as ProjectionInput,
+      );
+
+      // Build child where clause
+      let childWhere: BinaryExpr | undefined;
+      if (includeState.childWhere) {
+        const whereResult = buildWhereExpr(
+          includeState.childWhere,
+          this.contract,
+          paramsMap,
+          paramDescriptors,
+          paramValues,
+        );
+        childWhere = whereResult.expr;
+        if (whereResult.codecId && whereResult.paramName) {
+          paramCodecs[whereResult.paramName] = whereResult.codecId;
+        }
+      }
+
+      // Build child orderBy clause
+      const childOrderBy = includeState.childOrderBy
+        ? (() => {
+            const orderBy = includeState.childOrderBy as OrderBuilder<
+              string,
+              StorageColumn,
+              unknown
+            >;
+            const orderExpr = orderBy.expr;
+            const expr: ColumnRef | OperationExpr = (() => {
+              if (isOperationExpr(orderExpr)) {
+                const baseCol = extractBaseColumnRef(orderExpr);
+                return createColumnRef(baseCol.table, baseCol.column);
+              }
+              const colBuilder = orderExpr as { table: string; column: string };
+              return createColumnRef(colBuilder.table, colBuilder.column);
+            })();
+            return [createOrderByItem(expr, orderBy.dir)];
+          })()
+        : undefined;
+
+      // Build child projection items
+      const childProjectionItems: Array<{ alias: string; expr: ColumnRef | OperationExpr }> = [];
+      for (let i = 0; i < childProjectionState.aliases.length; i++) {
+        const alias = childProjectionState.aliases[i];
+        if (!alias) {
+          throw planInvalid(`Missing alias at index ${i}`);
+        }
+        const column = childProjectionState.columns[i];
+        if (!column) {
+          throw planInvalid(`Missing column for alias ${alias} at index ${i}`);
+        }
+        const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+        if (operationExpr) {
+          childProjectionItems.push({ alias, expr: operationExpr });
+        } else {
+          const col = column as { table: string; column: string };
+          childProjectionItems.push({ alias, expr: createColumnRef(col.table, col.column) });
+        }
+      }
+
+      // Build include AST directly
+      const includeAst: IncludeAst = {
+        kind: 'includeMany',
+        alias: includeState.alias,
+        child: {
+          table: includeState.childTable,
+          on: onExpr,
+          project: childProjectionItems,
+          ...(childWhere ? { where: childWhere } : {}),
+          ...(childOrderBy ? { orderBy: childOrderBy } : {}),
+          ...(typeof includeState.childLimit === 'number'
+            ? { limit: includeState.childLimit }
+            : {}),
+        },
+      };
+      includesAst.push(includeAst);
+
+      // Build include state for buildMeta
+      const includeForMeta: IncludeState = {
+        alias: includeState.alias,
+        table: includeState.childTable,
+        on: {
+          kind: 'join-on',
+          left: parentCol,
+          right: childCol,
+        },
+        childProjection: childProjectionState,
+        ...(includeState.childWhere ? { childWhere: includeState.childWhere } : {}),
+        ...(includeState.childOrderBy ? { childOrderBy: includeState.childOrderBy } : {}),
+        ...(includeState.childLimit !== undefined ? { childLimit: includeState.childLimit } : {}),
+      };
+      includesForMeta.push(includeForMeta);
     }
 
-    const plan = query.build(options);
+    // Build projection state
+    const projectionState = buildProjectionState(
+      this.table,
+      projectionInput,
+      includesForMeta.length > 0 ? includesForMeta : undefined,
+    );
+
+    // Build where clause
+    const whereResult = this.wherePredicate
+      ? buildWhereExpr(this.wherePredicate, this.contract, paramsMap, paramDescriptors, paramValues)
+      : undefined;
+    const whereExpr = whereResult?.expr;
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
+
+    // Build orderBy clause
+    const orderByClause = this.orderByExpr
+      ? (() => {
+          const orderBy = this.orderByExpr as OrderBuilder<string, StorageColumn, unknown>;
+          const orderExpr = orderBy.expr;
+          const expr: ColumnRef | OperationExpr = isOperationExpr(orderExpr)
+            ? orderExpr
+            : (() => {
+                const colBuilder = orderExpr as { table: string; column: string };
+                return createColumnRef(colBuilder.table, colBuilder.column);
+              })();
+          return [createOrderByItem(expr, orderBy.dir)];
+        })()
+      : undefined;
+
+    // Build main projection items
+    const projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }> =
+      [];
+    for (let i = 0; i < projectionState.aliases.length; i++) {
+      const alias = projectionState.aliases[i];
+      if (!alias) {
+        throw planInvalid(`Missing alias at index ${i}`);
+      }
+      const column = projectionState.columns[i];
+      if (!column) {
+        throw planInvalid(`Missing column for alias ${alias} at index ${i}`);
+      }
+
+      // Check if this alias matches an include alias
+      const matchingInclude = includesForMeta.find((inc) => inc.alias === alias);
+      if (matchingInclude) {
+        // This is an include reference
+        projectEntries.push({
+          alias,
+          expr: { kind: 'includeRef', alias },
+        });
+      } else {
+        // Check if this column has an operation expression
+        const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+        if (operationExpr) {
+          projectEntries.push({
+            alias,
+            expr: operationExpr,
+          });
+        } else {
+          // This is a regular column
+          const col = column as { table: string; column: string };
+          const tableName = col.table;
+          const columnName = col.column;
+          if (!tableName || !columnName) {
+            throw planInvalid(`Invalid column for alias ${alias} at index ${i}`);
+          }
+          projectEntries.push({
+            alias,
+            expr: createColumnRef(tableName, columnName),
+          });
+        }
+      }
+    }
+
+    // Build SELECT AST
+    const ast = createSelectAst({
+      from: this.table,
+      project: projectEntries,
+      ...(includesAst.length > 0 ? { includes: includesAst } : {}),
+      ...(whereExpr ? { where: whereExpr } : {}),
+      ...(orderByClause ? { orderBy: orderByClause } : {}),
+      ...(typeof this.limitValue === 'number' ? { limit: this.limitValue } : {}),
+    });
+
+    // Lower AST via adapter
+    const lowered = this.context.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    // Build plan metadata
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table: this.table,
+      projection: projectionState,
+      ...(includesForMeta.length > 0 ? { includes: includesForMeta } : {}),
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      ...(this.wherePredicate ? { where: this.wherePredicate as BinaryBuilder } : {}),
+      ...(this.orderByExpr ? { orderBy: this.orderByExpr } : {}),
+    });
+
+    // Create plan
+    const plan: Plan<Row> = Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
+      meta: {
+        ...planMeta,
+        lane: 'orm',
+      },
+    });
 
     // Compile relation filters to EXISTS subqueries and combine with main where clause
     if (this.relationFilters.length > 0) {
       const existsExprs = this._buildExistsSubqueries(this.relationFilters, options);
       if (existsExprs.length > 0) {
         // Combine EXISTS expressions with main where clause using AND logic
-        // For now, we'll add them to the AST directly
-        const ast = plan.ast as SelectAst;
         const combinedWhere = this._combineWhereClauses(ast.where, existsExprs);
         const modifiedAst: SelectAst = {
           ...ast,
           ...(combinedWhere !== undefined ? { where: combinedWhere } : {}),
         };
-        return {
-          ...plan,
+        // Re-lower the modified AST
+        const reLowered = this.context.adapter.lower(modifiedAst, {
+          contract: this.contract,
+          params: paramValues,
+        });
+        const reLoweredBody = reLowered.body as LoweredStatement;
+        return Object.freeze({
           ast: modifiedAst,
+          sql: reLoweredBody.sql,
+          params: reLoweredBody.params ?? paramValues,
           meta: {
-            ...plan.meta,
+            ...planMeta,
             lane: 'orm',
           },
-        };
+        });
       }
     }
 
-    return {
-      ...plan,
-      meta: {
-        ...plan.meta,
-        lane: 'orm',
-      },
-    };
+    return plan;
   }
 
   private _buildExistsSubqueries(
@@ -764,72 +951,62 @@ export class OrmModelBuilderImpl<
       // Build child where clause if present
       let childWhere: BinaryExpr | undefined;
       if (filter.childWhere) {
-        // Build child where clause using SQL builder
-        const childSqlBuilder = sql({ context: this.context });
-        // Get child model accessor to build default projection
-        const childSchemaHandle = schema(this.context);
-        const childSchemaTable = childSchemaHandle.tables[childTableName];
-        if (!childSchemaTable) {
-          throw planInvalid(`Table ${childTableName} not found in schema`);
-        }
-        const childModelAccessor: Record<string, AnyColumnBuilder> = {};
-        const childModel = this.contract.models[filter.childModelName];
-        if (childModel && typeof childModel === 'object' && 'fields' in childModel) {
-          const childModelFields = childModel.fields as Record<string, { column?: string }>;
-          for (const fieldName in childModelFields) {
-            const field = childModelFields[fieldName];
-            if (!field) continue;
-            const columnName =
-              this.contract.mappings.fieldToColumn?.[filter.childModelName]?.[fieldName] ??
-              field.column ??
-              fieldName;
-            const column = childSchemaTable.columns[columnName];
-            if (column) {
-              // ModelColumnAccessor is validated at runtime via contract; cast for type compatibility
-              (childModelAccessor as Record<string, AnyColumnBuilder>)[fieldName] = column;
-            }
-          }
-        }
-        // Use first column for projection (EXISTS doesn't care about the actual value)
-        const firstColumn = Object.values(childModelAccessor)[0];
-        if (!firstColumn) {
-          throw planInvalid(`No columns found for model ${filter.childModelName}`);
-        }
-        const childQuery = childSqlBuilder
-          .from(childTable)
-          .where(filter.childWhere)
-          .select({ _exists: firstColumn });
-        const childPlan = childQuery.build(options);
-        const childAst = childPlan.ast as SelectAst;
-        childWhere = childAst.where as BinaryExpr | undefined;
+        // Build child where clause directly
+        const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+        const paramDescriptors: ParamDescriptor[] = [];
+        const paramValues: unknown[] = [];
+        const whereResult = buildWhereExpr(
+          filter.childWhere,
+          this.contract,
+          paramsMap,
+          paramDescriptors,
+          paramValues,
+        );
+        childWhere = whereResult.expr;
       }
 
       // Build subquery AST
       // For EXISTS, we only need SELECT 1 FROM child_table WHERE join_condition AND child_where
       // For now, we'll build a simple subquery with just the first join condition
       // TODO: Support combining multiple join conditions with AND
-      const subqueryWhere: BinaryExpr | undefined = childWhere;
+      let subqueryWhere: BinaryExpr | undefined = childWhere;
+      if (joinConditions.length > 0) {
+        // Combine join conditions with child where
+        const firstJoinCondition = joinConditions[0];
+        if (firstJoinCondition) {
+          // For column-to-column comparisons, create BinaryExpr directly
+          // (createBinaryExpr expects ParamRef on right, but we need ColumnRef)
+          const joinWhere: BinaryExpr = {
+            kind: 'bin',
+            op: 'eq',
+            left: firstJoinCondition.left,
+            right: firstJoinCondition.right as unknown as ParamRef,
+          };
+          if (childWhere) {
+            // TODO: Support combining multiple conditions with AND
+            // For now, just use the join condition
+            subqueryWhere = joinWhere;
+          } else {
+            subqueryWhere = joinWhere;
+          }
+        }
+      }
       // For EXISTS, we need at least one column in the projection
       // Use the first join condition's right column as a simple projection
-      const projectionColumn = joinConditions[0]?.right ?? {
-        kind: 'col',
-        table: childTableName,
-        column: 'id',
-      };
-      const subquery: SelectAst = {
-        kind: 'select',
+      const projectionColumn = joinConditions[0]?.right ?? createColumnRef(childTableName, 'id');
+      const subquery = createSelectAst({
         from: childTable,
         project: [{ alias: '_exists', expr: projectionColumn }],
         ...(subqueryWhere ? { where: subqueryWhere } : {}),
-      };
+      });
 
       // Determine if this is NOT EXISTS based on filter type
       const notExists = filter.filterType === 'none' || filter.filterType === 'every';
 
       const existsExpr: ExistsExpr = {
         kind: 'exists',
-        not: notExists,
         subquery,
+        not: notExists,
       };
 
       existsExprs.push(existsExpr);
@@ -884,38 +1061,89 @@ export class OrmModelBuilderImpl<
     if (!tableName) {
       throw planInvalid(`Model ${this.modelName} not found in mappings`);
     }
-    const table: TableRef = { kind: 'table', name: tableName };
+    const table = createTableRef(tableName);
 
-    // Build insert query using SQL lane
-    const sqlBuilder = sql({ context: this.context });
-    const insertBuilder = (
-      sqlBuilder as {
-        insert: (table: TableRef, values: Record<string, ParamPlaceholder>) => unknown;
+    // Build INSERT AST directly
+    const paramsMap = {
+      ...(options?.params ?? {}),
+      ...data,
+    } as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const contractTable = this.contract.storage.tables[tableName];
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${tableName}`);
+    }
+
+    const insertValues: Record<string, ColumnRef | ParamRef> = {};
+    for (const [columnName, placeholder] of Object.entries(values)) {
+      if (!contractTable.columns[columnName]) {
+        throw planInvalid(`Unknown column ${columnName} in table ${tableName}`);
       }
-    ).insert(table, values);
 
-    // Build plan with params from data object
-    const plan = (insertBuilder as { build: (options?: BuildOptions) => Plan<unknown> }).build({
-      ...options,
-      params: {
-        ...(options?.params ?? {}),
-        ...data,
-      },
+      const paramName = placeholder.name;
+      if (!Object.hasOwn(paramsMap, paramName)) {
+        throw planInvalid(`Missing value for parameter ${paramName}`);
+      }
+
+      const value = paramsMap[paramName];
+      const index = paramValues.push(value);
+
+      const columnMeta = contractTable.columns[columnName];
+      const codecId = columnMeta?.type;
+      if (codecId && paramName) {
+        paramCodecs[paramName] = codecId;
+      }
+
+      paramDescriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: tableName, column: columnName },
+        ...(codecId ? { type: codecId } : {}),
+        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+      });
+
+      insertValues[columnName] = createParamRef(index, paramName);
+    }
+
+    const ast = createInsertAst({
+      table,
+      values: insertValues,
+    });
+
+    // Lower AST via adapter
+    const lowered = this.context.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    // Build plan metadata
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table,
+      projection: { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
     });
 
     // Return plan with ORM metadata
-    return {
-      ...plan,
+    return Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
       meta: {
-        ...plan.meta,
+        ...planMeta,
         lane: 'orm',
         annotations: {
-          ...plan.meta.annotations,
+          ...planMeta.annotations,
           intent: 'write',
           isMutation: true,
         },
       },
-    } as Plan<number>;
+    }) as Plan<number>;
   }
 
   update(
@@ -940,48 +1168,108 @@ export class OrmModelBuilderImpl<
     if (!tableName) {
       throw planInvalid(`Model ${this.modelName} not found in mappings`);
     }
-    const table: TableRef = { kind: 'table', name: tableName };
+    const table = createTableRef(tableName);
 
-    // Build update query using SQL lane
-    const sqlBuilder = sql({ context: this.context });
-    const updateBuilder = (
-      sqlBuilder as {
-        update: (
-          table: TableRef,
-          set: Record<string, ParamPlaceholder>,
-        ) => {
-          where: (predicate: AnyBinaryBuilder) => {
-            build: (options?: BuildOptions) => Plan<unknown>;
-          };
-        };
+    // Build UPDATE AST directly
+    const paramsMap = {
+      ...(options?.params ?? {}),
+      ...data,
+    } as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const contractTable = this.contract.storage.tables[tableName];
+    if (!contractTable) {
+      throw planInvalid(`Unknown table ${tableName}`);
+    }
+
+    const updateSet: Record<string, ColumnRef | ParamRef> = {};
+    for (const [columnName, placeholder] of Object.entries(set)) {
+      if (!contractTable.columns[columnName]) {
+        throw planInvalid(`Unknown column ${columnName} in table ${tableName}`);
       }
-    )
-      .update(table, set)
-      .where(wherePredicate);
 
-    // Build plan with params from both data and where predicate
-    // Note: If where predicate uses params with same names as data fields, they'll be merged
-    const plan = updateBuilder.build({
-      ...options,
-      params: {
-        ...(options?.params ?? {}),
-        ...data,
-      },
+      const paramName = placeholder.name;
+      if (!Object.hasOwn(paramsMap, paramName)) {
+        throw planInvalid(`Missing value for parameter ${paramName}`);
+      }
+
+      const value = paramsMap[paramName];
+      const index = paramValues.push(value);
+
+      const columnMeta = contractTable.columns[columnName];
+      const codecId = columnMeta?.type;
+      if (codecId && paramName) {
+        paramCodecs[paramName] = codecId;
+      }
+
+      paramDescriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table: tableName, column: columnName },
+        ...(codecId ? { type: codecId } : {}),
+        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+      });
+
+      updateSet[columnName] = createParamRef(index, paramName);
+    }
+
+    // Build where clause
+    const whereResult = buildWhereExpr(
+      wherePredicate,
+      this.contract,
+      paramsMap,
+      paramDescriptors,
+      paramValues,
+    );
+    const whereExpr = whereResult.expr;
+    if (!whereExpr) {
+      throw planInvalid('Failed to build WHERE clause');
+    }
+
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
+
+    const ast = createUpdateAst({
+      table,
+      set: updateSet,
+      where: whereExpr,
+    });
+
+    // Lower AST via adapter
+    const lowered = this.context.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    // Build plan metadata
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table,
+      projection: { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      where: wherePredicate as BinaryBuilder,
     });
 
     // Return plan with ORM metadata
-    return {
-      ...plan,
+    return Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
       meta: {
-        ...plan.meta,
+        ...planMeta,
         lane: 'orm',
         annotations: {
-          ...plan.meta.annotations,
+          ...planMeta.annotations,
           intent: 'write',
           isMutation: true,
         },
       },
-    } as Plan<number>;
+    }) as Plan<number>;
   }
 
   delete(
@@ -997,38 +1285,68 @@ export class OrmModelBuilderImpl<
     if (!tableName) {
       throw planInvalid(`Model ${this.modelName} not found in mappings`);
     }
-    const table: TableRef = { kind: 'table', name: tableName };
+    const table = createTableRef(tableName);
 
-    // Build delete query using SQL lane
-    const sqlBuilder = sql({ context: this.context });
-    const deleteBuilder = (
-      sqlBuilder as {
-        delete: (table: TableRef) => {
-          where: (predicate: AnyBinaryBuilder) => {
-            build: (options?: BuildOptions) => Plan<unknown>;
-          };
-        };
-      }
-    )
-      .delete(table)
-      .where(wherePredicate);
+    // Build DELETE AST directly
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
 
-    // Build plan with params from where predicate
-    const plan = deleteBuilder.build(options);
+    // Build where clause
+    const whereResult = buildWhereExpr(
+      wherePredicate,
+      this.contract,
+      paramsMap,
+      paramDescriptors,
+      paramValues,
+    );
+    const whereExpr = whereResult.expr;
+    if (!whereExpr) {
+      throw planInvalid('Failed to build WHERE clause');
+    }
+
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
+
+    const ast = createDeleteAst({
+      table,
+      where: whereExpr,
+    });
+
+    // Lower AST via adapter
+    const lowered = this.context.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    // Build plan metadata
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table,
+      projection: { aliases: [], columns: [] },
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      where: wherePredicate as BinaryBuilder,
+    });
 
     // Return plan with ORM metadata
-    return {
-      ...plan,
+    return Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
       meta: {
-        ...plan.meta,
+        ...planMeta,
         lane: 'orm',
         annotations: {
-          ...plan.meta.annotations,
+          ...planMeta.annotations,
           intent: 'write',
           isMutation: true,
         },
       },
-    } as Plan<number>;
+    }) as Plan<number>;
   }
 
   private _convertModelFieldsToColumns(
@@ -1103,4 +1421,462 @@ export class OrmModelBuilderImpl<
 
     return accessor as ModelColumnAccessor<TContract, CodecTypes, ModelName>;
   }
+}
+
+function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef {
+  if (expr.kind === 'col') {
+    return expr;
+  }
+  return extractBaseColumnRef(expr.self);
+}
+
+function collectColumnRefs(expr: ColumnRef | ParamRef | LiteralExpr | OperationExpr): ColumnRef[] {
+  if (expr.kind === 'col') {
+    return [expr];
+  }
+  if (expr.kind === 'operation') {
+    const refs: ColumnRef[] = collectColumnRefs(expr.self);
+    for (const arg of expr.args) {
+      refs.push(...collectColumnRefs(arg));
+    }
+    return refs;
+  }
+  return [];
+}
+
+function isOperationExpr(expr: AnyColumnBuilder | OperationExpr): expr is OperationExpr {
+  return typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'operation';
+}
+
+function getColumnInfo(expr: AnyColumnBuilder | OperationExpr): {
+  table: string;
+  column: string;
+} {
+  if (isOperationExpr(expr)) {
+    const baseCol = extractBaseColumnRef(expr);
+    return { table: baseCol.table, column: baseCol.column };
+  }
+  const colBuilder = expr as unknown as { table: string; column: string };
+  return { table: colBuilder.table, column: colBuilder.column };
+}
+
+function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'column'
+  );
+}
+
+function generateAlias(path: string[]): string {
+  if (path.length === 0) {
+    throw planInvalid('Alias path cannot be empty');
+  }
+  return path.join('_');
+}
+
+class AliasTracker {
+  private readonly aliases = new Set<string>();
+  private readonly aliasToPath = new Map<string, string[]>();
+
+  register(path: string[]): string {
+    const alias = generateAlias(path);
+    if (this.aliases.has(alias)) {
+      const existingPath = this.aliasToPath.get(alias);
+      throw planInvalid(
+        `Alias collision: path ${path.join('.')} would generate alias "${alias}" which conflicts with path ${existingPath?.join('.') ?? 'unknown'}`,
+      );
+    }
+    this.aliases.add(alias);
+    this.aliasToPath.set(alias, path);
+    return alias;
+  }
+
+  getPath(alias: string): string[] | undefined {
+    return this.aliasToPath.get(alias);
+  }
+
+  has(alias: string): boolean {
+    return this.aliases.has(alias);
+  }
+}
+
+interface ProjectionState {
+  readonly aliases: string[];
+  readonly columns: AnyColumnBuilder[];
+}
+
+type ProjectionInput = Record<string, AnyColumnBuilder | boolean | NestedProjection>;
+
+function flattenProjection(
+  projection: NestedProjection,
+  tracker: AliasTracker,
+  currentPath: string[] = [],
+): { aliases: string[]; columns: AnyColumnBuilder[] } {
+  const aliases: string[] = [];
+  const columns: AnyColumnBuilder[] = [];
+
+  for (const [key, value] of Object.entries(projection)) {
+    const path = [...currentPath, key];
+
+    if (isColumnBuilder(value)) {
+      const alias = tracker.register(path);
+      aliases.push(alias);
+      columns.push(value);
+    } else if (typeof value === 'object' && value !== null) {
+      const nested = flattenProjection(value, tracker, path);
+      aliases.push(...nested.aliases);
+      columns.push(...nested.columns);
+    } else {
+      throw planInvalid(
+        `Invalid projection value at path ${path.join('.')}: expected ColumnBuilder or nested object`,
+      );
+    }
+  }
+
+  return { aliases, columns };
+}
+
+interface IncludeState {
+  readonly alias: string;
+  readonly table: TableRef;
+  readonly on: JoinOnPredicate;
+  readonly childProjection: ProjectionState;
+  readonly childWhere?: AnyBinaryBuilder;
+  readonly childOrderBy?: AnyOrderBuilder;
+  readonly childLimit?: number;
+}
+
+function buildProjectionState(
+  _table: TableRef,
+  projection: ProjectionInput,
+  includes?: ReadonlyArray<IncludeState>,
+): ProjectionState {
+  const tracker = new AliasTracker();
+  const aliases: string[] = [];
+  const columns: AnyColumnBuilder[] = [];
+
+  for (const [key, value] of Object.entries(projection)) {
+    if (value === true) {
+      const matchingInclude = includes?.find((inc) => inc.alias === key);
+      if (!matchingInclude) {
+        throw planInvalid(
+          `Include alias "${key}" not found. Did you call includeMany() with alias "${key}"?`,
+        );
+      }
+      aliases.push(key);
+      columns.push({
+        kind: 'column',
+        table: matchingInclude.table.name,
+        column: '',
+        columnMeta: { type: 'core/json@1', nullable: true },
+      } as AnyColumnBuilder);
+    } else if (isColumnBuilder(value)) {
+      const alias = tracker.register([key]);
+      aliases.push(alias);
+      columns.push(value);
+    } else if (typeof value === 'object' && value !== null) {
+      const nested = flattenProjection(value as NestedProjection, tracker, [key]);
+      aliases.push(...nested.aliases);
+      columns.push(...nested.columns);
+    } else {
+      throw planInvalid(
+        `Invalid projection value at key "${key}": expected ColumnBuilder, boolean true (for includes), or nested object`,
+      );
+    }
+  }
+
+  if (aliases.length === 0) {
+    throw planInvalid('select() requires at least one column or include');
+  }
+
+  return { aliases, columns };
+}
+
+interface MetaBuildArgs {
+  readonly contract: SqlContract<SqlStorage>;
+  readonly table: TableRef;
+  readonly projection: ProjectionState;
+  readonly includes?: ReadonlyArray<IncludeState>;
+  readonly where?: BinaryBuilder;
+  readonly orderBy?: AnyOrderBuilder;
+  readonly paramDescriptors: ParamDescriptor[];
+  readonly paramCodecs?: Record<string, string>;
+}
+
+function buildMeta(args: MetaBuildArgs): PlanMeta {
+  const refsColumns = new Map<string, { table: string; column: string }>();
+  const refsTables = new Set<string>([args.table.name]);
+
+  for (const column of args.projection.columns) {
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      const allRefs = collectColumnRefs(operationExpr);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
+        });
+      }
+    } else {
+      const col = column as unknown as { table?: string; column?: string };
+      if (col.table && col.column) {
+        refsColumns.set(`${col.table}.${col.column}`, {
+          table: col.table,
+          column: col.column,
+        });
+      }
+    }
+  }
+
+  if (args.includes) {
+    for (const include of args.includes) {
+      refsTables.add(include.table.name);
+      const onLeft = include.on.left as unknown as { table: string; column: string };
+      const onRight = include.on.right as unknown as { table: string; column: string };
+      if (onLeft.table && onLeft.column && onRight.table && onRight.column) {
+        refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
+          table: onLeft.table,
+          column: onLeft.column,
+        });
+        refsColumns.set(`${onRight.table}.${onRight.column}`, {
+          table: onRight.table,
+          column: onRight.column,
+        });
+      }
+      for (const column of include.childProjection.columns) {
+        const col = column as unknown as { table?: string; column?: string };
+        if (col.table && col.column) {
+          refsColumns.set(`${col.table}.${col.column}`, {
+            table: col.table,
+            column: col.column,
+          });
+        }
+      }
+      if (include.childWhere) {
+        const colInfo = getColumnInfo(include.childWhere.left);
+        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+          table: colInfo.table,
+          column: colInfo.column,
+        });
+      }
+      if (include.childOrderBy) {
+        const orderBy = include.childOrderBy as unknown as {
+          expr?: AnyColumnBuilder | OperationExpr;
+        };
+        if (orderBy.expr) {
+          const colInfo = getColumnInfo(orderBy.expr);
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
+          });
+        }
+      }
+    }
+  }
+
+  if (args.where) {
+    const whereLeft = args.where.left;
+    const operationExpr = (whereLeft as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      const allRefs = collectColumnRefs(operationExpr);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
+        });
+      }
+    } else {
+      const colBuilder = whereLeft as unknown as { table?: string; column?: string };
+      if (colBuilder.table && colBuilder.column) {
+        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
+          table: colBuilder.table,
+          column: colBuilder.column,
+        });
+      }
+    }
+  }
+
+  if (args.orderBy) {
+    const orderBy = args.orderBy as unknown as {
+      expr?: AnyColumnBuilder | OperationExpr;
+    };
+    const orderByExpr = orderBy.expr;
+    if (orderByExpr) {
+      if (isOperationExpr(orderByExpr)) {
+        const allRefs = collectColumnRefs(orderByExpr);
+        for (const ref of allRefs) {
+          refsColumns.set(`${ref.table}.${ref.column}`, {
+            table: ref.table,
+            column: ref.column,
+          });
+        }
+      } else {
+        const colBuilder = orderByExpr as unknown as { table?: string; column?: string };
+        if (colBuilder.table && colBuilder.column) {
+          refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
+            table: colBuilder.table,
+            column: colBuilder.column,
+          });
+        }
+      }
+    }
+  }
+
+  const includeAliases = new Set(args.includes?.map((inc) => inc.alias) ?? []);
+  const projectionMap = Object.fromEntries(
+    args.projection.aliases.map((alias, index) => {
+      if (includeAliases.has(alias)) {
+        return [alias, `include:${alias}`];
+      }
+      const column = args.projection.columns[index];
+      if (!column) {
+        throw planInvalid(`Missing column for alias ${alias} at index ${index}`);
+      }
+      const col = column as unknown as {
+        table?: string;
+        column?: string;
+        _operationExpr?: OperationExpr;
+      };
+      if (!col.table || !col.column) {
+        return [alias, `include:${alias}`];
+      }
+      const operationExpr = col._operationExpr;
+      if (operationExpr) {
+        return [alias, `operation:${operationExpr.method}`];
+      }
+      return [alias, `${col.table}.${col.column}`];
+    }),
+  );
+
+  const projectionTypes: Record<string, string> = {};
+  for (let i = 0; i < args.projection.aliases.length; i++) {
+    const alias = args.projection.aliases[i];
+    if (!alias || includeAliases.has(alias)) {
+      continue;
+    }
+    const column = args.projection.columns[i];
+    if (!column) {
+      continue;
+    }
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      if (operationExpr.returns.kind === 'typeId') {
+        projectionTypes[alias] = operationExpr.returns.type;
+      } else if (operationExpr.returns.kind === 'builtin') {
+        projectionTypes[alias] = operationExpr.returns.type;
+      }
+    } else {
+      const col = column as unknown as { columnMeta?: { type?: string } };
+      const columnMeta = col.columnMeta;
+      if (columnMeta?.type) {
+        projectionTypes[alias] = columnMeta.type;
+      }
+    }
+  }
+
+  const projectionCodecs: Record<string, string> = {};
+  for (let i = 0; i < args.projection.aliases.length; i++) {
+    const alias = args.projection.aliases[i];
+    if (!alias || includeAliases.has(alias)) {
+      continue;
+    }
+    const column = args.projection.columns[i];
+    if (!column) {
+      continue;
+    }
+    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    if (operationExpr) {
+      if (operationExpr.returns.kind === 'typeId') {
+        projectionCodecs[alias] = operationExpr.returns.type;
+      }
+    } else {
+      const col = column as unknown as { columnMeta?: { type?: string } };
+      const columnMeta = col.columnMeta;
+      if (columnMeta?.type) {
+        projectionCodecs[alias] = columnMeta.type;
+      }
+    }
+  }
+
+  const allCodecs: Record<string, string> = {
+    ...projectionCodecs,
+    ...(args.paramCodecs ? args.paramCodecs : {}),
+  };
+
+  return Object.freeze({
+    target: args.contract.target,
+    ...(args.contract.targetFamily ? { targetFamily: args.contract.targetFamily } : {}),
+    coreHash: args.contract.coreHash,
+    lane: 'dsl',
+    refs: {
+      tables: Array.from(refsTables),
+      columns: Array.from(refsColumns.values()),
+    },
+    projection: projectionMap,
+    ...(Object.keys(projectionTypes).length > 0 ? { projectionTypes } : {}),
+    ...(Object.keys(allCodecs).length > 0
+      ? { annotations: Object.freeze({ codecs: Object.freeze(allCodecs) }) }
+      : {}),
+    paramDescriptors: args.paramDescriptors,
+    ...(args.contract.profileHash !== undefined ? { profileHash: args.contract.profileHash } : {}),
+  } satisfies PlanMeta);
+}
+
+function buildWhereExpr(
+  where: BinaryBuilder,
+  contract: SqlContract<SqlStorage>,
+  paramsMap: Record<string, unknown>,
+  descriptors: ParamDescriptor[],
+  values: unknown[],
+): {
+  expr: BinaryExpr;
+  codecId?: string;
+  paramName: string;
+} {
+  const placeholder = where.right;
+  const paramName = placeholder.name;
+
+  if (!Object.hasOwn(paramsMap, paramName)) {
+    throw planInvalid(`Missing value for parameter ${paramName}`);
+  }
+
+  const value = paramsMap[paramName];
+  const index = values.push(value);
+
+  let leftExpr: ColumnRef | OperationExpr;
+  let codecId: string | undefined;
+
+  const operationExpr = (where.left as { _operationExpr?: OperationExpr })._operationExpr;
+  if (operationExpr) {
+    leftExpr = operationExpr;
+  } else {
+    const colBuilder = where.left as unknown as {
+      table: string;
+      column: string;
+      columnMeta?: { type?: string; nullable?: boolean };
+    };
+    const meta = (colBuilder.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+
+    descriptors.push({
+      name: paramName,
+      source: 'dsl',
+      refs: { table: colBuilder.table, column: colBuilder.column },
+      ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+    });
+
+    const contractTable = contract.storage.tables[colBuilder.table];
+    const columnMeta = contractTable?.columns[colBuilder.column];
+    codecId = columnMeta?.type;
+
+    leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
+  }
+
+  return {
+    expr: createBinaryExpr('eq', leftExpr, createParamRef(index, paramName)),
+    ...(codecId ? { codecId } : {}),
+    paramName,
+  };
 }
