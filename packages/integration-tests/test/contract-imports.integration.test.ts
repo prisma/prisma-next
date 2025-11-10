@@ -321,6 +321,9 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/sql-contract-types': [
               `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/index.d.ts`,
             ],
+            '@prisma-next/sql-contract-ts/*': [
+              `${relativeToWorkspace}/packages/sql/authoring/sql-contract-ts/dist/exports/*.d.ts`,
+            ],
             '@prisma-next/sql-target': [
               `${relativeToWorkspace}/packages/sql-target/dist/exports/index.d.ts`,
             ],

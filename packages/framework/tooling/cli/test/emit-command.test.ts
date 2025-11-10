@@ -171,36 +171,40 @@ describe('emit command', () => {
     expect(consoleErrors.length).toBeGreaterThan(0);
   });
 
-  it('handles unsupported target family', async () => {
-    const command = createEmitCommand();
-    const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
+  it(
+    'handles unsupported target family',
+    async () => {
+      const command = createEmitCommand();
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
-    const invalidContractPath = join(outputDir, 'invalid-contract.ts');
-    writeFileSync(
-      invalidContractPath,
-      `export const contract = { targetFamily: 'document', target: 'mongodb' } as const;`,
-      'utf-8',
-    );
-
-    try {
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
+      const invalidContractPath = join(outputDir, 'invalid-contract.ts');
+      writeFileSync(
         invalidContractPath,
-        '--out',
-        outputDir,
-        '--adapter',
-        adapterPath,
-      ]);
-    } catch (error) {
-      expect(error).toBeDefined();
-    }
+        `export const contract = { targetFamily: 'document', target: 'mongodb' } as const;`,
+        'utf-8',
+      );
 
-    // validateContract throws "Unsupported target family" when targetFamily is not 'sql'
-    expect(consoleErrors.some((msg) => msg.includes('Unsupported target family'))).toBe(true);
-  });
+      try {
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          invalidContractPath,
+          '--out',
+          outputDir,
+          '--adapter',
+          adapterPath,
+        ]);
+      } catch (error) {
+        expect(error).toBeDefined();
+      }
+
+      // validateContract throws "Unsupported target family" when targetFamily is not 'sql'
+      expect(consoleErrors.some((msg) => msg.includes('Unsupported target family'))).toBe(true);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'handles extension paths',
