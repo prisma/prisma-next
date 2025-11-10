@@ -3,6 +3,7 @@ import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract-types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
+import type { SchemaHandle } from '../src/schema';
 import { schema } from '../src/schema';
 
 type TestContract = SqlContract<
@@ -25,24 +26,16 @@ type TestContract = SqlContract<
   SqlMappings
 >;
 
-type TestContractWithIdOnly = SqlContract<
-  {
-    readonly tables: {
-      readonly user: {
-        readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
-        };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
-      };
+type TestSchemaHandle = SchemaHandle<TestContract>;
+type TestUserTable = TestSchemaHandle['tables']['user'];
+
+type MutableStorage = {
+  tables: {
+    user: {
+      columns: Record<string, unknown>;
     };
-  },
-  Record<string, never>,
-  Record<string, never>,
-  SqlMappings
->;
+  };
+};
 
 describe('schema', () => {
   const contract = validateContract<TestContract>({
@@ -84,19 +77,62 @@ describe('schema', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
-    const userTable = tables.user;
-    expect(userTable.columns.id).toBeDefined();
-    expect(userTable.columns.id).toBe(userTable.columns.id);
-    expect(userTable.columns.email).toBeDefined();
-    expect(userTable.columns.email).toBe(userTable.columns.email);
+    const userTable: TestUserTable = tables.user;
+    // Test proxy access pattern: userTable.id should work via proxy
+    // The proxy allows accessing columns directly on the table object
+    const idViaProxy = (userTable as unknown as { id: typeof userTable.columns.id }).id;
+    const emailViaProxy = (userTable as unknown as { email: typeof userTable.columns.email }).email;
+
+    expect({
+      idColumn: userTable.columns.id,
+      emailColumn: userTable.columns.email,
+      idViaProxy,
+      emailViaProxy,
+      idMatches: idViaProxy === userTable.columns.id,
+      emailMatches: emailViaProxy === userTable.columns.email,
+    }).toMatchObject({
+      idColumn: userTable.columns.id,
+      emailColumn: userTable.columns.email,
+      idViaProxy: userTable.columns.id,
+      emailViaProxy: userTable.columns.email,
+      idMatches: true,
+      emailMatches: true,
+    });
   });
 
   it('table proxy returns undefined for non-existent properties', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
-    const userTable = tables.user;
-    expect((userTable.columns as Record<string, unknown>)['nonexistent']).toBeUndefined();
+    const userTable: TestUserTable = tables.user;
+    const nonexistentColumn = (userTable.columns as Record<string, unknown>)['nonexistent'];
+    const nonexistentViaProxy = (userTable as unknown as Record<string, unknown>)['nonexistent'];
+
+    expect({
+      columnAccess: nonexistentColumn,
+      proxyAccess: nonexistentViaProxy,
+    }).toMatchObject({
+      columnAccess: undefined,
+      proxyAccess: undefined,
+    });
+  });
+
+  it('table proxy returns undefined for non-string properties', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    // Access with Symbol or number to test non-string branch
+    const symbolAccess = (userTable as unknown as Record<symbol, unknown>)[Symbol('test')];
+    const numberAccess = (userTable as unknown as Record<number, unknown>)[0];
+
+    expect({
+      symbolAccess,
+      numberAccess,
+    }).toMatchObject({
+      symbolAccess: undefined,
+      numberAccess: undefined,
+    });
   });
 
   it('table proxy preserves standard properties', () => {
@@ -109,8 +145,8 @@ describe('schema', () => {
     expect(userTable.columns).toBeDefined();
   });
 
-  it('throws error for unknown table when building columns', () => {
-    const contractWithUnknownTable = validateContract<TestContractWithIdOnly>({
+  it('handles undefined column definitions gracefully', () => {
+    const contractWithUndefinedColumn = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
       coreHash: 'test-hash',
@@ -119,6 +155,7 @@ describe('schema', () => {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -133,11 +170,29 @@ describe('schema', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithUnknownTable, adapter);
+    const context = createTestContext(contractWithUndefinedColumn, adapter);
+    // Manually manipulate storage to have undefined column to test continue branch
+    // This tests the branch where columnDef is undefined (line 202 in schema.ts)
+    const storage = context.contract.storage as unknown as MutableStorage;
+    const userTable = storage.tables.user;
+    // Add a key with undefined value to test the continue branch
+    userTable.columns['undefinedColumn'] = undefined;
+
     const tables = schema(context).tables;
-    expect(tables.user).toBeDefined();
-    // The error is thrown when building columns, not when accessing the table
-    // This is tested indirectly through the schema function
+    const resultTable: TestUserTable = tables.user;
+    const undefinedColumn = (resultTable.columns as Record<string, unknown>)['undefinedColumn'];
+
+    expect({
+      tableDefined: resultTable !== undefined,
+      idDefined: resultTable.columns.id !== undefined,
+      emailDefined: resultTable.columns.email !== undefined,
+      undefinedColumnSkipped: undefinedColumn === undefined,
+    }).toMatchObject({
+      tableDefined: true,
+      idDefined: true,
+      emailDefined: true,
+      undefinedColumnSkipped: true,
+    });
   });
 
   it('column builder eq throws error for invalid param', () => {
@@ -156,12 +211,18 @@ describe('schema', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
-    const userTable = tables.user;
+    const userTable: TestUserTable = tables.user;
     const idColumn = userTable.columns.id;
 
-    expect(idColumn.columnMeta).toBeDefined();
-    expect(idColumn.columnMeta.type).toBe('pg/int4@1');
-    expect(idColumn.columnMeta.nullable).toBe(false);
+    expect({
+      hasColumnMeta: idColumn.columnMeta !== undefined,
+      type: idColumn.columnMeta.type,
+      nullable: idColumn.columnMeta.nullable,
+    }).toMatchObject({
+      hasColumnMeta: true,
+      type: 'pg/int4@1',
+      nullable: false,
+    });
   });
 
   it('column builder has __jsType property', () => {
@@ -178,38 +239,56 @@ describe('schema', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
-    const userTable = tables.user;
+    const userTable: TestUserTable = tables.user;
     const idColumn = userTable.columns.id;
 
     const binary = idColumn.eq(param('userId'));
-    expect(binary).toBeDefined();
-    expect(binary.kind).toBe('binary');
-    expect(binary.op).toBe('eq');
+    expect({
+      defined: binary !== undefined,
+      kind: binary.kind,
+      op: binary.op,
+    }).toMatchObject({
+      defined: true,
+      kind: 'binary',
+      op: 'eq',
+    });
   });
 
   it('column builder asc creates order builder', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
-    const userTable = tables.user;
+    const userTable: TestUserTable = tables.user;
     const idColumn = userTable.columns.id;
 
     const order = idColumn.asc();
-    expect(order).toBeDefined();
-    expect(order.kind).toBe('order');
-    expect(order.dir).toBe('asc');
+    expect({
+      defined: order !== undefined,
+      kind: order.kind,
+      dir: order.dir,
+    }).toMatchObject({
+      defined: true,
+      kind: 'order',
+      dir: 'asc',
+    });
   });
 
   it('column builder desc creates order builder', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
-    const userTable = tables.user;
+    const userTable: TestUserTable = tables.user;
     const idColumn = userTable.columns.id;
 
     const order = idColumn.desc();
-    expect(order).toBeDefined();
-    expect(order.kind).toBe('order');
-    expect(order.dir).toBe('desc');
+    expect({
+      defined: order !== undefined,
+      kind: order.kind,
+      dir: order.dir,
+    }).toMatchObject({
+      defined: true,
+      kind: 'order',
+      dir: 'desc',
+    });
   });
 });
