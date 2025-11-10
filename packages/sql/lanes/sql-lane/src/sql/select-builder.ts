@@ -1,0 +1,464 @@
+import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import {
+  createColumnRef,
+  createJoinOnBuilder,
+  createOrderByItem,
+  createSelectAst,
+  createTableRef,
+} from '@prisma-next/sql-relational-core/ast';
+import type {
+  AnyBinaryBuilder,
+  AnyOrderBuilder,
+  BinaryBuilder,
+  BuildOptions,
+  InferNestedProjectionRow,
+  JoinOnBuilder,
+  JoinOnPredicate,
+  NestedProjection,
+  OrderBuilder,
+  SqlBuilderOptions,
+} from '@prisma-next/sql-relational-core/types';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  Direction,
+  IncludeAst,
+  IncludeRef,
+  JoinAst,
+  LoweredStatement,
+  OperationExpr,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  TableRef,
+} from '@prisma-next/sql-target';
+import type { ProjectionInput } from '../types/internal';
+import { checkIncludeCapabilities } from '../utils/capabilities';
+import {
+  errorChildProjectionEmpty,
+  errorFromMustBeCalled,
+  errorIncludeAliasCollision,
+  errorInvalidColumnForAlias,
+  errorLimitMustBeNonNegativeInteger,
+  errorMissingAlias,
+  errorMissingColumnForAlias,
+  errorSelectMustBeCalled,
+  errorSelfJoinNotSupported,
+  errorUnknownTable,
+} from '../utils/errors';
+import { isOperationExpr } from '../utils/guards';
+import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
+import { buildIncludeAst, IncludeChildBuilderImpl } from './include-builder';
+import { buildJoinAst } from './join-builder';
+import { buildMeta } from './plan';
+import { buildWhereExpr } from './predicate-builder';
+import { buildProjectionState } from './projection';
+
+export class SelectBuilderImpl<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  Row = unknown,
+  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
+  Includes extends Record<string, unknown> = Record<string, never>,
+> {
+  private readonly contract: TContract;
+  private readonly adapter: import('@prisma-next/sql-target').Adapter<
+    import('@prisma-next/sql-target').QueryAst,
+    SqlContract<SqlStorage>,
+    LoweredStatement
+  >;
+  private readonly codecTypes: CodecTypes;
+  private readonly context: import('@prisma-next/runtime').RuntimeContext<TContract>;
+  private state: BuilderState = {};
+
+  constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
+    this.context = options.context;
+    this.contract = options.context.contract;
+    this.adapter = options.context.adapter;
+    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
+    if (state) {
+      this.state = state;
+    }
+  }
+
+  from(table: TableRef): SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>> {
+    return new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(
+      {
+        context: this.context,
+      },
+      { ...this.state, from: table },
+    );
+  }
+
+  innerJoin(
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    return this._addJoin('inner', table, on);
+  }
+
+  leftJoin(
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    return this._addJoin('left', table, on);
+  }
+
+  rightJoin(
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    return this._addJoin('right', table, on);
+  }
+
+  fullJoin(
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    return this._addJoin('full', table, on);
+  }
+
+  includeMany<
+    ChildProjection extends NestedProjection,
+    ChildRow = InferNestedProjectionRow<ChildProjection, CodecTypes>,
+    AliasName extends string = string,
+  >(
+    childTable: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+    childBuilder: (
+      child: import('./include-builder').IncludeChildBuilder<TContract, CodecTypes, unknown>,
+    ) => import('./include-builder').IncludeChildBuilder<TContract, CodecTypes, ChildRow>,
+    options?: { alias?: AliasName },
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes & { [K in AliasName]: ChildRow }> {
+    checkIncludeCapabilities(this.contract);
+
+    if (!this.contract.storage.tables[childTable.name]) {
+      errorUnknownTable(childTable.name);
+    }
+
+    const joinOnBuilder = createJoinOnBuilder();
+    const onPredicate = on(joinOnBuilder);
+
+    // Validate ON uses column equality
+    // TypeScript can't narrow ColumnBuilder properly, so we assert
+    const onLeft = onPredicate.left as { table: string; column: string };
+    const onRight = onPredicate.right as { table: string; column: string };
+    if (onLeft.table === onRight.table) {
+      errorSelfJoinNotSupported();
+    }
+
+    // Build child builder
+    const childBuilderImpl = new IncludeChildBuilderImpl<TContract, CodecTypes, unknown>(
+      this.contract,
+      this.codecTypes,
+      childTable,
+    );
+    const builtChild = childBuilder(
+      childBuilderImpl as import('./include-builder').IncludeChildBuilder<
+        TContract,
+        CodecTypes,
+        unknown
+      >,
+    );
+    const childState = (
+      builtChild as IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>
+    ).getState();
+
+    // Validate child projection is non-empty
+    if (childState.childProjection.aliases.length === 0) {
+      errorChildProjectionEmpty();
+    }
+
+    // Determine alias
+    const alias = options?.alias ?? childTable.name;
+
+    // Check for alias collisions with existing projection
+    if (this.state.projection) {
+      if (this.state.projection.aliases.includes(alias)) {
+        errorIncludeAliasCollision(alias, 'projection');
+      }
+    }
+
+    // Check for alias collisions with existing includes
+    const existingIncludes = this.state.includes ?? [];
+    if (existingIncludes.some((inc) => inc.alias === alias)) {
+      errorIncludeAliasCollision(alias, 'include');
+    }
+
+    const includeState: IncludeState = {
+      alias,
+      table: childTable,
+      on: onPredicate,
+      childProjection: childState.childProjection,
+      ...(childState.childWhere !== undefined ? { childWhere: childState.childWhere } : {}),
+      ...(childState.childOrderBy !== undefined ? { childOrderBy: childState.childOrderBy } : {}),
+      ...(childState.childLimit !== undefined ? { childLimit: childState.childLimit } : {}),
+    };
+
+    const newIncludes = [...existingIncludes, includeState];
+
+    // Type-level: Update Includes map with new include
+    // The AliasName generic parameter is inferred from options.alias, allowing TypeScript
+    // to track include definitions across multiple includeMany() calls and infer correct
+    // array types when select() includes boolean true for include references
+    type NewIncludes = Includes & { [K in AliasName]: ChildRow };
+
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, NewIncludes>(
+      {
+        context: this.context,
+      },
+      { ...this.state, includes: newIncludes },
+    );
+  }
+
+  private _addJoin(
+    joinType: 'inner' | 'left' | 'right' | 'full',
+    table: TableRef,
+    on: (on: JoinOnBuilder) => JoinOnPredicate,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    const fromTable = this.ensureFrom();
+
+    if (!this.contract.storage.tables[table.name]) {
+      errorUnknownTable(table.name);
+    }
+
+    if (table.name === fromTable.name) {
+      errorSelfJoinNotSupported();
+    }
+
+    const joinOnBuilder = createJoinOnBuilder();
+    const onPredicate = on(joinOnBuilder);
+
+    const joinState: JoinState = {
+      joinType,
+      table,
+      on: onPredicate,
+    };
+
+    const existingJoins = this.state.joins ?? [];
+    const newJoins = [...existingJoins, joinState];
+
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
+      {
+        context: this.context,
+      },
+      { ...this.state, joins: newJoins },
+    );
+  }
+
+  where(expr: AnyBinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
+      {
+        context: this.context,
+      },
+      { ...this.state, where: expr },
+    );
+  }
+
+  select<P extends ProjectionInput>(
+    projection: P,
+  ): SelectBuilderImpl<
+    TContract,
+    InferNestedProjectionRow<P, CodecTypes, Includes>,
+    CodecTypes,
+    Includes
+  > {
+    const table = this.ensureFrom();
+    const projectionState = buildProjectionState(table, projection, this.state.includes);
+
+    return new SelectBuilderImpl<
+      TContract,
+      InferNestedProjectionRow<P, CodecTypes, Includes>,
+      CodecTypes,
+      Includes
+    >(
+      {
+        context: this.context,
+      },
+      { ...this.state, projection: projectionState },
+    );
+  }
+
+  orderBy(order: AnyOrderBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
+      {
+        context: this.context,
+      },
+      { ...this.state, orderBy: order },
+    );
+  }
+
+  limit(count: number): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+    if (!Number.isInteger(count) || count < 0) {
+      errorLimitMustBeNonNegativeInteger();
+    }
+
+    return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
+      {
+        context: this.context,
+      },
+      { ...this.state, limit: count },
+    );
+  }
+
+  build(options?: BuildOptions): Plan<Row> {
+    const table = this.ensureFrom();
+    const projection = this.ensureProjection();
+
+    const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
+    const contractTable = this.contract.storage.tables[table.name];
+
+    if (!contractTable) {
+      errorUnknownTable(table.name);
+    }
+
+    const paramDescriptors: ParamDescriptor[] = [];
+    const paramValues: unknown[] = [];
+    const paramCodecs: Record<string, string> = {};
+
+    const whereResult = this.state.where
+      ? buildWhereExpr(this.contract, this.state.where, paramsMap, paramDescriptors, paramValues)
+      : undefined;
+    const whereExpr = whereResult?.expr;
+
+    if (whereResult?.codecId && whereResult.paramName) {
+      paramCodecs[whereResult.paramName] = whereResult.codecId;
+    }
+
+    const orderByClause = this.state.orderBy
+      ? (() => {
+          const orderBy = this.state.orderBy as OrderBuilder<string, StorageColumn, unknown>;
+          const orderExpr = orderBy.expr;
+          const expr: ColumnRef | OperationExpr = isOperationExpr(orderExpr)
+            ? orderExpr
+            : (() => {
+                const colBuilder = orderExpr as { table: string; column: string };
+                return createColumnRef(colBuilder.table, colBuilder.column);
+              })();
+          return [createOrderByItem(expr, orderBy.dir)];
+        })()
+      : undefined;
+
+    const joins = this.state.joins?.map((join) => buildJoinAst(join));
+
+    const includes = this.state.includes?.map((include) =>
+      buildIncludeAst(include, this.contract, paramsMap, paramDescriptors, paramValues),
+    );
+
+    // Build projection with support for includeRef and OperationExpr
+    const projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }> =
+      [];
+    for (let i = 0; i < projection.aliases.length; i++) {
+      const alias = projection.aliases[i];
+      if (!alias) {
+        errorMissingAlias(i);
+      }
+      const column = projection.columns[i];
+      if (!column) {
+        errorMissingColumnForAlias(alias, i);
+      }
+
+      // Check if this alias matches an include alias
+      const matchingInclude = this.state.includes?.find((inc) => inc.alias === alias);
+      if (matchingInclude) {
+        // This is an include reference
+        projectEntries.push({
+          alias,
+          expr: { kind: 'includeRef', alias },
+        });
+      } else {
+        // Check if this column has an operation expression
+        const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+        if (operationExpr) {
+          projectEntries.push({
+            alias,
+            expr: operationExpr,
+          });
+        } else {
+          // This is a regular column
+          // TypeScript can't narrow ColumnBuilder properly
+          const col = column as { table: string; column: string };
+          const tableName = col.table;
+          const columnName = col.column;
+          if (!tableName || !columnName) {
+            errorInvalidColumnForAlias(alias, i);
+          }
+          projectEntries.push({
+            alias,
+            expr: createColumnRef(tableName, columnName),
+          });
+        }
+      }
+    }
+
+    const ast = createSelectAst({
+      from: createTableRef(table.name),
+      joins,
+      includes,
+      project: projectEntries,
+      where: whereExpr,
+      orderBy: orderByClause,
+      limit: this.state.limit,
+    } as {
+      from: TableRef;
+      joins?: ReadonlyArray<JoinAst>;
+      includes?: ReadonlyArray<IncludeAst>;
+      project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
+      where?: BinaryExpr;
+      orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
+      limit?: number;
+    });
+
+    const lowered = this.adapter.lower(ast, {
+      contract: this.contract,
+      params: paramValues,
+    });
+    const loweredBody = lowered.body as LoweredStatement;
+
+    const planMeta = buildMeta({
+      contract: this.contract,
+      table,
+      projection,
+      joins: this.state.joins,
+      includes: this.state.includes,
+      paramDescriptors,
+      paramCodecs,
+      where: this.state.where,
+      orderBy: this.state.orderBy,
+    } as {
+      contract: SqlContract<SqlStorage>;
+      table: TableRef;
+      projection: ProjectionState;
+      joins?: ReadonlyArray<JoinState>;
+      includes?: ReadonlyArray<IncludeState>;
+      where?: BinaryBuilder;
+      orderBy?: AnyOrderBuilder;
+      paramDescriptors: ParamDescriptor[];
+      paramCodecs?: Record<string, string>;
+    });
+
+    const plan: Plan<Row> = Object.freeze({
+      ast,
+      sql: loweredBody.sql,
+      params: loweredBody.params ?? paramValues,
+      meta: planMeta,
+    });
+
+    return plan;
+  }
+
+  private ensureFrom() {
+    if (!this.state.from) {
+      errorFromMustBeCalled();
+    }
+
+    return this.state.from;
+  }
+
+  private ensureProjection() {
+    if (!this.state.projection) {
+      errorSelectMustBeCalled();
+    }
+
+    return this.state.projection;
+  }
+}

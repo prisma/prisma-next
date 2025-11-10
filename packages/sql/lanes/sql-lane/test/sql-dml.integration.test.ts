@@ -14,7 +14,7 @@ import {
   executePlanAndCollect,
   setupTestDatabase,
 } from '../../../../runtime/test/utils';
-import { sql } from '../src/sql';
+import { sql } from '../src/sql/builder';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',

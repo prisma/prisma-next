@@ -9,7 +9,7 @@ import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import type { SelectAst as SelectAstType } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createStubAdapter, createTestContext } from '../../../../runtime/test/utils';
-import { sql } from '../src/sql';
+import { sql } from '../src/sql/builder';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');

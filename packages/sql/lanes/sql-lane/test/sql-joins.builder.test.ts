@@ -11,7 +11,7 @@ import type {
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createTestContext } from '../../../../runtime/test/utils';
-import { sql } from '../src/sql';
+import { sql } from '../src/sql/builder';
 import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type for this test

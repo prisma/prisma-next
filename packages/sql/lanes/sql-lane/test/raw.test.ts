@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { createStubAdapter, createTestContext } from '../../../../runtime/test/utils';
 import { rawOptions as exportedRawOptions, sql as exportedSql } from '../src/exports/sql';
 import { rawOptions } from '../src/raw';
-import { sql } from '../src/sql';
+import { sql } from '../src/sql/builder';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
