@@ -6,7 +6,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { JoinOnBuilder, TableKey, TablesOf } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { expectTypeOf, test } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -889,3 +889,4 @@ test('delete with returning() infers Row type', () => {
 
   expectTypeOf(_plan).toExtend<Plan<Row>>();
 });
+

@@ -187,11 +187,13 @@ describe('ast/join', () => {
       const builder = createJoinOnBuilder();
 
       expect(() => {
-        builder.eqCol(null as unknown, tables.post.columns.userId);
+        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+        builder.eqCol(null as any, tables.post.columns.userId);
       }).toThrow('Join ON left operand must be a column');
 
       expect(() => {
-        builder.eqCol(undefined as unknown, tables.post.columns.userId);
+        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+        builder.eqCol(undefined as any, tables.post.columns.userId);
       }).toThrow('Join ON left operand must be a column');
     });
 
@@ -203,11 +205,13 @@ describe('ast/join', () => {
       const builder = createJoinOnBuilder();
 
       expect(() => {
-        builder.eqCol(tables.user.columns.id, null as unknown);
+        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+        builder.eqCol(tables.user.columns.id, null as any);
       }).toThrow('Join ON right operand must be a column');
 
       expect(() => {
-        builder.eqCol(tables.user.columns.id, undefined as unknown);
+        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+        builder.eqCol(tables.user.columns.id, undefined as any);
       }).toThrow('Join ON right operand must be a column');
     });
 

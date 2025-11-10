@@ -58,8 +58,8 @@ describe('ast/insert', () => {
       const insertAst = createInsertAst({ table, values });
 
       expect(insertAst.values).toBe(values);
-      expect(insertAst.values.id).toEqual(createColumnRef('user', 'id'));
-      expect(insertAst.values.email).toEqual(createParamRef(0, 'email'));
+      expect(insertAst.values['id']).toEqual(createColumnRef('user', 'id'));
+      expect(insertAst.values['email']).toEqual(createParamRef(0, 'email'));
     });
 
     it('creates insert ast without returning clause', () => {

@@ -44,7 +44,7 @@ describe('mutation builder edge cases', () => {
         sql<Contract, CodecTypes>({ context })
           .insert(userTable, {
             nonexistent: param('value'),
-          } as Record<string, typeof param>)
+          } as any)
           .build({ params: { value: 'test' } }),
       ).toThrow('Unknown column nonexistent in table user');
     });
@@ -95,7 +95,7 @@ describe('mutation builder edge cases', () => {
         sql<Contract, CodecTypes>({ context })
           .update(userTable, {
             nonexistent: param('value'),
-          } as Record<string, typeof param>)
+          } as any)
           .where(userColumns.id.eq(param('userId')))
           .build({ params: { value: 'test', userId: 1 } }),
       ).toThrow('Unknown column nonexistent in table user');

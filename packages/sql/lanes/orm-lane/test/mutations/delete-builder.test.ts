@@ -5,7 +5,6 @@ import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildDeletePlan } from '../../src/mutations/delete-builder';
 import type { OrmContext } from '../../src/orm/context';
-import type { ModelColumnAccessor } from '../../src/orm-types';
 
 describe('delete builder', () => {
   const contract: SqlContract<SqlStorage> = {
@@ -71,52 +70,57 @@ describe('delete builder', () => {
   const context: OrmContext<SqlContract<SqlStorage>> = {
     contract,
     adapter: adapter as unknown as OrmContext<SqlContract<SqlStorage>>['adapter'],
+    context: {} as any,
   };
 
-  const getModelAccessor = (): ModelColumnAccessor<
-    SqlContract<SqlStorage>,
-    Record<string, never>,
-    'User'
-  > => {
+  const getModelAccessor: () => any = () => {
     return {
       id: {
         eq: (p: unknown) => ({ left: { table: 'user', column: 'id' }, right: p, op: 'eq' }),
       },
-    } as unknown as ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>;
+    };
   };
 
   it('builds delete plan with where clause', () => {
-    const where = (
-      model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
-    ) => {
+    const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
 
-    const plan = buildDeletePlan(context, 'User', where, getModelAccessor, {
-      params: { userId: 1 },
-    });
+    const plan = buildDeletePlan<SqlContract<SqlStorage>, Record<string, never>, 'User'>(
+      context,
+      'User',
+      where,
+      getModelAccessor,
+      {
+        params: { userId: 1 },
+      },
+    );
 
     expect(plan).toBeDefined();
     expect(plan.meta.lane).toBe('orm');
-    expect(plan.meta.refs.tables).toEqual(['user']);
-    expect(plan.ast.kind).toBe('delete');
+    expect(plan.meta.refs?.tables).toEqual(['user']);
+    expect((plan.ast as any).kind).toBe('delete');
     expect(plan.sql).toBe('DELETE FROM user WHERE id = $1');
   });
 
   it('builds delete plan without codecId', () => {
-    const where = (
-      model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
-    ) => {
+    const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
 
-    const plan = buildDeletePlan(context, 'User', where, getModelAccessor, {
-      params: { userId: 1 },
-    });
+    const plan = buildDeletePlan<SqlContract<SqlStorage>, Record<string, never>, 'User'>(
+      context,
+      'User',
+      where,
+      getModelAccessor,
+      {
+        params: { userId: 1 },
+      },
+    );
 
     expect(plan.meta.annotations).toBeDefined();
-    expect(plan.meta.annotations?.intent).toBe('write');
-    expect(plan.meta.annotations?.isMutation).toBe(true);
+    expect(plan.meta.annotations?.['intent']).toBe('write');
+    expect(plan.meta.annotations?.['isMutation']).toBe(true);
   });
 
   it('builds delete plan with codecId', () => {
@@ -142,9 +146,7 @@ describe('delete builder', () => {
       contract: contractWithCodec,
     };
 
-    const where = (
-      model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
-    ) => {
+    const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
 
@@ -157,9 +159,7 @@ describe('delete builder', () => {
   });
 
   it('throws error when model not found', () => {
-    const where = (
-      model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
-    ) => {
+    const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
 
@@ -182,9 +182,7 @@ describe('delete builder', () => {
   });
 
   it('throws error when where expr is missing', () => {
-    const where = (
-      model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
-    ) => {
+    const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
 

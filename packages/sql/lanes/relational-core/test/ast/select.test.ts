@@ -177,7 +177,7 @@ describe('ast/select', () => {
 
       const selectAst = createSelectAst({ from, project });
 
-      expect(selectAst.project[0].expr).toBe(operationExpr);
+      expect(selectAst.project[0]?.expr).toBe(operationExpr);
     });
 
     it('creates select ast with exists expr in where', () => {
@@ -202,7 +202,7 @@ describe('ast/select', () => {
       const selectAst = createSelectAst({ from, project, where });
 
       expect(selectAst.where).toBe(where);
-      expect(selectAst.where.kind).toBe('exists');
+      expect(selectAst.where?.kind).toBe('exists');
     });
 
     it('removes undefined optional fields', () => {

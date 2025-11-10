@@ -29,6 +29,11 @@ describe('guards', () => {
         self: baseCol,
         args: [],
         returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'normalize(${self})',
+        },
       };
       const operation2: OperationExpr = {
         kind: 'operation',
@@ -36,7 +41,12 @@ describe('guards', () => {
         forTypeId: 'pgvector/vector@1',
         self: operation1,
         args: [],
-        returns: { kind: 'builtin', type: 'float8' },
+        returns: { kind: 'builtin', type: 'number' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          template: '${self} <=> ${arg0}',
+        },
       };
 
       const result = extractBaseColumnRef(operation2);
@@ -60,7 +70,7 @@ describe('guards', () => {
     });
 
     it('returns empty array for LiteralExpr', () => {
-      const literalExpr = { kind: 'literal', value: 'test' as const };
+      const literalExpr = { kind: 'literal' as const, value: 'test' };
       const result = collectColumnRefs(literalExpr);
       expect(result).toEqual([]);
     });
@@ -75,6 +85,11 @@ describe('guards', () => {
         self: col1,
         args: [col2],
         returns: { kind: 'builtin', type: 'boolean' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: '${self} = ${arg0}',
+        },
       };
 
       const result = collectColumnRefs(operation);
@@ -93,6 +108,11 @@ describe('guards', () => {
         self: col1,
         args: [],
         returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'normalize(${self})',
+        },
       };
       const outerOp: OperationExpr = {
         kind: 'operation',
@@ -100,7 +120,12 @@ describe('guards', () => {
         forTypeId: 'pgvector/vector@1',
         self: innerOp,
         args: [col2],
-        returns: { kind: 'builtin', type: 'float8' },
+        returns: { kind: 'builtin', type: 'number' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          template: '${self} <=> ${arg0}',
+        },
       };
 
       const result = collectColumnRefs(outerOp);
@@ -120,6 +145,11 @@ describe('guards', () => {
         self: colRef,
         args: [],
         returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'normalize(${self})',
+        },
       };
 
       expect(isOperationExpr(operation)).toBe(true);
@@ -137,15 +167,18 @@ describe('guards', () => {
     });
 
     it('returns false for null', () => {
-      expect(isOperationExpr(null)).toBe(false);
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+      expect(isOperationExpr(null as any)).toBe(false);
     });
 
     it('returns false for undefined', () => {
-      expect(isOperationExpr(undefined)).toBe(false);
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+      expect(isOperationExpr(undefined as any)).toBe(false);
     });
 
     it('returns false for plain object without kind', () => {
-      expect(isOperationExpr({ table: 'user', column: 'id' })).toBe(false);
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+      expect(isOperationExpr({ table: 'user', column: 'id' } as any)).toBe(false);
     });
   });
 
@@ -171,6 +204,11 @@ describe('guards', () => {
         self: baseCol,
         args: [],
         returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'normalize(${self})',
+        },
       };
 
       const result = getColumnInfo(operation);
@@ -186,6 +224,11 @@ describe('guards', () => {
         self: baseCol,
         args: [],
         returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'normalize(${self})',
+        },
       };
       const outerOp: OperationExpr = {
         kind: 'operation',
@@ -193,7 +236,12 @@ describe('guards', () => {
         forTypeId: 'pgvector/vector@1',
         self: innerOp,
         args: [],
-        returns: { kind: 'builtin', type: 'float8' },
+        returns: { kind: 'builtin', type: 'number' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          template: '${self} <=> ${arg0}',
+        },
       };
 
       const result = getColumnInfo(outerOp);
@@ -222,6 +270,11 @@ describe('guards', () => {
         self: colRef,
         args: [],
         returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'normalize(${self})',
+        },
       };
 
       expect(isColumnBuilder(operation)).toBe(false);

@@ -85,8 +85,8 @@ describe('ast/update', () => {
 
       const updateAst = createUpdateAst({ table, set, where });
 
-      expect(updateAst.set.id).toEqual(createColumnRef('user', 'id'));
-      expect(updateAst.set.email).toEqual(createParamRef(0, 'email'));
+      expect(updateAst.set['id']).toEqual(createColumnRef('user', 'id'));
+      expect(updateAst.set['email']).toEqual(createParamRef(0, 'email'));
     });
 
     it('creates update ast without returning clause', () => {

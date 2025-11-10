@@ -5,7 +5,6 @@ describe('index exports', () => {
   it('exports all expected types and functions', () => {
     expect(indexExports).toHaveProperty('rawOptions');
     expect(indexExports).toHaveProperty('sql');
-    expect(indexExports).toHaveProperty('SelectBuilder');
     expect(indexExports).toHaveProperty('createJoinOnBuilder');
   });
 
@@ -17,10 +16,9 @@ describe('index exports', () => {
     expect(typeof indexExports.sql).toBe('function');
   });
 
-  it('exports SelectBuilder type', () => {
-    // SelectBuilder is a type, not a class, so it won't be available at runtime
-    // We can't test type exports at runtime, but we can verify the export exists
-    expect(typeof indexExports.SelectBuilder).toBe('undefined');
+  it('exports SelectBuilder', () => {
+    // SelectBuilder is exported as a value (function/class), not just a type
+    expect(indexExports).toHaveProperty('SelectBuilder');
   });
 
   it('exports createJoinOnBuilder function', () => {

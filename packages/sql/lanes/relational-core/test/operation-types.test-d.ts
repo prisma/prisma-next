@@ -75,3 +75,4 @@ test('handles empty operations registry', () => {
   // When Operations is empty, OperationsForTypeId should return Record<string, never>
   expectTypeOf<Ops>().toEqualTypeOf<Record<string, never>>();
 });
+

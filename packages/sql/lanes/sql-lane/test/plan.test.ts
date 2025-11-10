@@ -5,7 +5,12 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyOrderBuilder,
+  JoinOnPredicate,
+} from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { OperationExpr } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
@@ -38,6 +43,12 @@ describe('buildMeta', () => {
       self: createColumnRef('user', 'id'),
       args: [],
       returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'normalize(${self})',
+      },
     };
 
     const columnWithOp = {
@@ -45,8 +56,12 @@ describe('buildMeta', () => {
       table: 'user',
       column: 'id',
       columnMeta: { type: 'pg/int4@1', nullable: false },
+      eq: () => ({}) as unknown as AnyBinaryBuilder,
+      asc: () => ({}) as unknown as AnyOrderBuilder,
+      desc: () => ({}) as unknown as AnyOrderBuilder,
+      __jsType: undefined as unknown,
       _operationExpr: operationExpr,
-    } as AnyColumnBuilder;
+    } as unknown as AnyColumnBuilder;
 
     const meta = buildMeta({
       contract,
@@ -76,7 +91,13 @@ describe('buildMeta', () => {
       forTypeId: 'pgvector/vector@1',
       self: createColumnRef('user', 'id'),
       args: [],
-      returns: { kind: 'builtin', type: 'float8' },
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} <=> ${arg0}',
+      },
     };
 
     const columnWithOp = {
@@ -84,8 +105,12 @@ describe('buildMeta', () => {
       table: 'user',
       column: 'id',
       columnMeta: { type: 'pg/int4@1', nullable: false },
+      eq: () => ({}) as unknown as AnyBinaryBuilder,
+      asc: () => ({}) as unknown as AnyOrderBuilder,
+      desc: () => ({}) as unknown as AnyOrderBuilder,
+      __jsType: undefined as unknown,
       _operationExpr: operationExpr,
-    } as AnyColumnBuilder;
+    } as unknown as AnyColumnBuilder;
 
     const meta = buildMeta({
       contract,
@@ -98,7 +123,7 @@ describe('buildMeta', () => {
     });
 
     expect(meta.projectionTypes).toEqual({
-      distance: 'float8',
+      distance: 'number',
     });
   });
 
@@ -142,7 +167,7 @@ describe('buildMeta', () => {
       id: 'user.id',
       posts: 'include:posts',
     });
-    expect(meta.refs.tables).toContain('post');
+    expect(meta.refs?.tables).toContain('post');
   });
 
   it('builds meta with joins', () => {
@@ -169,8 +194,8 @@ describe('buildMeta', () => {
       paramDescriptors: [],
     });
 
-    expect(meta.refs.tables).toContain('post');
-    expect(meta.refs.columns).toContainEqual({ table: 'user', column: 'id' });
+    expect(meta.refs?.tables).toContain('post');
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
   });
 
   it('builds meta with where clause', () => {
@@ -185,7 +210,7 @@ describe('buildMeta', () => {
       paramDescriptors: [],
     });
 
-    expect(meta.refs.columns).toContainEqual({ table: 'user', column: 'id' });
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
   });
 
   it('builds meta with orderBy clause', () => {
@@ -200,7 +225,7 @@ describe('buildMeta', () => {
       paramDescriptors: [],
     });
 
-    expect(meta.refs.columns).toContainEqual({ table: 'user', column: 'id' });
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
   });
 
   it('builds meta with paramCodecs', () => {
@@ -246,7 +271,7 @@ describe('buildMeta', () => {
             kind: 'join-on' as const,
             left: userColumns.id,
             right: userColumns.id,
-          },
+          } as unknown as JoinOnPredicate,
           childProjection: {
             aliases: ['id'],
             columns: [userColumns.id],
