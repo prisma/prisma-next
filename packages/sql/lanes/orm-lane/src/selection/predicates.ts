@@ -1,12 +1,7 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { BinaryExpr, ColumnRef, OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
-import type {
-  BinaryExpr,
-  ColumnRef,
-  OperationExpr,
-  SqlContract,
-  SqlStorage,
-} from '@prisma-next/sql-target';
 import { createBinaryExpr, createColumnRef, createParamRef } from '../utils/ast';
 import { errorMissingParameter } from '../utils/errors';
 

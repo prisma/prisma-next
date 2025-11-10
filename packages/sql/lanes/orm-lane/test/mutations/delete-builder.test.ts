@@ -1,9 +1,9 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { DeleteAst } from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
-import type { DeleteAst } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildDeletePlan } from '../../src/mutations/delete-builder';
 import type { OrmContext } from '../../src/orm/context';

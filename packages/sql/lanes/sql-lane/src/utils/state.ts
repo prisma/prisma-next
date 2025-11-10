@@ -1,10 +1,10 @@
+import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
   JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
-import type { TableRef } from '@prisma-next/sql-target';
 
 export interface ProjectionState {
   readonly aliases: string[];

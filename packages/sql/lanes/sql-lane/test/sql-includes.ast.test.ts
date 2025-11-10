@@ -1,11 +1,11 @@
-import { createColumnRef, createParamRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   BinaryExpr,
   ColumnRef,
   Direction,
   IncludeAst,
   SelectAst,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-relational-core/ast';
+import { createColumnRef, createParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 
 describe('Include AST types', () => {

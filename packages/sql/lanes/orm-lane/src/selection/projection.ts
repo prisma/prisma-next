@@ -1,3 +1,4 @@
+import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
@@ -5,7 +6,6 @@ import type {
   JoinOnPredicate,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import type { TableRef } from '@prisma-next/sql-target';
 import {
   errorAliasCollision,
   errorAliasPathEmpty,

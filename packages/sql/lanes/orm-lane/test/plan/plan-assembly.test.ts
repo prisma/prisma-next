@@ -1,18 +1,17 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type {
+  LoweredStatement,
+  OperationExpr,
+  SelectAst,
+  TableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyColumnBuilder,
   AnyOrderBuilder,
   BinaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
-import type {
-  LoweredStatement,
-  OperationExpr,
-  SelectAst,
-  SqlContract,
-  SqlStorage,
-  TableRef,
-} from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildMeta, createPlan, createPlanWithExists } from '../../src/plan/plan-assembly';
 import type { IncludeState } from '../../src/relations/include-plan';

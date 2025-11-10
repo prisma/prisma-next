@@ -1,4 +1,13 @@
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type {
+  Adapter,
+  ColumnRef,
+  LoweredStatement,
+  ParamRef,
+  QueryAst,
+  TableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
   createDeleteAst,
@@ -16,16 +25,6 @@ import type {
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
-import type {
-  Adapter,
-  ColumnRef,
-  LoweredStatement,
-  ParamRef,
-  QueryAst,
-  SqlContract,
-  SqlStorage,
-  TableRef,
-} from '@prisma-next/sql-target';
 import { checkReturningCapability } from '../utils/capabilities';
 import {
   errorFailedToBuildWhereClause,

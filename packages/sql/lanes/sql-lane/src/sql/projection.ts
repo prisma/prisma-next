@@ -1,5 +1,5 @@
+import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder, NestedProjection } from '@prisma-next/sql-relational-core/types';
-import type { TableRef } from '@prisma-next/sql-target';
 import type { ProjectionInput } from '../types/internal';
 import {
   errorAliasCollision,

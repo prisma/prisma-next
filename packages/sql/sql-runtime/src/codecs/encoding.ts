@@ -1,5 +1,5 @@
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
-import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
+import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
 function resolveParamCodec(
   paramDescriptor: ParamDescriptor,

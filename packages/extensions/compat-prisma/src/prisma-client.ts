@@ -2,6 +2,7 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { sql } from '@prisma-next/sql-lane/sql';
+import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -15,7 +16,6 @@ import {
   type Runtime,
   type RuntimeContext,
 } from '@prisma-next/sql-runtime';
-import type { TableRef } from '@prisma-next/sql-target';
 
 interface PrismaClientOptions {
   readonly contract: SqlContract<SqlStorage>;

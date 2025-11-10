@@ -3,7 +3,7 @@ import type {
   SqlExecuteRequest,
   SqlExplainResult,
   SqlQueryResult,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-relational-core/ast';
 import type {
   Client,
   QueryResult as PgQueryResult,

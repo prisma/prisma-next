@@ -1,21 +1,20 @@
 import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
-import { compact } from '@prisma-next/sql-relational-core/ast';
-import type {
-  AnyColumnBuilder,
-  AnyOrderBuilder,
-  BinaryBuilder,
-} from '@prisma-next/sql-relational-core/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import type {
   BinaryExpr,
   ExistsExpr,
   LoweredStatement,
   OperationExpr,
   SelectAst,
-  SqlContract,
-  SqlStorage,
   TableRef,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-relational-core/ast';
+import { compact } from '@prisma-next/sql-relational-core/ast';
+import type {
+  AnyColumnBuilder,
+  AnyOrderBuilder,
+  BinaryBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import type { IncludeState } from '../relations/include-plan';
 import type { ProjectionState } from '../selection/projection';
 import { collectColumnRefs, getColumnInfo, isOperationExpr } from '../utils/guards';

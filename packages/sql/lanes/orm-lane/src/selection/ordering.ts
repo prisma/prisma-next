@@ -1,5 +1,6 @@
+import type { StorageColumn } from '@prisma-next/sql-contract-types';
+import type { ColumnRef, Direction, OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import type { AnyOrderBuilder, OrderBuilder } from '@prisma-next/sql-relational-core/types';
-import type { ColumnRef, Direction, OperationExpr, StorageColumn } from '@prisma-next/sql-target';
 import { createColumnRef, createOrderByItem } from '../utils/ast';
 import { extractBaseColumnRef, isOperationExpr } from '../utils/guards';
 

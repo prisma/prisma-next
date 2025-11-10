@@ -3,13 +3,7 @@ import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract-types';
 import type { LoweringSpec } from '@prisma-next/sql-operations';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
-import type {
-  ColumnRef,
-  Direction,
-  OperationExpr,
-  ParamRef,
-  QueryAst,
-} from '@prisma-next/sql-target';
+import type { ColumnRef, Direction, OperationExpr, ParamRef, QueryAst } from './ast/types';
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';

@@ -6,18 +6,14 @@ import { fileURLToPath } from 'node:url';
 import type { ResultType } from '@prisma-next/contract/types';
 import type { ContractIR } from '@prisma-next/emitter';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { sql } from '@prisma-next/sql-lane/sql';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import type {
-  Adapter,
-  LoweredStatement,
-  SelectAst,
-  SqlContract,
-  SqlStorage,
-} from '@prisma-next/sql-target';
-import { createCodecRegistry, sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
@@ -65,7 +61,7 @@ describe('emit integration', () => {
     'loads TS contract, emits artifacts, and uses them with lanes',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../../sql/runtime/adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -129,7 +125,7 @@ describe('emit integration', () => {
     'round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../../sql/runtime/adapters/postgres');
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);

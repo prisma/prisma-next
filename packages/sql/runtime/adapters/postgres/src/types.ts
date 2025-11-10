@@ -1,4 +1,10 @@
 import type {
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+} from '@prisma-next/sql-contract-types';
+import type {
   BinaryExpr,
   ColumnRef,
   DeleteAst,
@@ -11,12 +17,8 @@ import type {
   ParamRef,
   QueryAst,
   SelectAst,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
   UpdateAst,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-relational-core/ast';
 
 export interface PostgresAdapterOptions {
   readonly profileId?: string;

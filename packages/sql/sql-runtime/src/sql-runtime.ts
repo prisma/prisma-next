@@ -10,15 +10,14 @@ import type {
   TelemetryOutcome,
 } from '@prisma-next/runtime-core';
 import { createRuntimeCore } from '@prisma-next/runtime-core';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import type {
   Adapter,
   CodecRegistry,
   LoweredStatement,
   SelectAst,
-  SqlContract,
   SqlDriver,
-  SqlStorage,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-relational-core/ast';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';

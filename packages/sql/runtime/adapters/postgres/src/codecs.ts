@@ -11,7 +11,7 @@
  * at compile time (to derive CodecTypes).
  */
 
-import { codec, defineCodecs } from '@prisma-next/sql-target';
+import { codec, defineCodecs } from '@prisma-next/sql-relational-core/ast';
 
 // Create individual codec instances
 const pgTextCodec = codec({

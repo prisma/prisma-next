@@ -1,5 +1,5 @@
 import type { Plan } from '@prisma-next/contract/types';
-import type { Codec, CodecRegistry } from '@prisma-next/sql-target';
+import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
 function resolveRowCodec(alias: string, plan: Plan, registry: CodecRegistry): Codec | null {
   const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;

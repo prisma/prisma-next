@@ -1,10 +1,4 @@
-import type {
-  ColumnRef,
-  LiteralExpr,
-  OperationExpr,
-  ParamRef,
-  TableRef,
-} from '@prisma-next/sql-target';
+import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef, TableRef } from './types';
 import { compact } from './util';
 
 export function createTableRef(name: string): TableRef {

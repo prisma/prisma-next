@@ -5,7 +5,7 @@ import type {
   OperationExpr,
   ParamRef,
   SelectAst,
-} from '@prisma-next/sql-target';
+} from './types';
 
 export function createBinaryExpr(
   op: 'eq',

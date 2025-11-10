@@ -1,4 +1,18 @@
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract-types';
+import type {
+  Adapter,
+  BinaryExpr,
+  ColumnRef,
+  Direction,
+  IncludeAst,
+  IncludeRef,
+  JoinAst,
+  LoweredStatement,
+  OperationExpr,
+  QueryAst,
+  TableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
   createJoinOnBuilder,
@@ -19,22 +33,6 @@ import type {
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
-import type {
-  Adapter,
-  BinaryExpr,
-  ColumnRef,
-  Direction,
-  IncludeAst,
-  IncludeRef,
-  JoinAst,
-  LoweredStatement,
-  OperationExpr,
-  QueryAst,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  TableRef,
-} from '@prisma-next/sql-target';
 import type { ProjectionInput } from '../types/internal';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {

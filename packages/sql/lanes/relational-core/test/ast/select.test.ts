@@ -6,7 +6,7 @@ import type {
   OperationExpr,
   SelectAst,
   TableRef,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
 import { createJoin, createJoinOnExpr } from '../../src/ast/join';

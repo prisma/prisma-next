@@ -1,11 +1,12 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import type { SqlContract, SqlStorage, TableRef } from '@prisma-next/sql-target';
 import type { ProjectionState } from '../utils/state';
 
 export type ProjectionInput = Record<string, AnyColumnBuilder | boolean | NestedProjection>;

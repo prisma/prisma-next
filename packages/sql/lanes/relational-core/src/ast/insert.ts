@@ -1,4 +1,4 @@
-import type { ColumnRef, InsertAst, ParamRef, TableRef } from '@prisma-next/sql-target';
+import type { ColumnRef, InsertAst, ParamRef, TableRef } from './types';
 import { compact } from './util';
 
 export interface CreateInsertAstOptions {

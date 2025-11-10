@@ -1,4 +1,9 @@
-import type { ColumnRef, OperationExpr, ParamRef, SelectAst } from '@prisma-next/sql-target';
+import type {
+  ColumnRef,
+  OperationExpr,
+  ParamRef,
+  SelectAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
 import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';

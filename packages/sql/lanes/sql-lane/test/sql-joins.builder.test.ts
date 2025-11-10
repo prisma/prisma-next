@@ -1,11 +1,10 @@
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
-import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry, createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
-import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
 import type { CodecTypes } from './fixtures/contract.d';
@@ -144,7 +143,9 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-    expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toEqual([
+    expect(
+      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
+    ).toEqual([
       {
         kind: 'join',
         joinType: 'inner',
@@ -178,9 +179,11 @@ describe('SQL builder joins', () => {
       .build();
 
     expect(
-      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
     ).toBeDefined();
-    expect((plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins).toEqual([
+    expect(
+      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
+    ).toEqual([
       {
         kind: 'join',
         joinType: 'inner',
@@ -224,7 +227,9 @@ describe('SQL builder joins', () => {
       .build();
 
     expect(
-      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins?.map((j) => ({
+      (
+        plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined
+      )?.joins?.map((j) => ({
         kind: j.kind,
         joinType: j.joinType,
       })),
@@ -254,10 +259,10 @@ describe('SQL builder joins', () => {
       .build({ params: { userId: 42 } });
 
     expect(
-      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
     ).toBeDefined();
     expect(
-      (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins,
+      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
     ).toHaveLength(1);
     const ast = plan.ast as SelectAst;
     expect(ast?.where).toBeDefined();
@@ -316,8 +321,8 @@ describe('SQL builder joins', () => {
       const builtPlan = plan.select({ userId: userColumns.id }).build();
 
       expect(
-        (builtPlan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.joins?.[0]
-          ?.joinType,
+        (builtPlan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)
+          ?.joins?.[0]?.joinType,
       ).toBe(joinType);
     }
   });
@@ -414,11 +419,13 @@ describe('SQL builder joins', () => {
         })
         .build();
 
-      const selectAst = plan.ast as import('@prisma-next/sql-target').SelectAst | undefined;
+      const selectAst = plan.ast as
+        | import('@prisma-next/sql-relational-core/ast').SelectAst
+        | undefined;
       expect(selectAst?.joins).toBeDefined();
       expect(selectAst?.joins?.length).toBe(1);
       expect(
-        (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project,
+        (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.project,
       ).toEqual([
         { alias: 'name', expr: createColumnRef('user', 'email') },
         { alias: 'post_title', expr: createColumnRef('post', 'title') },
@@ -488,7 +495,7 @@ describe('SQL builder joins', () => {
         .build();
 
       expect(
-        (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project,
+        (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.project,
       ).toEqual([
         { alias: 'user_id', expr: createColumnRef('user', 'id') },
         { alias: 'user_email', expr: createColumnRef('user', 'email') },

@@ -79,7 +79,7 @@ export const contract = defineContract<CodecTypes>()
 
   it('executes CLI to emit contract and verifies artifacts', async () => {
     const cliPath = resolve('packages/cli/dist/cli.js');
-    const adapterPath = resolve('packages/adapter-postgres');
+    const adapterPath = resolve('packages/sql/runtime/adapters/postgres');
 
     try {
       await execFileAsync('node', [
@@ -131,7 +131,7 @@ export const contract = defineContract<CodecTypes>()
   });
 
   it('round-trip test: TS contract → CLI emit → parse JSON → compare with loaded TS contract', async () => {
-    const adapterPath = resolve('packages/adapter-postgres');
+    const adapterPath = resolve('packages/sql/runtime/adapters/postgres');
 
     const originalContract = await loadContractFromTs(contractPath);
 

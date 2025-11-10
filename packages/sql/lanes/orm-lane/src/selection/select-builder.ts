@@ -8,7 +8,7 @@ import type {
   OperationExpr,
   SelectAst,
   TableRef,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-relational-core/ast';
 import type { IncludeState } from '../relations/include-plan';
 import { createColumnRef, createSelectAst, createTableRef } from '../utils/ast';
 import { errorInvalidColumn, errorMissingAlias, errorMissingColumn } from '../utils/errors';

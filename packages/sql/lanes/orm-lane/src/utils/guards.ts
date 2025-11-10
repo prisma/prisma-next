@@ -1,5 +1,10 @@
+import type {
+  ColumnRef,
+  LiteralExpr,
+  OperationExpr,
+  ParamRef,
+} from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
-import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from '@prisma-next/sql-target';
 
 export function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef {
   if (expr.kind === 'col') {

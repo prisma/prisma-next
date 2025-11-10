@@ -1,8 +1,10 @@
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type { ParamPlaceholder, RawFactory } from '@prisma-next/sql-relational-core/types';
-import type { SqlContract, SqlStorage, TableRef } from '@prisma-next/sql-target';
 import type { DeleteBuilder, InsertBuilder, UpdateBuilder } from '../sql/mutation-builder';
 import type { SelectBuilderImpl } from '../sql/select-builder';
 
+export type { TableRef } from '@prisma-next/sql-relational-core/ast';
 export type {
   AnyColumnBuilder,
   BuildOptions,
@@ -11,8 +13,6 @@ export type {
   RawFactory,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
-
-export type { TableRef } from '@prisma-next/sql-target';
 
 export type SelectBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,

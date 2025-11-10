@@ -1,4 +1,4 @@
-import type { BinaryExpr, ColumnRef, DeleteAst, TableRef } from '@prisma-next/sql-target';
+import type { BinaryExpr, ColumnRef, DeleteAst, TableRef } from './types';
 import { compact } from './util';
 
 export interface CreateDeleteAstOptions {

@@ -9,7 +9,7 @@ import type {
   OperationExpr,
   SelectAst,
   TableRef,
-} from '@prisma-next/sql-target';
+} from './types';
 import { compact } from './util';
 
 export interface CreateSelectAstOptions {

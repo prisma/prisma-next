@@ -1,4 +1,4 @@
-import type { ColumnRef, ParamRef, TableRef } from '@prisma-next/sql-target';
+import type { ColumnRef, ParamRef, TableRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
 import { createInsertAst } from '../../src/ast/insert';

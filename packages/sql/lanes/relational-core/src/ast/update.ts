@@ -1,4 +1,4 @@
-import type { BinaryExpr, ColumnRef, ParamRef, TableRef, UpdateAst } from '@prisma-next/sql-target';
+import type { BinaryExpr, ColumnRef, ParamRef, TableRef, UpdateAst } from './types';
 import { compact } from './util';
 
 export interface CreateUpdateAstOptions {

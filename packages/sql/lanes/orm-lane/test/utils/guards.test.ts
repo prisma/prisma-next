@@ -1,10 +1,10 @@
+import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
   createLiteralExpr,
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
-import type { OperationExpr } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import {
   collectColumnRefs,

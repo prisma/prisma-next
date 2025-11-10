@@ -1,9 +1,9 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { UpdateAst } from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
-import type { UpdateAst } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildUpdatePlan } from '../../src/mutations/update-builder';
 import type { OrmContext } from '../../src/orm/context';

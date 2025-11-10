@@ -1,11 +1,11 @@
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { SqlContract } from '@prisma-next/sql-contract-types';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract } from '@prisma-next/sql-target';
 import { Client } from 'pg';
 import contract from './contract.json' with { type: 'json' };
 

@@ -1,4 +1,12 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract-types';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  IncludeAst,
+  OperationExpr,
+  TableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
   createJoinOnExpr,
@@ -14,16 +22,6 @@ import type {
   NestedProjection,
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
-import type {
-  BinaryExpr,
-  ColumnRef,
-  IncludeAst,
-  OperationExpr,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  TableRef,
-} from '@prisma-next/sql-target';
 import {
   errorChildProjectionMustBeSpecified,
   errorLimitMustBeNonNegativeInteger,

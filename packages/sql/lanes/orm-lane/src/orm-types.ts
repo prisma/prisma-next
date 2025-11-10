@@ -1,4 +1,5 @@
 import type { Plan } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
@@ -9,7 +10,6 @@ import type {
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { OrmIncludeChildBuilder } from './orm-include-child';
 
 export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {

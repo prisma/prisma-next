@@ -1,4 +1,14 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract-types';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  ExistsExpr,
+  IncludeAst,
+  OperationExpr,
+  ParamRef,
+  TableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -9,18 +19,6 @@ import type {
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
-import type {
-  BinaryExpr,
-  ColumnRef,
-  ExistsExpr,
-  IncludeAst,
-  OperationExpr,
-  ParamRef,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  TableRef,
-} from '@prisma-next/sql-target';
 import { checkIncludeCapabilities } from '../orm/capabilities';
 import type { OrmIncludeState, RelationFilter } from '../orm/state';
 import { buildJoinOnExpr } from '../selection/join';

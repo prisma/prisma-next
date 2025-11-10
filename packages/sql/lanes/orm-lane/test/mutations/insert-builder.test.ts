@@ -1,7 +1,7 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
-import type { InsertAst } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildInsertPlan, convertModelFieldsToColumns } from '../../src/mutations/insert-builder';
 import type { OrmContext } from '../../src/orm/context';

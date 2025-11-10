@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
@@ -32,7 +32,7 @@ describe('emit command functionality', () => {
     'loads TS contract and emits contract.json and contract.d.ts',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../../sql/runtime/adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -77,7 +77,7 @@ describe('emit command functionality', () => {
     'emits contract with correct coreHash',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../../sql/runtime/adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -101,7 +101,7 @@ describe('emit command functionality', () => {
     async () => {
       const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../../sql/runtime/adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);

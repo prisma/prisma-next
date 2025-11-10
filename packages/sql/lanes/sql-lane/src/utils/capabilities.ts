@@ -1,4 +1,4 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import {
   errorIncludeCapabilitiesNotTrue,
   errorIncludeRequiresCapabilities,

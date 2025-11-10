@@ -1,4 +1,4 @@
-import type { ColumnRef, Direction, OperationExpr } from '@prisma-next/sql-target';
+import type { ColumnRef, Direction, OperationExpr } from './types';
 
 export function createOrderByItem(
   expr: ColumnRef | OperationExpr,

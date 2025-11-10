@@ -1,5 +1,10 @@
+import type {
+  ColumnRef,
+  LiteralExpr,
+  OperationExpr,
+  ParamRef,
+} from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
-import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from '@prisma-next/sql-target';
 
 /**
  * Recursively extracts the base ColumnRef from an OperationExpr.

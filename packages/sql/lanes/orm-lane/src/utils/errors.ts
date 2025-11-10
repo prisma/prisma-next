@@ -1,5 +1,5 @@
 import { planInvalid } from '@prisma-next/plan';
-import type { StorageColumn } from '@prisma-next/sql-target';
+import type { StorageColumn } from '@prisma-next/sql-contract-types';
 
 export function errorModelNotFound(modelName: string): never {
   throw planInvalid(`Model ${modelName} not found in mappings`);

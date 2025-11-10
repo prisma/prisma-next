@@ -318,14 +318,14 @@ describe('ColumnBuilder operations', () => {
     const distance = (
       normalized as unknown as {
         cosineDistance: (arg: unknown) => unknown;
-        _operationExpr?: import('@prisma-next/sql-target').OperationExpr;
+        _operationExpr?: import('@prisma-next/sql-relational-core/ast').OperationExpr;
       }
     ).cosineDistance(otherVectorColumn);
 
     // Verify the result has an operation expression
     expect(distance).toHaveProperty('kind', 'column');
     const distanceWithExpr = distance as unknown as {
-      _operationExpr?: import('@prisma-next/sql-target').OperationExpr;
+      _operationExpr?: import('@prisma-next/sql-relational-core/ast').OperationExpr;
     };
     expect(distanceWithExpr._operationExpr).toBeDefined();
 
@@ -340,7 +340,7 @@ describe('ColumnBuilder operations', () => {
     });
 
     // Verify the inner operation (normalize) has the column as its self
-    const innerOp = outerOp?.self as import('@prisma-next/sql-target').OperationExpr;
+    const innerOp = outerOp?.self as import('@prisma-next/sql-relational-core/ast').OperationExpr;
     expect(innerOp).toMatchObject({
       kind: 'operation',
       method: 'normalize',

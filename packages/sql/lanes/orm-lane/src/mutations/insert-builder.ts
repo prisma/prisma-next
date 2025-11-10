@@ -1,13 +1,8 @@
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { ColumnRef, LoweredStatement, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { BuildOptions, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
-import type {
-  ColumnRef,
-  LoweredStatement,
-  ParamRef,
-  SqlContract,
-  SqlStorage,
-} from '@prisma-next/sql-target';
 import type { OrmContext } from '../orm/context';
 import { createInsertAst, createParamRef, createTableRef } from '../utils/ast';
 import {

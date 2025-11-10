@@ -1,14 +1,13 @@
 import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import type {
   Adapter,
   LoweredStatement,
   SelectAst,
-  SqlContract,
   SqlDriver,
-  SqlStorage,
-} from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
+} from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { Log, Plugin, SqlStatement } from '../src/exports';

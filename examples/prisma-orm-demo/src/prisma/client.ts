@@ -1,7 +1,7 @@
 import { PrismaClient as LegacyPrismaClient } from '@prisma/client';
 import { PrismaClient as CompatPrismaClient } from '@prisma-next/compat-prisma';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract } from '@prisma-next/sql-target';
+import type { SqlContract } from '@prisma-next/sql-contract-types';
 import contract from '../prisma-next/contract.json' with { type: 'json' };
 
 import { getPrismaNextRuntime } from '../prisma-next/runtime';

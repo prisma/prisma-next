@@ -1,17 +1,18 @@
-import type { ParamPlaceholder, SqlBuilderOptions } from '@prisma-next/sql-relational-core/types';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,
   SqlContract,
   SqlStorage,
-  TableRef,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-contract-types';
+import type { TableRef } from '@prisma-next/sql-relational-core/ast';
+import { createJoinOnBuilder } from '@prisma-next/sql-relational-core/ast';
+import type { ParamPlaceholder, SqlBuilderOptions } from '@prisma-next/sql-relational-core/types';
 import { createRawFactory } from '../raw';
 import type { SelectBuilder } from '../types/public';
 import { DeleteBuilderImpl, InsertBuilderImpl, UpdateBuilderImpl } from './mutation-builder';
 import { SelectBuilderImpl } from './select-builder';
 
-export { createJoinOnBuilder } from '@prisma-next/sql-relational-core/ast';
+export { createJoinOnBuilder };
 export type { DeleteBuilder, InsertBuilder, SelectBuilder, UpdateBuilder } from '../types/public';
 export type { IncludeChildBuilder } from './include-builder';
 

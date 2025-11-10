@@ -9,10 +9,10 @@ import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { sql } from '@prisma-next/sql-lane/sql';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 
@@ -89,7 +89,10 @@ describe('emitter → lanes integration', () => {
         sources: {},
       };
 
-      const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+      const packs = loadExtensionPacks(
+        join(__dirname, '../../../sql/runtime/adapters/postgres'),
+        [],
+      );
       const options: EmitOptions = {
         outputDir: testDir,
         packs,

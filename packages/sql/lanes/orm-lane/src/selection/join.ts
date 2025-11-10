@@ -1,4 +1,4 @@
-import type { JoinOnExpr } from '@prisma-next/sql-target';
+import type { JoinOnExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef, createJoinOnExpr } from '../utils/ast';
 
 export function buildJoinOnExpr(

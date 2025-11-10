@@ -1,7 +1,7 @@
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { SqlContract } from '@prisma-next/sql-contract-types';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
-import type { SqlContract } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createJoinOnBuilder } from '../src/sql/builder';
 

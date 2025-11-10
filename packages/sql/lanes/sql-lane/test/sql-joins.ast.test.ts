@@ -1,5 +1,5 @@
+import type { JoinAst, JoinOnExpr, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
-import type { JoinAst, JoinOnExpr, SelectAst } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 
 describe('Join AST types', () => {

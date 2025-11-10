@@ -1,10 +1,10 @@
+import type { JoinAst } from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
   createJoin,
   createJoinOnExpr,
   createTableRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { JoinAst } from '@prisma-next/sql-target';
 import type { JoinState } from '../utils/state';
 
 export function buildJoinAst(join: JoinState): JoinAst {
