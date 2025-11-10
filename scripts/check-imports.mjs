@@ -182,12 +182,25 @@ function isImportAllowed(sourceInfo, targetInfo) {
     return true;
   }
 
-  // Cross-domain: only allowed when importing framework
+  // Cross-domain: framework tooling can import from SQL targets (for hooks) and SQL authoring (for contract validation)
   if (sourceInfo.domain !== targetInfo.domain) {
     if (targetInfo.domain === 'framework') {
       return true;
     }
+    // Framework tooling can import from SQL targets (for hooks)
+    if (sourceInfo.domain === 'framework' && sourceInfo.layer === 'tooling' && targetInfo.domain === 'sql' && targetInfo.layer === 'targets') {
+      return true;
+    }
+    // Framework tooling can import from SQL authoring (for contract validation)
+    if (sourceInfo.domain === 'framework' && sourceInfo.layer === 'tooling' && targetInfo.domain === 'sql' && targetInfo.layer === 'authoring') {
+      return true;
+    }
     return false;
+  }
+
+  // Within same domain: SQL authoring can import from SQL targets
+  if (sourceInfo.domain === 'sql' && sourceInfo.layer === 'authoring' && targetInfo.domain === 'sql' && targetInfo.layer === 'targets') {
+    return true;
   }
 
   // Migration → Runtime: denied
@@ -249,7 +262,6 @@ function getAllTsFiles(dir, fileList = []) {
 // Get changed files from git (for pre-commit mode)
 function getChangedFiles() {
   try {
-    const { execSync } = require('child_process');
     const output = execSync('git diff --cached --name-only --diff-filter=ACM', {
       encoding: 'utf-8',
       cwd: repoRoot,
@@ -277,6 +289,11 @@ function validateImports(changedFilesOnly = false) {
   for (const file of files) {
     // Skip test files - they can import from anywhere for testing purposes
     if (file.includes('/test/') || file.includes('.test.') || file.includes('.spec.')) {
+      continue;
+    }
+
+    // Skip config files - they can import from anywhere
+    if (file.endsWith('.config.ts') || file.endsWith('vitest.config.ts') || file.endsWith('tsup.config.ts')) {
       continue;
     }
 

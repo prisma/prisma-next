@@ -43,6 +43,9 @@
     "*.{ts,tsx,js,jsx,json,jsonc}": [
       "biome format --write",
       "biome check --write"
+    ],
+    "**/package.json": [
+      "node scripts/check-imports.mjs --changed-files"
     ]
   }
 }
