@@ -12,13 +12,14 @@ import type { ModelColumnAccessor } from '../orm-types';
 import { buildWhereExpr } from '../selection/predicates';
 import { createParamRef, createTableRef, createUpdateAst } from '../utils/ast';
 import {
+  assertColumnExists,
+  assertParameterExists,
   errorFailedToBuildWhereClause,
-  errorMissingParameter,
   errorModelNotFound,
-  errorUnknownColumn,
   errorUnknownTable,
   errorUpdateRequiresFields,
 } from '../utils/errors';
+import { createParamDescriptor } from '../utils/param-descriptor';
 import { convertModelFieldsToColumns } from './insert-builder';
 
 export function buildUpdatePlan<
@@ -63,31 +64,27 @@ export function buildUpdatePlan<
 
   const updateSet: Record<string, ColumnRef | ParamRef> = {};
   for (const [columnName, placeholder] of Object.entries(set)) {
-    if (!contractTable.columns[columnName]) {
-      errorUnknownColumn(columnName, tableName);
-    }
+    const columnMeta = contractTable.columns[columnName];
+    assertColumnExists(columnMeta, columnName, tableName);
 
     const paramName = placeholder.name;
-    if (!Object.hasOwn(paramsMap, paramName)) {
-      errorMissingParameter(paramName);
-    }
-
-    const value = paramsMap[paramName];
+    const value = assertParameterExists(paramsMap, paramName);
     const index = paramValues.push(value);
 
-    const columnMeta = contractTable.columns[columnName];
-    const codecId = columnMeta?.type;
+    const codecId = columnMeta.type;
     if (codecId && paramName) {
       paramCodecs[paramName] = codecId;
     }
 
-    paramDescriptors.push({
-      name: paramName,
-      source: 'dsl',
-      refs: { table: tableName, column: columnName },
-      ...(codecId ? { type: codecId } : {}),
-      ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
-    });
+    paramDescriptors.push(
+      createParamDescriptor({
+        name: paramName,
+        table: tableName,
+        column: columnName,
+        type: codecId,
+        nullable: columnMeta.nullable,
+      }),
+    );
 
     updateSet[columnName] = createParamRef(index, paramName);
   }

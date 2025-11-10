@@ -276,7 +276,7 @@ describe('runtime execute integration', () => {
 
 function loadContractFixture(): SqlContract<SqlStorage> {
   const fixtureDir = dirname(fileURLToPath(import.meta.url));
-  const contractPath = join(fixtureDir, '../../sql-query/test/fixtures/contract.json');
+  const contractPath = join(fixtureDir, 'fixtures/contract.json');
   const json = readFileSync(contractPath, 'utf8');
   const contractJson = JSON.parse(json) as unknown;
   return validateContract<SqlContract<SqlStorage>>(contractJson);

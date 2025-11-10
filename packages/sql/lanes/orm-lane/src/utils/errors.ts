@@ -1,4 +1,5 @@
 import { planInvalid } from '@prisma-next/plan';
+import type { StorageColumn } from '@prisma-next/sql-target';
 
 export function errorModelNotFound(modelName: string): never {
   throw planInvalid(`Model ${modelName} not found in mappings`);
@@ -106,4 +107,24 @@ export function errorRelationNotFound(relationName: string, modelName: string): 
 
 export function errorFailedToBuildWhereClause(): never {
   throw planInvalid('Failed to build WHERE clause');
+}
+
+export function assertColumnExists(
+  columnMeta: StorageColumn | undefined,
+  columnName: string,
+  tableName: string,
+): asserts columnMeta is StorageColumn {
+  if (!columnMeta) {
+    errorUnknownColumn(columnName, tableName);
+  }
+}
+
+export function assertParameterExists(
+  paramsMap: Record<string, unknown>,
+  paramName: string,
+): unknown {
+  if (!Object.hasOwn(paramsMap, paramName)) {
+    errorMissingParameter(paramName);
+  }
+  return paramsMap[paramName];
 }

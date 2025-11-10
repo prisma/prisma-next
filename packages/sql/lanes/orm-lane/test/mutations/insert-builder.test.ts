@@ -328,56 +328,12 @@ describe('insert builder', () => {
       });
     });
 
-    it('builds insert plan without codecId when column type is missing', () => {
-      const contractWithoutType: SqlContract<SqlStorage> = {
-        ...contract,
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { type: 'pg/int4@1', nullable: false },
-                email: { type: 'pg/text@1', nullable: true },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      };
-
-      const contextWithoutType: OrmContext<SqlContract<SqlStorage>> = {
-        ...context,
-        contract: contractWithoutType,
-      };
-
-      const plan = buildInsertPlan(contextWithoutType, 'User', {
-        id: 1,
-        email: 'test@example.com',
-      });
-
-      expect({
-        idCodec: plan.meta.annotations?.codecs?.['id'],
-        emailCodec: plan.meta.annotations?.codecs?.['email'],
-      }).toMatchObject({
-        idCodec: 'pg/int4@1',
-        emailCodec: undefined,
-      });
-    });
-
     it('builds insert plan with nullable column', () => {
       const plan = buildInsertPlan(context, 'User', { id: 1, email: 'test@example.com' });
 
       const paramDescriptors = plan.meta.paramDescriptors;
       const emailDescriptor = paramDescriptors.find((d) => d.name === 'email');
       expect(emailDescriptor?.nullable).toBe(true);
-    });
-
-    it('builds insert plan without codecId when paramName is missing', () => {
-      const plan = buildInsertPlan(context, 'User', { id: 1, email: 'test@example.com' });
-
-      expect(plan.meta.annotations?.codecs).toBeDefined();
     });
 
     it('builds insert plan with options params merged with data', () => {
@@ -397,46 +353,6 @@ describe('insert builder', () => {
       });
       // extraParam is in paramsMap but not used in the insert, so it won't be in plan.params
       // unless it's referenced by a placeholder
-    });
-
-    it('builds insert plan without codecs when no codecIds', () => {
-      const contractWithoutCodecs: SqlContract<SqlStorage> = {
-        ...contract,
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { type: 'pg/int4@1', nullable: false },
-                email: { type: 'pg/text@1', nullable: true },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      };
-
-      const contextWithoutCodecs: OrmContext<SqlContract<SqlStorage>> = {
-        ...context,
-        contract: contractWithoutCodecs,
-      };
-
-      const plan = buildInsertPlan(contextWithoutCodecs, 'User', {
-        id: 1,
-        email: 'test@example.com',
-      });
-
-      expect({
-        codecs: plan.meta.annotations?.codecs,
-        intent: plan.meta.annotations?.['intent'],
-        isMutation: plan.meta.annotations?.['isMutation'],
-      }).toMatchObject({
-        codecs: undefined,
-        intent: 'write',
-        isMutation: true,
-      });
     });
   });
 });

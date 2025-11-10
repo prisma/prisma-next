@@ -11,12 +11,13 @@ import type {
 import type { OrmContext } from '../orm/context';
 import { createInsertAst, createParamRef, createTableRef } from '../utils/ast';
 import {
+  assertColumnExists,
+  assertParameterExists,
   errorCreateRequiresFields,
-  errorMissingParameter,
   errorModelNotFound,
-  errorUnknownColumn,
   errorUnknownTable,
 } from '../utils/errors';
+import { createParamDescriptor } from '../utils/param-descriptor';
 
 export function convertModelFieldsToColumns<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
@@ -87,31 +88,27 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
 
   const insertValues: Record<string, ColumnRef | ParamRef> = {};
   for (const [columnName, placeholder] of Object.entries(values)) {
-    if (!contractTable.columns[columnName]) {
-      errorUnknownColumn(columnName, tableName);
-    }
+    const columnMeta = contractTable.columns[columnName];
+    assertColumnExists(columnMeta, columnName, tableName);
 
     const paramName = placeholder.name;
-    if (!Object.hasOwn(paramsMap, paramName)) {
-      errorMissingParameter(paramName);
-    }
-
-    const value = paramsMap[paramName];
+    const value = assertParameterExists(paramsMap, paramName);
     const index = paramValues.push(value);
 
-    const columnMeta = contractTable.columns[columnName];
-    const codecId = columnMeta?.type;
+    const codecId = columnMeta.type;
     if (codecId && paramName) {
       paramCodecs[paramName] = codecId;
     }
 
-    paramDescriptors.push({
-      name: paramName,
-      source: 'dsl',
-      refs: { table: tableName, column: columnName },
-      ...(codecId ? { type: codecId } : {}),
-      ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
-    });
+    paramDescriptors.push(
+      createParamDescriptor({
+        name: paramName,
+        table: tableName,
+        column: columnName,
+        type: codecId,
+        nullable: columnMeta.nullable,
+      }),
+    );
 
     insertValues[columnName] = createParamRef(index, paramName);
   }

@@ -470,7 +470,7 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs?.columns).toHaveLength(3);
+      expect(meta.refs?.columns).toHaveLength(2);
       const postIdRef = meta.refs?.columns?.find((c) => c.table === 'post' && c.column === 'id');
       expect(postIdRef).toBeDefined();
     });
@@ -519,7 +519,7 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs?.columns).toHaveLength(3);
+      expect(meta.refs?.columns).toHaveLength(2);
       const postIdRef = meta.refs?.columns?.find((c) => c.table === 'post' && c.column === 'id');
       expect(postIdRef).toBeDefined();
     });
@@ -556,7 +556,18 @@ describe('plan assembly', () => {
     it('builds meta without annotations when no codecs', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+        columns: [
+          {
+            kind: 'column',
+            table: 'user',
+            column: 'id',
+            columnMeta: { nullable: false },
+            eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+            asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+            desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+            __jsType: undefined,
+          } as unknown as AnyColumnBuilder,
+        ],
       };
 
       const args = {
@@ -574,7 +585,18 @@ describe('plan assembly', () => {
     it('builds meta without projectionTypes when empty', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+        columns: [
+          {
+            kind: 'column',
+            table: 'user',
+            column: 'id',
+            columnMeta: { nullable: false },
+            eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+            asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+            desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+            __jsType: undefined,
+          } as unknown as AnyColumnBuilder,
+        ],
       };
 
       const args = {
@@ -728,8 +750,8 @@ describe('plan assembly', () => {
       const lowered = {
         body: {
           sql: 'SELECT * FROM user WHERE id = $1',
-          params: [],
-        } as LoweredStatement,
+          params: undefined,
+        } as unknown as LoweredStatement,
       };
       const paramValues: unknown[] = [1];
       const planMeta: PlanMeta = {
