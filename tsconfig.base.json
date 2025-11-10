@@ -19,18 +19,20 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@prisma-next/adapter-postgres/*": ["packages/adapter-postgres/src/exports/*.ts"],
-      "@prisma-next/driver-postgres": ["packages/driver-postgres/src/exports/index.ts"],
-      "@prisma-next/driver-postgres/*": ["packages/driver-postgres/src/exports/*.ts"],
-      "@prisma-next/sql-target": ["packages/sql-target/src/exports/index.ts"],
-      "@prisma-next/sql-target/*": ["packages/sql-target/src/exports/*.ts"],
-      "@prisma-next/contract": ["packages/contract/src/exports/types.ts"],
-      "@prisma-next/contract/*": ["packages/contract/src/exports/*.ts"],
+      "@prisma-next/adapter-postgres/*": [
+        "packages/sql/runtime/adapters/postgres/src/exports/*.ts"
+      ],
+      "@prisma-next/driver-postgres": [
+        "packages/sql/runtime/drivers/postgres/src/exports/index.ts"
+      ],
+      "@prisma-next/driver-postgres/*": ["packages/sql/runtime/drivers/postgres/src/exports/*.ts"],
+      "@prisma-next/contract": ["packages/framework/core-contract/src/exports/types.ts"],
+      "@prisma-next/contract/*": ["packages/framework/core-contract/src/exports/*.ts"],
       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
       "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
       "@prisma-next/emitter/*": ["packages/framework/tooling/emitter/src/exports/*.ts"],
-      "@prisma-next/compat-prisma": ["packages/compat-prisma/src/exports/index.ts"],
-      "@prisma-next/compat-prisma/*": ["packages/compat-prisma/src/exports/*.ts"],
+      "@prisma-next/compat-prisma": ["packages/extensions/compat-prisma/src/exports/index.ts"],
+      "@prisma-next/compat-prisma/*": ["packages/extensions/compat-prisma/src/exports/*.ts"],
       "@prisma-next/node-utils": ["packages/node-utils/src/exports/index.ts"],
       "@prisma-next/node-utils/*": ["packages/node-utils/src/exports/*.ts"],
       "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
@@ -57,8 +59,10 @@
   "references": [
     { "path": "./packages/relational-ir" },
     { "path": "./packages/psl" },
-    { "path": "./packages/sql-target" },
-    { "path": "./packages/driver-postgres" },
+    { "path": "./packages/sql/runtime/drivers/postgres" },
+    { "path": "./packages/sql/runtime/adapters/postgres" },
+    { "path": "./packages/framework/core-contract" },
+    { "path": "./packages/extensions/compat-prisma" },
     { "path": "./packages/schema-emitter" },
     { "path": "./packages/framework/tooling/cli" },
     { "path": "./packages/framework/core-plan" },

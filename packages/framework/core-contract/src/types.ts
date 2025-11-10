@@ -117,3 +117,15 @@ export interface Plan<_Row = unknown> {
  * Example: `type Row = ResultType<typeof plan>`
  */
 export type ResultType<P> = P extends Plan<infer R> ? R : never;
+
+/**
+ * Type guard to check if a contract is a Document contract
+ */
+export function isDocumentContract(contract: unknown): contract is DocumentContract {
+  return (
+    typeof contract === 'object' &&
+    contract !== null &&
+    'targetFamily' in contract &&
+    contract.targetFamily === 'document'
+  );
+}

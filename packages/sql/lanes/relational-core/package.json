@@ -19,8 +19,7 @@
     "@prisma-next/plan": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-contract-types": "workspace:*",
-    "@prisma-next/sql-operations": "workspace:*",
-    "@prisma-next/sql-target": "workspace:*"
+    "@prisma-next/sql-operations": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/sql-contract-ts": "workspace:*",

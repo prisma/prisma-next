@@ -85,36 +85,28 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/adapter-postgres/**",
+      "glob": "packages/sql/runtime/adapters/postgres/**",
       "domain": "sql",
       "layer": "adapters",
       "plane": "runtime"
     },
     {
-      "glob": "packages/driver-postgres/**",
+      "glob": "packages/sql/runtime/drivers/postgres/**",
       "domain": "sql",
-      "layer": "adapters",
+      "layer": "drivers",
       "plane": "runtime"
     },
     {
-      "glob": "packages/compat-prisma/**",
-      "domain": "sql",
-      "layer": "adapters",
+      "glob": "packages/extensions/compat-prisma/**",
+      "domain": "extensions",
+      "layer": "compat",
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql-target/**",
-      "domain": "legacy",
-      "layer": "legacy",
-      "plane": "migration",
-      "note": "Legacy package (will be removed in Slice 7)"
-    },
-    {
-      "glob": "packages/contract/**",
-      "domain": "legacy",
-      "layer": "legacy",
-      "plane": "shared",
-      "note": "Legacy package (migrated to packages/core/contract)"
+      "glob": "packages/framework/core-contract/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
     },
     {
       "glob": "packages/node-utils/**",
@@ -151,6 +143,6 @@
   },
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-core"],
-    "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters"]
+    "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters", "drivers"]
   }
 }

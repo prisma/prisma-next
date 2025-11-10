@@ -1,7 +1,6 @@
 {
-  "name": "@prisma-next/driver-postgres",
+  "name": "@prisma-next/compat-prisma",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
   "scripts": {
@@ -13,18 +12,22 @@
     "clean": "node ../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/sql-target": "workspace:*",
-    "pg": "^8.11.5",
-    "pg-cursor": "^2.10.5"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*"
   },
   "devDependencies": {
+    "@prisma/dev": "^0.1.1",
     "@prisma-next/test-utils": "workspace:*",
-    "pg-mem": "^3.0.5",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.11.5",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.1",
-    "@types/pg": "^8.11.10",
-    "@types/pg-cursor": "^2.4.6"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^2.1.1"
   },
   "exports": {
     ".": {
