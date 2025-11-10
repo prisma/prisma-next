@@ -5,7 +5,7 @@ This spec defines a single, coherent MVP for the two‑week spike. It reflects t
 ## Goals (two‑week spike)
 - Compatibility import‑swap for a minimal Prisma ORM example app with zero query edits via a compatibility layer
 - Safety and coaching value via the budgets plugin blocking an unbounded read and surfacing a clear fix
-- Extensibility demonstrated by installing and using a `pgvector` pack without core changes
+- Extensibility demonstrated by installing and using a true extension pack `@prisma-next/extension-pgvector` (in `packages/extensions/extension-pgvector`) without core changes
 
 Supporting goals for developer experience and verification:
 - No manual generate: PSL → contract artifacts on save
@@ -14,7 +14,7 @@ Supporting goals for developer experience and verification:
 ## Acceptance Criteria
 - Example app runs unchanged on PN via a compatibility layer (import‑swap, zero query edits)
 - Budgets plugin blocks an unbounded read with an actionable fix
-- `pgvector` pack installed and used in the demo without core changes
+- `@prisma-next/extension-pgvector` installed as a pack and used in the demo without core changes
 
 Supporting acceptance
 - Vite plugin auto‑emits contract and blocks on contract errors
@@ -65,7 +65,7 @@ Guardrails (CI)
 - `src/prisma/scripts/seed.ts` (esr runner; idempotent top‑up).
 - `migrations/YYYYMMDDThhmm_snake_case/` ([Migration System](./architecture%20docs/subsystems/7.%20Migration%20System.md); [ADR 009 — Deterministic Naming Scheme](./architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md)).
 - `vite.config.ts` (plugin wired; [ADR 032 — Dev Auto Emit Integration](./architecture%20docs/adrs/ADR%20032%20-%20Dev%20Auto%20Emit%20Integration.md)).
-- `prisma-next.config.ts` (CLI‑only config; [Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 097 — Tooling runs on canonical JSON only](./architecture%20docs/adrs/ADR%20097%20-%20Tooling%20runs%20on%20canonical%20JSON%20only.md)).
+- `prisma-next.config.ts` (CLI‑only config; [Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 097 — Tooling runs on canonical JSON only](./architecture%20docs/adrs/ADR%20097%20-%20Tooling%20runs%20on%20canonical%20JSON%20only.md)). Includes packs array with `'@prisma-next/extension-pgvector'` to register vector types/ops/codecs.
 - `test/*` (Vitest, single‑threaded).
 
 ### Scripts (package.json)
@@ -79,7 +79,7 @@ Guardrails (CI)
 ## Vite Plugin — `@prisma/vite-plugin-prisma-next`
 - Watches `src/prisma/schema.psl`.
 - Emits `contract.json` + `.d.ts` deterministically ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 010](./architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)).
-- Blocks dev server on parse/validate/hash mismatch ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 006 — Dual Authoring Modes](./architecture%20docs/adrs/ADR%20006%20-%20Dual%20Authoring%20Modes.md)).
+- Blocks dev server on parse/validate/hash mismatch ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 006 — Dual Authoring Modes](./architecture%20docs/adrs/ADR%20006%20-%20Dual%20Authoring%20Modes.md)). Loads configured packs (e.g., `@prisma-next/extension-pgvector`) for emission and type generation.
 - No guardrails/budgets here (runtime concern; [Runtime & Plugin Framework](./architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md)).
 
 ## Query Lanes & API

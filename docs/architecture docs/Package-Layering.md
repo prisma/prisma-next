@@ -127,9 +127,9 @@ graph LR
 
 The innermost layer containing target-family agnostic types and utilities.
 
-- `packages/core/contract/` → `@prisma-next/contract` - Core contract types + plan metadata
-- `packages/core/plan/` → `@prisma-next/plan` - Plan helpers, diagnostics, shared errors
-- `packages/core/operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
+- `packages/framework/core-plan/` → `@prisma-next/plan` - Plan helpers, diagnostics, shared errors
+- `packages/framework/core-operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
+- `packages/contract/` → `@prisma-next/contract` - Core contract types + plan metadata (legacy, will be migrated)
 
 **Dependency Rules:** Cannot import from any other layer.
 
@@ -138,9 +138,9 @@ The innermost layer containing target-family agnostic types and utilities.
 Contract authoring surfaces for creating contracts programmatically.
 
 **Framework Domain (Migration Plane):**
-- `packages/authoring/contract-authoring/` → `@prisma-next/contract-authoring` - TS builders, canonicalization, schema DSL
-- `packages/authoring/contract-ts/` → `@prisma-next/contract-ts` - TS authoring surface (future)
-- `packages/authoring/contract-psl/` → `@prisma-next/contract-psl` - PSL parser + IR (future)
+- `packages/framework/authoring/contract-authoring/` → `@prisma-next/contract-authoring` - TS builders, canonicalization, schema DSL
+- `packages/framework/authoring/contract-ts/` → `@prisma-next/contract-ts` - TS authoring surface (future)
+- `packages/framework/authoring/contract-psl/` → `@prisma-next/contract-psl` - PSL parser + IR (future)
 
 **SQL Domain (Migration Plane):**
 - `packages/sql/authoring/sql-contract-ts/` → `@prisma-next/sql-contract-ts` - SQL TS authoring surface wraps `@prisma-next/contract-authoring`
@@ -170,7 +170,7 @@ Lanes consume targets and relational-core helpers to produce AST plans. Packages
 Target-agnostic runtime kernel plus per-family runtime implementations.
 
 **Framework Domain (Runtime Plane):**
-- `packages/runtime/core/` → `@prisma-next/runtime-core` – verification, marker checks, plugin SPI (Slice 6 moves code here)
+- `packages/framework/runtime-core/` → `@prisma-next/runtime-core` – verification, marker checks, plugin SPI (Slice 6 moves code here)
 
 **SQL Domain (Runtime Plane):**
 - `packages/sql/sql-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that composes runtime-core with SQL adapters (future document runtimes will mirror this)
@@ -201,21 +201,25 @@ Database adapters, drivers, and optional compatibility shims. These packages may
 
 | Directory | Published Package Name |
 |-----------|------------------------|
-| `packages/core/contract/` | `@prisma-next/contract` |
-| `packages/core/plan/` | `@prisma-next/plan` |
-| `packages/core/operations/` | `@prisma-next/operations` |
-| `packages/authoring/contract-authoring/` | `@prisma-next/contract-authoring` |
+| `packages/contract/` | `@prisma-next/contract` (legacy, will be migrated) |
+| `packages/framework/core-plan/` | `@prisma-next/plan` |
+| `packages/framework/core-operations/` | `@prisma-next/operations` |
+| `packages/framework/authoring/contract-authoring/` | `@prisma-next/contract-authoring` |
+| `packages/framework/authoring/contract-ts/` | `@prisma-next/contract-ts` |
+| `packages/framework/authoring/contract-psl/` | `@prisma-next/contract-psl` |
+| `packages/framework/tooling/cli/` | `@prisma-next/cli` |
+| `packages/framework/tooling/emitter/` | `@prisma-next/emitter` |
+| `packages/framework/runtime-core/` | `@prisma-next/runtime-core` |
 | `packages/targets/sql/contract-types/` | `@prisma-next/sql-contract-types` |
 | `packages/targets/sql/operations/` | `@prisma-next/sql-operations` |
 | `packages/targets/sql/emitter/` | `@prisma-next/sql-contract-emitter` |
 | `packages/sql/lanes/relational-core/` | `@prisma-next/sql-relational-core` |
 | `packages/sql/lanes/sql-lane/` | `@prisma-next/sql-lane` |
 | `packages/sql/lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
-| `packages/runtime/core/` | `@prisma-next/runtime-core` |
 | `packages/sql/sql-runtime/` | `@prisma-next/sql-runtime` |
-| `packages/sql/postgres/postgres-adapter/` | `@prisma-next/adapter-postgres` |
-| `packages/sql/postgres/postgres-driver/` | `@prisma-next/driver-postgres` |
-| `packages/compat/compat-prisma/` | `@prisma-next/compat-prisma` |
+| `packages/adapter-postgres/` | `@prisma-next/adapter-postgres` |
+| `packages/driver-postgres/` | `@prisma-next/driver-postgres` |
+| `packages/compat-prisma/` | `@prisma-next/compat-prisma` |
 
 ## TypeScript Path Aliases
 
@@ -227,18 +231,22 @@ Path aliases map published package names to source entry files:
 {
   "compilerOptions": {
     "paths": {
-      "@prisma-next/contract": ["packages/core/contract/src/index.ts"],
-      "@prisma-next/plan": ["packages/core/plan/src/index.ts"],
-      "@prisma-next/operations": ["packages/core/operations/src/index.ts"],
-      "@prisma-next/contract-authoring": ["packages/authoring/contract-authoring/src/index.ts"],
+      "@prisma-next/contract": ["packages/contract/src/exports/types.ts"],
+      "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
+      "@prisma-next/operations": ["packages/framework/core-operations/src/index.ts"],
+      "@prisma-next/contract-authoring": ["packages/framework/authoring/contract-authoring/src/index.ts"],
+      "@prisma-next/contract-ts": ["packages/framework/authoring/contract-ts/src/index.ts"],
+      "@prisma-next/contract-psl": ["packages/framework/authoring/contract-psl/src/index.ts"],
+      "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
+      "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
+      "@prisma-next/runtime-core": ["packages/framework/runtime-core/src/index.ts"],
       "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
       "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],
       "@prisma-next/sql-contract-emitter": ["packages/targets/sql/emitter/src/index.ts"],
       "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
-      "@prisma-next/runtime-core": ["packages/runtime/core/src/index.ts"],
       "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/index.ts"],
-      "@prisma-next/adapter-postgres": ["packages/sql/postgres/postgres-adapter/src/index.ts"],
-      "@prisma-next/driver-postgres": ["packages/sql/postgres/postgres-driver/src/index.ts"]
+      "@prisma-next/adapter-postgres": ["packages/adapter-postgres/src/exports/index.ts"],
+      "@prisma-next/driver-postgres": ["packages/driver-postgres/src/exports/index.ts"]
     }
   }
 }
@@ -393,7 +401,7 @@ The package layering structure has been scaffolded with placeholder packages:
 **Migration Status:** ✅ Phase 2 Complete (Slice 2)
 
 - **Contract Authoring (Phase 1)**: SQL contract authoring code moved from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`)
-- **Contract Authoring (Phase 2)**: Target-agnostic contract authoring core extracted to `@prisma-next/contract-authoring` in the authoring layer (`packages/authoring/contract-authoring`)
+- **Contract Authoring (Phase 2)**: Target-agnostic contract authoring core extracted to `@prisma-next/contract-authoring` in the authoring layer (`packages/framework/authoring/contract-authoring`)
 - `@prisma-next/sql-contract-ts` now composes `@prisma-next/contract-authoring` with SQL-specific types
 - Integration tests that depend on both `sql-contract-ts` and `sql-query` moved to `@prisma-next/integration-tests` to avoid cyclic dependencies
 - `@prisma-next/sql-query` maintains backward compatibility through re-exports (will be removed in Slice 7)

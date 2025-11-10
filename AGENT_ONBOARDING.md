@@ -69,16 +69,30 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 
 ### Package Organization Principles
 
-- **Core contract types** (`ContractBase`) live in `@prisma-next/contract`
-- **Target-agnostic contract authoring** (builder state types, builder classes, type helpers) lives in `@prisma-next/contract-authoring` in the authoring ring (`packages/authoring/contract-authoring`)
-- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-contract-types` (targets ring)
-- **Target-neutral operations** (operation registry, capability helpers) live in `@prisma-next/operations` (core ring)
-- **SQL-specific operations** (operation assembly, lowering specs) live in `@prisma-next/sql-operations` (targets ring)
-- **SQL emitter hook** (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` (targets ring)
-- **SQL contract authoring** (`defineContract`, `validateContract`) lives in `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`). It composes `@prisma-next/contract-authoring` with SQL-specific types.
+The repository is organized by **Domains → Layers → Planes**:
+
+- **Domains**: Framework (target-agnostic) and target families (SQL, document, etc.)
+- **Layers**: Core → Authoring → Targets → Lanes → Runtime → Adapters (dependency direction enforced)
+- **Planes**: Migration (authoring, tooling, targets) vs Runtime (lanes, runtime, adapters)
+
+**Framework Domain** (`packages/framework/**`):
+- **Core layer** (shared plane): `@prisma-next/plan`, `@prisma-next/operations` live in `packages/framework/core-*`
+- **Authoring layer** (migration plane): `@prisma-next/contract-authoring`, `@prisma-next/contract-ts`, `@prisma-next/contract-psl` live in `packages/framework/authoring/*`
+- **Tooling layer** (migration plane): `@prisma-next/cli`, `@prisma-next/emitter` live in `packages/framework/tooling/*`
+- **Runtime-core layer** (runtime plane): `@prisma-next/runtime-core` lives in `packages/framework/runtime-core`
+
+**SQL Domain** (`packages/sql/**` and `packages/targets/sql/**`):
+- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-contract-types` (targets layer)
+- **SQL-specific operations** (operation assembly, lowering specs) live in `@prisma-next/sql-operations` (targets layer)
+- **SQL emitter hook** (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` (targets layer)
+- **SQL contract authoring** (`defineContract`, `validateContract`) lives in `@prisma-next/sql-contract-ts` in `packages/sql/authoring/sql-contract-ts`. It composes `@prisma-next/contract-authoring` with SQL-specific types.
+
+**General Principles**:
+- **Core contract types** (`ContractBase`) live in `@prisma-next/contract` (legacy package, will be migrated)
+- **Target-neutral operations** (operation registry, capability helpers) live in `@prisma-next/operations` (framework/core layer)
 - **Emitter is hook-based**: Target family hooks (e.g., SQL) extend emission with family-specific validation and type generation
 - **Adapters are extension packs**: Adapters and extension packs use the same manifest structure and are treated identically
-- **Package layering**: Packages follow a ring-based architecture (core → authoring → targets → lanes → runtime) with unidirectional dependencies enforced by tooling
+- **Package layering**: Packages follow domain/layer/plane architecture with unidirectional dependencies enforced by `scripts/check-imports.mjs`
 - Each package exports curated, tree-shakeable modules
 - All packages use ESM and TypeScript source
 
@@ -1256,6 +1270,70 @@ pnpm test:coverage
 5. **Edge cases**: Test error conditions, boundary cases, and invalid inputs
 
 ## 📦 Package Restructuring
+
+### Moving Packages (Domain/Layer/Plane Relocation)
+
+When moving packages to reflect domain/layer/plane structure (e.g., moving framework packages under `packages/framework/**`), you must update:
+
+1. **Use `git mv`** to preserve file history:
+   ```bash
+   git mv packages/core/plan packages/framework/core-plan
+   git mv packages/authoring/contract-authoring packages/framework/authoring/contract-authoring
+   git mv packages/cli packages/framework/tooling/cli
+   ```
+
+2. **Update `pnpm-workspace.yaml`**: Replace old globs with new patterns:
+   ```yaml
+   packages:
+     - packages/framework/**  # Replaces packages/core/*, packages/authoring/*, etc.
+   ```
+
+3. **Update `tsconfig.base.json`**: Update path mappings and project references:
+   ```json
+   {
+     "paths": {
+       "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
+       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"]
+     },
+     "references": [
+       { "path": "./packages/framework/core-plan" },
+       { "path": "./packages/framework/tooling/cli" }
+     ]
+   }
+   ```
+
+4. **Update `architecture.config.json`**: Update glob patterns for moved packages:
+   ```json
+   {
+     "glob": "packages/framework/core-plan/**",
+     "domain": "framework",
+     "layer": "core",
+     "plane": "shared"
+   }
+   ```
+
+5. **Update package-level configs** (relative paths change based on depth):
+   - **`tsconfig.json`**: Update `extends` path (e.g., `../../../../tsconfig.base.json` for `packages/framework/tooling/cli`)
+   - **`package.json`**: Update `biome.json` and `clean.mjs` script paths
+   - **Depth calculation**: From `packages/framework/tooling/cli` to root = 4 levels up (`../../../../`)
+
+6. **Update hardcoded paths**:
+   - Test files that reference package paths (e.g., `packages/e2e-tests/test/runtime.basic.test.ts`)
+   - `scripts/check-imports.mjs` exceptions for moved packages
+
+7. **Run `pnpm install`** to update the lockfile after moving packages
+
+8. **Verify**:
+   - `pnpm -w build` - all packages build
+   - `pnpm -w test` - tests pass
+   - `pnpm lint:deps` - import validation passes
+   - `pnpm typecheck` - TypeScript checks pass
+
+**Key Learnings:**
+- Relative paths in `tsconfig.json`, `biome.json`, and `clean.mjs` scripts must be recalculated based on new package depth
+- Framework domain packages are organized as: `packages/framework/{core-*,authoring/*,tooling/*,runtime-core}`
+- Always use `git mv` to preserve history
+- Published package names (`@prisma-next/*`) remain unchanged - only filesystem paths change
 
 ### Moving Code Between Packages
 

@@ -15,7 +15,7 @@ Adopt a package layout that encodes Domains → Layers → Planes:
 - **Layers**: Clean Architecture layers (`core/`, `authoring/`, `targets/`, `lanes/`, `runtime/`, `adapters/`). Within a domain, layers may depend laterally (same layer) and downward (toward core), never upward.
 - **Planes**: Migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters). Migration plane must not import runtime plane code; runtime plane may consume artifacts (JSON/manifests) from migration, but not code imports.
 - Group SQL-specific packages under a dedicated namespace (`packages/sql/**`) for family cohesion (contract types/emitter/ops, lanes, runtime, and adapters).
-- Extract a target-agnostic runtime core (`packages/runtime/core`) that owns plan verification, plugin lifecycle, and the runtime SPI. Family-specific runtimes (e.g., `packages/sql/sql-runtime`) implement the SPI and plug into core via context.
+- Extract a target-agnostic runtime core (`packages/framework/runtime-core`) that owns plan verification, plugin lifecycle, and the runtime SPI. Family-specific runtimes (e.g., `packages/sql/sql-runtime`) implement the SPI and plug into core via context.
 - Keep the emitter core target-agnostic with family hooks; SQL-specific validation and `.d.ts` generation live in the SQL family hook.
 - Avoid transitional shims unless required internally; there are no external consumers.
 
@@ -78,7 +78,7 @@ packages/
 
 ### Runtime Separation
 
-- `packages/runtime/core` exposes a target-agnostic SPI (verification, plugin lifecycle, telemetry), no direct imports from `targets/*`.
+- `packages/framework/runtime-core` exposes a target-agnostic SPI (verification, plugin lifecycle, telemetry), no direct imports from `targets/*`.
 - `packages/sql/sql-runtime` implements the SPI using SQL adapters and codecs from `packages/targets/sql/*` and `packages/sql/postgres/*`.
 - This enables booting the runtime with a non-SQL family by swapping in another family-runtime package that implements the same SPI.
 
@@ -113,11 +113,11 @@ packages/
 ## Migration Plan (High-Level)
 
 1) Scaffold the new folder skeleton and path aliases; add import guardrails and CI checks.
-2) Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/authoring/contract-authoring`.
+2) Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/framework/authoring/contract-authoring`.
 3) Stand up `lanes/relational-core` and move schema/column builders and operation attachment there.
 4) Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.
 5) Restructure `sql-target` under `targets/sql` and keep a curated entrypoint for adapters.
-6) Extract `runtime/core` and move SQL-specific execution into `sql/sql-runtime`.
+6) Extract `framework/runtime-core` and move SQL-specific execution into `sql/sql-runtime`.
 7) Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated.
 
 ## Alternatives Considered

@@ -7,74 +7,85 @@ alwaysApply: false
 
 ## Overview
 
-The repository uses a ring-based package layering architecture with unidirectional dependencies enforced by `scripts/check-imports.mjs`. The import validation script uses declarative package-to-ring mapping to validate that packages follow dependency rules.
+The repository uses a domain/layer/plane package layering architecture with unidirectional dependencies enforced by `scripts/check-imports.mjs`. The import validation script uses data-driven configuration from `architecture.config.json` to validate that packages follow dependency rules.
 
-## Ring Structure
+## Domain/Layer/Plane Structure
 
-Packages are organized into concentric rings with dependencies flowing inward:
+Packages are organized by:
+- **Domains**: framework (target-agnostic) and target families (sql, document, etc.)
+- **Layers**: core → authoring → targets → lanes → runtime → adapters (dependency direction)
+- **Planes**: migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters)
+
+Dependencies flow inward (toward core) within a domain:
 
 ```
-core → authoring → targets → lanes → runtime-core → family-runtime → adapters
+core → authoring → targets → lanes → runtime → adapters
 ```
 
 ## Import Validation Script
 
-The import validation script (`scripts/check-imports.mjs`) uses declarative maps at the top of the file:
+The import validation script (`scripts/check-imports.mjs`) uses data-driven configuration from `architecture.config.json`:
 
-1. **`PACKAGE_TO_RING`**: Maps package directory paths to ring names
-   ```javascript
-   const PACKAGE_TO_RING = {
-     'packages/sql/lanes/orm-lane': 'lanes',
-     'packages/sql/lanes/sql-lane': 'lanes',
-     // ...
-   };
+1. **Package Configs**: Maps package glob patterns to domain/layer/plane
+   ```json
+   {
+     "glob": "packages/framework/core-plan/**",
+     "domain": "framework",
+     "layer": "core",
+     "plane": "shared"
+   }
    ```
 
-2. **`PACKAGE_NAME_TO_PATH`**: Maps package names (from `@prisma-next/package-name`) to directory paths
-   ```javascript
-   const PACKAGE_NAME_TO_PATH = {
-     'sql-orm-lane': 'packages/sql/lanes/orm-lane',
-     'sql-lane': 'packages/sql/lanes/sql-lane',
-     // ...
-   };
+2. **Layer Order**: Defines dependency direction within domains
+   ```json
+   {
+     "layerOrder": {
+       "framework": ["core", "authoring", "tooling", "runtime-core"],
+       "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters"]
+     }
+   }
    ```
 
-3. **`RINGS`**: Defines allowed dependencies for each ring
-   ```javascript
-   const RINGS = {
-     lanes: {
-       allowed: ['core', 'authoring', 'targets'],
-     },
-     // ...
-   };
+3. **Rules**: Defines allowed/denied dependency patterns
+   ```json
+   {
+     "rules": {
+       "sameLayer": "allow",
+       "downward": "allow",
+       "upward": "deny",
+       "crossDomain": "denyExceptFramework",
+       "migrationToRuntime": "deny",
+       "runtimeToMigration": "allowArtifactsOnly"
+     }
+   }
    ```
 
 ## Rules
 
-### Same-Ring Imports
+### Same-Layer Imports
 
-Packages in the same ring can import from each other. For example, `orm-lane` can import from `sql-relational-core` (both are in the `lanes` ring).
+Packages in the same layer can import from each other. For example, `orm-lane` can import from `sql-relational-core` (both are in the `lanes` layer).
 
-**✅ CORRECT: Same-ring imports**
+**✅ CORRECT: Same-layer imports**
 ```typescript
 // packages/sql/lanes/orm-lane/src/orm-builder.ts
 import { schema } from '@prisma-next/sql-relational-core/schema';
 ```
 
-### Cross-Ring Imports
+### Cross-Layer Imports
 
-Packages can only import from inner rings (rings closer to core). Outer rings cannot import from inner rings.
+Packages can only import from inner layers (layers closer to core). Outer layers cannot import from inner layers.
 
-**✅ CORRECT: Import from inner ring**
+**✅ CORRECT: Import from inner layer**
 ```typescript
-// packages/sql/lanes/orm-lane/src/orm-builder.ts (lanes ring)
-import { planInvalid } from '@prisma-next/plan'; // core ring - allowed
+// packages/sql/lanes/orm-lane/src/orm-builder.ts (lanes layer)
+import { planInvalid } from '@prisma-next/plan'; // core layer - allowed
 ```
 
-**❌ WRONG: Import from outer ring**
+**❌ WRONG: Import from outer layer**
 ```typescript
-// packages/core/plan/src/plan.ts (core ring)
-import { sql } from '@prisma-next/sql-lane'; // lanes ring - NOT allowed
+// packages/framework/core-plan/src/plan.ts (core layer)
+import { sql } from '@prisma-next/sql-lane'; // lanes layer - NOT allowed
 ```
 
 ### Temporary Exceptions
@@ -104,17 +115,21 @@ if (
 
 When adding a new package:
 
-1. **Add to `PACKAGE_TO_RING`**: Map the package directory path to its ring
-   ```javascript
-   'packages/sql/lanes/new-lane': 'lanes',
+1. **Add to `architecture.config.json`**: Add a package config entry with glob pattern, domain, layer, and plane
+   ```json
+   {
+     "glob": "packages/framework/tooling/new-tool/**",
+     "domain": "framework",
+     "layer": "tooling",
+     "plane": "migration"
+   }
    ```
 
-2. **Add to `PACKAGE_NAME_TO_PATH`**: Map the package name to its directory path
-   ```javascript
-   'sql-new-lane': 'packages/sql/lanes/new-lane',
-   ```
+2. **Update `tsconfig.base.json`**: Add path mappings and project references if needed
 
-3. **Run `pnpm lint:deps`**: Verify no violations
+3. **Update `pnpm-workspace.yaml`**: Add package glob pattern if needed
+
+4. **Run `pnpm lint:deps`**: Verify no violations
 
 ## Running Import Validation
 
@@ -124,20 +139,31 @@ pnpm lint:deps
 
 This command:
 - Scans all TypeScript files in `packages/`
-- Validates imports against ring and family rules
+- Validates imports against domain/layer/plane rules
 - Reports violations with detailed context
 - Can be run locally or in CI
 
 ## Common Issues
 
-### Package Not Found in Map
+### Package Not Found in Config
 
-If a package is not in `PACKAGE_TO_RING`, it will be treated as a legacy package (allows all imports). Add it to the map to enforce proper dependency rules.
+If a package is not in `architecture.config.json`, it will be treated as a legacy package (allows all imports). Add it to the config to enforce proper dependency rules.
 
 ### Path Matching Issues
 
-The script uses longest-path matching to find the most specific package match. If a file path matches multiple package paths, the longest (most specific) match is used.
+The script uses glob pattern matching to find the most specific package match. If a file path matches multiple package globs, the longest (most specific) match is used.
 
-### Family Namespace vs Ring
+### Domain/Layer/Plane Structure
 
-Some packages belong to family namespaces (e.g., `sql`) rather than specific rings. These are handled separately in the validation logic.
+Packages are organized by:
+- **Domain**: framework (target-agnostic) or target families (sql, document, etc.)
+- **Layer**: core → authoring → targets → lanes → runtime → adapters (dependency direction)
+- **Plane**: migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters)
+
+The validation script enforces:
+- Same-layer imports: allowed
+- Downward imports (toward core): allowed
+- Upward imports (away from core): denied
+- Cross-domain imports: denied except framework domain
+- Migration → Runtime imports: denied
+- Runtime → Migration imports: allowed for artifacts only

@@ -69,7 +69,7 @@ export { verifyContract, assertContract } from '../contract-verifier';
 
 ## Exceptions
 
-- CLI entry points (`packages/cli/src/index.ts`) - these contain actual implementation
+- CLI entry points (`packages/framework/tooling/cli/src/index.ts`) - these contain actual implementation
 - Main package functions (`packages/schema-emitter/src/index.ts`) - these contain actual implementation
 - Explicit API surfaces (`packages/runtime/src/exports/index.ts`) - these are intentional public APIs
 

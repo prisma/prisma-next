@@ -57,7 +57,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 **✅ CORRECT: Use package exports in fixtures**
 
 ```typescript
-// packages/cli/test/fixtures/valid-contract.ts
+// packages/framework/tooling/cli/test/fixtures/valid-contract.ts
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 ```
 
@@ -147,7 +147,7 @@ When extracting code from one package to another:
 
 **Example:**
 - Old: `packages/sql-target/src/operations-registry.ts`
-- New: `packages/core/operations/src/index.ts` (core types) + `packages/targets/sql/operations/src/index.ts` (SQL-specific)
+- New: `packages/framework/core-operations/src/index.ts` (core types) + `packages/targets/sql/operations/src/index.ts` (SQL-specific)
 - Action:
   1. Move implementation to new packages
   2. Move tests to new packages with updated imports (`../src/index`)
