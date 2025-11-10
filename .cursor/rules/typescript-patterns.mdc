@@ -163,6 +163,61 @@ export function createColumnBuilder(): ColumnBuilder {
 }
 ```
 
+### Exception: Classes with Private Properties in Exported Types
+
+**CRITICAL**: When a class with private properties is part of an exported type (e.g., returned from an exported function), the class must be explicitly exported from the exports file, not just from the source file. Otherwise, TypeScript treats it as an anonymous class type, which cannot have private or protected properties.
+
+**❌ WRONG: Class not exported from exports file**
+
+```typescript
+// src/schema.ts
+export class TableBuilderImpl {
+  private readonly _name: string;
+  // ...
+}
+
+export function schema() {
+  return { tables: { user: new TableBuilderImpl('user', ...) } };
+}
+
+// src/exports/schema.ts
+export { schema } from '../schema';
+// TableBuilderImpl is NOT exported here
+```
+
+When `schema.tables` is exported, TypeScript infers the type and sees `TableBuilderImpl` as an anonymous class type, causing:
+```
+error TS4094: Property '_name' of exported anonymous class type may not be private or protected.
+```
+
+**✅ CORRECT: Export class from exports file**
+
+```typescript
+// src/schema.ts
+export class TableBuilderImpl {
+  private readonly _name: string;
+  // ...
+}
+
+export function schema() {
+  return { tables: { user: new TableBuilderImpl('user', ...) } };
+}
+
+// src/exports/schema.ts
+export { schema, TableBuilderImpl } from '../schema';
+// TableBuilderImpl is explicitly exported so TypeScript recognizes it as a named class
+```
+
+**Why this matters:**
+- TypeScript requires named classes (not anonymous) to have private properties in exported types
+- Exporting the class from the exports file makes it part of the public API, allowing TypeScript to recognize it as a named class
+- This is an exception to the "don't export classes" rule when the class is part of exported types
+
+**When to use this pattern:**
+- When a class with private properties is returned from an exported function
+- When the class type is part of an exported type (e.g., in a return type)
+- When TypeScript would otherwise treat the class as anonymous in exported types
+
 ## Runtime Values Cannot Be Type Parameters
 
 **CRITICAL RULE**: TypeScript cannot use runtime values as type parameters. When iterating over object properties in a loop, you cannot use the loop variable as a type parameter.

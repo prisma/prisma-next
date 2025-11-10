@@ -92,6 +92,19 @@ flowchart TD
 
 **Note**: Error helpers (`planInvalid`, `planUnsupported`) and the `RuntimeError` type are imported from `@prisma-next/plan` (core ring) rather than being defined locally. This ensures target-agnostic error handling.
 
+## Package Structure
+
+This package follows the standard `exports/` directory pattern:
+
+- `src/exports/schema.ts` - Re-exports schema builder
+- `src/exports/param.ts` - Re-exports parameter helpers
+- `src/exports/types.ts` - Re-exports type definitions
+- `src/exports/operations-registry.ts` - Re-exports operations registry
+- `src/exports/errors.ts` - Re-exports error helpers (from `@prisma-next/plan`)
+- `src/index.ts` - Main entry point that re-exports from `exports/`
+
+This enables subpath imports like `@prisma-next/sql-relational-core/schema`, `@prisma-next/sql-relational-core/param`, etc.
+
 ## Related Subsystems
 
 - **[Query Lanes](../../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)**: Detailed subsystem specification

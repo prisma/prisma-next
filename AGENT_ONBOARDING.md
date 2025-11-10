@@ -47,8 +47,10 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 ### Core Packages
 
 - **`@prisma-next/contract`** - Core contract types (`ContractBase`, `Source`). **SQL-specific types live in `@prisma-next/sql-target`**
+- **`@prisma-next/plan`** - Plan helpers, diagnostics, and shared errors (`planInvalid`, `planUnsupported`, `RuntimeError`) in the core ring
 - **`@prisma-next/emitter`** - Contract emission engine that transforms IR into `contract.json` and `contract.d.ts` using a hook-based architecture
 - **`@prisma-next/sql-contract-ts`** - SQL-specific TypeScript contract authoring surface (`defineContract`, `validateContract`) in the SQL family namespace
+- **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-query`** - SQL query DSL (re-exports contract authoring from `@prisma-next/sql-contract-ts` for backward compatibility)
 - **`@prisma-next/runtime`** - Execution engine, plugins (budgets, lints), contract verification
 - **`@prisma-next/sql-target`** - SQL target family abstraction, emitter hook implementation, and SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
@@ -899,6 +901,7 @@ database = await createDevDatabase({
 **See `docs/Testing Guide.md` for comprehensive testing practices and philosophy.**
 
 - **Vitest** for all tests
+- **Vitest Configuration**: Use `vite-tsconfig-paths` plugin to automatically resolve workspace dependencies using tsconfig path mappings. This is cleaner than manual aliases and automatically picks up new path mappings. See `.cursor/rules/test-import-patterns.mdc` for details.
 - **Testing Pyramid**: 70% Unit Tests, 20% Integration Tests, 10% E2E Tests
 - **Testing Philosophy**: Conciseness without obscurity, separation of concerns, maintainability, readability
 - **DRY Patterns**: Extract helpers when patterns appear 3+ times - see `docs/Testing Guide.md` for examples

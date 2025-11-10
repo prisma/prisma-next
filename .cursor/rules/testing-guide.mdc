@@ -36,6 +36,13 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - Located in `**/*.test-d.ts` files
 - See `.cursor/rules/vitest-expect-typeof.mdc` for details
 
+**Test Fixtures:**
+- Test fixtures should not depend on specific adapters (e.g., `@prisma-next/adapter-postgres`)
+- Define `CodecTypes` inline in test fixtures to remain adapter-agnostic
+- Use `createStubAdapter()` from `@prisma-next/runtime/test/utils` instead of specific adapter factories in tests
+- This prevents cyclic dependencies and keeps tests adapter-agnostic
+- See `AGENT_ONBOARDING.md` for details
+
 ## Common Patterns
 
 ### Shared Test Utilities

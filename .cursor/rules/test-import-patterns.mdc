@@ -85,24 +85,53 @@ import { defineContract } from '../src/exports/contract-builder';
 
 ## Vitest Configuration
 
-When tests import from source files, Vitest doesn't need special resolve aliases for workspace dependencies. The standard Vitest configuration is sufficient:
+**Use `vite-tsconfig-paths` plugin** to automatically resolve workspace dependencies using tsconfig path mappings. This is cleaner and more maintainable than manual aliases:
 
 ```typescript
 // vitest.config.ts
+import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  plugins: [tsconfigPaths()],
   test: {
     globals: true,
     environment: 'node',
-    // No resolve aliases needed when tests import from source
+    // No manual aliases needed - tsconfig paths are used automatically
   },
 });
 ```
 
-**Only add resolve aliases if:**
-- Tests import from package exports (dist files) that have workspace dependencies
-- Integration tests that need to resolve workspace dependencies from dist files
+**Why use `vite-tsconfig-paths`?**
+- Automatically reads tsconfig path mappings from `tsconfig.base.json`
+- No need to manually maintain aliases in vitest configs
+- Consistent with TypeScript's path resolution
+- Works for both source files and dist files
+- Easier to maintain - new path mappings are picked up automatically
+
+**Import ordering:**
+- External packages should be sorted alphabetically
+- Biome will enforce this ordering
+- Example: `tsconfigPaths` comes before `defineConfig` alphabetically
+
+**❌ WRONG: Manual aliases**
+```typescript
+// Don't do this - use vite-tsconfig-paths instead
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const planPath = resolve(__dirname, 'node_modules/@prisma-next/plan/dist/index.js');
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@prisma-next/plan': planPath,
+    },
+  },
+  // ...
+});
+```
 
 ## Package Extraction Patterns
 

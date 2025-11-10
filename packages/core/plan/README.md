@@ -61,6 +61,16 @@ flowchart TD
 
 This package has **no dependencies** - it's part of the innermost core ring and provides foundational error utilities.
 
+## Package Structure
+
+This package follows the standard `exports/` directory pattern:
+
+- `src/exports/errors.ts` - Re-exports error helpers (`planInvalid`, `planUnsupported`)
+- `src/exports/types.ts` - Re-exports error types (`RuntimeError`)
+- `src/index.ts` - Main entry point that re-exports from `exports/`
+
+This enables subpath imports like `@prisma-next/plan/errors` and `@prisma-next/plan/types` if needed in the future.
+
 ## Related Subsystems
 
 - **[Query Lanes](../../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)**: Uses plan errors during query construction
