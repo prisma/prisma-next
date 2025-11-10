@@ -196,7 +196,8 @@ function isImportAllowed(sourceInfo, targetInfo, sourceFilePath) {
       targetInfo.domain === 'sql' &&
       targetInfo.layer === 'targets' &&
       sourceFilePath &&
-      relative(repoRoot, sourceFilePath).startsWith('packages/cli/')
+      (relative(repoRoot, sourceFilePath).startsWith('packages/cli/') ||
+        relative(repoRoot, sourceFilePath).startsWith('packages/framework/tooling/cli/'))
     ) {
       return true;
     }
@@ -208,7 +209,8 @@ function isImportAllowed(sourceInfo, targetInfo, sourceFilePath) {
       targetInfo.domain === 'sql' &&
       targetInfo.layer === 'authoring' &&
       sourceFilePath &&
-      relative(repoRoot, sourceFilePath).startsWith('packages/cli/')
+      (relative(repoRoot, sourceFilePath).startsWith('packages/cli/') ||
+        relative(repoRoot, sourceFilePath).startsWith('packages/framework/tooling/cli/'))
     ) {
       return true;
     }

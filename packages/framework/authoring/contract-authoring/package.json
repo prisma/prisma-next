@@ -1,24 +1,24 @@
 {
-  "name": "@prisma-next/operations",
+  "name": "@prisma-next/contract-authoring",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "description": "Target-neutral operation registry and capability helpers for Prisma Next",
+  "description": "Target-agnostic contract authoring builder core for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "test": "vitest run --passWithNoTests",
-    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
-    "clean": "node ../../scripts/clean.mjs"
+    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "clean": "node ../../../../scripts/clean.mjs"
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/plan": "workspace:*"
+    "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:*",
+    "@vitest/coverage-v8": "^2.1.1",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.1"

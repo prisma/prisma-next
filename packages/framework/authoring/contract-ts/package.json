@@ -8,8 +8,8 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
-    "clean": "node ../../../scripts/clean.mjs"
+    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "clean": "node ../../../../scripts/clean.mjs"
   },
   "devDependencies": {
     "tsup": "^8.3.0",

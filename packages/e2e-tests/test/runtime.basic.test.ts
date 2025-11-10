@@ -20,7 +20,7 @@ const repoRoot = resolve(__dirname, '../../..');
 
 describe('end-to-end basic queries', () => {
   const adapterPath = resolve(repoRoot, 'packages/adapter-postgres');
-  const cliPath = resolve(repoRoot, 'packages/cli/dist/cli.js');
+  const cliPath = resolve(repoRoot, 'packages/framework/tooling/cli/dist/cli.js');
   const contractTsPath = resolve(__dirname, 'fixtures/contract.ts');
   const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 

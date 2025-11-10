@@ -1,6 +1,5 @@
 packages:
-  - packages/core/*
-  - packages/authoring/*
+  - packages/framework/**
   - packages/targets/sql/*
   - packages/sql/**
   - packages/runtime/*

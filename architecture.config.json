@@ -1,43 +1,49 @@
 {
   "packages": [
     {
-      "glob": "packages/core/**",
+      "glob": "packages/framework/core-plan/**",
       "domain": "framework",
       "layer": "core",
       "plane": "shared"
     },
     {
-      "glob": "packages/authoring/contract-authoring/**",
+      "glob": "packages/framework/core-operations/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/framework/authoring/contract-authoring/**",
       "domain": "framework",
       "layer": "authoring",
       "plane": "migration"
     },
     {
-      "glob": "packages/authoring/contract-ts/**",
+      "glob": "packages/framework/authoring/contract-ts/**",
       "domain": "framework",
       "layer": "authoring",
       "plane": "migration"
     },
     {
-      "glob": "packages/authoring/contract-psl/**",
+      "glob": "packages/framework/authoring/contract-psl/**",
       "domain": "framework",
       "layer": "authoring",
       "plane": "migration"
     },
     {
-      "glob": "packages/cli/**",
+      "glob": "packages/framework/tooling/cli/**",
       "domain": "framework",
       "layer": "tooling",
       "plane": "migration"
     },
     {
-      "glob": "packages/emitter/**",
+      "glob": "packages/framework/tooling/emitter/**",
       "domain": "framework",
       "layer": "tooling",
       "plane": "migration"
     },
     {
-      "glob": "packages/runtime/core/**",
+      "glob": "packages/framework/runtime-core/**",
       "domain": "framework",
       "layer": "runtime-core",
       "plane": "runtime"
