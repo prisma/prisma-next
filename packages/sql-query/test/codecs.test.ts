@@ -1,7 +1,7 @@
 import type { Plan } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { schema } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
+import { sql } from '@prisma-next/sql-lane/sql';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';

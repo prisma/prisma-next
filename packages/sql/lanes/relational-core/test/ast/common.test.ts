@@ -1,10 +1,4 @@
-import type {
-  ColumnRef,
-  LiteralExpr,
-  OperationExpr,
-  ParamRef,
-  TableRef,
-} from '@prisma-next/sql-target';
+import type { OperationExpr } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import {
   createColumnRef,

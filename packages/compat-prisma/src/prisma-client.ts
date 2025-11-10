@@ -1,10 +1,14 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
-import { param } from '@prisma-next/sql-query/param';
-import { schema } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
-import type { BinaryBuilder, ColumnBuilder, OrderBuilder } from '@prisma-next/sql-query/types';
+import { sql } from '@prisma-next/sql-lane/sql';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import type {
+  BinaryBuilder,
+  ColumnBuilder,
+  OrderBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import {
   createRuntime,
   createRuntimeContext,

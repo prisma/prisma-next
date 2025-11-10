@@ -1,5 +1,4 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
-import type { LoweredStatement } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildInsertPlan, convertModelFieldsToColumns } from '../../src/mutations/insert-builder';

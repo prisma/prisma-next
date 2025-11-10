@@ -3,9 +3,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
+import { sql } from '@prisma-next/sql-lane/sql';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import { budgets, lints } from '@prisma-next/sql-runtime';
 import {
   createTestContext,

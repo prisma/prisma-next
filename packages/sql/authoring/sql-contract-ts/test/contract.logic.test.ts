@@ -454,7 +454,7 @@ describe('validateContract logic validation', () => {
       }) as Record<string, unknown>;
 
     const addPostModel = (contract: Record<string, unknown>) => {
-      (contract.models as Record<string, Record<string, unknown>>).Post = {
+      (contract['models'] as Record<string, Record<string, unknown>>)['Post'] = {
         storage: { table: 'Post' },
         fields: {
           id: { column: 'id' },
@@ -462,7 +462,12 @@ describe('validateContract logic validation', () => {
         },
         relations: {},
       };
-      (contract.storage as Record<string, Record<string, unknown>>).tables.Post = {
+      (
+        (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
+          string,
+          Record<string, unknown>
+        >
+      )['Post'] = {
         columns: {
           id: { type: 'pg/text@1', nullable: false },
           userId: { type: 'pg/text@1', nullable: false },
@@ -477,8 +482,10 @@ describe('validateContract logic validation', () => {
 
     it('throws when a model references a missing table', () => {
       const contract = createModelContract();
-      (contract.models as Record<string, Record<string, unknown>>).User.storage.table =
-        'MissingTable';
+      const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
+        'User'
+      ] as Record<string, unknown>;
+      userModel['storage'] = { table: 'MissingTable' };
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
         /references non-existent table "MissingTable"/,
       );
@@ -486,7 +493,12 @@ describe('validateContract logic validation', () => {
 
     it('throws when the model table lacks a primary key', () => {
       const contract = createModelContract();
-      delete (contract.storage as Record<string, Record<string, unknown>>).tables.User.primaryKey;
+      delete (
+        (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
+          string,
+          Record<string, unknown>
+        >
+      )?.['User']?.['primaryKey'];
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
         /table "User" is missing a primary key/,
       );
@@ -494,9 +506,10 @@ describe('validateContract logic validation', () => {
 
     it('throws when a model field references a missing column', () => {
       const contract = createModelContract();
-      (contract.models as Record<string, Record<string, unknown>>).User.fields.id = {
-        column: 'missing',
-      };
+      const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
+        'User'
+      ] as Record<string, unknown>;
+      userModel['fields'] = { id: { column: 'missing' } };
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
         /references non-existent column "missing"/,
       );
@@ -504,14 +517,26 @@ describe('validateContract logic validation', () => {
 
     it('skips foreign key validation for 1:N relations', () => {
       const contract = addPostModel(createModelContract());
-      (contract.models as Record<string, Record<string, unknown>>).User.relations = {
+      (
+        (contract['models'] as Record<string, Record<string, unknown>>)?.['User'] as Record<
+          string,
+          unknown
+        >
+      )['relations'] = {
         posts: {
           to: 'Post',
           on: { parentCols: ['id'], childCols: ['userId'] },
           cardinality: '1:N',
         },
       };
-      (contract.storage as Record<string, Record<string, unknown>>).tables.Post.foreignKeys = [
+      (
+        (
+          (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
+            string,
+            Record<string, unknown>
+          >
+        )?.['Post'] as Record<string, unknown>
+      )['foreignKeys'] = [
         {
           columns: ['userId'],
           references: { table: 'User', columns: ['id'] },
@@ -522,7 +547,12 @@ describe('validateContract logic validation', () => {
 
     it('throws when an N:1 relation lacks a matching foreign key', () => {
       const contract = addPostModel(createModelContract());
-      (contract.models as Record<string, Record<string, unknown>>).Post.relations = {
+      (
+        (contract['models'] as Record<string, Record<string, unknown>>)?.['Post'] as Record<
+          string,
+          unknown
+        >
+      )['relations'] = {
         user: {
           to: 'User',
           on: { parentCols: ['id'], childCols: ['userId'] },
@@ -536,14 +566,26 @@ describe('validateContract logic validation', () => {
 
     it('accepts N:1 relations with matching foreign keys', () => {
       const contract = addPostModel(createModelContract());
-      (contract.models as Record<string, Record<string, unknown>>).Post.relations = {
+      (
+        (contract['models'] as Record<string, Record<string, unknown>>)?.['Post'] as Record<
+          string,
+          unknown
+        >
+      )['relations'] = {
         user: {
           to: 'User',
           on: { parentCols: ['id'], childCols: ['userId'] },
           cardinality: 'N:1',
         },
       };
-      (contract.storage as Record<string, Record<string, unknown>>).tables.Post.foreignKeys = [
+      (
+        (
+          (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
+            string,
+            Record<string, unknown>
+          >
+        )?.['Post'] as Record<string, unknown>
+      )['foreignKeys'] = [
         {
           columns: ['userId'],
           references: { table: 'User', columns: ['id'] },

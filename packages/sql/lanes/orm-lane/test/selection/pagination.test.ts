@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPaginationState, type PaginationState } from '../../src/selection/pagination';
+import { createPaginationState } from '../../src/selection/pagination';
 
 describe('pagination', () => {
   it('creates pagination state with limit only', () => {

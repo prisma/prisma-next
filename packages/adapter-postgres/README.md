@@ -129,7 +129,7 @@ flowchart TD
 
 ```typescript
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
-import { createRuntime } from '@prisma-next/runtime';
+import { createRuntime } from '@prisma-next/sql-runtime';
 
 const runtime = createRuntime({
   contract,

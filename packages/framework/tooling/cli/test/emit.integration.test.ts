@@ -6,8 +6,9 @@ import { fileURLToPath } from 'node:url';
 import type { ResultType } from '@prisma-next/contract/types';
 import type { ContractIR } from '@prisma-next/emitter';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { sql } from '@prisma-next/sql-lane/sql';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import type {
   Adapter,

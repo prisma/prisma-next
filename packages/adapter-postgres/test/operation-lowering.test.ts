@@ -1,4 +1,4 @@
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { OperationExpr, SelectAst } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/adapter';

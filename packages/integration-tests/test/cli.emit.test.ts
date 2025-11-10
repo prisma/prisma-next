@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract-types';
-import { validateContract } from '@prisma-next/sql-query/schema';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 type EmittedContract = SqlContract<

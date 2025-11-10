@@ -1,4 +1,4 @@
-import type { ColumnRef, Direction, OperationExpr } from '@prisma-next/sql-target';
+import type { ColumnRef, OperationExpr } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef } from '../../src/ast/common';
 import { createOrderByItem } from '../../src/ast/order';

@@ -30,7 +30,7 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.storage.tables.User.columns.id.nullable).toBe(false);
+    expect(contract.storage.tables['User']?.columns['id']?.nullable).toBe(false);
   });
 
   it('normalizes missing uniques array', () => {
@@ -54,7 +54,7 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.storage.tables.User.uniques).toEqual([]);
+    expect(contract.storage.tables['User']?.['uniques']).toEqual([]);
   });
 
   it('normalizes missing indexes array', () => {
@@ -78,7 +78,7 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.storage.tables.User.indexes).toEqual([]);
+    expect(contract.storage.tables['User']?.['indexes']).toEqual([]);
   });
 
   it('normalizes missing foreignKeys array', () => {
@@ -102,7 +102,7 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.storage.tables.User.foreignKeys).toEqual([]);
+    expect(contract.storage.tables['User']?.['foreignKeys']).toEqual([]);
   });
 
   it('normalizes missing columns in table', () => {
@@ -127,7 +127,7 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.storage.tables.User).toBeDefined();
+    expect(contract.storage.tables['User']).toBeDefined();
   });
 
   it('normalizes table without columns property', () => {
@@ -255,8 +255,8 @@ describe('validateContract normalization', () => {
     } as any;
     const normalized = normalizeContract(contractInput);
     // Normalization should complete even though validation would fail
-    expect(normalized.storage.tables.User).toBeDefined();
-    expect(normalized.storage.tables.User).not.toHaveProperty('columns');
+    expect(normalized.storage.tables['User']).toBeDefined();
+    expect(normalized.storage.tables['User']).not.toHaveProperty('columns');
   });
 
   it('normalizeContract handles table with undefined columns', () => {
@@ -282,7 +282,7 @@ describe('validateContract normalization', () => {
     } as any;
     const normalized = normalizeContract(contractInput);
     // Normalization should complete even though validation would fail
-    expect(normalized.storage.tables.User).toBeDefined();
+    expect(normalized.storage.tables['User']).toBeDefined();
   });
 
   it('normalizeContract handles models with existing relations', () => {
@@ -323,7 +323,7 @@ describe('validateContract normalization', () => {
     } as any;
     const normalized = normalizeContract(contractInput);
     // Normalization should preserve existing relations (lines 420-425)
-    expect(normalized.models.User.relations).toEqual({
+    expect((normalized.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
         on: { parentCols: ['id'], childCols: ['userId'] },
@@ -361,7 +361,7 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.models.User.relations).toEqual({});
+    expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({});
   });
 
   it('normalizes missing top-level relations', () => {
@@ -533,8 +533,8 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.models.User.relations).toEqual({});
-    expect(contract.models.Post.relations).toEqual({});
+    expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({});
+    expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({});
   });
 
   it('normalizes models with existing relations', () => {
@@ -602,14 +602,14 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.models.User.relations).toEqual({
+    expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
         on: { parentCols: ['id'], childCols: ['userId'] },
         cardinality: '1:N',
       },
     });
-    expect(contract.models.Post.relations).toEqual({
+    expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({
       user: {
         to: 'User',
         on: { parentCols: ['id'], childCols: ['userId'] },
@@ -677,14 +677,14 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.models.User.relations).toEqual({
+    expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
         on: { parentCols: ['id'], childCols: ['userId'] },
         cardinality: '1:N',
       },
     });
-    expect(contract.models.Post.relations).toEqual({});
+    expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({});
   });
 });
 
@@ -715,12 +715,12 @@ describe('computeMappings', () => {
       },
     };
     const mappings = computeMappings(models, storage);
-    expect(mappings.modelToTable.User).toBe('user');
-    expect(mappings.tableToModel.user).toBe('User');
-    expect(mappings.fieldToColumn.User.id).toBe('id');
-    expect(mappings.fieldToColumn.User.email).toBe('email');
-    expect(mappings.columnToField.user.id).toBe('id');
-    expect(mappings.columnToField.user.email).toBe('email');
+    expect(mappings.modelToTable?.['User']).toBe('user');
+    expect(mappings.tableToModel?.['user']).toBe('User');
+    expect(mappings.fieldToColumn?.['User']?.['id']).toBe('id');
+    expect(mappings.fieldToColumn?.['User']?.['email']).toBe('email');
+    expect(mappings.columnToField?.['user']?.['id']).toBe('id');
+    expect(mappings.columnToField?.['user']?.['email']).toBe('email');
   });
 
   it('preserves existing mappings when provided', () => {
@@ -752,7 +752,7 @@ describe('computeMappings', () => {
       operationTypes: { custom: {} },
     };
     const mappings = computeMappings(models, storage, existingMappings);
-    expect(mappings.modelToTable.User).toBe('custom_table');
+    expect(mappings.modelToTable?.['User']).toBe('custom_table');
     expect(mappings.codecTypes).toEqual(existingMappings.codecTypes);
     expect(mappings.operationTypes).toEqual(existingMappings.operationTypes);
   });
@@ -799,11 +799,11 @@ describe('computeMappings', () => {
       },
     };
     const mappings = computeMappings(models, storage);
-    expect(mappings.modelToTable.User).toBe('user');
-    expect(mappings.modelToTable.Post).toBe('post');
-    expect(mappings.tableToModel.user).toBe('User');
-    expect(mappings.tableToModel.post).toBe('Post');
-    expect(mappings.fieldToColumn.Post.userId).toBe('user_id');
-    expect(mappings.columnToField.post.user_id).toBe('userId');
+    expect(mappings.modelToTable?.['User']).toBe('user');
+    expect(mappings.modelToTable?.['Post']).toBe('post');
+    expect(mappings.tableToModel?.['user']).toBe('User');
+    expect(mappings.tableToModel?.['post']).toBe('Post');
+    expect(mappings.fieldToColumn?.['Post']?.['userId']).toBe('user_id');
+    expect(mappings.columnToField?.['post']?.['user_id']).toBe('userId');
   });
 });

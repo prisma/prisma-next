@@ -62,7 +62,7 @@ describe('validateContract edge cases', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.models.User.relations).toEqual({});
+    expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({});
   });
 
   it('handles table without columns in normalization', () => {

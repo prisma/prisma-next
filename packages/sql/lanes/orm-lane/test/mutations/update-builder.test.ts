@@ -1,7 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
-import type { LoweredStatement } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildUpdatePlan } from '../../src/mutations/update-builder';

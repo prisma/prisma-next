@@ -1,4 +1,4 @@
-import type { BinaryExpr, ColumnRef, DeleteAst, TableRef } from '@prisma-next/sql-target';
+import type { BinaryExpr, ColumnRef, TableRef } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
 import { createDeleteAst } from '../../src/ast/delete';

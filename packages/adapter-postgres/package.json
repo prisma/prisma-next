@@ -13,7 +13,7 @@
     "clean": "node ../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/sql-query": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-target": "workspace:*"
   },
   "devDependencies": {

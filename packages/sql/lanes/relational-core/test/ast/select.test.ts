@@ -1,9 +1,7 @@
 import type {
   BinaryExpr,
   ColumnRef,
-  Direction,
   ExistsExpr,
-  IncludeAst,
   JoinAst,
   OperationExpr,
   SelectAst,

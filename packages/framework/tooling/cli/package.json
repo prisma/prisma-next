@@ -27,7 +27,6 @@
   },
   "devDependencies": {
     "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/sql-query": "workspace:*",
     "@prisma-next/sql-target": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/node": "^20.0.0",

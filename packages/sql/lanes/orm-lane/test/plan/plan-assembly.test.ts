@@ -1,4 +1,4 @@
-import type { ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
+import type { PlanMeta } from '@prisma-next/contract/types';
 import type { AnyOrderBuilder, BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import type {
   OperationExpr,

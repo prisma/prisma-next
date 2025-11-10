@@ -14,7 +14,8 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/sql-query": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
     "pg": "^8.11.5"
   },
   "devDependencies": {

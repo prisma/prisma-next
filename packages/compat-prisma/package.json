@@ -15,7 +15,8 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/sql-query": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*"
   },

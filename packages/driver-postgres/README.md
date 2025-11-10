@@ -79,7 +79,7 @@ flowchart TD
 
 ```typescript
 import { createPostgresDriver } from '@prisma-next/driver-postgres';
-import { createRuntime } from '@prisma-next/runtime';
+import { createRuntime } from '@prisma-next/sql-runtime';
 
 const driver = createPostgresDriver({
   connectionString: process.env.DATABASE_URL,

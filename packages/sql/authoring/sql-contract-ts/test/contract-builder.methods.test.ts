@@ -85,7 +85,7 @@ describe('contract builder methods', () => {
       .table('user', (t) => t.column('id', { type: 'pg/int4@1' }))
       .build();
     expect(contract.storage.tables.user.columns.id).toBeDefined();
-    expect(contract.storage.tables.user.primaryKey).toBeUndefined();
+    expect(contract.storage.tables.user['primaryKey']).toBeUndefined();
   });
 
   it('builds model with relations', () => {
@@ -116,7 +116,7 @@ describe('contract builder methods', () => {
           }),
       )
       .build();
-    expect(contract.models.Post.relations).toBeDefined();
+    expect((contract.models['Post'] as { relations?: unknown })['relations']).toBeDefined();
     expect(contract.relations.post).toBeDefined();
     expect(contract.relations.post?.user).toBeDefined();
   });
