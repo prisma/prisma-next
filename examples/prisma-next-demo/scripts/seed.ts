@@ -1,5 +1,5 @@
 import type { Plan, ResultType } from '@prisma-next/contract/types';
-import { param } from '@prisma-next/sql-query/param';
+import { param } from '@prisma-next/sql-relational-core/param';
 import { schema, sql } from '../src/prisma/query';
 import { closeRuntime, getRuntime } from '../src/prisma/runtime';
 

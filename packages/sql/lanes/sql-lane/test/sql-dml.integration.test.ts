@@ -1,19 +1,20 @@
 import type { ResultType } from '@prisma-next/contract/types';
-import { param } from '@prisma-next/sql-query/param';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { sql } from '@prisma-next/sql-lane/sql';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
+import { createPostgresAdapter } from '../../../../adapter-postgres/src/exports/adapter';
 import {
   createTestContext,
   createTestRuntime,
   executePlanAndCollect,
   setupTestDatabase,
-} from '../../runtime/test/utils';
+} from '../../../../runtime/test/utils';
+import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',

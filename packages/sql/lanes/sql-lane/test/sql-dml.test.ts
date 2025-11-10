@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { param } from '@prisma-next/sql-query/param';
-import { schema } from '@prisma-next/sql-query/schema';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   Adapter,
   DeleteAst,
@@ -16,7 +16,7 @@ import type {
 } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
-import { createTestContext } from '../../runtime/test/utils';
+import { createTestContext } from '../../../../runtime/test/utils';
 import { sql } from '../src/sql';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 

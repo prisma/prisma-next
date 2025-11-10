@@ -23,6 +23,8 @@ Provide SQL query authoring surfaces that compile to immutable Plans. Support mu
 
 **Note**: Relational core primitives (schema builders, column builders, parameter helpers, operations registry) have been moved to `@prisma-next/sql-relational-core`. This package re-exports them for backward compatibility during the migration. The re-exports will be removed in Slice 7 once all callers have migrated.
 
+**Note**: The SQL lane (relational DSL + raw SQL helpers) has been moved to `@prisma-next/sql-lane`. The ORM lane (ORM builder + includes + filters) has been moved to `@prisma-next/sql-orm-lane`. This package re-exports them for backward compatibility during the migration. The re-exports will be removed in Slice 7 once all callers have migrated.
+
 **Non-goals:**
 - Execution or runtime behavior (runtime)
 - Dialect-specific lowering (adapters)

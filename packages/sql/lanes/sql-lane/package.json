@@ -7,21 +7,33 @@
   "description": "Relational DSL and raw SQL helpers for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
     "clean": "node ../../../../scripts/clean.mjs"
   },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/plan": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-target": "workspace:*"
+  },
   "devDependencies": {
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
     "tsup": "^8.3.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^2.1.1"
   },
   "files": [
     "dist"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "./sql": {
+      "types": "./dist/exports/sql.d.ts",
+      "import": "./dist/exports/sql.js"
     }
   }
 }

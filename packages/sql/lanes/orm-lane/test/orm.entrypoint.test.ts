@@ -11,7 +11,7 @@ import type {
 } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
-import { createTestContext } from '../../runtime/test/utils';
+import { createTestContext } from '../../../../runtime/test/utils';
 import { orm } from '../src/orm';
 import type { Contract } from './fixtures/contract.d';
 

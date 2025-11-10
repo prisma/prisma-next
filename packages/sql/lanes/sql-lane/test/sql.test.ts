@@ -4,13 +4,12 @@ import { fileURLToPath } from 'node:url';
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { RuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { param } from '@prisma-next/sql-query/param';
-import { schema } from '@prisma-next/sql-query/schema';
-import type { ColumnBuilder } from '@prisma-next/sql-query/types';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import type { SelectAst as SelectAstType, SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
-import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
-import { orm } from '../src/orm';
+import { createStubAdapter, createTestContext } from '../../../../runtime/test/utils';
 import { sql } from '../src/sql';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 

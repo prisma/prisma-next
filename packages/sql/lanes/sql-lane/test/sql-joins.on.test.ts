@@ -1,8 +1,8 @@
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { schema } from '@prisma-next/sql-query/schema';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { SqlContract } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
-import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
+import { createStubAdapter, createTestContext } from '../../../../runtime/test/utils';
 import { createJoinOnBuilder } from '../src/sql';
 
 // Define a fully-typed contract type for this test

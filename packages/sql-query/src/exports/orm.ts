@@ -1,10 +1,2 @@
-export { orm } from '../orm';
-export type {
-  ModelColumnAccessor,
-  OrmBuilderOptions,
-  OrmModelBuilder,
-  OrmRegistry,
-  OrmRelationAccessor,
-  OrmRelationFilterBuilder,
-  OrmWhereProperty,
-} from '../orm-types';
+// TODO: Remove this transitional re-export in Slice 7 once all callers migrate to @prisma-next/sql-orm-lane
+export * from '@prisma-next/sql-orm-lane/orm';

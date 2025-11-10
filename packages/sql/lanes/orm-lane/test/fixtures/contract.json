@@ -1,0 +1,42 @@
+{
+  "$schema": "../../schemas/data-contract-sql-v1.json",
+  "schemaVersion": "1",
+  "target": "postgres",
+  "targetFamily": "sql",
+  "coreHash": "sha256:test-core",
+  "profileHash": "sha256:test-profile",
+  "models": {
+    "User": {
+      "storage": { "table": "user" },
+      "fields": {
+        "id": { "column": "id" },
+        "email": { "column": "email" },
+        "createdAt": { "column": "createdAt" }
+      },
+      "relations": {}
+    }
+  },
+  "storage": {
+    "tables": {
+      "user": {
+        "columns": {
+          "id": { "type": "pg/int4@1", "nullable": false },
+          "email": { "type": "pg/text@1", "nullable": false },
+          "createdAt": { "type": "pg/timestamptz@1", "nullable": false }
+        },
+        "primaryKey": {
+          "columns": ["id"]
+        },
+        "uniques": [],
+        "indexes": [],
+        "foreignKeys": []
+      }
+    }
+  },
+  "extensions": {},
+  "capabilities": {
+    "postgres": {
+      "returning": true
+    }
+  }
+}
