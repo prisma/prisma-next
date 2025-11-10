@@ -1,16 +1,8 @@
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const workspaceRoot = resolve(__dirname, '../../..');
-
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@prisma-next/plan': resolve(workspaceRoot, 'packages/core/plan/src/index.ts'),
-    },
-  },
+  plugins: [tsconfigPaths()],
   test: {
     globals: true,
     environment: 'node',

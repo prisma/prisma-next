@@ -28,6 +28,7 @@
     "ts-toolbelt": "^9.6.0",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^2.1.1"
   },
   "files": [
