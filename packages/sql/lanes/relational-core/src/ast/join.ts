@@ -6,7 +6,6 @@ import type {
 } from '@prisma-next/sql-relational-core/types';
 import { isColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import type { ColumnRef, JoinAst, JoinOnExpr, TableRef } from '@prisma-next/sql-target';
-import { createColumnRef } from './common';
 
 export function createJoin(
   joinType: 'inner' | 'left' | 'right' | 'full',

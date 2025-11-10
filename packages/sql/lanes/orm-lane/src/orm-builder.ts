@@ -845,7 +845,7 @@ export class OrmModelBuilderImpl<
 
     // Build SELECT AST
     const ast = createSelectAst({
-      from: this.table,
+      from: createTableRef(this.table.name),
       project: projectEntries,
       ...(includesAst.length > 0 ? { includes: includesAst } : {}),
       ...(whereExpr ? { where: whereExpr } : {}),
@@ -863,7 +863,7 @@ export class OrmModelBuilderImpl<
     // Build plan metadata
     const planMeta = buildMeta({
       contract: this.contract,
-      table: this.table,
+      table: createTableRef(this.table.name),
       projection: projectionState,
       ...(includesForMeta.length > 0 ? { includes: includesForMeta } : {}),
       paramDescriptors,

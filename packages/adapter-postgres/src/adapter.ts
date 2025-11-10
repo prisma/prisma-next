@@ -133,7 +133,11 @@ function renderWhere(expr: BinaryExpr | ExistsExpr): string {
 function renderBinary(expr: BinaryExpr): string {
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = isOperationExpr(leftExpr) ? renderOperation(leftExpr) : renderColumn(leftExpr);
-  const right = renderParam(expr.right);
+  // Handle both ParamRef and ColumnRef on the right side
+  // (ColumnRef can appear in EXISTS subqueries for correlation)
+  const rightExpr = expr.right as ParamRef | ColumnRef;
+  const right =
+    rightExpr.kind === 'col' ? renderColumn(rightExpr) : renderParam(rightExpr as ParamRef);
   // Only wrap in parentheses if it's an operation expression
   const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
   return `${leftRendered} = ${right}`;

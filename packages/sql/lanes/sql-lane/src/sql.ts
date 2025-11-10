@@ -34,22 +34,17 @@ import type {
 import type {
   BinaryExpr,
   ColumnRef,
-  DeleteAst,
-  Direction,
   ExtractCodecTypes,
   ExtractOperationTypes,
   IncludeRef,
-  InsertAst,
   LiteralExpr,
   LoweredStatement,
   OperationExpr,
   ParamRef,
-  SelectAst,
   SqlContract,
   SqlStorage,
   StorageColumn,
   TableRef,
-  UpdateAst,
 } from '@prisma-next/sql-target';
 import { createRawFactory } from './raw';
 

@@ -8,6 +8,7 @@ export default defineConfig({
     'exports/types': 'src/exports/types.ts',
     'exports/operations-registry': 'src/exports/operations-registry.ts',
     'exports/errors': 'src/exports/errors.ts',
+    'exports/ast': 'src/exports/ast.ts',
   },
   outDir: 'dist',
   format: ['esm'],
