@@ -3,6 +3,9 @@ description: Use Object.hasOwn() instead of hasOwnProperty()
 alwaysApply: false
 tags: [typescript, linting]
 appliesTo: ["**/*.ts", "**/*.tsx"]
+owner: prisma-next-docs
+lastUpdated: 2025-01-15
+severity: warn
 ---
 
 # Use Object.hasOwn() Instead of hasOwnProperty()

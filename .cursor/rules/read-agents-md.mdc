@@ -1,5 +1,11 @@
 ---
-alwaysApply: true
+description: Read AGENTS.md and AGENT_ONBOARDING.md for onboarding context
+alwaysApply: false
+tags: [onboarding, documentation]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-01-15
+severity: info
 ---
 
 Read AGENTS.md and AGENT_ONBOARDING.md
