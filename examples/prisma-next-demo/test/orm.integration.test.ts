@@ -5,7 +5,7 @@ import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';

@@ -4,7 +4,7 @@ import {
   readContractMarker,
   writeContractMarker,
 } from '@prisma-next/runtime';
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract } from '@prisma-next/sql-target';
 import { Client } from 'pg';
 import contract from './contract.json' with { type: 'json' };

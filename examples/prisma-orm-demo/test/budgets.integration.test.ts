@@ -8,7 +8,8 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/runtime';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import { withDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
