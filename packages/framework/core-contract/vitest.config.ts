@@ -18,6 +18,7 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
         'schemas/**',
+        '**/types.ts', // Types-only file
       ],
       thresholds: {
         lines: 90,
