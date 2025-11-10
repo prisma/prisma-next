@@ -16,7 +16,7 @@ import { emitAndVerifyContract, loadContractFromDisk } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const repoRoot = resolve(__dirname, '../../..');
+const repoRoot = resolve(__dirname, '../../../../');
 
 describe('end-to-end basic queries', () => {
   const adapterPath = resolve(repoRoot, 'packages/sql/runtime/adapters/postgres');
