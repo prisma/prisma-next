@@ -151,17 +151,8 @@ export class OrmModelBuilderImpl<
 
         return (
           child: (
-            child: OrmIncludeChildBuilder<
-              TContract,
-              CodecTypes,
-              typeof childModelName
-            >,
-          ) => OrmIncludeChildBuilder<
-            TContract,
-            CodecTypes,
-            typeof childModelName,
-            unknown
-          >,
+            child: OrmIncludeChildBuilder<TContract, CodecTypes, typeof childModelName>,
+          ) => OrmIncludeChildBuilder<TContract, CodecTypes, typeof childModelName, unknown>,
         ) => {
           return self._applyInclude(prop, childModelName, child, relationDef);
         };
@@ -174,12 +165,7 @@ export class OrmModelBuilderImpl<
     childModelName: string,
     childBuilderFn: (
       child: OrmIncludeChildBuilder<TContract, CodecTypes, string>,
-    ) => OrmIncludeChildBuilder<
-      TContract,
-      CodecTypes,
-      string,
-      unknown
-    >,
+    ) => OrmIncludeChildBuilder<TContract, CodecTypes, string, unknown>,
     relationDef: {
       to: string;
       cardinality: string;
@@ -199,18 +185,10 @@ export class OrmModelBuilderImpl<
       childModelName,
     );
     const builtChild = childBuilderFn(
-      childBuilder as OrmIncludeChildBuilder<
-        TContract,
-        CodecTypes,
-        string
-      >,
+      childBuilder as OrmIncludeChildBuilder<TContract, CodecTypes, string>,
     );
     const childState = (
-      builtChild as OrmIncludeChildBuilderImpl<
-        TContract,
-        CodecTypes,
-        string
-      >
+      builtChild as OrmIncludeChildBuilderImpl<TContract, CodecTypes, string>
     ).getState();
 
     // Store the include

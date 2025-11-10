@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
@@ -45,8 +46,8 @@ describe('sql DSL builder', () => {
       kind: 'select',
       from: { name: 'user' },
       project: [
-        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-        { alias: 'email', expr: { kind: 'col', table: 'user', column: 'email' } },
+        { alias: 'id', expr: createColumnRef('user', 'id') },
+        { alias: 'email', expr: createColumnRef('user', 'email') },
       ],
       where: {
         left: { table: 'user', column: 'id' },
@@ -247,8 +248,8 @@ describe('sql DSL builder', () => {
         .build();
 
       expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
-        { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
-        { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'name', expr: createColumnRef('user', 'email') },
+        { alias: 'post_title', expr: createColumnRef('user', 'id') },
       ]);
 
       expect(plan.meta.projection).toEqual({
@@ -272,7 +273,7 @@ describe('sql DSL builder', () => {
         .build();
 
       expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
-        { alias: 'a_b_c', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'a_b_c', expr: createColumnRef('user', 'id') },
       ]);
 
       expect(plan.meta.projection).toEqual({
@@ -298,10 +299,10 @@ describe('sql DSL builder', () => {
         .build();
 
       expect((plan.ast as SelectAstType | undefined)?.project).toEqual([
-        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-        { alias: 'post_title', expr: { kind: 'col', table: 'user', column: 'email' } },
-        { alias: 'post_author_name', expr: { kind: 'col', table: 'user', column: 'id' } },
-        { alias: 'email', expr: { kind: 'col', table: 'user', column: 'email' } },
+        { alias: 'id', expr: createColumnRef('user', 'id') },
+        { alias: 'post_title', expr: createColumnRef('user', 'email') },
+        { alias: 'post_author_name', expr: createColumnRef('user', 'id') },
+        { alias: 'email', expr: createColumnRef('user', 'email') },
       ]);
 
       expect(plan.meta.projection).toEqual({

@@ -1,4 +1,8 @@
-import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import {
+  createColumnRef,
+  createLiteralExpr,
+  createParamRef,
+} from '@prisma-next/sql-relational-core/ast';
 import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import type { ColumnRef, OperationExpr, ParamRef } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
@@ -15,9 +19,15 @@ describe('guards', () => {
     it('returns ColumnRef directly when expr is ColumnRef', () => {
       const colRef: ColumnRef = createColumnRef('user', 'id');
       const result = extractBaseColumnRef(colRef);
-      expect(result).toBe(colRef);
-      expect(result.table).toBe('user');
-      expect(result.column).toBe('id');
+      expect({
+        isColRef: result === colRef,
+        table: result.table,
+        column: result.column,
+      }).toMatchObject({
+        isColRef: true,
+        table: 'user',
+        column: 'id',
+      });
     });
 
     it('recursively unwraps OperationExpr to find base ColumnRef', () => {
@@ -32,6 +42,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: 'normalize(${self})',
         },
       };
@@ -45,14 +56,21 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: '${self} <=> ${arg0}',
         },
       };
 
       const result = extractBaseColumnRef(operation2);
-      expect(result).toEqual(baseCol);
-      expect(result.table).toBe('user');
-      expect(result.column).toBe('id');
+      expect({
+        equalsBaseCol: result === baseCol,
+        table: result.table,
+        column: result.column,
+      }).toMatchObject({
+        equalsBaseCol: true,
+        table: 'user',
+        column: 'id',
+      });
     });
   });
 
@@ -64,13 +82,13 @@ describe('guards', () => {
     });
 
     it('returns empty array for ParamRef', () => {
-      const paramRef: ParamRef = { kind: 'param', index: 1, name: 'userId' };
+      const paramRef: ParamRef = createParamRef(1, 'userId');
       const result = collectColumnRefs(paramRef);
       expect(result).toEqual([]);
     });
 
     it('returns empty array for LiteralExpr', () => {
-      const literalExpr = { kind: 'literal' as const, value: 'test' };
+      const literalExpr = createLiteralExpr('test');
       const result = collectColumnRefs(literalExpr);
       expect(result).toEqual([]);
     });
@@ -88,6 +106,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: '${self} = ${arg0}',
         },
       };
@@ -111,6 +130,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: 'normalize(${self})',
         },
       };
@@ -124,6 +144,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: '${self} <=> ${arg0}',
         },
       };
@@ -148,6 +169,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: 'normalize(${self})',
         },
       };
@@ -207,6 +229,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: 'normalize(${self})',
         },
       };
@@ -227,6 +250,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: 'normalize(${self})',
         },
       };
@@ -240,6 +264,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: '${self} <=> ${arg0}',
         },
       };
@@ -273,6 +298,7 @@ describe('guards', () => {
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
           template: 'normalize(${self})',
         },
       };

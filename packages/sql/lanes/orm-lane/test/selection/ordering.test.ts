@@ -18,12 +18,19 @@ describe('ordering', () => {
           column: 'id',
         },
         dir: 'asc' as const,
-      } as OrderBuilder<string, unknown, unknown>;
+      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
       const result = buildOrderByClause(orderBy);
-      expect(result).toBeDefined();
-      expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr).toMatchObject({ kind: 'col', table: 'user', column: 'id' });
-      expect(result?.[0]?.dir).toBe('asc');
+      expect({
+        defined: result !== undefined,
+        length: result?.length,
+        expr: result?.[0]?.expr,
+        dir: result?.[0]?.dir,
+      }).toMatchObject({
+        defined: true,
+        length: 1,
+        expr: { kind: 'col', table: 'user', column: 'id' },
+        dir: 'asc',
+      });
     });
 
     it('builds orderBy clause with operation expr', () => {
@@ -44,12 +51,19 @@ describe('ordering', () => {
       const orderBy = {
         expr: operationExpr,
         dir: 'desc' as const,
-      } as OrderBuilder<string, unknown, unknown>;
+      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
       const result = buildOrderByClause(orderBy);
-      expect(result).toBeDefined();
-      expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr.kind).toBe('operation');
-      expect(result?.[0]?.dir).toBe('desc');
+      expect({
+        defined: result !== undefined,
+        length: result?.length,
+        exprKind: result?.[0]?.expr.kind,
+        dir: result?.[0]?.dir,
+      }).toMatchObject({
+        defined: true,
+        length: 1,
+        exprKind: 'operation',
+        dir: 'desc',
+      });
     });
 
     it('builds orderBy clause with desc direction', () => {
@@ -59,10 +73,15 @@ describe('ordering', () => {
           column: 'createdAt',
         },
         dir: 'desc' as const,
-      } as OrderBuilder<string, unknown, unknown>;
+      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
       const result = buildOrderByClause(orderBy);
-      expect(result).toBeDefined();
-      expect(result?.[0]?.dir).toBe('desc');
+      expect({
+        defined: result !== undefined,
+        dir: result?.[0]?.dir,
+      }).toMatchObject({
+        defined: true,
+        dir: 'desc',
+      });
     });
   });
 
@@ -79,12 +98,19 @@ describe('ordering', () => {
           column: 'id',
         },
         dir: 'asc' as const,
-      } as OrderBuilder<string, unknown, unknown>;
+      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
       const result = buildChildOrderByClause(orderBy);
-      expect(result).toBeDefined();
-      expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr).toMatchObject({ kind: 'col', table: 'post', column: 'id' });
-      expect(result?.[0]?.dir).toBe('asc');
+      expect({
+        defined: result !== undefined,
+        length: result?.length,
+        expr: result?.[0]?.expr,
+        dir: result?.[0]?.dir,
+      }).toMatchObject({
+        defined: true,
+        length: 1,
+        expr: { kind: 'col', table: 'post', column: 'id' },
+        dir: 'asc',
+      });
     });
 
     it('builds child orderBy clause with operation expr', () => {
@@ -105,12 +131,19 @@ describe('ordering', () => {
       const orderBy = {
         expr: operationExpr,
         dir: 'desc' as const,
-      } as OrderBuilder<string, unknown, unknown>;
+      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
       const result = buildChildOrderByClause(orderBy);
-      expect(result).toBeDefined();
-      expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr).toMatchObject({ kind: 'col', table: 'post', column: 'id' });
-      expect(result?.[0]?.dir).toBe('desc');
+      expect({
+        defined: result !== undefined,
+        length: result?.length,
+        expr: result?.[0]?.expr,
+        dir: result?.[0]?.dir,
+      }).toMatchObject({
+        defined: true,
+        length: 1,
+        expr: { kind: 'col', table: 'post', column: 'id' },
+        dir: 'desc',
+      });
     });
 
     it('builds child orderBy clause with nested operation expr', () => {
@@ -145,12 +178,19 @@ describe('ordering', () => {
       const orderBy = {
         expr: outerOp,
         dir: 'asc' as const,
-      } as OrderBuilder<string, unknown, unknown>;
+      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
       const result = buildChildOrderByClause(orderBy);
-      expect(result).toBeDefined();
-      expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr).toMatchObject({ kind: 'col', table: 'post', column: 'id' });
-      expect(result?.[0]?.dir).toBe('asc');
+      expect({
+        defined: result !== undefined,
+        length: result?.length,
+        expr: result?.[0]?.expr,
+        dir: result?.[0]?.dir,
+      }).toMatchObject({
+        defined: true,
+        length: 1,
+        expr: { kind: 'col', table: 'post', column: 'id' },
+        dir: 'asc',
+      });
     });
   });
 });

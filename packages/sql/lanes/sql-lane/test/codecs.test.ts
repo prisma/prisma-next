@@ -1,10 +1,10 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { Plan } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -177,8 +177,13 @@ describe('DSL Lane Codec Type Stamping', () => {
 
     // Runtime check: verify plan structure supports type inference
     // Note: ResultType<typeof plan> can be used to extract the row type at the type level
-    expect(plan.meta.projection).toBeDefined();
-    expect(plan.meta.projectionTypes).toBeDefined();
+    expect({
+      hasProjection: plan.meta.projection !== undefined,
+      hasProjectionTypes: plan.meta.projectionTypes !== undefined,
+    }).toMatchObject({
+      hasProjection: true,
+      hasProjectionTypes: true,
+    });
   });
 
   it('stamps projectionTypes for all selected columns', () => {
@@ -243,4 +248,3 @@ describe('DSL Lane Codec Type Stamping', () => {
     expect(projectionTypesKeys.sort()).toEqual(projectionKeys.sort());
   });
 });
-

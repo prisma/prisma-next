@@ -8,14 +8,37 @@ import {
   type ProjectionInput,
 } from '../../src/selection/projection';
 
+function createMockColumnBuilder(
+  table: string,
+  column: string,
+  columnMeta: { type: string; nullable: boolean },
+): AnyColumnBuilder {
+  return {
+    kind: 'column',
+    table,
+    column,
+    columnMeta,
+    eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+    asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+    desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+    __jsType: undefined,
+  } as unknown as AnyColumnBuilder;
+}
+
 describe('projection', () => {
   describe('AliasTracker', () => {
     it('registers alias for path', () => {
       const tracker = new AliasTracker();
       const alias = tracker.register(['user', 'id']);
-      expect(alias).toBe('user_id');
-      expect(tracker.has('user_id')).toBe(true);
-      expect(tracker.getPath('user_id')).toEqual(['user', 'id']);
+      expect({
+        alias,
+        has: tracker.has('user_id'),
+        path: tracker.getPath('user_id'),
+      }).toMatchObject({
+        alias: 'user_id',
+        has: true,
+        path: ['user', 'id'],
+      });
     });
 
     it('throws error on alias collision', () => {
@@ -31,18 +54,30 @@ describe('projection', () => {
 
     it('returns undefined for non-existent alias', () => {
       const tracker = new AliasTracker();
-      expect(tracker.getPath('nonexistent')).toBeUndefined();
-      expect(tracker.has('nonexistent')).toBe(false);
+      expect({
+        path: tracker.getPath('nonexistent'),
+        has: tracker.has('nonexistent'),
+      }).toMatchObject({
+        path: undefined,
+        has: false,
+      });
     });
 
     it('handles multiple aliases', () => {
       const tracker = new AliasTracker();
       const alias1 = tracker.register(['user', 'id']);
       const alias2 = tracker.register(['user', 'email']);
-      expect(alias1).toBe('user_id');
-      expect(alias2).toBe('user_email');
-      expect(tracker.has('user_id')).toBe(true);
-      expect(tracker.has('user_email')).toBe(true);
+      expect({
+        alias1,
+        alias2,
+        has1: tracker.has('user_id'),
+        has2: tracker.has('user_email'),
+      }).toMatchObject({
+        alias1: 'user_id',
+        alias2: 'user_email',
+        has1: true,
+        has2: true,
+      });
     });
   });
 
@@ -54,7 +89,11 @@ describe('projection', () => {
         table: 'user',
         column: 'id',
         columnMeta: { type: 'pg/int4@1', nullable: false },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const projection: NestedProjection = {
         id: colBuilder,
       };
@@ -99,7 +138,11 @@ describe('projection', () => {
         table: 'user',
         column: 'id',
         columnMeta: { type: 'pg/int4@1', nullable: false },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const projection: NestedProjection = {
         user: {
           profile: {
@@ -130,7 +173,11 @@ describe('projection', () => {
         table: 'user',
         column: 'id',
         columnMeta: { type: 'pg/int4@1', nullable: false },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const projection: NestedProjection = {
         id: col,
       };
@@ -143,7 +190,7 @@ describe('projection', () => {
   });
 
   describe('buildProjectionState', () => {
-    const table: TableRef = { name: 'user', alias: 'u' };
+    const table: TableRef = { kind: 'table', name: 'user' };
 
     it('builds projection state with column builder', () => {
       const col: AnyColumnBuilder = {
@@ -151,7 +198,11 @@ describe('projection', () => {
         table: 'user',
         column: 'id',
         columnMeta: { type: 'pg/int4@1', nullable: false },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const projection: ProjectionInput = {
         id: col,
       };
@@ -169,20 +220,19 @@ describe('projection', () => {
       const includes = [
         {
           alias: 'posts',
-          table: { name: 'post', alias: 'p' },
+          table: { kind: 'table', name: 'post' },
           on: {
-            parentCols: ['id'],
-            childCols: ['userId'],
+            kind: 'join-on' as const,
+            left: createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+            right: createMockColumnBuilder('post', 'userId', {
+              type: 'pg/int4@1',
+              nullable: false,
+            }),
           },
           childProjection: {
             aliases: ['id'],
             columns: [
-              {
-                kind: 'column',
-                table: 'post',
-                column: 'id',
-                columnMeta: { type: 'pg/int4@1', nullable: false },
-              } as AnyColumnBuilder,
+              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
             ],
           },
         },
@@ -190,11 +240,19 @@ describe('projection', () => {
 
       const result = buildProjectionState(table, projection, includes);
 
-      expect(result.aliases).toEqual(['posts']);
-      expect(result.columns).toHaveLength(1);
-      expect(result.columns[0]?.kind).toBe('column');
-      expect(result.columns[0]?.table).toBe('post');
-      expect(result.columns[0]?.columnMeta?.type).toBe('core/json@1');
+      expect({
+        aliases: result.aliases,
+        columnCount: result.columns.length,
+        firstColumn: result.columns[0],
+      }).toMatchObject({
+        aliases: ['posts'],
+        columnCount: 1,
+        firstColumn: {
+          kind: 'column',
+          table: 'post',
+          columnMeta: { type: 'core/json@1' },
+        },
+      });
     });
 
     it('throws error when include alias not found', () => {
@@ -257,7 +315,11 @@ describe('projection', () => {
         table: 'user',
         column: 'id',
         columnMeta: { type: 'pg/int4@1', nullable: false },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const projection: ProjectionInput = {
         id: col,
         posts: true,
@@ -265,20 +327,19 @@ describe('projection', () => {
       const includes = [
         {
           alias: 'posts',
-          table: { name: 'post', alias: 'p' },
+          table: { kind: 'table', name: 'post' },
           on: {
-            parentCols: ['id'],
-            childCols: ['userId'],
+            kind: 'join-on' as const,
+            left: createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+            right: createMockColumnBuilder('post', 'userId', {
+              type: 'pg/int4@1',
+              nullable: false,
+            }),
           },
           childProjection: {
             aliases: ['id'],
             columns: [
-              {
-                kind: 'column',
-                table: 'post',
-                column: 'id',
-                columnMeta: { type: 'pg/int4@1', nullable: false },
-              } as AnyColumnBuilder,
+              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
             ],
           },
         },
@@ -298,7 +359,11 @@ describe('projection', () => {
         table: 'user',
         column: 'id',
         columnMeta: { type: 'pg/int4@1', nullable: false },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const projection: ProjectionInput = {
         user_id: col,
         user: {

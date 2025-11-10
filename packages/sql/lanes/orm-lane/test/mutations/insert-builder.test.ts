@@ -1,4 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
+import type { InsertAst } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildInsertPlan, convertModelFieldsToColumns } from '../../src/mutations/insert-builder';
@@ -70,7 +72,7 @@ describe('insert builder', () => {
   const context: OrmContext<SqlContract<SqlStorage>> = {
     contract,
     adapter: adapter as unknown as OrmContext<SqlContract<SqlStorage>>['adapter'],
-    context: {} as any,
+    context: {} as unknown as RuntimeContext<SqlContract<SqlStorage>>,
   };
 
   describe('convertModelFieldsToColumns', () => {
@@ -78,10 +80,17 @@ describe('insert builder', () => {
       const fields = { id: 1, email: 'test@example.com' };
       const result = convertModelFieldsToColumns(contract, 'User', fields);
 
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('email');
-      expect(result['id']?.name).toBe('id');
-      expect(result['email']?.name).toBe('email');
+      expect({
+        hasId: Object.hasOwn(result, 'id'),
+        hasEmail: Object.hasOwn(result, 'email'),
+        idName: result['id']?.name,
+        emailName: result['email']?.name,
+      }).toMatchObject({
+        hasId: true,
+        hasEmail: true,
+        idName: 'id',
+        emailName: 'email',
+      });
     });
 
     it('uses fieldToColumn mapping when available', () => {
@@ -194,11 +203,19 @@ describe('insert builder', () => {
     it('builds insert plan with data', () => {
       const plan = buildInsertPlan(context, 'User', { id: 1, email: 'test@example.com' });
 
-      expect(plan).toBeDefined();
-      expect(plan.meta.lane).toBe('orm');
-      expect(plan.meta.refs?.tables).toEqual(['user']);
-      expect((plan.ast as any).kind).toBe('insert');
-      expect(plan.sql).toBe('INSERT INTO user (id, email) VALUES ($1, $2)');
+      expect({
+        defined: plan !== undefined,
+        lane: plan.meta.lane,
+        tables: plan.meta.refs?.tables,
+        astKind: (plan.ast as InsertAst).kind,
+        sql: plan.sql,
+      }).toMatchObject({
+        defined: true,
+        lane: 'orm',
+        tables: ['user'],
+        astKind: 'insert',
+        sql: 'INSERT INTO user (id, email) VALUES ($1, $2)',
+      });
     });
 
     it('throws error when data is empty', () => {
@@ -288,16 +305,27 @@ describe('insert builder', () => {
         },
       );
 
-      expect(plan.params).toContain(1);
-      expect(plan.params).toContain('test@example.com');
+      expect({
+        hasId: plan.params.includes(1),
+        hasEmail: plan.params.includes('test@example.com'),
+      }).toMatchObject({
+        hasId: true,
+        hasEmail: true,
+      });
     });
 
     it('builds insert plan with codecId', () => {
       const plan = buildInsertPlan(context, 'User', { id: 1, email: 'test@example.com' });
 
-      expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.['id']).toBe('pg/int4@1');
-      expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
+      expect({
+        codecsDefined: plan.meta.annotations?.codecs !== undefined,
+        idCodec: plan.meta.annotations?.codecs?.['id'],
+        emailCodec: plan.meta.annotations?.codecs?.['email'],
+      }).toMatchObject({
+        codecsDefined: true,
+        idCodec: 'pg/int4@1',
+        emailCodec: 'pg/text@1',
+      });
     });
 
     it('builds insert plan without codecId when column type is missing', () => {
@@ -329,8 +357,13 @@ describe('insert builder', () => {
         email: 'test@example.com',
       });
 
-      expect(plan.meta.annotations?.codecs?.['id']).toBe('pg/int4@1');
-      expect(plan.meta.annotations?.codecs?.['email']).toBeUndefined();
+      expect({
+        idCodec: plan.meta.annotations?.codecs?.['id'],
+        emailCodec: plan.meta.annotations?.codecs?.['email'],
+      }).toMatchObject({
+        idCodec: 'pg/int4@1',
+        emailCodec: undefined,
+      });
     });
 
     it('builds insert plan with nullable column', () => {
@@ -355,8 +388,13 @@ describe('insert builder', () => {
         { params: { extraParam: 'value' } },
       );
 
-      expect(plan.params).toContain(1);
-      expect(plan.params).toContain('test@example.com');
+      expect({
+        hasId: plan.params.includes(1),
+        hasEmail: plan.params.includes('test@example.com'),
+      }).toMatchObject({
+        hasId: true,
+        hasEmail: true,
+      });
       // extraParam is in paramsMap but not used in the insert, so it won't be in plan.params
       // unless it's referenced by a placeholder
     });
@@ -390,9 +428,15 @@ describe('insert builder', () => {
         email: 'test@example.com',
       });
 
-      expect(plan.meta.annotations?.codecs).toBeUndefined();
-      expect(plan.meta.annotations?.['intent']).toBe('write');
-      expect(plan.meta.annotations?.['isMutation']).toBe(true);
+      expect({
+        codecs: plan.meta.annotations?.codecs,
+        intent: plan.meta.annotations?.['intent'],
+        isMutation: plan.meta.annotations?.['isMutation'],
+      }).toMatchObject({
+        codecs: undefined,
+        intent: 'write',
+        isMutation: true,
+      });
     });
   });
 });

@@ -4,14 +4,24 @@ import { createPaginationState } from '../../src/selection/pagination';
 describe('pagination', () => {
   it('creates pagination state with limit only', () => {
     const state = createPaginationState(10);
-    expect(state).toEqual({ limit: 10 });
-    expect(state.offset).toBeUndefined();
+    expect({
+      limit: state.limit,
+      offset: state.offset,
+    }).toMatchObject({
+      limit: 10,
+      offset: undefined,
+    });
   });
 
   it('creates pagination state with offset only', () => {
     const state = createPaginationState(undefined, 20);
-    expect(state).toEqual({ offset: 20 });
-    expect(state.limit).toBeUndefined();
+    expect({
+      limit: state.limit,
+      offset: state.offset,
+    }).toMatchObject({
+      limit: undefined,
+      offset: 20,
+    });
   });
 
   it('creates pagination state with both limit and offset', () => {
@@ -21,9 +31,13 @@ describe('pagination', () => {
 
   it('creates empty pagination state when both are undefined', () => {
     const state = createPaginationState();
-    expect(state).toEqual({});
-    expect(state.limit).toBeUndefined();
-    expect(state.offset).toBeUndefined();
+    expect({
+      limit: state.limit,
+      offset: state.offset,
+    }).toMatchObject({
+      limit: undefined,
+      offset: undefined,
+    });
   });
 
   it('creates pagination state with zero values', () => {

@@ -1,3 +1,4 @@
+import { createColumnRef, createParamRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -16,12 +17,12 @@ describe('Include AST types', () => {
         table: { kind: 'table', name: 'post' },
         on: {
           kind: 'eqCol',
-          left: { kind: 'col', table: 'user', column: 'id' },
-          right: { kind: 'col', table: 'post', column: 'userId' },
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('post', 'userId'),
         },
         project: [
-          { alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } },
-          { alias: 'title', expr: { kind: 'col', table: 'post', column: 'title' } },
+          { alias: 'id', expr: createColumnRef('post', 'id') },
+          { alias: 'title', expr: createColumnRef('post', 'title') },
         ],
       },
     };
@@ -37,8 +38,8 @@ describe('Include AST types', () => {
     const whereExpr: BinaryExpr = {
       kind: 'bin',
       op: 'eq',
-      left: { kind: 'col', table: 'post', column: 'published' },
-      right: { kind: 'param', index: 1, name: 'published' },
+      left: createColumnRef('post', 'published'),
+      right: createParamRef(1, 'published'),
     };
 
     const includeAst: IncludeAst = {
@@ -48,11 +49,11 @@ describe('Include AST types', () => {
         table: { kind: 'table', name: 'post' },
         on: {
           kind: 'eqCol',
-          left: { kind: 'col', table: 'user', column: 'id' },
-          right: { kind: 'col', table: 'post', column: 'userId' },
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('post', 'userId'),
         },
         where: whereExpr,
-        project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+        project: [{ alias: 'id', expr: createColumnRef('post', 'id') }],
       },
     };
 
@@ -62,7 +63,7 @@ describe('Include AST types', () => {
 
   it('defines IncludeAst with optional orderBy clause', () => {
     const orderBy: ReadonlyArray<{ expr: ColumnRef; dir: Direction }> = [
-      { expr: { kind: 'col', table: 'post', column: 'createdAt' }, dir: 'desc' },
+      { expr: createColumnRef('post', 'createdAt'), dir: 'desc' },
     ];
 
     const includeAst: IncludeAst = {
@@ -72,11 +73,11 @@ describe('Include AST types', () => {
         table: { kind: 'table', name: 'post' },
         on: {
           kind: 'eqCol',
-          left: { kind: 'col', table: 'user', column: 'id' },
-          right: { kind: 'col', table: 'post', column: 'userId' },
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('post', 'userId'),
         },
         orderBy,
-        project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+        project: [{ alias: 'id', expr: createColumnRef('post', 'id') }],
       },
     };
 
@@ -93,11 +94,11 @@ describe('Include AST types', () => {
         table: { kind: 'table', name: 'post' },
         on: {
           kind: 'eqCol',
-          left: { kind: 'col', table: 'user', column: 'id' },
-          right: { kind: 'col', table: 'post', column: 'userId' },
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('post', 'userId'),
         },
         limit: 10,
-        project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+        project: [{ alias: 'id', expr: createColumnRef('post', 'id') }],
       },
     };
 
@@ -116,15 +117,15 @@ describe('Include AST types', () => {
             table: { kind: 'table', name: 'post' },
             on: {
               kind: 'eqCol',
-              left: { kind: 'col', table: 'user', column: 'id' },
-              right: { kind: 'col', table: 'post', column: 'userId' },
+              left: createColumnRef('user', 'id'),
+              right: createColumnRef('post', 'userId'),
             },
-            project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+            project: [{ alias: 'id', expr: createColumnRef('post', 'id') }],
           },
         },
       ],
       project: [
-        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'id', expr: createColumnRef('user', 'id') },
         { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
       ],
     };
@@ -139,7 +140,7 @@ describe('Include AST types', () => {
     const selectAst: SelectAst = {
       kind: 'select',
       from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+      project: [{ alias: 'id', expr: createColumnRef('user', 'id') }],
     };
 
     expect(selectAst.includes).toBeUndefined();
@@ -150,7 +151,7 @@ describe('Include AST types', () => {
       kind: 'select',
       from: { kind: 'table', name: 'user' },
       project: [
-        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'id', expr: createColumnRef('user', 'id') },
         { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
       ],
     };

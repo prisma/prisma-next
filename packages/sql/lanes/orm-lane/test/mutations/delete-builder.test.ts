@@ -1,6 +1,8 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
+import type { DeleteAst } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildDeletePlan } from '../../src/mutations/delete-builder';
@@ -71,7 +73,7 @@ describe('delete builder', () => {
   const context: OrmContext<SqlContract<SqlStorage>> = {
     contract,
     adapter: adapter as unknown as OrmContext<SqlContract<SqlStorage>>['adapter'],
-    context: {} as any,
+    context: {} as unknown as RuntimeContext<SqlContract<SqlStorage>>,
   };
 
   const getModelAccessor: () => ModelColumnAccessor<
@@ -87,6 +89,7 @@ describe('delete builder', () => {
   };
 
   it('builds delete plan with where clause', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
     const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
@@ -101,14 +104,23 @@ describe('delete builder', () => {
       },
     );
 
-    expect(plan).toBeDefined();
-    expect(plan.meta.lane).toBe('orm');
-    expect(plan.meta.refs?.tables).toEqual(['user']);
-    expect((plan.ast as any).kind).toBe('delete');
-    expect(plan.sql).toBe('DELETE FROM user WHERE id = $1');
+    expect({
+      defined: plan !== undefined,
+      lane: plan.meta.lane,
+      tables: plan.meta.refs?.tables,
+      astKind: (plan.ast as unknown as DeleteAst).kind,
+      sql: plan.sql,
+    }).toMatchObject({
+      defined: true,
+      lane: 'orm',
+      tables: ['user'],
+      astKind: 'delete',
+      sql: 'DELETE FROM user WHERE id = $1',
+    });
   });
 
   it('builds delete plan without codecId', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
     const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
@@ -123,9 +135,15 @@ describe('delete builder', () => {
       },
     );
 
-    expect(plan.meta.annotations).toBeDefined();
-    expect(plan.meta.annotations?.['intent']).toBe('write');
-    expect(plan.meta.annotations?.['isMutation']).toBe(true);
+    expect({
+      annotationsDefined: plan.meta.annotations !== undefined,
+      intent: plan.meta.annotations?.['intent'],
+      isMutation: plan.meta.annotations?.['isMutation'],
+    }).toMatchObject({
+      annotationsDefined: true,
+      intent: 'write',
+      isMutation: true,
+    });
   });
 
   it('builds delete plan with codecId', () => {
@@ -151,6 +169,7 @@ describe('delete builder', () => {
       contract: contractWithCodec,
     };
 
+    // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
     const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
@@ -159,11 +178,17 @@ describe('delete builder', () => {
       params: { userId: 1 },
     });
 
-    expect(plan.meta.annotations?.codecs).toBeDefined();
-    expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
+    expect({
+      codecsDefined: plan.meta.annotations?.codecs !== undefined,
+      userIdCodec: plan.meta.annotations?.codecs?.['userId'],
+    }).toMatchObject({
+      codecsDefined: true,
+      userIdCodec: 'pg/int4@1',
+    });
   });
 
   it('throws error when model not found', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
     const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
@@ -187,6 +212,7 @@ describe('delete builder', () => {
   });
 
   it('throws error when where expr is missing', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
     const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };

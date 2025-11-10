@@ -1,3 +1,4 @@
+import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type { JoinAst, JoinOnExpr, SelectAst } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 
@@ -5,8 +6,8 @@ describe('Join AST types', () => {
   it('defines JoinOnExpr with eqCol kind', () => {
     const onExpr: JoinOnExpr = {
       kind: 'eqCol',
-      left: { kind: 'col', table: 'user', column: 'id' },
-      right: { kind: 'col', table: 'post', column: 'userId' },
+      left: createColumnRef('user', 'id'),
+      right: createColumnRef('post', 'userId'),
     };
 
     expect(onExpr.kind).toBe('eqCol');
@@ -23,8 +24,8 @@ describe('Join AST types', () => {
       table: { kind: 'table', name: 'post' },
       on: {
         kind: 'eqCol',
-        left: { kind: 'col', table: 'user', column: 'id' },
-        right: { kind: 'col', table: 'post', column: 'userId' },
+        left: createColumnRef('user', 'id'),
+        right: createColumnRef('post', 'userId'),
       },
     };
 
@@ -45,12 +46,12 @@ describe('Join AST types', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'eqCol',
-            left: { kind: 'col', table: 'user', column: 'id' },
-            right: { kind: 'col', table: 'post', column: 'userId' },
+            left: createColumnRef('user', 'id'),
+            right: createColumnRef('post', 'userId'),
           },
         },
       ],
-      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+      project: [{ alias: 'id', expr: createColumnRef('user', 'id') }],
     };
 
     expect(selectAst.joins).toBeDefined();
@@ -62,7 +63,7 @@ describe('Join AST types', () => {
     const selectAst: SelectAst = {
       kind: 'select',
       from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+      project: [{ alias: 'id', expr: createColumnRef('user', 'id') }],
     };
 
     expect(selectAst.joins).toBeUndefined();
@@ -83,8 +84,8 @@ describe('Join AST types', () => {
         table: { kind: 'table', name: 'post' },
         on: {
           kind: 'eqCol',
-          left: { kind: 'col', table: 'user', column: 'id' },
-          right: { kind: 'col', table: 'post', column: 'userId' },
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('post', 'userId'),
         },
       };
 

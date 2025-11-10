@@ -1,6 +1,10 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
-import type { AnyOrderBuilder, BinaryBuilder } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyColumnBuilder,
+  AnyOrderBuilder,
+  BinaryBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import type {
   LoweredStatement,
   OperationExpr,
@@ -65,26 +69,24 @@ describe('plan assembly', () => {
     table: string,
     column: string,
     columnMeta: { type: string; nullable: boolean },
-  ): any {
+  ): AnyColumnBuilder {
     return {
       kind: 'column',
       table,
       column,
       columnMeta,
-      eq: () => ({ kind: 'binary', op: 'eq', left: {} as any, right: {} as any }),
-      asc: () => ({ kind: 'order', expr: {} as any, dir: 'asc' }),
-      desc: () => ({ kind: 'order', expr: {} as any, dir: 'desc' }),
+      eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+      asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+      desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
       __jsType: undefined,
-    };
+    } as unknown as AnyColumnBuilder;
   }
 
   describe('buildMeta', () => {
     it('builds meta with simple projection', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
-        ],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
       const args = {
@@ -96,12 +98,21 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.lane).toBe('dsl');
-      expect(meta.refs?.tables).toEqual(['user']);
-      expect(meta.refs?.columns).toHaveLength(1);
-      expect(meta.refs?.columns?.[0]?.table).toBe('user');
-      expect(meta.refs?.columns?.[0]?.column).toBe('id');
-      expect(meta.projection).toEqual({ id: 'user.id' });
+      expect({
+        lane: meta.lane,
+        tables: meta.refs?.tables,
+        columnCount: meta.refs?.columns?.length,
+        columnTable: meta.refs?.columns?.[0]?.table,
+        columnColumn: meta.refs?.columns?.[0]?.column,
+        projection: meta.projection,
+      }).toMatchObject({
+        lane: 'dsl',
+        tables: ['user'],
+        columnCount: 1,
+        columnTable: 'user',
+        columnColumn: 'id',
+        projection: { id: 'user.id' },
+      });
     });
 
     it('builds meta with operation expr in projection', () => {
@@ -145,9 +156,15 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.projection).toEqual({ sum: 'operation:add' });
-      expect(meta.projectionTypes).toEqual({ sum: 'pg/int4@1' });
-      expect(meta.annotations?.codecs).toEqual({ sum: 'pg/int4@1' });
+      expect({
+        projection: meta.projection,
+        projectionTypes: meta.projectionTypes,
+        codecs: meta.annotations?.codecs,
+      }).toMatchObject({
+        projection: { sum: 'operation:add' },
+        projectionTypes: { sum: 'pg/int4@1' },
+        codecs: { sum: 'pg/int4@1' },
+      });
     });
 
     it('builds meta with operation expr returning builtin type', () => {
@@ -209,8 +226,9 @@ describe('plan assembly', () => {
           alias: 'posts',
           table: { kind: 'table', name: 'post' },
           on: {
-            left: createColumnRef('user', 'id'),
-            right: createColumnRef('post', 'userId'),
+            kind: 'join-on',
+            left: { type: 'pg/int4@1', nullable: false },
+            right: { type: 'pg/int4@1', nullable: false },
           },
           childProjection: {
             aliases: ['id'],
@@ -239,14 +257,12 @@ describe('plan assembly', () => {
     it('builds meta with where clause', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
-        ],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
       const where: BinaryBuilder = {
         kind: 'binary',
-        left: createColumnRef('user', 'id') as any,
+        left: createColumnRef('user', 'id') as unknown as BinaryBuilder['left'],
         right: { kind: 'param-placeholder', name: 'userId' },
         op: 'eq',
       };
@@ -261,17 +277,21 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs?.columns).toHaveLength(1);
-      expect(meta.refs?.columns?.[0]?.table).toBe('user');
-      expect(meta.refs?.columns?.[0]?.column).toBe('id');
+      expect({
+        columnCount: meta.refs?.columns?.length,
+        columnTable: meta.refs?.columns?.[0]?.table,
+        columnColumn: meta.refs?.columns?.[0]?.column,
+      }).toMatchObject({
+        columnCount: 1,
+        columnTable: 'user',
+        columnColumn: 'id',
+      });
     });
 
     it('builds meta with where clause operation expr', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
-        ],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
       const operationExpr: OperationExpr = {
@@ -311,17 +331,21 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs?.columns).toHaveLength(1);
-      expect(meta.refs?.columns?.[0]?.table).toBe('user');
-      expect(meta.refs?.columns?.[0]?.column).toBe('id');
+      expect({
+        columnCount: meta.refs?.columns?.length,
+        columnTable: meta.refs?.columns?.[0]?.table,
+        columnColumn: meta.refs?.columns?.[0]?.column,
+      }).toMatchObject({
+        columnCount: 1,
+        columnTable: 'user',
+        columnColumn: 'id',
+      });
     });
 
     it('builds meta with orderBy clause', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
-        ],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
       const orderBy: AnyOrderBuilder = {
@@ -342,17 +366,21 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs?.columns).toHaveLength(1);
-      expect(meta.refs?.columns?.[0]?.table).toBe('user');
-      expect(meta.refs?.columns?.[0]?.column).toBe('id');
+      expect({
+        columnCount: meta.refs?.columns?.length,
+        columnTable: meta.refs?.columns?.[0]?.table,
+        columnColumn: meta.refs?.columns?.[0]?.column,
+      }).toMatchObject({
+        columnCount: 1,
+        columnTable: 'user',
+        columnColumn: 'id',
+      });
     });
 
     it('builds meta with orderBy operation expr', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
-        ],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
       const operationExpr: OperationExpr = {
@@ -388,9 +416,15 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs?.columns).toHaveLength(1);
-      expect(meta.refs?.columns?.[0]?.table).toBe('user');
-      expect(meta.refs?.columns?.[0]?.column).toBe('id');
+      expect({
+        columnCount: meta.refs?.columns?.length,
+        columnTable: meta.refs?.columns?.[0]?.table,
+        columnColumn: meta.refs?.columns?.[0]?.column,
+      }).toMatchObject({
+        columnCount: 1,
+        columnTable: 'user',
+        columnColumn: 'id',
+      });
     });
 
     it('builds meta with include childWhere', () => {
@@ -407,8 +441,9 @@ describe('plan assembly', () => {
           alias: 'posts',
           table: { kind: 'table', name: 'post' },
           on: {
-            left: createColumnRef('user', 'id'),
-            right: createColumnRef('post', 'userId'),
+            kind: 'join-on',
+            left: { type: 'pg/int4@1', nullable: false },
+            right: { type: 'pg/int4@1', nullable: false },
           },
           childProjection: {
             aliases: ['id'],
@@ -418,7 +453,7 @@ describe('plan assembly', () => {
           },
           childWhere: {
             kind: 'binary',
-            left: createColumnRef('post', 'id') as any,
+            left: createColumnRef('post', 'id') as unknown as BinaryBuilder['left'],
             right: { kind: 'param-placeholder', name: 'postId' },
             op: 'eq',
           } as BinaryBuilder,
@@ -435,8 +470,8 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs.columns).toHaveLength(3);
-      const postIdRef = meta.refs.columns.find((c) => c.table === 'post' && c.column === 'id');
+      expect(meta.refs?.columns).toHaveLength(3);
+      const postIdRef = meta.refs?.columns?.find((c) => c.table === 'post' && c.column === 'id');
       expect(postIdRef).toBeDefined();
     });
 
@@ -454,8 +489,9 @@ describe('plan assembly', () => {
           alias: 'posts',
           table: { kind: 'table', name: 'post' },
           on: {
-            left: createColumnRef('user', 'id'),
-            right: createColumnRef('post', 'userId'),
+            kind: 'join-on',
+            left: { type: 'pg/int4@1', nullable: false },
+            right: { type: 'pg/int4@1', nullable: false },
           },
           childProjection: {
             aliases: ['id'],
@@ -483,17 +519,15 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs.columns).toHaveLength(3);
-      const postIdRef = meta.refs.columns.find((c) => c.table === 'post' && c.column === 'id');
+      expect(meta.refs?.columns).toHaveLength(3);
+      const postIdRef = meta.refs?.columns?.find((c) => c.table === 'post' && c.column === 'id');
       expect(postIdRef).toBeDefined();
     });
 
     it('builds meta with paramCodecs merged with projection codecs', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
-        ],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
       const args = {
@@ -506,18 +540,23 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.annotations?.codecs).toHaveProperty('id');
-      expect(meta.annotations?.codecs).toHaveProperty('userId');
-      expect(meta.annotations?.codecs?.['id']).toBe('pg/int4@1');
-      expect(meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
+      expect({
+        hasId: Object.hasOwn(meta.annotations?.codecs ?? {}, 'id'),
+        hasUserId: Object.hasOwn(meta.annotations?.codecs ?? {}, 'userId'),
+        idCodec: meta.annotations?.codecs?.['id'],
+        userIdCodec: meta.annotations?.codecs?.['userId'],
+      }).toMatchObject({
+        hasId: true,
+        hasUserId: true,
+        idCodec: 'pg/int4@1',
+        userIdCodec: 'pg/int4@1',
+      });
     });
 
     it('builds meta without annotations when no codecs', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
-        ],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
       const args = {
@@ -535,9 +574,7 @@ describe('plan assembly', () => {
     it('builds meta without projectionTypes when empty', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
-        ],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
       const args = {
@@ -561,7 +598,11 @@ describe('plan assembly', () => {
             table: '',
             column: '',
             columnMeta: { type: 'core/json@1', nullable: true },
-          },
+            eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+            asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+            desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+            __jsType: undefined,
+          } as unknown as AnyColumnBuilder,
         ],
       };
 
@@ -570,8 +611,9 @@ describe('plan assembly', () => {
           alias: 'include_alias',
           table: { kind: 'table', name: 'post' },
           on: {
-            left: createColumnRef('user', 'id'),
-            right: createColumnRef('post', 'userId'),
+            kind: 'join-on',
+            left: { type: 'pg/int4@1', nullable: false },
+            right: { type: 'pg/int4@1', nullable: false },
           },
           childProjection: {
             aliases: ['id'],
@@ -686,7 +728,7 @@ describe('plan assembly', () => {
       const lowered = {
         body: {
           sql: 'SELECT * FROM user WHERE id = $1',
-          params: undefined,
+          params: [],
         } as LoweredStatement,
       };
       const paramValues: unknown[] = [1];
@@ -717,12 +759,13 @@ describe('plan assembly', () => {
         project: [],
       };
       const combinedWhere = {
-        kind: 'exists',
+        kind: 'exists' as const,
         subquery: {
-          kind: 'select',
-          from: { name: 'post', alias: 'p' },
+          kind: 'select' as const,
+          from: { kind: 'table' as const, name: 'post' },
           project: [],
         },
+        not: false,
       };
       const lowered = {
         body: {
@@ -746,7 +789,7 @@ describe('plan assembly', () => {
 
       const plan = createPlanWithExists(ast, combinedWhere, lowered, paramValues, planMeta);
 
-      expect((plan.ast as any).where).toBe(combinedWhere);
+      expect((plan.ast as SelectAst).where).toBe(combinedWhere);
       expect(plan.meta.lane).toBe('orm');
     });
 
@@ -778,7 +821,7 @@ describe('plan assembly', () => {
 
       const plan = createPlanWithExists(ast, undefined, lowered, paramValues, planMeta);
 
-      expect((plan.ast as any).where).toBeUndefined();
+      expect((plan.ast as SelectAst).where).toBeUndefined();
       expect(plan.meta.lane).toBe('orm');
     });
   });

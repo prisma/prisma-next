@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createTableRef } from '@prisma-next/sql-relational-core/ast';
+import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
@@ -44,7 +45,7 @@ describe('mutation builder edge cases', () => {
         sql<Contract, CodecTypes>({ context })
           .insert(userTable, {
             nonexistent: param('value'),
-          } as any)
+          } as unknown as Record<string, ParamPlaceholder>)
           .build({ params: { value: 'test' } }),
       ).toThrow('Unknown column nonexistent in table user');
     });
@@ -70,8 +71,8 @@ describe('mutation builder edge cases', () => {
       expect(plan.ast).toMatchObject({
         kind: 'insert',
         returning: expect.arrayContaining([
-          { kind: 'col', table: 'user', column: 'id' },
-          { kind: 'col', table: 'user', column: 'email' },
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'email'),
         ]),
       });
     });
@@ -95,7 +96,7 @@ describe('mutation builder edge cases', () => {
         sql<Contract, CodecTypes>({ context })
           .update(userTable, {
             nonexistent: param('value'),
-          } as any)
+          } as unknown as Record<string, ParamPlaceholder>)
           .where(userColumns.id.eq(param('userId')))
           .build({ params: { value: 'test', userId: 1 } }),
       ).toThrow('Unknown column nonexistent in table user');
@@ -145,8 +146,8 @@ describe('mutation builder edge cases', () => {
       expect(plan.ast).toMatchObject({
         kind: 'update',
         returning: expect.arrayContaining([
-          { kind: 'col', table: 'user', column: 'id' },
-          { kind: 'col', table: 'user', column: 'email' },
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'email'),
         ]),
       });
     });
@@ -188,8 +189,8 @@ describe('mutation builder edge cases', () => {
       expect(plan.ast).toMatchObject({
         kind: 'delete',
         returning: expect.arrayContaining([
-          { kind: 'col', table: 'user', column: 'id' },
-          { kind: 'col', table: 'user', column: 'email' },
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'email'),
         ]),
       });
     });

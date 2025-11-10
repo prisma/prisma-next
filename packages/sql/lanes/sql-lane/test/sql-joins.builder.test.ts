@@ -1,5 +1,6 @@
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -150,8 +151,8 @@ describe('SQL builder joins', () => {
         table: { kind: 'table', name: 'post' },
         on: {
           kind: 'eqCol',
-          left: { kind: 'col', table: 'user', column: 'id' },
-          right: { kind: 'col', table: 'post', column: 'userId' },
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('post', 'userId'),
         },
       },
     ]);
@@ -186,8 +187,8 @@ describe('SQL builder joins', () => {
         table: { kind: 'table', name: 'post' },
         on: {
           kind: 'eqCol',
-          left: { kind: 'col', table: 'user', column: 'id' },
-          right: { kind: 'col', table: 'post', column: 'userId' },
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('post', 'userId'),
         },
       },
       {
@@ -196,8 +197,8 @@ describe('SQL builder joins', () => {
         table: { kind: 'table', name: 'comment' },
         on: {
           kind: 'eqCol',
-          left: { kind: 'col', table: 'post', column: 'id' },
-          right: { kind: 'col', table: 'comment', column: 'postId' },
+          left: createColumnRef('post', 'id'),
+          right: createColumnRef('comment', 'postId'),
         },
       },
     ]);
@@ -419,9 +420,9 @@ describe('SQL builder joins', () => {
       expect(
         (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project,
       ).toEqual([
-        { alias: 'name', expr: { kind: 'col', table: 'user', column: 'email' } },
-        { alias: 'post_title', expr: { kind: 'col', table: 'post', column: 'title' } },
-        { alias: 'post_id', expr: { kind: 'col', table: 'post', column: 'id' } },
+        { alias: 'name', expr: createColumnRef('user', 'email') },
+        { alias: 'post_title', expr: createColumnRef('post', 'title') },
+        { alias: 'post_id', expr: createColumnRef('post', 'id') },
       ]);
 
       expect(plan.meta.projection).toEqual({
@@ -489,10 +490,10 @@ describe('SQL builder joins', () => {
       expect(
         (plan.ast as import('@prisma-next/sql-target').SelectAst | undefined)?.project,
       ).toEqual([
-        { alias: 'user_id', expr: { kind: 'col', table: 'user', column: 'id' } },
-        { alias: 'user_email', expr: { kind: 'col', table: 'user', column: 'email' } },
-        { alias: 'post_info_title', expr: { kind: 'col', table: 'post', column: 'title' } },
-        { alias: 'post_info_id', expr: { kind: 'col', table: 'post', column: 'id' } },
+        { alias: 'user_id', expr: createColumnRef('user', 'id') },
+        { alias: 'user_email', expr: createColumnRef('user', 'email') },
+        { alias: 'post_info_title', expr: createColumnRef('post', 'title') },
+        { alias: 'post_info_id', expr: createColumnRef('post', 'id') },
       ]);
 
       expect(plan.meta.projection).toEqual({

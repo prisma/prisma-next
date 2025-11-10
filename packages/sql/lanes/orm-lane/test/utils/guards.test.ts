@@ -75,10 +75,17 @@ describe('guards', () => {
         },
       };
       const result = extractBaseColumnRef(outerOp);
-      expect(result).toBe(baseCol);
-      expect(result.kind).toBe('col');
-      expect(result.table).toBe('user');
-      expect(result.column).toBe('id');
+      expect({
+        isBaseCol: result === baseCol,
+        kind: result.kind,
+        table: result.table,
+        column: result.column,
+      }).toMatchObject({
+        isBaseCol: true,
+        kind: 'col',
+        table: 'user',
+        column: 'id',
+      });
     });
   });
 

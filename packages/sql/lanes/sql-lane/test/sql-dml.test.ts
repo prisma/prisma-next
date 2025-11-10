@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
@@ -109,10 +110,7 @@ describe('DML builders', () => {
           email: { kind: 'param', name: 'email', index: 1 },
           createdAt: { kind: 'param', name: 'createdAt', index: 2 },
         },
-        returning: [
-          { kind: 'col', table: 'user', column: 'id' },
-          { kind: 'col', table: 'user', column: 'email' },
-        ],
+        returning: [createColumnRef('user', 'id'), createColumnRef('user', 'email')],
       });
     });
 
@@ -193,10 +191,7 @@ describe('DML builders', () => {
           left: { table: 'user', column: 'id' },
           right: { kind: 'param', name: 'userId', index: 2 },
         },
-        returning: [
-          { kind: 'col', table: 'user', column: 'id' },
-          { kind: 'col', table: 'user', column: 'email' },
-        ],
+        returning: [createColumnRef('user', 'id'), createColumnRef('user', 'email')],
       });
     });
 
@@ -269,10 +264,7 @@ describe('DML builders', () => {
           left: { table: 'user', column: 'id' },
           right: { kind: 'param', name: 'userId', index: 1 },
         },
-        returning: [
-          { kind: 'col', table: 'user', column: 'id' },
-          { kind: 'col', table: 'user', column: 'email' },
-        ],
+        returning: [createColumnRef('user', 'id'), createColumnRef('user', 'email')],
       });
     });
 
@@ -444,10 +436,7 @@ describe('DML builders', () => {
 
       expect(plan.ast).toMatchObject({
         kind: 'insert',
-        returning: [
-          { kind: 'col', table: 'user', column: 'id' },
-          { kind: 'col', table: 'user', column: 'email' },
-        ],
+        returning: [createColumnRef('user', 'id'), createColumnRef('user', 'email')],
       });
     });
 

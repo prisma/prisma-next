@@ -18,6 +18,7 @@ import type {
   OrderBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type {
   Adapter,
   BinaryExpr,
@@ -34,7 +35,6 @@ import type {
   StorageColumn,
   TableRef,
 } from '@prisma-next/sql-target';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { ProjectionInput } from '../types/internal';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {
@@ -51,7 +51,11 @@ import {
 } from '../utils/errors';
 import { isOperationExpr } from '../utils/guards';
 import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
-import { buildIncludeAst, IncludeChildBuilder, IncludeChildBuilderImpl } from './include-builder';
+import {
+  buildIncludeAst,
+  type IncludeChildBuilder,
+  IncludeChildBuilderImpl,
+} from './include-builder';
 import { buildJoinAst } from './join-builder';
 import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';

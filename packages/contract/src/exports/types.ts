@@ -17,9 +17,7 @@ export type {
 /**
  * Type guard to check if a contract is a SQL contract
  */
-export function isSqlContract(
-  contract: unknown,
-): contract is SqlContract<SqlStorage> {
+export function isSqlContract(contract: unknown): contract is SqlContract<SqlStorage> {
   return (
     typeof contract === 'object' &&
     contract !== null &&

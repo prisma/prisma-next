@@ -139,17 +139,8 @@ export type OrmIncludeAccessor<
           ? ChildModelName extends string
             ? (
                 child: (
-                  child: OrmIncludeChildBuilder<
-                    TContract,
-                    CodecTypes,
-                    ChildModelName
-                  >,
-                ) => OrmIncludeChildBuilder<
-                  TContract,
-                  CodecTypes,
-                  ChildModelName,
-                  unknown
-                >,
+                  child: OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName>,
+                ) => OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, unknown>,
               ) => OrmModelBuilder<TContract, CodecTypes, ModelName, Row>
             : never
           : never;

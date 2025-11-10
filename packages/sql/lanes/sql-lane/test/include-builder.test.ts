@@ -45,10 +45,17 @@ describe('IncludeChildBuilderImpl', () => {
       .limit(10);
 
     const state = builder.getState();
-    expect(state.childProjection).toBeDefined();
-    expect(state.childWhere).toBeDefined();
-    expect(state.childOrderBy).toBeDefined();
-    expect(state.childLimit).toBe(10);
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      hasWhere: state.childWhere !== undefined,
+      hasOrderBy: state.childOrderBy !== undefined,
+      limit: state.childLimit,
+    }).toMatchObject({
+      hasProjection: true,
+      hasWhere: true,
+      hasOrderBy: true,
+      limit: 10,
+    });
   });
 
   it('allows chaining where after select', () => {
@@ -62,8 +69,13 @@ describe('IncludeChildBuilderImpl', () => {
       .where(userColumns.id.eq(param('userId')));
 
     const state = builder.getState();
-    expect(state.childProjection).toBeDefined();
-    expect(state.childWhere).toBeDefined();
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      hasWhere: state.childWhere !== undefined,
+    }).toMatchObject({
+      hasProjection: true,
+      hasWhere: true,
+    });
   });
 
   it('allows chaining orderBy after select', () => {
@@ -77,8 +89,13 @@ describe('IncludeChildBuilderImpl', () => {
       .orderBy(userColumns.id.asc());
 
     const state = builder.getState();
-    expect(state.childProjection).toBeDefined();
-    expect(state.childOrderBy).toBeDefined();
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      hasOrderBy: state.childOrderBy !== undefined,
+    }).toMatchObject({
+      hasProjection: true,
+      hasOrderBy: true,
+    });
   });
 
   it('allows chaining limit after select', () => {
@@ -92,8 +109,13 @@ describe('IncludeChildBuilderImpl', () => {
       .limit(5);
 
     const state = builder.getState();
-    expect(state.childProjection).toBeDefined();
-    expect(state.childLimit).toBe(5);
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      limit: state.childLimit,
+    }).toMatchObject({
+      hasProjection: true,
+      limit: 5,
+    });
   });
 
   it('throws when limit is negative', () => {
@@ -147,11 +169,19 @@ describe('buildIncludeAst', () => {
 
     const ast = buildIncludeAst(includeState, contract, { userId: 42 }, [], []);
 
-    expect(ast.kind).toBe('includeMany');
-    expect(ast.alias).toBe('posts');
-    expect(ast.child.where).toBeDefined();
-    expect(ast.child.orderBy).toBeDefined();
-    expect(ast.child.limit).toBe(10);
+    expect({
+      kind: ast.kind,
+      alias: ast.alias,
+      hasWhere: ast.child.where !== undefined,
+      hasOrderBy: ast.child.orderBy !== undefined,
+      limit: ast.child.limit,
+    }).toMatchObject({
+      kind: 'includeMany',
+      alias: 'posts',
+      hasWhere: true,
+      hasOrderBy: true,
+      limit: 10,
+    });
   });
 
   it('builds include AST without optional fields', () => {
@@ -171,11 +201,19 @@ describe('buildIncludeAst', () => {
 
     const ast = buildIncludeAst(includeState, contract, {}, [], []);
 
-    expect(ast.kind).toBe('includeMany');
-    expect(ast.alias).toBe('posts');
-    expect(ast.child.where).toBeUndefined();
-    expect(ast.child.orderBy).toBeUndefined();
-    expect(ast.child.limit).toBeUndefined();
+    expect({
+      kind: ast.kind,
+      alias: ast.alias,
+      where: ast.child.where,
+      orderBy: ast.child.orderBy,
+      limit: ast.child.limit,
+    }).toMatchObject({
+      kind: 'includeMany',
+      alias: 'posts',
+      where: undefined,
+      orderBy: undefined,
+      limit: undefined,
+    });
   });
 
   it('throws when column is missing for alias', () => {

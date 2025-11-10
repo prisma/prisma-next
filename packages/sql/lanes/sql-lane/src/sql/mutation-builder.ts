@@ -15,6 +15,7 @@ import type {
   ParamPlaceholder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type {
   Adapter,
   ColumnRef,
@@ -25,7 +26,6 @@ import type {
   SqlStorage,
   TableRef,
 } from '@prisma-next/sql-target';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { checkReturningCapability } from '../utils/capabilities';
 import {
   errorFailedToBuildWhereClause,

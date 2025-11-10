@@ -233,4 +233,3 @@ describe('Operation capability gating', () => {
     ).toBeUndefined();
   });
 });
-
