@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
+import { exec } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
@@ -98,7 +98,7 @@ async function parseCoverageReport(packageDir) {
     const coverageData = JSON.parse(await readFile(coverageJsonPath, 'utf-8'));
 
     const fileCoverage = Object.entries(coverageData).map(([filePath, data]) => {
-      const relativePath = filePath.replace(packageDir + '/', '');
+      const relativePath = filePath.replace(`${packageDir}/`, '');
       const statementMap = data.s || {};
       const branchMap = data.b || {};
       const functionMap = data.f || {};
@@ -107,7 +107,6 @@ async function parseCoverageReport(packageDir) {
       const coveredStatements = Object.values(statementMap).filter((v) => v > 0).length;
       const statementPct = statements > 0 ? (coveredStatements / statements) * 100 : 100;
 
-      const branches = Object.keys(branchMap).length;
       const branchHits = Object.values(branchMap).flat();
       const coveredBranches = branchHits.filter((v) => v > 0).length;
       const totalBranchPoints = branchHits.length;
@@ -126,7 +125,7 @@ async function parseCoverageReport(packageDir) {
     });
 
     return fileCoverage;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -280,9 +279,9 @@ async function formatResults(results) {
   const passed = results.filter((r) => !r.skipped && r.testPassed && r.coveragePassed);
   const skipped = results.filter((r) => r.skipped);
 
-  console.log('\n' + '='.repeat(80));
+  console.log(`\n${'='.repeat(80)}`);
   console.log('COVERAGE REPORT SUMMARY');
-  console.log('='.repeat(80) + '\n');
+  console.log(`${'='.repeat(80)}\n`);
 
   if (testFailures.length > 0) {
     console.log('❌ PACKAGES WITH TEST FAILURES:');
@@ -306,7 +305,7 @@ async function formatResults(results) {
       if (thresholds && result.coverageReport) {
         const fileFailures = checkThresholds(result.coverageReport, thresholds);
         if (fileFailures.length > 0) {
-          console.log(`    Files below thresholds:`);
+          console.log('    Files below thresholds:');
           for (const failure of fileFailures) {
             console.log(`      - ${failure.file}`);
             for (const fail of failure.failures) {
@@ -354,7 +353,7 @@ async function formatResults(results) {
     console.log('-'.repeat(80));
     for (const item of thresholdSuggestions) {
       console.log(`  • ${item.package}`);
-      console.log(`    Current coverage:`);
+      console.log('    Current coverage:');
       if (item.suggestions.statements) {
         console.log(
           `      statements: ${item.overallCoverage.statements.pct.toFixed(2)}% (threshold: ${item.suggestions.statements.current}%)`,
@@ -370,7 +369,7 @@ async function formatResults(results) {
           `      functions: ${item.overallCoverage.functions.pct.toFixed(2)}% (threshold: ${item.suggestions.functions.current}%)`,
         );
       }
-      console.log(`    Suggested thresholds:`);
+      console.log('    Suggested thresholds:');
       const suggestedThresholds = [];
       if (item.suggestions.statements) {
         suggestedThresholds.push(`statements: ${item.suggestions.statements.suggested}`);
@@ -399,7 +398,7 @@ async function formatResults(results) {
   console.log(
     `Total: ${results.length} | Passed: ${passed.length} | Test Failures: ${testFailures.length} | Coverage Failures: ${coverageFailures.length} | Threshold Suggestions: ${thresholdSuggestions.length} | Skipped: ${skipped.length}`,
   );
-  console.log('='.repeat(80) + '\n');
+  console.log(`${'='.repeat(80)}\n`);
 
   return {
     testFailures: testFailures.length,

@@ -10,8 +10,8 @@
  * Family namespaces (e.g., sql/*) can import from inner rings and their own family packages.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, dirname } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -162,15 +162,18 @@ function extractImports(content) {
 
   // Match import statements
   const importRegex = /import\s+(?:type\s+)?(?:[\w*{}\s,]+\s+from\s+)?['"]([^'"]+)['"]/g;
-  let match;
-  while ((match = importRegex.exec(content)) !== null) {
+  let match = importRegex.exec(content);
+  while (match !== null) {
     imports.push(match[1]);
+    match = importRegex.exec(content);
   }
 
   // Match require statements
   const requireRegex = /require\(['"]([^'"]+)['"]\)/g;
-  while ((match = requireRegex.exec(content)) !== null) {
+  match = requireRegex.exec(content);
+  while (match !== null) {
     imports.push(match[1]);
+    match = requireRegex.exec(content);
   }
 
   return imports;
