@@ -15,7 +15,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/plan": "workspace:*",
-    "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/sql-orm-lane": "workspace:*",

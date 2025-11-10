@@ -15,7 +15,7 @@
   "dependencies": {
     "@prisma/client": "^6.0.0",
     "@prisma-next/compat-prisma": "workspace:*",
-    "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",

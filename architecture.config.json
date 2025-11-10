@@ -103,13 +103,6 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/runtime/**",
-      "domain": "legacy",
-      "layer": "legacy",
-      "plane": "runtime",
-      "note": "Legacy runtime package (will be split in Slice 6)"
-    },
-    {
       "glob": "packages/sql-query/**",
       "domain": "legacy",
       "layer": "legacy",

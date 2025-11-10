@@ -22,7 +22,6 @@
   },
   "devDependencies": {
     "@prisma/dev": "^0.1.1",
-    "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "tsup": "^8.3.0",

@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
-    "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-query": "workspace:*",
     "@prisma-next/sql-target": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",

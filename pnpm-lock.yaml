@@ -44,12 +44,12 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/driver-postgres
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../../packages/runtime
       '@prisma-next/sql-query':
         specifier: workspace:*
         version: link:../../packages/sql-query
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../packages/sql/sql-runtime
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -96,9 +96,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/driver-postgres
-      '@prisma-next/runtime':
+      '@prisma-next/sql-runtime':
         specifier: workspace:*
-        version: link:../../packages/runtime
+        version: link:../../packages/sql/sql-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../packages/test-utils
@@ -176,12 +176,12 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../driver-postgres
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../runtime
       '@prisma-next/sql-query':
         specifier: workspace:*
         version: link:../sql-query
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../sql/sql-runtime
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -259,12 +259,12 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../driver-postgres
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../runtime
       '@prisma-next/sql-query':
         specifier: workspace:*
         version: link:../sql-query
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../sql/sql-runtime
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
@@ -363,13 +363,29 @@ importers:
         version: 2.1.9(@types/node@20.19.24)
 
   packages/framework/runtime-core:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../contract
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../core-operations
+      arktype:
+        specifier: ^2.1.25
+        version: 2.1.25
     devDependencies:
+      '@prisma/dev':
+        specifier: ^0.1.1
+        version: 0.1.1(typescript@5.9.3)
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
 
   packages/framework/tooling/cli:
     dependencies:
@@ -398,12 +414,12 @@ importers:
         specifier: ^0.19.0
         version: 0.19.12
     devDependencies:
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../../../runtime
       '@prisma-next/sql-query':
         specifier: workspace:*
         version: link:../../../sql-query
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../../sql/sql-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test-utils
@@ -465,9 +481,6 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../framework/tooling/emitter
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../runtime
       '@prisma-next/sql-contract-emitter':
         specifier: workspace:*
         version: link:../targets/sql/emitter
@@ -477,6 +490,9 @@ importers:
       '@prisma-next/sql-query':
         specifier: workspace:*
         version: link:../sql-query
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../sql/sql-runtime
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
@@ -512,46 +528,6 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
-  packages/runtime:
-    dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../contract
-      '@prisma-next/driver-postgres':
-        specifier: workspace:*
-        version: link:../driver-postgres
-      '@prisma-next/operations':
-        specifier: workspace:*
-        version: link:../framework/core-operations
-      '@prisma-next/sql-target':
-        specifier: workspace:*
-        version: link:../sql-target
-      arktype:
-        specifier: ^2.1.25
-        version: 2.1.25
-    devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../test-utils
-      '@prisma/dev':
-        specifier: ^0.1.1
-        version: 0.1.1(typescript@5.9.3)
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.15.6
-      pg:
-        specifier: ^8.11.5
-        version: 8.16.3
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
-
   packages/sql-query:
     dependencies:
       '@prisma-next/contract':
@@ -560,9 +536,6 @@ importers:
       '@prisma-next/plan':
         specifier: workspace:*
         version: link:../framework/core-plan
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../runtime
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../sql/authoring/sql-contract-ts
@@ -575,6 +548,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../sql/lanes/relational-core
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../sql/sql-runtime
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../sql-target
@@ -662,9 +638,9 @@ importers:
         specifier: ^9.6.0
         version: 9.6.0
     devDependencies:
-      '@prisma-next/runtime':
+      '@prisma-next/sql-runtime':
         specifier: workspace:*
-        version: link:../../../runtime
+        version: link:../../sql-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test-utils
@@ -692,15 +668,15 @@ importers:
       '@prisma-next/plan':
         specifier: workspace:*
         version: link:../../../framework/core-plan
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../../../runtime
       '@prisma-next/sql-lane':
         specifier: workspace:*
         version: link:../sql-lane
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../relational-core
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../sql-runtime
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../../../sql-target
@@ -735,15 +711,15 @@ importers:
       '@prisma-next/plan':
         specifier: workspace:*
         version: link:../../../framework/core-plan
-      '@prisma-next/runtime':
-        specifier: workspace:*
-        version: link:../../../runtime
       '@prisma-next/sql-contract-types':
         specifier: workspace:*
         version: link:../../../targets/sql/contract-types
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../../targets/sql/operations
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../sql-runtime
       '@prisma-next/sql-target':
         specifier: workspace:*
         version: link:../../../sql-target
@@ -808,13 +784,41 @@ importers:
         version: 2.1.9(@types/node@20.19.24)
 
   packages/sql/sql-runtime:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../contract
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../framework/core-operations
+      '@prisma-next/runtime-core':
+        specifier: workspace:*
+        version: link:../../framework/runtime-core
+      '@prisma-next/sql-contract-types':
+        specifier: workspace:*
+        version: link:../../targets/sql/contract-types
+      '@prisma-next/sql-target':
+        specifier: workspace:*
+        version: link:../../sql-target
     devDependencies:
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../driver-postgres
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../test-utils
+      '@prisma/dev':
+        specifier: ^0.1.1
+        version: 0.1.1(typescript@5.9.3)
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
 
   packages/targets/sql/contract-types:
     dependencies:

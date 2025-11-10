@@ -2,7 +2,6 @@ packages:
   - packages/framework/**
   - packages/targets/sql/*
   - packages/sql/**
-  - packages/runtime/*
   - packages/compat/*
   - packages/document
   - packages/*
