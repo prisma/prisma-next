@@ -211,5 +211,38 @@ describe('Runtime class', () => {
       const promise = drainPlanExecution(runtime, mockPlan);
       await expect(promise).resolves.not.toThrow();
     });
+
+    it('throws CONTRACT.MARKER_MISMATCH when core hash differs', async () => {
+      const mockDriver = createMockDriver();
+      const adapter = createPostgresAdapter();
+
+      mockDriver.query = vi.fn().mockResolvedValue({
+        rows: [
+          {
+            core_hash: 'sha256:different-core',
+            profile_hash: 'sha256:test-profile',
+          },
+        ],
+      });
+
+      const context = createTestContext(mockContract, adapter);
+      const runtime = createRuntime({
+        context,
+        adapter,
+        driver: mockDriver,
+        verify: { mode: 'onFirstUse', requireMarker: true },
+      });
+
+      await expect(async () => {
+        await drainPlanExecution(runtime, mockPlan);
+      }).rejects.toMatchObject({
+        code: 'CONTRACT.MARKER_MISMATCH',
+        category: 'CONTRACT',
+        details: expect.objectContaining({
+          expected: 'sha256:test-core',
+          actual: 'sha256:different-core',
+        }),
+      });
+    });
   });
 });

@@ -236,5 +236,157 @@ describe('lints plugin', () => {
         code: 'LINT.NO_LIMIT',
       });
     });
+
+    it('respects configured severity for selectStar', async () => {
+      const plugin = lints({
+        severities: {
+          selectStar: 'error',
+        },
+      });
+      const ctx = createMockContext();
+      const plan: Plan = {
+        sql: 'SELECT * FROM "user"',
+        params: [],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test',
+          lane: 'raw',
+          paramDescriptors: [],
+        },
+      };
+
+      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+        code: 'LINT.SELECT_STAR',
+      });
+    });
+
+    it('respects configured severity for readOnlyMutation', async () => {
+      const plugin = lints({
+        severities: {
+          readOnlyMutation: 'error',
+        },
+      });
+      const ctx = createMockContext();
+      const plan: Plan = {
+        sql: 'INSERT INTO "user" (id) VALUES (1)',
+        params: [],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test',
+          lane: 'raw',
+          paramDescriptors: [],
+          annotations: { intent: 'read' },
+        },
+      };
+
+      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+        code: 'LINT.READ_ONLY_MUTATION',
+      });
+    });
+
+    it('respects configured severity for unindexedPredicate', async () => {
+      const plugin = lints({
+        severities: {
+          unindexedPredicate: 'error',
+        },
+      });
+      const ctx = createMockContext();
+      const plan: Plan = {
+        sql: 'SELECT id FROM "user" WHERE email = $1',
+        params: ['test@example.com'],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test',
+          lane: 'raw',
+          paramDescriptors: [],
+          refs: {
+            tables: ['user'],
+            columns: [{ table: 'user', column: 'email' }],
+          },
+        },
+      };
+
+      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+        code: 'LINT.UNINDEXED_PREDICATE',
+      });
+    });
+
+    it('returns undefined for unknown lint code', async () => {
+      const plugin = lints({
+        severities: {
+          selectStar: 'warn',
+        },
+      });
+      const ctx = createMockContext();
+      const plan: Plan = {
+        sql: 'SELECT id FROM "user"',
+        params: [],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test',
+          lane: 'raw',
+          paramDescriptors: [],
+        },
+      };
+
+      await expect(plugin.beforeExecute?.(plan, ctx)).resolves.not.toThrow();
+    });
+
+    it('handles WITH statement containing SELECT', async () => {
+      const plugin = lints();
+      const ctx = createMockContext();
+      const plan: Plan = {
+        sql: 'WITH users AS (SELECT id FROM "user") SELECT * FROM users',
+        params: [],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test',
+          lane: 'raw',
+          paramDescriptors: [],
+        },
+      };
+
+      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+        code: 'LINT.SELECT_STAR',
+      });
+    });
+
+    it('handles WITH statement without SELECT', async () => {
+      const plugin = lints();
+      const ctx = createMockContext();
+      const plan: Plan = {
+        sql: 'WITH users AS (INSERT INTO "user" (id) VALUES (1) RETURNING id) INSERT INTO "post" (user_id) VALUES (1)',
+        params: [],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test',
+          lane: 'raw',
+          paramDescriptors: [],
+        },
+      };
+
+      await plugin.beforeExecute?.(plan, ctx);
+      expect(ctx.log.warn).not.toHaveBeenCalled();
+      expect(ctx.log.error).not.toHaveBeenCalled();
+    });
+
+    it('handles other statement types', async () => {
+      const plugin = lints();
+      const ctx = createMockContext();
+      const plan: Plan = {
+        sql: 'CREATE TABLE "user" (id INTEGER)',
+        params: [],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test',
+          lane: 'raw',
+          paramDescriptors: [],
+        },
+      };
+
+      await plugin.beforeExecute?.(plan, ctx);
+      expect(ctx.log.warn).not.toHaveBeenCalled();
+      expect(ctx.log.error).not.toHaveBeenCalled();
+    });
   });
 });

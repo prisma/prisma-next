@@ -18,6 +18,7 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
         '**/plugins/types.ts', // Types-only file
+        'core/**', // Core subdirectory
       ],
       thresholds: {
         lines: 80,

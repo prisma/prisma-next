@@ -311,6 +311,69 @@ describe('budgets plugin', () => {
 
       await expect(plugin.beforeExecute?.(plan, ctx)).resolves.not.toThrow();
     });
+
+    it('warns when explain shows rows exceeding budget in permissive mode', async () => {
+      const plugin = budgets({
+        maxRows: 100,
+        explain: { enabled: true },
+        severities: { rowCount: 'warn' },
+      });
+      const plan: Plan = {
+        sql: 'SELECT id FROM "user"',
+        params: [],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test-core',
+          lane: 'raw',
+          paramDescriptors: [],
+          refs: { tables: ['user'], columns: [] },
+          projection: { id: 'user.id' },
+        },
+      };
+
+      const driver = createMockDriver();
+      driver.explain = vi.fn().mockResolvedValue({
+        rows: [{ 'Plan Rows': 200 }],
+      });
+      const ctx = createMockContext(driver, 'permissive');
+
+      await expect(plugin.beforeExecute?.(plan, ctx)).resolves.not.toThrow();
+      expect(ctx.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'BUDGET.ROWS_EXCEEDED',
+        }),
+      );
+    });
+
+    it('warns when heuristic shows rows exceeding budget in permissive mode', async () => {
+      const plugin = budgets({
+        maxRows: 100,
+        defaultTableRows: 200,
+        severities: { rowCount: 'warn' },
+      });
+      const plan: Plan = {
+        sql: 'SELECT id FROM "user"',
+        params: [],
+        meta: {
+          target: 'postgres',
+          coreHash: 'sha256:test-core',
+          lane: 'raw',
+          paramDescriptors: [],
+          refs: { tables: ['user'], columns: [] },
+          projection: { id: 'user.id' },
+        },
+      };
+
+      const driver = createMockDriver();
+      const ctx = createMockContext(driver, 'permissive');
+
+      await expect(plugin.beforeExecute?.(plan, ctx)).resolves.not.toThrow();
+      expect(ctx.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'BUDGET.ROWS_EXCEEDED',
+        }),
+      );
+    });
   });
 
   describe('onRow', () => {

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import type {
   Adapter,
   DeleteAst,
@@ -280,6 +281,93 @@ describe('DML builders', () => {
       expect(() => {
         sql<Contract, CodecTypes>({ context }).delete(tables.user).build({ params: {} });
       }).toThrow('where() must be called before building a DELETE query');
+    });
+
+    it('throws error for missing parameter in where clause', () => {
+      const userColumns = tables.user.columns;
+      expect(() => {
+        sql<Contract, CodecTypes>({ context })
+          .delete(tables.user)
+          .where(userColumns.id.eq(param('userId')))
+          .build({ params: {} });
+      }).toThrow('Missing value for parameter userId');
+    });
+  });
+
+  describe('delete with operations', () => {
+    const contractWithVector = validateContract<SqlContract<SqlStorage>>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
+              vector: { type: 'pgvector/vector@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapterWithOps = createStubAdapter();
+    const contextWithOps = createTestContext(contractWithVector, adapterWithOps, {
+      extensions: [
+        {
+          operations: () => [
+            {
+              forTypeId: 'pgvector/vector@1',
+              method: 'cosineDistance',
+              args: [{ kind: 'param' }],
+              returns: { kind: 'builtin', type: 'number' },
+              lowering: {
+                targetFamily: 'sql',
+                strategy: 'infix',
+                // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+                template: '${self} <=> ${arg0}',
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const tablesWithOps = schema(contextWithOps).tables;
+    const userTableWithOps = tablesWithOps['user'];
+    if (!userTableWithOps) throw new Error('user table not found');
+    const vectorColumn = userTableWithOps.columns['vector'];
+    if (!vectorColumn) throw new Error('vector column not found');
+
+    it('builds delete plan with operation in where clause', () => {
+      const distance = (
+        vectorColumn as unknown as {
+          cosineDistance: (arg: unknown) => { eq: (value: unknown) => unknown };
+        }
+      ).cosineDistance(param('other'));
+      const binary = distance.eq(param('threshold')) as BinaryBuilder;
+
+      const plan = sql({ context: contextWithOps })
+        .delete(userTableWithOps)
+        .where(binary)
+        .build({ params: { other: [1, 2, 3], threshold: 0.5 } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'delete',
+        table: { name: 'user' },
+        where: expect.objectContaining({
+          kind: 'bin',
+          op: 'eq',
+        }),
+      });
+      expect(plan.params).toContain(0.5);
     });
   });
 

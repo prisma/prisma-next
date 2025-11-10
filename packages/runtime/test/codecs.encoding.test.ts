@@ -221,4 +221,24 @@ describe('Param Encoding Error Handling', () => {
     const encoded = encodeParams(plan, registry);
     expect(encoded).toEqual([]);
   });
+
+  it('passes through value when codec not found in registry', () => {
+    const plan = createMockPlan([{ name: 'param1', type: 'pg/nonexistent@1', source: 'dsl' }]);
+    const encoded = encodeParam('test-value', plan.meta.paramDescriptors[0]!, plan, registry);
+    expect(encoded).toBe('test-value');
+  });
+
+  it('passes through value when plan annotation codec not found', () => {
+    const plan: Plan = {
+      ...createMockPlan([{ name: 'param1', type: 'pg/text@1', source: 'dsl' }]),
+      meta: {
+        ...createMockPlan([{ name: 'param1', type: 'pg/text@1', source: 'dsl' }]).meta,
+        annotations: {
+          codecs: { param1: 'pg/nonexistent@1' },
+        },
+      },
+    } as Plan;
+    const encoded = encodeParam('test-value', plan.meta.paramDescriptors[0]!, plan, registry);
+    expect(encoded).toBe('test-value');
+  });
 });
