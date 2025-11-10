@@ -1,7 +1,7 @@
 # Recommendations
 
 ## Observations
-- `packages/integration-tests/test` mixes CLI, emitter, runtime, and contract tests in one Vitest project, so failures are hard to triage.
+- `test/integration/test` mixes CLI, emitter, runtime, and contract tests in one Vitest project, so failures are hard to triage.
 - Fixtures share mutable global state, so parallel test execution is flaky.
 - Some tests still import from `@prisma-next/sql-query`, which blocks removal of the legacy package.
 

@@ -19,7 +19,7 @@ Provide reusable generic test utilities that DRY up common testing patterns acro
 - Test-specific business logic
 - Package-specific test utilities (those belong in package test directories)
 - Runtime-specific utilities (see `@prisma-next/runtime/test/utils`)
-- Contract-related utilities (see `e2e-tests/test/utils.ts`)
+- Contract-related utilities (see `test/e2e/framework/test/utils.ts`)
 
 ## Architecture
 
@@ -46,7 +46,7 @@ flowchart TD
     INTEGRATION --> ASYNC
 ```
 
-**Note**: Runtime-specific utilities are in `@prisma-next/runtime/test/utils`, and contract-related utilities are in `e2e-tests/test/utils.ts`.
+**Note**: Runtime-specific utilities are in `@prisma-next/runtime/test/utils`, and contract-related utilities are in `test/e2e/framework/test/utils.ts`.
 
 ## Components
 
@@ -83,7 +83,7 @@ it('compiles TypeScript', async () => {
 }, timeouts.typeScriptCompilation);
 ```
 
-**Note**: For runtime-specific utilities (plan execution, runtime creation, contract markers), see `@prisma-next/runtime/test/utils`. For contract-related utilities (contract loading, emission verification), see `e2e-tests/test/utils.ts`.
+**Note**: For runtime-specific utilities (plan execution, runtime creation, contract markers), see `@prisma-next/runtime/test/utils`. For contract-related utilities (contract loading, emission verification), see `test/e2e/framework/test/utils.ts`.
 
 ## Dependencies
 

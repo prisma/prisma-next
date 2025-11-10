@@ -6,9 +6,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../biome.json --error-on-warnings",
-    "emit": "prisma-next emit --contract test/fixtures/contract.ts --out test/fixtures/generated --adapter ../../packages/adapter-postgres",
-    "clean": "node ../../scripts/clean.mjs"
+    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
+    "emit": "prisma-next emit --contract test/fixtures/contract.ts --out test/fixtures/generated --adapter ../../../packages/sql/runtime/adapters/postgres",
+    "clean": "node ../../../scripts/clean.mjs"
   },
   "devDependencies": {
     "vitest": "^2.1.1",

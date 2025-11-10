@@ -113,24 +113,6 @@
       "domain": "framework",
       "layer": "tooling",
       "plane": "migration"
-    },
-    {
-      "glob": "packages/test-utils/**",
-      "domain": "framework",
-      "layer": "tooling",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/integration-tests/**",
-      "domain": "framework",
-      "layer": "tooling",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/e2e-tests/**",
-      "domain": "framework",
-      "layer": "tooling",
-      "plane": "shared"
     }
   ],
   "rules": {

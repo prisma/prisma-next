@@ -9,7 +9,7 @@ const execAsync = promisify(exec);
 
 const ROOT = resolve(process.cwd());
 
-const EXCLUDED_PATHS = ['examples/', 'packages/integration-tests', 'packages/e2e-tests'];
+const EXCLUDED_PATHS = ['examples/', 'test/'];
 
 async function getPackages() {
   // Use pnpm to get all packages recursively

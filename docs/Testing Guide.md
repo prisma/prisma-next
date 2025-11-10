@@ -55,7 +55,7 @@ it('creates runtime with contract and adapter', () => {
 
 **Example:**
 ```typescript
-// packages/integration-tests/test/contract-emission.test.ts
+// test/integration/test/contract-emission.test.ts
 it('emits contract and executes query', async () => {
   const { contractJson, contractDts } = await emit(ir, options, sqlTargetFamilyHook);
   const contract = validateContract<Contract>(JSON.parse(contractJson));
@@ -74,7 +74,7 @@ it('emits contract and executes query', async () => {
 - Test high-value execution paths
 - Use real database (Postgres via dev server)
 - Test complete flows: CLI → emission → validation → query building → execution
-- Located in `packages/e2e-tests/test/`
+- Located in `test/e2e/framework/test/`
 
 **Why they matter:** E2E tests verify the entire system works together, catching integration issues that unit and integration tests might miss.
 
@@ -85,7 +85,7 @@ it('emits contract and executes query', async () => {
 
 **Example:**
 ```typescript
-// packages/e2e-tests/test/runtime.e2e.test.ts
+// test/e2e/framework/test/runtime.e2e.test.ts
 import { withDevDatabase, withClient } from '@prisma-next/test-utils';
 import {
   setupE2EDatabase,
@@ -233,11 +233,11 @@ Good test helpers:
 **Test utilities are organized across multiple locations to avoid circular dependencies:**
 - **`@prisma-next/test-utils`**: Generic database and async iterable utilities with zero dependencies on other `@prisma-next/*` packages
 - **`@prisma-next/runtime/test/utils`**: Runtime-specific test utilities (plan execution, runtime creation, contract markers)
-- **`e2e-tests/test/utils.ts`**: Contract-related utilities for E2E tests (contract loading, emission verification)
+- **`test/e2e/framework/test/utils.ts`**: Contract-related utilities for E2E tests (contract loading, emission verification)
 
 #### Shared Test Utilities
 
-**Note**: The `@prisma-next/test-utils` package has zero dependencies on other `@prisma-next/*` packages. For runtime-specific utilities, import from `@prisma-next/runtime/test/utils`. For contract-related utilities in E2E tests, import from `e2e-tests/test/utils.ts`.
+**Note**: The `@prisma-next/test-utils` package has zero dependencies on other `@prisma-next/*` packages. For runtime-specific utilities, import from `@prisma-next/sql-runtime/test/utils`. For contract-related utilities in E2E tests, import from `test/e2e/framework/test/utils.ts`.
 
 ```typescript
 // Import from generic utilities
@@ -329,7 +329,7 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 **Unit tests:** `src/**/*.test.ts` (alongside source code)
 **Integration tests:** `test/**/*.integration.test.ts` or `src/**/*.integration.test.ts`
 **Type tests:** `src/**/*.test-d.ts` (type-level tests using `expectTypeOf`)
-**E2E tests:** `packages/e2e-tests/test/**/*.test.ts`
+**E2E tests:** `test/e2e/framework/test/**/*.test.ts`
 
 ### Test File Structure
 

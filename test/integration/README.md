@@ -34,18 +34,18 @@ This package depends on all packages under test via workspace protocol:
 - `@prisma-next/sql-query` - Query builders
 - `@prisma-next/sql-target` - SQL target family
 
+## Location
+
+This package is located at `test/integration/` (not in `packages/`) as it is a test suite, not a source package.
+
 ## Running Tests
 
 ```bash
-# Run all integration tests
-pnpm -F integration-tests test
+# Run all integration tests (from test/integration/)
+cd test/integration && pnpm test
 
 # Run tests with coverage
-pnpm -F integration-tests test:coverage
-
-# Or via turbo
-turbo run test --filter=integration-tests
-turbo run test:coverage --filter=integration-tests
+cd test/integration && pnpm test:coverage
 ```
 
 Tests automatically depend on builds of target packages via Turborepo.
@@ -61,7 +61,7 @@ Tests automatically depend on builds of target packages via Turborepo.
 
 - `@prisma-next/sql-query`: SQL query builder and plan types
 - `@prisma-next/runtime`: Runtime execution engine that consumes contracts
-- `@prisma-next/e2e-tests`: End-to-end tests using the CLI to emit contracts and execute queries
+- `test/e2e/framework/`: End-to-end tests using the CLI to emit contracts and execute queries
 
 ## Architecture
 

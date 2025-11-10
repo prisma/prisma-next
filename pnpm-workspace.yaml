@@ -7,4 +7,5 @@ packages:
   - packages/document
   - packages/*
   - examples/*
+  - test/**
 

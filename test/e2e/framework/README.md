@@ -10,10 +10,14 @@ End-to-end tests that verify the full flow using the built CLI, emitted contract
 - Assert multiple rows and verify compile-time row types
 - Test nested projection shaping with flattened aliases
 
+## Location
+
+This package is located at `test/e2e/framework/` (not in `packages/`) as it is a test suite, not a source package.
+
 ## Scripts
-- `pnpm -F e2e-tests test` — run the test suite (requires repo build first)
-- `pnpm -F e2e-tests test:coverage` — run tests with coverage (requires repo build first)
-- `pnpm -F e2e-tests gen-contract` — regenerate committed fixture artifacts from `test/fixtures/contract.ts`
+- `pnpm test` (from `test/e2e/framework/`) — run the test suite (requires repo build first)
+- `pnpm test:coverage` (from `test/e2e/framework/`) — run tests with coverage (requires repo build first)
+- `pnpm gen-contract` (from `test/e2e/framework/`) — regenerate committed fixture artifacts from `test/fixtures/contract.ts`
 
 ## Architecture
 
@@ -91,7 +95,7 @@ await withDevDatabase(
 
 ## Test Utilities
 
-Contract-related test utilities are located in `e2e-tests/test/utils.ts`. These utilities depend on `@prisma-next/sql-query` and `@prisma-next/sql-target` for contract validation and types.
+Contract-related test utilities are located in `test/e2e/framework/test/utils.ts`. These utilities depend on `@prisma-next/sql-contract-ts` and `@prisma-next/sql-contract-types` for contract validation and types.
 
 **Available Utilities:**
 - `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk. The generic type parameter should be specified from the emitted `contract.d.ts` file (e.g., `loadContractFromDisk<Contract>(contractJsonPath)`).

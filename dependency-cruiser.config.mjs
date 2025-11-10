@@ -79,14 +79,10 @@ const isSqlLanesToRuntime = (sourceGroup, targetGroup) =>
   targetGroup.plane === 'runtime';
 
 const isCliToSqlTargets = (sourceGroup, targetGroup) =>
-  isCliGroup(sourceGroup) &&
-  targetGroup.domain === 'sql' &&
-  targetGroup.layer === 'targets';
+  isCliGroup(sourceGroup) && targetGroup.domain === 'sql' && targetGroup.layer === 'targets';
 
 const isCliToSqlAuthoring = (sourceGroup, targetGroup) =>
-  isCliGroup(sourceGroup) &&
-  targetGroup.domain === 'sql' &&
-  targetGroup.layer === 'authoring';
+  isCliGroup(sourceGroup) && targetGroup.domain === 'sql' && targetGroup.layer === 'authoring';
 
 const isExtensionsToSqlTargets = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'extensions' &&
@@ -122,7 +118,7 @@ const createUpwardRules = () => {
         `upward-${sourceGroup.key}-to-${targetGroup.layer}`,
         `Upward import: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)} (away from core)`,
         sourceGroup,
-        targetGroup
+        targetGroup,
       );
     }
   }
@@ -135,7 +131,10 @@ const createCrossDomainRules = () => {
       if (targetGroup.domain === 'framework') continue;
 
       // TODO: CLI tooling uses SQL targets/authoring hooks until the plugin split is complete (docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4)
-      if (isCliToSqlTargets(sourceGroup, targetGroup) || isCliToSqlAuthoring(sourceGroup, targetGroup)) {
+      if (
+        isCliToSqlTargets(sourceGroup, targetGroup) ||
+        isCliToSqlAuthoring(sourceGroup, targetGroup)
+      ) {
         continue;
       }
 
@@ -147,7 +146,7 @@ const createCrossDomainRules = () => {
         `cross-domain-${sourceGroup.domain}-to-${targetGroup.domain}`,
         `Cross-domain import: ${sourceGroup.domain} cannot import from ${targetGroup.domain} (except framework)`,
         sourceGroup,
-        targetGroup
+        targetGroup,
       );
     }
   }
@@ -163,7 +162,7 @@ const createPlaneRules = () => {
         `migration-to-runtime-${sourceGroup.domain}-${sourceGroup.layer}-to-${targetGroup.layer}`,
         `Migration → Runtime: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)}`,
         sourceGroup,
-        targetGroup
+        targetGroup,
       );
     }
   }
@@ -188,14 +187,16 @@ const createPlaneRules = () => {
         `runtime-to-migration-${sourceGroup.domain}-${sourceGroup.layer}-to-${targetGroup.layer}`,
         `Runtime → Migration: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)} (artifacts are consumed out of band)`,
         sourceGroup,
-        targetGroup
+        targetGroup,
       );
     }
   }
 };
 
 const createDriverRules = () => {
-  const driverGroups = moduleGroups.filter((group) => group.domain === 'sql' && group.layer === 'drivers');
+  const driverGroups = moduleGroups.filter(
+    (group) => group.domain === 'sql' && group.layer === 'drivers',
+  );
 
   for (const driverGroup of driverGroups) {
     for (const sourceGroup of moduleGroups) {
@@ -207,16 +208,27 @@ const createDriverRules = () => {
         `drivers-only-adapters-${sourceGroup.domain}-${sourceGroup.layer}`,
         `Drivers can only be imported by adapters: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(driverGroup)}`,
         sourceGroup,
-        driverGroup
+        driverGroup,
       );
     }
   }
+};
+
+const createTestImportRules = () => {
+  forbidden.push({
+    name: 'packages-cannot-import-test',
+    comment: 'packages/** cannot import from test/** (test suites are not part of source)',
+    severity: 'error',
+    from: { path: '^packages/' },
+    to: { path: '^test/' },
+  });
 };
 
 createUpwardRules();
 createCrossDomainRules();
 createPlaneRules();
 createDriverRules();
+createTestImportRules();
 
 export default {
   forbidden,
@@ -245,7 +257,8 @@ export default {
         '\\.d\\.ts$',
         'dist',
         'coverage',
-        '^packages/(document|e2e-tests|integration-tests)/',
+        '^packages/document/',
+        '^test/',
       ],
     },
     reporterOptions: {

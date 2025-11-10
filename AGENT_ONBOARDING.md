@@ -944,7 +944,7 @@ database = await createDevDatabase({
 - **Type assertions**: Use `toExtend()` not `toMatchTypeOf()` - see `.cursor/rules/vitest-expect-typeof.mdc`
 - **Type tests**: Use `expectTypeOf` helpers, not manual type checks with conditional types - see `.cursor/rules/vitest-expect-typeof.mdc`
 - **Test descriptions**: Omit "should" - see `.cursor/rules/omit-should-in-tests.mdc`
-- **Shared Test Utilities**: Use `@prisma-next/test-utils` for generic test patterns, `@prisma-next/runtime/test/utils` for runtime-specific utilities, and `e2e-tests/test/utils.ts` for contract-related E2E utilities - see "E2E Test Patterns" below
+- **Shared Test Utilities**: Use `@prisma-next/test-utils` for generic test patterns, `@prisma-next/sql-runtime/test/utils` for runtime-specific utilities, and `test/e2e/framework/test/utils.ts` for contract-related E2E utilities - see "E2E Test Patterns" below
 - **Test File Organization**: Keep test files under 500 lines. Split large files by functionality, feature area, or test type. Use descriptive file names like `codecs.registry.test.ts`, `runtime.joins.test.ts`. See `.cursor/rules/test-file-organization.mdc` for details
 - **Test Assertion Patterns**: Prefer object comparison (`expect(row).toEqual({ ... })`) over piece-by-piece property checks. Use `toMatchObject` for partial comparisons and `expect.any()` for type-only checks. For parsed JSON, use `toMatchObject` instead of individual assertions with type casts. See `.cursor/rules/test-file-organization.mdc` for details
 - **Context Creation in Tests**: Always create `RuntimeContext` inside each test function, not at module level. Creating context at module level causes initialization/timing issues. See `.cursor/rules/testing-guide.mdc` for details
@@ -954,11 +954,11 @@ database = await createDevDatabase({
 **Test Utilities Organization**: Test utilities are organized across multiple locations to avoid circular dependencies:
 - **`@prisma-next/test-utils`**: Generic database and async iterable utilities with zero dependencies on other `@prisma-next/*` packages
 - **`@prisma-next/runtime/test/utils`**: Runtime-specific test utilities (plan execution, runtime creation, contract markers)
-- **`e2e-tests/test/utils.ts`**: Contract-related utilities for E2E tests (contract loading, emission verification)
+- **`test/e2e/framework/test/utils.ts`**: Contract-related utilities for E2E tests (contract loading, emission verification)
 
 **Key Helpers:**
-- `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk (in `e2e-tests/test/utils.ts`). The generic type parameter should be specified from the emitted `contract.d.ts` file (e.g., `loadContractFromDisk<Contract>(contractJsonPath)`).
-- `emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, expectedContractJsonPath)`: Emits contract via CLI and verifies it matches on-disk artifacts (in `e2e-tests/test/utils.ts`). Used in a single test to verify contract emission correctness.
+- `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk (in `test/e2e/framework/test/utils.ts`). The generic type parameter should be specified from the emitted `contract.d.ts` file (e.g., `loadContractFromDisk<Contract>(contractJsonPath)`).
+- `emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, expectedContractJsonPath)`: Emits contract via CLI and verifies it matches on-disk artifacts (in `test/e2e/framework/test/utils.ts`). Used in a single test to verify contract emission correctness.
 - `setupE2EDatabase(client, contract, setupFn)`: Sets up database schema, data, and writes contract marker (in `@prisma-next/runtime/test/utils`)
 - `createTestRuntimeFromClient(contract, client, adapter)`: Creates a runtime with standard test configuration (in `@prisma-next/runtime/test/utils`)
 - `executePlanAndCollect<P extends Plan>(runtime, plan)`: Executes a plan and collects all results into an array (in `@prisma-next/runtime/test/utils`). The return type is automatically inferred from the plan's type parameter using `ResultType<P>[]`.
@@ -1040,7 +1040,7 @@ describe('end-to-end tests', () => {
 - **Developer responsibility**: Developers are responsible for keeping the on-disk contract artifacts up-to-date when they change the contract source. The verification test will fail if artifacts are out of sync.
 - **Benefits**: Reduces test execution time, ensures contract artifacts are stable, and enables compile-time type checking using the emitted contract types.
 
-See `packages/test-utils/README.md` for full documentation of generic helpers, `packages/runtime/README.md` for runtime-specific test utilities, and `packages/e2e-tests/README.md` for contract-related E2E test utilities.
+See `test/utils/README.md` for full documentation of generic helpers, `packages/sql/sql-runtime/test/utils.ts` for runtime-specific test utilities, and `test/e2e/framework/README.md` for contract-related E2E test utilities.
 
 ### Package Layering & Import Validation
 
@@ -1328,7 +1328,7 @@ When moving packages to reflect domain/layer/plane structure (e.g., moving frame
    - **Depth calculation**: From `packages/framework/tooling/cli` to root = 4 levels up (`../../../../`)
 
 6. **Update hardcoded paths**:
-   - Test files that reference package paths (e.g., `packages/e2e-tests/test/runtime.basic.test.ts`)
+   - Test files that reference package paths (e.g., `test/e2e/framework/test/runtime.basic.test.ts`)
    - `scripts/check-imports.mjs` exceptions for moved packages
 
 7. **Run `pnpm install`** to update the lockfile after moving packages
@@ -1549,7 +1549,7 @@ pnpm coverage:packages
 17. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
 18. **E2E Tests Package** - Created `@prisma-next/e2e-tests` package that tests the full flow: CLI emission → contract validation → runtime execution → type verification. Tests emit contracts via CLI, spin up dev Postgres DB, execute queries, and verify both runtime results and compile-time types.
 19. **Shared Test Utilities Package** - Created `@prisma-next/test-utils` package to centralize common test patterns across all test suites. Provides helpers for database management, plan execution, runtime creation, contract management, and E2E testing. Refactored e2e tests to use shared utilities, reducing duplication by 28% (1219 → 882 lines). E2E tests now load contracts from committed fixtures rather than emitting on every test run, with a single test verifying contract emission correctness. The `executePlanAndCollect` function now properly infers return types from plans using `ResultType<P>[]`, preserving full type information. Contract loading uses a generic type parameter pattern (`loadContractFromDisk<Contract>`) to enable compile-time type checking with emitted contract types. See "E2E Test Patterns" section above for usage examples.
-20. **Test Utilities Dependency Refactoring** - Broke circular dependency between `test-utils` and `runtime` by moving runtime-specific utilities (`executePlanAndCollect`, `drainPlanExecution`, `setupTestDatabase`, `writeTestContractMarker`, `createTestRuntime`, `createTestRuntimeFromClient`, `setupE2EDatabase`) to `runtime/test/utils.ts`. Removed all dependencies from `test-utils` on other `@prisma-next/*` packages by moving contract-related functions (`loadContractFromDisk`, `emitAndVerifyContract`) to `e2e-tests/test/utils.ts`. `test-utils` now has zero dependencies on other `@prisma-next/*` packages, allowing it to be used by all packages without circular dependencies. Runtime-specific utilities are in `@prisma-next/runtime/test/utils`, and contract helpers are in `e2e-tests/test/utils.ts` (local to e2e-tests).
+20. **Test Utilities Dependency Refactoring** - Broke circular dependency between `test-utils` and `runtime` by moving runtime-specific utilities (`executePlanAndCollect`, `drainPlanExecution`, `setupTestDatabase`, `writeTestContractMarker`, `createTestRuntime`, `createTestRuntimeFromClient`, `setupE2EDatabase`) to `packages/sql/sql-runtime/test/utils.ts`. Removed all dependencies from `test-utils` on other `@prisma-next/*` packages by moving contract-related functions (`loadContractFromDisk`, `emitAndVerifyContract`) to `test/e2e/framework/test/utils.ts`. `test-utils` now has zero dependencies on other `@prisma-next/*` packages, allowing it to be used by all packages without circular dependencies. Runtime-specific utilities are in `packages/sql/sql-runtime/test/utils.ts`, and contract helpers are in `test/e2e/framework/test/utils.ts` (local to e2e-tests).
 21. **SQL Types Import Correction** - Fixed incorrect imports of SQL types from `@prisma-next/contract/types` to use `@prisma-next/sql-target` instead. SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`) must be imported from `@prisma-next/sql-target` during migration (Slice 5-7). After Slice 7, imports should use `@prisma-next/sql-contract-types` directly. See `.cursor/rules/sql-types-imports.mdc` for details.
 22. **GitHub Actions CI Workflow** - Set up comprehensive CI workflow with separate jobs for typecheck, lint, build, test, e2e tests, and coverage. Workflow includes concurrency control, Postgres service configuration, coverage artifact uploads, and optional Codecov integration. All jobs run in parallel where possible for faster feedback.
 23. **Generated File Metadata** - Added `_generated` metadata field to `contract.json` files to indicate they're generated artifacts. This field is excluded from canonicalization/hashing to ensure determinism. Added warning header comments to `contract.d.ts` files. Both prevent accidental manual edits and guide users to regenerate using `prisma-next emit`.
@@ -1596,7 +1596,7 @@ const adapter = createPostgresAdapter();
 const context = createRuntimeContext({ contract, adapter, extensions: [] });
 
 // In E2E tests, use loadContractFromDisk to load from committed fixtures
-// Note: loadContractFromDisk is in e2e-tests/test/utils.ts, not test-utils
+// Note: loadContractFromDisk is in test/e2e/framework/test/utils.ts, not test-utils
 import { loadContractFromDisk } from './utils';
 
 const contract = await loadContractFromDisk<Contract>(contractJsonPath);

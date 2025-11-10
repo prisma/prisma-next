@@ -129,7 +129,8 @@ jobs:
       - name: Build
         run: pnpm build
       - name: Run E2E tests
-        run: pnpm --filter @prisma-next/e2e-tests test
+        run: pnpm test
+        working-directory: test/e2e/framework
 
   coverage:
     name: Coverage

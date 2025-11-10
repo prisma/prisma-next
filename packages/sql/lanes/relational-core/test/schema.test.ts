@@ -1,10 +1,11 @@
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract-types';
+import type { ExtractCodecTypes, SqlContract, SqlMappings } from '@prisma-next/sql-contract-types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import type { SchemaHandle } from '../src/schema';
 import { schema } from '../src/schema';
+import type { OperationTypes } from '../src/types';
 
 type TestContract = SqlContract<
   {
@@ -26,7 +27,7 @@ type TestContract = SqlContract<
   SqlMappings
 >;
 
-type TestSchemaHandle = SchemaHandle<TestContract>;
+type TestSchemaHandle = SchemaHandle<TestContract, ExtractCodecTypes<TestContract>, OperationTypes>;
 type TestUserTable = TestSchemaHandle['tables']['user'];
 
 type MutableStorage = {
