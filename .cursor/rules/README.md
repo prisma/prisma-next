@@ -32,6 +32,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 
 ## Refactoring
 - `.cursor/rules/modular-refactoring-patterns.mdc` — Split monoliths into modules
+- `.cursor/rules/moving-packages.mdc` — Guidelines for moving packages and updating relative paths
 - `.cursor/rules/no-barrel-files.mdc` — Avoid barrels
 
 ## Architecture

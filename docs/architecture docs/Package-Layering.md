@@ -402,7 +402,8 @@ The package layering structure has been scaffolded with placeholder packages:
 - **Contract Authoring (Phase 1)**: SQL contract authoring code moved from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`)
 - **Contract Authoring (Phase 2)**: Target-agnostic contract authoring core extracted to `@prisma-next/contract-authoring` in the authoring layer (`packages/framework/authoring/contract-authoring`)
 - `@prisma-next/sql-contract-ts` now composes `@prisma-next/contract-authoring` with SQL-specific types
-- Integration tests that depend on both `sql-contract-ts` and `sql-query` moved to `@prisma-next/integration-tests` to avoid cyclic dependencies
+- Integration tests that depend on both `sql-contract-ts` and `sql-query` moved to `@prisma-next/integration-tests` (located at `test/integration/`) to avoid cyclic dependencies
+- Test packages (`e2e-tests`, `integration-tests`, `test-utils`) moved from `packages/` to `test/` directory to separate test suites from source packages
 - **Package Cleanup (Slice 7)**: `@prisma-next/sql-query` legacy package removed; all imports updated to use new package structure
 
 During migration from the old structure:

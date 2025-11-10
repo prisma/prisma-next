@@ -20,6 +20,9 @@ Welcome. This is a contract‑first, agent‑friendly data layer. Start here for
 ```bash
 pnpm build                 # Build via Turbo
 pnpm test:packages         # Run package tests
+pnpm test:e2e              # Run e2e tests
+pnpm test:integration      # Run integration tests
+pnpm test:all              # Run all tests (packages + examples + integration + e2e)
 pnpm coverage:packages     # Coverage (packages only)
 pnpm lint:deps             # Validate layering/imports
 cd examples/todo-app && pnpm demo  # End-to-end demo

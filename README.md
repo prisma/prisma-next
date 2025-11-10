@@ -223,10 +223,11 @@ For detailed information about package layering, see:
 - **`@prisma-next/adapter-postgres`** - Postgres adapter implementation
 - **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
 
-### Test Packages
+### Test Packages (located in `test/` directory)
 
-- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages
-- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database
+- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages (located at `test/integration/`)
+- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database (located at `test/e2e/framework/`)
+- **`@prisma-next/test-utils`** - Shared test utilities for all test suites (located at `test/utils/`)
 
 ## Quick Start
 
@@ -259,11 +260,14 @@ pnpm generate && pnpm start
 ### All Packages
 
 **Tests:**
-- `pnpm test` - Run all tests
-- `pnpm test:packages` - Test only packages (exclude examples)
-- `pnpm test:examples` - Test only examples
+- `pnpm test` - Run all tests via Turbo
+- `pnpm test:all` - Run all test suites explicitly (packages → examples → integration → e2e)
+- `pnpm test:packages` - Test only source packages (excludes examples and test suites)
+- `pnpm test:examples` - Test only example apps
+- `pnpm test:integration` - Test only integration tests
+- `pnpm test:e2e` - Test only e2e tests
 - `pnpm test:coverage` - Run tests with coverage
-- `pnpm coverage:packages` - Coverage for packages only
+- `pnpm coverage:packages` - Coverage for packages only (excludes examples and test suites)
 
 **Type Checking:**
 - `pnpm typecheck` - Type check all packages

@@ -70,8 +70,11 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/adapter-postgres`** - Postgres adapter implementation (extension pack)
 - **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
 - **`@prisma-next/compat-prisma`** - Compatibility layer for Prisma ORM import-swap
-- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages
-- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database
+
+**Test Packages** (located in `test/` directory, not `packages/`):
+- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages (located at `test/integration/`)
+- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database (located at `test/e2e/framework/`)
+- **`@prisma-next/test-utils`** - Shared test utilities for all test suites (located at `test/utils/`)
 
 ### Package Organization Principles
 
@@ -1061,9 +1064,12 @@ See `.cursor/rules/import-validation.mdc` for detailed guidance on import valida
 ### Running Tests and Coverage
 
 **Test Commands:**
-- `pnpm test` - Run all tests (packages + examples)
-- `pnpm test:packages` - Test only packages (exclude examples)
-- `pnpm test:examples` - Test only examples
+- `pnpm test` - Run all tests via Turbo (packages + examples + test suites)
+- `pnpm test:all` - Run all test suites explicitly (packages → examples → integration → e2e)
+- `pnpm test:packages` - Test only source packages (excludes examples and test suites)
+- `pnpm test:examples` - Test only example apps
+- `pnpm test:integration` - Test only integration tests
+- `pnpm test:e2e` - Test only e2e tests
 
 **Coverage Commands:**
 - `pnpm test:coverage` - Run tests with coverage for all packages (including examples)
@@ -1075,10 +1081,17 @@ See `.cursor/rules/import-validation.mdc` for detailed guidance on import valida
 # Run all tests
 pnpm test
 
+# Run all test suites explicitly
+pnpm test:all
+
 # Run tests for packages only
 pnpm test:packages
 
-# Run coverage for all packages (excluding examples)
+# Run specific test suites
+pnpm test:e2e
+pnpm test:integration
+
+# Run coverage for all packages (excluding examples and test suites)
 pnpm coverage:packages
 
 # Run coverage for a specific package
@@ -1322,12 +1335,17 @@ When moving packages to reflect domain/layer/plane structure (e.g., moving frame
    ```
 
 5. **Update package-level configs** (relative paths change based on depth):
-   - **`tsconfig.json`**: Update `extends` path (e.g., `../../../../tsconfig.base.json` for `packages/framework/tooling/cli`)
+   - **`tsconfig.json`**: Update `extends` path (e.g., `../../../../tsconfig.base.json` for `packages/framework/tooling/cli`, `../../../tsconfig.base.json` for `test/integration/`)
    - **`package.json`**: Update `biome.json` and `clean.mjs` script paths
-   - **Depth calculation**: From `packages/framework/tooling/cli` to root = 4 levels up (`../../../../`)
+   - **Depth calculation**:
+     - From `packages/framework/tooling/cli` to root = 4 levels up (`../../../../`)
+     - From `test/integration/test/` to root = 3 levels up (`../../../`)
+     - From `test/e2e/framework/` to root = 3 levels up (`../../../`)
+   - **See `.cursor/rules/moving-packages.mdc`** for detailed guidance on calculating relative paths
 
 6. **Update hardcoded paths**:
    - Test files that reference package paths (e.g., `test/e2e/framework/test/runtime.basic.test.ts`)
+   - Extension pack manifest paths (e.g., `../../../packages/sql/runtime/adapters/postgres` from `test/integration/test/`)
    - `scripts/check-imports.mjs` exceptions for moved packages
 
 7. **Run `pnpm install`** to update the lockfile after moving packages

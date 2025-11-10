@@ -2,6 +2,10 @@
 
 Shared test utilities for Prisma Next test suites.
 
+## Location
+
+This package is located at `test/utils/` (not in `packages/`) as it is a test utility package, not a source package.
+
 ## Overview
 
 The test-utils package provides shared generic test helpers used across multiple test suites in Prisma Next. It centralizes common testing patterns to reduce duplication and ensure consistency.
