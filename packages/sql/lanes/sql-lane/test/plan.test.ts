@@ -1,0 +1,275 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import type { OperationExpr } from '@prisma-next/sql-target';
+import { describe, expect, it } from 'vitest';
+import { buildMeta } from '../src/sql/plan';
+import type { Contract } from './fixtures/contract.d';
+
+const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+
+function loadContract(name: string): Contract {
+  const filePath = join(fixtureDir, `${name}.json`);
+  const contents = readFileSync(filePath, 'utf8');
+  const contractJson = JSON.parse(contents);
+  return validateContract<Contract>(contractJson);
+}
+
+describe('buildMeta', () => {
+  const contract = loadContract('contract');
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
+  const tables = schema<Contract>(context).tables;
+  const userTable = tables.user;
+  const userColumns = userTable.columns;
+  const tableRef = createTableRef('user');
+
+  it('builds meta with operation expressions in projection', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pgvector/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+    };
+
+    const columnWithOp = {
+      kind: 'column' as const,
+      table: 'user',
+      column: 'id',
+      columnMeta: { type: 'pg/int4@1', nullable: false },
+      _operationExpr: operationExpr,
+    } as AnyColumnBuilder;
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['normalized'],
+        columns: [columnWithOp],
+      },
+      paramDescriptors: [],
+    });
+
+    expect(meta.projection).toEqual({
+      normalized: 'operation:normalize',
+    });
+    expect(meta.projectionTypes).toEqual({
+      normalized: 'pgvector/vector@1',
+    });
+    expect(meta.annotations?.codecs).toEqual({
+      normalized: 'pgvector/vector@1',
+    });
+  });
+
+  it('builds meta with builtin operation return type', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'cosineDistance',
+      forTypeId: 'pgvector/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'builtin', type: 'float8' },
+    };
+
+    const columnWithOp = {
+      kind: 'column' as const,
+      table: 'user',
+      column: 'id',
+      columnMeta: { type: 'pg/int4@1', nullable: false },
+      _operationExpr: operationExpr,
+    } as AnyColumnBuilder;
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['distance'],
+        columns: [columnWithOp],
+      },
+      paramDescriptors: [],
+    });
+
+    expect(meta.projectionTypes).toEqual({
+      distance: 'float8',
+    });
+  });
+
+  it('builds meta with includes', () => {
+    const includes = [
+      {
+        alias: 'posts',
+        table: createTableRef('post'),
+        on: {
+          kind: 'join-on' as const,
+          left: userColumns.id,
+          right: userColumns.id,
+        },
+        childProjection: {
+          aliases: ['id'],
+          columns: [userColumns.id],
+        },
+      },
+    ];
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id', 'posts'],
+        columns: [
+          userColumns.id,
+          {
+            kind: 'column' as const,
+            table: 'post',
+            column: '',
+            columnMeta: { type: 'core/json@1', nullable: true },
+          } as AnyColumnBuilder,
+        ],
+      },
+      includes,
+      paramDescriptors: [],
+    });
+
+    expect(meta.projection).toEqual({
+      id: 'user.id',
+      posts: 'include:posts',
+    });
+    expect(meta.refs.tables).toContain('post');
+  });
+
+  it('builds meta with joins', () => {
+    const joins = [
+      {
+        joinType: 'inner' as const,
+        table: createTableRef('post'),
+        on: {
+          kind: 'join-on' as const,
+          left: userColumns.id,
+          right: userColumns.id,
+        },
+      },
+    ];
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      joins,
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs.tables).toContain('post');
+    expect(meta.refs.columns).toContainEqual({ table: 'user', column: 'id' });
+  });
+
+  it('builds meta with where clause', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      where: userColumns.id.eq(param('userId')),
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs.columns).toContainEqual({ table: 'user', column: 'id' });
+  });
+
+  it('builds meta with orderBy clause', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      orderBy: userColumns.id.asc(),
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs.columns).toContainEqual({ table: 'user', column: 'id' });
+  });
+
+  it('builds meta with paramCodecs', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      paramDescriptors: [],
+      paramCodecs: {
+        userId: 'pg/int4@1',
+      },
+    });
+
+    expect(meta.annotations?.codecs).toEqual({
+      id: 'pg/int4@1',
+      userId: 'pg/int4@1',
+    });
+  });
+
+  it('handles empty projectionTypes', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['posts'],
+        columns: [
+          {
+            kind: 'column' as const,
+            table: 'post',
+            column: '',
+            columnMeta: { type: 'core/json@1', nullable: true },
+          } as AnyColumnBuilder,
+        ],
+      },
+      includes: [
+        {
+          alias: 'posts',
+          table: createTableRef('post'),
+          on: {
+            kind: 'join-on' as const,
+            left: userColumns.id,
+            right: userColumns.id,
+          },
+          childProjection: {
+            aliases: ['id'],
+            columns: [userColumns.id],
+          },
+        },
+      ],
+      paramDescriptors: [],
+    });
+
+    expect(meta.projectionTypes).toBeUndefined();
+  });
+
+  it('handles missing column for alias', () => {
+    expect(() =>
+      buildMeta({
+        contract,
+        table: tableRef,
+        projection: {
+          aliases: ['id'],
+          columns: [],
+        },
+        paramDescriptors: [],
+      }),
+    ).toThrow('Missing column for alias id at index 0');
+  });
+});

@@ -364,7 +364,7 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
   }
 }
 
-function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
+export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
   const contractObj = contract as Record<string, unknown>;
 
   // Only normalize if storage exists (validation will catch if it's missing)

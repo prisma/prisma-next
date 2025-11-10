@@ -609,4 +609,200 @@ describe('operations-registry', () => {
     expect(result).toBeDefined();
     expect(result).toHaveProperty('kind', 'column');
   });
+
+  it('handles operations with returnTypeId that attach operations recursively', () => {
+    const firstSignature: OperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'typeId', type: 'pg/int4@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const secondSignature: OperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'multiply',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} * ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [firstSignature, secondSignature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (arg: unknown) => unknown;
+    };
+
+    const result = idColumn.add(5) as unknown as {
+      multiply: (arg: unknown) => unknown;
+    };
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty('kind', 'column');
+    expect(typeof result.multiply).toBe('function');
+  });
+
+  it('handles column builder with existing operation expression', () => {
+    const firstSignature: OperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'typeId', type: 'pg/int4@1' }],
+      returns: { kind: 'typeId', type: 'pg/int4@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [firstSignature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (arg: unknown) => unknown;
+    };
+
+    const firstResult = idColumn.add(idColumn);
+    const secondResult = idColumn.add(firstResult);
+    expect(secondResult).toBeDefined();
+    expect(secondResult).toHaveProperty('kind', 'column');
+  });
+
+  it('handles operations with eq, asc, and desc methods on result', () => {
+    const signature: OperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (arg: unknown) => unknown;
+    };
+
+    const result = idColumn.add(5) as unknown as {
+      eq: (value: ReturnType<typeof param>) => unknown;
+      asc: () => unknown;
+      desc: () => unknown;
+    };
+
+    const binary = result.eq(param('value'));
+    expect(binary).toHaveProperty('kind', 'binary');
+    expect(binary).toHaveProperty('op', 'eq');
+
+    const orderAsc = result.asc();
+    expect(orderAsc).toHaveProperty('kind', 'order');
+    expect(orderAsc).toHaveProperty('dir', 'asc');
+
+    const orderDesc = result.desc();
+    expect(orderDesc).toHaveProperty('kind', 'order');
+    expect(orderDesc).toHaveProperty('dir', 'desc');
+  });
 });

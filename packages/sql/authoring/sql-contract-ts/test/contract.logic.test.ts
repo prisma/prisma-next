@@ -246,6 +246,124 @@ describe('validateContract logic validation', () => {
     );
   });
 
+  it('throws when foreignKey references non-existent column in referenced table after validating table exists', () => {
+    const invalid = {
+      ...validContractInput,
+      storage: {
+        tables: {
+          User: {
+            columns: {
+              id: { type: 'pg/text@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          Post: {
+            columns: {
+              id: { type: 'pg/text@1', nullable: false },
+              userId: { type: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                columns: ['userId'],
+                references: { table: 'User', columns: ['nonExistentColumn'] },
+              },
+            ],
+          },
+        },
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /foreignKey references non-existent column.*nonExistentColumn.*User/,
+    );
+  });
+
+  it('throws when foreignKey column count mismatch after validating all columns exist', () => {
+    const invalid = {
+      ...validContractInput,
+      storage: {
+        tables: {
+          User: {
+            columns: {
+              id: { type: 'pg/text@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          Post: {
+            columns: {
+              id: { type: 'pg/text@1', nullable: false },
+              userId: { type: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                columns: ['userId'],
+                references: { table: 'User', columns: ['id', 'email'] },
+              },
+            ],
+          },
+        },
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /column count.*does not match/,
+    );
+  });
+
+  it('throws when composite foreignKey column count mismatch with all columns existing', () => {
+    const invalid = {
+      ...validContractInput,
+      storage: {
+        tables: {
+          User: {
+            columns: {
+              id: { type: 'pg/text@1', nullable: false },
+              tenantId: { type: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id', 'tenantId'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          Post: {
+            columns: {
+              id: { type: 'pg/text@1', nullable: false },
+              userId: { type: 'pg/text@1', nullable: false },
+              tenantId: { type: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                columns: ['userId', 'tenantId'],
+                references: { table: 'User', columns: ['id', 'tenantId', 'id'] },
+              },
+            ],
+          },
+        },
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /column count.*does not match/,
+    );
+  });
+
   it('validates composite primary keys', () => {
     const contractInput = {
       ...validContractInput,
@@ -302,5 +420,136 @@ describe('validateContract logic validation', () => {
       },
     };
     expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
+  });
+
+  describe('model validation', () => {
+    const createModelContract = () =>
+      ({
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        models: {
+          User: {
+            storage: { table: 'User' },
+            fields: {
+              id: { column: 'id' },
+            },
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            User: {
+              columns: {
+                id: { type: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      }) as Record<string, unknown>;
+
+    const addPostModel = (contract: Record<string, unknown>) => {
+      (contract.models as Record<string, Record<string, unknown>>).Post = {
+        storage: { table: 'Post' },
+        fields: {
+          id: { column: 'id' },
+          userId: { column: 'userId' },
+        },
+        relations: {},
+      };
+      (contract.storage as Record<string, Record<string, unknown>>).tables.Post = {
+        columns: {
+          id: { type: 'pg/text@1', nullable: false },
+          userId: { type: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+      return contract;
+    };
+
+    it('throws when a model references a missing table', () => {
+      const contract = createModelContract();
+      (contract.models as Record<string, Record<string, unknown>>).User.storage.table =
+        'MissingTable';
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+        /references non-existent table "MissingTable"/,
+      );
+    });
+
+    it('throws when the model table lacks a primary key', () => {
+      const contract = createModelContract();
+      delete (contract.storage as Record<string, Record<string, unknown>>).tables.User.primaryKey;
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+        /table "User" is missing a primary key/,
+      );
+    });
+
+    it('throws when a model field references a missing column', () => {
+      const contract = createModelContract();
+      (contract.models as Record<string, Record<string, unknown>>).User.fields.id = {
+        column: 'missing',
+      };
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+        /references non-existent column "missing"/,
+      );
+    });
+
+    it('skips foreign key validation for 1:N relations', () => {
+      const contract = addPostModel(createModelContract());
+      (contract.models as Record<string, Record<string, unknown>>).User.relations = {
+        posts: {
+          to: 'Post',
+          on: { parentCols: ['id'], childCols: ['userId'] },
+          cardinality: '1:N',
+        },
+      };
+      (contract.storage as Record<string, Record<string, unknown>>).tables.Post.foreignKeys = [
+        {
+          columns: ['userId'],
+          references: { table: 'User', columns: ['id'] },
+        },
+      ];
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+    });
+
+    it('throws when an N:1 relation lacks a matching foreign key', () => {
+      const contract = addPostModel(createModelContract());
+      (contract.models as Record<string, Record<string, unknown>>).Post.relations = {
+        user: {
+          to: 'User',
+          on: { parentCols: ['id'], childCols: ['userId'] },
+          cardinality: 'N:1',
+        },
+      };
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+        /relation "user" does not have a corresponding foreign key/,
+      );
+    });
+
+    it('accepts N:1 relations with matching foreign keys', () => {
+      const contract = addPostModel(createModelContract());
+      (contract.models as Record<string, Record<string, unknown>>).Post.relations = {
+        user: {
+          to: 'User',
+          on: { parentCols: ['id'], childCols: ['userId'] },
+          cardinality: 'N:1',
+        },
+      };
+      (contract.storage as Record<string, Record<string, unknown>>).tables.Post.foreignKeys = [
+        {
+          columns: ['userId'],
+          references: { table: 'User', columns: ['id'] },
+        },
+      ];
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+    });
   });
 });

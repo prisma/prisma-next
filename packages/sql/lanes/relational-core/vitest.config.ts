@@ -21,10 +21,10 @@ export default defineConfig({
         '**/types.ts', // Types-only file
       ],
       thresholds: {
-        lines: 90,
-        branches: 80,
-        functions: 93,
-        statements: 90,
+        lines: 96,
+        branches: 91,
+        functions: 95,
+        statements: 96,
       },
     },
   },
