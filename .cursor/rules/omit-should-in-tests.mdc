@@ -2,6 +2,11 @@
 description: Enforce omitting "should" in test descriptions
 globs: ["**/*.test.ts", "**/*.test.js", "**/*.spec.ts", "**/*.spec.js"]
 alwaysApply: true
+tags: [testing]
+appliesTo: ["**/*.test.ts", "**/*.spec.ts"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
 ---
 
 When writing unit tests, omit the word "should" in test descriptions. Write concise, direct descriptions instead.

@@ -1,3 +1,13 @@
+---
+description: Canonical import paths for SQL types
+alwaysApply: false
+tags: [sql, typing]
+appliesTo: ["packages/sql/**"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
+---
+
 # SQL Types Import Path
 
 **CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) should be imported from `@prisma-next/sql-target` for backward compatibility during the migration period (Slice 5-7). After Slice 7, imports should use the new packages directly.

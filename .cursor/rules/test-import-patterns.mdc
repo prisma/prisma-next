@@ -1,6 +1,11 @@
 ---
 description: Test import patterns and conventions
 alwaysApply: false
+tags: [testing]
+appliesTo: ["**/*.test.ts", "**/*.spec.ts"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
 ---
 
 # Test Import Patterns

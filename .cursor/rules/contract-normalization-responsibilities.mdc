@@ -1,3 +1,13 @@
+---
+description: Clarify normalization responsibilities across authoring, emitter, and runtime
+alwaysApply: false
+tags: [architecture, contract]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
+---
+
 # Contract Normalization Responsibilities
 
 ## Overview

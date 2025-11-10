@@ -1,6 +1,11 @@
 ---
 description: Import validation and package layering rules
 alwaysApply: false
+tags: [architecture, layering, imports]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: warn
 ---
 
 # Import Validation

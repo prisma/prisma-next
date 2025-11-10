@@ -1,5 +1,12 @@
 # Agent Onboarding: Prisma Next Repository
 
+Note: This deep‑dive is being modularized. For a concise entrypoint, see `AGENTS.md`. For focused topics, see `docs/onboarding/`:
+- Getting Started — `docs/onboarding/Getting-Started.md`
+- Repo Map & Layering — `docs/onboarding/Repo-Map-and-Layering.md`
+- Conventions — `docs/onboarding/Conventions.md`
+- Testing — `docs/onboarding/Testing.md`
+- Common Tasks — `docs/onboarding/Common-Tasks-Playbook.md`
+
 Welcome! This document provides the essential context you need to work effectively in the Prisma Next repository.
 
 ## 🎯 Project Overview

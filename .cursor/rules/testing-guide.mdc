@@ -1,6 +1,11 @@
 ---
 description: Testing guide and best practices for Prisma Next
 alwaysApply: false
+tags: [testing]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
 ---
 
 # Testing Guide

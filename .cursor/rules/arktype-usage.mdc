@@ -1,6 +1,11 @@
 ---
 description: When you would otherwise reach for Zod, use Arktype. Read this any time you need to work with Arktype
 alwaysApply: false
+tags: [types, validation]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
 ---
 # Arktype Usage Guidelines
 

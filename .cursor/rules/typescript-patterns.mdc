@@ -1,6 +1,11 @@
 ---
 description: TypeScript and architecture patterns for this codebase
 alwaysApply: false
+tags: [typescript, architecture]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
 ---
 # TypeScript and Architecture Patterns
 

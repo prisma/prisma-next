@@ -1,6 +1,11 @@
 ---
 description: Type inference patterns for includeMany feature
 alwaysApply: false
+tags: [sql, typing]
+appliesTo: ["packages/sql/**"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
 ---
 
 # includeMany Type Inference Patterns
