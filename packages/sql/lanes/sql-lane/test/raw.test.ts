@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract, SqlMappings } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createStubAdapter, createTestContext } from '../../../../runtime/test/utils';
 import { rawOptions as exportedRawOptions, sql as exportedSql } from '../src/exports/sql';
@@ -12,11 +12,48 @@ import { sql } from '../src/sql';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
-function loadContract(name: string): SqlContract<SqlStorage> {
+type FixtureContract = SqlContract<
+  {
+    readonly tables: {
+      readonly user: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
+          readonly email: { readonly type: 'pg/text@1'; readonly nullable: false };
+          readonly createdAt: { readonly type: 'pg/timestamptz@1'; readonly nullable: false };
+        };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
+      };
+    };
+  },
+  {
+    readonly User: {
+      readonly storage: { readonly table: 'user' };
+      readonly fields: {
+        readonly id: { readonly column: 'id' };
+        readonly email: { readonly column: 'email' };
+        readonly createdAt: { readonly column: 'createdAt' };
+      };
+      readonly relations: Record<string, never>;
+    };
+  },
+  Record<string, never>,
+  SqlMappings
+> & {
+  readonly capabilities?: {
+    readonly postgres?: {
+      readonly returning?: boolean;
+    };
+  };
+};
+
+function loadContract(name: string): FixtureContract {
   const filePath = join(fixtureDir, `${name}.json`);
   const contents = readFileSync(filePath, 'utf8');
   const contractJson = JSON.parse(contents) as unknown;
-  return validateContract<SqlContract<SqlStorage>>(contractJson);
+  return validateContract<FixtureContract>(contractJson);
 }
 
 describe('raw lane', () => {

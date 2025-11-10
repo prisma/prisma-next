@@ -7,8 +7,37 @@ import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract, SqlMappings } from '@prisma-next/sql-target';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+type EmittedContract = SqlContract<
+  {
+    readonly tables: {
+      readonly user: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
+          readonly email: { readonly type: 'pg/text@1'; readonly nullable: false };
+        };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
+      };
+    };
+  },
+  {
+    readonly User: {
+      readonly storage: { readonly table: 'user' };
+      readonly fields: {
+        readonly id: { readonly column: 'id' };
+        readonly email: { readonly column: 'email' };
+      };
+      readonly relations: Record<string, never>;
+    };
+  },
+  Record<string, never>,
+  SqlMappings
+>;
 
 const execFileAsync = promisify(execFile);
 
@@ -96,7 +125,7 @@ export const contract = defineContract<CodecTypes>()
     expect(contractDtsContent).toContain('export type Contract');
     expect(contractDtsContent).toContain('CodecTypes');
 
-    const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson);
+    const validatedContract = validateContract<EmittedContract>(contractJson);
     expect(validatedContract.targetFamily).toBe('sql');
     expect(validatedContract.target).toBe('postgres');
   });
@@ -130,7 +159,7 @@ export const contract = defineContract<CodecTypes>()
     const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
     const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-    const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson);
+    const validatedContract = validateContract<EmittedContract>(contractJson);
 
     expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
     expect(validatedContract.target).toBe(originalContract.target);
