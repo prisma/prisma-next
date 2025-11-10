@@ -88,7 +88,10 @@ describe('contract.d.ts imports resolution', () => {
         sources: {},
       };
 
-      const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
+      const packs = loadExtensionPacks(
+        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        [],
+      );
       const options: EmitOptions = {
         outputDir: testDir,
         packs,
@@ -252,7 +255,10 @@ type UserIdColumn = UserColumns['id'];
         sources: {},
       };
 
-      const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
+      const packs = loadExtensionPacks(
+        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        [],
+      );
       const options: EmitOptions = {
         outputDir: testDir,
         packs,

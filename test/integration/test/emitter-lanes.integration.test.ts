@@ -89,7 +89,10 @@ describe('emitter → lanes integration', () => {
         sources: {},
       };
 
-      const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
+      const packs = loadExtensionPacks(
+        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        [],
+      );
       const options: EmitOptions = {
         outputDir: testDir,
         packs,
@@ -182,7 +185,10 @@ describe('emitter → lanes integration', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options: EmitOptions = {
       outputDir: testDir,
       packs,
@@ -254,7 +260,10 @@ describe('emitter → lanes integration', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options: EmitOptions = {
       outputDir: testDir,
       packs,
@@ -267,7 +276,10 @@ describe('emitter → lanes integration', () => {
     // Cast to ContractIR for the emitter (SqlContract has all required ContractIR fields)
     const ir2 = validatedContract as unknown as ContractIR;
 
-    const packs2 = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
+    const packs2 = loadExtensionPacks(
+      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options2: EmitOptions = {
       outputDir: testDir,
       packs: packs2,
