@@ -102,7 +102,7 @@ describe('emitter round-trip', () => {
         sources: {},
       };
 
-      const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+      const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
       const options: EmitOptions = {
         outputDir: '',
         packs,
@@ -199,7 +199,7 @@ describe('emitter round-trip', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: '',
       packs,
@@ -259,7 +259,7 @@ describe('emitter round-trip', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: '',
       packs,
@@ -334,7 +334,7 @@ describe('emitter round-trip', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
     const options: EmitOptions = {
       outputDir: '',
       packs,

@@ -59,7 +59,7 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       await command.parseAsync([
         'node',
@@ -101,7 +101,7 @@ describe('emit command', () => {
       const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       await command.parseAsync([
         'node',
@@ -150,7 +150,7 @@ describe('emit command', () => {
   it('handles invalid contract file', async () => {
     const command = createEmitCommand();
     const invalidPath = join(outputDir, 'nonexistent-contract.ts');
-    const adapterPath = resolve(__dirname, '../../adapter-postgres');
+    const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
     try {
       await command.parseAsync([
@@ -173,7 +173,7 @@ describe('emit command', () => {
 
   it('handles unsupported target family', async () => {
     const command = createEmitCommand();
-    const adapterPath = resolve(__dirname, '../../adapter-postgres');
+    const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
     const invalidContractPath = join(outputDir, 'invalid-contract.ts');
     writeFileSync(
@@ -207,7 +207,7 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       await command.parseAsync([
         'node',
@@ -234,7 +234,7 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       await command.parseAsync([
         'node',
@@ -261,7 +261,7 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       await command.parseAsync([
         'node',
@@ -290,7 +290,7 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       await command.parseAsync([
         'node',
@@ -315,7 +315,7 @@ describe('emit command', () => {
   it('handles errors and exits with code 1', async () => {
     const command = createEmitCommand();
     const invalidPath = join(outputDir, 'nonexistent-contract.ts');
-    const adapterPath = resolve(__dirname, '../../adapter-postgres');
+    const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
     try {
       await command.parseAsync([

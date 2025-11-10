@@ -32,7 +32,7 @@ describe('emit command functionality', () => {
     'loads TS contract and emits contract.json and contract.d.ts',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -77,7 +77,7 @@ describe('emit command functionality', () => {
     'emits contract with correct coreHash',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -101,7 +101,7 @@ describe('emit command functionality', () => {
     async () => {
       const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../adapter-postgres');
+      const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
