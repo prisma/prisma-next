@@ -1,10 +1,10 @@
 import type { Plan } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import { createTestContext } from '../../runtime/test/utils';
-import { sql } from '../src/sql';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -74,7 +74,9 @@ describe('DSL Lane Codec Type Stamping', () => {
     // Verify the types are contract scalar types
     for (const [_alias, scalarType] of Object.entries(projectionTypes)) {
       expect(typeof scalarType).toBe('string');
-      expect(scalarType.length).toBeGreaterThan(0);
+      if (typeof scalarType === 'string') {
+        expect(scalarType.length).toBeGreaterThan(0);
+      }
     }
   });
 

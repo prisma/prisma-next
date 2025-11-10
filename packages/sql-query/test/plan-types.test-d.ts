@@ -2,11 +2,12 @@ import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import type { TableKey, TablesOf } from '@prisma-next/sql-query/types';
+import type { JoinOnBuilder } from '@prisma-next/sql-relational-core/types';
 import type { SqlContract } from '@prisma-next/sql-target';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
-import { sql } from '../src/sql';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -521,7 +522,9 @@ test('result typing is derived solely from projection, unaffected by joins', () 
 
   const _plan = sql({ context })
     .from(userTable)
-    .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
+    .innerJoin(postTable, (on: JoinOnBuilder) =>
+      on.eqCol(userColumns['id']!, postColumns['userId']!),
+    )
     .select({
       userId: userColumns['id']!,
       postId: postColumns['id']!,
@@ -537,7 +540,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
   expectTypeOf<Row['title']>().toEqualTypeOf<string>();
 
   // Row should NOT have email (not in projection, even though it's available from user table)
-  expectTypeOf<Row>().not.toHaveProperty('email');
+  expectTypeOf<Row>().not.toMatchTypeOf<{ email: unknown }>();
 
   // Verify the overall structure
   expectTypeOf<Row>().toExtend<{
@@ -748,7 +751,9 @@ test('nested projection with joins infers nested Row type', () => {
 
   const _plan = sql({ context })
     .from(userTable)
-    .innerJoin(postTable, (on) => on.eqCol(userColumns['id']!, postColumns['userId']!))
+    .innerJoin(postTable, (on: JoinOnBuilder) =>
+      on.eqCol(userColumns['id']!, postColumns['userId']!),
+    )
     .select({
       name: userColumns['email']!,
       post: {

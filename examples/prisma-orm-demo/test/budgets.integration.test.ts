@@ -9,7 +9,7 @@ import {
   writeContractMarker,
 } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { sql } from '@prisma-next/sql-lane/sql';
+import { sql } from '@prisma-next/sql-lane';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { withDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';

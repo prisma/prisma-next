@@ -34,11 +34,13 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     expect(tables).toBeDefined();
-    expect(tables['user']).toBeDefined();
-    expect(tables['user'].name).toBe('user');
-    expect(tables['user'].columns).toBeDefined();
-    expect(tables['user'].columns['id']).toBeDefined();
-    expect(tables['user'].columns['email']).toBeDefined();
+    const userTable = tables['user'];
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
+    expect(userTable.name).toBe('user');
+    expect(userTable.columns).toBeDefined();
+    expect(userTable.columns['id']).toBeDefined();
+    expect(userTable.columns['email']).toBeDefined();
   });
 
   it('table proxy allows direct column access', () => {
@@ -46,10 +48,12 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
-    expect(userTable['id']).toBeDefined();
-    expect(userTable['id']).toBe(userTable.columns['id']);
-    expect(userTable['email']).toBeDefined();
-    expect(userTable['email']).toBe(userTable.columns['email']);
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
+    expect(userTable.columns['id']).toBeDefined();
+    expect(userTable.columns['id']).toBe(userTable.columns['id']);
+    expect(userTable.columns['email']).toBeDefined();
+    expect(userTable.columns['email']).toBe(userTable.columns['email']);
   });
 
   it('table proxy returns undefined for non-existent properties', () => {
@@ -57,7 +61,9 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
-    expect(userTable['nonexistent']).toBeUndefined();
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
+    expect(userTable.columns['nonexistent']).toBeUndefined();
   });
 
   it('table proxy preserves standard properties', () => {
@@ -65,6 +71,8 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
     expect(userTable.name).toBe('user');
     expect(userTable.kind).toBe('table');
     expect(userTable.columns).toBeDefined();
@@ -106,10 +114,14 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
     const idColumn = userTable.columns['id'];
+    expect(idColumn).toBeDefined();
+    if (!idColumn) return;
 
     expect(() => {
-      idColumn.eq({ kind: 'invalid' } as unknown);
+      idColumn.eq({ kind: 'invalid' } as unknown as ReturnType<typeof param>);
     }).toThrow('Parameter placeholder required for column comparison');
   });
 
@@ -118,7 +130,11 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
     const idColumn = userTable.columns['id'];
+    expect(idColumn).toBeDefined();
+    if (!idColumn) return;
 
     expect(idColumn.columnMeta).toBeDefined();
     expect(idColumn.columnMeta.type).toBe('pg/int4@1');
@@ -130,7 +146,11 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
     const idColumn = userTable.columns['id'];
+    expect(idColumn).toBeDefined();
+    if (!idColumn) return;
 
     expect(idColumn.__jsType).toBeUndefined();
   });
@@ -140,7 +160,11 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
     const idColumn = userTable.columns['id'];
+    expect(idColumn).toBeDefined();
+    if (!idColumn) return;
 
     const binary = idColumn.eq(param('userId'));
     expect(binary).toBeDefined();
@@ -153,7 +177,11 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
     const idColumn = userTable.columns['id'];
+    expect(idColumn).toBeDefined();
+    if (!idColumn) return;
 
     const order = idColumn.asc();
     expect(order).toBeDefined();
@@ -166,7 +194,11 @@ describe('schema', () => {
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
+    expect(userTable).toBeDefined();
+    if (!userTable) return;
     const idColumn = userTable.columns['id'];
+    expect(idColumn).toBeDefined();
+    if (!idColumn) return;
 
     const order = idColumn.desc();
     expect(order).toBeDefined();

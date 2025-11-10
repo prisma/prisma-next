@@ -1,12 +1,51 @@
 import { createStubAdapter, createTestContext } from '@prisma-next/runtime/test/utils';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { OperationSignature, SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { OperationSignature, SqlContract, SqlMappings } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 
+type TestContract = SqlContract<
+  {
+    readonly tables: {
+      readonly user: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
+          readonly vector: { readonly type: 'pgvector/vector@1'; readonly nullable: false };
+        };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
+      };
+    };
+  },
+  Record<string, never>,
+  Record<string, never>,
+  SqlMappings
+>;
+
+type TestContractWithIdOnly = SqlContract<
+  {
+    readonly tables: {
+      readonly user: {
+        readonly columns: {
+          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
+        };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
+      };
+    };
+  },
+  Record<string, never>,
+  Record<string, never>,
+  SqlMappings
+>;
+
 describe('operations-registry', () => {
-  const contract = validateContract<SqlContract<SqlStorage>>({
+  const contract = validateContract<TestContract>({
     target: 'postgres',
     targetFamily: 'sql',
     coreHash: 'test-hash',
@@ -52,8 +91,8 @@ describe('operations-registry', () => {
       ],
     });
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const vectorColumn = userTable.columns['vector'];
+    const userTable = tables.user;
+    const vectorColumn = userTable.columns.vector;
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
     );
@@ -63,8 +102,8 @@ describe('operations-registry', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const vectorColumn = userTable.columns['vector'];
+    const userTable = tables.user;
+    const vectorColumn = userTable.columns.vector;
     expect(
       (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();
@@ -85,7 +124,7 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithoutCaps = validateContract<SqlContract<SqlStorage>>({
+    const contractWithoutCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
       coreHash: 'test-hash',
@@ -108,7 +147,7 @@ describe('operations-registry', () => {
       mappings: {},
     });
 
-    const contractWithCaps = validateContract<SqlContract<SqlStorage>>({
+    const contractWithCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
       coreHash: 'test-hash',
@@ -145,8 +184,8 @@ describe('operations-registry', () => {
       ],
     });
     const tablesWithoutCaps = schema(contextWithoutCapabilities).tables;
-    const userTableWithoutCaps = tablesWithoutCaps['user'];
-    const vectorColumnWithoutCaps = userTableWithoutCaps.columns['vector'];
+    const userTableWithoutCaps = tablesWithoutCaps.user;
+    const vectorColumnWithoutCaps = userTableWithoutCaps.columns.vector;
     expect(
       (vectorColumnWithoutCaps as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();
@@ -159,8 +198,8 @@ describe('operations-registry', () => {
       ],
     });
     const tablesWithCaps = schema(contextWithCapabilities).tables;
-    const userTableWithCaps = tablesWithCaps['user'];
-    const vectorColumnWithCaps = userTableWithCaps.columns['vector'];
+    const userTableWithCaps = tablesWithCaps.user;
+    const vectorColumnWithCaps = userTableWithCaps.columns.vector;
     expect(
       typeof (vectorColumnWithCaps as unknown as { cosineDistance: unknown }).cosineDistance,
     ).toBe('function');
@@ -181,7 +220,7 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithFalseCaps = validateContract<SqlContract<SqlStorage>>({
+    const contractWithFalseCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
       coreHash: 'test-hash',
@@ -218,8 +257,8 @@ describe('operations-registry', () => {
       ],
     });
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const vectorColumn = userTable.columns['vector'];
+    const userTable = tables.user;
+    const vectorColumn = userTable.columns.vector;
     expect(
       (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();
@@ -240,7 +279,7 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithPartialCaps = validateContract<SqlContract<SqlStorage>>({
+    const contractWithPartialCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
       coreHash: 'test-hash',
@@ -269,7 +308,7 @@ describe('operations-registry', () => {
       },
     });
 
-    const contractWithAllCaps = validateContract<SqlContract<SqlStorage>>({
+    const contractWithAllCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
       coreHash: 'test-hash',
@@ -307,8 +346,8 @@ describe('operations-registry', () => {
       ],
     });
     const tablesPartial = schema(contextWithPartialCaps).tables;
-    const userTablePartial = tablesPartial['user'];
-    const vectorColumnPartial = userTablePartial.columns['vector'];
+    const userTablePartial = tablesPartial.user;
+    const vectorColumnPartial = userTablePartial.columns.vector;
     expect(
       (vectorColumnPartial as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();
@@ -321,8 +360,8 @@ describe('operations-registry', () => {
       ],
     });
     const tablesAll = schema(contextWithAllCaps).tables;
-    const userTableAll = tablesAll['user'];
-    const vectorColumnAll = userTableAll.columns['vector'];
+    const userTableAll = tablesAll.user;
+    const vectorColumnAll = userTableAll.columns.vector;
     expect(typeof (vectorColumnAll as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
     );
@@ -351,8 +390,8 @@ describe('operations-registry', () => {
       ],
     });
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const vectorColumn = userTable.columns['vector'];
+    const userTable = tables.user;
+    const vectorColumn = userTable.columns.vector;
     expect(typeof (vectorColumn as unknown as { cosineDistance: unknown }).cosineDistance).toBe(
       'function',
     );
@@ -373,7 +412,7 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithoutCaps = validateContract<SqlContract<SqlStorage>>({
+    const contractWithoutCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
       coreHash: 'test-hash',
@@ -405,8 +444,8 @@ describe('operations-registry', () => {
       ],
     });
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const vectorColumn = userTable.columns['vector'];
+    const userTable = tables.user;
+    const vectorColumn = userTable.columns.vector;
     expect(
       (vectorColumn as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();
@@ -435,8 +474,8 @@ describe('operations-registry', () => {
       ],
     });
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const vectorColumn = userTable.columns['vector'] as unknown as {
+    const userTable = tables.user;
+    const vectorColumn = userTable.columns.vector as unknown as {
       cosineDistance: (...args: unknown[]) => unknown;
     };
 
@@ -472,8 +511,8 @@ describe('operations-registry', () => {
       ],
     });
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const vectorColumn = userTable.columns['vector'] as unknown as {
+    const userTable = tables.user;
+    const vectorColumn = userTable.columns.vector as unknown as {
       cosineDistance: (arg: unknown) => unknown;
     };
 
@@ -505,8 +544,8 @@ describe('operations-registry', () => {
       ],
     });
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const vectorColumn = userTable.columns['vector'] as unknown as {
+    const userTable = tables.user;
+    const vectorColumn = userTable.columns.vector as unknown as {
       cosineDistance: (arg: unknown) => unknown;
     };
 
@@ -529,7 +568,7 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<SqlContract<SqlStorage>>({
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
       coreHash: 'test-hash',
@@ -560,8 +599,8 @@ describe('operations-registry', () => {
       ],
     });
     const tables = schema(context).tables;
-    const userTable = tables['user'];
-    const idColumn = userTable.columns['id'] as unknown as {
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
       add: (arg: unknown) => unknown;
     };
 

@@ -7,7 +7,8 @@ import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { sql } from '@prisma-next/sql-lane/sql';
+import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
+import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
@@ -481,8 +482,9 @@ describe('runtime execute integration', () => {
             .from(userTable)
             .includeMany(
               postTable,
-              (on) => on.eqCol(userTable.columns['id']!, postTable.columns['userId']!),
-              (child) =>
+              (on: JoinOnBuilder) =>
+                on.eqCol(userTable.columns['id']!, postTable.columns['userId']!),
+              (child: IncludeChildBuilder) =>
                 child
                   .select({
                     id: postTable.columns['id']!,

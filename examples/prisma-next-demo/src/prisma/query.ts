@@ -1,5 +1,5 @@
-import { sql as sqlBuilder } from '@prisma-next/sql-lane/sql';
-import { orm as ormBuilder } from '@prisma-next/sql-orm-lane/orm';
+import { sql as sqlBuilder } from '@prisma-next/sql-lane';
+import { orm as ormBuilder } from '@prisma-next/sql-orm-lane';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import type { Contract } from './contract.d';
 import { getContext } from './runtime';

@@ -22,6 +22,8 @@
   "devDependencies": {
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.11.5",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^5.1.4",
@@ -31,6 +33,10 @@
     "dist"
   ],
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
     "./sql": {
       "types": "./dist/exports/sql.d.ts",
       "import": "./dist/exports/sql.js"

@@ -1,6 +1,6 @@
 import type { ResultType } from '@prisma-next/contract/types';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
@@ -14,7 +14,7 @@ import {
   executePlanAndCollect,
   setupTestDatabase,
 } from '../../../../runtime/test/utils';
-import { createPostgresDriverFromOptions } from '../../driver-postgres/src/postgres-driver';
+import { sql } from '../src/sql';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -127,9 +127,9 @@ describe('DML Integration Tests', () => {
           createdAt: param('createdAt'),
         })
         .returning(
-          idCol as import('@prisma-next/sql-query/types').ColumnBuilder,
-          emailCol as import('@prisma-next/sql-query/types').ColumnBuilder,
-          createdAtCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+          idCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
+          emailCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
+          createdAtCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
         )
         .build({
           params: {
@@ -219,8 +219,8 @@ describe('DML Integration Tests', () => {
         })
         .where(idCol.eq(param('userId')))
         .returning(
-          idCol as import('@prisma-next/sql-query/types').ColumnBuilder,
-          emailCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+          idCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
+          emailCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
         )
         .build({
           params: {
@@ -314,8 +314,8 @@ describe('DML Integration Tests', () => {
         .delete(userTable)
         .where(idCol.eq(param('userId')))
         .returning(
-          idCol as import('@prisma-next/sql-query/types').ColumnBuilder,
-          emailCol as import('@prisma-next/sql-query/types').ColumnBuilder,
+          idCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
+          emailCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
         )
         .build({
           params: {

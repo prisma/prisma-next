@@ -33,6 +33,10 @@
     "dist"
   ],
   "exports": {
+    ".": {
+      "types": "./dist/exports/orm.d.ts",
+      "import": "./dist/exports/orm.js"
+    },
     "./orm": {
       "types": "./dist/exports/orm.d.ts",
       "import": "./dist/exports/orm.js"

@@ -2,12 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { RuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
-import type { SelectAst as SelectAstType, SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SelectAst as SelectAstType } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { createStubAdapter, createTestContext } from '../../../../runtime/test/utils';
 import { sql } from '../src/sql';
@@ -20,12 +19,6 @@ function loadContract(name: string): Contract {
   const contents = readFileSync(filePath, 'utf8');
   const contractJson = JSON.parse(contents);
   return validateContract<Contract>(contractJson);
-}
-
-function createOrmWithContext<TContract extends SqlContract<SqlStorage>>(
-  context: RuntimeContext<SqlContract<SqlStorage>>,
-): ReturnType<typeof orm<TContract>> {
-  return orm<TContract>({ context: context as unknown as RuntimeContext<TContract> });
 }
 
 describe('sql DSL builder', () => {
@@ -417,80 +410,5 @@ describe('sql DSL builder', () => {
     // Access __jsType getter (type-level helper, returns undefined at runtime)
     const jsType = (idColumn as { __jsType: unknown }).__jsType;
     expect(jsType).toBeUndefined();
-  });
-
-  it('uses fieldToColumn mapping when available', () => {
-    const contract = loadContract('contract');
-    const contractWithMapping = {
-      ...contract,
-      mappings: {
-        ...contract.mappings,
-        fieldToColumn: {
-          ...contract.mappings.fieldToColumn,
-          User: {
-            ...contract.mappings.fieldToColumn?.User,
-            email: 'email',
-          },
-        },
-      },
-    };
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithMapping, adapter);
-    const o = createOrmWithContext<Contract>(context);
-    const builder = (o as unknown as { user: () => unknown }).user();
-
-    // Should not throw - should use fieldToColumn mapping
-    expect(() => {
-      (
-        builder as {
-          where: (fn: (m: unknown) => unknown) => unknown;
-        }
-      ).where((m: unknown) => {
-        const model = m as { email: { eq: (p: unknown) => unknown } };
-        return model.email.eq(param('email'));
-      });
-    }).not.toThrow();
-  });
-
-  it('uses field.column when fieldToColumn mapping is missing', () => {
-    const contract = loadContract('contract');
-    const contractWithFieldColumn = {
-      ...contract,
-      mappings: {
-        ...contract.mappings,
-        fieldToColumn: {
-          ...contract.mappings.fieldToColumn,
-          User: {},
-        },
-      },
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          fields: {
-            ...contract.models.User.fields,
-            email: {
-              column: 'email',
-            } as { column?: string },
-          },
-        },
-      },
-    };
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithFieldColumn, adapter);
-    const o = createOrmWithContext<Contract>(context);
-    const builder = (o as unknown as { user: () => unknown }).user();
-
-    // Should not throw - should use field.column
-    expect(() => {
-      (
-        builder as {
-          where: (fn: (m: unknown) => unknown) => unknown;
-        }
-      ).where((m: unknown) => {
-        const model = m as { email: { eq: (p: unknown) => unknown } };
-        return model.email.eq(param('email'));
-      });
-    }).not.toThrow();
   });
 });
