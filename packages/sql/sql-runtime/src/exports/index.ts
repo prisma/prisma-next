@@ -1,3 +1,12 @@
+export type {
+  AfterExecuteResult,
+  BudgetsOptions,
+  LintsOptions,
+  Log,
+  Plugin,
+  PluginContext,
+} from '@prisma-next/runtime-core';
+export { budgets, lints } from '@prisma-next/runtime-core';
 export {
   extractTypeIds,
   validateCodecRegistryCompleteness,
@@ -12,11 +21,6 @@ export {
   readContractMarker,
   writeContractMarker,
 } from '../sql-marker';
-export type { BudgetsOptions } from '@prisma-next/sql-runtime-core';
-export { budgets } from '@prisma-next/sql-runtime-core';
-export type { LintsOptions } from '@prisma-next/sql-runtime-core';
-export { lints } from '@prisma-next/sql-runtime-core';
-export type { AfterExecuteResult, Log, Plugin, PluginContext } from '@prisma-next/sql-runtime-core';
 export type {
   Runtime,
   RuntimeOptions,

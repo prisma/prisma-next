@@ -1,7 +1,7 @@
 import { planInvalid } from '@prisma-next/plan';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyBinaryBuilder, AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
 

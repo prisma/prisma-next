@@ -1,6 +1,6 @@
-import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract-types';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import { schema } from '../src/schema';

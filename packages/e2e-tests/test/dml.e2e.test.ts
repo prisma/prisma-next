@@ -2,10 +2,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {

@@ -1,6 +1,5 @@
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
@@ -12,6 +11,7 @@ import type {
   NestedProjection,
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { SelectAst, SqlContract, SqlStorage, TableRef } from '@prisma-next/sql-target';
 import { buildDeletePlan } from '../mutations/delete-builder';
 import { buildInsertPlan } from '../mutations/insert-builder';

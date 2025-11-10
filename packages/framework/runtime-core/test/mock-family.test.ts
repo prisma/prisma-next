@@ -1,10 +1,9 @@
 import type { Plan } from '@prisma-next/contract/types';
-import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { describe, expect, it } from 'vitest';
-import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi';
-import { createRuntimeCore } from '../src/runtime-core';
 import type { Plugin } from '../src/plugins/types';
+import { createRuntimeCore } from '../src/runtime-core';
+import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi';
 
 interface MockContract {
   readonly target: string;
@@ -34,19 +33,26 @@ class MockMarkerReader implements MarkerReader {
 
 class MockDriver {
   private rows: ReadonlyArray<Record<string, unknown>> = [];
+  private markerRows: ReadonlyArray<Record<string, unknown>> = [];
 
   setRows(rows: ReadonlyArray<Record<string, unknown>>): void {
     this.rows = rows;
   }
 
+  setMarkerRows(rows: ReadonlyArray<Record<string, unknown>>): void {
+    this.markerRows = rows;
+  }
+
   async query(
     sql: string,
-    params: readonly unknown[],
+    _params: readonly unknown[],
   ): Promise<{
     rows: ReadonlyArray<unknown>;
   }> {
-    void sql;
-    void params;
+    // If the query looks like a marker query, return marker rows
+    if (sql.includes('mock_marker') || sql.includes('core_hash') || sql.includes('profile_hash')) {
+      return { rows: this.markerRows };
+    }
     return { rows: this.rows };
   }
 
@@ -116,7 +122,7 @@ describe('runtime-core with mock family', () => {
         target: 'mock',
         coreHash: 'sha256:test-core',
         lane: 'raw-sql',
-        createdAt: new Date().toISOString(),
+        paramDescriptors: [],
       },
     };
 
@@ -157,7 +163,7 @@ describe('runtime-core with mock family', () => {
         target: 'other',
         coreHash: 'sha256:other-core',
         lane: 'raw-sql',
-        createdAt: new Date().toISOString(),
+        paramDescriptors: [],
       },
     };
 
@@ -222,7 +228,7 @@ describe('runtime-core with mock family', () => {
         target: 'mock',
         coreHash: 'sha256:test-core',
         lane: 'raw-sql',
-        createdAt: new Date().toISOString(),
+        paramDescriptors: [],
       },
     };
 

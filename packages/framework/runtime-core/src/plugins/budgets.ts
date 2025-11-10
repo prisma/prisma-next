@@ -31,7 +31,7 @@ async function computeEstimatedRows(
   }
 
   try {
-    const result = await driver.explain(plan.sql, plan.params);
+    const result = await driver.explain(plan.sql, [...plan.params]);
     return extractEstimatedRows(result.rows);
   } catch {
     return undefined;

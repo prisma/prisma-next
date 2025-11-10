@@ -1,6 +1,10 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { Plan } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import { param } from '@prisma-next/sql-query/param';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import {
   createTestContext,
   createTestRuntime,
@@ -8,10 +12,6 @@ import {
   setupTestDatabase,
   teardownTestDatabase,
 } from '@prisma-next/sql-runtime/test/utils';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
-import { param } from '@prisma-next/sql-query/param';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';

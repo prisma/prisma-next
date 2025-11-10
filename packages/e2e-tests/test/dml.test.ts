@@ -3,15 +3,15 @@ import { fileURLToPath } from 'node:url';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import { param } from '@prisma-next/sql-query/param';
+import { schema } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import {
   createTestRuntime,
   executePlanAndCollect,
   setupTestDatabase,
 } from '@prisma-next/sql-runtime/test/utils';
-import { param } from '@prisma-next/sql-query/param';
-import { schema } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';

@@ -1,13 +1,15 @@
 import type { Plan } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type {
+  Log,
+  Plugin,
   RuntimeCore,
   RuntimeCoreOptions,
   RuntimeTelemetryEvent,
   RuntimeVerifyOptions,
   TelemetryOutcome,
-} from '@prisma-next/sql-runtime-core';
-import { createRuntimeCore } from '@prisma-next/sql-runtime-core';
+} from '@prisma-next/runtime-core';
+import { createRuntimeCore } from '@prisma-next/runtime-core';
 import type {
   Adapter,
   CodecRegistry,
@@ -17,12 +19,11 @@ import type {
   SqlDriver,
   SqlStorage,
 } from '@prisma-next/sql-target';
-import type { Log, Plugin } from '@prisma-next/sql-runtime-core';
-import { SqlFamilyAdapter } from './sql-family-adapter';
-import type { RuntimeContext } from './sql-context';
-import { validateCodecRegistryCompleteness } from './codecs/validation';
-import { encodeParams } from './codecs/encoding';
 import { decodeRow } from './codecs/decoding';
+import { encodeParams } from './codecs/encoding';
+import { validateCodecRegistryCompleteness } from './codecs/validation';
+import type { RuntimeContext } from './sql-context';
+import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
@@ -47,6 +48,8 @@ export interface Runtime {
   operations(): OperationRegistry;
 }
 
+export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
+
 class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
   implements Runtime
 {
@@ -60,7 +63,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { context, driver, adapter, verify, plugins, mode, log } = options;
+    const { context, driver, verify, plugins, mode, log } = options;
     this.contract = context.contract;
     this.codecRegistry = context.codecs;
     this.codecRegistryValidated = false;
@@ -80,8 +83,8 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
         Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
         SqlDriver
       >[],
-      mode,
-      log,
+      ...(mode !== undefined ? { mode } : {}),
+      ...(log !== undefined ? { log } : {}),
       operationRegistry: context.operations,
     };
 

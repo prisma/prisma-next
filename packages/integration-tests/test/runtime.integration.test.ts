@@ -3,6 +3,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import { schema, validateContract } from '@prisma-next/sql-query/schema';
+import { sql } from '@prisma-next/sql-query/sql';
 import { budgets, lints } from '@prisma-next/sql-runtime';
 import {
   createTestContext,
@@ -12,9 +15,6 @@ import {
   setupTestDatabase,
   teardownTestDatabase,
 } from '@prisma-next/sql-runtime/test/utils';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';

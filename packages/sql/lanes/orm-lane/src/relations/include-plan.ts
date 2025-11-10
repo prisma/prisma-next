@@ -1,5 +1,4 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -9,6 +8,7 @@ import type {
   BuildOptions,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type {
   BinaryExpr,
   ColumnRef,

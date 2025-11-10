@@ -1,10 +1,10 @@
 import type { Plan } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
+import { runtimeError } from './errors';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
+import type { Log, Plugin, PluginContext } from './plugins/types';
 import type { RuntimeFamilyAdapter } from './runtime-spi';
-import { runtimeError } from './errors';
-import type { AfterExecuteResult, Log, Plugin, PluginContext } from './plugins/types';
 
 export interface RuntimeVerifyOptions {
   readonly mode: 'onFirstUse' | 'startup' | 'always';
@@ -32,30 +32,37 @@ export interface RuntimeCoreOptions<TContract = unknown, TAdapter = unknown, TDr
 }
 
 export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
+  // Type parameters are used in the implementation for type safety
+  readonly _typeContract?: TContract;
+  readonly _typeAdapter?: TAdapter;
+  readonly _typeDriver?: TDriver;
   execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
 }
 
-interface DriverWithQuery<TDriver> {
+interface DriverWithQuery<_TDriver> {
   query(sql: string, params: readonly unknown[]): Promise<{ rows: ReadonlyArray<unknown> }>;
 }
 
-interface DriverWithExecute<TDriver> {
+interface DriverWithExecute<_TDriver> {
   execute<Row = Record<string, unknown>>(options: {
     sql: string;
     params: readonly unknown[];
   }): AsyncIterable<Row>;
 }
 
-interface DriverWithClose<TDriver> {
+interface DriverWithClose<_TDriver> {
   close(): Promise<void>;
 }
 
 class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown>
   implements RuntimeCore<TContract, TAdapter, TDriver>
 {
+  readonly _typeContract?: TContract;
+  readonly _typeAdapter?: TAdapter;
+  readonly _typeDriver?: TDriver;
   private readonly contract: TContract;
   private readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   private readonly driver: TDriver;

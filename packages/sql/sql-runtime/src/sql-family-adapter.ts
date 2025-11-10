@@ -3,10 +3,10 @@ import type {
   MarkerReader,
   MarkerStatement,
   RuntimeFamilyAdapter,
-} from '@prisma-next/sql-runtime-core';
+} from '@prisma-next/runtime-core';
+import { runtimeError } from '@prisma-next/runtime-core';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { readContractMarker } from './sql-marker';
-import { runtimeError } from '@prisma-next/sql-runtime-core';
 
 class SqlMarkerReader implements MarkerReader {
   readMarkerStatement(): MarkerStatement {

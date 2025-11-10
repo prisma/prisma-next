@@ -1,11 +1,11 @@
 import { dataTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { ResultType } from '@prisma-next/contract/types';
-import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { ComputeColumnJsType } from '@prisma-next/sql-query/types';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-target';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { CodecTypes, Contract } from './fixtures/contract.d';

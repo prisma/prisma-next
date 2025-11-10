@@ -130,7 +130,7 @@ import {
   setupTestDatabase,
   createTestRuntime,
   createTestRuntimeFromClient,
-} from '@prisma-next/runtime/test/utils';
+} from '@prisma-next/sql-runtime/test/utils';
 ```
 
 **For contract-related utilities in E2E tests**, import from local `./utils`:
