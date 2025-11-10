@@ -14,15 +14,14 @@ Provide SQL target family abstraction, emitter hook implementation, and SQL-spec
 
 ## Responsibilities
 
-- **Emitter Hook**: Implement `TargetFamilyHook` for SQL target family
-  - `validateTypes`: Validate type IDs against extensions and packs
-  - `validateStructure`: Validate SQL-specific contract structure
-  - `generateContractTypes`: Generate `contract.d.ts` for SQL contracts
-  - `getTypesImports`: Determine required type imports from packs
-- **Contract Types**: Define SQL-specific contract types (`SqlContract`, `SqlStorage`, etc.)
+- **Transitional Re-exports**: Re-exports from new packages for backward compatibility
+  - `operations-registry.ts`: Re-exports from `@prisma-next/operations` and `@prisma-next/sql-operations`
+  - `contract-types.ts`: Re-exports from `@prisma-next/sql-contract-types`
+  - `emitter-hook.ts`: Re-exports from `@prisma-next/sql-contract-emitter`
+  - **Note**: These re-exports will be removed in Slice 7. Consumers should import directly from the new packages.
 - **Adapter SPI**: Define adapter interfaces for SQL lowering and execution
 - **Codec Infrastructure**: Define codec interfaces and registry types
-- **Operations Registry**: Define operation registry for extension pack operations on value types
+- **SQL Target Types**: SQL-specific AST types and utilities
 
 **Non-goals:**
 - Query compilation or execution (sql-query, runtime)

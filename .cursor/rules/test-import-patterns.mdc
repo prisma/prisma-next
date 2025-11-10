@@ -138,15 +138,22 @@ export default defineConfig({
 When extracting code from one package to another:
 
 1. **Move tests with the code** - Tests should move to the new package
-2. **Remove duplicate tests** - Don't keep duplicate test files in both packages
-3. **Update imports** - Update all imports to use the new package
-4. **Delete old implementation files** - Remove old source files after migration
-5. **Keep transitional re-exports** - Re-exports stay until Slice 7 (per brief)
+2. **Update test imports** - Tests should import from source (`../src/index`) not from package exports
+3. **Remove duplicate tests** - Don't keep duplicate test files in both packages
+4. **Update consumer imports** - Update all consumer imports to use the new package
+5. **Add tests for re-exports** - Re-export files need tests to verify they work correctly
+6. **Delete old implementation files** - Remove old source files after migration
+7. **Keep transitional re-exports** - Re-exports stay until future slice (per brief) with TODO comments
 
 **Example:**
-- Old: `packages/sql-query/src/contract-builder.ts` (885 lines)
-- New: `packages/sql/authoring/sql-contract-ts/src/contract-builder.ts`
-- Action: Delete old file, update all imports, remove duplicate tests
+- Old: `packages/sql-target/src/operations-registry.ts`
+- New: `packages/core/operations/src/index.ts` (core types) + `packages/targets/sql/operations/src/index.ts` (SQL-specific)
+- Action: 
+  1. Move implementation to new packages
+  2. Move tests to new packages with updated imports (`../src/index`)
+  3. Add tests for re-exports in old package
+  4. Update all consumer imports
+  5. Keep transitional re-exports with TODO comments
 
 ## Common Mistakes
 

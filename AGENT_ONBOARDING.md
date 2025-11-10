@@ -55,7 +55,11 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives in the SQL lanes ring
 - **`@prisma-next/sql-query`** - SQL query DSL (re-exports contract authoring from `@prisma-next/sql-contract-ts` for backward compatibility, will be removed in Slice 7)
 - **`@prisma-next/runtime`** - Execution engine, plugins (budgets, lints), contract verification
-- **`@prisma-next/sql-target`** - SQL target family abstraction, emitter hook implementation, and SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
+- **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers (core ring)
+- **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly (targets ring)
+- **`@prisma-next/sql-contract-types`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) (targets ring)
+- **`@prisma-next/sql-contract-emitter`** - SQL emitter hook implementation (targets ring)
+- **`@prisma-next/sql-target`** - SQL target family abstraction with transitional re-exports (will be removed in Slice 7)
 - **`@prisma-next/adapter-postgres`** - Postgres adapter implementation (extension pack)
 - **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
 - **`@prisma-next/compat-prisma`** - Compatibility layer for Prisma ORM import-swap
@@ -67,7 +71,10 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 
 - **Core contract types** (`ContractBase`) live in `@prisma-next/contract`
 - **Target-agnostic contract authoring** (builder state types, builder classes, type helpers) lives in `@prisma-next/contract-authoring` in the authoring ring (`packages/authoring/contract-authoring`)
-- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-target/src/contract-types.ts` (moved from `sql-query` to break circular dependency)
+- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-contract-types` (targets ring)
+- **Target-neutral operations** (operation registry, capability helpers) live in `@prisma-next/operations` (core ring)
+- **SQL-specific operations** (operation assembly, lowering specs) live in `@prisma-next/sql-operations` (targets ring)
+- **SQL emitter hook** (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` (targets ring)
 - **SQL contract authoring** (`defineContract`, `validateContract`) lives in `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`). It composes `@prisma-next/contract-authoring` with SQL-specific types.
 - **Emitter is hook-based**: Target family hooks (e.g., SQL) extend emission with family-specific validation and type generation
 - **Adapters are extension packs**: Adapters and extension packs use the same manifest structure and are treated identically
@@ -1247,6 +1254,58 @@ pnpm test:coverage
 3. **Add integration tests**: Ensure end-to-end flows are covered
 4. **Type tests**: Use `.test-d.ts` files for type-level testing (doesn't affect coverage but ensures type safety)
 5. **Edge cases**: Test error conditions, boundary cases, and invalid inputs
+
+## 📦 Package Restructuring
+
+### Moving Code Between Packages
+
+When restructuring packages (e.g., Slice 5 - Restructure SQL Target & Operations Core):
+
+1. **Move implementation files** to new packages following package layering rules
+2. **Move tests with code** - Tests should move to the new package and import from source (`../src/index`)
+3. **Update all imports** - Update consumers to import from new packages
+4. **Add transitional re-exports** - Keep re-exports in old package with TODO comments for removal in future slice
+5. **Delete old implementation files** - Remove old source files after migration is complete
+6. **Update package READMEs** - Document new responsibilities and dependencies
+
+### Test Coverage for Re-export Files
+
+Re-export files (transitional exports) need tests to verify they work correctly:
+
+```typescript
+// packages/sql-target/test/operations-registry.test.ts
+import { createOperationRegistry, type OperationRegistry } from '../src/operations-registry';
+
+describe('operations-registry re-exports', () => {
+  it('re-exports createOperationRegistry from @prisma-next/operations', () => {
+    const registry = createOperationRegistry();
+    expect(registry).toBeDefined();
+  });
+});
+```
+
+### tsup Configuration for Test Utils
+
+When building test utilities that are imported by other packages:
+
+- **Mark workspace packages as external** - Use `external: [/^@prisma-next\//]` to prevent bundling
+- **Mark external dependencies as external** - Use `external: ['pg', '@prisma/dev', '@prisma/get-platform', 'arktype']` to prevent bundling CommonJS dependencies
+- **Avoid bundling CommonJS dependencies** - Bundling CommonJS dependencies into ESM bundles causes Vite parsing errors
+
+Example:
+```typescript
+// packages/runtime/tsup.config.ts
+export default defineConfig({
+  external: [
+    /^@prisma-next\//,
+    'pg',
+    '@types/pg',
+    '@prisma/dev',
+    '@prisma/get-platform',
+    'arktype',
+  ],
+});
+```
 
 ## 🔄 CI/CD
 
