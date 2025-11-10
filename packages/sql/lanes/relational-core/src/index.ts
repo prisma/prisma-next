@@ -1,3 +1,4 @@
+export * from './exports/ast';
 export * from './exports/errors';
 export * from './exports/operations-registry';
 export * from './exports/param';
