@@ -1,0 +1,143 @@
+---
+description: Import validation and package layering rules
+alwaysApply: false
+---
+
+# Import Validation
+
+## Overview
+
+The repository uses a ring-based package layering architecture with unidirectional dependencies enforced by `scripts/check-imports.mjs`. The import validation script uses declarative package-to-ring mapping to validate that packages follow dependency rules.
+
+## Ring Structure
+
+Packages are organized into concentric rings with dependencies flowing inward:
+
+```
+core → authoring → targets → lanes → runtime-core → family-runtime → adapters
+```
+
+## Import Validation Script
+
+The import validation script (`scripts/check-imports.mjs`) uses declarative maps at the top of the file:
+
+1. **`PACKAGE_TO_RING`**: Maps package directory paths to ring names
+   ```javascript
+   const PACKAGE_TO_RING = {
+     'packages/sql/lanes/orm-lane': 'lanes',
+     'packages/sql/lanes/sql-lane': 'lanes',
+     // ...
+   };
+   ```
+
+2. **`PACKAGE_NAME_TO_PATH`**: Maps package names (from `@prisma-next/package-name`) to directory paths
+   ```javascript
+   const PACKAGE_NAME_TO_PATH = {
+     'sql-orm-lane': 'packages/sql/lanes/orm-lane',
+     'sql-lane': 'packages/sql/lanes/sql-lane',
+     // ...
+   };
+   ```
+
+3. **`RINGS`**: Defines allowed dependencies for each ring
+   ```javascript
+   const RINGS = {
+     lanes: {
+       allowed: ['core', 'authoring', 'targets'],
+     },
+     // ...
+   };
+   ```
+
+## Rules
+
+### Same-Ring Imports
+
+Packages in the same ring can import from each other. For example, `orm-lane` can import from `sql-relational-core` (both are in the `lanes` ring).
+
+**✅ CORRECT: Same-ring imports**
+```typescript
+// packages/sql/lanes/orm-lane/src/orm-builder.ts
+import { schema } from '@prisma-next/sql-relational-core/schema';
+```
+
+### Cross-Ring Imports
+
+Packages can only import from inner rings (rings closer to core). Outer rings cannot import from inner rings.
+
+**✅ CORRECT: Import from inner ring**
+```typescript
+// packages/sql/lanes/orm-lane/src/orm-builder.ts (lanes ring)
+import { planInvalid } from '@prisma-next/plan'; // core ring - allowed
+```
+
+**❌ WRONG: Import from outer ring**
+```typescript
+// packages/core/plan/src/plan.ts (core ring)
+import { sql } from '@prisma-next/sql-lane'; // lanes ring - NOT allowed
+```
+
+### Temporary Exceptions
+
+When a package violates dependency rules but needs to temporarily import from another package (e.g., during refactoring), add a temporary exception in the validation script with a TODO comment:
+
+```javascript
+// TODO: Remove this exception once orm-lane is refactored to build AST nodes directly
+// See: docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4
+// Temporary exception: orm-lane can import from sql-lane until refactor is complete
+if (
+  sourceRing.name === 'lanes' &&
+  targetRing.name === 'lanes' &&
+  relative(repoRoot, file).includes('orm-lane') &&
+  importPath.includes('sql-lane')
+) {
+  continue; // Temporary: allow orm-lane → sql-lane until refactor
+}
+```
+
+**Important**: Temporary exceptions must:
+- Include a TODO comment explaining why the exception exists
+- Reference the relevant brief or issue
+- Be removed once the refactoring is complete
+
+## Adding New Packages
+
+When adding a new package:
+
+1. **Add to `PACKAGE_TO_RING`**: Map the package directory path to its ring
+   ```javascript
+   'packages/sql/lanes/new-lane': 'lanes',
+   ```
+
+2. **Add to `PACKAGE_NAME_TO_PATH`**: Map the package name to its directory path
+   ```javascript
+   'sql-new-lane': 'packages/sql/lanes/new-lane',
+   ```
+
+3. **Run `pnpm lint:deps`**: Verify no violations
+
+## Running Import Validation
+
+```bash
+pnpm lint:deps
+```
+
+This command:
+- Scans all TypeScript files in `packages/`
+- Validates imports against ring and family rules
+- Reports violations with detailed context
+- Can be run locally or in CI
+
+## Common Issues
+
+### Package Not Found in Map
+
+If a package is not in `PACKAGE_TO_RING`, it will be treated as a legacy package (allows all imports). Add it to the map to enforce proper dependency rules.
+
+### Path Matching Issues
+
+The script uses longest-path matching to find the most specific package match. If a file path matches multiple package paths, the longest (most specific) match is used.
+
+### Family Namespace vs Ring
+
+Some packages belong to family namespaces (e.g., `sql`) rather than specific rings. These are handled separately in the validation logic.
