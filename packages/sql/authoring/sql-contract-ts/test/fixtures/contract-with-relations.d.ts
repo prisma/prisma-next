@@ -1,6 +1,6 @@
 // Contract type definitions for contract-with-relations.json
 
-import type { SqlContract } from '@prisma-next/sql-target';
+import type { SqlContract } from '@prisma-next/sql-contract-types';
 // Minimal CodecTypes for testing - matches adapter-postgres structure
 type CodecTypes = {
   readonly 'pg/int4@1': { output: number };

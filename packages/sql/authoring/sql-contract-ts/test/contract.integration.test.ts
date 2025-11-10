@@ -1,4 +1,4 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { validateContract } from '../src/contract';
 

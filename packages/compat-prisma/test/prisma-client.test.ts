@@ -9,8 +9,8 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/runtime';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { validateContract } from '@prisma-next/sql-query/schema';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import { timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';

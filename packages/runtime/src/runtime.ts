@@ -1,12 +1,6 @@
 import type { Plan } from '@prisma-next/contract/types';
-import type {
-  Adapter,
-  LoweredStatement,
-  SelectAst,
-  SqlContract,
-  SqlDriver,
-  SqlStorage,
-} from '@prisma-next/sql-target';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { Adapter, LoweredStatement, SelectAst, SqlDriver } from '@prisma-next/sql-target';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow, readContractMarker } from './marker';
 
@@ -25,7 +19,8 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-import type { CodecRegistry, OperationRegistry } from '@prisma-next/sql-target';
+import type { OperationRegistry } from '@prisma-next/operations';
+import type { CodecRegistry } from '@prisma-next/sql-target';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';

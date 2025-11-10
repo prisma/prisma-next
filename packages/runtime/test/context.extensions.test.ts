@@ -1,4 +1,4 @@
-import type { OperationSignature } from '@prisma-next/sql-target';
+import type { OperationSignature } from '@prisma-next/sql-operations';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { Extension } from '../src/context';

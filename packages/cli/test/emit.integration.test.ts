@@ -7,7 +7,6 @@ import type { ResultType } from '@prisma-next/contract/types';
 import type { ContractIR } from '@prisma-next/emitter';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
 import { createRuntimeContext } from '@prisma-next/runtime';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { schema, validateContract } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type {
@@ -17,7 +16,7 @@ import type {
   SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-target';
-import { createCodecRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry, sqlTargetFamilyHook } from '@prisma-next/sql-target';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';

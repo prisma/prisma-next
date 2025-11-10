@@ -1,5 +1,8 @@
-export type { Codec, CodecDefBuilder, CodecInput, CodecOutput, CodecRegistry } from '../codecs';
-export { codec, createCodecRegistry, defineCodecs } from '../codecs';
+// TODO: Remove in Slice 7 - use @prisma-next/operations and @prisma-next/sql-operations directly
+export type { ArgSpec, OperationRegistry, ReturnSpec } from '@prisma-next/operations';
+export { createOperationRegistry } from '@prisma-next/operations';
+// TODO: Remove in Slice 7 - use @prisma-next/sql-contract-emitter directly
+export { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 // TODO: Remove in Slice 7 - use @prisma-next/sql-contract-types directly
 export type {
   ExtractCodecTypes,
@@ -17,18 +20,11 @@ export type {
   StorageColumn,
   StorageTable,
   UniqueConstraint,
-} from '../contract-types';
-// TODO: Remove in Slice 7 - use @prisma-next/sql-contract-emitter directly
-export { sqlTargetFamilyHook } from '../emitter-hook';
-// TODO: Remove in Slice 7 - use @prisma-next/operations and @prisma-next/sql-operations directly
-export type {
-  ArgSpec,
-  LoweringSpec,
-  OperationRegistry,
-  OperationSignature,
-  ReturnSpec,
-} from '../operations-registry';
-export { assembleOperationRegistry, createOperationRegistry } from '../operations-registry';
+} from '@prisma-next/sql-contract-types';
+export type { LoweringSpec, OperationSignature } from '@prisma-next/sql-operations';
+export { assembleOperationRegistry } from '@prisma-next/sql-operations';
+export type { Codec, CodecDefBuilder, CodecInput, CodecOutput, CodecRegistry } from '../codecs';
+export { codec, createCodecRegistry, defineCodecs } from '../codecs';
 export {
   Adapter,
   AdapterProfile,

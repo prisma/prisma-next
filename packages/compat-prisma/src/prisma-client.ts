@@ -6,11 +6,12 @@ import {
   type Runtime,
   type RuntimeContext,
 } from '@prisma-next/runtime';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { BinaryBuilder, ColumnBuilder, OrderBuilder } from '@prisma-next/sql-query/types';
-import type { SqlContract, SqlStorage, TableRef } from '@prisma-next/sql-target';
+import type { TableRef } from '@prisma-next/sql-target';
 
 interface PrismaClientOptions {
   readonly contract: SqlContract<SqlStorage>;

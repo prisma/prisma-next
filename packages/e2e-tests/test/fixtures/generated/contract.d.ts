@@ -8,7 +8,7 @@ import type {
   SqlStorage,
   SqlMappings,
   ModelDefinition,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-contract-types';
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;

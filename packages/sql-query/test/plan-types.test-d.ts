@@ -1,11 +1,11 @@
 import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { createRuntimeContext } from '@prisma-next/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { SqlContract } from '@prisma-next/sql-contract-types';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import type { TableKey, TablesOf } from '@prisma-next/sql-query/types';
 import type { JoinOnBuilder } from '@prisma-next/sql-relational-core/types';
-import type { SqlContract } from '@prisma-next/sql-target';
 import { expectTypeOf, test } from 'vitest';
 import { createPostgresAdapter } from '../../adapter-postgres/src/exports/adapter';
 import type { CodecTypes, Contract } from './fixtures/contract.d';

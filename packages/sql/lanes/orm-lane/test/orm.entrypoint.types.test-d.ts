@@ -1,4 +1,4 @@
-import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { expectTypeOf, test } from 'vitest';
 import type { OrmRegistry } from '../src/orm-types';
 import type { Contract } from './fixtures/contract.d';
