@@ -111,13 +111,21 @@ describe('projection', () => {
         table: 'user',
         column: 'id',
         columnMeta: { type: 'pg/int4@1', nullable: false },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const col2: AnyColumnBuilder = {
         kind: 'column',
         table: 'user',
         column: 'email',
         columnMeta: { type: 'pg/text@1', nullable: true },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const projection: NestedProjection = {
         user: {
           id: col1,
@@ -220,7 +228,7 @@ describe('projection', () => {
       const includes = [
         {
           alias: 'posts',
-          table: { kind: 'table', name: 'post' },
+          table: { kind: 'table' as const, name: 'post' },
           on: {
             kind: 'join-on' as const,
             left: createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
@@ -271,13 +279,21 @@ describe('projection', () => {
         table: 'user',
         column: 'id',
         columnMeta: { type: 'pg/int4@1', nullable: false },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const col2: AnyColumnBuilder = {
         kind: 'column',
         table: 'user',
         column: 'email',
         columnMeta: { type: 'pg/text@1', nullable: true },
-      };
+        eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+        asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+        desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+        __jsType: undefined,
+      } as unknown as AnyColumnBuilder;
       const projection: ProjectionInput = {
         user: {
           id: col1,
@@ -327,7 +343,7 @@ describe('projection', () => {
       const includes = [
         {
           alias: 'posts',
-          table: { kind: 'table', name: 'post' },
+          table: { kind: 'table' as const, name: 'post' },
           on: {
             kind: 'join-on' as const,
             left: createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
