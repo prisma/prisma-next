@@ -21,91 +21,142 @@ const repoRoot = join(__dirname, '..');
 // Define ring structure and allowed dependencies
 const RINGS = {
   core: {
-    path: 'packages/core',
     allowed: [],
   },
   authoring: {
-    path: 'packages/authoring',
     allowed: ['core'],
   },
   targets: {
-    path: 'packages/targets',
     allowed: ['core', 'authoring'],
   },
   lanes: {
-    path: 'packages/sql/lanes',
     allowed: ['core', 'authoring', 'targets'],
   },
   'runtime-core': {
-    path: 'packages/runtime/core',
     allowed: ['core', 'authoring', 'targets'],
   },
   'sql-runtime': {
-    path: 'packages/sql/sql-runtime',
     allowed: ['core', 'authoring', 'targets', 'runtime-core'],
   },
   adapters: {
-    path: 'packages/sql/postgres',
     allowed: ['core', 'authoring', 'targets', 'sql-runtime'],
   },
+  sql: {
+    allowed: ['core', 'authoring', 'targets', 'sql'], // Family namespace
+  },
   compat: {
-    path: 'packages/compat',
     allowed: ['*'], // Compat can import from all rings
   },
-};
-
-// Family namespaces that can import from their own family
-const FAMILY_NAMESPACES = {
-  sql: {
-    path: 'packages/sql',
-    allowed: ['core', 'authoring', 'targets', 'sql'], // Can import from inner rings and sql family
+  legacy: {
+    allowed: ['*'], // Legacy packages can import from anywhere
   },
 };
 
-// Legacy packages that haven't been migrated yet
-const LEGACY_PACKAGES = [
-  'packages/sql-query',
-  'packages/sql-target',
-  'packages/runtime',
-  'packages/adapter-postgres',
-  'packages/driver-postgres',
-  'packages/compat-prisma',
-  'packages/emitter',
-  'packages/cli',
-  'packages/contract',
-  'packages/node-utils',
-  'packages/test-utils',
-  'packages/integration-tests',
-  'packages/e2e-tests',
-];
+// Declarative map: package directory path → ring name
+const PACKAGE_TO_RING = {
+  // Core ring
+  'packages/core/plan': 'core',
+  'packages/core/operations': 'core',
+  'packages/core/contract': 'core',
+
+  // Authoring ring
+  'packages/authoring/contract-authoring': 'authoring',
+  'packages/authoring/contract-ts': 'authoring',
+  'packages/authoring/contract-psl': 'authoring',
+
+  // Targets ring
+  'packages/targets/sql/contract-types': 'targets',
+  'packages/targets/sql/operations': 'targets',
+  'packages/targets/sql/emitter': 'targets',
+
+  // Lanes ring
+  'packages/sql/lanes/relational-core': 'lanes',
+  'packages/sql/lanes/sql-lane': 'lanes',
+  'packages/sql/lanes/orm-lane': 'lanes',
+
+  // Runtime ring
+  'packages/runtime/core': 'runtime-core',
+
+  // SQL runtime
+  'packages/sql/sql-runtime': 'sql-runtime',
+
+  // Adapters
+  'packages/sql/postgres/postgres-adapter': 'adapters',
+  'packages/sql/postgres/postgres-driver': 'adapters',
+
+  // SQL family (for packages not yet in specific rings)
+  'packages/sql/authoring/sql-contract-ts': 'sql',
+
+  // Compat
+  'packages/compat/compat-prisma': 'compat',
+
+  // Legacy packages (allow all imports)
+  'packages/sql-query': 'legacy',
+  'packages/sql-target': 'legacy',
+  'packages/runtime': 'legacy',
+  'packages/adapter-postgres': 'legacy',
+  'packages/driver-postgres': 'legacy',
+  'packages/compat-prisma': 'legacy',
+  'packages/emitter': 'legacy',
+  'packages/cli': 'legacy',
+  'packages/contract': 'legacy',
+  'packages/node-utils': 'legacy',
+  'packages/test-utils': 'legacy',
+  'packages/integration-tests': 'legacy',
+  'packages/e2e-tests': 'legacy',
+};
+
+// Map package names (from @prisma-next/package-name) to package directory paths
+const PACKAGE_NAME_TO_PATH = {
+  plan: 'packages/core/plan',
+  operations: 'packages/core/operations',
+  contract: 'packages/core/contract',
+  'contract-authoring': 'packages/authoring/contract-authoring',
+  'contract-ts': 'packages/authoring/contract-ts',
+  'contract-psl': 'packages/authoring/contract-psl',
+  'sql-contract-types': 'packages/targets/sql/contract-types',
+  'sql-operations': 'packages/targets/sql/operations',
+  'sql-contract-emitter': 'packages/targets/sql/emitter',
+  'sql-relational-core': 'packages/sql/lanes/relational-core',
+  'sql-lane': 'packages/sql/lanes/sql-lane',
+  'sql-orm-lane': 'packages/sql/lanes/orm-lane',
+  'runtime-core': 'packages/runtime/core',
+  'sql-runtime': 'packages/sql/sql-runtime',
+  'adapter-postgres': 'packages/sql/postgres/postgres-adapter',
+  'driver-postgres': 'packages/sql/postgres/postgres-driver',
+  'sql-contract-ts': 'packages/sql/authoring/sql-contract-ts',
+  'compat-prisma': 'packages/compat/compat-prisma',
+};
 
 function getRingForPath(filePath) {
   const relativePath = relative(repoRoot, filePath);
 
-  // Check if it's a legacy package first
-  for (const legacyPath of LEGACY_PACKAGES) {
-    if (relativePath.startsWith(legacyPath)) {
-      return { type: 'legacy', name: 'legacy', config: { allowed: ['*'] } };
+  // Find the longest matching package path (most specific match)
+  let matchedPath = null;
+  let matchedRing = null;
+
+  for (const [packagePath, ringName] of Object.entries(PACKAGE_TO_RING)) {
+    if (relativePath.startsWith(packagePath)) {
+      // Use longest match (most specific)
+      if (!matchedPath || packagePath.length > matchedPath.length) {
+        matchedPath = packagePath;
+        matchedRing = ringName;
+      }
     }
   }
 
-  // Check family namespaces
-  for (const [family, config] of Object.entries(FAMILY_NAMESPACES)) {
-    if (relativePath.startsWith(config.path)) {
-      return { type: 'family', name: family, config };
+  if (matchedRing) {
+    const config = RINGS[matchedRing];
+    if (!config) {
+      return null;
     }
-  }
-
-  // Check rings
-  for (const [ring, config] of Object.entries(RINGS)) {
-    if (relativePath.startsWith(config.path)) {
-      return { type: 'ring', name: ring, config };
-    }
+    const type = matchedRing === 'sql' ? 'family' : matchedRing === 'legacy' ? 'legacy' : 'ring';
+    return { type, name: matchedRing, config };
   }
 
   // Other packages (not yet migrated)
   if (relativePath.startsWith('packages/')) {
-    return { type: 'legacy', name: 'legacy', config: { allowed: ['*'] } };
+    return { type: 'legacy', name: 'legacy', config: RINGS.legacy };
   }
 
   return null;
@@ -115,32 +166,18 @@ function getRingForImport(importPath) {
   // Handle @prisma-next/* imports
   if (importPath.startsWith('@prisma-next/')) {
     const packageName = importPath.split('/')[1];
+    const packagePath = PACKAGE_NAME_TO_PATH[packageName];
 
-    // Map package names to rings
-    const packageToRing = {
-      plan: 'core',
-      operations: 'core',
-      contract: 'core',
-      'contract-authoring': 'authoring',
-      'contract-ts': 'authoring',
-      'sql-contract-ts': 'sql',
-      'contract-psl': 'authoring',
-      'sql-contract-types': 'targets',
-      'sql-operations': 'targets',
-      'sql-contract-emitter': 'targets',
-      'sql-relational-core': 'lanes',
-      'sql-lane': 'lanes',
-      'sql-orm-lane': 'lanes',
-      'runtime-core': 'runtime-core',
-      'sql-runtime': 'sql-runtime',
-      'adapter-postgres': 'adapters',
-      'driver-postgres': 'adapters',
-      'compat-prisma': 'compat',
-    };
-
-    const ringName = packageToRing[packageName];
-    if (ringName) {
-      return { type: 'ring', name: ringName, config: RINGS[ringName] || RINGS.compat };
+    if (packagePath) {
+      const ringName = PACKAGE_TO_RING[packagePath];
+      if (ringName) {
+        const config = RINGS[ringName];
+        if (!config) {
+          return null;
+        }
+        const type = ringName === 'sql' ? 'family' : ringName === 'legacy' ? 'legacy' : 'ring';
+        return { type, name: ringName, config };
+      }
     }
   }
 
@@ -235,6 +272,28 @@ function validateImports() {
         // Check if it's a family namespace importing from its own family
         if (sourceRing.type === 'family' && targetRing.name === sourceRing.name) {
           continue; // Family can import from its own family
+        }
+
+        // Allow packages in the same ring to import from each other
+        // (e.g., orm-lane can import from sql-relational-core)
+        if (
+          sourceRing.type === 'ring' &&
+          targetRing.type === 'ring' &&
+          sourceRing.name === targetRing.name
+        ) {
+          continue; // Same ring packages can import from each other
+        }
+
+        // TODO: Remove this exception once orm-lane is refactored to build AST nodes directly
+        // See: docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4
+        // Temporary exception: orm-lane can import from sql-lane until refactor is complete
+        if (
+          sourceRing.name === 'lanes' &&
+          targetRing.name === 'lanes' &&
+          relative(repoRoot, file).includes('orm-lane') &&
+          importPath.includes('sql-lane')
+        ) {
+          continue; // Temporary: allow orm-lane → sql-lane until refactor
         }
 
         violations.push({
