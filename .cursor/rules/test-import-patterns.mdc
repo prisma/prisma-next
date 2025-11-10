@@ -166,6 +166,27 @@ import { validateContract } from '@prisma-next/sql-query/contract';
 import { validateContract } from '../src/contract';
 ```
 
+### Using Package Aliases for the Containing Package
+
+**❌ WRONG: Import from own package using path alias**
+```typescript
+// packages/sql-lane/test/sql.test.ts
+import { sql } from '@prisma-next/sql-lane/sql';
+```
+
+**Problem:**
+- Causes TypeScript `rootDir` inference issues during typechecking
+- Tests should use relative imports for their own package
+- Package aliases are for cross-package imports, not same-package imports
+
+**✅ CORRECT: Use relative imports for own package**
+```typescript
+// packages/sql-lane/test/sql.test.ts
+import { sql } from '../src/sql';
+```
+
+**Rule:** Test files should **never** import from their own package using package aliases (e.g., `@prisma-next/package-name/...`). Always use relative imports (e.g., `../src/...`) when importing from the same package.
+
 ### Keeping Duplicate Test Files
 
 **❌ WRONG:** Keeping the same test file in both old and new packages
