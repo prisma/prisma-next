@@ -70,6 +70,7 @@ describe('insert builder', () => {
   const context: OrmContext<SqlContract<SqlStorage>> = {
     contract,
     adapter: adapter as unknown as OrmContext<SqlContract<SqlStorage>>['adapter'],
+    context: {} as any,
   };
 
   describe('convertModelFieldsToColumns', () => {
@@ -79,8 +80,8 @@ describe('insert builder', () => {
 
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('email');
-      expect(result.id.name).toBe('id');
-      expect(result.email.name).toBe('email');
+      expect(result['id']?.name).toBe('id');
+      expect(result['email']?.name).toBe('email');
     });
 
     it('uses fieldToColumn mapping when available', () => {
@@ -195,8 +196,8 @@ describe('insert builder', () => {
 
       expect(plan).toBeDefined();
       expect(plan.meta.lane).toBe('orm');
-      expect(plan.meta.refs.tables).toEqual(['user']);
-      expect(plan.ast.kind).toBe('insert');
+      expect(plan.meta.refs?.tables).toEqual(['user']);
+      expect((plan.ast as any).kind).toBe('insert');
       expect(plan.sql).toBe('INSERT INTO user (id, email) VALUES ($1, $2)');
     });
 
@@ -295,8 +296,8 @@ describe('insert builder', () => {
       const plan = buildInsertPlan(context, 'User', { id: 1, email: 'test@example.com' });
 
       expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.id).toBe('pg/int4@1');
-      expect(plan.meta.annotations?.codecs?.email).toBe('pg/text@1');
+      expect(plan.meta.annotations?.codecs?.['id']).toBe('pg/int4@1');
+      expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
     });
 
     it('builds insert plan without codecId when column type is missing', () => {
@@ -307,7 +308,7 @@ describe('insert builder', () => {
             user: {
               columns: {
                 id: { type: 'pg/int4@1', nullable: false },
-                email: { nullable: true },
+                email: { type: 'pg/text@1', nullable: true },
               },
               primaryKey: { columns: ['id'] },
               uniques: [],
@@ -328,8 +329,8 @@ describe('insert builder', () => {
         email: 'test@example.com',
       });
 
-      expect(plan.meta.annotations?.codecs?.id).toBe('pg/int4@1');
-      expect(plan.meta.annotations?.codecs?.email).toBeUndefined();
+      expect(plan.meta.annotations?.codecs?.['id']).toBe('pg/int4@1');
+      expect(plan.meta.annotations?.codecs?.['email']).toBeUndefined();
     });
 
     it('builds insert plan with nullable column', () => {
@@ -367,8 +368,8 @@ describe('insert builder', () => {
           tables: {
             user: {
               columns: {
-                id: { nullable: false },
-                email: { nullable: true },
+                id: { type: 'pg/int4@1', nullable: false },
+                email: { type: 'pg/text@1', nullable: true },
               },
               primaryKey: { columns: ['id'] },
               uniques: [],
@@ -390,8 +391,8 @@ describe('insert builder', () => {
       });
 
       expect(plan.meta.annotations?.codecs).toBeUndefined();
-      expect(plan.meta.annotations?.intent).toBe('write');
-      expect(plan.meta.annotations?.isMutation).toBe(true);
+      expect(plan.meta.annotations?.['intent']).toBe('write');
+      expect(plan.meta.annotations?.['isMutation']).toBe(true);
     });
   });
 });

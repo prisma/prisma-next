@@ -25,6 +25,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/typescript-patterns.mdc` — TS & architecture patterns
 - `.cursor/rules/arktype-usage.mdc` — Arktype usage guidelines
 - `.cursor/rules/type-extraction-from-contract.mdc` — Extracting types from contracts
+- `.cursor/rules/no-inline-imports.mdc` — Prohibit inline type imports in source files
 
 ## Refactoring
 - `.cursor/rules/modular-refactoring-patterns.mdc` — Split monoliths into modules

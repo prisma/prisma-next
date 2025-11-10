@@ -1,3 +1,4 @@
+import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type { OrderBuilder } from '@prisma-next/sql-relational-core/types';
 import type { OperationExpr } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
@@ -21,22 +22,24 @@ describe('ordering', () => {
       const result = buildOrderByClause(orderBy);
       expect(result).toBeDefined();
       expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr.kind).toBe('col');
-      expect(result?.[0]?.expr.table).toBe('user');
-      expect(result?.[0]?.expr.column).toBe('id');
+      expect(result?.[0]?.expr).toMatchObject({ kind: 'col', table: 'user', column: 'id' });
       expect(result?.[0]?.dir).toBe('asc');
     });
 
     it('builds orderBy clause with operation expr', () => {
       const operationExpr: OperationExpr = {
         kind: 'operation',
-        op: 'add',
-        self: {
-          kind: 'col',
-          table: 'user',
-          column: 'id',
-        },
+        method: 'add',
+        forTypeId: 'pg/int4@1',
+        self: createColumnRef('user', 'id'),
         args: [],
+        returns: { kind: 'builtin', type: 'number' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: '${self} + ${arg0}',
+        },
       };
       const orderBy = {
         expr: operationExpr,
@@ -80,22 +83,24 @@ describe('ordering', () => {
       const result = buildChildOrderByClause(orderBy);
       expect(result).toBeDefined();
       expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr.kind).toBe('col');
-      expect(result?.[0]?.expr.table).toBe('post');
-      expect(result?.[0]?.expr.column).toBe('id');
+      expect(result?.[0]?.expr).toMatchObject({ kind: 'col', table: 'post', column: 'id' });
       expect(result?.[0]?.dir).toBe('asc');
     });
 
     it('builds child orderBy clause with operation expr', () => {
       const operationExpr: OperationExpr = {
         kind: 'operation',
-        op: 'multiply',
-        self: {
-          kind: 'col',
-          table: 'post',
-          column: 'id',
-        },
+        method: 'multiply',
+        forTypeId: 'pg/int4@1',
+        self: createColumnRef('post', 'id'),
         args: [],
+        returns: { kind: 'builtin', type: 'number' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: '${self} * ${arg0}',
+        },
       };
       const orderBy = {
         expr: operationExpr,
@@ -104,28 +109,38 @@ describe('ordering', () => {
       const result = buildChildOrderByClause(orderBy);
       expect(result).toBeDefined();
       expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr.kind).toBe('col');
-      expect(result?.[0]?.expr.table).toBe('post');
-      expect(result?.[0]?.expr.column).toBe('id');
+      expect(result?.[0]?.expr).toMatchObject({ kind: 'col', table: 'post', column: 'id' });
       expect(result?.[0]?.dir).toBe('desc');
     });
 
     it('builds child orderBy clause with nested operation expr', () => {
       const innerOp: OperationExpr = {
         kind: 'operation',
-        op: 'add',
-        self: {
-          kind: 'col',
-          table: 'post',
-          column: 'id',
-        },
+        method: 'add',
+        forTypeId: 'pg/int4@1',
+        self: createColumnRef('post', 'id'),
         args: [],
+        returns: { kind: 'builtin', type: 'number' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: '${self} + ${arg0}',
+        },
       };
       const outerOp: OperationExpr = {
         kind: 'operation',
-        op: 'multiply',
+        method: 'multiply',
+        forTypeId: 'pg/int4@1',
         self: innerOp,
         args: [],
+        returns: { kind: 'builtin', type: 'number' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: '${self} * ${arg0}',
+        },
       };
       const orderBy = {
         expr: outerOp,
@@ -134,9 +149,7 @@ describe('ordering', () => {
       const result = buildChildOrderByClause(orderBy);
       expect(result).toBeDefined();
       expect(result?.length).toBe(1);
-      expect(result?.[0]?.expr.kind).toBe('col');
-      expect(result?.[0]?.expr.table).toBe('post');
-      expect(result?.[0]?.expr.column).toBe('id');
+      expect(result?.[0]?.expr).toMatchObject({ kind: 'col', table: 'post', column: 'id' });
       expect(result?.[0]?.dir).toBe('asc');
     });
   });

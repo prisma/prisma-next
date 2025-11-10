@@ -2,6 +2,7 @@ import type { Plan, PlanRefs } from '@prisma-next/contract/types';
 import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract-types';
 import type { LoweringSpec } from '@prisma-next/sql-operations';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type {
   ColumnRef,
   Direction,
@@ -466,5 +467,5 @@ export interface BuildOptions {
 export interface SqlBuilderOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
-  readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
+  readonly context: RuntimeContext<TContract>;
 }

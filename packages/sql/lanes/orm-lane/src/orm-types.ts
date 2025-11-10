@@ -10,6 +10,7 @@ import type {
 } from '@prisma-next/sql-relational-core/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { OrmIncludeChildBuilder } from './orm-include-child';
 
 export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {
   readonly context: RuntimeContext<TContract>;
@@ -138,12 +139,12 @@ export type OrmIncludeAccessor<
           ? ChildModelName extends string
             ? (
                 child: (
-                  child: import('./orm-include-child').OrmIncludeChildBuilder<
+                  child: OrmIncludeChildBuilder<
                     TContract,
                     CodecTypes,
                     ChildModelName
                   >,
-                ) => import('./orm-include-child').OrmIncludeChildBuilder<
+                ) => OrmIncludeChildBuilder<
                   TContract,
                   CodecTypes,
                   ChildModelName,

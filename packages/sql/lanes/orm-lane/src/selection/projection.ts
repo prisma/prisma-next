@@ -1,4 +1,10 @@
-import type { AnyColumnBuilder, NestedProjection } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyOrderBuilder,
+  JoinOnPredicate,
+  NestedProjection,
+} from '@prisma-next/sql-relational-core/types';
 import type { TableRef } from '@prisma-next/sql-target';
 import {
   errorAliasCollision,
@@ -81,10 +87,10 @@ export function buildProjectionState(
   includes?: ReadonlyArray<{
     readonly alias: string;
     readonly table: TableRef;
-    readonly on: import('@prisma-next/sql-relational-core/types').JoinOnPredicate;
+    readonly on: JoinOnPredicate;
     readonly childProjection: ProjectionState;
-    readonly childWhere?: import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder;
-    readonly childOrderBy?: import('@prisma-next/sql-relational-core/types').AnyOrderBuilder;
+    readonly childWhere?: AnyBinaryBuilder;
+    readonly childOrderBy?: AnyOrderBuilder;
     readonly childLimit?: number;
   }>,
 ): ProjectionState {

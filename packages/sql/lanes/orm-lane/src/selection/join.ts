@@ -1,3 +1,4 @@
+import type { JoinOnExpr } from '@prisma-next/sql-target';
 import { createColumnRef, createJoinOnExpr } from '../utils/ast';
 
 export function buildJoinOnExpr(
@@ -5,7 +6,7 @@ export function buildJoinOnExpr(
   parentColName: string,
   childTableName: string,
   childColName: string,
-): import('@prisma-next/sql-target').JoinOnExpr {
+): JoinOnExpr {
   const leftCol = createColumnRef(parentTableName, parentColName);
   const rightCol = createColumnRef(childTableName, childColName);
   return createJoinOnExpr(leftCol, rightCol);

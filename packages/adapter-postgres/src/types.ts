@@ -6,6 +6,7 @@ import type {
   InsertAst,
   JoinAst,
   LiteralExpr,
+  LoweredStatement,
   OperationExpr,
   ParamRef,
   QueryAst,
@@ -30,7 +31,7 @@ export interface OrderClause {
   readonly dir: Direction;
 }
 
-export type PostgresLoweredStatement = import('@prisma-next/sql-target').LoweredStatement;
+export type PostgresLoweredStatement = LoweredStatement;
 
 export type {
   BinaryExpr,

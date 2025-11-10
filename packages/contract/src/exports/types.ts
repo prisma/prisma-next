@@ -1,3 +1,4 @@
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
 import type { DocumentContract } from '../types';
 
 // Shared types
@@ -18,9 +19,7 @@ export type {
  */
 export function isSqlContract(
   contract: unknown,
-): contract is import('@prisma-next/sql-target').SqlContract<
-  import('@prisma-next/sql-target').SqlStorage
-> {
+): contract is SqlContract<SqlStorage> {
   return (
     typeof contract === 'object' &&
     contract !== null &&

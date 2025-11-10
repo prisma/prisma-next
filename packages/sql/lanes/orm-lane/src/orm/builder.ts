@@ -16,6 +16,7 @@ import type { SelectAst, SqlContract, SqlStorage, TableRef } from '@prisma-next/
 import { buildDeletePlan } from '../mutations/delete-builder';
 import { buildInsertPlan } from '../mutations/insert-builder';
 import { buildUpdatePlan } from '../mutations/update-builder';
+import type { OrmIncludeChildBuilder } from '../orm-include-child';
 import { OrmIncludeChildBuilderImpl } from '../orm-include-child';
 import { OrmRelationFilterBuilderImpl } from '../orm-relation-filter';
 import type {
@@ -150,12 +151,12 @@ export class OrmModelBuilderImpl<
 
         return (
           child: (
-            child: import('../orm-include-child').OrmIncludeChildBuilder<
+            child: OrmIncludeChildBuilder<
               TContract,
               CodecTypes,
               typeof childModelName
             >,
-          ) => import('../orm-include-child').OrmIncludeChildBuilder<
+          ) => OrmIncludeChildBuilder<
             TContract,
             CodecTypes,
             typeof childModelName,
@@ -172,8 +173,8 @@ export class OrmModelBuilderImpl<
     relationName: string,
     childModelName: string,
     childBuilderFn: (
-      child: import('../orm-include-child').OrmIncludeChildBuilder<TContract, CodecTypes, string>,
-    ) => import('../orm-include-child').OrmIncludeChildBuilder<
+      child: OrmIncludeChildBuilder<TContract, CodecTypes, string>,
+    ) => OrmIncludeChildBuilder<
       TContract,
       CodecTypes,
       string,
@@ -198,14 +199,14 @@ export class OrmModelBuilderImpl<
       childModelName,
     );
     const builtChild = childBuilderFn(
-      childBuilder as import('../orm-include-child').OrmIncludeChildBuilder<
+      childBuilder as OrmIncludeChildBuilder<
         TContract,
         CodecTypes,
         string
       >,
     );
     const childState = (
-      builtChild as import('../orm-include-child').OrmIncludeChildBuilderImpl<
+      builtChild as OrmIncludeChildBuilderImpl<
         TContract,
         CodecTypes,
         string

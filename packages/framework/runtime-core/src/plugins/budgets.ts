@@ -1,4 +1,5 @@
 import type { Plan } from '@prisma-next/contract/types';
+import type { AfterExecuteResult } from './types';
 import type { Plugin, PluginContext } from './types';
 
 export interface BudgetsOptions {
@@ -278,7 +279,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
 
     async afterExecute(
       _plan: Plan,
-      result: import('./types').AfterExecuteResult,
+      result: AfterExecuteResult,
       ctx: PluginContext<TContract, TAdapter, TDriver>,
     ) {
       const latencyMs = result.latencyMs;

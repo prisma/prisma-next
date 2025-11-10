@@ -5,6 +5,7 @@ import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
 import { buildDeletePlan } from '../../src/mutations/delete-builder';
 import type { OrmContext } from '../../src/orm/context';
+import type { ModelColumnAccessor } from '../../src/orm-types';
 
 describe('delete builder', () => {
   const contract: SqlContract<SqlStorage> = {
@@ -73,12 +74,16 @@ describe('delete builder', () => {
     context: {} as any,
   };
 
-  const getModelAccessor: () => any = () => {
+  const getModelAccessor: () => ModelColumnAccessor<
+    SqlContract<SqlStorage>,
+    Record<string, never>,
+    'User'
+  > = () => {
     return {
       id: {
         eq: (p: unknown) => ({ left: { table: 'user', column: 'id' }, right: p, op: 'eq' }),
       },
-    };
+    } as unknown as ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>;
   };
 
   it('builds delete plan with where clause', () => {
@@ -155,7 +160,7 @@ describe('delete builder', () => {
     });
 
     expect(plan.meta.annotations?.codecs).toBeDefined();
-    expect(plan.meta.annotations?.codecs?.userId).toBe('pg/int4@1');
+    expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
   });
 
   it('throws error when model not found', () => {

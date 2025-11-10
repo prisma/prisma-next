@@ -19,6 +19,7 @@ import type {
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
 import type {
+  Adapter,
   BinaryExpr,
   ColumnRef,
   Direction,
@@ -27,11 +28,13 @@ import type {
   JoinAst,
   LoweredStatement,
   OperationExpr,
+  QueryAst,
   SqlContract,
   SqlStorage,
   StorageColumn,
   TableRef,
 } from '@prisma-next/sql-target';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { ProjectionInput } from '../types/internal';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {
@@ -48,7 +51,7 @@ import {
 } from '../utils/errors';
 import { isOperationExpr } from '../utils/guards';
 import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
-import { buildIncludeAst, IncludeChildBuilderImpl } from './include-builder';
+import { buildIncludeAst, IncludeChildBuilder, IncludeChildBuilderImpl } from './include-builder';
 import { buildJoinAst } from './join-builder';
 import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
@@ -61,13 +64,9 @@ export class SelectBuilderImpl<
   Includes extends Record<string, unknown> = Record<string, never>,
 > {
   private readonly contract: TContract;
-  private readonly adapter: import('@prisma-next/sql-target').Adapter<
-    import('@prisma-next/sql-target').QueryAst,
-    SqlContract<SqlStorage>,
-    LoweredStatement
-  >;
+  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   private readonly codecTypes: CodecTypes;
-  private readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
+  private readonly context: RuntimeContext<TContract>;
   private state: BuilderState = {};
 
   constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
@@ -125,8 +124,8 @@ export class SelectBuilderImpl<
     childTable: TableRef,
     on: (on: JoinOnBuilder) => JoinOnPredicate,
     childBuilder: (
-      child: import('./include-builder').IncludeChildBuilder<TContract, CodecTypes, unknown>,
-    ) => import('./include-builder').IncludeChildBuilder<TContract, CodecTypes, ChildRow>,
+      child: IncludeChildBuilder<TContract, CodecTypes, unknown>,
+    ) => IncludeChildBuilder<TContract, CodecTypes, ChildRow>,
     options?: { alias?: AliasName },
   ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes & { [K in AliasName]: ChildRow }> {
     checkIncludeCapabilities(this.contract);
@@ -153,11 +152,7 @@ export class SelectBuilderImpl<
       childTable,
     );
     const builtChild = childBuilder(
-      childBuilderImpl as import('./include-builder').IncludeChildBuilder<
-        TContract,
-        CodecTypes,
-        unknown
-      >,
+      childBuilderImpl as IncludeChildBuilder<TContract, CodecTypes, unknown>,
     );
     const childState = (
       builtChild as IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>

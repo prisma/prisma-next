@@ -16,13 +16,16 @@ import type {
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
 import type {
+  Adapter,
   ColumnRef,
   LoweredStatement,
   ParamRef,
+  QueryAst,
   SqlContract,
   SqlStorage,
   TableRef,
 } from '@prisma-next/sql-target';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { checkReturningCapability } from '../utils/capabilities';
 import {
   errorFailedToBuildWhereClause,
@@ -78,12 +81,8 @@ export class InsertBuilderImpl<
 > implements InsertBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: import('@prisma-next/sql-target').Adapter<
-    import('@prisma-next/sql-target').QueryAst,
-    SqlContract<SqlStorage>,
-    LoweredStatement
-  >;
-  private readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
+  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  private readonly context: RuntimeContext<TContract>;
   private readonly table: TableRef;
   private readonly values: Record<string, ParamPlaceholder>;
   private returningColumns: AnyColumnBuilder[] = [];
@@ -219,12 +218,8 @@ export class UpdateBuilderImpl<
 > implements UpdateBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: import('@prisma-next/sql-target').Adapter<
-    import('@prisma-next/sql-target').QueryAst,
-    SqlContract<SqlStorage>,
-    LoweredStatement
-  >;
-  private readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
+  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  private readonly context: RuntimeContext<TContract>;
   private readonly table: TableRef;
   private readonly set: Record<string, ParamPlaceholder>;
   private wherePredicate?: BinaryBuilder;
@@ -400,12 +395,8 @@ export class DeleteBuilderImpl<
 > implements DeleteBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: import('@prisma-next/sql-target').Adapter<
-    import('@prisma-next/sql-target').QueryAst,
-    SqlContract<SqlStorage>,
-    LoweredStatement
-  >;
-  private readonly context: import('@prisma-next/sql-runtime').RuntimeContext<TContract>;
+  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  private readonly context: RuntimeContext<TContract>;
   private readonly table: TableRef;
   private wherePredicate?: BinaryBuilder;
   private returningColumns: AnyColumnBuilder[] = [];

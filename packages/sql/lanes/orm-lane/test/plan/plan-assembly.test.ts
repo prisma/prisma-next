@@ -1,6 +1,8 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
+import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type { AnyOrderBuilder, BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import type {
+  LoweredStatement,
   OperationExpr,
   SelectAst,
   SqlContract,
@@ -56,19 +58,32 @@ describe('plan assembly', () => {
     sources: {},
   };
 
-  const table: TableRef = { name: 'user', alias: 'u' };
+  const table: TableRef = { kind: 'table', name: 'user' };
+
+  // Helper to create mock column builder
+  function createMockColumnBuilder(
+    table: string,
+    column: string,
+    columnMeta: { type: string; nullable: boolean },
+  ): any {
+    return {
+      kind: 'column',
+      table,
+      column,
+      columnMeta,
+      eq: () => ({ kind: 'binary', op: 'eq', left: {} as any, right: {} as any }),
+      asc: () => ({ kind: 'order', expr: {} as any, dir: 'asc' }),
+      desc: () => ({ kind: 'order', expr: {} as any, dir: 'desc' }),
+      __jsType: undefined,
+    };
+  }
 
   describe('buildMeta', () => {
     it('builds meta with simple projection', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
         ],
       };
 
@@ -82,27 +97,29 @@ describe('plan assembly', () => {
       const meta = buildMeta(args);
 
       expect(meta.lane).toBe('dsl');
-      expect(meta.refs.tables).toEqual(['user']);
-      expect(meta.refs.columns).toHaveLength(1);
-      expect(meta.refs.columns[0]?.table).toBe('user');
-      expect(meta.refs.columns[0]?.column).toBe('id');
+      expect(meta.refs?.tables).toEqual(['user']);
+      expect(meta.refs?.columns).toHaveLength(1);
+      expect(meta.refs?.columns?.[0]?.table).toBe('user');
+      expect(meta.refs?.columns?.[0]?.column).toBe('id');
       expect(meta.projection).toEqual({ id: 'user.id' });
     });
 
     it('builds meta with operation expr in projection', () => {
       const operationExpr: OperationExpr = {
         kind: 'operation',
-        op: 'add',
         method: 'add',
-        self: {
-          kind: 'col',
-          table: 'user',
-          column: 'id',
-        },
+        forTypeId: 'pg/int4@1',
+        self: createColumnRef('user', 'id'),
         args: [],
         returns: {
           kind: 'typeId',
           type: 'pg/int4@1',
+        },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: '${self} + ${arg0}',
         },
       };
 
@@ -136,17 +153,19 @@ describe('plan assembly', () => {
     it('builds meta with operation expr returning builtin type', () => {
       const operationExpr: OperationExpr = {
         kind: 'operation',
-        op: 'count',
         method: 'count',
-        self: {
-          kind: 'col',
-          table: 'user',
-          column: 'id',
-        },
+        forTypeId: 'pg/int4@1',
+        self: createColumnRef('user', 'id'),
         args: [],
         returns: {
           kind: 'builtin',
           type: 'number',
+        },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: 'count(${self})',
         },
       };
 
@@ -180,38 +199,23 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['id', 'posts'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
-          {
-            kind: 'column',
-            table: 'post',
-            column: '',
-            columnMeta: { type: 'core/json@1', nullable: true },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+          createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
         ],
       };
 
       const includes: IncludeState[] = [
         {
           alias: 'posts',
-          table: { name: 'post', alias: 'p' },
+          table: { kind: 'table', name: 'post' },
           on: {
-            left: { kind: 'col', table: 'user', column: 'id' },
-            right: { kind: 'col', table: 'post', column: 'userId' },
+            left: createColumnRef('user', 'id'),
+            right: createColumnRef('post', 'userId'),
           },
           childProjection: {
             aliases: ['id'],
             columns: [
-              {
-                kind: 'column',
-                table: 'post',
-                column: 'id',
-                columnMeta: { type: 'pg/int4@1', nullable: false },
-              },
+              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
             ],
           },
         },
@@ -227,8 +231,8 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs.tables).toContain('user');
-      expect(meta.refs.tables).toContain('post');
+      expect(meta.refs?.tables).toContain('user');
+      expect(meta.refs?.tables).toContain('post');
       expect(meta.projection).toEqual({ id: 'user.id', posts: 'include:posts' });
     });
 
@@ -236,21 +240,14 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
         ],
       };
 
       const where: BinaryBuilder = {
-        left: {
-          table: 'user',
-          column: 'id',
-        },
-        right: { name: 'userId', index: 0 },
+        kind: 'binary',
+        left: createColumnRef('user', 'id') as any,
+        right: { kind: 'param-placeholder', name: 'userId' },
         op: 'eq',
       };
 
@@ -264,45 +261,43 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs.columns).toHaveLength(1);
-      expect(meta.refs.columns[0]?.table).toBe('user');
-      expect(meta.refs.columns[0]?.column).toBe('id');
+      expect(meta.refs?.columns).toHaveLength(1);
+      expect(meta.refs?.columns?.[0]?.table).toBe('user');
+      expect(meta.refs?.columns?.[0]?.column).toBe('id');
     });
 
     it('builds meta with where clause operation expr', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
         ],
       };
 
       const operationExpr: OperationExpr = {
         kind: 'operation',
-        op: 'add',
         method: 'add',
-        self: {
-          kind: 'col',
-          table: 'user',
-          column: 'id',
-        },
+        forTypeId: 'pg/int4@1',
+        self: createColumnRef('user', 'id'),
         args: [],
         returns: {
           kind: 'typeId',
           type: 'pg/int4@1',
         },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: '${self} + ${arg0}',
+        },
       };
 
       const where: BinaryBuilder = {
+        kind: 'binary',
         left: {
           _operationExpr: operationExpr,
         } as unknown as BinaryBuilder['left'],
-        right: { name: 'value', index: 0 },
+        right: { kind: 'param-placeholder', name: 'value' },
         op: 'eq',
       };
 
@@ -316,21 +311,16 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs.columns).toHaveLength(1);
-      expect(meta.refs.columns[0]?.table).toBe('user');
-      expect(meta.refs.columns[0]?.column).toBe('id');
+      expect(meta.refs?.columns).toHaveLength(1);
+      expect(meta.refs?.columns?.[0]?.table).toBe('user');
+      expect(meta.refs?.columns?.[0]?.column).toBe('id');
     });
 
     it('builds meta with orderBy clause', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
         ],
       };
 
@@ -352,37 +342,34 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs.columns).toHaveLength(1);
-      expect(meta.refs.columns[0]?.table).toBe('user');
-      expect(meta.refs.columns[0]?.column).toBe('id');
+      expect(meta.refs?.columns).toHaveLength(1);
+      expect(meta.refs?.columns?.[0]?.table).toBe('user');
+      expect(meta.refs?.columns?.[0]?.column).toBe('id');
     });
 
     it('builds meta with orderBy operation expr', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
         ],
       };
 
       const operationExpr: OperationExpr = {
         kind: 'operation',
-        op: 'add',
         method: 'add',
-        self: {
-          kind: 'col',
-          table: 'user',
-          column: 'id',
-        },
+        forTypeId: 'pg/int4@1',
+        self: createColumnRef('user', 'id'),
         args: [],
         returns: {
           kind: 'typeId',
           type: 'pg/int4@1',
+        },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: '${self} + ${arg0}',
         },
       };
 
@@ -401,55 +388,38 @@ describe('plan assembly', () => {
 
       const meta = buildMeta(args);
 
-      expect(meta.refs.columns).toHaveLength(1);
-      expect(meta.refs.columns[0]?.table).toBe('user');
-      expect(meta.refs.columns[0]?.column).toBe('id');
+      expect(meta.refs?.columns).toHaveLength(1);
+      expect(meta.refs?.columns?.[0]?.table).toBe('user');
+      expect(meta.refs?.columns?.[0]?.column).toBe('id');
     });
 
     it('builds meta with include childWhere', () => {
       const projection: ProjectionState = {
         aliases: ['id', 'posts'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
-          {
-            kind: 'column',
-            table: 'post',
-            column: '',
-            columnMeta: { type: 'core/json@1', nullable: true },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+          createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
         ],
       };
 
       const includes: IncludeState[] = [
         {
           alias: 'posts',
-          table: { name: 'post', alias: 'p' },
+          table: { kind: 'table', name: 'post' },
           on: {
-            left: { kind: 'col', table: 'user', column: 'id' },
-            right: { kind: 'col', table: 'post', column: 'userId' },
+            left: createColumnRef('user', 'id'),
+            right: createColumnRef('post', 'userId'),
           },
           childProjection: {
             aliases: ['id'],
             columns: [
-              {
-                kind: 'column',
-                table: 'post',
-                column: 'id',
-                columnMeta: { type: 'pg/int4@1', nullable: false },
-              },
+              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
             ],
           },
           childWhere: {
-            left: {
-              table: 'post',
-              column: 'id',
-            },
-            right: { name: 'postId', index: 0 },
+            kind: 'binary',
+            left: createColumnRef('post', 'id') as any,
+            right: { kind: 'param-placeholder', name: 'postId' },
             op: 'eq',
           } as BinaryBuilder,
         },
@@ -474,38 +444,23 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['id', 'posts'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
-          {
-            kind: 'column',
-            table: 'post',
-            column: '',
-            columnMeta: { type: 'core/json@1', nullable: true },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+          createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
         ],
       };
 
       const includes: IncludeState[] = [
         {
           alias: 'posts',
-          table: { name: 'post', alias: 'p' },
+          table: { kind: 'table', name: 'post' },
           on: {
-            left: { kind: 'col', table: 'user', column: 'id' },
-            right: { kind: 'col', table: 'post', column: 'userId' },
+            left: createColumnRef('user', 'id'),
+            right: createColumnRef('post', 'userId'),
           },
           childProjection: {
             aliases: ['id'],
             columns: [
-              {
-                kind: 'column',
-                table: 'post',
-                column: 'id',
-                columnMeta: { type: 'pg/int4@1', nullable: false },
-              },
+              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
             ],
           },
           childOrderBy: {
@@ -537,12 +492,7 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: { type: 'pg/int4@1', nullable: false },
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
         ],
       };
 
@@ -558,20 +508,15 @@ describe('plan assembly', () => {
 
       expect(meta.annotations?.codecs).toHaveProperty('id');
       expect(meta.annotations?.codecs).toHaveProperty('userId');
-      expect(meta.annotations?.codecs?.id).toBe('pg/int4@1');
-      expect(meta.annotations?.codecs?.userId).toBe('pg/int4@1');
+      expect(meta.annotations?.codecs?.['id']).toBe('pg/int4@1');
+      expect(meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
     });
 
     it('builds meta without annotations when no codecs', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: {},
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
         ],
       };
 
@@ -591,12 +536,7 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: {},
-          },
+          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
         ],
       };
 
@@ -628,20 +568,15 @@ describe('plan assembly', () => {
       const includes: IncludeState[] = [
         {
           alias: 'include_alias',
-          table: { name: 'post', alias: 'p' },
+          table: { kind: 'table', name: 'post' },
           on: {
-            left: { kind: 'col', table: 'user', column: 'id' },
-            right: { kind: 'col', table: 'post', column: 'userId' },
+            left: createColumnRef('user', 'id'),
+            right: createColumnRef('post', 'userId'),
           },
           childProjection: {
             aliases: ['id'],
             columns: [
-              {
-                kind: 'column',
-                table: 'post',
-                column: 'id',
-                columnMeta: { type: 'pg/int4@1', nullable: false },
-              },
+              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
             ],
           },
         },
@@ -811,7 +746,7 @@ describe('plan assembly', () => {
 
       const plan = createPlanWithExists(ast, combinedWhere, lowered, paramValues, planMeta);
 
-      expect(plan.ast.where).toBe(combinedWhere);
+      expect((plan.ast as any).where).toBe(combinedWhere);
       expect(plan.meta.lane).toBe('orm');
     });
 
@@ -843,7 +778,7 @@ describe('plan assembly', () => {
 
       const plan = createPlanWithExists(ast, undefined, lowered, paramValues, planMeta);
 
-      expect(plan.ast.where).toBeUndefined();
+      expect((plan.ast as any).where).toBeUndefined();
       expect(plan.meta.lane).toBe('orm');
     });
   });

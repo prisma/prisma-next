@@ -1,5 +1,6 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import type { OperationExpr } from '@prisma-next/sql-target';
@@ -59,9 +60,7 @@ describe('predicates', () => {
 
       expect(result.expr.kind).toBe('bin');
       expect(result.expr.op).toBe('eq');
-      expect(result.expr.left.kind).toBe('col');
-      expect(result.expr.left.table).toBe('user');
-      expect(result.expr.left.column).toBe('id');
+      expect(result.expr.left).toMatchObject({ kind: 'col', table: 'user', column: 'id' });
       expect(result.expr.right.kind).toBe('param');
       expect(result.paramName).toBe('userId');
       expect(result.codecId).toBe('pg/int4@1');
@@ -97,13 +96,17 @@ describe('predicates', () => {
     it('builds where expr with operation expr', () => {
       const operationExpr: OperationExpr = {
         kind: 'operation',
-        op: 'add',
-        self: {
-          kind: 'col',
-          table: 'user',
-          column: 'id',
-        },
+        method: 'add',
+        forTypeId: 'pg/int4@1',
+        self: createColumnRef('user', 'id'),
         args: [],
+        returns: { kind: 'builtin', type: 'number' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'infix',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: '${self} + ${arg0}',
+        },
       };
       const where: BinaryBuilder = {
         left: {

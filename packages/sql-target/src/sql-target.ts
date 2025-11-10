@@ -1,4 +1,5 @@
 import type { CodecRegistry } from './codecs';
+import type { LoweringSpec, ReturnSpec } from './operations-registry';
 
 export type AdapterTarget = string;
 
@@ -94,8 +95,8 @@ export interface OperationExpr {
   readonly forTypeId: string;
   readonly self: ColumnRef | OperationExpr;
   readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr | OperationExpr>;
-  readonly returns: import('./operations-registry').ReturnSpec;
-  readonly lowering: import('./operations-registry').LoweringSpec;
+  readonly returns: ReturnSpec;
+  readonly lowering: LoweringSpec;
 }
 
 export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is OperationExpr {

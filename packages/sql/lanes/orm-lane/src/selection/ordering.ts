@@ -1,12 +1,12 @@
 import type { AnyOrderBuilder, OrderBuilder } from '@prisma-next/sql-relational-core/types';
-import type { ColumnRef, OperationExpr, StorageColumn } from '@prisma-next/sql-target';
+import type { ColumnRef, Direction, OperationExpr, StorageColumn } from '@prisma-next/sql-target';
 import { createColumnRef, createOrderByItem } from '../utils/ast';
 import { extractBaseColumnRef, isOperationExpr } from '../utils/guards';
 
 export function buildOrderByClause(orderBy: AnyOrderBuilder | undefined):
   | ReadonlyArray<{
       expr: ColumnRef | OperationExpr;
-      dir: import('@prisma-next/sql-target').Direction;
+      dir: Direction;
     }>
   | undefined {
   if (!orderBy) {
@@ -27,7 +27,7 @@ export function buildOrderByClause(orderBy: AnyOrderBuilder | undefined):
 export function buildChildOrderByClause(orderBy: AnyOrderBuilder | undefined):
   | ReadonlyArray<{
       expr: ColumnRef | OperationExpr;
-      dir: import('@prisma-next/sql-target').Direction;
+      dir: Direction;
     }>
   | undefined {
   if (!orderBy) {

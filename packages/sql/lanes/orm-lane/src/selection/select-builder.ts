@@ -1,6 +1,7 @@
 import type {
   BinaryExpr,
   ColumnRef,
+  Direction,
   ExistsExpr,
   IncludeAst,
   IncludeRef,
@@ -66,7 +67,7 @@ export function buildSelectAst(
   orderByClause:
     | ReadonlyArray<{
         expr: ColumnRef | OperationExpr;
-        dir: import('@prisma-next/sql-target').Direction;
+        dir: Direction;
       }>
     | undefined,
   limit: number | undefined,
@@ -85,7 +86,7 @@ export function buildSelectAst(
     where?: BinaryExpr | ExistsExpr;
     orderBy?: ReadonlyArray<{
       expr: ColumnRef | OperationExpr;
-      dir: import('@prisma-next/sql-target').Direction;
+      dir: Direction;
     }>;
     limit?: number;
   });
