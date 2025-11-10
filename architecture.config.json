@@ -107,12 +107,6 @@
       "domain": "framework",
       "layer": "core",
       "plane": "shared"
-    },
-    {
-      "glob": "packages/node-utils/**",
-      "domain": "framework",
-      "layer": "tooling",
-      "plane": "migration"
     }
   ],
   "rules": {

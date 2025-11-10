@@ -103,7 +103,6 @@ flowchart TD
 
 ## Dependencies
 
-- **`@prisma-next/node-utils`**: File I/O utilities for loading extension packs
 - **`arktype`**: Runtime type validation for manifests
 
 ## Package Location

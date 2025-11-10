@@ -13,7 +13,6 @@
     "clean": "node ../../../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/node-utils": "workspace:*",
     "arktype": "^2.0.0",
     "prettier": "^3.3.3"
   },

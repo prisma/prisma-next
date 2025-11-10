@@ -33,8 +33,6 @@
       "@prisma-next/emitter/*": ["packages/framework/tooling/emitter/src/exports/*.ts"],
       "@prisma-next/compat-prisma": ["packages/extensions/compat-prisma/src/exports/index.ts"],
       "@prisma-next/compat-prisma/*": ["packages/extensions/compat-prisma/src/exports/*.ts"],
-      "@prisma-next/node-utils": ["packages/node-utils/src/exports/index.ts"],
-      "@prisma-next/node-utils/*": ["packages/node-utils/src/exports/*.ts"],
       "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
       "@prisma-next/operations": ["packages/framework/core-operations/src/index.ts"],
       "@prisma-next/contract-authoring": [

@@ -94,7 +94,6 @@ flowchart TD
 - **`commander`**: CLI argument parsing and command routing
 - **`esbuild`**: Bundling TypeScript contract files with import allowlisting
 - **`@prisma-next/emitter`**: Contract emission engine (returns strings)
-- **`@prisma-next/node-utils`**: File I/O utilities
 
 ## Design Decisions
 
