@@ -89,6 +89,12 @@ const isExtensionsToSqlTargets = (sourceGroup, targetGroup) =>
   targetGroup.domain === 'sql' &&
   targetGroup.layer === 'targets';
 
+const isCompatPrismaToSql = (sourceGroup, targetGroup) =>
+  sourceGroup.domain === 'extensions' &&
+  sourceGroup.layer === 'compat' &&
+  sourceGroup.globs.some((glob) => glob.includes('compat-prisma')) &&
+  targetGroup.domain === 'sql';
+
 const isSqlRuntimeOrAdaptersToTargets = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'sql' &&
   ['runtime', 'lanes', 'adapters'].includes(sourceGroup.layer) &&
@@ -142,6 +148,11 @@ const createCrossDomainRules = () => {
         continue;
       }
 
+      // TODO: compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API
+      if (isCompatPrismaToSql(sourceGroup, targetGroup)) {
+        continue;
+      }
+
       pushRule(
         `cross-domain-${sourceGroup.domain}-to-${targetGroup.domain}`,
         `Cross-domain import: ${sourceGroup.domain} cannot import from ${targetGroup.domain} (except framework)`,
@@ -180,6 +191,11 @@ const createPlaneRules = () => {
 
       // Extensions share compatibility layers with SQL targets tonight; revisit when the plane is decoupled
       if (isExtensionsToSqlTargets(sourceGroup, targetGroup)) {
+        continue;
+      }
+
+      // TODO: compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API
+      if (isCompatPrismaToSql(sourceGroup, targetGroup)) {
         continue;
       }
 
