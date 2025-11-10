@@ -19,6 +19,44 @@ Supporting goals for developer experience and verification:
 Supporting acceptance
 - Vite plugin auto‑emits contract and blocks on contract errors
 
+## Validation Roadmap (Architecture Confidence)
+
+To de‑risk package organization and prove extensibility across planes and families, we will complete the following validations in order. These do not change the MVP demo goals; they harden the architecture while we develop features.
+
+1) SQL Extension Pack: PGVector (SQL domain — Targets + Lanes + Adapters)
+- Scope: add vector scalar + ops in `@prisma-next/sql-contract-types`/`@prisma-next/sql-operations`; expose ops in lanes; ensure adapter lowering executes successfully.
+- Acceptance: write vector queries through DSL/ORM, produce valid Plans, lower to SQL, execute via Postgres adapter, decode results with codecs.
+
+2) Migration Plane MVP (Framework Tooling + SQL Targets)
+- Framework Tooling: a minimal contract diff + planner engine that loads current/next contracts, diffs at a neutral IR level, and delegates to family hooks.
+- SQL Targets: planner hooks convert diffs to SQL DDL ops (add/remove/alter table/column subset).
+- Apply orchestration: CLI invokes runtime‑core SPI to execute ops via SQL runtime; no direct adapter imports from tooling.
+- Acceptance: migrate a schema (DDL subset) end‑to‑end; artifacts use `@prisma-next/plan`; migration plane does not import runtime plane code.
+
+3) PSL Authoring Parity (Framework Authoring)
+- Scope: minimal PSL parser in `@prisma-next/contract-psl` producing the same contract IR as TS builders for a representative schema.
+- Equivalence harness: emit JSON from TS and PSL; compare byte equality (canonicalization + hash equality).
+- Optional: Vite/TS plugin validates equivalence in dev/CI.
+- Acceptance: TS and PSL authoring produce byte‑identical contract.json for non‑trivial schema (relations, indexes, codecs).
+
+4) New Database Target Scaffolding (e.g., MySQL)
+- Scope: scaffold `packages/targets/mysql/{contract-types,operations,emitter}`; minimal lowering templates for CRUD; thin adapter stub if needed.
+- Acceptance: planner calls MySQL family hooks for DDL diffs; lanes lower a basic Plan to MySQL SQL (execution optional); confirms Domains/Layers/Planes generalize beyond SQL.
+
+5) Views Extension (SQL domain — Targets + Tooling)
+- Scope: Views extension pack adds schema‑level features; emitter validates; lanes can select from view sources.
+- Acceptance: add view in extension → emit contract → query via DSL/ORM; confirms schema‑level extension path works.
+
+6) Example App + PPg (End‑to‑End)
+- Scope: agent‑assisted demo using authoring → planner/apply → runtime lanes with PGVector.
+- Acceptance: PPg marker checks succeed; plans execute; guardrails/telemetry recorded; demonstrates authoring + migration + runtime planes working together.
+
+Guardrails (CI)
+- Enforce Domains/Layers/Planes via `architecture.config.json` and `pnpm lint:deps`:
+  - Migration → Runtime code imports forbidden; Runtime consumes artifacts only via runtime‑core SPI.
+  - Cross‑family imports forbidden except into Framework packages.
+  - ORM lane must not import SQL lane (04a criterion).
+
 ## Example App (ESM) — `examples/prisma-next-demo/`
 - `src/prisma/schema.psl` ([Data Contract](./architecture%20docs/subsystems/1.%20Data%20Contract.md)).
 - `src/prisma/contract.json`, `src/prisma/contract.d.ts` ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 007 — Types Only Emission](./architecture%20docs/adrs/ADR%20007%20-%20Types%20Only%20Emission.md); [ADR 010 — Canonicalization Rules](./architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)).
