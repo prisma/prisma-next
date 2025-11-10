@@ -37,6 +37,7 @@ describe('operations-registry re-exports', () => {
     const loweringSpec: LoweringSpec = {
       targetFamily: 'sql',
       strategy: 'function',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
       template: 'test(${self})',
     };
     expect(loweringSpec.targetFamily).toBe('sql');
@@ -52,6 +53,7 @@ describe('operations-registry re-exports', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'test(${self})',
       },
     };
