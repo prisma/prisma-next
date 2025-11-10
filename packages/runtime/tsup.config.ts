@@ -12,4 +12,12 @@ export default defineConfig({
   clean: true,
   target: 'es2022',
   minify: false,
+  external: [
+    /^@prisma-next\//,
+    'pg',
+    '@types/pg',
+    '@prisma/dev',
+    '@prisma/get-platform',
+    'arktype',
+  ],
 });
