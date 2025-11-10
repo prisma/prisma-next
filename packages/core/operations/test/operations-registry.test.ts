@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createOperationRegistry, type OperationSignature } from '../src/operations-registry';
+import { createOperationRegistry, type OperationSignature } from '../src/index';
 
 describe('OperationRegistry', () => {
   it('creates empty registry', () => {
@@ -14,12 +14,6 @@ describe('OperationRegistry', () => {
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
     };
 
     registry.register(signature);
@@ -35,24 +29,12 @@ describe('OperationRegistry', () => {
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
     };
     const signature2: OperationSignature = {
       forTypeId: 'pg/vector@1',
       method: 'l2Distance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <-> ${arg0}',
-      },
     };
 
     registry.register(signature1);
@@ -70,12 +52,6 @@ describe('OperationRegistry', () => {
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
     };
 
     registry.register(signature);
@@ -89,24 +65,12 @@ describe('OperationRegistry', () => {
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
     };
     const signature2: OperationSignature = {
       forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'cosine_similarity(${self}, ${arg0})',
-      },
     };
 
     registry.register(signature1);
@@ -122,24 +86,12 @@ describe('OperationRegistry', () => {
       method: 'distance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
     };
     const signature2: OperationSignature = {
       forTypeId: 'pg/point@1',
       method: 'distance',
       args: [{ kind: 'typeId', type: 'pg/point@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'distance(${self}, ${arg0})',
-      },
     };
 
     registry.register(signature1);
@@ -156,12 +108,6 @@ describe('OperationRegistry', () => {
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
     };
 
     registry.register(signature);
@@ -176,12 +122,6 @@ describe('OperationRegistry', () => {
       method: 'cosineDistance',
       args: [{ kind: 'literal' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
     };
 
     registry.register(signature);
@@ -196,12 +136,6 @@ describe('OperationRegistry', () => {
       method: 'normalize',
       args: [],
       returns: { kind: 'typeId', type: 'pg/vector@1' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'normalize(${self})',
-      },
     };
 
     registry.register(signature);
@@ -216,12 +150,6 @@ describe('OperationRegistry', () => {
       method: 'cosineSimilarity',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }, { kind: 'param' }, { kind: 'literal' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'cosine_similarity(${self}, ${arg0}, ${arg1}, ${arg2})',
-      },
     };
 
     registry.register(signature);
@@ -236,12 +164,6 @@ describe('OperationRegistry', () => {
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
       capabilities: ['pgvector.index.ivfflat'],
     };
 

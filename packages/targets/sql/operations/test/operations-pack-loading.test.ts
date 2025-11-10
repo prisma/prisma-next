@@ -1,6 +1,6 @@
 import type { ExtensionPack } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
-import { assembleOperationRegistry } from '../src/operations-registry';
+import { assembleOperationRegistry } from '../src/index';
 
 describe('assembleOperationRegistry', () => {
   it('assembles registry from extension pack manifests', () => {

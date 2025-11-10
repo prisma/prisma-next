@@ -1,14 +1,15 @@
+import type { OperationRegistry } from '@prisma-next/operations';
+import { createOperationRegistry } from '@prisma-next/operations';
 import type {
   Adapter,
   CodecRegistry,
   LoweredStatement,
-  OperationRegistry,
   OperationSignature,
   QueryAst,
   SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-target';
-import { createCodecRegistry, createOperationRegistry } from '@prisma-next/sql-target';
+import { createCodecRegistry } from '@prisma-next/sql-target';
 
 export interface RuntimeContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,

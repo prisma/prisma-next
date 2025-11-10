@@ -1,16 +1,13 @@
 import type { Plan, PlanRefs } from '@prisma-next/contract/types';
+import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract-types';
+import type { LoweringSpec } from '@prisma-next/sql-operations';
 import type {
-  ArgSpec,
   ColumnRef,
   Direction,
-  LoweringSpec,
   OperationExpr,
   ParamRef,
   QueryAst,
-  ReturnSpec,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
 } from '@prisma-next/sql-target';
 
 export interface ParamPlaceholder {

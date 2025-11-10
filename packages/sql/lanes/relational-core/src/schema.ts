@@ -1,16 +1,16 @@
 // TODO: Slice 6 will clean up RuntimeContext dependency
 
+import type { OperationRegistry } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
 import type { RuntimeContext } from '@prisma-next/runtime';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,
-  OperationRegistry,
   SqlContract,
   SqlStorage,
   StorageColumn,
-  TableRef,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-contract-types';
+import type { TableRef } from '@prisma-next/sql-target';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type {
   BinaryBuilder,

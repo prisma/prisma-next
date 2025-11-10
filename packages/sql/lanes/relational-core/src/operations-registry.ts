@@ -1,13 +1,9 @@
+import type { OperationRegistry } from '@prisma-next/operations';
+import { hasAllCapabilities } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
-import type {
-  ColumnRef,
-  LiteralExpr,
-  OperationExpr,
-  OperationRegistry,
-  OperationSignature,
-  ParamRef,
-  StorageColumn,
-} from '@prisma-next/sql-target';
+import type { StorageColumn } from '@prisma-next/sql-contract-types';
+import type { OperationSignature } from '@prisma-next/sql-operations';
+import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from '@prisma-next/sql-target';
 import type { AnyColumnBuilder, ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
 
 function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
@@ -199,7 +195,7 @@ export function attachOperationsToColumnBuilder<
 
   const typeId = columnMeta.type;
 
-  const operations = registry.byType(typeId);
+  const operations = registry.byType(typeId) as OperationSignature[];
   if (operations.length === 0) {
     return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
@@ -219,14 +215,7 @@ export function attachOperationsToColumnBuilder<
         continue;
       }
 
-      const hasAllCapabilities = operation.capabilities.every((cap) => {
-        const [namespace, ...rest] = cap.split('.');
-        const key = rest.join('.');
-        const namespaceCaps = namespace ? contractCapabilities[namespace] : undefined;
-        return namespaceCaps?.[key] === true;
-      });
-
-      if (!hasAllCapabilities) {
+      if (!hasAllCapabilities(operation.capabilities, contractCapabilities)) {
         continue;
       }
     }

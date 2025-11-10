@@ -12,7 +12,7 @@ import type {
   StorageColumn,
   StorageTable,
   UniqueConstraint,
-} from '@prisma-next/sql-target';
+} from '@prisma-next/sql-contract-types';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 

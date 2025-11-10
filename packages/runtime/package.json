@@ -15,6 +15,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/operations": "workspace:*",
     "@prisma-next/sql-target": "workspace:*",
     "arktype": "^2.1.25"
   },

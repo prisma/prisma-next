@@ -13,7 +13,11 @@
     "clean": "node ../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/emitter": "workspace:*"
+    "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/operations": "workspace:*",
+    "@prisma-next/sql-contract-emitter": "workspace:*",
+    "@prisma-next/sql-contract-types": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

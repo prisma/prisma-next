@@ -18,7 +18,9 @@
   "dependencies": {
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/node-utils": "workspace:*",
+    "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-contract-types": "workspace:*",
     "@prisma-next/sql-target": "workspace:*",
     "commander": "^12.0.0",
     "esbuild": "^0.19.0"
