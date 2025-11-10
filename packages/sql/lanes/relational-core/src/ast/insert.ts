@@ -1,4 +1,5 @@
 import type { ColumnRef, InsertAst, ParamRef, TableRef } from '@prisma-next/sql-target';
+import { compact } from './util';
 
 export interface CreateInsertAstOptions {
   readonly table: TableRef;
@@ -7,10 +8,10 @@ export interface CreateInsertAstOptions {
 }
 
 export function createInsertAst(options: CreateInsertAstOptions): InsertAst {
-  return {
+  return compact({
     kind: 'insert',
     table: options.table,
     values: options.values,
-    ...(options.returning && options.returning.length > 0 ? { returning: options.returning } : {}),
-  };
+    returning: options.returning,
+  }) as InsertAst;
 }

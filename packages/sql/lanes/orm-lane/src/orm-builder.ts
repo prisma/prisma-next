@@ -2,6 +2,7 @@ import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/type
 import { planInvalid } from '@prisma-next/plan';
 import type { RuntimeContext } from '@prisma-next/runtime';
 import {
+  compact,
   createBinaryExpr,
   createColumnRef,
   createDeleteAst,
@@ -30,6 +31,7 @@ import type {
 import type {
   BinaryExpr,
   ColumnRef,
+  Direction,
   ExistsExpr,
   IncludeAst,
   IncludeRef,
@@ -734,24 +736,22 @@ export class OrmModelBuilderImpl<
       }
 
       // Build include AST directly
-      const includeAst: IncludeAst = {
+      const includeAst: IncludeAst = compact({
         kind: 'includeMany',
         alias: includeState.alias,
-        child: {
+        child: compact({
           table: includeState.childTable,
           on: onExpr,
           project: childProjectionItems,
-          ...(childWhere ? { where: childWhere } : {}),
-          ...(childOrderBy ? { orderBy: childOrderBy } : {}),
-          ...(typeof includeState.childLimit === 'number'
-            ? { limit: includeState.childLimit }
-            : {}),
-        },
-      };
+          where: childWhere,
+          orderBy: childOrderBy,
+          limit: includeState.childLimit,
+        }),
+      }) as IncludeAst;
       includesAst.push(includeAst);
 
       // Build include state for buildMeta
-      const includeForMeta: IncludeState = {
+      const includeForMeta: IncludeState = compact({
         alias: includeState.alias,
         table: includeState.childTable,
         on: {
@@ -760,10 +760,10 @@ export class OrmModelBuilderImpl<
           right: childCol,
         },
         childProjection: childProjectionState,
-        ...(includeState.childWhere ? { childWhere: includeState.childWhere } : {}),
-        ...(includeState.childOrderBy ? { childOrderBy: includeState.childOrderBy } : {}),
-        ...(includeState.childLimit !== undefined ? { childLimit: includeState.childLimit } : {}),
-      };
+        childWhere: includeState.childWhere,
+        childOrderBy: includeState.childOrderBy,
+        childLimit: includeState.childLimit,
+      }) as IncludeState;
       includesForMeta.push(includeForMeta);
     }
 
@@ -847,10 +847,17 @@ export class OrmModelBuilderImpl<
     const ast = createSelectAst({
       from: createTableRef(this.table.name),
       project: projectEntries,
-      ...(includesAst.length > 0 ? { includes: includesAst } : {}),
-      ...(whereExpr ? { where: whereExpr } : {}),
-      ...(orderByClause ? { orderBy: orderByClause } : {}),
-      ...(typeof this.limitValue === 'number' ? { limit: this.limitValue } : {}),
+      includes: includesAst,
+      where: whereExpr,
+      orderBy: orderByClause,
+      limit: this.limitValue,
+    } as {
+      from: TableRef;
+      project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
+      includes?: ReadonlyArray<IncludeAst>;
+      where?: BinaryExpr | ExistsExpr;
+      orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
+      limit?: number;
     });
 
     // Lower AST via adapter
@@ -865,12 +872,12 @@ export class OrmModelBuilderImpl<
       contract: this.contract,
       table: createTableRef(this.table.name),
       projection: projectionState,
-      ...(includesForMeta.length > 0 ? { includes: includesForMeta } : {}),
+      includes: includesForMeta.length > 0 ? includesForMeta : undefined,
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
-      ...(this.wherePredicate ? { where: this.wherePredicate as BinaryBuilder } : {}),
-      ...(this.orderByExpr ? { orderBy: this.orderByExpr } : {}),
-    });
+      paramCodecs: Object.keys(paramCodecs).length > 0 ? paramCodecs : undefined,
+      where: this.wherePredicate as BinaryBuilder | undefined,
+      orderBy: this.orderByExpr,
+    } as MetaBuildArgs);
 
     // Create plan
     const plan: Plan<Row> = Object.freeze({
@@ -997,7 +1004,11 @@ export class OrmModelBuilderImpl<
       const subquery = createSelectAst({
         from: childTable,
         project: [{ alias: '_exists', expr: projectionColumn }],
-        ...(subqueryWhere ? { where: subqueryWhere } : {}),
+        where: subqueryWhere,
+      } as {
+        from: TableRef;
+        project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
+        where?: BinaryExpr | ExistsExpr;
       });
 
       // Determine if this is NOT EXISTS based on filter type
@@ -1126,8 +1137,8 @@ export class OrmModelBuilderImpl<
       table,
       projection: { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
-    });
+      paramCodecs: Object.keys(paramCodecs).length > 0 ? paramCodecs : undefined,
+    } as MetaBuildArgs);
 
     // Return plan with ORM metadata
     return Object.freeze({
@@ -1251,9 +1262,9 @@ export class OrmModelBuilderImpl<
       table,
       projection: { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      paramCodecs: Object.keys(paramCodecs).length > 0 ? paramCodecs : undefined,
       where: wherePredicate as BinaryBuilder,
-    });
+    } as MetaBuildArgs);
 
     // Return plan with ORM metadata
     return Object.freeze({
@@ -1328,9 +1339,9 @@ export class OrmModelBuilderImpl<
       table,
       projection: { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
+      paramCodecs: Object.keys(paramCodecs).length > 0 ? paramCodecs : undefined,
       where: wherePredicate as BinaryBuilder,
-    });
+    } as MetaBuildArgs);
 
     // Return plan with ORM metadata
     return Object.freeze({
@@ -1805,23 +1816,26 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     ...(args.paramCodecs ? args.paramCodecs : {}),
   };
 
-  return Object.freeze({
-    target: args.contract.target,
-    ...(args.contract.targetFamily ? { targetFamily: args.contract.targetFamily } : {}),
-    coreHash: args.contract.coreHash,
-    lane: 'dsl',
-    refs: {
-      tables: Array.from(refsTables),
-      columns: Array.from(refsColumns.values()),
-    },
-    projection: projectionMap,
-    ...(Object.keys(projectionTypes).length > 0 ? { projectionTypes } : {}),
-    ...(Object.keys(allCodecs).length > 0
-      ? { annotations: Object.freeze({ codecs: Object.freeze(allCodecs) }) }
-      : {}),
-    paramDescriptors: args.paramDescriptors,
-    ...(args.contract.profileHash !== undefined ? { profileHash: args.contract.profileHash } : {}),
-  } satisfies PlanMeta);
+  return Object.freeze(
+    compact({
+      target: args.contract.target,
+      targetFamily: args.contract.targetFamily,
+      coreHash: args.contract.coreHash,
+      lane: 'dsl',
+      refs: {
+        tables: Array.from(refsTables),
+        columns: Array.from(refsColumns.values()),
+      },
+      projection: projectionMap,
+      projectionTypes: Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
+      annotations:
+        Object.keys(allCodecs).length > 0
+          ? Object.freeze({ codecs: Object.freeze(allCodecs) })
+          : undefined,
+      paramDescriptors: args.paramDescriptors,
+      profileHash: args.contract.profileHash,
+    }) as PlanMeta,
+  );
 }
 
 function buildWhereExpr(

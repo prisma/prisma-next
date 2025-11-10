@@ -10,6 +10,7 @@ import type {
   SelectAst,
   TableRef,
 } from '@prisma-next/sql-target';
+import { compact } from './util';
 
 export interface CreateSelectAstOptions {
   readonly from: TableRef;
@@ -25,14 +26,14 @@ export interface CreateSelectAstOptions {
 }
 
 export function createSelectAst(options: CreateSelectAstOptions): SelectAst {
-  return {
+  return compact({
     kind: 'select',
     from: options.from,
-    ...(options.joins && options.joins.length > 0 ? { joins: options.joins } : {}),
-    ...(options.includes && options.includes.length > 0 ? { includes: options.includes } : {}),
+    joins: options.joins,
+    includes: options.includes,
     project: options.project,
-    ...(options.where ? { where: options.where } : {}),
-    ...(options.orderBy ? { orderBy: options.orderBy } : {}),
-    ...(typeof options.limit === 'number' ? { limit: options.limit } : {}),
-  };
+    where: options.where,
+    orderBy: options.orderBy,
+    limit: options.limit,
+  }) as SelectAst;
 }

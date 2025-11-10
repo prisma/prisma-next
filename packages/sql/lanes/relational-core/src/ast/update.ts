@@ -1,4 +1,5 @@
 import type { BinaryExpr, ColumnRef, ParamRef, TableRef, UpdateAst } from '@prisma-next/sql-target';
+import { compact } from './util';
 
 export interface CreateUpdateAstOptions {
   readonly table: TableRef;
@@ -8,11 +9,11 @@ export interface CreateUpdateAstOptions {
 }
 
 export function createUpdateAst(options: CreateUpdateAstOptions): UpdateAst {
-  return {
+  return compact({
     kind: 'update',
     table: options.table,
     set: options.set,
     where: options.where,
-    ...(options.returning && options.returning.length > 0 ? { returning: options.returning } : {}),
-  };
+    returning: options.returning,
+  }) as UpdateAst;
 }

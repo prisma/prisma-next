@@ -1,4 +1,5 @@
 import type { BinaryExpr, ColumnRef, DeleteAst, TableRef } from '@prisma-next/sql-target';
+import { compact } from './util';
 
 export interface CreateDeleteAstOptions {
   readonly table: TableRef;
@@ -7,10 +8,10 @@ export interface CreateDeleteAstOptions {
 }
 
 export function createDeleteAst(options: CreateDeleteAstOptions): DeleteAst {
-  return {
+  return compact({
     kind: 'delete',
     table: options.table,
     where: options.where,
-    ...(options.returning && options.returning.length > 0 ? { returning: options.returning } : {}),
-  };
+    returning: options.returning,
+  }) as DeleteAst;
 }

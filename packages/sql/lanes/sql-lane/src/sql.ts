@@ -1,6 +1,7 @@
 import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
 import {
+  compact,
   createBinaryExpr,
   createColumnRef,
   createDeleteAst,
@@ -34,9 +35,12 @@ import type {
 import type {
   BinaryExpr,
   ColumnRef,
+  Direction,
   ExtractCodecTypes,
   ExtractOperationTypes,
+  IncludeAst,
   IncludeRef,
+  JoinAst,
   LiteralExpr,
   LoweredStatement,
   OperationExpr,
@@ -725,12 +729,20 @@ class SelectBuilderImpl<
 
     const ast = createSelectAst({
       from: createTableRef(table.name),
-      ...(joins && joins.length > 0 ? { joins } : {}),
-      ...(includes && includes.length > 0 ? { includes } : {}),
+      joins,
+      includes,
       project: projectEntries,
-      ...(whereExpr ? { where: whereExpr } : {}),
-      ...(orderByClause ? { orderBy: orderByClause } : {}),
-      ...(typeof this.state.limit === 'number' ? { limit: this.state.limit } : {}),
+      where: whereExpr,
+      orderBy: orderByClause,
+      limit: this.state.limit,
+    } as {
+      from: TableRef;
+      joins?: ReadonlyArray<JoinAst>;
+      includes?: ReadonlyArray<IncludeAst>;
+      project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
+      where?: BinaryExpr;
+      orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
+      limit?: number;
     });
 
     const lowered = this.adapter.lower(ast, {
@@ -743,13 +755,13 @@ class SelectBuilderImpl<
       contract: this.contract,
       table,
       projection,
-      ...(this.state.joins ? { joins: this.state.joins } : {}),
-      ...(this.state.includes ? { includes: this.state.includes } : {}),
+      joins: this.state.joins,
+      includes: this.state.includes,
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
-      ...(this.state.where ? { where: this.state.where } : {}),
-      ...(this.state.orderBy ? { orderBy: this.state.orderBy } : {}),
-    });
+      paramCodecs,
+      where: this.state.where,
+      orderBy: this.state.orderBy,
+    } as MetaBuildArgs);
 
     const plan: Plan<Row> = Object.freeze({
       ast,
@@ -1186,23 +1198,26 @@ function buildMeta(args: MetaBuildArgs): PlanMeta {
     ...(args.paramCodecs ? args.paramCodecs : {}),
   };
 
-  return Object.freeze({
-    target: args.contract.target,
-    ...(args.contract.targetFamily ? { targetFamily: args.contract.targetFamily } : {}),
-    coreHash: args.contract.coreHash,
-    lane: 'dsl',
-    refs: {
-      tables: Array.from(refsTables),
-      columns: Array.from(refsColumns.values()),
-    },
-    projection: projectionMap,
-    ...(Object.keys(projectionTypes).length > 0 ? { projectionTypes } : {}),
-    ...(Object.keys(allCodecs).length > 0
-      ? { annotations: Object.freeze({ codecs: Object.freeze(allCodecs) }) }
-      : {}),
-    paramDescriptors: args.paramDescriptors,
-    ...(args.contract.profileHash !== undefined ? { profileHash: args.contract.profileHash } : {}),
-  } satisfies PlanMeta);
+  return Object.freeze(
+    compact({
+      target: args.contract.target,
+      targetFamily: args.contract.targetFamily,
+      coreHash: args.contract.coreHash,
+      lane: 'dsl',
+      refs: {
+        tables: Array.from(refsTables),
+        columns: Array.from(refsColumns.values()),
+      },
+      projection: projectionMap,
+      projectionTypes: Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
+      annotations:
+        Object.keys(allCodecs).length > 0
+          ? Object.freeze({ codecs: Object.freeze(allCodecs) })
+          : undefined,
+      paramDescriptors: args.paramDescriptors,
+      profileHash: args.contract.profileHash,
+    }) as PlanMeta,
+  );
 }
 
 export type SelectBuilder<
@@ -1363,7 +1378,7 @@ class InsertBuilderImpl<
     const ast = createInsertAst({
       table: createTableRef(this.table.name),
       values,
-      ...(returning.length > 0 ? { returning } : {}),
+      returning,
     });
 
     const lowered = this.adapter.lower(ast, {
@@ -1550,7 +1565,7 @@ class UpdateBuilderImpl<
       table: createTableRef(this.table.name),
       set,
       where: whereExpr,
-      ...(returning.length > 0 ? { returning } : {}),
+      returning,
     });
 
     const lowered = this.adapter.lower(ast, {
@@ -1769,7 +1784,7 @@ class DeleteBuilderImpl<
     const ast = createDeleteAst({
       table: createTableRef(this.table.name),
       where: whereExpr,
-      ...(returning.length > 0 ? { returning } : {}),
+      returning,
     });
 
     const lowered = this.adapter.lower(ast, {

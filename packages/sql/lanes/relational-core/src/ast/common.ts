@@ -5,6 +5,7 @@ import type {
   ParamRef,
   TableRef,
 } from '@prisma-next/sql-target';
+import { compact } from './util';
 
 export function createTableRef(name: string): TableRef {
   return {
@@ -22,11 +23,11 @@ export function createColumnRef(table: string, column: string): ColumnRef {
 }
 
 export function createParamRef(index: number, name?: string): ParamRef {
-  return {
+  return compact({
     kind: 'param',
     index,
-    ...(name !== undefined ? { name } : {}),
-  };
+    name,
+  }) as ParamRef;
 }
 
 export function createOperationExpr(operation: OperationExpr): OperationExpr {
