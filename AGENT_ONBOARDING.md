@@ -2118,6 +2118,95 @@ const ir2: ContractIR = {
 
 **Key Point:** Match the pattern used for `capabilities` - always provide fallback empty objects for optional properties that must be objects.
 
+## Modular Refactoring Patterns
+
+**Pattern**: When refactoring large monolithic files, extract functionality into modular structures while maintaining API stability.
+
+### When to Refactor
+
+**Signals that refactoring is needed:**
+- File exceeds 1000+ lines
+- Multiple distinct responsibilities in one file
+- Difficult to test individual components
+- Hard to understand the overall structure
+- Repeated patterns that could be extracted
+
+### Refactoring Strategy
+
+**Phase 1: Extract Pure Helpers** - Start with side-effect-free utility functions (AST wrappers, error constructors, type guards)
+
+**Phase 2: Extract Domain Modules** - Group related functionality by domain (selection, mutations, relations, plan assembly)
+
+**Phase 3: Extract State and Context** - Separate state management and context creation from logic
+
+**Phase 4: Create Facade** - Replace monolithic class with thin facade that delegates to modules
+
+### Key Principles
+
+- **Maintain API stability** - Public API must not change during refactoring
+- **Use proper types** - Replace `any` with generics during extraction
+- **Centralize errors** - All error messages come from a single module
+- **Test frequently** - Run tests after each extraction phase
+- **Handle optional properties** - Use `compact` helper for `exactOptionalPropertyTypes`
+
+### Example: ORM Lane Refactoring
+
+The `@prisma-next/sql-orm-lane` package was refactored from a single 1900-line `orm-builder.ts` file into a modular structure:
+
+- **`orm/`** - Core builder facade, context, state, capabilities
+- **`selection/`** - Query selection building (predicates, ordering, pagination, projection, joins)
+- **`relations/`** - Relation handling (include AST, EXISTS subqueries)
+- **`mutations/`** - Write operations (INSERT, UPDATE, DELETE)
+- **`plan/`** - Plan assembly and metadata building
+- **`utils/`** - Shared utilities (AST wrappers, errors, guards)
+- **`types/`** - Internal type exports
+
+**Result:**
+- ✅ Public API unchanged
+- ✅ All tests pass
+- ✅ Better maintainability
+- ✅ Easier to understand and test individual components
+
+### Example: SQL Lane Refactoring
+
+The `@prisma-next/sql-lane` package was refactored from a single 1940-line `sql.ts` file into a modular structure:
+
+- **`sql/`** - Core builder modules:
+  - `builder.ts` - Thin public facade (replaces old `sql.ts`)
+  - `select-builder.ts` - SelectBuilderImpl class
+  - `mutation-builder.ts` - Insert/Update/Delete builders
+  - `include-builder.ts` - IncludeMany child builder and AST building
+  - `join-builder.ts` - Join DSL logic
+  - `predicate-builder.ts` - Where clause building (consolidated duplicate implementations)
+  - `projection.ts` - Projection building logic
+  - `plan.ts` - Plan assembly and meta building
+  - `context.ts` - Context wiring logic
+- **`utils/`** - Shared utilities:
+  - `errors.ts` - Centralized error constructors
+  - `capabilities.ts` - Capability checking logic
+  - `guards.ts` - Type guards and column info helpers
+  - `state.ts` - Immutable builder state types
+- **`types/`** - Type definitions:
+  - `internal.ts` - Internal helper types
+  - `public.ts` - Public type re-exports
+
+**Key Learnings:**
+- **Consolidate duplicate code**: The refactoring consolidated three duplicate `_buildWhereExpr` implementations (in SelectBuilderImpl, UpdateBuilderImpl, DeleteBuilderImpl) into a single `buildWhereExpr` function in `predicate-builder.ts`
+- **Use AST factories consistently**: All AST construction now flows through factories from `@prisma-next/sql-relational-core/ast`, ensuring consistency and reducing duplication
+- **Centralize error handling**: All error constructors are in `utils/errors.ts`, providing a single source of truth for error messages
+- **Capability checks**: Capability checking logic is centralized in `utils/capabilities.ts`, following the same pattern as the ORM lane
+- **State management**: Immutable state types are extracted to `utils/state.ts`, making state shapes reusable across modules
+- **Test imports**: Test files were updated to import from `../src/sql/builder` instead of `../src/sql` after the refactoring
+
+**Result:**
+- ✅ Public API unchanged (all exports remain the same)
+- ✅ All 96 tests pass
+- ✅ Better maintainability (focused modules instead of one giant file)
+- ✅ Easier to understand and test individual components
+- ✅ No duplicate code (especially `_buildWhereExpr`)
+
+See `.cursor/rules/modular-refactoring-patterns.mdc` for comprehensive refactoring patterns and examples.
+
 ---
 
 **Remember**: This is a prototype. Some design docs describe future state. Focus on the MVP spec and the briefs marked "complete" for implemented features.
