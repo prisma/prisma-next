@@ -1,34 +1,50 @@
 #!/usr/bin/env node
 
 import { exec } from 'node:child_process';
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
 const ROOT = resolve(process.cwd());
-const PACKAGES_DIR = join(ROOT, 'packages');
 
-const EXCLUDED_PACKAGES = ['integration-tests', 'e2e-tests'];
+const EXCLUDED_PATHS = ['examples/', 'packages/integration-tests', 'packages/e2e-tests'];
 
 async function getPackages() {
-  const entries = await readdir(PACKAGES_DIR, { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((name) => !EXCLUDED_PACKAGES.includes(name));
+  // Use pnpm to get all packages recursively
+  const { stdout } = await execAsync('pnpm -r list --json', { cwd: ROOT });
+  const packages = JSON.parse(stdout);
+
+  // Filter to only packages in packages/ directory, exclude examples and test packages
+  const packagePaths = packages
+    .map((pkg) => {
+      if (!pkg.path) return null;
+      const relativePath = pkg.path.replace(`${ROOT}/`, '');
+      return relativePath;
+    })
+    .filter((path) => {
+      if (!path) return false;
+      // Only include packages in packages/ directory
+      if (!path.startsWith('packages/')) return false;
+      // Exclude test packages and examples
+      if (EXCLUDED_PATHS.some((excluded) => path.startsWith(excluded))) return false;
+      return true;
+    })
+    .map((path) => path.replace('packages/', ''));
+
+  return packagePaths;
 }
 
-async function runCoverage(packageName) {
-  const packageDir = join(PACKAGES_DIR, packageName);
+async function runCoverage(packagePath) {
+  const packageDir = join(ROOT, 'packages', packagePath);
   const packageJsonPath = join(packageDir, 'package.json');
 
   try {
     const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf-8'));
 
     if (!packageJson.scripts?.['test:coverage']) {
-      return { package: packageName, skipped: true, reason: 'No test:coverage script' };
+      return { package: packagePath, skipped: true, reason: 'No test:coverage script' };
     }
 
     const command = `pnpm --filter ${packageJson.name} test:coverage`;
@@ -53,7 +69,7 @@ async function runCoverage(packageName) {
       const coverageReport = await parseCoverageReport(packageDir).catch(() => null);
 
       return {
-        package: packageName,
+        package: packagePath,
         testPassed: !testFailed,
         coveragePassed: !coverageFailed,
         coverageReport,
@@ -74,7 +90,7 @@ async function runCoverage(packageName) {
       const coverageReport = await parseCoverageReport(packageDir).catch(() => null);
 
       return {
-        package: packageName,
+        package: packagePath,
         testPassed: !testFailed,
         coveragePassed: !coverageFailed,
         coverageReport,
@@ -84,7 +100,7 @@ async function runCoverage(packageName) {
     }
   } catch (error) {
     return {
-      package: packageName,
+      package: packagePath,
       skipped: true,
       reason: error.message,
     };
@@ -244,8 +260,8 @@ function suggestThresholdIncreases(overallCoverage, thresholds, margin = 5) {
   return hasSuggestions ? suggestions : null;
 }
 
-async function getThresholds(packageName) {
-  const vitestConfigPath = join(PACKAGES_DIR, packageName, 'vitest.config.ts');
+async function getThresholds(packagePath) {
+  const vitestConfigPath = join(ROOT, 'packages', packagePath, 'vitest.config.ts');
 
   try {
     const configContent = await readFile(vitestConfigPath, 'utf-8');
@@ -414,9 +430,9 @@ async function main() {
   console.log(`Running coverage for ${packages.length} packages...\n`);
 
   const results = [];
-  for (const packageName of packages) {
-    process.stdout.write(`Running coverage for ${packageName}... `);
-    const result = await runCoverage(packageName);
+  for (const packagePath of packages) {
+    process.stdout.write(`Running coverage for ${packagePath}... `);
+    const result = await runCoverage(packagePath);
     results.push(result);
 
     if (result.skipped) {
