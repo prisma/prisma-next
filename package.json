@@ -17,7 +17,7 @@
     "lint:fix": "pnpm biome check --write .",
     "lint:packages": "turbo run lint --filter='!./examples/**'",
     "lint:examples": "turbo run lint --filter='./examples/**'",
-    "lint:deps": "node scripts/check-imports.mjs",
+    "lint:deps": "depcruise --config dependency-cruiser.config.mjs packages",
     "lint:rules": "node scripts/validate-rules.mjs",
     "lint:docs": "node scripts/validate-package-readmes.mjs",
     "typecheck": "turbo run typecheck",
@@ -32,6 +32,7 @@
     "@changesets/cli": "^2.27.8",
     "@types/node": "^24.7.2",
     "@vitest/coverage-v8": "^2.1.1",
+    "dependency-cruiser": "^16.3.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
     "turbo": "^2.3.0",
@@ -46,8 +47,8 @@
       "biome format --write",
       "biome check --write"
     ],
-    "**/package.json": [
-      "node scripts/check-imports.mjs --changed-files"
+    "*.{ts,tsx,js,jsx}": [
+      "node scripts/lint-deps-focused.mjs"
     ]
   }
 }

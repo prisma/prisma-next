@@ -1045,15 +1045,16 @@ See `packages/test-utils/README.md` for full documentation of generic helpers, `
 ### Package Layering & Import Validation
 
 **Import Validation:**
-- `pnpm lint:deps` - Validates that packages follow ring-based dependency rules
-- Uses declarative package-to-ring mapping in `scripts/check-imports.mjs`
+- `pnpm lint:deps` - Validates that packages follow domain/layer/plane dependency rules
+- Uses Dependency Cruiser with declarative package-to-domain/layer/plane mapping in `architecture.config.json`
+- Configuration in `dependency-cruiser.config.mjs` loads `architecture.config.json` and defines rules
 - Enforces unidirectional dependencies: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`
-- Packages in the same ring can import from each other
-- Temporary exceptions are allowed with TODO comments for known violations that need refactoring
+- Packages in the same layer can import from each other
+- Temporary exceptions are allowed with TODO comments in `dependency-cruiser.config.mjs` for known violations that need refactoring
 
 **Adding New Packages:**
-1. Add package directory path to `PACKAGE_TO_RING` map in `scripts/check-imports.mjs`
-2. Add package name to `PACKAGE_NAME_TO_PATH` map
+1. Add package config to `architecture.config.json` with glob pattern, domain, layer, and plane
+2. Update `tsconfig.base.json` path aliases if needed
 3. Run `pnpm lint:deps` to verify no violations
 
 See `.cursor/rules/import-validation.mdc` for detailed guidance on import validation rules.

@@ -12,7 +12,7 @@ severity: warn
 
 ## Overview
 
-The repository uses a domain/layer/plane package layering architecture with unidirectional dependencies enforced by `scripts/check-imports.mjs`. The import validation script uses data-driven configuration from `architecture.config.json` to validate that packages follow dependency rules.
+The repository uses a domain/layer/plane package layering architecture with unidirectional dependencies enforced by Dependency Cruiser. The import validation uses data-driven configuration from `architecture.config.json` to validate that packages follow dependency rules.
 
 ## Domain/Layer/Plane Structure
 
@@ -27,9 +27,9 @@ Dependencies flow inward (toward core) within a domain:
 core → authoring → targets → lanes → runtime → adapters
 ```
 
-## Import Validation Script
+## Import Validation Configuration
 
-The import validation script (`scripts/check-imports.mjs`) uses data-driven configuration from `architecture.config.json`:
+Dependency Cruiser (`dependency-cruiser.config.mjs`) uses data-driven configuration from `architecture.config.json`:
 
 1. **Package Configs**: Maps package glob patterns to domain/layer/plane
    ```json
@@ -95,19 +95,20 @@ import { sql } from '@prisma-next/sql-lane'; // lanes layer - NOT allowed
 
 ### Temporary Exceptions
 
-When a package violates dependency rules but needs to temporarily import from another package (e.g., during refactoring), add a temporary exception in the validation script with a TODO comment:
+When a package violates dependency rules but needs to temporarily import from another package (e.g., during refactoring), add a temporary exception in `dependency-cruiser.config.mjs` with a TODO comment:
 
 ```javascript
-// TODO: Remove this exception once orm-lane is refactored to build AST nodes directly
+// Temporary exception: CLI → SQL targets (for hooks)
+// TODO: Refactor CLI to be target-family-agnostic (use plugin system or dynamic loading)
 // See: docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4
-// Temporary exception: orm-lane can import from sql-lane until refactor is complete
 if (
-  sourceRing.name === 'lanes' &&
-  targetRing.name === 'lanes' &&
-  relative(repoRoot, file).includes('orm-lane') &&
-  importPath.includes('sql-lane')
+  sourceGroup.domain === 'framework' &&
+  sourceGroup.layer === 'tooling' &&
+  sourceGroup.patterns.some((p) => p.includes('tooling/cli')) &&
+  targetGroup.domain === 'sql' &&
+  targetGroup.layer === 'targets'
 ) {
-  continue; // Temporary: allow orm-lane → sql-lane until refactor
+  continue; // Temporary: allow CLI → SQL targets until refactor
 }
 ```
 
@@ -156,7 +157,7 @@ If a package is not in `architecture.config.json`, it will be treated as a legac
 
 ### Path Matching Issues
 
-The script uses glob pattern matching to find the most specific package match. If a file path matches multiple package globs, the longest (most specific) match is used.
+Dependency Cruiser uses regex pattern matching to find the most specific package match. Patterns are derived from glob patterns in `architecture.config.json` and converted to regex patterns in `dependency-cruiser.config.mjs`.
 
 ### Domain/Layer/Plane Structure
 
@@ -165,10 +166,12 @@ Packages are organized by:
 - **Layer**: core → authoring → targets → lanes → runtime → adapters (dependency direction)
 - **Plane**: migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters)
 
-The validation script enforces:
+Dependency Cruiser enforces:
 - Same-layer imports: allowed
 - Downward imports (toward core): allowed
 - Upward imports (away from core): denied
 - Cross-domain imports: denied except framework domain
 - Migration → Runtime imports: denied
-- Runtime → Migration imports: allowed for artifacts only
+- Runtime → Migration imports: denied (artifacts are consumed out-of-band)
+
+See `dependency-cruiser.config.mjs` for the complete rule definitions.

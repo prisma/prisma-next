@@ -346,30 +346,30 @@ packages:
 
 ## Import Validation
 
-Import dependencies are validated using `scripts/check-imports.mjs`:
+Import dependencies are validated using Dependency Cruiser:
 
 ```bash
 pnpm lint:deps
 ```
 
-This script:
+Dependency Cruiser:
 - Scans all TypeScript files in `packages/`
 - Validates imports against domain, layer, and plane rules
 - Reports violations with detailed context
 - Can be run locally or in CI
-- Supports changed-files mode for pre-commit hooks
+- Supports incremental checks for lint-staged hooks
 - Enforces the dependency direction: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`
 
 **Implementation:**
 - Uses data-driven configuration from `architecture.config.json`
 - Maps package directory globs to {domain, layer, plane} based on configuration
-- Maps package names to directory paths by reading package.json files
-- Uses longest-path matching to find the most specific package match
+- Converts glob patterns to regex patterns in `dependency-cruiser.config.mjs`
+- Uses TypeScript path resolution for accurate module resolution
 - Allows same-layer imports (e.g., `orm-lane` can import from `sql-relational-core`)
 - Enforces cross-domain rules (only framework can be imported cross-domain)
 - Enforces plane boundaries (migration cannot import runtime, runtime cannot import migration code)
 
-**Status:** ✅ Import validation script is active and enforces Domains/Layers/Planes dependency rules using data-driven configuration.
+**Status:** ✅ Import validation is active and enforces Domains/Layers/Planes dependency rules using Dependency Cruiser with data-driven configuration.
 
 ## Adding New Packages
 
@@ -394,7 +394,7 @@ The package layering structure has been scaffolded with placeholder packages:
 - Placeholder packages with basic structure (package.json, tsconfig.json, src/index.ts, tsup.config.ts, README.md)
 - Workspace configuration updated (`pnpm-workspace.yaml`)
 - TypeScript path aliases and project references added (`tsconfig.base.json`)
-- Import validation script created (`scripts/check-imports.mjs`)
+- Import validation configured (Dependency Cruiser with `dependency-cruiser.config.mjs`)
 - Architecture configuration file created (`architecture.config.json`)
 - `pnpm lint:deps` script added to root package.json
 
