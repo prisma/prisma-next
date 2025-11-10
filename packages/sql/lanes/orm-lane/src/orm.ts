@@ -1,6 +1,6 @@
 import { planInvalid } from '@prisma-next/plan';
 import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import { OrmModelBuilderImpl } from './orm-builder';
+import { OrmModelBuilderImpl } from './orm/builder';
 import type { OrmBuilderOptions, OrmRegistry } from './orm-types';
 
 type ModelName<TContract extends SqlContract<SqlStorage>> = keyof TContract['models'] & string;

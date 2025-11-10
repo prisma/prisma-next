@@ -1,4 +1,5 @@
 export { orm } from './orm';
+export { OrmModelBuilderImpl } from './orm/builder';
 export type {
   ModelColumnAccessor,
   OrmBuilderOptions,

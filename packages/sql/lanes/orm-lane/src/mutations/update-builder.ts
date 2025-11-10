@@ -1,0 +1,154 @@
+import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { AnyBinaryBuilder, BuildOptions } from '@prisma-next/sql-relational-core/types';
+import type {
+  ColumnRef,
+  LoweredStatement,
+  ParamRef,
+  SqlContract,
+  SqlStorage,
+} from '@prisma-next/sql-target';
+import type { OrmContext } from '../orm/context';
+import type { ModelColumnAccessor } from '../orm-types';
+import { buildWhereExpr } from '../selection/predicates';
+import { createParamRef, createTableRef, createUpdateAst } from '../utils/ast';
+import {
+  errorFailedToBuildWhereClause,
+  errorMissingParameter,
+  errorModelNotFound,
+  errorUnknownColumn,
+  errorUnknownTable,
+  errorUpdateRequiresFields,
+} from '../utils/errors';
+import { convertModelFieldsToColumns } from './insert-builder';
+
+export function buildUpdatePlan<
+  TContract extends SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }>,
+  ModelName extends string,
+>(
+  context: OrmContext<TContract>,
+  modelName: ModelName,
+  where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+  getModelAccessor: () => ModelColumnAccessor<TContract, CodecTypes, ModelName>,
+  data: Record<string, unknown>,
+  options?: BuildOptions,
+): Plan<number> {
+  if (!data || Object.keys(data).length === 0) {
+    errorUpdateRequiresFields();
+  }
+
+  const set = convertModelFieldsToColumns(context.contract, modelName, data);
+
+  const modelAccessor = getModelAccessor();
+  const wherePredicate = where(modelAccessor);
+
+  const tableName = context.contract.mappings.modelToTable?.[modelName];
+  if (!tableName) {
+    errorModelNotFound(modelName);
+  }
+  const table = createTableRef(tableName);
+
+  const paramsMap = {
+    ...(options?.params ?? {}),
+    ...data,
+  } as Record<string, unknown>;
+  const paramDescriptors: ParamDescriptor[] = [];
+  const paramValues: unknown[] = [];
+  const paramCodecs: Record<string, string> = {};
+
+  const contractTable = context.contract.storage.tables[tableName];
+  if (!contractTable) {
+    errorUnknownTable(tableName);
+  }
+
+  const updateSet: Record<string, ColumnRef | ParamRef> = {};
+  for (const [columnName, placeholder] of Object.entries(set)) {
+    if (!contractTable.columns[columnName]) {
+      errorUnknownColumn(columnName, tableName);
+    }
+
+    const paramName = placeholder.name;
+    if (!Object.hasOwn(paramsMap, paramName)) {
+      errorMissingParameter(paramName);
+    }
+
+    const value = paramsMap[paramName];
+    const index = paramValues.push(value);
+
+    const columnMeta = contractTable.columns[columnName];
+    const codecId = columnMeta?.type;
+    if (codecId && paramName) {
+      paramCodecs[paramName] = codecId;
+    }
+
+    paramDescriptors.push({
+      name: paramName,
+      source: 'dsl',
+      refs: { table: tableName, column: columnName },
+      ...(codecId ? { type: codecId } : {}),
+      ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+    });
+
+    updateSet[columnName] = createParamRef(index, paramName);
+  }
+
+  const whereResult = buildWhereExpr(
+    wherePredicate,
+    context.contract,
+    paramsMap,
+    paramDescriptors,
+    paramValues,
+  );
+  const whereExpr = whereResult.expr;
+  if (!whereExpr) {
+    errorFailedToBuildWhereClause();
+  }
+
+  if (whereResult?.codecId && whereResult.paramName) {
+    paramCodecs[whereResult.paramName] = whereResult.codecId;
+  }
+
+  const ast = createUpdateAst({
+    table,
+    set: updateSet,
+    where: whereExpr,
+  });
+
+  const lowered = context.adapter.lower(ast, {
+    contract: context.contract,
+    params: paramValues,
+  });
+  const loweredBody = lowered.body as LoweredStatement;
+
+  return Object.freeze({
+    ast,
+    sql: loweredBody.sql,
+    params: loweredBody.params ?? paramValues,
+    meta: {
+      target: context.contract.target,
+      targetFamily: context.contract.targetFamily,
+      coreHash: context.contract.coreHash,
+      lane: 'orm',
+      refs: {
+        tables: [tableName],
+        columns: [],
+      },
+      projection: {},
+      paramDescriptors,
+      ...(Object.keys(paramCodecs).length > 0
+        ? {
+            annotations: {
+              codecs: paramCodecs,
+              intent: 'write',
+              isMutation: true,
+            },
+          }
+        : {
+            annotations: {
+              intent: 'write',
+              isMutation: true,
+            },
+          }),
+    },
+  }) as Plan<number>;
+}
