@@ -62,3 +62,7 @@
 - Keep the new packages tree-shakeable: export only curated entry points, avoid wildcard exports from `src`.
 - Document any remaining references to `@prisma-next/sql-query` so Slice 7 can remove the shims confidently.
 - Coordinate with Slice 5 to ensure operation registry imports still work after the package split.
+
+### Known Issues
+
+**ORM-lane dependency on sql-lane**: Currently, `orm-lane` imports from `sql-lane` to build queries, which violates Goal 4 (neither package should import from the other). This is tracked with a temporary exception in `scripts/check-imports.mjs`. The `orm-lane` package should be refactored to build AST nodes directly instead of using the SQL lane builder. See TODO comment in `scripts/check-imports.mjs` for details.

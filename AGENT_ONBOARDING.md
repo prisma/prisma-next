@@ -51,7 +51,9 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/emitter`** - Contract emission engine that transforms IR into `contract.json` and `contract.d.ts` using a hook-based architecture
 - **`@prisma-next/sql-contract-ts`** - SQL-specific TypeScript contract authoring surface (`defineContract`, `validateContract`) in the SQL family namespace
 - **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries in the SQL lanes ring
-- **`@prisma-next/sql-query`** - SQL query DSL (re-exports contract authoring from `@prisma-next/sql-contract-ts` for backward compatibility)
+- **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers for building SQL queries in the SQL lanes ring
+- **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives in the SQL lanes ring
+- **`@prisma-next/sql-query`** - SQL query DSL (re-exports contract authoring from `@prisma-next/sql-contract-ts` for backward compatibility, will be removed in Slice 7)
 - **`@prisma-next/runtime`** - Execution engine, plugins (budgets, lints), contract verification
 - **`@prisma-next/sql-target`** - SQL target family abstraction, emitter hook implementation, and SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
 - **`@prisma-next/adapter-postgres`** - Postgres adapter implementation (extension pack)
@@ -1009,6 +1011,22 @@ describe('end-to-end tests', () => {
 - **Benefits**: Reduces test execution time, ensures contract artifacts are stable, and enables compile-time type checking using the emitted contract types.
 
 See `packages/test-utils/README.md` for full documentation of generic helpers, `packages/runtime/README.md` for runtime-specific test utilities, and `packages/e2e-tests/README.md` for contract-related E2E test utilities.
+
+### Package Layering & Import Validation
+
+**Import Validation:**
+- `pnpm lint:deps` - Validates that packages follow ring-based dependency rules
+- Uses declarative package-to-ring mapping in `scripts/check-imports.mjs`
+- Enforces unidirectional dependencies: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`
+- Packages in the same ring can import from each other
+- Temporary exceptions are allowed with TODO comments for known violations that need refactoring
+
+**Adding New Packages:**
+1. Add package directory path to `PACKAGE_TO_RING` map in `scripts/check-imports.mjs`
+2. Add package name to `PACKAGE_NAME_TO_PATH` map
+3. Run `pnpm lint:deps` to verify no violations
+
+See `.cursor/rules/import-validation.mdc` for detailed guidance on import validation rules.
 
 ### Running Tests and Coverage
 

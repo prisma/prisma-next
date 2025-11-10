@@ -23,6 +23,7 @@ This package provides the relational query DSL and raw SQL helpers for building 
 
 ## Exports
 
+- `.` - Main package export (exports `sql`, `SelectBuilder`, `rawOptions`, and types)
 - `./sql` - Relational DSL entry point (`sql()`, `SelectBuilder`, `InsertBuilder`, `UpdateBuilder`, `DeleteBuilder`)
 
 ## Architecture

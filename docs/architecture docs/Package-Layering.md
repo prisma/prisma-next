@@ -279,7 +279,15 @@ This script:
 - Can be run locally or in CI
 - Enforces the dependency direction: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`
 
-**Status:** ✅ Scaffolding complete - Import validation script is active and enforces ring-based dependency rules.
+**Implementation:**
+- Uses declarative package-to-ring mapping (`PACKAGE_TO_RING`) at the top of the script
+- Maps package directory paths to ring names (e.g., `'packages/sql/lanes/orm-lane': 'lanes'`)
+- Maps package names to directory paths (`PACKAGE_NAME_TO_PATH`) for import resolution
+- Uses longest-path matching to find the most specific package match
+- Allows same-ring imports (e.g., `orm-lane` can import from `sql-relational-core`)
+- Supports temporary exceptions with TODO comments for known violations that need refactoring
+
+**Status:** ✅ Import validation script is active and enforces ring-based dependency rules using declarative package-to-ring mapping.
 
 ## Adding New Packages
 

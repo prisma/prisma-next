@@ -4,7 +4,9 @@ ORM builder, include compilation, and relation filters for Prisma Next.
 
 ## Overview
 
-This package provides the ORM query builder that compiles model-based queries to SQL lane primitives. It is part of the SQL lanes ring and depends on `@prisma-next/sql-relational-core` for schema access and `@prisma-next/sql-lane` for query building.
+This package provides the ORM query builder that compiles model-based queries to SQL lane primitives. It is part of the SQL lanes ring and depends on `@prisma-next/sql-relational-core` for schema access.
+
+**Note**: Currently, this package imports from `@prisma-next/sql-lane` to build queries. Per the package layering brief (Slice 4), it should be refactored to build AST nodes directly instead of using the SQL lane builder. This is tracked as a known issue with a temporary exception in the import validation script.
 
 ## Responsibilities
 
@@ -24,6 +26,7 @@ This package provides the ORM query builder that compiles model-based queries to
 
 ## Exports
 
+- `.` - Main package export (exports `orm` and related types)
 - `./orm` - ORM builder entry point (`orm()`, `OrmRegistry`, `OrmModelBuilder`, etc.)
 
 ## Architecture
