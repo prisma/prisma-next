@@ -60,10 +60,8 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers for building SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives in the SQL lanes ring
-- **`@prisma-next/sql-lane`** - SQL DSL (relational DSL + raw SQL helpers)
-- **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives
-- **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries
-- **`@prisma-next/runtime`** - Execution engine, plugins (budgets, lints), contract verification
+- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-core with SQL adapters
+- **`@prisma-next/runtime-core`** - Target-agnostic runtime kernel (verification, plugin lifecycle, telemetry)
 - **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers (core ring)
 - **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly (targets ring)
 - **`@prisma-next/sql-contract-types`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) (targets ring)
@@ -169,7 +167,7 @@ SqlContract<
 **RuntimeContext** encapsulates `SqlContract`, `OperationRegistry`, and `CodecRegistry`, decoupling them from `Runtime` and allowing them to be passed to schema/query builders:
 
 ```typescript
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import pgVector from '@prisma/extension-pg-vector';
@@ -219,7 +217,7 @@ interface Extension {
 // src/prisma/query.ts
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane/sql';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { adapter } from './adapter';
 import type { Contract } from './contract.d';
@@ -265,7 +263,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { sql } from '@prisma-next/sql-lane/sql';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import contractJson from './contract.json' assert { type: 'json' };
 import type { Contract } from './contract.d';
@@ -369,7 +367,7 @@ The ORM lane provides a model-centric API that compiles to SQL lane primitives. 
 ```typescript
 import { orm } from '@prisma-next/sql-orm-lane/orm';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' assert { type: 'json' };
@@ -1580,7 +1578,7 @@ Check the TODO comments in code (especially `packages/sql-query/src/contract.ts`
 **Load a contract and create context:**
 ```typescript
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' assert { type: 'json' };
@@ -1705,7 +1703,7 @@ type JoinedRow = ResultType<typeof joinedPlan>;  // { userId: number; postId: nu
 ```typescript
 import { orm } from '@prisma-next/sql-orm-lane/orm';
 import { param } from '@prisma-next/sql-relational-core/param';
-import { createRuntimeContext } from '@prisma-next/runtime';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';

@@ -458,6 +458,39 @@ database = await createDevDatabase({
 
 **When adding new test suites:** Assign a new port range and document it here.
 
+### AST Node Creation
+
+**Pattern:** Use factory functions instead of manual object creation for AST nodes
+
+**Available factory functions from `@prisma-next/sql-relational-core/ast`:**
+- `createColumnRef(table, column)` - Creates a `ColumnRef`
+- `createParamRef(index, name?)` - Creates a `ParamRef`
+- `createLiteralExpr(value)` - Creates a `LiteralExpr`
+- `createTableRef(name)` - Creates a `TableRef`
+- `createBinaryExpr(op, left, right)` - Creates a `BinaryExpr` (from `ast/predicate`)
+
+```typescript
+// ✅ CORRECT: Use factory functions
+import { createColumnRef, createParamRef, createLiteralExpr } from '@prisma-next/sql-relational-core/ast';
+
+const colRef: ColumnRef = createColumnRef('user', 'id');
+const paramRef: ParamRef = createParamRef(1, 'userId');
+const literalExpr: LiteralExpr = createLiteralExpr('test');
+```
+
+```typescript
+// ❌ WRONG: Manual object creation
+const colRef: ColumnRef = { kind: 'col', table: 'user', column: 'id' };
+const paramRef: ParamRef = { kind: 'param', index: 1, name: 'userId' };
+const literalExpr: LiteralExpr = { kind: 'literal', value: 'test' };
+```
+
+**Why?** Factory functions ensure consistency, type safety, and make refactoring easier. Manual object creation duplicates AST structure definitions and is error-prone.
+
+**Exception:** `OperationExpr` objects are complex and don't have a factory function (the `createOperationExpr` function just returns the operation as-is). Manual creation is acceptable for `OperationExpr` in tests.
+
+See `.cursor/rules/use-ast-factories.mdc` for detailed guidelines.
+
 ---
 
 ## Type Testing
@@ -473,7 +506,7 @@ database = await createDevDatabase({
 ```typescript
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/contract.d';
-import type { ResultType, Plan } from '@prisma-next/sql-query/types';
+import type { ResultType, Plan } from '@prisma-next/sql-relational-core/types';
 
 test('Contract types are correct', () => {
   type UserTable = Contract['storage']['tables']['user'];
@@ -831,10 +864,10 @@ pnpm test:packages
 pnpm test:examples
 
 # Run tests for a specific package
-pnpm --filter @prisma-next/runtime test
+pnpm --filter @prisma-next/sql-runtime test
 
 # Run tests in watch mode
-pnpm --filter @prisma-next/runtime test --watch
+pnpm --filter @prisma-next/sql-runtime test --watch
 ```
 
 ### Coverage Commands
@@ -844,7 +877,7 @@ pnpm --filter @prisma-next/runtime test --watch
 pnpm coverage:packages
 
 # Run tests with coverage for a specific package
-pnpm --filter @prisma-next/runtime test:coverage
+pnpm --filter @prisma-next/sql-runtime test:coverage
 
 # Run tests with coverage for all packages (including examples)
 pnpm test:coverage
@@ -857,7 +890,7 @@ pnpm test:coverage
 pnpm typecheck:packages
 
 # Type check a specific package
-pnpm --filter @prisma-next/runtime typecheck
+pnpm --filter @prisma-next/sql-runtime typecheck
 ```
 
 ---

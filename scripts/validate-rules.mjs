@@ -10,7 +10,15 @@ const CURATED_ALWAYS = new Set([
   'doc-maintenance.mdc',
 ]);
 
-const REQUIRED = ['description', 'alwaysApply', 'tags', 'appliesTo', 'owner', 'lastUpdated', 'severity'];
+const REQUIRED = [
+  'description',
+  'alwaysApply',
+  'tags',
+  'appliesTo',
+  'owner',
+  'lastUpdated',
+  'severity',
+];
 
 let errors = [];
 
@@ -31,13 +39,17 @@ for (const file of files) {
     if (!(key in fm)) errors.push(`${file}: missing required key '${key}'`);
   }
   // Types
-  if (fm.description && typeof fm.description !== 'string') errors.push(`${file}: description must be string`);
-  if (fm.alwaysApply !== undefined && typeof fm.alwaysApply !== 'boolean') errors.push(`${file}: alwaysApply must be boolean`);
+  if (fm.description && typeof fm.description !== 'string')
+    errors.push(`${file}: description must be string`);
+  if (fm.alwaysApply !== undefined && typeof fm.alwaysApply !== 'boolean')
+    errors.push(`${file}: alwaysApply must be boolean`);
   if (fm.tags && !Array.isArray(fm.tags)) errors.push(`${file}: tags must be array`);
   if (fm.appliesTo && !Array.isArray(fm.appliesTo)) errors.push(`${file}: appliesTo must be array`);
   if (fm.owner && typeof fm.owner !== 'string') errors.push(`${file}: owner must be string`);
-  if (fm.severity && !['info', 'warn', 'error'].includes(String(fm.severity))) errors.push(`${file}: severity must be one of info|warn|error`);
-  if (fm.lastUpdated && !/^\d{4}-\d{2}-\d{2}$/.test(String(fm.lastUpdated))) errors.push(`${file}: lastUpdated must be YYYY-MM-DD`);
+  if (fm.severity && !['info', 'warn', 'error'].includes(String(fm.severity)))
+    errors.push(`${file}: severity must be one of info|warn|error`);
+  if (fm.lastUpdated && !/^\d{4}-\d{2}-\d{2}$/.test(String(fm.lastUpdated)))
+    errors.push(`${file}: lastUpdated must be YYYY-MM-DD`);
 
   // Curated alwaysApply
   if (fm.alwaysApply === true && !CURATED_ALWAYS.has(file)) {
@@ -76,4 +88,3 @@ function parseFrontmatter(src) {
   }
   return obj;
 }
-

@@ -862,6 +862,41 @@ const builder = (o as unknown as { user: () => unknown }).user();
 - Casting to `unknown` first allows TypeScript to accept the subsequent type assertion
 - This pattern is common when working with Proxy-based APIs
 
+## Test Mock Type Assertions
+
+**Pattern**: When creating test mocks that don't perfectly match types, use `as unknown as Type` (double cast).
+
+**❌ WRONG: Using `any` in test mocks**
+```typescript
+function createMockColumnBuilder(...): any {
+  return {
+    kind: 'column',
+    eq: () => ({ kind: 'binary', op: 'eq', left: {} as any, right: {} as any }),
+  };
+}
+```
+
+**✅ CORRECT: Using `unknown` with proper type assertions**
+```typescript
+function createMockColumnBuilder(...): AnyColumnBuilder {
+  return {
+    kind: 'column',
+    eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+  } as unknown as AnyColumnBuilder;
+}
+```
+
+**Why?**
+- `unknown` is type-safe (requires explicit checks)
+- Double cast (`as unknown as Type`) allows TypeScript to accept the assertion when types don't perfectly overlap
+- Avoids lint errors from `noExplicitAny` rule
+- Makes it clear the mock is intentionally simplified
+
+**When to use:**
+- Creating test mocks that don't implement the full interface
+- Mocking complex types where full implementation isn't needed
+- Test utilities that return simplified versions of types
+
 ## DRY Test Patterns
 
 **Pattern**: Common patterns in test files should be extracted into helper functions with JSDoc comments explaining their purpose.

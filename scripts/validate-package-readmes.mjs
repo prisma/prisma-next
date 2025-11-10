@@ -22,13 +22,16 @@ for (const dir of dirs) {
   }
   const txt = readFileSync(readme, 'utf8');
   if (!/^#\s+/m.test(txt)) warnings.push(`${dir}: README missing top-level title`);
-  if (!/^##\s+Responsibilities/m.test(txt)) warnings.push(`${dir}: README missing 'Responsibilities' section`);
-  if (!/^##\s+Dependencies/m.test(txt)) warnings.push(`${dir}: README missing 'Dependencies' section`);
+  if (!/^##\s+Responsibilities/m.test(txt))
+    warnings.push(`${dir}: README missing 'Responsibilities' section`);
+  if (!/^##\s+Dependencies/m.test(txt))
+    warnings.push(`${dir}: README missing 'Dependencies' section`);
 }
 
 if (errors.length) {
   console.error('README validation failed:\n' + errors.map((e) => ` - ${e}`).join('\n'));
-  if (warnings.length) console.warn('README warnings:\n' + warnings.map((w) => ` - ${w}`).join('\n'));
+  if (warnings.length)
+    console.warn('README warnings:\n' + warnings.map((w) => ` - ${w}`).join('\n'));
   process.exit(1);
 } else if (warnings.length) {
   console.warn('README warnings:\n' + warnings.map((w) => ` - ${w}`).join('\n'));
