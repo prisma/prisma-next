@@ -61,7 +61,7 @@ describe('emit integration', () => {
     'loads TS contract, emits artifacts, and uses them with lanes',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../../sql/runtime/adapters/postgres');
+      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -125,7 +125,7 @@ describe('emit integration', () => {
     'round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../../sql/runtime/adapters/postgres');
+      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);

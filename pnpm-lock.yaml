@@ -664,6 +664,9 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../../../targets/sql/operations
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../../../lanes/relational-core
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

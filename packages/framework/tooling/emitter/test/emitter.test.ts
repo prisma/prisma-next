@@ -113,7 +113,10 @@ describe('emitter', () => {
         sources: {},
       };
 
-      const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
+      const packs = loadExtensionPacks(
+        join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+        [],
+      );
       const options: EmitOptions = {
         outputDir: '',
         packs,
@@ -158,7 +161,10 @@ describe('emitter', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options: EmitOptions = {
       outputDir: '',
       packs,
@@ -193,7 +199,10 @@ describe('emitter', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options: EmitOptions = {
       outputDir: '',
       packs,
@@ -227,7 +236,10 @@ describe('emitter', () => {
       sources: {},
     } as ContractIR;
 
-    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options: EmitOptions = {
       outputDir: '',
       packs,
@@ -263,7 +275,10 @@ describe('emitter', () => {
       sources: {},
     } as ContractIR;
 
-    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options: EmitOptions = {
       outputDir: '',
       packs,
@@ -297,7 +312,10 @@ describe('emitter', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options: EmitOptions = {
       outputDir: '',
       packs,
@@ -332,7 +350,10 @@ describe('emitter', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     const options: EmitOptions = {
       outputDir: '',
       packs,

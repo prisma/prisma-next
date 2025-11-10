@@ -4,7 +4,9 @@ import { loadExtensionPackManifest, loadExtensionPacks } from '../src/extension-
 
 describe('extension-pack', () => {
   it('loads valid manifest', () => {
-    const manifest = loadExtensionPackManifest(join(__dirname, '../../../../adapter-postgres'));
+    const manifest = loadExtensionPackManifest(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+    );
     expect(manifest.id).toBe('postgres');
     expect(manifest.version).toBe('15.0.0');
     expect(manifest.types?.codecTypes?.import.package).toBe(
@@ -13,7 +15,10 @@ describe('extension-pack', () => {
   });
 
   it('loads extension packs with adapter first', () => {
-    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), []);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+      [],
+    );
     expect(packs.length).toBe(1);
     expect(packs[0]?.manifest.id).toBe('postgres');
   });
@@ -25,9 +30,10 @@ describe('extension-pack', () => {
   });
 
   it('loads extension packs with multiple extensions', () => {
-    const packs = loadExtensionPacks(join(__dirname, '../../../../adapter-postgres'), [
-      join(__dirname, '../../../../adapter-postgres'),
-    ]);
+    const packs = loadExtensionPacks(
+      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
+      [join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres')],
+    );
     expect(packs.length).toBe(2);
     expect(packs[0]?.manifest.id).toBe('postgres');
     expect(packs[1]?.manifest.id).toBe('postgres');

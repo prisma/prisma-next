@@ -24,7 +24,7 @@ let contract: ReturnType<typeof validateContract>;
 beforeAll(async () => {
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
-  const adapterPath = resolve(__dirname, '../../../packages/adapter-postgres');
+  const adapterPath = resolve(__dirname, '../../../packages/sql/runtime/adapters/postgres');
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, []);

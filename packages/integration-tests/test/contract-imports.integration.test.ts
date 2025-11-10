@@ -88,10 +88,7 @@ describe('contract.d.ts imports resolution', () => {
         sources: {},
       };
 
-      const packs = loadExtensionPacks(
-        join(__dirname, '../../../sql/runtime/adapters/postgres'),
-        [],
-      );
+      const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
       const options: EmitOptions = {
         outputDir: testDir,
         packs,
@@ -152,10 +149,10 @@ type UserIdColumn = UserColumns['id'];
           baseUrl: '.',
           paths: {
             '@prisma-next/sql-contract-types': [
-              `${relativeToWorkspace}/packages/sql-target/dist/exports/index.d.ts`,
+              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/index.d.ts`,
             ],
             '@prisma-next/sql-contract-types/*': [
-              `${relativeToWorkspace}/packages/sql-target/dist/exports/*`,
+              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/sql/runtime/adapters/postgres/dist/exports/*`,
@@ -255,10 +252,7 @@ type UserIdColumn = UserColumns['id'];
         sources: {},
       };
 
-      const packs = loadExtensionPacks(
-        join(__dirname, '../../../sql/runtime/adapters/postgres'),
-        [],
-      );
+      const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
       const options: EmitOptions = {
         outputDir: testDir,
         packs,
@@ -325,10 +319,10 @@ type CodecIntType = CodecTypes['pg/int4@1'];
               `${relativeToWorkspace}/packages/sql/authoring/sql-contract-ts/dist/exports/*.d.ts`,
             ],
             '@prisma-next/sql-contract-types': [
-              `${relativeToWorkspace}/packages/sql-target/dist/exports/index.d.ts`,
+              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/index.d.ts`,
             ],
             '@prisma-next/sql-contract-types/*': [
-              `${relativeToWorkspace}/packages/sql-target/dist/exports/*`,
+              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/sql/runtime/adapters/postgres/dist/exports/*`,

@@ -15,7 +15,8 @@
   "dependencies": {
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-contract-types": "workspace:*",
-    "@prisma-next/sql-operations": "workspace:*"
+    "@prisma-next/sql-operations": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
