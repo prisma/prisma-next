@@ -6,7 +6,7 @@ import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -104,7 +104,7 @@ describe('contract.d.ts imports resolution', () => {
 
       // Verify the generated contract.d.ts contains the correct import
       const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
-      expect(contractDtsContent).toContain("from '@prisma-next/sql-target'");
+      expect(contractDtsContent).toContain("from '@prisma-next/sql-contract-types'");
       expect(contractDtsContent).toContain('SqlContract');
       expect(contractDtsContent).toContain('SqlStorage');
       expect(contractDtsContent).toContain('SqlMappings');
@@ -113,7 +113,7 @@ describe('contract.d.ts imports resolution', () => {
 
       // Create a test TypeScript file that imports the generated contract.d.ts
       const testFileContent = `import type { Contract, CodecTypes } from './contract.d.ts';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 
 // Verify we can use the Contract type
 // biome-ignore lint/suspicious/noExplicitAny: test code with type assertions
@@ -148,6 +148,9 @@ type UserIdColumn = UserColumns['id'];
           types: [],
           baseUrl: '.',
           paths: {
+            '@prisma-next/sql-contract-types': [
+              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/index.d.ts`,
+            ],
             '@prisma-next/sql-target': [
               `${relativeToWorkspace}/packages/sql-target/dist/exports/index.d.ts`,
             ],
@@ -268,7 +271,7 @@ type UserIdColumn = UserColumns['id'];
 
       // Verify the contract.d.ts imports are correct
       const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
-      expect(contractDtsContent).toContain("from '@prisma-next/sql-target'");
+      expect(contractDtsContent).toContain("from '@prisma-next/sql-contract-types'");
       expect(contractDtsContent).toContain("from '@prisma-next/adapter-postgres/codec-types'");
 
       // Create a comprehensive test file that uses all exported types
@@ -315,6 +318,9 @@ type CodecIntType = CodecTypes['pg/int4@1'];
           types: [],
           baseUrl: '.',
           paths: {
+            '@prisma-next/sql-contract-types': [
+              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/index.d.ts`,
+            ],
             '@prisma-next/sql-target': [
               `${relativeToWorkspace}/packages/sql-target/dist/exports/index.d.ts`,
             ],
