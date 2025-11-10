@@ -118,7 +118,7 @@ packages/
 4) Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.
 5) Restructure `sql-target` under `targets/sql` and keep a curated entrypoint for adapters.
 6) Extract `framework/runtime-core` and move SQL-specific execution into `sql/sql-runtime`.
-7) Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated.
+7) Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated. ✅ **Complete** - `@prisma-next/sql-query` removed in Slice 7.
 
 ## Alternatives Considered
 
