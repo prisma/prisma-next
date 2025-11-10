@@ -6,9 +6,9 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { SelectAst as SelectAstType } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
-import { createStubAdapter, createTestContext } from '../../../../runtime/test/utils';
 import { sql } from '../src/sql/builder';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 

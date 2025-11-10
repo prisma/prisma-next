@@ -6,13 +6,13 @@ import { param } from '@prisma-next/sql-query/param';
 import { schema } from '@prisma-next/sql-query/schema';
 import { sql } from '@prisma-next/sql-query/sql';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { describe, expect, it } from 'vitest';
 import {
   createTestRuntimeFromClient,
   executePlanAndCollect,
   setupE2EDatabase,
-} from '../../runtime/test/utils';
+} from '@prisma-next/sql-runtime/test/utils';
+import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 import { loadContractFromDisk } from './utils';
 

@@ -2,8 +2,8 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import type { OperationSignature } from '@prisma-next/sql-operations';
 import { schema } from '@prisma-next/sql-query/schema';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { createStubAdapter, createTestContext } from '../../runtime/test/utils';
 
 describe('Operation capability gating', () => {
   it('exposes operation with required capability when capability is present', () => {

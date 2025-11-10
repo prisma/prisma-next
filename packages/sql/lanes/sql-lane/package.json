@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/pg": "^8.11.10",
     "pg": "^8.11.5",

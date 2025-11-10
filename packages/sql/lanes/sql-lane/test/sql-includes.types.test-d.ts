@@ -7,10 +7,10 @@ import type {
   HasIncludeManyCapabilities,
   InferNestedProjectionRow,
 } from '@prisma-next/sql-relational-core/types';
+import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { expectTypeOf, test } from 'vitest';
-import { createTestContext } from '../../../../runtime/test/utils';
 import { sql } from '../src/sql/builder';
 
 // Test contracts with different capability configurations

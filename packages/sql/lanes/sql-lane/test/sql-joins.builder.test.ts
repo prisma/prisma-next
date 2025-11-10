@@ -2,10 +2,10 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-target';
 import { createCodecRegistry } from '@prisma-next/sql-target';
 import { describe, expect, it } from 'vitest';
-import { createTestContext } from '../../../../runtime/test/utils';
 import { sql } from '../src/sql/builder';
 import type { CodecTypes } from './fixtures/contract.d';
 
