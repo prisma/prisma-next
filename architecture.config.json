@@ -49,12 +49,6 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/targets/sql/**",
-      "domain": "sql",
-      "layer": "targets",
-      "plane": "migration"
-    },
-    {
       "glob": "packages/sql/authoring/**",
       "domain": "sql",
       "layer": "authoring",
@@ -119,6 +113,12 @@
       "domain": "sql",
       "layer": "core",
       "plane": "shared"
+    },
+    {
+      "glob": "packages/sql/tooling/**",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "migration"
     }
   ],
   "rules": {
@@ -154,6 +154,6 @@
   },
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
-    "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters", "drivers"]
+    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"]
   }
 }

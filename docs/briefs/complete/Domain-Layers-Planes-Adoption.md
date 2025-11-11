@@ -117,7 +117,7 @@ Rules to enforce
     { "glob": "packages/emitter/**",              "domain": "framework", "layer": "tooling",       "plane": "migration" },
     { "glob": "packages/runtime/core/**",         "domain": "framework", "layer": "runtime-core",  "plane": "runtime" },
 
-    { "glob": "packages/targets/sql/**",          "domain": "sql",       "layer": "targets",      "plane": "migration" },
+    { "glob": "packages/sql/tooling/**",          "domain": "sql",       "layer": "tooling",      "plane": "migration" },
     { "glob": "packages/sql/authoring/**",        "domain": "sql",       "layer": "authoring",    "plane": "migration" },
     { "glob": "packages/sql/lanes/**",            "domain": "sql",       "layer": "lanes",        "plane": "runtime" },
     { "glob": "packages/sql/sql-runtime/**",      "domain": "sql",       "layer": "runtime",      "plane": "runtime" },

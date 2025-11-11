@@ -1,0 +1,17 @@
+Directory Layout — SQL Family vs Targets
+
+Rule: Place all SQL target-family packages (all layers and planes) under `packages/sql/**`.
+
+- Family internals: contract types, operations, emitter hooks, lanes, runtime, and adapters live under `packages/sql/**` in their respective layer folders.
+- Concrete targets: The top-level `packages/targets/**` is reserved for concrete target implementations as extension packs (e.g., `packages/targets/postgres`, `packages/targets/mysql`). These packs may contribute manifests and runtime pieces per the extension SPI.
+
+Examples
+- Family emitter hook: `packages/sql/targets/emitter` → `@prisma-next/sql-contract-emitter`
+- Contract types: `packages/sql/contract` → `@prisma-next/sql-contract`
+- Operations: `packages/sql/operations` → `@prisma-next/sql-operations`
+- Postgres adapter: `packages/sql/runtime/adapters/postgres` → `@prisma-next/adapter-postgres`
+- Postgres pack (concrete target): `packages/targets/postgres` (extension pack)
+
+Notes
+- Avoid placing SQL family internals under `packages/targets/sql/**`.
+- When moving existing code to conform, update `architecture.config.json`, `tsconfig.base.json` path aliases, and docs alongside the move.

@@ -79,13 +79,13 @@ packages/
 ### Runtime Separation
 
 - `packages/framework/runtime-core` exposes a target-agnostic SPI (verification, plugin lifecycle, telemetry), no direct imports from `targets/*`.
-- `packages/sql/sql-runtime` implements the SPI using SQL adapters and codecs from `packages/targets/sql/*` and `packages/sql/postgres/*`.
+- `packages/sql/sql-runtime` implements the SPI using SQL adapters and codecs from `packages/sql/contract/*`, `packages/sql/operations/*`, and `packages/sql/postgres/*`.
 - This enables booting the runtime with a non-SQL family by swapping in another family-runtime package that implements the same SPI.
 
 ### Emitter Hooks
 
 - Emitter remains target-agnostic with a hook registry keyed by `targetFamily`.
-- SQL-specific validation and `.d.ts` generation are implemented by the SQL hook under `packages/targets/sql/emitter`.
+- SQL-specific validation and `.d.ts` generation are implemented by the SQL hook under `packages/sql/tooling/emitter`.
 
 ### Package Naming Conventions
 
@@ -116,7 +116,7 @@ packages/
 2) Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/framework/authoring/contract-authoring`.
 3) Stand up `lanes/relational-core` and move schema/column builders and operation attachment there.
 4) Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.
-5) Restructure `sql-target` under `targets/sql` and keep a curated entrypoint for adapters.
+5) Restructure `sql-target` under `sql/tooling` and keep a curated entrypoint for adapters.
 6) Extract `framework/runtime-core` and move SQL-specific execution into `sql/sql-runtime`.
 7) Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated. ✅ **Complete** - `@prisma-next/sql-query` removed in Slice 7.
 

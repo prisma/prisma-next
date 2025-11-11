@@ -6,7 +6,7 @@
 - Goal is to lay the groundwork so subsequent slices can move code without violating dependency rules.
 
 ### Goals
-1. Create the top-level folder skeleton (`packages/core`, `packages/authoring`, `packages/targets/sql`, `packages/lanes`, `packages/runtime`, `packages/sql`, `packages/document`, `packages/compat`). Tag each package by domain/layer/plane in the guardrail config.
+1. Create the top-level folder skeleton (`packages/core`, `packages/authoring`, `packages/lanes`, `packages/runtime`, `packages/sql`, `packages/document`, `packages/compat`, and optionally `packages/targets/<concrete>` for extension packs). Tag each package by domain/layer/plane in the guardrail config.
 2. Update `pnpm-workspace.yaml` to include the new globs (even if empty) so tooling recognizes the future packages.
 3. Add TypeScript path aliases + project references for the new packages (stubs pointing to placeholder `src/index.ts`).
 4. Configure import guardrails enforcing Domains/Layers/Planes: same‑layer + downward allowed; upward denied; migration→runtime imports denied; cross‑domain imports denied except into framework.

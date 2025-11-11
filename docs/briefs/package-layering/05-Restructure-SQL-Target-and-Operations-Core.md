@@ -11,7 +11,7 @@
    - Keep this package target-neutral; it should depend only on `@prisma-next/contract` types.
    - Provide exports used by authoring, relational core, lanes, runtime, and adapters.
 2. **Split SQL target responsibilities**
-   - Create/complete `packages/targets/sql/contract-types`, `packages/targets/sql/operations`, and `packages/targets/sql/emitter` with their own build/test configs.
+  - Create/complete `packages/sql/contract`, `packages/sql/operations`, and `packages/sql/tooling/emitter` with their own build/test configs.
    - Move the relevant files from `packages/sql-target/src` into those packages.
    - Keep curated exports so consumers import only what they need.
 3. **Update consumers**
@@ -20,14 +20,14 @@
 4. **Verify extension packs and adapters register operations through the new module.**
 
 ### Filesystem changes (explicit)
-- Create target packages under `packages/targets/sql/`:
-  - `packages/targets/sql/contract-types/src/index.ts` (exports `SqlContract`, `SqlStorage`, mappings)
-  - `packages/targets/sql/operations/src/index.ts` (exports SQL op manifests + lowering metadata)
-  - `packages/targets/sql/emitter/src/index.ts` (SQL emitter hook implementation)
+- Create SQL family packages under `packages/sql/`:
+  - `packages/sql/contract/src/exports/types.ts` (exports `SqlContract`, `SqlStorage`, mappings)
+  - `packages/sql/operations/src/index.ts` (exports SQL op manifests + lowering metadata)
+  - `packages/sql/tooling/emitter/src/index.ts` (SQL emitter hook implementation)
 - Move code from `packages/sql-target/src/*` into the new packages:
   - `contract-types.ts` → `targets/sql/contract-types/src`
   - `operations-registry.ts` (manifests) → `targets/sql/operations/src`
-  - `emitter-hook.ts` → `targets/sql/emitter/src`
+  - `emitter-hook.ts` → `sql/tooling/emitter/src`
 - Update `packages/sql-target/src/exports/*` to re-export from the new packages temporarily (with TODO: Slice 7 removal).
 - Update `tsconfig.base.json` paths for the three new packages and add them to `pnpm-workspace.yaml`.
 
@@ -38,7 +38,7 @@
 
 ### Deliverables
 - `packages/core/operations` populated with shared registry helpers and tests.
-- `packages/targets/sql/{contract-types,operations,emitter}` containing the SQL-specific pieces with independent build/test configs.
+- `packages/sql/{contract,operations,tooling/emitter}` containing the SQL-specific pieces with independent build/test configs.
 - Updated imports throughout the repo pointing at the new packages, plus transitional re-exports.
 - Documentation (Slice 12, ADR 140) reflecting the new boundaries.
 

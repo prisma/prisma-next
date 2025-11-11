@@ -90,7 +90,7 @@ The repository is organized by **Domains → Layers → Planes**:
 - **Tooling layer** (migration plane): `@prisma-next/cli`, `@prisma-next/emitter` live in `packages/framework/tooling/*`
 - **Runtime-executor layer** (runtime plane): `@prisma-next/runtime-executor` lives in `packages/framework/runtime-executor`
 
-**SQL Domain (Target‑Family)** (`packages/sql/**` and `packages/targets/sql/**`):
+**SQL Domain (Target‑Family)** (`packages/sql/**`):
 - Family‑level types and schema: `@prisma-next/sql-contract-types` (dialect‑agnostic contract shapes)
 - Family‑level operations: `@prisma-next/sql-operations` (operation types/registry helpers, shared plane). Manifest assembly happens in CLI layer.
 - Family emitter hook: `@prisma-next/sql-contract-emitter` (`sqlTargetFamilyHook`)
@@ -612,7 +612,7 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
 **Implementation:**
 - Core emitter: `packages/framework/tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
 - Target family SPI: The `emit()` function accepts a `targetFamily: TargetFamilyHook` parameter directly. Authoring surfaces (CLI, tests) determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry or auto-registration.
-- SQL target family SPI: `packages/targets/sql/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
+- SQL target family SPI: `packages/sql/tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
 - Extension pack loading: `packages/framework/tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
 - Manifest types: `packages/framework/tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
 - CLI pack assembly: `packages/framework/tooling/cli/src/pack-assembly.ts` - assembles operation registries from extension packs and extracts separate codec/operation type imports

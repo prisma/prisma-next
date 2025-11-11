@@ -79,7 +79,7 @@
   ```
 
 ### Affected Files (initial extraction)
-- Move/remove assembly from: `packages/targets/sql/operations/src/index.ts`
+- Move/remove assembly from: `packages/sql/operations/src/index.ts`
   - Remove direct imports of `ExtensionPack` and pack types from this package.
   - Keep only `SqlLoweringSpec`, `SqlOperationSignature`, registry helpers.
 - Add mapping/assembly in tooling: `packages/framework/tooling/packs/src/sql-ops.ts`
@@ -108,4 +108,3 @@
 - Hidden coupling in tests to old assembly: migrate tests gradually; provide shared fixtures for manifests and a helper that builds a registry via tooling.
 - Naming churn: keep `@prisma-next/sql-operations` name stable; only move responsibilities.
 - Docs drift: update Architecture Overview and AGENT_ONBOARDING to reflect the Pack Manager/tooling role vs shared sql-operations model.
-

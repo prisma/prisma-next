@@ -95,10 +95,10 @@ packages/
 | `packages/sql-query/src/sql.ts`, `raw.ts`, AST builders, adapters to SQL strings | `packages/lanes/sql-lane` | Consumes `relational-core`; exposes the relational DSL and raw lane surfaces. |
 | `packages/sql-query/src/orm-builder.ts`, `orm-types.ts`, `orm-include-child.ts`, `orm-relation-filter.ts` | `packages/lanes/orm-lane` | Splits `orm-builder.ts` into feature-specific modules (projection, includes, filters) and depends on `relational-core` for schema access. |
 | Operation registry types (`packages/sql-target/src/operations-registry.ts`) + column attachment logic | `packages/core/operations` | New shared module (`@prisma-next/operations`) defining `OperationSignature`, capability gating, and the execution helper used by both authoring validation and lanes. |
-| `packages/sql-target` | `packages/targets/sql` | Flatten into subfolders (`contract-types`, `operations`, `emitter`). Provide a single curated entry point for adapters. |
+| `packages/sql-target` | `packages/sql` | Flatten into subfolders (`contract`, `operations`, `tooling/emitter`). Provide a single curated entry point for adapters under `packages/sql/runtime/adapters/*`. |
 | `packages/runtime` (SQL-specific today) | `packages/runtime/core` + `packages/sql/sql-runtime` | Core owns plan verification + plugin SPI; SQL runtime implements the family-specific runtime and plugs into core. |
 
-> **Target-family domains:** each new family (document, graph, …) should mirror the SQL domain—authoring packages under `packages/<family>/authoring`, target packages under `packages/targets/<family>`, lanes under `packages/<family>/lanes`, runtime implementation under `packages/<family>/<family>-runtime`, and adapters under `packages/<family>/<adapter>`. Layers keep dependency direction consistent; domains keep ownership discoverable.
+> **Target-family domains:** each new family (document, graph, …) should mirror the SQL domain—authoring packages under `packages/<family>/authoring`, family-specific targets under `packages/<family>/targets`, lanes under `packages/<family>/lanes`, runtime implementation under `packages/<family>/<family>-runtime`, and adapters under `packages/<family>/runtime/adapters/*`. The top-level `packages/targets/**` is reserved for concrete target extension packs (e.g., `packages/targets/postgres`). Layers keep dependency direction consistent; domains keep ownership discoverable.
 
 ---
 

@@ -106,6 +106,5 @@ M5 — Architecture & Dependency Cruiser
 ### Verification Checklist (grep/scriptable)
 - No `ExtensionPack` or `manifest` imports in `packages/sql/operations/src`.
 - No `loadExtensionPacks` exposed in `packages/framework/tooling/emitter/src/exports/index.ts`.
-- No imports from `packages/targets/sql/**` in runtime-plane code.
+- No imports from `packages/sql/tooling/**` (migration plane) in runtime-plane code.
 - `pnpm lint:deps` passes with runtime→migration operations exception removed.
-

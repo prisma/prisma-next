@@ -67,7 +67,7 @@ Naming note: published names can remain (`@prisma-next/adapter-postgres`, `@pris
    - Update internal imports and path aliases accordingly
 
 4) `packages/sql-target`
-   - State: legacy, replaced by `packages/targets/sql/{contract-types,operations,emitter}`
+   - State: legacy, replaced by `packages/sql/{contract,operations,tooling/emitter}`
    - Action: remove package; optionally leave a stub `README.md` that points to the new locations
    - If transitional re-exports exist, delete them; update tests to use new targets packages
 
@@ -129,4 +129,3 @@ Naming note: published names can remain (`@prisma-next/adapter-postgres`, `@pris
 ## Notes
 
 - This brief complements 06a by finishing framework domain relocation and ensures the SQL runtime/adapters axis is cleanly laid out for upcoming extension packs and additional targets (e.g., MySQL).
-

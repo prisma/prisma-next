@@ -328,7 +328,7 @@ importers:
         version: link:../../../sql/contract
       '@prisma-next/sql-contract-emitter':
         specifier: workspace:*
-        version: link:../../../targets/sql/emitter
+        version: link:../../../sql/tooling/emitter
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../sql/authoring/sql-contract-ts
@@ -713,14 +713,14 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
-  packages/targets/sql/emitter:
+  packages/sql/tooling/emitter:
     dependencies:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../../framework/tooling/emitter
       '@prisma-next/sql-contract':
         specifier: workspace:*
-        version: link:../../../sql/contract
+        version: link:../../contract
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -797,7 +797,7 @@ importers:
         version: link:../../packages/framework/tooling/emitter
       '@prisma-next/sql-contract-emitter':
         specifier: workspace:*
-        version: link:../../packages/targets/sql/emitter
+        version: link:../../packages/sql/tooling/emitter
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../packages/sql/authoring/sql-contract-ts

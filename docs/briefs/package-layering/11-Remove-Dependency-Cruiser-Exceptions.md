@@ -43,7 +43,8 @@ The shared plane (as used in `architecture.config.json`) contains code and prebu
 1. ~~Surface Contracts to Shared Plane~~ ✅ **COMPLETED**
    - ~~Create `packages/sql/contract` (plane: shared) that exposes target‑agnostic and per‑target contract artifacts: `contract.d.ts` + `contract.json`.~~ ✅ **COMPLETED** - Package created with types, validators, and factories
    - ~~Update SQL authoring/targets to emit into this package; re‑export minimal public types.~~ ✅ **COMPLETED** - Deprecated `@prisma-next/sql-contract-types` in favor of `@prisma-next/sql-contract`
-   - ~~Update consumers to import from `packages/sql/contract` or framework core‑contract instead of `packages/targets/sql` or authoring packages.~~ ✅ **COMPLETED** - All imports updated
+  - ~~Update consumers to import from `packages/sql/contract` or framework core‑contract instead of `packages/targets/sql` or authoring packages.~~ ✅ **COMPLETED** - All imports updated
+  - Note: SQL family packages live under `packages/sql/**`; do not place family internals under `packages/targets/**` (reserved for concrete target packs like Postgres/MySQL).
 
 2. ~~Remove Runtime → Migration Edges~~ ✅ **COMPLETED** (for contract types)
    - ~~Update `packages/sql/sql-runtime`, `packages/sql/lanes/*`, `packages/sql/runtime/adapters/*`, and `packages/extensions/compat-prisma` to import from the shared contract surface or framework core‑contract only.~~ ✅ **COMPLETED** - All packages import from `@prisma-next/sql-contract/types`

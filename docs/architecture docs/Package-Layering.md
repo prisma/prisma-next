@@ -147,15 +147,13 @@ Contract authoring surfaces for creating contracts programmatically.
 **SQL Domain (Migration Plane):**
 - `packages/sql/authoring/sql-contract-ts/` → `@prisma-next/sql-contract-ts` - SQL TS authoring surface wraps `@prisma-next/contract-authoring`
 
-**Dependency Rules:** Can import from `core/*` only. SQL authoring may also import from SQL targets layer.
+**Dependency Rules:** Can import from `core/*` only. SQL authoring may also import from SQL tooling layer.
 
-### Targets Layer (SQL Domain, Migration→Runtime Boundary)
+### Tooling Layer (SQL Domain, Migration Plane)
 
-Target-family specific contract types and emitter hooks.
+Target-family specific emitter hooks.
 
-- `packages/targets/sql/contract-types/` → `@prisma-next/sql-contract-types` - SQL contract types
-- `packages/targets/sql/operations/` → `@prisma-next/sql-operations` - SQL-specific operations
-- `packages/targets/sql/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
+- `packages/sql/tooling/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
 
 **Dependency Rules:** Can import from `core/*` and `authoring/*` only.
 
@@ -214,7 +212,7 @@ Database adapters, drivers, and optional compatibility shims. These packages may
 | `packages/framework/runtime-executor/` | `@prisma-next/runtime-executor` |
 | `packages/targets/sql/contract-types/` | `@prisma-next/sql-contract-types` |
 | `packages/targets/sql/operations/` | `@prisma-next/sql-operations` |
-| `packages/targets/sql/emitter/` | `@prisma-next/sql-contract-emitter` |
+| `packages/sql/tooling/emitter/` | `@prisma-next/sql-contract-emitter` |
 | `packages/sql/lanes/relational-core/` | `@prisma-next/sql-relational-core` |
 | `packages/sql/lanes/sql-lane/` | `@prisma-next/sql-lane` |
 | `packages/sql/lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
@@ -242,9 +240,9 @@ Path aliases map published package names to source entry files:
       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
       "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
       "@prisma-next/runtime-executor": ["packages/framework/runtime-executor/src/index.ts"],
-      "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
-      "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],
-      "@prisma-next/sql-contract-emitter": ["packages/targets/sql/emitter/src/index.ts"],
+      "@prisma-next/sql-contract": ["packages/sql/contract/src/exports/types.ts"],
+      "@prisma-next/sql-operations": ["packages/sql/operations/src/index.ts"],
+      "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
       "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
       "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/index.ts"],
       "@prisma-next/adapter-postgres": ["packages/adapter-postgres/src/exports/index.ts"],
@@ -264,7 +262,7 @@ Layer aliases are optional ergonomic helpers for internal development. They are 
     "paths": {
       "@core/*": ["packages/core/*/src"],
       "@authoring/*": ["packages/authoring/*/src"],
-      "@targets/sql/*": ["packages/targets/sql/*/src"],
+      "@targets/*": ["packages/targets/*/src"],
       "@sql/*": ["packages/sql/*/src"],
       "@runtime/*": ["packages/runtime/*/src"],
       "@adapters/*": ["packages/sql/*/*/src"]
@@ -287,11 +285,11 @@ Layer aliases are optional ergonomic helpers for internal development. They are 
 
 - **`core/*`** → cannot import from any other layer
 - **`authoring/*`** → can import from `core/*` only
-- **`targets/sql/*`** → can import from `core/*` and `authoring/*` only
-- **`sql/lanes/*`** → can import from `core/*`, `authoring/*`, `targets/sql/*` only
-- **`runtime/core`** → can import from `core/*`, `authoring/*`, `targets/sql/*` only (no direct imports from `targets/*`)
-- **`sql/sql-runtime`** → can import from `runtime/core` and `targets/sql/*` and `sql/postgres/*` only
-- **`sql/postgres/*`** → can import from `targets/sql/*` and `sql/sql-runtime` only
+- **`sql/tooling/*`** → can import from `core/*` and `authoring/*` only
+- **`sql/lanes/*`** → can import from `core/*`, `authoring/*`, `sql/tooling/*` only
+- **`runtime/core`** → can import from `core/*`, `authoring/*`, `sql/tooling/*` only (no direct imports from `targets/*`)
+- **`sql/sql-runtime`** → can import from `runtime/core` and `sql/tooling/*` and `sql/postgres/*` only
+- **`sql/postgres/*`** → can import from `sql/tooling/*` and `sql/sql-runtime` only
 
 ### Domain Rules
 
@@ -338,7 +336,7 @@ The `pnpm-workspace.yaml` includes patterns for all layers:
 packages:
   - packages/core/*
   - packages/authoring/*
-  - packages/targets/sql/*
+  - packages/sql/tooling/*
   - packages/sql/**
   - packages/runtime/*
   - packages/compat/*

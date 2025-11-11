@@ -25,16 +25,16 @@ This document defines the relationship between the repository directory layout a
 
 **SQL Domain:**
 - `packages/sql/authoring/sql-contract-ts` → `@prisma-next/sql-contract-ts`
-- `packages/targets/sql/contract-types` → `@prisma-next/sql-contract-types`
-- `packages/targets/sql/operations` → `@prisma-next/sql-operations`
-- `packages/targets/sql/emitter` → `@prisma-next/sql-contract-emitter`
+- `packages/sql/contract` → `@prisma-next/sql-contract`
+- `packages/sql/operations` → `@prisma-next/sql-operations`
+- `packages/sql/tooling/emitter` → `@prisma-next/sql-contract-emitter`
 - `packages/sql/lanes/relational-core` → `@prisma-next/sql-relational-core`
 - `packages/sql/lanes/sql-lane` → `@prisma-next/sql-lane`
 - `packages/sql/lanes/orm-lane` → `@prisma-next/sql-orm-lane`
 - `packages/sql/sql-runtime` → `@prisma-next/sql-runtime`
-- `packages/adapter-postgres` → `@prisma-next/adapter-postgres`
-- `packages/driver-postgres` → `@prisma-next/driver-postgres`
-- `packages/compat-prisma` → `@prisma-next/compat-prisma`
+- `packages/sql/runtime/adapters/postgres` → `@prisma-next/adapter-postgres`
+- `packages/sql/runtime/drivers/postgres` → `@prisma-next/driver-postgres`
+- `packages/extensions/compat-prisma` → `@prisma-next/compat-prisma`
 
 ## TypeScript Path Aliases (dev-time)
 
@@ -57,9 +57,9 @@ Use published package names as canonical import specifiers. Map them to `src/` e
       "@prisma-next/runtime-executor": ["packages/framework/runtime-executor/src/index.ts"],
 
       "@prisma-next/sql-contract-ts": ["packages/sql/authoring/sql-contract-ts/src/exports/index.ts"],
-      "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
-      "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],
-      "@prisma-next/sql-contract-emitter": ["packages/targets/sql/emitter/src/index.ts"],
+      "@prisma-next/sql-contract": ["packages/sql/contract/src/exports/types.ts"],
+      "@prisma-next/sql-operations": ["packages/sql/operations/src/index.ts"],
+      "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
 
       "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
       "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
@@ -86,7 +86,7 @@ Optional layer/group aliases for ergonomics (not for published imports):
       "@framework/authoring/*": ["packages/framework/authoring/*/src"],
       "@framework/tooling/*": ["packages/framework/tooling/*/src"],
       "@framework/runtime-executor": ["packages/framework/runtime-executor/src"],
-      "@targets/sql/*": ["packages/targets/sql/*/src"],
+      "@sql/tooling/*": ["packages/sql/tooling/*/src"],
       "@sql/*": ["packages/sql/*/src"],
       "@adapters/*": ["packages/adapter-*/src"]
     }
@@ -99,7 +99,7 @@ Optional layer/group aliases for ergonomics (not for published imports):
 ```yaml
 packages:
   - packages/framework/**
-  - packages/targets/sql/*
+  - packages/sql/tooling/*
   - packages/sql/**
   - packages/runtime/*
   - packages/compat/*
@@ -110,4 +110,3 @@ packages:
 
 - Use `scripts/check-imports.mjs` with `architecture.config.json` to enforce dependency direction: `core → authoring → targets → lanes → runtime-executor → family-runtime → adapters`.
 - The import validation script enforces domain/layer/plane rules: same-layer imports allowed, downward imports allowed, upward imports denied, cross-domain imports denied except framework domain, migration→runtime imports denied, runtime→migration imports allowed for artifacts only.
-

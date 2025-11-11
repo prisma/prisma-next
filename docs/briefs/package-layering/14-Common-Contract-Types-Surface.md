@@ -17,7 +17,7 @@ This slice makes structure and flow predictable: shared types/validators in a de
 
 ### Decisions (locked)
 - Package name/path (SQL, shared plane): `@prisma-next/sql-contract` at `packages/sql/contract`.
-- Types source: Move SQL contract type aliases from `packages/targets/sql/contract-types` into `packages/sql/contract/src/types.ts`. Keep `@prisma-next/sql-contract-types` as a transitional re‑export until all imports are updated.
+- Types source: SQL contract type aliases live in `packages/sql/contract/src/types.ts`. The previous `packages/targets/sql/contract-types` location has been retired.
 - Validators: Implement Arktype validators in `packages/sql/contract/src/validators.ts` (side‑effect free).
 - SQL IR factories: Implement in `packages/sql/contract/src/factories.ts` (pure, normalized builders for storage/tables/columns/models/relations/mappings/contracts).
 - Family‑agnostic IR model + factories: Implement in the framework shared plane under `packages/framework/core-contract` and export via `@prisma-next/contract/exports/ir`. Rationale: IR is pure data with value across planes, including no‑emit runtime; it should live alongside `ContractBase`/plan types, not in tooling. The emitter depends on IR; it may temporarily re‑export for migration.
@@ -133,7 +133,7 @@ validateSqlContract(c); // throws on structural mismatch
 4. ~~Add `framework/core-contract/exports/ir.ts` with IR types + factories and export from `@prisma-next/contract`. Optionally, temporarily re‑export from emitter to smooth migration.~~ ✅ **COMPLETED** - IR moved to `@prisma-next/contract/ir`
 5. Update imports:
    - Authoring (`packages/sql/authoring/sql-contract-ts`) → `@prisma-next/sql-contract/exports/types` (and optionally validators for JSON validation helper).
-   - SQL emitter (`packages/targets/sql/emitter`) → SQL types/validators from `@prisma-next/sql-contract/exports/*`; use shared IR factories from `@prisma-next/contract/exports/ir` where applicable.
+   - SQL emitter (`packages/sql/tooling/emitter`) → SQL types/validators from `@prisma-next/sql-contract/exports/*`; use shared IR factories from `@prisma-next/contract/exports/ir` where applicable.
    - Lanes/runtime: compile‑time type imports, if any, switch to `@prisma-next/sql-contract/exports/types`. Runtime continues to ingest `contract.json` and can validate via `validateSqlContract`; in no‑emit, construct IR via `@prisma-next/contract/exports/ir`.
 6. Refactor tests:
    - Replace ad‑hoc IR literals with SQL factories + emitter IR factories; keep a few negative literal cases.
