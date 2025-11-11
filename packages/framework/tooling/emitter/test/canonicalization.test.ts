@@ -1,21 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalizeContract } from '../src/canonicalization';
-import type { ContractIR } from '../src/types';
+import { createContractIR } from './utils';
 
 describe('canonicalization', () => {
   it('orders top-level sections correctly', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
-      storage: { tables: {} },
-      extensions: {},
+    const ir = createContractIR({
       capabilities: { postgres: { jsonAgg: true } },
       meta: { source: 'test' },
-      sources: {},
-    };
+    });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
@@ -38,12 +30,7 @@ describe('canonicalization', () => {
   });
 
   it('omits nullable false from columns', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -54,11 +41,7 @@ describe('canonicalization', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
@@ -73,18 +56,7 @@ describe('canonicalization', () => {
   });
 
   it('omits empty arrays and objects except required ones', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
-      storage: { tables: {} },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    const ir = createContractIR();
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result);
@@ -106,12 +78,7 @@ describe('canonicalization', () => {
   });
 
   it('preserves semantic array order for column lists', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -125,20 +92,11 @@ describe('canonicalization', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result1 = canonicalizeContract(ir);
 
-    const ir2: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
+    const ir2 = createContractIR({
       storage: {
         tables: {
           user: {
@@ -152,11 +110,7 @@ describe('canonicalization', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result2 = canonicalizeContract(ir2);
 
@@ -164,12 +118,7 @@ describe('canonicalization', () => {
   });
 
   it('sorts non-semantic arrays by canonical name', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -183,11 +132,7 @@ describe('canonicalization', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
@@ -200,12 +145,7 @@ describe('canonicalization', () => {
   });
 
   it('sorts nested object keys lexicographically', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -217,11 +157,7 @@ describe('canonicalization', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
@@ -234,22 +170,13 @@ describe('canonicalization', () => {
   });
 
   it('sorts extension namespaces lexicographically', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
-      storage: { tables: {} },
+    const ir = createContractIR({
       extensions: {
         pgvector: { version: '1.0.0' },
         postgres: { version: '15.0.0' },
         another: { version: '1.0.0' },
       },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
@@ -259,12 +186,7 @@ describe('canonicalization', () => {
   });
 
   it('omits generated false', () => {
-    const ir: ContractIR = {
-      targetFamily: 'sql',
-      target: 'postgres',
-      schemaVersion: '1',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -274,11 +196,7 @@ describe('canonicalization', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;

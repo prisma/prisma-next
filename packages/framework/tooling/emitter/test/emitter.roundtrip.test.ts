@@ -5,6 +5,7 @@ import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { TargetFamilyHook } from '../src/target-family';
 import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
+import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
@@ -74,12 +75,7 @@ describe('emitter round-trip', () => {
   it(
     'round-trip with minimal IR',
     async () => {
-      const ir: ContractIR = {
-        schemaVersion: '1',
-        targetFamily: 'sql',
-        target: 'postgres',
-        models: {},
-        relations: {},
+      const ir = createContractIR({
         storage: {
           tables: {
             user: {
@@ -97,10 +93,7 @@ describe('emitter round-trip', () => {
           postgres: { version: '15.0.0' },
           pg: {},
         },
-        capabilities: {},
-        meta: {},
-        sources: {},
-      };
+      });
 
       const packs = loadExtensionPacks(
         join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -114,7 +107,7 @@ describe('emitter round-trip', () => {
       const result1 = await emit(ir, options, mockSqlHook);
       const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-      const ir2: ContractIR = {
+      const ir2 = createContractIR({
         schemaVersion: contractJson1['schemaVersion'] as string,
         targetFamily: contractJson1['targetFamily'] as string,
         target: contractJson1['target'] as string,
@@ -126,7 +119,7 @@ describe('emitter round-trip', () => {
           (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
         meta: (contractJson1['meta'] as Record<string, unknown>) || {},
         sources: (contractJson1['sources'] as Record<string, unknown>) || {},
-      };
+      });
 
       const result2 = await emit(ir2, options, mockSqlHook);
 
@@ -137,10 +130,7 @@ describe('emitter round-trip', () => {
   );
 
   it('round-trip with complex IR', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
+    const ir = createContractIR({
       models: {
         User: {
           storage: { table: 'user' },
@@ -161,7 +151,6 @@ describe('emitter round-trip', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           user: {
@@ -197,10 +186,7 @@ describe('emitter round-trip', () => {
       extensions: {
         postgres: { version: '15.0.0' },
       },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -214,7 +200,7 @@ describe('emitter round-trip', () => {
     const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2: ContractIR = {
+    const ir2 = createContractIR({
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
@@ -226,7 +212,7 @@ describe('emitter round-trip', () => {
         (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: (contractJson1['meta'] as Record<string, unknown>) || {},
       sources: (contractJson1['sources'] as Record<string, unknown>) || {},
-    };
+    });
 
     const result2 = await emit(ir2, options, mockSqlHook);
 
@@ -235,12 +221,7 @@ describe('emitter round-trip', () => {
   });
 
   it('round-trip with nullable fields', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -260,10 +241,7 @@ describe('emitter round-trip', () => {
         postgres: { version: '15.0.0' },
         pg: {},
       },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -277,7 +255,7 @@ describe('emitter round-trip', () => {
     const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2: ContractIR = {
+    const ir2 = createContractIR({
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
@@ -289,7 +267,7 @@ describe('emitter round-trip', () => {
         (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: (contractJson1['meta'] as Record<string, unknown>) || {},
       sources: (contractJson1['sources'] as Record<string, unknown>) || {},
-    };
+    });
 
     const result2 = await emit(ir2, options, mockSqlHook);
 
@@ -310,12 +288,7 @@ describe('emitter round-trip', () => {
   });
 
   it('round-trip with capabilities', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -339,9 +312,7 @@ describe('emitter round-trip', () => {
           lateral: true,
         },
       },
-      meta: {},
-      sources: {},
-    };
+    });
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -355,7 +326,7 @@ describe('emitter round-trip', () => {
     const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2: ContractIR = {
+    const ir2 = createContractIR({
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
@@ -367,7 +338,7 @@ describe('emitter round-trip', () => {
         (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: (contractJson1['meta'] as Record<string, unknown>) || {},
       sources: (contractJson1['sources'] as Record<string, unknown>) || {},
-    };
+    });
 
     const result2 = await emit(ir2, options, mockSqlHook);
 

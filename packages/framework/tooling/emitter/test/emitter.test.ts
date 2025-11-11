@@ -5,6 +5,7 @@ import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { TargetFamilyHook } from '../src/target-family';
 import type { ContractIR, EmitOptions, ExtensionPack, ExtensionPackManifest } from '../src/types';
+import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
@@ -73,10 +74,7 @@ describe('emitter', () => {
   it(
     'emits contract.json and contract.d.ts',
     async () => {
-      const ir: ContractIR = {
-        schemaVersion: '1',
-        targetFamily: 'sql',
-        target: 'postgres',
+      const ir = createContractIR({
         models: {
           User: {
             storage: { table: 'user' },
@@ -87,7 +85,6 @@ describe('emitter', () => {
             relations: {},
           },
         },
-        relations: {},
         storage: {
           tables: {
             user: {
@@ -108,10 +105,7 @@ describe('emitter', () => {
           },
           pg: {},
         },
-        capabilities: {},
-        meta: {},
-        sources: {},
-      };
+      });
 
       const packs = loadExtensionPacks(
         join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -136,12 +130,7 @@ describe('emitter', () => {
   );
 
   it('validates type IDs come from referenced extensions', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -155,11 +144,7 @@ describe('emitter', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -174,12 +159,7 @@ describe('emitter', () => {
   });
 
   it('validates type ID format', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -193,11 +173,7 @@ describe('emitter', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -212,12 +188,8 @@ describe('emitter', () => {
   });
 
   it('throws error when targetFamily is missing', async () => {
-    const ir = {
-      schemaVersion: '1',
-      target: 'postgres',
+    const ir = createContractIR({
       targetFamily: undefined as unknown as string,
-      models: {},
-      relations: {},
       storage: {
         tables: {
           user: {
@@ -230,11 +202,7 @@ describe('emitter', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    } as ContractIR;
+    }) as ContractIR;
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -251,12 +219,8 @@ describe('emitter', () => {
   });
 
   it('throws error when target is missing', async () => {
-    const ir = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
+    const ir = createContractIR({
       target: undefined as unknown as string,
-      models: {},
-      relations: {},
       storage: {
         tables: {
           user: {
@@ -269,11 +233,7 @@ describe('emitter', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    } as ContractIR;
+    }) as ContractIR;
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -288,12 +248,7 @@ describe('emitter', () => {
   });
 
   it('throws error when extension pack is missing from extensions', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -306,11 +261,7 @@ describe('emitter', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -326,12 +277,7 @@ describe('emitter', () => {
   });
 
   it('handles missing extensions field', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -344,11 +290,7 @@ describe('emitter', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const packs = loadExtensionPacks(
       join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
@@ -364,12 +306,7 @@ describe('emitter', () => {
   });
 
   it('handles empty packs array', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      models: {},
-      relations: {},
+    const ir = createContractIR({
       storage: {
         tables: {
           user: {
@@ -382,11 +319,7 @@ describe('emitter', () => {
           },
         },
       },
-      extensions: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const packs: ExtensionPack[] = [];
     const options: EmitOptions = {
@@ -395,5 +328,267 @@ describe('emitter', () => {
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
+  });
+
+  it('throws error when schemaVersion is missing', async () => {
+    const ir = createContractIR({
+      schemaVersion: undefined as unknown as string,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR must have schemaVersion',
+    );
+  });
+
+  it('throws error when models is missing', async () => {
+    const ir = createContractIR({
+      models: undefined as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have models');
+  });
+
+  it('throws error when models is not an object', async () => {
+    const ir = createContractIR({
+      models: 'not-an-object' as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have models');
+  });
+
+  it('throws error when storage is missing', async () => {
+    const ir = createContractIR({
+      storage: undefined as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have storage');
+  });
+
+  it('throws error when storage is not an object', async () => {
+    const ir = createContractIR({
+      storage: 'not-an-object' as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have storage');
+  });
+
+  it('throws error when relations is missing', async () => {
+    const ir = createContractIR({
+      relations: undefined as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have relations');
+  });
+
+  it('throws error when relations is not an object', async () => {
+    const ir = createContractIR({
+      relations: 'not-an-object' as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have relations');
+  });
+
+  it('throws error when extensions is missing', async () => {
+    const ir = createContractIR({
+      extensions: undefined as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have extensions');
+  });
+
+  it('throws error when extensions is not an object', async () => {
+    const ir = createContractIR({
+      extensions: 'not-an-object' as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have extensions');
+  });
+
+  it('throws error when capabilities is missing', async () => {
+    const ir = createContractIR({
+      capabilities: undefined as unknown as Record<string, Record<string, boolean>>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR must have capabilities',
+    );
+  });
+
+  it('throws error when capabilities is not an object', async () => {
+    const ir = createContractIR({
+      capabilities: 'not-an-object' as unknown as Record<string, Record<string, boolean>>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR must have capabilities',
+    );
+  });
+
+  it('throws error when meta is missing', async () => {
+    const ir = createContractIR({
+      meta: undefined as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have meta');
+  });
+
+  it('throws error when meta is not an object', async () => {
+    const ir = createContractIR({
+      meta: 'not-an-object' as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have meta');
+  });
+
+  it('throws error when sources is missing', async () => {
+    const ir = createContractIR({
+      sources: undefined as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
+  });
+
+  it('throws error when sources is not an object', async () => {
+    const ir = createContractIR({
+      sources: 'not-an-object' as unknown as Record<string, unknown>,
+    }) as ContractIR;
+
+    const packs: ExtensionPack[] = [];
+    const options: EmitOptions = {
+      outputDir: '',
+      packs,
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
+  });
+
+  it('throws error when extension pack is missing from extensions', async () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {},
+      },
+    });
+
+    // Use a mock hook that doesn't validate types to avoid type validation errors
+    const mockHookNoTypeValidation: TargetFamilyHook = {
+      id: 'sql',
+      validateTypes: () => {
+        // Skip type validation
+      },
+      validateStructure: (ir: ContractIR) => {
+        if (ir.targetFamily !== 'sql') {
+          throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
+        }
+      },
+      generateContractTypes: () => {
+        return `// Generated contract types
+export type CodecTypes = Record<string, never>;
+export type LaneCodecTypes = CodecTypes;
+export type Contract = unknown;
+`;
+      },
+      getTypesImports: () => [],
+    };
+
+    const mockPack: ExtensionPack = {
+      manifest: {
+        id: 'missing-pack',
+        version: '1.0.0',
+      },
+      path: '/mock/path',
+    };
+
+    const options: EmitOptions = {
+      outputDir: '',
+      packs: [mockPack],
+    };
+
+    await expect(emit(ir, options, mockHookNoTypeValidation)).rejects.toThrow(
+      'Extension pack "missing-pack" (loaded from manifest) must appear in contract.extensions.missing-pack',
+    );
   });
 });
