@@ -1,11 +1,7 @@
 ---
 description: When you use validateContract()
-alwaysApply: false
-tags: [contract, validation]
-appliesTo: ["packages/sql/**"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
+globs: ["packages/sql/**"]
+alwaysApply: true
 ---
 # validateContract Usage Pattern
 

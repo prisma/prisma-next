@@ -3,22 +3,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const RULES_DIR = '.cursor/rules';
-const CURATED_ALWAYS = new Set([
-  'use-correct-tools.mdc',
-  'no-target-branches.mdc',
-  'omit-should-in-tests.mdc',
-  'doc-maintenance.mdc',
-]);
 
-const REQUIRED = [
-  'description',
-  'alwaysApply',
-  'tags',
-  'appliesTo',
-  'owner',
-  'lastUpdated',
-  'severity',
-];
+const REQUIRED = ['description', 'alwaysApply'];
 
 let errors = [];
 
@@ -34,26 +20,28 @@ for (const file of files) {
     continue;
   }
   const fm = parseFrontmatter(fmMatch[1]);
+
   // Validate required keys
   for (const key of REQUIRED) {
     if (!(key in fm)) errors.push(`${file}: missing required key '${key}'`);
   }
-  // Types
+
+  // Validate types
   if (fm.description && typeof fm.description !== 'string')
     errors.push(`${file}: description must be string`);
   if (fm.alwaysApply !== undefined && typeof fm.alwaysApply !== 'boolean')
     errors.push(`${file}: alwaysApply must be boolean`);
-  if (fm.tags && !Array.isArray(fm.tags)) errors.push(`${file}: tags must be array`);
-  if (fm.appliesTo && !Array.isArray(fm.appliesTo)) errors.push(`${file}: appliesTo must be array`);
-  if (fm.owner && typeof fm.owner !== 'string') errors.push(`${file}: owner must be string`);
-  if (fm.severity && !['info', 'warn', 'error'].includes(String(fm.severity)))
-    errors.push(`${file}: severity must be one of info|warn|error`);
-  if (fm.lastUpdated && !/^\d{4}-\d{2}-\d{2}$/.test(String(fm.lastUpdated)))
-    errors.push(`${file}: lastUpdated must be YYYY-MM-DD`);
+  if (fm.globs !== undefined && !Array.isArray(fm.globs))
+    errors.push(`${file}: globs must be array`);
 
-  // Curated alwaysApply
-  if (fm.alwaysApply === true && !CURATED_ALWAYS.has(file)) {
-    errors.push(`${file}: alwaysApply=true but not in curated list`);
+  // Check for disallowed properties
+  const allowedKeys = new Set(['description', 'globs', 'alwaysApply']);
+  for (const key of Object.keys(fm)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(
+        `${file}: disallowed property '${key}' (allowed: description, globs, alwaysApply)`,
+      );
+    }
   }
 }
 
@@ -74,17 +62,21 @@ function parseFrontmatter(src) {
     let val = m[2].trim();
     if (val === 'true') val = true;
     else if (val === 'false') val = false;
-    else if (val.startsWith('[') && val.endsWith(']')) {
+    else if (val === '') {
+      // Empty value: for globs, treat as empty array; otherwise undefined
+      if (key === 'globs') val = [];
+      else val = undefined;
+    } else if (val.startsWith('[') && val.endsWith(']')) {
       // simple array: ["a", "b"] or ['a','b'] or [a, b]
       const inner = val.slice(1, -1).trim();
       obj[key] = inner ? inner.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')) : [];
       continue;
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-      // date string
     } else {
       val = val.replace(/^['"]|['"]$/g, '');
     }
-    obj[key] = val;
+    if (val !== undefined) {
+      obj[key] = val;
+    }
   }
   return obj;
 }

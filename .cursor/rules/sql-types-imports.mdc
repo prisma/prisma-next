@@ -1,11 +1,7 @@
 ---
 description: Canonical import paths for SQL types
-alwaysApply: false
-tags: [sql, typing]
-appliesTo: ["packages/sql/**"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
+globs: ["packages/sql/**"]
+alwaysApply: true
 ---
 
 # SQL Types Import Path
@@ -25,7 +21,7 @@ import type { SqlContract, SqlStorage, SqlMappings } from '@prisma-next/sql-cont
 
 - **`@prisma-next/contract`**: Core contract types (`ContractBase`, `Source`) and document family types (`DocumentContract`)
 - **`@prisma-next/sql-contract`**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, `ModelDefinition`, `StorageTable`, `StorageColumn`, etc.) - **canonical source** (shared plane)
-- **`@prisma-next/sql-operations`**: SQL-specific operations (`OperationSignature`, `LoweringSpec`, `assembleOperationRegistry`) - **canonical source**
+- **`@prisma-next/sql-operations`**: SQL-specific operations (`OperationSignature`, `LoweringSpec`, `assembleOperationRegistry`) - **canonical source** (shared plane, see brief 18)
 - **`@prisma-next/sql-contract-emitter`**: SQL emitter hook (`sqlTargetFamilyHook`) - **canonical source**
 - **`@prisma-next/operations`**: Target-neutral operations (`OperationRegistry`, `ArgSpec`, `ReturnSpec`, `createOperationRegistry`) - **canonical source**
 
@@ -35,7 +31,7 @@ import type { SqlContract, SqlStorage, SqlMappings } from '@prisma-next/sql-cont
 - **`@prisma-next/sql-contract/types`**: SQL-specific contract types (canonical source, shared plane)
 - **`@prisma-next/sql-contract/validators`**: SQL contract validators (shared plane)
 - **`@prisma-next/sql-contract/factories`**: SQL contract IR factories (shared plane)
-- **`@prisma-next/sql-operations`**: SQL-specific operations (canonical source, use directly)
+- **`@prisma-next/sql-operations`**: SQL-specific operations (canonical source, shared plane, use directly)
 - **`@prisma-next/sql-contract-emitter`**: SQL emitter hook (canonical source, use directly)
 - **`@prisma-next/operations`**: Target-neutral operations (canonical source, use directly)
 

@@ -1,11 +1,7 @@
 ---
 description: Standard patterns for working with Prisma Next queries
-alwaysApply: false
-tags: [sql, query]
-appliesTo: ["packages/sql/**"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
+globs: ["packages/sql/**"]
+alwaysApply: true
 ---
 
 # Query Patterns

@@ -1,11 +1,7 @@
 ---
 description: Prefer assertions over defensive checks when data is guaranteed to be valid
-alwaysApply: false
-tags: [code-quality, assertions, defensive-programming]
-appliesTo: ["**/*.ts"]
-owner: prisma-next-docs
-lastUpdated: 2025-01-27
-severity: info
+globs: ["**/*.ts"]
+alwaysApply: true
 ---
 
 # Prefer Assertions Over Defensive Checks
@@ -135,7 +131,7 @@ it('builds plan without codecId when column type is missing', () => {
       },
     },
   } as SqlContract<SqlStorage>; // Type assertion bypasses validation
-  
+
   // This test is unrealistic - StorageColumn requires 'type'
 });
 ```

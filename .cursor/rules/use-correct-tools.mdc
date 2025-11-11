@@ -1,11 +1,7 @@
 ---
 description: Use the tools the codebase is configured for
+globs:
 alwaysApply: true
-tags: [tooling]
-appliesTo: ["**/*"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: warn
 ---
 
 - Use pnpm not npm!
