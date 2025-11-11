@@ -97,7 +97,7 @@ describe('contract.d.ts imports resolution', () => {
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -173,7 +173,7 @@ type UserIdColumn = UserColumns['id'];
               `${relativeToWorkspace}/packages/sql/contract/dist/exports/types/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/sql/runtime/adapters/postgres/dist/exports/*`,
+              `${relativeToWorkspace}/packages/targets/postgres-adapter/dist/exports/*`,
             ],
           },
         },
@@ -271,7 +271,7 @@ type UserIdColumn = UserColumns['id'];
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -353,7 +353,7 @@ type CodecIntType = CodecTypes['pg/int4@1'];
               `${relativeToWorkspace}/packages/sql/contract/dist/exports/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/sql/runtime/adapters/postgres/dist/exports/*`,
+              `${relativeToWorkspace}/packages/targets/postgres-adapter/dist/exports/*`,
             ],
             '@prisma-next/sql-query/*': [
               `${relativeToWorkspace}/packages/sql-query/dist/exports/*.d.ts`,

@@ -98,7 +98,7 @@ describe('emitter → lanes integration', () => {
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -201,7 +201,7 @@ describe('emitter → lanes integration', () => {
     };
 
     const packs = loadExtensionPacks(
-      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
     const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -283,7 +283,7 @@ describe('emitter → lanes integration', () => {
     };
 
     const packs = loadExtensionPacks(
-      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
     const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -306,7 +306,7 @@ describe('emitter → lanes integration', () => {
     const ir2 = validatedContract as unknown as ContractIR;
 
     const packs2 = loadExtensionPacks(
-      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
     const operationRegistry2 = assembleOperationRegistryFromPacks(packs2);

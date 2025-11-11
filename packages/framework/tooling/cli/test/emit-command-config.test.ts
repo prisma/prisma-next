@@ -6,13 +6,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(__dirname, '../../../../');
+const workspaceRoot = resolve(__dirname, '../../../../../');
 
 function createConfigFileContent(): string {
   // Use absolute paths to dist files to avoid import resolution issues in temp directories
   const adapterPath = resolve(
     workspaceRoot,
-    'packages/sql/runtime/adapters/postgres/dist/exports/cli.js',
+    'packages/targets/postgres-adapter/dist/exports/cli.js',
   );
   const targetPath = resolve(workspaceRoot, 'packages/targets/sql/postgres/dist/exports/cli.js');
   const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');

@@ -1,11 +1,15 @@
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { Plugin } from 'esbuild';
+import { build } from 'esbuild';
 import type { PrismaNextConfig } from './config-types';
 
 /**
  * Loads the Prisma Next config from a TypeScript file.
  * Supports both default export and named export.
+ * Uses esbuild to bundle and compile TypeScript files.
  *
  * @param configPath - Optional path to config file. Defaults to `./prisma-next.config.ts` in current directory.
  * @returns The loaded config object.
@@ -22,10 +26,93 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
     );
   }
 
+  const fileName = resolvedPath.split('/').pop() || '';
+  const isPrismaNextConfig = fileName.startsWith('prisma-next.config.');
+  if (!configPath && !isPrismaNextConfig) {
+    throw new Error('Config file must be named prisma-next.config.ts (or .js/.mjs)');
+  }
+
+  // If the file is already a .js or .mjs file, import it directly
+  if (resolvedPath.endsWith('.js') || resolvedPath.endsWith('.mjs')) {
+    try {
+      const configUrl = pathToFileURL(resolvedPath).href;
+      const configModule = await import(configUrl);
+      const config = configModule.default ?? configModule.config ?? configModule;
+      if (!config) {
+        throw new Error(
+          `Config file at ${resolvedPath} must export a default export or named export 'config'.`,
+        );
+      }
+      validateConfig(config);
+      return config as PrismaNextConfig;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to load config from ${resolvedPath}: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  // For TypeScript files, use esbuild to bundle and compile
+  const tempFile = join(
+    tmpdir(),
+    `prisma-next-config-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`,
+  );
+
+  // Plugin to mark absolute file paths as external (but not the entry point)
+  const externalAbsolutePathsPlugin: Plugin = {
+    name: 'external-absolute-paths',
+    setup(build) {
+      build.onResolve({ filter: /.*/ }, (args) => {
+        // Don't mark the entry point as external
+        if (args.kind === 'entry-point') {
+          return undefined;
+        }
+        // Mark absolute paths (starting with /) as external
+        if (args.path.startsWith('/')) {
+          return {
+            path: args.path,
+            external: true,
+          };
+        }
+        return undefined;
+      });
+    },
+  };
+
   try {
-    // Use file:// URL for ESM import
-    const configUrl = pathToFileURL(resolvedPath).href;
+    const result = await build({
+      entryPoints: [resolvedPath],
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      target: 'es2022',
+      outfile: tempFile,
+      write: false,
+      logLevel: 'error',
+      // Keep package imports external - they'll be resolved at runtime
+      packages: 'external',
+      plugins: [externalAbsolutePathsPlugin],
+    });
+
+    if (result.errors.length > 0) {
+      const errorMessages = result.errors.map((e: { text: string }) => e.text).join('\n');
+      throw new Error(`Failed to bundle config file: ${errorMessages}`);
+    }
+
+    if (!result.outputFiles || result.outputFiles.length === 0) {
+      throw new Error('No output files generated from bundling');
+    }
+
+    const bundleContent = result.outputFiles[0]?.text;
+    if (bundleContent === undefined) {
+      throw new Error('Bundle content is undefined');
+    }
+    writeFileSync(tempFile, bundleContent, 'utf-8');
+
+    const configUrl = pathToFileURL(tempFile).href;
     const configModule = await import(configUrl);
+    unlinkSync(tempFile);
 
     // Support both default export and named export
     const config = configModule.default ?? configModule.config ?? configModule;
@@ -41,6 +128,14 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
 
     return config as PrismaNextConfig;
   } catch (error) {
+    // Clean up temp file on error
+    if (existsSync(tempFile)) {
+      try {
+        unlinkSync(tempFile);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
     if (error instanceof Error) {
       throw new Error(`Failed to load config from ${resolvedPath}: ${error.message}`);
     }
