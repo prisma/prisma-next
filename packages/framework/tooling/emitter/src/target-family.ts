@@ -4,6 +4,8 @@ import type { TypesImportSpec } from './types';
 
 export interface ValidationContext {
   readonly operationRegistry?: OperationRegistry;
+  readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
+  readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;
 }
 

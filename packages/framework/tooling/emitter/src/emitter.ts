@@ -60,6 +60,8 @@ export async function emit(
 
   const ctx: ValidationContext = {
     ...(operationRegistry ? { operationRegistry } : {}),
+    ...(codecTypeImports ? { codecTypeImports } : {}),
+    ...(operationTypeImports ? { operationTypeImports } : {}),
     ...(extensionIds ? { extensionIds } : {}),
   };
   targetFamily.validateTypes(ir, ctx);

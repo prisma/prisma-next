@@ -73,7 +73,6 @@ const isCliGroup = (group) =>
   group.layer === 'tooling' &&
   group.globs.some((glob) => glob.includes('tooling/cli'));
 
-
 const isSqlLanesToRuntime = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'sql' &&
   sourceGroup.layer === 'lanes' &&
@@ -86,6 +85,13 @@ const isCliToSqlTargets = (sourceGroup, targetGroup) =>
 
 const isCliToSqlAuthoring = (sourceGroup, targetGroup) =>
   isCliGroup(sourceGroup) && targetGroup.domain === 'sql' && targetGroup.layer === 'authoring';
+
+const isCliToSqlOperations = (sourceGroup, targetGroup) =>
+  isCliGroup(sourceGroup) &&
+  targetGroup.domain === 'sql' &&
+  targetGroup.layer === 'core' &&
+  targetGroup.plane === 'shared' &&
+  targetGroup.globs.some((glob) => glob.includes('sql/operations'));
 
 const isExtensionsToSqlTargets = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'extensions' &&
@@ -132,9 +138,11 @@ const createCrossDomainRules = () => {
       if (targetGroup.domain === 'framework') continue;
 
       // TODO: CLI tooling uses SQL targets/authoring hooks until the plugin split is complete (docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4)
+      // CLI assembles operation registries from packs, so it needs to import sql/operations (shared plane)
       if (
         isCliToSqlTargets(sourceGroup, targetGroup) ||
-        isCliToSqlAuthoring(sourceGroup, targetGroup)
+        isCliToSqlAuthoring(sourceGroup, targetGroup) ||
+        isCliToSqlOperations(sourceGroup, targetGroup)
       ) {
         continue;
       }
