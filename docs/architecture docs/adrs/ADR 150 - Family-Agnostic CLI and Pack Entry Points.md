@@ -18,10 +18,12 @@ We want a single, simple way for applications to declare their target family, ta
   - `/runtime`: exports runtime factories/types; used only by DB‑connected commands or app runtime.
 
 3. Family‑agnostic CLI + family‑provided helpers
-- The config’s `family` export includes:
+- The config's `family` export includes:
   - `hook: TargetFamilyHook` (used by `@prisma-next/emitter`)
-  - `assembleOperationRegistry`, `extractCodecTypeImports`, `extractOperationTypeImports`
-- The CLI calls these helpers to assemble inputs for emit; manifests remain opaque to the CLI.
+  - `assembleOperationRegistry`, `extractCodecTypeImports`, `extractOperationTypeImports` (assembly helpers)
+  - `validateContractIR` (validates and normalizes contract, returns ContractIR without mappings)
+  - `stripMappings?` (optionally strips runtime-only mappings from contract)
+- The CLI calls these helpers to assemble inputs for emit and validate contracts; manifests remain opaque to the CLI.
 
 4. TargetFamilyHook validates operator registry
 - The emitter passes `ctx.operationRegistry` and `ctx.extensionIds` to `TargetFamilyHook.validateTypes`.
@@ -46,12 +48,17 @@ Trade‑offs
 - Requires families to provide helper functions in their `/cli` exports.
 - Slightly more structure in pack publishing (two entrypoints).
 
-## Implementation Sketch
+## Implementation Status
 
-1) Add config loader: loads TS module and returns config (unknown).
-2) Move SQL pack assembly/types under SQL family tooling and re‑export helpers from `@prisma-next/family-sql/cli`.
-3) Update emit to read helpers from `config.family`, assemble inputs, and call emitter with `family.hook`.
-4) Update docs and examples; remove flags.
+✅ **Completed** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL)
+
+1) ✅ Config loader: `packages/framework/tooling/cli/src/load-config.ts` loads TS module and returns config.
+2) ✅ SQL pack assembly moved to `packages/sql/tooling/assembly` and re‑exported from `@prisma-next/family-sql/cli`.
+3) ✅ Emit command updated to read helpers from `config.family`, assemble inputs, and call emitter with `family.hook`.
+4) ✅ Flags removed: `--adapter` and `--extensions` flags removed; config-only model enforced.
+5) ✅ Pack loading/assembly removed from framework CLI; family-provided helpers handle all assembly logic.
+6) ✅ Contract validation decoupled: Framework CLI uses `family.validateContractIR()` instead of direct SQL imports.
+7) ✅ Dependency boundaries enforced: All CLI→SQL exceptions removed from dependency-cruiser; framework CLI is fully family-agnostic.
 
 ## References
 - ADR 005 — Thin Core, Fat Targets

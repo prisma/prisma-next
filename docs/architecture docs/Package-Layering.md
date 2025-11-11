@@ -61,14 +61,16 @@ The SQL domain contains SQL-specific packages organized by layer:
 
 ### Targets Domain (Extension Packs)
 
-The targets domain contains concrete target extension packs (e.g., Postgres, MySQL):
+The targets domain contains concrete target extension packs (e.g., Postgres, MySQL). Dialect (target), adapter, and driver are kept as separate packages to enable mix-and-match:
 
 ```
 * targets
-|-- sql/postgres (migration plane)
-|   |-- @prisma-next/targets-postgres
+|-- postgres (migration plane)
+|   |-- @prisma-next/targets-postgres (target descriptor)
 |-- postgres-adapter (multi-plane: shared, migration, runtime)
-    |-- @prisma-next/adapter-postgres
+|   |-- @prisma-next/adapter-postgres (adapter with CLI/runtime entrypoints)
+|-- postgres-driver (runtime plane)
+    |-- @prisma-next/driver-postgres (driver implementation)
 ```
 
 ### Layer Structure
@@ -166,6 +168,8 @@ Contract authoring surfaces for creating contracts programmatically.
 Target-family specific emitter hooks and family‑provided helpers for CLI assembly.
 
 - `packages/sql/tooling/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
+- `packages/sql/tooling/assembly/` → `@prisma-next/sql-tooling-assembly` - SQL family assembly helpers (operation registry, type imports)
+- `packages/sql/tooling/cli/` → `@prisma-next/family-sql` - SQL family CLI entry point (exports `FamilyDescriptor` with hook and helpers)
 - Pack entrypoints: use `/cli` for IR descriptors and helpers (no runtime), `/runtime` for factories (runtime only). The app config imports from `/cli` to keep emit pure.
 
 **Dependency Rules:** Can import from `core/*` and `authoring/*` only.
@@ -190,13 +194,24 @@ Target-agnostic runtime kernel plus per-family runtime implementations.
 
 **Dependency Rules:** runtime-executor can import from inner layers only. Family runtimes can import from runtime-executor, targets, and their family's adapters.
 
-### Adapters Layer (SQL Domain, Runtime Plane)
+### Adapters Layer (Targets Domain, Multi-Plane)
 
-Database adapters, drivers, and optional compatibility shims. These packages may depend on runtime-family packages and inner layers but never outward.
+Database adapters, drivers, and targets (dialects) live in the Targets domain as separate packages. Adapters use multi-plane entrypoints to support both CLI (migration) and runtime usage.
 
-- `packages/sql/postgres/postgres-adapter/` → `@prisma-next/adapter-postgres`
-- `packages/sql/postgres/postgres-driver/` → `@prisma-next/driver-postgres`
-- `packages/compat/compat-prisma/` → `@prisma-next/compat-prisma` (compat layer that lives alongside adapters)
+**Targets (Migration Plane):**
+- `packages/targets/postgres/` → `@prisma-next/targets-postgres` - Postgres target descriptor
+
+**Adapters (Multi-Plane: Shared, Migration, Runtime):**
+- `packages/targets/postgres-adapter/` → `@prisma-next/adapter-postgres` - Postgres adapter with multi-plane entrypoints:
+  - `src/core/**` → shared plane (adapter SPI implementation)
+  - `src/exports/cli.ts` → migration plane (CLI descriptor)
+  - `src/exports/runtime.ts` → runtime plane (runtime factory)
+
+**Drivers (Runtime Plane):**
+- `packages/targets/postgres-driver/` → `@prisma-next/driver-postgres` - Postgres driver
+
+**Compatibility (Runtime Plane):**
+- `packages/extensions/compat-prisma/` → `@prisma-next/compat-prisma` (compat layer that lives alongside adapters)
 
 ## Naming Conventions
 
@@ -207,7 +222,7 @@ Database adapters, drivers, and optional compatibility shims. These packages may
 - Use the published package name as the only import specifier
 - Encode target family in the package name prefix (e.g., `@prisma-next/sql-...`)
 - Collapse nested directories to hyphenated names (no slashes after scope)
-- Keep conventional names for adapters/drivers (e.g., `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`), even if they live under `packages/sql/postgres/**`
+- Keep conventional names for adapters/drivers (e.g., `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`). They are located under `packages/targets/**` as separate packages (target, adapter, driver) to enable mix-and-match.
 - Layers constrain dependencies but don't appear in package names except when meaningful (e.g., `runtime-executor`)
 
 ### Examples
@@ -230,9 +245,10 @@ Database adapters, drivers, and optional compatibility shims. These packages may
 | `packages/sql/lanes/sql-lane/` | `@prisma-next/sql-lane` |
 | `packages/sql/lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
 | `packages/sql/sql-runtime/` | `@prisma-next/sql-runtime` |
-| `packages/adapter-postgres/` | `@prisma-next/adapter-postgres` |
-| `packages/driver-postgres/` | `@prisma-next/driver-postgres` |
-| `packages/compat-prisma/` | `@prisma-next/compat-prisma` |
+| `packages/targets/postgres/` | `@prisma-next/targets-postgres` |
+| `packages/targets/postgres-adapter/` | `@prisma-next/adapter-postgres` |
+| `packages/targets/postgres-driver/` | `@prisma-next/driver-postgres` |
+| `packages/extensions/compat-prisma/` | `@prisma-next/compat-prisma` |
 
 ## TypeScript Path Aliases
 
@@ -301,8 +317,8 @@ Layer aliases are optional ergonomic helpers for internal development. They are 
 - **`sql/tooling/*`** → can import from `core/*` and `authoring/*` only
 - **`sql/lanes/*`** → can import from `core/*`, `authoring/*`, `sql/tooling/*` only
 - **`runtime/core`** → can import from `core/*`, `authoring/*`, `sql/tooling/*` only (no direct imports from `targets/*`)
-- **`sql/sql-runtime`** → can import from `runtime/core` and `sql/tooling/*` and `sql/postgres/*` only
-- **`sql/postgres/*`** → can import from `sql/tooling/*` and `sql/sql-runtime` only
+- **`sql/sql-runtime`** → can import from `runtime/core` and `sql/tooling/*` and `targets/postgres-adapter/*` only
+- **`targets/postgres-adapter/*`** → can import from `sql/tooling/*` and `sql/sql-runtime` only
 
 ### Domain Rules
 
@@ -411,9 +427,11 @@ Some packages span multiple planes (e.g., adapters that have both CLI entry poin
 - **`src/exports/runtime.ts`**: Runtime plane entry point (runtime factories)
 
 **Example:** `@prisma-next/adapter-postgres` spans three planes:
-- `packages/targets/postgres-adapter/src/core/**` → domain: `targets`, layer: `adapters`, plane: `shared`
-- `packages/targets/postgres-adapter/src/exports/cli.ts` → domain: `targets`, layer: `adapters`, plane: `migration`
-- `packages/targets/postgres-adapter/src/exports/runtime.ts` → domain: `targets`, layer: `adapters`, plane: `runtime`
+- `packages/targets/postgres-adapter/src/core/**` → domain: `extensions` (or `targets`), layer: `adapters`, plane: `shared`
+- `packages/targets/postgres-adapter/src/exports/cli.ts` → domain: `extensions` (or `targets`), layer: `adapters`, plane: `migration`
+- `packages/targets/postgres-adapter/src/exports/runtime.ts` → domain: `extensions` (or `targets`), layer: `adapters`, plane: `runtime`
+
+**Note:** Dialect (target), adapter, and driver are separate packages under `packages/targets/**` to enable mix-and-match. The adapter package uses multi-plane entrypoints to support both CLI configuration (migration plane) and runtime usage (runtime plane) while keeping shared core code (shared plane) accessible to both.
 
 This structure allows the same package to provide both CLI configuration (migration plane) and runtime implementation (runtime plane) while keeping shared code (core) accessible to both.
 

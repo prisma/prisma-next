@@ -264,35 +264,40 @@ To make the "thin core, fat targets" principle enforceable in code, the reposito
 
 Key points:
 - Core owns contracts, plan model, and a target-agnostic runtime kernel.
-- Family packages (e.g., `sql/`) contain family-specific contract types/emitter hooks, lanes, runtime implementation, and adapters.
+- Family packages (e.g., `sql/`) contain family-specific contract types/emitter hooks, lanes, and runtime implementation. Concrete adapters and targets live in the `targets/` domain.
+- CLI is family-agnostic: framework CLI reads config and calls family-provided helpers; pack assembly logic lives in family packages, not the framework CLI.
 - No long-lived transitional shims are maintained; there are no external consumers. Short-lived internal bridges are allowed only during migration.
 
 Example layout
 
 ```
 packages/
-  core/
-    contract/            # contract types + plan metadata
-    plan/                # diagnostics, shared errors
-    operations/          # target-neutral operation registry + helpers
-  authoring/
-    contract-authoring/  # TS builders, canonicalization, schema DSL
-  targets/
-    sql/
-      contract-types/
-      operations/
-      emitter/
-  lanes/
-    relational-core/     # schema + column builders, operation attachment
-    sql-lane/            # relational DSL + raw lane
-    orm-lane/            # ORM builder, includes, relation filters
-  runtime/
-    core/                # target-agnostic runtime kernel (verification, plugins, SPI)
+  framework/
+    core-contract/       # contract types + plan metadata
+    core-plan/           # diagnostics, shared errors
+    core-operations/     # target-neutral operation registry + helpers
+    authoring/
+      contract-authoring/  # TS builders, canonicalization, schema DSL
+    tooling/
+      cli/               # framework CLI (config-only, family-agnostic)
+      emitter/           # contract emitter with family hooks
+    runtime-executor/    # target-agnostic runtime kernel (verification, plugins, SPI)
   sql/
+    contract/            # SQL contract types (shared plane)
+    operations/          # SQL operation types (shared plane)
+    tooling/
+      emitter/           # SQL emitter hook
+      assembly/          # SQL family assembly helpers
+      cli/               # SQL family CLI entry point
+    lanes/
+      relational-core/   # schema + column builders, operation attachment
+      sql-lane/          # relational DSL + raw lane
+      orm-lane/          # ORM builder, includes, relation filters
     sql-runtime/         # SQL runtime implementing the runtime SPI
-    postgres/
-      postgres-adapter/
-      postgres-driver/
+  targets/
+    postgres/            # Postgres target descriptor
+    postgres-adapter/    # Postgres adapter (multi-plane: shared, migration, runtime)
+    postgres-driver/     # Postgres driver
 ```
 
 Dependency direction is strictly one-way: `core → authoring → targets → lanes → runtime(core) → family runtime → adapters`. Inner rings never import outer rings. Enforce with tsconfig path groups, ESLint path rules, and an import-graph CI check.

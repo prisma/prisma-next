@@ -46,14 +46,15 @@ packages/
     core/                (target-agnostic runtime kernel: verification, plugins, SPI)
   sql/
     sql-runtime/         (SQL runtime implementation of the SPI)
-    postgres/
-      postgres-adapter/
-      postgres-driver/
-    # mysql/, sqlite/ can mirror postgres/
+  targets/
+    postgres/            (Postgres target descriptor)
+    postgres-adapter/    (Postgres adapter with multi-plane entrypoints)
+    postgres-driver/     (Postgres driver)
+    # mysql/, sqlite/ can mirror postgres/ structure
+  extensions/
+    compat-prisma/       (optional facades/shims if needed later)
   document/
     # future document family mirrors sql/ layout
-  compat/
-    compat-prisma/       (optional facades/shims if needed later)
 ```
 
 ### Dependency Rules
@@ -79,7 +80,7 @@ packages/
 ### Runtime Separation
 
 - `packages/framework/runtime-core` exposes a target-agnostic SPI (verification, plugin lifecycle, telemetry), no direct imports from `targets/*`.
-- `packages/sql/sql-runtime` implements the SPI using SQL adapters and codecs from `packages/sql/contract/*`, `packages/sql/operations/*`, and `packages/sql/postgres/*`.
+- `packages/sql/sql-runtime` implements the SPI using SQL adapters and codecs from `packages/sql/contract/*`, `packages/sql/operations/*`, and `packages/targets/postgres-adapter/*`.
 - This enables booting the runtime with a non-SQL family by swapping in another family-runtime package that implements the same SPI.
 
 ### Emitter Hooks
@@ -91,7 +92,7 @@ packages/
 
 - Package names use the `@prisma-next/<name>` convention.
 - Target families are encoded via prefixes (e.g., `sql-`), producing names like `@prisma-next/sql-lane`, regardless of nested folders.
-- Adapters/drivers retain conventional names (`@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) even when nested under `packages/sql/postgres/**`.
+- Adapters/drivers retain conventional names (`@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) and are located under `packages/targets/**` as separate packages (target, adapter, driver).
 - Layers are for dependency direction, not naming; only `runtime-core` carries its layer in the name for clarity.
 - See also: `docs/reference/Package Naming and Path Aliases.md` for concrete path→package mappings and tsconfig alias examples.
 
@@ -116,9 +117,11 @@ packages/
 2) Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/framework/authoring/contract-authoring`.
 3) Stand up `lanes/relational-core` and move schema/column builders and operation attachment there.
 4) Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.
-5) Restructure `sql-target` under `sql/tooling` and keep a curated entrypoint for adapters.
-6) Extract `framework/runtime-core` and move SQL-specific execution into `sql/sql-runtime`.
-7) Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated. ✅ **Complete** - `@prisma-next/sql-query` removed in Slice 7.
+5) ✅ Restructure `sql-target` under `sql/tooling` and keep a curated entrypoint for adapters. **Complete**
+6) ✅ Extract `framework/runtime-core` and move SQL-specific execution into `sql/sql-runtime`. **Complete**
+7) ✅ Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated. **Complete** - `@prisma-next/sql-query` removed in Slice 7.
+8) ✅ Move pack assembly from framework CLI to family-provided helpers. **Complete** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL) - Pack assembly logic moved to `@prisma-next/sql-tooling-assembly` and exported via `@prisma-next/family-sql/cli`. Contract validation also decoupled via `family.validateContractIR()` hook. All CLI→SQL dependency exceptions removed.
+9) ✅ Migrate Postgres adapter from SQL domain to Targets domain. **Complete** (Briefs: Separate-Dialect-Adapter-Driver, Migrate-Postgres-Adapter-to-Targets-Domain) - Adapter, target, and driver are now separate packages under `packages/targets/**` with multi-plane entrypoints.
 
 ## Alternatives Considered
 

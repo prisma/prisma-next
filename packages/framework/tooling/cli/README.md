@@ -99,20 +99,25 @@ flowchart TD
 
 ### Emit Command (`commands/emit.ts`)
 - Command implementation using commander
-- Loads the user’s config module (`prisma-next.config.ts`)
-- Reads family hook and family helpers (`assembleOperationRegistry`, `extractCodecTypeImports`, `extractOperationTypeImports`) from `config.family`
+- Loads the user's config module (`prisma-next.config.ts`)
+- Reads family hook and family helpers from `config.family`:
+  - `assembleOperationRegistry`, `extractCodecTypeImports`, `extractOperationTypeImports` for assembly
+  - `validateContractIR` for contract validation and normalization
 - Calls family helpers with `{ adapter, target, extensions }` to assemble inputs for emission; manifests are treated as opaque by the CLI
 - Loads TS contract using `loadContractFromTs()` utility
+- Validates contract using `config.family.validateContractIR()` which returns ContractIR without mappings
 - Calls `emit()` from emitter with the assembled inputs and `family.hook`
 - Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact
 - Writes `contract.json` and `contract.d.ts` to output directory
 
 ### Family Helpers (provided by family /cli entrypoint)
 - The SQL family (and other families) provide helper functions used by the CLI to assemble inputs for emission:
-  - `assembleOperationRegistry(descriptors)`
-  - `extractCodecTypeImports(descriptors)`
-  - `extractOperationTypeImports(descriptors)`
-- These helpers move family-specific assembly logic out of the CLI so the CLI remains family‑agnostic.
+  - `assembleOperationRegistry(descriptors)` - Assembles operation registry from adapter/target/extension descriptors
+  - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
+  - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
+  - `validateContractIR(contractJson)` - Validates and normalizes contract, returns ContractIR without mappings
+  - `stripMappings?(contract)` - Optionally strips runtime-only mappings from contract
+- These helpers move family-specific assembly and validation logic out of the CLI so the CLI remains family‑agnostic.
 
 ### Pack Manifest Types (IR)
 - Families define their manifest IR and related types under their own tooling packages. CLI treats manifests as opaque data.
