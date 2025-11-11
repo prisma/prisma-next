@@ -6,10 +6,16 @@ import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  assembleOperationRegistryFromPacks,
+  extractExtensionIds,
+  extractTypeImports,
+} from '../../../packages/framework/tooling/cli/src/pack-assembly';
+import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
 const execFileAsync = promisify(execFile);
 
@@ -93,9 +99,14 @@ describe('contract.d.ts imports resolution', () => {
         join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
         [],
       );
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const typeImports = extractTypeImports(packs);
+      const extensionIds = extractExtensionIds(packs);
       const options: EmitOptions = {
         outputDir: testDir,
-        packs,
+        operationRegistry,
+        typeImports,
+        extensionIds,
       };
 
       const result = await emit(ir, options, sqlTargetFamilyHook);
@@ -260,9 +271,14 @@ type UserIdColumn = UserColumns['id'];
         join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
         [],
       );
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const typeImports = extractTypeImports(packs);
+      const extensionIds = extractExtensionIds(packs);
       const options: EmitOptions = {
         outputDir: testDir,
-        packs,
+        operationRegistry,
+        typeImports,
+        extensionIds,
       };
 
       const result = await emit(ir, options, sqlTargetFamilyHook);

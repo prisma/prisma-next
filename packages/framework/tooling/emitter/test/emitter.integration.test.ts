@@ -1,17 +1,15 @@
-import { join } from 'node:path';
-import { timeouts } from '@prisma-next/test-utils';
 import { createOperationRegistry } from '@prisma-next/operations';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { ContractIR } from '../../../core-contract/src/ir';
 import { emit } from '../src/emitter';
-import { loadExtensionPacks } from '../src/extension-pack';
-import type { TargetFamilyHook } from '../src/target-family';
+import type { TargetFamilyHook, ValidationContext } from '../src/target-family';
 import type { EmitOptions, TypesImportSpec } from '../src/types';
 import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR, _operationRegistry?) => {
+  validateTypes: (ir: ContractIR, _ctx: ValidationContext) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
       | undefined;
@@ -108,23 +106,10 @@ describe('emitter integration', () => {
         },
       });
 
-      const packs = loadExtensionPacks(
-        join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-        [],
-      );
+      // Create minimal test data (emitter tests don't load packs)
       const operationRegistry = createOperationRegistry();
       const typeImports: TypesImportSpec[] = [];
-      for (const pack of packs) {
-        const codecTypes = pack.manifest.types?.codecTypes;
-        if (codecTypes?.import) {
-          typeImports.push(codecTypes.import);
-        }
-        const operationTypes = pack.manifest.types?.operationTypes;
-        if (operationTypes?.import) {
-          typeImports.push(operationTypes.import);
-        }
-      }
-      const extensionIds = packs.map((p) => p.manifest.id);
+      const extensionIds = ['postgres', 'pg'];
       const options: EmitOptions = {
         outputDir: '',
         operationRegistry,
@@ -187,13 +172,15 @@ describe('emitter integration', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    // Create minimal test data (emitter tests don't load packs)
+    const operationRegistry = createOperationRegistry();
+    const typeImports: TypesImportSpec[] = [];
+    const extensionIds = ['postgres', 'pg'];
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports,
+      extensionIds,
     };
 
     const result1 = await emit(ir, options, mockSqlHook);
@@ -238,13 +225,15 @@ describe('emitter integration', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    // Create minimal test data (emitter tests don't load packs)
+    const operationRegistry = createOperationRegistry();
+    const typeImports: TypesImportSpec[] = [];
+    const extensionIds = ['postgres', 'pg'];
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports,
+      extensionIds,
     };
 
     const result1 = await emit(ir, options, mockSqlHook);

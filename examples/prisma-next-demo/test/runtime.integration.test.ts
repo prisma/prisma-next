@@ -4,7 +4,7 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
 import type { ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
@@ -15,6 +15,12 @@ import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-r
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  assembleOperationRegistryFromPacks,
+  extractExtensionIds,
+  extractTypeImports,
+} from '../../../packages/framework/tooling/cli/src/pack-assembly';
+import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
 import type { Contract } from '../src/prisma/contract.d';
 import { stampMarker } from '../src/prisma/scripts/stamp-marker';
@@ -28,12 +34,17 @@ beforeAll(async () => {
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, []);
+  const operationRegistry = assembleOperationRegistryFromPacks(packs);
+  const typeImports = extractTypeImports(packs);
+  const extensionIds = extractExtensionIds(packs);
 
   const result = await emit(
     contractIR,
     {
       outputDir,
-      packs,
+      operationRegistry,
+      typeImports,
+      extensionIds,
     },
     sqlTargetFamilyHook,
   );

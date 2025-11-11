@@ -130,14 +130,8 @@ This package is part of the **framework domain**, **tooling layer**, **migration
 
 ```typescript
 import { emit } from '@prisma-next/emitter';
-import { loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
-
-// Load extension packs
-const packs = loadExtensionPacks(
-  './packages/adapter-postgres',
-  ['./packages/extension-pack']
-);
+import { createOperationRegistry } from '@prisma-next/operations';
 
 // Determine target family SPI based on target family
 import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
@@ -150,10 +144,12 @@ const ir: ContractIR = {
   // ... contract structure
 };
 
-// Pass target family SPI directly to emit()
+// Pass pre-assembled context to emit() (pack loading happens in CLI layer)
 const result = await emit(ir, {
   outputDir: './dist',
-  packs,
+  operationRegistry: createOperationRegistry(), // Pre-assembled from packs
+  typeImports: [], // Extracted from packs
+  extensionIds: ['postgres', 'pg'], // Extracted from packs
 }, sqlTargetFamilyHook);
 
 // result.contractJson: string (JSON) - canonical JSON without _generated metadata
@@ -188,5 +184,6 @@ This ensures all required fields are present with sensible defaults. See `.curso
 
 ## Exports
 
-- `.`: Main emitter API (`emit`, `loadExtensionPacks`, types)
+- `.`: Main emitter API (`emit`, types)
+- **Note**: Pack loading functions (`loadExtensionPacks`, `loadExtensionPackManifest`) are CLI-only and not exported from the emitter. Import them from `@prisma-next/cli` or use the CLI's `pack-loading.ts` module directly.
 

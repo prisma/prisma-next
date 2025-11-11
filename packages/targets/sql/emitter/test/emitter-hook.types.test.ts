@@ -1,5 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ExtensionPackManifest } from '@prisma-next/emitter';
+import type { ValidationContext } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
@@ -39,15 +39,12 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const manifests: ExtensionPackManifest[] = [
-      {
-        id: 'postgres',
-        version: '15.0.0',
-      },
-    ];
+    const ctx: ValidationContext = {
+      extensionIds: ['postgres', 'pg'],
+    };
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, manifests);
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -64,15 +61,12 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const manifests: ExtensionPackManifest[] = [
-      {
-        id: 'postgres',
-        version: '15.0.0',
-      },
-    ];
+    const ctx: ValidationContext = {
+      extensionIds: ['postgres'],
+    };
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, manifests);
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).toThrow();
   });
 
@@ -89,10 +83,10 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const manifests: ExtensionPackManifest[] = [];
+    const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, manifests);
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).toThrow('invalid type ID format');
   });
 
@@ -109,15 +103,12 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const manifests: ExtensionPackManifest[] = [
-      {
-        id: 'postgres',
-        version: '15.0.0',
-      },
-    ];
+    const ctx: ValidationContext = {
+      extensionIds: ['postgres'],
+    };
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, manifests);
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -134,10 +125,10 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const manifests: ExtensionPackManifest[] = [];
+    const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, manifests);
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).toThrow('is missing type');
   });
 
@@ -154,10 +145,10 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const manifests: ExtensionPackManifest[] = [];
+    const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, manifests);
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).toThrow('invalid type ID format');
   });
 
@@ -168,20 +159,20 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const manifests: ExtensionPackManifest[] = [];
+    const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, manifests);
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
   it('validates types with missing storage', () => {
     const ir = createContractIR({});
 
-    const manifests: ExtensionPackManifest[] = [];
+    const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, manifests);
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 });

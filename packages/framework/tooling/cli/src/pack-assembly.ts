@@ -1,21 +1,19 @@
-import type { OperationManifest, ExtensionPack, TypesImportSpec } from '@prisma-next/emitter';
+import type { ExtensionPack, OperationManifest, TypesImportSpec } from '@prisma-next/emitter';
 import {
   createSqlOperationRegistry,
   register,
-  type SqlOperationSignature,
   type SqlOperationRegistry,
+  type SqlOperationSignature,
 } from '@prisma-next/sql-operations';
 
 /**
  * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
  */
-export function operationManifestToSignature(
-  manifest: OperationManifest,
-): SqlOperationSignature {
+export function operationManifestToSignature(manifest: OperationManifest): SqlOperationSignature {
   return {
     forTypeId: manifest.for,
     method: manifest.method,
-    args: manifest.args.map((arg) => {
+    args: manifest.args.map((arg: OperationManifest['args'][number]) => {
       if (arg.kind === 'typeId') {
         if (!arg.type) {
           throw new Error('typeId arg must have type property');
@@ -40,9 +38,7 @@ export function operationManifestToSignature(
           type: manifest.returns.type as 'number' | 'boolean' | 'string',
         };
       }
-      throw new Error(
-        `Invalid return kind: ${(manifest.returns as { kind: unknown }).kind}`,
-      );
+      throw new Error(`Invalid return kind: ${(manifest.returns as { kind: unknown }).kind}`);
     })(),
     lowering: {
       targetFamily: 'sql',
@@ -100,9 +96,6 @@ export function extractTypeImports(
 /**
  * Extracts extension IDs from packs for extension validation.
  */
-export function extractExtensionIds(
-  packs: ReadonlyArray<ExtensionPack>,
-): ReadonlyArray<string> {
+export function extractExtensionIds(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<string> {
   return packs.map((pack) => pack.manifest.id);
 }
-

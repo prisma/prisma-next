@@ -20,9 +20,6 @@ export function createSqlOperationRegistry(): SqlOperationRegistry {
   return createOperationRegistry() as SqlOperationRegistry;
 }
 
-export function register(
-  registry: SqlOperationRegistry,
-  signature: SqlOperationSignature,
-): void {
+export function register(registry: SqlOperationRegistry, signature: SqlOperationSignature): void {
   registry.register(signature);
 }

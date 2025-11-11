@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ResultType } from '@prisma-next/contract/types';
 import type { EmitOptions } from '@prisma-next/emitter';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -16,6 +16,12 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import {
+  assembleOperationRegistryFromPacks,
+  extractExtensionIds,
+  extractTypeImports,
+} from '../../../packages/framework/tooling/cli/src/pack-assembly';
+import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
@@ -94,9 +100,14 @@ describe('emitter → lanes integration', () => {
         join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
         [],
       );
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const typeImports = extractTypeImports(packs);
+      const extensionIds = extractExtensionIds(packs);
       const options: EmitOptions = {
         outputDir: testDir,
-        packs,
+        operationRegistry,
+        typeImports,
+        extensionIds,
       };
 
       const result = await emit(ir, options, sqlTargetFamilyHook);
@@ -190,9 +201,14 @@ describe('emitter → lanes integration', () => {
       join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
       [],
     );
+    const operationRegistry = assembleOperationRegistryFromPacks(packs);
+    const typeImports = extractTypeImports(packs);
+    const extensionIds = extractExtensionIds(packs);
     const options: EmitOptions = {
       outputDir: testDir,
-      packs,
+      operationRegistry,
+      typeImports,
+      extensionIds,
     };
 
     const result = await emit(ir, options, sqlTargetFamilyHook);
@@ -265,9 +281,14 @@ describe('emitter → lanes integration', () => {
       join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
       [],
     );
+    const operationRegistry = assembleOperationRegistryFromPacks(packs);
+    const typeImports = extractTypeImports(packs);
+    const extensionIds = extractExtensionIds(packs);
     const options: EmitOptions = {
       outputDir: testDir,
-      packs,
+      operationRegistry,
+      typeImports,
+      extensionIds,
     };
 
     const result1 = await emit(ir, options, sqlTargetFamilyHook);
@@ -281,9 +302,14 @@ describe('emitter → lanes integration', () => {
       join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
       [],
     );
+    const operationRegistry2 = assembleOperationRegistryFromPacks(packs2);
+    const typeImports2 = extractTypeImports(packs2);
+    const extensionIds2 = extractExtensionIds(packs2);
     const options2: EmitOptions = {
       outputDir: testDir,
-      packs: packs2,
+      operationRegistry: operationRegistry2,
+      typeImports: typeImports2,
+      extensionIds: extensionIds2,
     };
 
     const result2 = await emit(ir2, options2, sqlTargetFamilyHook);

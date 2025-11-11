@@ -1,5 +1,7 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ExtensionPack } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
+import { extractTypeImports } from '../../../framework/tooling/cli/src/pack-assembly';
 import { sqlTargetFamilyHook } from '../src/index';
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {
@@ -202,7 +204,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates mappings type when models is undefined with codecTypes', () => {
-    const packs = [
+    const packs: ExtensionPack[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -238,7 +240,8 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, packs);
+    const typeImports = extractTypeImports(packs);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, typeImports);
     expect(types).toContain('SqlMappings');
     expect(types).toContain('codecTypes: TestTypes');
     expect(types).toContain('operationTypes: Record<string, never>');
@@ -261,7 +264,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const packs = [
+    const packs: ExtensionPack[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -280,7 +283,8 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, packs);
+    const typeImports = extractTypeImports(packs);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, typeImports);
     expect(types).toContain('SqlMappings');
     expect(types).toContain('codecTypes: TestTypes');
     expect(types).toContain('operationTypes: Record<string, never>');
@@ -523,7 +527,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('gets types imports with multiple extensions', () => {
-    const packs = [
+    const packs: ExtensionPack[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -558,16 +562,14 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const codecImports = sqlTargetFamilyHook.getCodecTypesImports(packs);
-    const operationImports = sqlTargetFamilyHook.getOperationTypesImports(packs);
-    const imports = [...codecImports, ...operationImports];
+    const imports = extractTypeImports(packs);
     expect(imports.length).toBe(2);
     expect(imports[0]?.package).toBe('@test/adapter/codec-types');
     expect(imports[1]?.package).toBe('@test/extension/codec-types');
   });
 
   it('gets types imports with packs without codecTypes', () => {
-    const packs = [
+    const packs: ExtensionPack[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -577,14 +579,12 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const codecImports = sqlTargetFamilyHook.getCodecTypesImports(packs);
-    const operationImports = sqlTargetFamilyHook.getOperationTypesImports(packs);
-    const imports = [...codecImports, ...operationImports];
+    const imports = extractTypeImports(packs);
     expect(imports.length).toBe(0);
   });
 
-  it('gets types imports using getTypesImports', () => {
-    const packs = [
+  it('gets types imports using extractTypeImports', () => {
+    const packs: ExtensionPack[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -610,7 +610,7 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const imports = sqlTargetFamilyHook.getTypesImports(packs);
+    const imports = extractTypeImports(packs);
     expect(imports.length).toBe(2);
     expect(imports[0]?.package).toBe('@test/adapter/codec-types');
     expect(imports[1]?.package).toBe('@test/adapter/operation-types');

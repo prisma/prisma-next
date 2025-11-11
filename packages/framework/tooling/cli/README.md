@@ -83,9 +83,12 @@ flowchart TD
 
 ### Emit Command (`commands/emit.ts`)
 - Command implementation using commander
-- Loads extension packs using `loadExtensionPacks()` from emitter
+- Loads extension packs using `loadExtensionPacks()` from `pack-loading.ts` (CLI-only)
+- Assembles operation registry using `assembleOperationRegistryFromPacks()` from `pack-assembly.ts`
+- Extracts type imports using `extractTypeImports()` from `pack-assembly.ts`
+- Extracts extension IDs using `extractExtensionIds()` from `pack-assembly.ts`
 - Loads TS contract using `loadContractFromTs()` utility
-- Calls `emit()` from emitter (returns strings)
+- Calls `emit()` from emitter (returns strings) with pre-assembled context
 - Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact
 - Writes `contract.json` and `contract.d.ts` to output directory
 

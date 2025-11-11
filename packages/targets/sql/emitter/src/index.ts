@@ -1,5 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ValidationContext } from '@prisma-next/emitter';
+import type { TypesImportSpec, ValidationContext } from '@prisma-next/emitter';
 import type {
   ModelDefinition,
   ModelField,
@@ -17,7 +17,7 @@ export const sqlTargetFamilyHook = {
     }
 
     const referencedNamespaces = new Set<string>();
-    
+
     // Collect namespaces from ir.extensions
     const extensions = ir.extensions as Record<string, unknown> | undefined;
     if (extensions) {
@@ -25,13 +25,13 @@ export const sqlTargetFamilyHook = {
         referencedNamespaces.add(namespace);
       }
     }
-    
+
     // Also validate against extensionIds from context for consistency
     if (ctx.extensionIds) {
       for (const extensionId of ctx.extensionIds) {
         // Extract namespace from extension ID (format: namespace/name@version or just namespace)
         const namespaceMatch = extensionId.match(/^([^/]+)/);
-        if (namespaceMatch && namespaceMatch[1]) {
+        if (namespaceMatch?.[1]) {
           referencedNamespaces.add(namespaceMatch[1]);
         }
       }

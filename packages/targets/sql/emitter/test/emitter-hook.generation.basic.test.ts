@@ -1,5 +1,7 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ExtensionPack } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
+import { extractTypeImports } from '../../../framework/tooling/cli/src/pack-assembly';
 import { sqlTargetFamilyHook } from '../src/index';
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {
@@ -84,7 +86,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('gets types imports', () => {
-    const packs = [
+    const packs: ExtensionPack[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -103,9 +105,7 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const codecImports = sqlTargetFamilyHook.getCodecTypesImports(packs);
-    const operationImports = sqlTargetFamilyHook.getOperationTypesImports(packs);
-    const imports = [...codecImports, ...operationImports];
+    const imports = extractTypeImports(packs);
     expect(imports.length).toBe(1);
     expect(imports[0]?.package).toBe('@test/adapter/codec-types');
     expect(imports[0]?.named).toBe('CodecTypes');
@@ -128,7 +128,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const packs = [
+    const packs: ExtensionPack[] = [
       {
         manifest: {
           id: 'postgres',
@@ -163,7 +163,8 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, packs);
+    const typeImports = extractTypeImports(packs);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, typeImports);
     expect(types).toContain('PgTypes');
     expect(types).toContain('VectorTypes');
   });

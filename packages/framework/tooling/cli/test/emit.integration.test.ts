@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ResultType } from '@prisma-next/contract/types';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -22,6 +22,7 @@ import {
   extractExtensionIds,
   extractTypeImports,
 } from '../src/pack-assembly';
+import { loadExtensionPacks } from '../src/pack-loading';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
@@ -141,12 +142,17 @@ describe('emit integration', () => {
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const typeImports = extractTypeImports(packs);
+      const extensionIds = extractExtensionIds(packs);
 
       const result1 = await emit(
         contract1,
         {
           outputDir,
-          packs,
+          operationRegistry,
+          typeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );
@@ -164,7 +170,9 @@ describe('emit integration', () => {
         contract2,
         {
           outputDir,
-          packs,
+          operationRegistry,
+          typeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );

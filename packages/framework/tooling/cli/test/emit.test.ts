@@ -2,11 +2,17 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
+import {
+  assembleOperationRegistryFromPacks,
+  extractExtensionIds,
+  extractTypeImports,
+} from '../src/pack-assembly';
+import { loadExtensionPacks } from '../src/pack-loading';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
@@ -36,12 +42,17 @@ describe('emit command functionality', () => {
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const typeImports = extractTypeImports(packs);
+      const extensionIds = extractExtensionIds(packs);
 
       const result = await emit(
         contract,
         {
           outputDir,
-          packs,
+          operationRegistry,
+          typeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );
@@ -81,12 +92,17 @@ describe('emit command functionality', () => {
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const typeImports = extractTypeImports(packs);
+      const extensionIds = extractExtensionIds(packs);
 
       const result = await emit(
         contract,
         {
           outputDir,
-          packs,
+          operationRegistry,
+          typeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );
@@ -105,12 +121,17 @@ describe('emit command functionality', () => {
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const typeImports = extractTypeImports(packs);
+      const extensionIds = extractExtensionIds(packs);
 
       const result = await emit(
         contract,
         {
           outputDir: newOutputDir,
-          packs,
+          operationRegistry,
+          typeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );

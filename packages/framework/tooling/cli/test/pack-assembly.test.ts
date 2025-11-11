@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import type { ExtensionPack, OperationManifest } from '@prisma-next/emitter';
+import { describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
   extractExtensionIds,
@@ -430,4 +430,3 @@ describe('extractExtensionIds', () => {
     expect(ids).toEqual([]);
   });
 });
-
