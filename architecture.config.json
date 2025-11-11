@@ -107,6 +107,12 @@
       "domain": "framework",
       "layer": "core",
       "plane": "shared"
+    },
+    {
+      "glob": "packages/sql/contract/**",
+      "domain": "sql",
+      "layer": "core",
+      "plane": "shared"
     }
   ],
   "rules": {
