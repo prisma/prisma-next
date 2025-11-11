@@ -31,6 +31,12 @@
 - Updated imports across runtime, lanes, adapters, and extensions to consume shared artifacts.
 - Docs updated: `.cursor/rules/import-validation.mdc` and Architecture references.
 
+### Shared Plane — Definition
+The shared plane (as used in `architecture.config.json`) contains code and prebuilt artifacts that are safe to import from both the migration and runtime planes. Constraints:
+- Must not import from migration or runtime planes.
+- Side‑effect free (no environment‑specific IO at import time).
+- Typically types (`.d.ts`), validators, and generated JSON artifacts.
+
 ### High‑Level Approach
 1. Surface Contracts to Shared Plane
    - Create `packages/sql/contract` (plane: shared) that exposes target‑agnostic and per‑target contract artifacts: `contract.d.ts` + `contract.json`.
@@ -38,21 +44,21 @@
    - Update consumers to import from `packages/sql/contract` or framework core‑contract instead of `packages/targets/sql` or authoring packages.
 
 2. Remove Runtime → Migration Edges
-   - Update `packages/sql/sql-runtime`, `packages/sql/lanes/*`, `packages/sql/runtime/adapters/*`, and `packages/extensions/compat-prisma` to import from the shared contract or framework core‑contract only.
+   - Update `packages/sql/sql-runtime`, `packages/sql/lanes/*`, `packages/sql/runtime/adapters/*`, and `packages/extensions/compat-prisma` to import from the shared contract surface or framework core‑contract only.
    - Replace any code‑time coupling with reading/using generated artifacts.
 
 3. Pluginize CLI for Target Families
    - Define a plugin interface in `packages/framework/tooling` that depends only on shared/core types.
-   - Implement SQL plugin(s) under runtime/adapters or a new `packages/sql/tooling-plugin` using the shared contract.
+   - Implement SQL plugin(s) under runtime/adapters or a new `packages/sql/tooling-plugin` using the shared contract surface.
    - Wire CLI to load plugins based on capabilities in the contract; remove direct imports from CLI to SQL authoring/targets.
 
 4. Fix Lanes ↔ Runtime Upward Imports
-   - Extract shared runtime DTOs/ports used by lanes to `packages/framework/runtime-core` or a small `sql/runtime-interfaces` in shared plane.
+   - Extract shared runtime DTOs/ports used by lanes to `packages/framework/runtime-core` or a small `sql/runtime-interfaces` in the shared plane.
    - Update lanes to depend downward only; remove `isSqlLanesToRuntime` necessity.
 
 5. Enforce and Document
    - Delete exception predicates from `dependency-cruiser.config.mjs` and re‑run `pnpm lint:deps`.
-   - Update `.cursor/rules/import-validation.mdc` to remove exception notes and to reference the shared contract and CLI plugin boundaries.
+   - Update `.cursor/rules/import-validation.mdc` to remove exception notes and to reference the shared contract surface and CLI plugin boundaries.
 
 ### Step‑By‑Step Plan
 1. Scaffold `packages/sql/contract` (shared plane) with build to emit `contract.d.ts` and `contract.json`.
@@ -84,4 +90,3 @@
 - M2: CLI plugin interface + SQL plugin in place; CLI no longer imports authoring/targets.
 - M3: Lanes/runtimes split finalized; no upward imports within SQL domain.
 - M4: Delete all exceptions from depcruise config; docs updated; CI green.
-

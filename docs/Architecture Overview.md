@@ -42,7 +42,7 @@ Prisma Next is organized around two planes that share the contract and a pinned 
 - **Migration Plane** (build time): authoring, planning, verifying, and applying contract changes
 - **Query Plane** (runtime): authoring, validating, and executing query plans against live data
 
-Both planes operate on the same shared artifacts:
+Both planes operate on the same shared artifacts (produced and consumed via a small Common "shared" plane):
 
 - **Data Contract:** Generated from PSL + TypeScript builders + extension manifests and distributed as JSON alongside TypeScript definitions
 - **Capability profile:** The contract declares required capabilities (and optional adapter pins) and emits a pinned `profileHash`. The runner verifies the database satisfies the contract and writes the same `profileHash` to the marker (ADR 117, ADR 021)
@@ -166,6 +166,16 @@ sequenceDiagram
   DB-->>Runner: Success
   Runner->>Marker: Update coreHash/profileHash, write ledger
 ```
+
+## Domains and Responsibilities
+
+- Framework: Target‑agnostic core (contract base types, plan model, runtime SPI, tooling/CLI).
+- SQL (Target‑Family): Dialect‑agnostic SQL family building blocks (contract shape/types, operations specs, emitter hook, lanes). This domain defines how SQL targets integrate but does not include a concrete dialect.
+- Extensions: Concrete target and ecosystem packs (e.g., Postgres adapter/driver, codec packs, compat layers). Extensions implement Framework/Family SPIs and are dynamically composed.
+
+Notes
+- Family vs Target: “Target‑family” (SQL) applies to any SQL dialect; “target” is a concrete dialect (Postgres, MySQL). Family code lives in the SQL domain; dialect code lives in Extensions.
+- Plane boundaries: Shared plane hosts type‑only code and validators safe for both planes. Migration and Runtime must not import code across planes; runtime consumes artifacts and shared‑plane types only.
 ## Query Plane — Runtime Assertions
 
 **Authoring**
