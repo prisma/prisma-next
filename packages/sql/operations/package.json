@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@prisma-next/operations": "workspace:*",
-    "arktype": "^2.4.0"
+    "arktype": "^2.1.26"
   },
   "devDependencies": {
     "@prisma-next/emitter": "workspace:*",
