@@ -22,7 +22,8 @@
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
-    "@prisma-next/sql-lane": "workspace:*"
+    "@prisma-next/sql-lane": "workspace:*",
+    "@prisma-next/sql-tooling-assembly": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

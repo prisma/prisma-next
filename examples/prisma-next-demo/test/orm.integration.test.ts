@@ -7,15 +7,15 @@ import { emit } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
-import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { Pool } from 'pg';
-import { beforeAll, describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
-} from '../../../packages/framework/tooling/cli/src/pack-assembly';
+} from '@prisma-next/sql-tooling-assembly';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { Pool } from 'pg';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
 import type { Contract } from '../src/prisma/contract.d';

@@ -14,15 +14,15 @@ import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-rela
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
-import { loadContractFromTs } from '../src/load-ts-contract';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
-} from '../src/pack-assembly';
+} from '@prisma-next/sql-tooling-assembly';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { loadContractFromTs } from '../src/load-ts-contract';
 import { loadExtensionPacks } from '../src/pack-loading';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

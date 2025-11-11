@@ -14,14 +14,14 @@ import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-rela
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
-} from '../../../packages/framework/tooling/cli/src/pack-assembly';
+} from '@prisma-next/sql-tooling-assembly';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {

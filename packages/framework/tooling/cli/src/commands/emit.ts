@@ -1,8 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { emit } from '@prisma-next/emitter';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { loadContractFromTs } from '../load-ts-contract';
@@ -72,16 +70,13 @@ export function createEmitCommand(): Command {
 
         const contractRaw = await loadContractFromTs(contractPath);
 
-        // Normalize the contract to ensure all required fields are present
+        // Validate and normalize the contract using family-specific validation
         // This ensures consistency between CLI emit and programmatic emit
-        const contract = validateContract<SqlContract<SqlStorage>>(contractRaw);
+        // validateContractIR returns ContractIR without mappings (mappings are runtime-only)
+        const contractIR = config.family.validateContractIR(contractRaw);
 
         // Use family hook from config
         const targetFamily = config.family.hook;
-
-        // Strip mappings before emitting - mappings are not part of ContractIR
-        // They are computed at runtime and should not be persisted to contract.json
-        const { mappings: _mappings, ...contractIR } = contract;
 
         const result = await emit(
           contractIR as unknown as typeof contractRaw,

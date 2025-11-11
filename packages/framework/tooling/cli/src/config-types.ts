@@ -19,6 +19,17 @@ export interface FamilyDescriptor {
   readonly extractOperationTypeImports: (
     descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
   ) => ReadonlyArray<TypesImportSpec>;
+  /**
+   * Validates a contract JSON and returns a validated ContractIR (without mappings).
+   * Mappings are runtime-only and should not be part of ContractIR.
+   */
+  readonly validateContractIR: (contractJson: unknown) => unknown;
+  /**
+   * Optionally strips mappings from a contract.
+   * Default implementation is a no-op (returns contract as-is).
+   * SQL family overrides this to strip mappings before emitting ContractIR.
+   */
+  readonly stripMappings?: (contract: unknown) => unknown;
 }
 
 /**

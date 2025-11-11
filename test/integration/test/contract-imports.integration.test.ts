@@ -8,14 +8,14 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
-} from '../../../packages/framework/tooling/cli/src/pack-assembly';
+} from '@prisma-next/sql-tooling-assembly';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
 const execFileAsync = promisify(execFile);

@@ -68,33 +68,12 @@ const pushRule = (name, comment, sourceGroup, targetGroup) => {
   });
 };
 
-const isCliGroup = (group) =>
-  group.domain === 'framework' &&
-  group.layer === 'tooling' &&
-  group.globs.some((glob) => glob.includes('tooling/cli'));
-
 const isSqlLanesToRuntime = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'sql' &&
   sourceGroup.layer === 'lanes' &&
   sourceGroup.plane === 'runtime' &&
   targetGroup.layer === 'runtime' &&
   targetGroup.plane === 'runtime';
-
-const isCliToSqlTargets = (sourceGroup, targetGroup) =>
-  isCliGroup(sourceGroup) && targetGroup.domain === 'sql' && targetGroup.layer === 'targets';
-
-const isCliToSqlTooling = (sourceGroup, targetGroup) =>
-  isCliGroup(sourceGroup) && targetGroup.domain === 'sql' && targetGroup.layer === 'tooling';
-
-const isCliToSqlAuthoring = (sourceGroup, targetGroup) =>
-  isCliGroup(sourceGroup) && targetGroup.domain === 'sql' && targetGroup.layer === 'authoring';
-
-const isCliToSqlOperations = (sourceGroup, targetGroup) =>
-  isCliGroup(sourceGroup) &&
-  targetGroup.domain === 'sql' &&
-  targetGroup.layer === 'core' &&
-  targetGroup.plane === 'shared' &&
-  targetGroup.globs.some((glob) => glob.includes('sql/operations'));
 
 const isExtensionsToSqlTargets = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'extensions' &&
@@ -139,17 +118,6 @@ const createCrossDomainRules = () => {
     for (const targetGroup of moduleGroups) {
       if (sourceGroup.domain === targetGroup.domain) continue;
       if (targetGroup.domain === 'framework') continue;
-
-      // TODO: CLI tooling uses SQL tooling/authoring hooks until the plugin split is complete (docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4)
-      // CLI assembles operation registries from packs, so it needs to import sql/operations (shared plane)
-      if (
-        isCliToSqlTargets(sourceGroup, targetGroup) ||
-        isCliToSqlTooling(sourceGroup, targetGroup) ||
-        isCliToSqlAuthoring(sourceGroup, targetGroup) ||
-        isCliToSqlOperations(sourceGroup, targetGroup)
-      ) {
-        continue;
-      }
 
       if (isExtensionsToSqlTargets(sourceGroup, targetGroup)) {
         continue;

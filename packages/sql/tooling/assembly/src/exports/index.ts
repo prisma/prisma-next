@@ -1,8 +1,13 @@
 export {
   assembleOperationRegistryFromDescriptors,
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImports,
   extractCodecTypeImportsFromDescriptors,
+  extractExtensionIds,
   extractExtensionIdsFromDescriptors,
+  extractOperationTypeImports,
   extractOperationTypeImportsFromDescriptors,
+  extractTypeImports,
   operationManifestToSignature,
 } from '../pack-assembly';
 export type {

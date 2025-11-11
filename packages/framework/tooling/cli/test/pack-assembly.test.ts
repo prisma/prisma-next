@@ -1,11 +1,17 @@
-import { describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
+  type ExtensionPackManifest,
   extractExtensionIds,
   extractTypeImports,
+  type OperationManifest,
   operationManifestToSignature,
-} from '../src/pack-assembly';
-import type { ExtensionPack, OperationManifest } from '../src/pack-manifest-types';
+} from '@prisma-next/sql-tooling-assembly';
+import { describe, expect, it } from 'vitest';
+
+type ExtensionPack = {
+  readonly manifest: ExtensionPackManifest;
+  readonly path: string;
+};
 
 describe('operationManifestToSignature', () => {
   it('converts OperationManifest to SqlOperationSignature', () => {
@@ -150,7 +156,7 @@ describe('operationManifestToSignature', () => {
 
 describe('assembleOperationRegistryFromPacks', () => {
   it('assembles registry from packs with operations', () => {
-    const pack1: ExtensionPack = {
+    const pack1: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack-1',
         version: '1.0.0',
@@ -179,7 +185,7 @@ describe('assembleOperationRegistryFromPacks', () => {
   });
 
   it('assembles registry from multiple packs', () => {
-    const pack1: ExtensionPack = {
+    const pack1: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack-1',
         version: '1.0.0',
@@ -201,7 +207,7 @@ describe('assembleOperationRegistryFromPacks', () => {
       path: '/test/pack1',
     };
 
-    const pack2: ExtensionPack = {
+    const pack2: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack-2',
         version: '1.0.0',
@@ -230,7 +236,7 @@ describe('assembleOperationRegistryFromPacks', () => {
   });
 
   it('handles packs without operations', () => {
-    const pack: ExtensionPack = {
+    const pack: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack',
         version: '1.0.0',
@@ -248,7 +254,7 @@ describe('assembleOperationRegistryFromPacks', () => {
   });
 
   it('throws error for duplicate method name on same typeId', () => {
-    const pack: ExtensionPack = {
+    const pack: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack',
         version: '1.0.0',
@@ -319,7 +325,7 @@ describe('extractTypeImports', () => {
   });
 
   it('extracts operation type imports from packs', () => {
-    const pack: ExtensionPack = {
+    const pack: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack',
         version: '1.0.0',
@@ -346,7 +352,7 @@ describe('extractTypeImports', () => {
   });
 
   it('extracts both codec and operation type imports', () => {
-    const pack: ExtensionPack = {
+    const pack: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack',
         version: '1.0.0',
@@ -385,7 +391,7 @@ describe('extractTypeImports', () => {
   });
 
   it('handles packs without type imports', () => {
-    const pack: ExtensionPack = {
+    const pack: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack',
         version: '1.0.0',
@@ -405,7 +411,7 @@ describe('extractTypeImports', () => {
 
 describe('extractExtensionIds', () => {
   it('extracts extension IDs from packs', () => {
-    const pack1: ExtensionPack = {
+    const pack1: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack-1',
         version: '1.0.0',
@@ -413,7 +419,7 @@ describe('extractExtensionIds', () => {
       path: '/test/pack1',
     };
 
-    const pack2: ExtensionPack = {
+    const pack2: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
         id: 'test-pack-2',
         version: '1.0.0',

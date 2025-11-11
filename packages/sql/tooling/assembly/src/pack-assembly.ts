@@ -10,7 +10,7 @@ import {
   type SqlOperationRegistry,
   type SqlOperationSignature,
 } from '@prisma-next/sql-operations';
-import type { OperationManifest } from './pack-manifest-types';
+import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
 
 /**
  * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
@@ -146,4 +146,81 @@ export function extractExtensionIdsFromDescriptors(
   }
 
   return ids;
+}
+
+/**
+ * Assembles an operation registry from extension packs.
+ * Extracts OperationManifest[] from packs, converts them to SqlOperationSignature,
+ * and registers them in a new registry.
+ */
+export function assembleOperationRegistryFromPacks(
+  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
+): SqlOperationRegistry {
+  const registry = createSqlOperationRegistry();
+
+  for (const pack of packs) {
+    const operations = pack.manifest.operations ?? [];
+    for (const operationManifest of operations) {
+      const signature = operationManifestToSignature(operationManifest);
+      register(registry, signature);
+    }
+  }
+
+  return registry;
+}
+
+/**
+ * Extracts codec type imports from extension packs for contract.d.ts generation.
+ */
+export function extractCodecTypeImports(
+  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
+): ReadonlyArray<TypesImportSpec> {
+  const imports: TypesImportSpec[] = [];
+
+  for (const pack of packs) {
+    const codecTypes = pack.manifest.types?.codecTypes;
+    if (codecTypes?.import) {
+      imports.push(codecTypes.import);
+    }
+  }
+
+  return imports;
+}
+
+/**
+ * Extracts operation type imports from extension packs for contract.d.ts generation.
+ */
+export function extractOperationTypeImports(
+  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
+): ReadonlyArray<TypesImportSpec> {
+  const imports: TypesImportSpec[] = [];
+
+  for (const pack of packs) {
+    const operationTypes = pack.manifest.types?.operationTypes;
+    if (operationTypes?.import) {
+      imports.push(operationTypes.import);
+    }
+  }
+
+  return imports;
+}
+
+/**
+ * Extracts extension IDs from packs for extension validation.
+ */
+export function extractExtensionIds(
+  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
+): ReadonlyArray<string> {
+  return packs.map((pack) => pack.manifest.id);
+}
+
+/**
+ * @deprecated Use extractCodecTypeImports and extractOperationTypeImports instead
+ * Extracts all type imports from extension packs (both codec and operation types).
+ * Kept for backward compatibility during migration.
+ */
+export function extractTypeImports(
+  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
+): ReadonlyArray<TypesImportSpec> {
+  return [...extractCodecTypeImports(packs), ...extractOperationTypeImports(packs)];
 }

@@ -1,10 +1,10 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import { describe, expect, it } from 'vitest';
 import {
+  type ExtensionPackManifest,
   extractCodecTypeImports,
   extractOperationTypeImports,
-} from '../../../framework/tooling/cli/src/pack-assembly';
-import type { ExtensionPack } from '../../../framework/tooling/cli/src/pack-manifest-types';
+} from '@prisma-next/sql-tooling-assembly';
+import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {
@@ -207,7 +207,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates mappings type when models is undefined with codecTypes', () => {
-    const packs: ExtensionPack[] = [
+    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -272,7 +272,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const packs: ExtensionPack[] = [
+    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -540,7 +540,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('gets types imports with multiple extensions', () => {
-    const packs: ExtensionPack[] = [
+    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -584,7 +584,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('gets types imports with packs without codecTypes', () => {
-    const packs: ExtensionPack[] = [
+    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
       {
         manifest: {
           id: 'test-adapter',
@@ -601,7 +601,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('gets types imports using extractCodecTypeImports and extractOperationTypeImports', () => {
-    const packs: ExtensionPack[] = [
+    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
       {
         manifest: {
           id: 'test-adapter',
