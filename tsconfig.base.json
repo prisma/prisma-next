@@ -19,13 +19,11 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@prisma-next/adapter-postgres/cli": ["packages/sql/runtime/adapters/postgres/src/cli.ts"],
+      "@prisma-next/adapter-postgres/cli": ["packages/targets/postgres-adapter/src/exports/cli.ts"],
       "@prisma-next/adapter-postgres/runtime": [
-        "packages/sql/runtime/adapters/postgres/src/exports/runtime.ts"
+        "packages/targets/postgres-adapter/src/exports/runtime.ts"
       ],
-      "@prisma-next/adapter-postgres/*": [
-        "packages/sql/runtime/adapters/postgres/src/exports/*.ts"
-      ],
+      "@prisma-next/adapter-postgres/*": ["packages/targets/postgres-adapter/src/exports/*.ts"],
       "@prisma-next/driver-postgres": [
         "packages/sql/runtime/drivers/postgres/src/exports/index.ts"
       ],
@@ -71,7 +69,7 @@
     { "path": "./packages/relational-ir" },
     { "path": "./packages/psl" },
     { "path": "./packages/sql/runtime/drivers/postgres" },
-    { "path": "./packages/sql/runtime/adapters/postgres" },
+    { "path": "./packages/targets/postgres-adapter" },
     { "path": "./packages/framework/core-contract" },
     { "path": "./packages/extensions/compat-prisma" },
     { "path": "./packages/schema-emitter" },

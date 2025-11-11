@@ -7,5 +7,5 @@
  * Runtime codec implementations are provided by the adapter's codec registry.
  */
 
-export type { CodecTypes } from '../codecs';
-export { dataTypes } from '../codecs';
+export type { CodecTypes } from '../core/codecs';
+export { dataTypes } from '../core/codecs';

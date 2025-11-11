@@ -9,8 +9,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../../../biome.json --error-on-warnings",
-    "clean": "node ../../scripts/clean.mjs"
+    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
+    "clean": "node ../../../scripts/clean.mjs"
   },
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
@@ -41,12 +41,12 @@
       "import": "./dist/exports/codec-types.js"
     },
     "./cli": {
-      "types": "./dist/cli.d.ts",
-      "import": "./dist/cli.js"
+      "types": "./dist/exports/cli.d.ts",
+      "import": "./dist/exports/cli.js"
     },
     "./runtime": {
-      "types": "./dist/runtime.d.ts",
-      "import": "./dist/runtime.js"
+      "types": "./dist/exports/runtime.d.ts",
+      "import": "./dist/exports/runtime.js"
     }
   }
 }

@@ -8,8 +8,8 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 
-import { createPostgresAdapter } from '../src/adapter';
-import type { PostgresContract } from '../src/types';
+import { createPostgresAdapter } from '../src/core/adapter';
+import type { PostgresContract } from '../src/core/types';
 
 const contract = Object.freeze(
   validateContract<PostgresContract>({

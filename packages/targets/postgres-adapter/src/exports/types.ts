@@ -11,4 +11,4 @@ export type {
   SelectAst,
   StorageColumn,
   StorageTable,
-} from '../types';
+} from '../core/types';

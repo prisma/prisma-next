@@ -79,8 +79,20 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/runtime/adapters/postgres/**",
-      "domain": "sql",
+      "glob": "packages/targets/postgres-adapter/src/core/**",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/targets/postgres-adapter/src/exports/cli.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/targets/postgres-adapter/src/exports/runtime.ts",
+      "domain": "targets",
       "layer": "adapters",
       "plane": "runtime"
     },
