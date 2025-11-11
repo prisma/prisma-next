@@ -287,7 +287,7 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
-  packages/framework/runtime-core:
+  packages/framework/runtime-executor:
     dependencies:
       '@prisma-next/contract':
         specifier: workspace:*
@@ -647,9 +647,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../framework/core-operations
-      '@prisma-next/runtime-core':
+      '@prisma-next/runtime-executor':
         specifier: workspace:*
-        version: link:../../framework/runtime-core
+        version: link:../../framework/runtime-executor
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../contract

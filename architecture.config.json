@@ -43,9 +43,9 @@
       "plane": "migration"
     },
     {
-      "glob": "packages/framework/runtime-core/**",
+      "glob": "packages/framework/runtime-executor/**",
       "domain": "framework",
-      "layer": "runtime-core",
+      "layer": "runtime-executor",
       "plane": "runtime"
     },
     {
@@ -153,7 +153,7 @@
     }
   },
   "layerOrder": {
-    "framework": ["core", "authoring", "tooling", "runtime-core"],
+    "framework": ["core", "authoring", "tooling", "runtime-executor"],
     "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters", "drivers"]
   }
 }

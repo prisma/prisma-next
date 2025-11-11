@@ -1,10 +1,10 @@
 {
-  "name": "@prisma-next/runtime-core",
+  "name": "@prisma-next/runtime-executor",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "description": "Target-agnostic runtime kernel for Prisma Next",
+  "description": "Target-agnostic execution engine for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run",

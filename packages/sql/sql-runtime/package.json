@@ -16,7 +16,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/operations": "workspace:*",
-    "@prisma-next/runtime-core": "workspace:*",
+    "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*"
   },
   "devDependencies": {

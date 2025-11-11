@@ -1,10 +1,11 @@
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import type { ContractIR } from '../../../core-contract/src/ir';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { TargetFamilyHook } from '../src/target-family';
-import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
+import type { EmitOptions, ExtensionPackManifest } from '../src/types';
 import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {

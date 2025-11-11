@@ -1,20 +1,20 @@
-# @prisma-next/runtime-core
+# @prisma-next/runtime-executor
 
-Target-agnostic runtime kernel for Prisma Next.
+Target-agnostic execution engine for Prisma Next.
 
 ## Package Classification
 
 - **Domain**: framework
-- **Layer**: runtime-core
+- **Layer**: runtime-executor
 - **Plane**: runtime
 
 ## Overview
 
-The runtime-core package provides the target-neutral kernel responsible for plan validation, marker verification, plugin lifecycle, telemetry, and the runtime SPI definition. It is designed to work with any target family (SQL, document, graph, etc.) through the `RuntimeFamilyAdapter` interface.
+The runtime-executor package provides the target-neutral execution engine responsible for plan validation, marker verification, plugin lifecycle, telemetry, and the runtime SPI definition. It is designed to work with any target family (SQL, document, graph, etc.) through the `RuntimeFamilyAdapter` interface.
 
 ## Purpose
 
-Provide a target-agnostic runtime kernel that family runtimes (e.g., `@prisma-next/sql-runtime`) can compose with family-specific adapters, drivers, and codecs.
+Provide a target-agnostic execution engine that family runtimes (e.g., `@prisma-next/sql-runtime`) can compose with family-specific adapters, drivers, and codecs.
 
 ## Responsibilities
 
@@ -52,10 +52,10 @@ The target-neutral runtime implementation that:
 
 ## Usage
 
-Family runtimes (e.g., `@prisma-next/sql-runtime`) compose runtime-core with family-specific implementations:
+Family runtimes (e.g., `@prisma-next/sql-runtime`) compose runtime-executor with family-specific implementations:
 
 ```typescript
-import { createRuntimeCore } from '@prisma-next/runtime-core';
+import { createRuntimeCore } from '@prisma-next/runtime-executor';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
 const familyAdapter = new SqlFamilyAdapter(contract);
@@ -80,4 +80,4 @@ const core = createRuntimeCore({
 
 ## Testing
 
-Includes a mock-family smoke test (`test/mock-family.test.ts`) that proves runtime-core can work without SQL dependencies.
+Includes a mock-family smoke test (`test/mock-family.test.ts`) that proves runtime-executor can work without SQL dependencies.

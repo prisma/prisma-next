@@ -60,8 +60,8 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers for building SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives in the SQL lanes ring
-- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-core with SQL adapters
-- **`@prisma-next/runtime-core`** - Target-agnostic runtime kernel (verification, plugin lifecycle, telemetry)
+- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-executor with SQL adapters
+- **`@prisma-next/runtime-executor`** - Target-agnostic execution engine (verification, plugin lifecycle, telemetry)
 - **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers (core ring)
 - **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly (targets ring)
 - **`@prisma-next/sql-contract-types`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) (targets ring)
@@ -88,7 +88,7 @@ The repository is organized by **Domains → Layers → Planes**:
 - **Core layer** (shared plane): `@prisma-next/plan`, `@prisma-next/operations` live in `packages/framework/core-*`
 - **Authoring layer** (migration plane): `@prisma-next/contract-authoring`, `@prisma-next/contract-ts`, `@prisma-next/contract-psl` live in `packages/framework/authoring/*`
 - **Tooling layer** (migration plane): `@prisma-next/cli`, `@prisma-next/emitter` live in `packages/framework/tooling/*`
-- **Runtime-core layer** (runtime plane): `@prisma-next/runtime-core` lives in `packages/framework/runtime-core`
+- **Runtime-executor layer** (runtime plane): `@prisma-next/runtime-executor` lives in `packages/framework/runtime-executor`
 
 **SQL Domain (Target‑Family)** (`packages/sql/**` and `packages/targets/sql/**`):
 - Family‑level types and schema: `@prisma-next/sql-contract-types` (dialect‑agnostic contract shapes)
@@ -1054,7 +1054,7 @@ See `test/utils/README.md` for full documentation of generic helpers, `packages/
 - `pnpm lint:deps` - Validates that packages follow domain/layer/plane dependency rules
 - Uses Dependency Cruiser with declarative package-to-domain/layer/plane mapping in `architecture.config.json`
 - Configuration in `dependency-cruiser.config.mjs` loads `architecture.config.json` and defines rules
-- Enforces unidirectional dependencies: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`
+- Enforces unidirectional dependencies: `core → authoring → targets → lanes → runtime-executor → family-runtime → adapters`
 - Packages in the same layer can import from each other
 - Temporary exceptions are allowed with TODO comments in `dependency-cruiser.config.mjs` for known violations that need refactoring
 
@@ -1362,7 +1362,7 @@ When moving packages to reflect domain/layer/plane structure (e.g., moving frame
 
 **Key Learnings:**
 - Relative paths in `tsconfig.json`, `biome.json`, and `clean.mjs` scripts must be recalculated based on new package depth
-- Framework domain packages are organized as: `packages/framework/{core-*,authoring/*,tooling/*,runtime-core}`
+- Framework domain packages are organized as: `packages/framework/{core-*,authoring/*,tooling/*,runtime-executor}`
 - Always use `git mv` to preserve history
 - Published package names (`@prisma-next/*`) remain unchanged - only filesystem paths change
 
