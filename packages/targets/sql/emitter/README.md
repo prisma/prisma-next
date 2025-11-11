@@ -21,7 +21,7 @@ This package provides the SQL-specific emitter hook implementation for the Prism
 
 - **Depends on**:
   - `@prisma-next/emitter` (contract IR and extension pack types)
-  - `@prisma-next/sql-contract-types` (SQL contract type definitions)
+  - `@prisma-next/sql-contract` (SQL contract type definitions)
 - **Depended on by**:
   - `@prisma-next/cli` (uses for contract emission)
   - `@prisma-next/integration-tests` (uses for contract emission tests)
@@ -36,7 +36,7 @@ flowchart TD
 
     subgraph "Targets Ring"
         SQL_EMITTER[@prisma-next/sql-contract-emitter]
-        CT[@prisma-next/sql-contract-types]
+        CT[@prisma-next/sql-contract]
     end
 
     subgraph "Tooling Ring"

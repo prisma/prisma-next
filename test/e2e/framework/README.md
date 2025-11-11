@@ -95,7 +95,7 @@ await withDevDatabase(
 
 ## Test Utilities
 
-Contract-related test utilities are located in `test/e2e/framework/test/utils.ts`. These utilities depend on `@prisma-next/sql-contract-ts` and `@prisma-next/sql-contract-types` for contract validation and types.
+Contract-related test utilities are located in `test/e2e/framework/test/utils.ts`. These utilities depend on `@prisma-next/sql-contract-ts` and `@prisma-next/sql-contract` for contract validation and types.
 
 **Available Utilities:**
 - `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk. The generic type parameter should be specified from the emitted `contract.d.ts` file (e.g., `loadContractFromDisk<Contract>(contractJsonPath)`).

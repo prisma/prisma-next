@@ -40,7 +40,6 @@
       ],
       "@prisma-next/contract-ts": ["packages/framework/authoring/contract-ts/src/index.ts"],
       "@prisma-next/contract-psl": ["packages/framework/authoring/contract-psl/src/index.ts"],
-      "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
       "@prisma-next/sql-contract": ["packages/sql/contract/src/index.ts"],
       "@prisma-next/sql-contract/*": ["packages/sql/contract/src/exports/*.ts"],
       "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],

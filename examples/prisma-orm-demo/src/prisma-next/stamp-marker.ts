@@ -1,5 +1,5 @@
+import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract } from '@prisma-next/sql-contract-types';
 import {
   ensureSchemaStatement,
   ensureTableStatement,

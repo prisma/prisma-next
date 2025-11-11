@@ -81,7 +81,7 @@ const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
 
 - **`@prisma-next/contract-authoring`** - Target-agnostic builder core (builder state types, builder classes, type helpers)
 - **`@prisma-next/contract`** - Core contract types (`ContractBase`)
-- **`@prisma-next/sql-target`** - SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
+- **`@prisma-next/sql-contract`** - SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
 - **`arktype`** - Runtime validation
 - **`ts-toolbelt`** - Type utilities
 

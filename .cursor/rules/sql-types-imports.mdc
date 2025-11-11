@@ -10,31 +10,21 @@ severity: info
 
 # SQL Types Import Path
 
-**CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) should be imported from `@prisma-next/sql-target` for backward compatibility during the migration period (Slice 5-7). After Slice 7, imports should use the new packages directly.
+**CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) should be imported from `@prisma-next/sql-contract/types` (shared plane package).
 
-## Current Import Strategy (Slice 5-7)
+## Current Import Strategy
 
-During the migration period, most packages should use transitional re-exports from `@prisma-next/sql-target`:
-
-```typescript
-// ✅ CORRECT: Import SQL types from sql-target (transitional re-export)
-import type { SqlContract, SqlStorage, SqlMappings } from '@prisma-next/sql-target';
-```
-
-## Future Import Strategy (After Slice 7)
-
-After Slice 7, imports should use the new packages directly:
+All packages should import SQL contract types from the shared plane:
 
 ```typescript
-// ✅ CORRECT: Import SQL types from sql-contract-types (after Slice 7)
-import type { SqlContract, SqlStorage, SqlMappings } from '@prisma-next/sql-contract-types';
+// ✅ CORRECT: Import SQL types from sql-contract (shared plane)
+import type { SqlContract, SqlStorage, SqlMappings } from '@prisma-next/sql-contract/types';
 ```
 
 ## Package Structure
 
 - **`@prisma-next/contract`**: Core contract types (`ContractBase`, `Source`) and document family types (`DocumentContract`)
-- **`@prisma-next/sql-contract-types`**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, `ModelDefinition`, `StorageTable`, `StorageColumn`, etc.) - **canonical source**
-- **`@prisma-next/sql-target`**: Transitional re-exports from `@prisma-next/sql-contract-types` (will be removed in Slice 7)
+- **`@prisma-next/sql-contract`**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, `ModelDefinition`, `StorageTable`, `StorageColumn`, etc.) - **canonical source** (shared plane)
 - **`@prisma-next/sql-operations`**: SQL-specific operations (`OperationSignature`, `LoweringSpec`, `assembleOperationRegistry`) - **canonical source**
 - **`@prisma-next/sql-contract-emitter`**: SQL emitter hook (`sqlTargetFamilyHook`) - **canonical source**
 - **`@prisma-next/operations`**: Target-neutral operations (`OperationRegistry`, `ArgSpec`, `ReturnSpec`, `createOperationRegistry`) - **canonical source**
@@ -42,18 +32,19 @@ import type { SqlContract, SqlStorage, SqlMappings } from '@prisma-next/sql-cont
 ## When to Use Each Package
 
 - **`@prisma-next/contract/types`**: Core contract types (`ContractBase`, `Source`) or document family types (`DocumentContract`)
-- **`@prisma-next/sql-target`**: Use during migration (Slice 5-7) for backward compatibility. Re-exports from `@prisma-next/sql-contract-types`, `@prisma-next/sql-operations`, `@prisma-next/sql-contract-emitter`, and `@prisma-next/operations`
-- **`@prisma-next/sql-contract-types`**: SQL-specific contract types (canonical source, use directly after Slice 7)
-- **`@prisma-next/sql-operations`**: SQL-specific operations (canonical source, use directly after Slice 7)
-- **`@prisma-next/sql-contract-emitter`**: SQL emitter hook (canonical source, use directly after Slice 7)
+- **`@prisma-next/sql-contract/types`**: SQL-specific contract types (canonical source, shared plane)
+- **`@prisma-next/sql-contract/validators`**: SQL contract validators (shared plane)
+- **`@prisma-next/sql-contract/factories`**: SQL contract IR factories (shared plane)
+- **`@prisma-next/sql-operations`**: SQL-specific operations (canonical source, use directly)
+- **`@prisma-next/sql-contract-emitter`**: SQL emitter hook (canonical source, use directly)
 - **`@prisma-next/operations`**: Target-neutral operations (canonical source, use directly)
 
 ## Migration Notes
 
-- **Lanes and Runtime packages**: Should use transitional re-exports from `@prisma-next/sql-target` during migration
-- **Authoring and CLI packages**: Can use direct imports from new packages
-- **Test files**: Should use transitional re-exports for consistency with source code
-- **After Slice 7**: All packages should import directly from the new packages, and `@prisma-next/sql-target` re-exports will be removed
+- **All packages**: Should import SQL contract types from `@prisma-next/sql-contract/types` (shared plane)
+- **Runtime and Lanes**: Can safely import from `@prisma-next/sql-contract/types` as it's in the shared plane
+- **Authoring and Emitter**: Import from `@prisma-next/sql-contract/types` for types, `@prisma-next/sql-contract/validators` for validation
+- **Test files**: Use `@prisma-next/sql-contract/types` and `@prisma-next/sql-contract/factories` for test fixtures
 
 ## Common Mistakes
 
@@ -61,4 +52,4 @@ If you see TypeScript errors like:
 - `"@prisma-next/contract/types" has no exported member named 'SqlContract'`
 - `Module '"@prisma-next/contract/types"' has no exported member 'SqlStorage'`
 
-This means you're importing SQL types from the wrong package. Change the import to use `@prisma-next/sql-target` (during migration) or `@prisma-next/sql-contract-types` (after Slice 7).
+This means you're importing SQL types from the wrong package. Change the import to use `@prisma-next/sql-contract/types`.
