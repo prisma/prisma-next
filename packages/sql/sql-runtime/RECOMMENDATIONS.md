@@ -1,10 +1,10 @@
 # Recommendations
 
 ## Observations
-- Another placeholder; `src/index.ts` exports nothing so runtime logic still lives in `@prisma-next/runtime`.
-- Docs do not explain how this package will compose runtime-core once Slice 6 is done.
+- Package successfully composes `@prisma-next/runtime-executor` with SQL-specific adapters, drivers, and codecs.
+- The SQL runtime provides a family-specific implementation of the `RuntimeFamilyAdapter` interface.
 
 ## Suggested Actions
-- Implement the SQL runtime wrapper (wiring codecs, adapters, driver) so consumers can import it directly.
-- Document the expected options/context (verify modes, plugins, telemetry) so future targets can mirror the structure.
+- Continue to document the composition pattern for future target families (document, graph, etc.).
+- Ensure SQL-specific runtime features are clearly separated from the target-agnostic runtime-executor.
 

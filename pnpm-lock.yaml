@@ -507,7 +507,7 @@ importers:
         version: link:../../contract
       '@prisma-next/sql-operations':
         specifier: workspace:*
-        version: link:../../../targets/sql/operations
+        version: link:../../operations
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../sql-runtime
@@ -574,6 +574,53 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
+  packages/sql/operations:
+    dependencies:
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../framework/core-operations
+      arktype:
+        specifier: ^2.1.25
+        version: 2.1.25
+    devDependencies:
+      '@prisma-next/emitter':
+        specifier: workspace:*
+        version: link:../../framework/tooling/emitter
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
+
+  packages/sql/operations-types:
+    dependencies:
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../framework/core-operations
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: ^2.1.1
+        version: 2.1.9(vitest@2.1.9(@types/node@20.19.24))
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
+
   packages/sql/runtime/adapters/postgres:
     dependencies:
       '@prisma-next/sql-contract':
@@ -584,7 +631,7 @@ importers:
         version: link:../../../authoring/sql-contract-ts
       '@prisma-next/sql-operations':
         specifier: workspace:*
-        version: link:../../../../targets/sql/operations
+        version: link:../../../operations
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../../lanes/relational-core
@@ -609,7 +656,7 @@ importers:
         version: link:../../../contract
       '@prisma-next/sql-operations':
         specifier: workspace:*
-        version: link:../../../../targets/sql/operations
+        version: link:../../../operations
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -679,28 +726,6 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
-  packages/targets/sql/contract-types:
-    dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../../framework/core-contract
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../../sql/contract
-    devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../test/utils
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
-
   packages/targets/sql/emitter:
     dependencies:
       '@prisma-next/emitter':
@@ -709,28 +734,6 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../../sql/contract
-    devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../test/utils
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
-
-  packages/targets/sql/operations:
-    dependencies:
-      '@prisma-next/emitter':
-        specifier: workspace:*
-        version: link:../../../framework/tooling/emitter
-      '@prisma-next/operations':
-        specifier: workspace:*
-        version: link:../../../framework/core-operations
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

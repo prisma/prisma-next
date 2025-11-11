@@ -31,8 +31,8 @@ The framework domain contains target-agnostic packages that work across all targ
 |-- tooling (migration plane)
 |   |-- @prisma-next/cli
 |   |-- @prisma-next/emitter
-|-- runtime-core (runtime plane)
-    |-- @prisma-next/runtime-core
+|-- runtime-executor (runtime plane)
+    |-- @prisma-next/runtime-executor
 ```
 
 ### SQL Target Family Domain
@@ -120,7 +120,10 @@ graph LR
 **Plane boundaries:**
 - Migration plane (authoring, tooling, targets) must not import runtime plane code.
 - Runtime plane may consume artifacts (JSON/manifests) from migration, but not code imports.
+- Shared plane must not import from migration or runtime planes.
 - Example: `@prisma-next/sql-contract-ts` (migration plane) cannot import from `@prisma-next/sql-lane` (runtime plane).
+
+Plane import constraints are enforced declaratively via `planeRules` in `architecture.config.json`. Each plane specifies which planes it can import from (`allow`) and which are forbidden (`forbid`), with optional exceptions for temporary refactoring needs.
 
 ### Core Layer (Framework Domain, Shared Plane)
 
@@ -169,12 +172,12 @@ Lanes consume targets and relational-core helpers to produce AST plans. Packages
 Target-agnostic runtime kernel plus per-family runtime implementations.
 
 **Framework Domain (Runtime Plane):**
-- `packages/framework/runtime-core/` → `@prisma-next/runtime-core` – verification, marker checks, plugin SPI (Slice 6 moves code here)
+- `packages/framework/runtime-executor/` → `@prisma-next/runtime-executor` – verification, marker checks, plugin SPI (Slice 6 moves code here)
 
 **SQL Domain (Runtime Plane):**
-- `packages/sql/sql-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that composes runtime-core with SQL adapters (future document runtimes will mirror this)
+- `packages/sql/sql-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that composes runtime-executor with SQL adapters (future document runtimes will mirror this)
 
-**Dependency Rules:** runtime-core can import from inner layers only. Family runtimes can import from runtime-core, targets, and their family's adapters.
+**Dependency Rules:** runtime-executor can import from inner layers only. Family runtimes can import from runtime-executor, targets, and their family's adapters.
 
 ### Adapters Layer (SQL Domain, Runtime Plane)
 
@@ -194,7 +197,7 @@ Database adapters, drivers, and optional compatibility shims. These packages may
 - Encode target family in the package name prefix (e.g., `@prisma-next/sql-...`)
 - Collapse nested directories to hyphenated names (no slashes after scope)
 - Keep conventional names for adapters/drivers (e.g., `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`), even if they live under `packages/sql/postgres/**`
-- Layers constrain dependencies but don't appear in package names except when meaningful (e.g., `runtime-core`)
+- Layers constrain dependencies but don't appear in package names except when meaningful (e.g., `runtime-executor`)
 
 ### Examples
 
@@ -208,7 +211,7 @@ Database adapters, drivers, and optional compatibility shims. These packages may
 | `packages/framework/authoring/contract-psl/` | `@prisma-next/contract-psl` |
 | `packages/framework/tooling/cli/` | `@prisma-next/cli` |
 | `packages/framework/tooling/emitter/` | `@prisma-next/emitter` |
-| `packages/framework/runtime-core/` | `@prisma-next/runtime-core` |
+| `packages/framework/runtime-executor/` | `@prisma-next/runtime-executor` |
 | `packages/targets/sql/contract-types/` | `@prisma-next/sql-contract-types` |
 | `packages/targets/sql/operations/` | `@prisma-next/sql-operations` |
 | `packages/targets/sql/emitter/` | `@prisma-next/sql-contract-emitter` |
@@ -238,7 +241,7 @@ Path aliases map published package names to source entry files:
       "@prisma-next/contract-psl": ["packages/framework/authoring/contract-psl/src/index.ts"],
       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
       "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
-      "@prisma-next/runtime-core": ["packages/framework/runtime-core/src/index.ts"],
+      "@prisma-next/runtime-executor": ["packages/framework/runtime-executor/src/index.ts"],
       "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
       "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],
       "@prisma-next/sql-contract-emitter": ["packages/targets/sql/emitter/src/index.ts"],
@@ -357,7 +360,7 @@ Dependency Cruiser:
 - Reports violations with detailed context
 - Can be run locally or in CI
 - Supports incremental checks for lint-staged hooks
-- Enforces the dependency direction: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`
+- Enforces the dependency direction: `core → authoring → targets → lanes → runtime-executor → family-runtime → adapters`
 
 **Implementation:**
 - Uses data-driven configuration from `architecture.config.json`
@@ -366,9 +369,12 @@ Dependency Cruiser:
 - Uses TypeScript path resolution for accurate module resolution
 - Allows same-layer imports (e.g., `orm-lane` can import from `sql-relational-core`)
 - Enforces cross-domain rules (only framework can be imported cross-domain)
-- Enforces plane boundaries (migration cannot import runtime, runtime cannot import migration code)
+- Enforces plane boundaries via declarative `planeRules` in `architecture.config.json`:
+  - Shared plane cannot import from migration or runtime
+  - Migration plane cannot import from runtime
+  - Runtime plane cannot import from migration (with documented exceptions)
 
-**Status:** ✅ Import validation is active and enforces Domains/Layers/Planes dependency rules using Dependency Cruiser with data-driven configuration.
+**Status:** ✅ Import validation is active and enforces Domains/Layers/Planes dependency rules using Dependency Cruiser with data-driven configuration. Plane rules are defined declaratively in `architecture.config.json` rather than hardcoded in the dependency cruiser config.
 
 ## Adding New Packages
 

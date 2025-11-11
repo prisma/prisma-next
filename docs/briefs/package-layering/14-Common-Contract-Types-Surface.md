@@ -128,9 +128,9 @@ validateSqlContract(c); // throws on structural mismatch
 
 ### Migration Plan (no open questions)
 1. Create `packages/sql/contract` with types/validators/factories and exports barrels.
-2. Move type aliases from `packages/targets/sql/contract-types/src/index.ts` → `packages/sql/contract/src/types.ts`.
-3. Convert `@prisma-next/sql-contract-types` to a transitional re‑export of `@prisma-next/sql-contract/exports/types` and add a deprecation notice in its README.
-4. Add `framework/core-contract/exports/ir.ts` with IR types + factories and export from `@prisma-next/contract`. Optionally, temporarily re‑export from emitter to smooth migration.
+2. ~~Move type aliases from `packages/targets/sql/contract-types/src/index.ts` → `packages/sql/contract/src/types.ts`.~~ ✅ **COMPLETED**
+3. ~~Convert `@prisma-next/sql-contract-types` to a transitional re‑export of `@prisma-next/sql-contract/exports/types` and add a deprecation notice in its README.~~ ✅ **COMPLETED** - Package deleted entirely
+4. ~~Add `framework/core-contract/exports/ir.ts` with IR types + factories and export from `@prisma-next/contract`. Optionally, temporarily re‑export from emitter to smooth migration.~~ ✅ **COMPLETED** - IR moved to `@prisma-next/contract/ir`
 5. Update imports:
    - Authoring (`packages/sql/authoring/sql-contract-ts`) → `@prisma-next/sql-contract/exports/types` (and optionally validators for JSON validation helper).
    - SQL emitter (`packages/targets/sql/emitter`) → SQL types/validators from `@prisma-next/sql-contract/exports/*`; use shared IR factories from `@prisma-next/contract/exports/ir` where applicable.
@@ -143,7 +143,7 @@ validateSqlContract(c); // throws on structural mismatch
   - Authoring→Targets (was for types)
   - Runtime/Extensions→Targets (use shared validators/types and artifact injection)
 - Run `pnpm lint:deps`; resolve any stragglers.
-8. Delete transitional `@prisma-next/sql-contract-types` once grep shows no imports.
+8. ~~Delete transitional `@prisma-next/sql-contract-types` once grep shows no imports.~~ ✅ **COMPLETED**
 
 ### Acceptance Criteria
 - `@prisma-next/sql-contract` exists (shared plane) with types, validators, SQL IR factories; zero side effects.
