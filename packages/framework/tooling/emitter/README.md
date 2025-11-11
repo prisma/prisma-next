@@ -164,6 +164,28 @@ const result = await emit(ir, {
 
 **Note**: The emitter returns canonical JSON without `_generated` metadata. Callers (e.g., CLI) may add `_generated` metadata to the JSON before writing to disk. The `_generated` field is excluded from canonicalization/hashing to ensure determinism.
 
+## Test Utilities
+
+When writing tests that create `ContractIR` objects, use the factory function from test utilities:
+
+```typescript
+import { createContractIR } from './test/utils';
+
+const ir = createContractIR({
+  storage: {
+    tables: {
+      user: {
+        columns: {
+          id: { type: 'pg/int4@1', nullable: false },
+        },
+      },
+    },
+  },
+});
+```
+
+This ensures all required fields are present with sensible defaults. See `.cursor/rules/use-contract-ir-factories.mdc` for guidelines.
+
 ## Exports
 
 - `.`: Main emitter API (`emit`, `loadExtensionPacks`, types)

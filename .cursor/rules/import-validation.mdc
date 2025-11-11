@@ -19,7 +19,7 @@ The repository uses a domain/layer/plane package layering architecture with unid
 Packages are organized by:
 - **Domains**: framework (target-agnostic) and target families (sql, document, etc.)
 - **Layers**: core → authoring → targets → lanes → runtime → adapters (dependency direction)
-- **Planes**: migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters)
+- **Planes**: migration (authoring, tooling, targets), runtime (lanes, runtime, adapters), and shared — cross‑plane code and prebuilt artifacts safe for both
 
 Dependencies flow inward (toward core) within a domain:
 

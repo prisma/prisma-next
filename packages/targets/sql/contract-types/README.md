@@ -1,10 +1,10 @@
 # @prisma-next/sql-contract-types
 
-SQL-specific contract types for Prisma Next.
+SQL target‑family contract types for Prisma Next (dialect‑agnostic).
 
 ## Overview
 
-This package provides SQL-specific contract type definitions, including storage types, model definitions, and mappings. It's part of the targets ring and defines the SQL contract structure.
+This package provides SQL‑family contract type definitions, including storage types, model definitions, and mappings. It defines the shape of the SQL contract and is safe to consume from authoring, emitter, and lanes. It does not include authoring logic or any concrete adapter/driver code.
 
 ## Responsibilities
 
@@ -28,7 +28,7 @@ This package provides SQL-specific contract type definitions, including storage 
 
 ```mermaid
 flowchart TD
-    subgraph "Targets Ring"
+    subgraph "SQL Family"
         CT[@prisma-next/sql-contract-types]
         EMITTER[@prisma-next/sql-contract-emitter]
     end
@@ -44,6 +44,8 @@ flowchart TD
     CT --> SQL_TS
     CT --> EMITTER
     CT --> REL_CORE
+
+Note: Concrete targets (e.g., Postgres adapter/driver) live in the Extensions domain and implement Framework/Family SPIs. This package remains dialect‑agnostic.
 ```
 
 ## Usage

@@ -82,7 +82,7 @@ The repository is organized by **Domains → Layers → Planes**:
 
 - **Domains**: Framework (target-agnostic) and target families (SQL, document, etc.)
 - **Layers**: Core → Authoring → Targets → Lanes → Runtime → Adapters (dependency direction enforced)
-- **Planes**: Migration (authoring, tooling, targets) vs Runtime (lanes, runtime, adapters)
+- **Planes**: Migration (authoring, tooling, targets), Runtime (lanes, runtime, adapters), and Shared — cross‑plane code and artifacts safe for both
 
 **Framework Domain** (`packages/framework/**`):
 - **Core layer** (shared plane): `@prisma-next/plan`, `@prisma-next/operations` live in `packages/framework/core-*`
@@ -90,11 +90,15 @@ The repository is organized by **Domains → Layers → Planes**:
 - **Tooling layer** (migration plane): `@prisma-next/cli`, `@prisma-next/emitter` live in `packages/framework/tooling/*`
 - **Runtime-core layer** (runtime plane): `@prisma-next/runtime-core` lives in `packages/framework/runtime-core`
 
-**SQL Domain** (`packages/sql/**` and `packages/targets/sql/**`):
-- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-contract-types` (targets layer)
-- **SQL-specific operations** (operation assembly, lowering specs) live in `@prisma-next/sql-operations` (targets layer)
-- **SQL emitter hook** (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` (targets layer)
-- **SQL contract authoring** (`defineContract`, `validateContract`) lives in `@prisma-next/sql-contract-ts` in `packages/sql/authoring/sql-contract-ts`. It composes `@prisma-next/contract-authoring` with SQL-specific types.
+**SQL Domain (Target‑Family)** (`packages/sql/**` and `packages/targets/sql/**`):
+- Family‑level types and schema: `@prisma-next/sql-contract-types` (dialect‑agnostic contract shapes)
+- Family‑level operations: `@prisma-next/sql-operations` (operation specs/registry)
+- Family emitter hook: `@prisma-next/sql-contract-emitter` (`sqlTargetFamilyHook`)
+- Contract authoring (SQL family): `@prisma-next/sql-contract-ts` (`packages/sql/authoring/sql-contract-ts`), composes `@prisma-next/contract-authoring` + family types
+
+**Extensions Domain (Concrete Targets & Packs)**:
+- Concrete adapters/drivers (e.g., Postgres) and ecosystem packs live under `packages/extensions/**` and implement SPIs from Framework/SQL family.
+- Examples: `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`, `@prisma-next/compat-prisma`.
 
 **General Principles**:
 - **Core contract types** (`ContractBase`) live in `@prisma-next/contract` (legacy package, will be migrated)
@@ -2222,6 +2226,12 @@ const ir2: ContractIR = {
 ```
 
 **Key Point:** Match the pattern used for `capabilities` - always provide fallback empty objects for optional properties that must be objects.
+
+**Note:** In tests, use the `createContractIR()` factory function instead of manually constructing `ContractIR` objects. This ensures all required fields are present with proper defaults. See `.cursor/rules/use-contract-ir-factories.mdc` for guidelines.
+
+**Type Notes:**
+- `capabilities` in `ContractIR` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`
+- `ExtensionPack` requires both `manifest` and `path` properties
 
 ## Modular Refactoring Patterns
 

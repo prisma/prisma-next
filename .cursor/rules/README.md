@@ -35,6 +35,10 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/moving-packages.mdc` — Guidelines for moving packages and updating relative paths
 - `.cursor/rules/no-barrel-files.mdc` — Avoid barrels
 
+## Testing
+- `.cursor/rules/use-ast-factories.mdc` — Use factory functions for AST nodes in tests
+- `.cursor/rules/use-contract-ir-factories.mdc` — Use factory functions for ContractIR objects in tests
+
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Responsibilities
