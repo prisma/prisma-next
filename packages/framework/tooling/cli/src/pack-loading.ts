@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ExtensionPack, ExtensionPackManifest } from '@prisma-next/emitter';
 import { type } from 'arktype';
+import type { ExtensionPack, ExtensionPackManifest } from './pack-manifest-types';
 
 function readJsonFile<T = unknown>(filePath: string): T {
   let content: string;

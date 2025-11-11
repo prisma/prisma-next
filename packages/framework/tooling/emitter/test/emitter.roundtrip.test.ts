@@ -60,7 +60,9 @@ const mockSqlHook: TargetFamilyHook = {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }
   },
-  generateContractTypes: (_ir, _typeImports) => {
+  generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports) => {
+    void _codecTypeImports;
+    void _operationTypeImports;
     return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
@@ -95,12 +97,14 @@ describe('emitter round-trip', () => {
 
       // Create minimal test data (emitter tests don't load packs)
       const operationRegistry = createOperationRegistry();
-      const typeImports: TypesImportSpec[] = [];
+      const codecTypeImports: TypesImportSpec[] = [];
+      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitOptions = {
         outputDir: '',
         operationRegistry,
-        typeImports,
+        codecTypeImports,
+        operationTypeImports,
         extensionIds,
       };
 
@@ -190,12 +194,14 @@ describe('emitter round-trip', () => {
 
     // Create minimal test data (emitter tests don't load packs)
     const operationRegistry = createOperationRegistry();
-    const typeImports: TypesImportSpec[] = [];
+    const codecTypeImports: TypesImportSpec[] = [];
+    const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres'];
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports,
+      codecTypeImports,
+      operationTypeImports,
       extensionIds,
     };
 
@@ -247,12 +253,14 @@ describe('emitter round-trip', () => {
 
     // Create minimal test data (emitter tests don't load packs)
     const operationRegistry = createOperationRegistry();
-    const typeImports: TypesImportSpec[] = [];
+    const codecTypeImports: TypesImportSpec[] = [];
+    const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports,
+      codecTypeImports,
+      operationTypeImports,
       extensionIds,
     };
 
@@ -320,12 +328,14 @@ describe('emitter round-trip', () => {
 
     // Create minimal test data (emitter tests don't load packs)
     const operationRegistry = createOperationRegistry();
-    const typeImports: TypesImportSpec[] = [];
+    const codecTypeImports: TypesImportSpec[] = [];
+    const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports,
+      codecTypeImports,
+      operationTypeImports,
       extensionIds,
     };
 

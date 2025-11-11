@@ -9,8 +9,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
 import {
   assembleOperationRegistryFromPacks,
+  extractCodecTypeImports,
   extractExtensionIds,
-  extractTypeImports,
+  extractOperationTypeImports,
 } from '../src/pack-assembly';
 import { loadExtensionPacks } from '../src/pack-loading';
 
@@ -43,7 +44,8 @@ describe('emit command functionality', () => {
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const typeImports = extractTypeImports(packs);
+      const codecTypeImports = extractCodecTypeImports(packs);
+      const operationTypeImports = extractOperationTypeImports(packs);
       const extensionIds = extractExtensionIds(packs);
 
       const result = await emit(
@@ -51,7 +53,8 @@ describe('emit command functionality', () => {
         {
           outputDir,
           operationRegistry,
-          typeImports,
+          codecTypeImports,
+          operationTypeImports,
           extensionIds,
         },
         sqlTargetFamilyHook,
@@ -93,7 +96,8 @@ describe('emit command functionality', () => {
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const typeImports = extractTypeImports(packs);
+      const codecTypeImports = extractCodecTypeImports(packs);
+      const operationTypeImports = extractOperationTypeImports(packs);
       const extensionIds = extractExtensionIds(packs);
 
       const result = await emit(
@@ -101,7 +105,8 @@ describe('emit command functionality', () => {
         {
           outputDir,
           operationRegistry,
-          typeImports,
+          codecTypeImports,
+          operationTypeImports,
           extensionIds,
         },
         sqlTargetFamilyHook,
@@ -122,7 +127,8 @@ describe('emit command functionality', () => {
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const typeImports = extractTypeImports(packs);
+      const codecTypeImports = extractCodecTypeImports(packs);
+      const operationTypeImports = extractOperationTypeImports(packs);
       const extensionIds = extractExtensionIds(packs);
 
       const result = await emit(
@@ -130,7 +136,8 @@ describe('emit command functionality', () => {
         {
           outputDir: newOutputDir,
           operationRegistry,
-          typeImports,
+          codecTypeImports,
+          operationTypeImports,
           extensionIds,
         },
         sqlTargetFamilyHook,

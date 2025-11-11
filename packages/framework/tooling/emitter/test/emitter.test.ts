@@ -57,10 +57,11 @@ const mockSqlHook: TargetFamilyHook = {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }
   },
-  generateContractTypes: (ir: ContractIR, typeImports) => {
+  generateContractTypes: (ir: ContractIR, _codecTypeImports, _operationTypeImports) => {
     // Access ir properties to satisfy lint rules, but we don't use them in the mock
     void ir;
-    void typeImports;
+    void _codecTypeImports;
+    void _operationTypeImports;
     return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
@@ -108,12 +109,14 @@ describe('emitter', () => {
 
       // Create empty registry and minimal test data (emitter tests don't load packs)
       const operationRegistry = createOperationRegistry();
-      const typeImports: TypesImportSpec[] = [];
+      const codecTypeImports: TypesImportSpec[] = [];
+      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitOptions = {
         outputDir: '',
         operationRegistry,
-        typeImports,
+        codecTypeImports,
+        operationTypeImports,
         extensionIds,
       };
 
@@ -151,7 +154,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -179,7 +183,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -207,7 +212,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -237,7 +243,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -264,7 +271,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -292,7 +300,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -320,7 +329,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -336,7 +346,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -354,7 +365,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -370,7 +382,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -386,7 +399,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -402,7 +416,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -418,7 +433,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -434,7 +450,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -450,7 +467,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -466,7 +484,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -482,7 +501,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -500,7 +520,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -518,7 +539,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -534,7 +556,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -550,7 +573,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -566,7 +590,8 @@ describe('emitter', () => {
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry,
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -591,7 +616,9 @@ describe('emitter', () => {
           throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
         }
       },
-      generateContractTypes: (_ir, _typeImports) => {
+      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports) => {
+        void _codecTypeImports;
+        void _operationTypeImports;
         return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
@@ -603,7 +630,8 @@ export type Contract = unknown;
     const options: EmitOptions = {
       outputDir: '',
       operationRegistry: createOperationRegistry(),
-      typeImports: [],
+      codecTypeImports: [],
+      operationTypeImports: [],
       extensionIds: ['missing-pack'],
     };
 

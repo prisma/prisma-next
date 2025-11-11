@@ -8,8 +8,9 @@ import { Command } from 'commander';
 import { loadContractFromTs } from '../load-ts-contract';
 import {
   assembleOperationRegistryFromPacks,
+  extractCodecTypeImports,
   extractExtensionIds,
-  extractTypeImports,
+  extractOperationTypeImports,
 } from '../pack-assembly';
 import { loadExtensionPacks } from '../pack-loading';
 
@@ -45,7 +46,8 @@ export function createEmitCommand(): Command {
 
           // Assemble operation registry and extract type imports from packs
           const operationRegistry = assembleOperationRegistryFromPacks(packs);
-          const typeImports = extractTypeImports(packs);
+          const codecTypeImports = extractCodecTypeImports(packs);
+          const operationTypeImports = extractOperationTypeImports(packs);
           const extensionIds = extractExtensionIds(packs);
 
           const contractRaw = await loadContractFromTs(contractPath);
@@ -65,7 +67,8 @@ export function createEmitCommand(): Command {
             {
               outputDir,
               operationRegistry,
-              typeImports,
+              codecTypeImports,
+              operationTypeImports,
               extensionIds,
             },
             targetFamily,

@@ -1,7 +1,10 @@
 import { join } from 'node:path';
 import { type } from 'arktype';
+import type {
+  ExtensionPack,
+  ExtensionPackManifest,
+} from '../../../tooling/cli/src/pack-manifest-types';
 import { readJsonFile } from './fs';
-import type { ExtensionPack, ExtensionPackManifest } from './types';
 
 const TypesImportSpecSchema = type({
   package: 'string',

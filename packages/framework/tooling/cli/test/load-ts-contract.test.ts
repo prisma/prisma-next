@@ -96,13 +96,17 @@ describe('loadContractFromTs', () => {
     await expect(loadContractFromTs(invalidPath)).rejects.toThrow();
   });
 
-  it('rejects functions in contract export', async () => {
-    const contractPath = join(fixturesDir, 'function-in-object.ts');
+  it(
+    'rejects functions in contract export',
+    async () => {
+      const contractPath = join(fixturesDir, 'function-in-object.ts');
 
-    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
-      'Contract export contains function',
-    );
-  });
+      await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+        'Contract export contains function',
+      );
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'rejects circular references in contract',

@@ -12,8 +12,9 @@ import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
+  extractCodecTypeImports,
   extractExtensionIds,
-  extractTypeImports,
+  extractOperationTypeImports,
 } from '../../../packages/framework/tooling/cli/src/pack-assembly';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
@@ -31,7 +32,8 @@ beforeAll(async () => {
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, []);
   const operationRegistry = assembleOperationRegistryFromPacks(packs);
-  const typeImports = extractTypeImports(packs);
+  const codecTypeImports = extractCodecTypeImports(packs);
+  const operationTypeImports = extractOperationTypeImports(packs);
   const extensionIds = extractExtensionIds(packs);
 
   const result = await emit(
@@ -39,7 +41,8 @@ beforeAll(async () => {
     {
       outputDir,
       operationRegistry,
-      typeImports,
+      codecTypeImports,
+      operationTypeImports,
       extensionIds,
     },
     sqlTargetFamilyHook,

@@ -54,13 +54,12 @@ export async function emit(
   options: EmitOptions,
   targetFamily: TargetFamilyHook,
 ): Promise<EmitResult> {
-  const { operationRegistry, typeImports, extensionIds } = options;
+  const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } = options;
 
   validateCoreStructure(ir);
 
   const ctx: ValidationContext = {
     ...(operationRegistry ? { operationRegistry } : {}),
-    ...(typeImports ? { typeImports } : {}),
     ...(extensionIds ? { extensionIds } : {}),
   };
   targetFamily.validateTypes(ir, ctx);
@@ -111,7 +110,11 @@ export async function emit(
   };
   const contractJsonString = JSON.stringify(contractJsonWithMeta, null, 2);
 
-  const contractDtsRaw = targetFamily.generateContractTypes(ir, typeImports ?? []);
+  const contractDtsRaw = targetFamily.generateContractTypes(
+    ir,
+    codecTypeImports ?? [],
+    operationTypeImports ?? [],
+  );
   const contractDts = await format(contractDtsRaw, {
     parser: 'typescript',
     singleQuote: true,

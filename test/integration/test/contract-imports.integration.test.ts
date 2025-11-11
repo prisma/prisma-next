@@ -12,8 +12,9 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
+  extractCodecTypeImports,
   extractExtensionIds,
-  extractTypeImports,
+  extractOperationTypeImports,
 } from '../../../packages/framework/tooling/cli/src/pack-assembly';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
@@ -100,12 +101,14 @@ describe('contract.d.ts imports resolution', () => {
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const typeImports = extractTypeImports(packs);
+      const codecTypeImports = extractCodecTypeImports(packs);
+      const operationTypeImports = extractOperationTypeImports(packs);
       const extensionIds = extractExtensionIds(packs);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
-        typeImports,
+        codecTypeImports,
+        operationTypeImports,
         extensionIds,
       };
 
@@ -164,10 +167,10 @@ type UserIdColumn = UserColumns['id'];
           baseUrl: '.',
           paths: {
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/index.d.ts`,
+              `${relativeToWorkspace}/packages/sql/contract/dist/exports/types.d.ts`,
             ],
             '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/*`,
+              `${relativeToWorkspace}/packages/sql/contract/dist/exports/types/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/sql/runtime/adapters/postgres/dist/exports/*`,
@@ -272,12 +275,14 @@ type UserIdColumn = UserColumns['id'];
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const typeImports = extractTypeImports(packs);
+      const codecTypeImports = extractCodecTypeImports(packs);
+      const operationTypeImports = extractOperationTypeImports(packs);
       const extensionIds = extractExtensionIds(packs);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
-        typeImports,
+        codecTypeImports,
+        operationTypeImports,
         extensionIds,
       };
 

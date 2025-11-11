@@ -18,8 +18,9 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
+  extractCodecTypeImports,
   extractExtensionIds,
-  extractTypeImports,
+  extractOperationTypeImports,
 } from '../../../packages/framework/tooling/cli/src/pack-assembly';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
@@ -101,12 +102,14 @@ describe('emitter → lanes integration', () => {
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const typeImports = extractTypeImports(packs);
+      const codecTypeImports = extractCodecTypeImports(packs);
+      const operationTypeImports = extractOperationTypeImports(packs);
       const extensionIds = extractExtensionIds(packs);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
-        typeImports,
+        codecTypeImports,
+        operationTypeImports,
         extensionIds,
       };
 
@@ -202,12 +205,14 @@ describe('emitter → lanes integration', () => {
       [],
     );
     const operationRegistry = assembleOperationRegistryFromPacks(packs);
-    const typeImports = extractTypeImports(packs);
+    const codecTypeImports = extractCodecTypeImports(packs);
+    const operationTypeImports = extractOperationTypeImports(packs);
     const extensionIds = extractExtensionIds(packs);
     const options: EmitOptions = {
       outputDir: testDir,
       operationRegistry,
-      typeImports,
+      codecTypeImports,
+      operationTypeImports,
       extensionIds,
     };
 
@@ -282,12 +287,14 @@ describe('emitter → lanes integration', () => {
       [],
     );
     const operationRegistry = assembleOperationRegistryFromPacks(packs);
-    const typeImports = extractTypeImports(packs);
+    const codecTypeImports = extractCodecTypeImports(packs);
+    const operationTypeImports = extractOperationTypeImports(packs);
     const extensionIds = extractExtensionIds(packs);
     const options: EmitOptions = {
       outputDir: testDir,
       operationRegistry,
-      typeImports,
+      codecTypeImports,
+      operationTypeImports,
       extensionIds,
     };
 
@@ -303,12 +310,14 @@ describe('emitter → lanes integration', () => {
       [],
     );
     const operationRegistry2 = assembleOperationRegistryFromPacks(packs2);
-    const typeImports2 = extractTypeImports(packs2);
+    const codecTypeImports2 = extractCodecTypeImports(packs2);
+    const operationTypeImports2 = extractOperationTypeImports(packs2);
     const extensionIds2 = extractExtensionIds(packs2);
     const options2: EmitOptions = {
       outputDir: testDir,
       operationRegistry: operationRegistry2,
-      typeImports: typeImports2,
+      codecTypeImports: codecTypeImports2,
+      operationTypeImports: operationTypeImports2,
       extensionIds: extensionIds2,
     };
 

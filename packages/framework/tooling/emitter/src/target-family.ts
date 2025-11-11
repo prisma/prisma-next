@@ -4,7 +4,6 @@ import type { TypesImportSpec } from './types';
 
 export interface ValidationContext {
   readonly operationRegistry?: OperationRegistry;
-  readonly typeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;
 }
 
@@ -15,5 +14,9 @@ export interface TargetFamilyHook {
 
   validateStructure(ir: ContractIR): void;
 
-  generateContractTypes(ir: ContractIR, typeImports: ReadonlyArray<TypesImportSpec>): string;
+  generateContractTypes(
+    ir: ContractIR,
+    codecTypeImports: ReadonlyArray<TypesImportSpec>,
+    operationTypeImports: ReadonlyArray<TypesImportSpec>,
+  ): string;
 }

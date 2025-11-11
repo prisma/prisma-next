@@ -85,12 +85,31 @@ flowchart TD
 - Command implementation using commander
 - Loads extension packs using `loadExtensionPacks()` from `pack-loading.ts` (CLI-only)
 - Assembles operation registry using `assembleOperationRegistryFromPacks()` from `pack-assembly.ts`
-- Extracts type imports using `extractTypeImports()` from `pack-assembly.ts`
+- Extracts codec type imports using `extractCodecTypeImports()` from `pack-assembly.ts`
+- Extracts operation type imports using `extractOperationTypeImports()` from `pack-assembly.ts`
 - Extracts extension IDs using `extractExtensionIds()` from `pack-assembly.ts`
 - Loads TS contract using `loadContractFromTs()` utility
-- Calls `emit()` from emitter (returns strings) with pre-assembled context
+- Calls `emit()` from emitter (returns strings) with pre-assembled context (separate codec/operation type imports)
 - Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact
 - Writes `contract.json` and `contract.d.ts` to output directory
+
+### Pack Loading (`pack-loading.ts`)
+- Loads extension pack manifests from file paths
+- Validates manifest structure using Arktype schemas
+- Returns `ExtensionPack[]` with manifest and path
+
+### Pack Assembly (`pack-assembly.ts`)
+- Converts `OperationManifest` to `SqlOperationSignature` using `operationManifestToSignature()`
+- Assembles `OperationRegistry` from extension packs using `assembleOperationRegistryFromPacks()`
+- Extracts codec type imports using `extractCodecTypeImports()` (separate from operation types)
+- Extracts operation type imports using `extractOperationTypeImports()` (separate from codec types)
+- Extracts extension IDs using `extractExtensionIds()`
+- **Deprecated**: `extractTypeImports()` is kept for backward compatibility but should be replaced with separate extract functions
+
+### Pack Manifest Types (`pack-manifest-types.ts`)
+- Defines manifest type interfaces: `ExtensionPack`, `ExtensionPackManifest`, `OperationManifest`
+- Defines manifest spec types: `ArgSpecManifest`, `ReturnSpecManifest`, `LoweringSpecManifest`
+- **Canonical Source**: Manifest types are CLI-only. The emitter does not export manifest types.
 
 ## Dependencies
 

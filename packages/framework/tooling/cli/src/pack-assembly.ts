@@ -1,10 +1,11 @@
-import type { ExtensionPack, OperationManifest, TypesImportSpec } from '@prisma-next/emitter';
+import type { TypesImportSpec } from '@prisma-next/emitter';
 import {
   createSqlOperationRegistry,
   register,
   type SqlOperationRegistry,
   type SqlOperationSignature,
 } from '@prisma-next/sql-operations';
+import type { ExtensionPack, OperationManifest } from './pack-manifest-types';
 
 /**
  * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
@@ -71,9 +72,9 @@ export function assembleOperationRegistryFromPacks(
 }
 
 /**
- * Extracts type imports from extension packs for contract.d.ts generation.
+ * Extracts codec type imports from extension packs for contract.d.ts generation.
  */
-export function extractTypeImports(
+export function extractCodecTypeImports(
   packs: ReadonlyArray<ExtensionPack>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
@@ -83,7 +84,20 @@ export function extractTypeImports(
     if (codecTypes?.import) {
       imports.push(codecTypes.import);
     }
+  }
 
+  return imports;
+}
+
+/**
+ * Extracts operation type imports from extension packs for contract.d.ts generation.
+ */
+export function extractOperationTypeImports(
+  packs: ReadonlyArray<ExtensionPack>,
+): ReadonlyArray<TypesImportSpec> {
+  const imports: TypesImportSpec[] = [];
+
+  for (const pack of packs) {
     const operationTypes = pack.manifest.types?.operationTypes;
     if (operationTypes?.import) {
       imports.push(operationTypes.import);
@@ -91,6 +105,17 @@ export function extractTypeImports(
   }
 
   return imports;
+}
+
+/**
+ * @deprecated Use extractCodecTypeImports and extractOperationTypeImports instead
+ * Extracts all type imports from extension packs (both codec and operation types).
+ * Kept for backward compatibility during migration.
+ */
+export function extractTypeImports(
+  packs: ReadonlyArray<ExtensionPack>,
+): ReadonlyArray<TypesImportSpec> {
+  return [...extractCodecTypeImports(packs), ...extractOperationTypeImports(packs)];
 }
 
 /**

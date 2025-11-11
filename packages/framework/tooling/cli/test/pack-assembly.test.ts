@@ -1,4 +1,3 @@
-import type { ExtensionPack, OperationManifest } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
@@ -6,6 +5,7 @@ import {
   extractTypeImports,
   operationManifestToSignature,
 } from '../src/pack-assembly';
+import type { ExtensionPack, OperationManifest } from '../src/pack-manifest-types';
 
 describe('operationManifestToSignature', () => {
   it('converts OperationManifest to SqlOperationSignature', () => {

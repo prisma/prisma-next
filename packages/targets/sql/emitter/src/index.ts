@@ -226,33 +226,18 @@ export const sqlTargetFamilyHook = {
     }
   },
 
-  generateContractTypes(ir: ContractIR, typeImports: ReadonlyArray<TypesImportSpec>): string {
-    const codecImports: TypesImportSpec[] = [];
-    const operationImports: TypesImportSpec[] = [];
-
-    // Separate codec and operation type imports based on package path patterns
-    // This is a heuristic - in practice, CLI should separate them when extracting
-    for (const imp of typeImports) {
-      if (imp.package.includes('codec-types') || imp.package.includes('codecTypes')) {
-        codecImports.push(imp);
-      } else if (
-        imp.package.includes('operation-types') ||
-        imp.package.includes('operationTypes')
-      ) {
-        operationImports.push(imp);
-      } else {
-        // Default to codec types if unclear
-        codecImports.push(imp);
-      }
-    }
-
-    const allImports = [...codecImports, ...operationImports];
+  generateContractTypes(
+    ir: ContractIR,
+    codecTypeImports: ReadonlyArray<TypesImportSpec>,
+    operationTypeImports: ReadonlyArray<TypesImportSpec>,
+  ): string {
+    const allImports = [...codecTypeImports, ...operationTypeImports];
     const importLines = allImports.map(
       (imp) => `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`,
     );
 
-    const codecTypes = codecImports.map((imp) => imp.alias).join(' & ');
-    const operationTypes = operationImports.map((imp) => imp.alias).join(' & ');
+    const codecTypes = codecTypeImports.map((imp) => imp.alias).join(' & ');
+    const operationTypes = operationTypeImports.map((imp) => imp.alias).join(' & ');
 
     const storage = ir.storage as SqlStorage;
     const models = ir.models as Record<string, ModelDefinition>;
