@@ -1,5 +1,11 @@
 ---
+description: Keep documentation and READMEs accurate and updated
 alwaysApply: true
+tags: [documentation, maintenance]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: warn
 ---
 
 - Whenever you receive a correction or correct a mistake, make sure it's documented in .cursor/rules either by updating an existing doc or adding a new one

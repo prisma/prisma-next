@@ -1,0 +1,66 @@
+{
+  "name": "@prisma-next/sql-relational-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Schema and column builders, operation attachment, and AST types for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "clean": "node ../../../../scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/operations": "workspace:*",
+    "@prisma-next/plan": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/sql-contract-types": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*",
+    "ts-toolbelt": "^9.6.0"
+  },
+  "devDependencies": {
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^2.1.1"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/exports/schema.d.ts",
+      "import": "./dist/exports/schema.js"
+    },
+    "./param": {
+      "types": "./dist/exports/param.d.ts",
+      "import": "./dist/exports/param.js"
+    },
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
+    },
+    "./operations-registry": {
+      "types": "./dist/exports/operations-registry.d.ts",
+      "import": "./dist/exports/operations-registry.js"
+    },
+    "./errors": {
+      "types": "./dist/exports/errors.d.ts",
+      "import": "./dist/exports/errors.js"
+    },
+    "./ast": {
+      "types": "./dist/exports/ast.d.ts",
+      "import": "./dist/exports/ast.js"
+    }
+  }
+}

@@ -39,6 +39,8 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Lint dependencies
+        run: pnpm lint:deps
       - name: Lint packages
         run: pnpm lint:packages
       - name: Lint examples
@@ -127,7 +129,41 @@ jobs:
       - name: Build
         run: pnpm build
       - name: Run E2E tests
-        run: pnpm --filter @prisma-next/e2e-tests test
+        run: pnpm test:e2e
+
+  test-integration:
+    name: Integration Tests
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      TEST_TIMEOUT_MULTIPLIER: 2
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Run Integration tests
+        run: pnpm test:integration
 
   coverage:
     name: Coverage
@@ -162,13 +198,13 @@ jobs:
         run: pnpm build
       - name: Generate coverage and report
         run: node scripts/coverage-report.mjs
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-reports
-          path: |
-            **/coverage/**
-          retention-days: 7
+      # - name: Upload coverage reports
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: coverage-reports
+      #     path: |
+      #       **/coverage/**
+      #     retention-days: 7
       - name: Coverage comment
         if: github.event_name == 'pull_request'
         uses: codecov/codecov-action@v4

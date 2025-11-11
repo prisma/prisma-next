@@ -47,7 +47,7 @@ Implement TS-only contract loading and a CLI command that produces `contract.jso
 - Integration:
   - Load a minimal TS contract → emit → consume with lanes (`LaneCodecTypes`) → build/execute plan; assert parity with an equivalent emit path.
   - **Round-Trip Test**: TS contract → IR → JSON → IR (parse) → compare with original IR → JSON (emit again) → compare with first emit. Both JSON outputs must be byte-identical.
-  - **CLI Integration Test** (in `packages/integration-tests`): Test the CLI operation to emit a contract from a TS-authored contract source. Full round trip: execute CLI to emit contract → parse the emitted `contract.json` → load and validate the original TS contract → compare parsed JSON to loaded contract structure. Ensures CLI correctly transforms TS contract source into canonical JSON artifacts.
+  - **CLI Integration Test** (in `test/integration`): Test the CLI operation to emit a contract from a TS-authored contract source. Full round trip: execute CLI to emit contract → parse the emitted `contract.json` → load and validate the original TS contract → compare parsed JSON to loaded contract structure. Ensures CLI correctly transforms TS contract source into canonical JSON artifacts.
   - CI task to run both TS-only and emit-path suites.
 
 ### Acceptance Criteria

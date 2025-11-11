@@ -1,6 +1,11 @@
 ---
 description: Test file organization and splitting guidelines
 alwaysApply: false
+tags: [testing]
+appliesTo: ["**/*.test.ts", "**/*.spec.ts"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
 ---
 
 # Test File Organization
@@ -26,6 +31,7 @@ Split test files when:
 - Group tests by functionality (e.g., "basic", "errors", "structure", "generation")
 - Group tests by feature area (e.g., "joins", "projections", "includes")
 - Group tests by test type (e.g., "unit", "integration", "edge-cases")
+- **Integration tests that depend on multiple packages** should be placed in `@prisma-next/integration-tests` to avoid cyclic dependencies. For example, tests that use both `sql-contract-ts` and `sql-query` belong in the integration-tests package.
 
 **2. Use descriptive file names:**
 - Use suffixes to indicate test category: `.basic.test.ts`, `.errors.test.ts`, `.structure.test.ts`

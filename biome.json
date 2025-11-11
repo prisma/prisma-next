@@ -67,7 +67,7 @@
         "**/*.test-d.ts",
         "**/test/**/*.ts",
         "**/tests/**/*.ts",
-        "**/packages/node-utils/**/*.ts",
+        "**/packages/framework/tooling/emitter/**/*.ts",
         "**/packages/cli/**/*.ts"
       ],
       "javascript": {

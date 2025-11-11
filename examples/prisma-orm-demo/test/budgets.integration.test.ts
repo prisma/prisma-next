@@ -7,9 +7,10 @@ import {
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
-} from '@prisma-next/runtime';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
+} from '@prisma-next/sql-runtime';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { sql } from '@prisma-next/sql-lane';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import { withDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { describe, expect, it } from 'vitest';

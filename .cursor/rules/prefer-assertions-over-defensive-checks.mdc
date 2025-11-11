@@ -1,0 +1,159 @@
+---
+description: Prefer assertions over defensive checks when data is guaranteed to be valid
+alwaysApply: false
+tags: [code-quality, assertions, defensive-programming]
+appliesTo: ["**/*.ts"]
+owner: prisma-next-docs
+lastUpdated: 2025-01-27
+severity: info
+---
+
+# Prefer Assertions Over Defensive Checks
+
+**CRITICAL**: When data has already been validated, use assertions instead of defensive checks. This eliminates unrealistic test scenarios and makes invalid states unrepresentable.
+
+## The Problem
+
+Defensive checks with optional chaining create code paths that are impossible in practice:
+
+```typescript
+// ❌ WRONG: Defensive check after validation
+if (!contractTable.columns[columnName]) {
+  errorUnknownColumn(columnName, tableName);
+}
+
+const columnMeta = contractTable.columns[columnName];
+const codecId = columnMeta?.type; // Optional chaining unnecessary
+if (codecId && paramName) {
+  paramCodecs[paramName] = codecId;
+}
+
+paramDescriptors.push({
+  ...(codecId ? { type: codecId } : {}),
+  ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+});
+```
+
+This leads to:
+- **Unrealistic tests**: Tests that use type assertions to bypass TypeScript and test impossible states
+- **Code coverage padding**: Tests added solely to reach coverage thresholds, not to test real scenarios
+- **Maintenance burden**: Tests that break when types are tightened, requiring type assertions to work around
+
+## The Solution
+
+**✅ CORRECT: Use assertions after validation**
+
+```typescript
+// Validate first
+if (!contractTable.columns[columnName]) {
+  errorUnknownColumn(columnName, tableName);
+}
+
+// Assert that data exists (non-null assertion or explicit check)
+const columnMeta = contractTable.columns[columnName]!;
+const codecId = columnMeta.type; // Required property, no optional chaining
+
+if (codecId && paramName) {
+  paramCodecs[paramName] = codecId;
+}
+
+paramDescriptors.push({
+  ...(codecId ? { type: codecId } : {}),
+  nullable: columnMeta.nullable, // Required property, no optional check
+});
+```
+
+## When to Use Assertions
+
+Use assertions when:
+
+1. **Data has been validated**: You've already checked that the data exists/is valid
+2. **Type system guarantees it**: TypeScript types require the property to exist
+3. **Contract validation ensures it**: Runtime validation (e.g., `validateContract`) guarantees the structure
+
+**Example scenarios:**
+- After checking `if (!contractTable.columns[columnName])` → use `columnMeta!` assertion
+- After validating contract structure → access required properties directly
+- After checking `if (!model)` → use `model!` assertion
+
+## When NOT to Use Assertions
+
+Don't use assertions when:
+
+1. **Data is truly optional**: The property might legitimately be missing
+2. **External input**: Data from user input, APIs, or files that hasn't been validated
+3. **Unvalidated contracts**: Contract data that hasn't been validated yet
+
+## Benefits
+
+- **Eliminates unrealistic tests**: No need to test impossible states with type assertions
+- **Better type safety**: TypeScript can infer types correctly without optional chaining
+- **Clearer intent**: Code shows that data is guaranteed to exist
+- **Reduced test maintenance**: Fewer tests that break when types are tightened
+- **Better error messages**: Assertions fail fast with clear errors if assumptions are wrong
+
+## Refactoring Pattern
+
+**Before:**
+```typescript
+const columnMeta = contractTable.columns[columnName];
+const codecId = columnMeta?.type;
+if (codecId && paramName) {
+  paramCodecs[paramName] = codecId;
+}
+```
+
+**After:**
+```typescript
+const columnMeta = contractTable.columns[columnName]!;
+const codecId = columnMeta.type;
+if (codecId && paramName) {
+  paramCodecs[paramName] = codecId;
+}
+```
+
+## Test Cleanup
+
+After refactoring to use assertions, remove tests that:
+- Use type assertions (`as SqlContract<SqlStorage>`) to bypass type checking
+- Test impossible states (e.g., missing required properties)
+- Were added solely for code coverage
+
+**Example of test to remove:**
+```typescript
+// ❌ Remove: Tests impossible state
+it('builds plan without codecId when column type is missing', () => {
+  const contractWithoutType = {
+    ...contract,
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            email: { nullable: true } as { nullable: true; type?: string },
+          },
+        },
+      },
+    },
+  } as SqlContract<SqlStorage>; // Type assertion bypasses validation
+  
+  // This test is unrealistic - StorageColumn requires 'type'
+});
+```
+
+## Examples from Codebase
+
+**Good patterns:**
+- Using `columnMeta!` after validating column exists
+- Accessing `columnMeta.type` directly (required property)
+- Using `columnMeta.nullable` directly (required property)
+
+**Bad patterns (to avoid):**
+- Optional chaining (`columnMeta?.type`) after validation
+- Conditional property spreading (`...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {})`) for required properties
+- Tests that use type assertions to test impossible states
+
+## Related Rules
+
+- `.cursor/rules/use-ast-factories.mdc`: Use factory functions for AST nodes
+- `.cursor/rules/typescript-patterns.mdc`: TypeScript best practices
+- `.cursor/rules/testing-guide.mdc`: Testing best practices

@@ -12,29 +12,29 @@ This document defines the relationship between the repository directory layout a
 
 ## Path → Package Name Examples
 
-- `packages/core/contract` → `@prisma-next/contract`
-- `packages/core/plan` → `@prisma-next/plan`
-- `packages/core/operations` → `@prisma-next/operations`
+**Framework Domain:**
+- `packages/contract` → `@prisma-next/contract` (legacy, will be migrated)
+- `packages/framework/core-plan` → `@prisma-next/plan`
+- `packages/framework/core-operations` → `@prisma-next/operations`
+- `packages/framework/authoring/contract-authoring` → `@prisma-next/contract-authoring`
+- `packages/framework/authoring/contract-ts` → `@prisma-next/contract-ts`
+- `packages/framework/authoring/contract-psl` → `@prisma-next/contract-psl`
+- `packages/framework/tooling/cli` → `@prisma-next/cli`
+- `packages/framework/tooling/emitter` → `@prisma-next/emitter`
+- `packages/framework/runtime-core` → `@prisma-next/runtime-core`
 
-- `packages/authoring/contract-authoring` → `@prisma-next/contract-authoring`
-- `packages/authoring/contract-ts` → `@prisma-next/contract-ts`
-- `packages/authoring/contract-psl` → `@prisma-next/contract-psl`
-
+**SQL Domain:**
+- `packages/sql/authoring/sql-contract-ts` → `@prisma-next/sql-contract-ts`
 - `packages/targets/sql/contract-types` → `@prisma-next/sql-contract-types`
 - `packages/targets/sql/operations` → `@prisma-next/sql-operations`
 - `packages/targets/sql/emitter` → `@prisma-next/sql-contract-emitter`
-
 - `packages/sql/lanes/relational-core` → `@prisma-next/sql-relational-core`
 - `packages/sql/lanes/sql-lane` → `@prisma-next/sql-lane`
 - `packages/sql/lanes/orm-lane` → `@prisma-next/sql-orm-lane`
-
-- `packages/runtime/core` → `@prisma-next/runtime-core`
 - `packages/sql/sql-runtime` → `@prisma-next/sql-runtime`
-
-- `packages/sql/postgres/postgres-adapter` → `@prisma-next/adapter-postgres`
-- `packages/sql/postgres/postgres-driver` → `@prisma-next/driver-postgres`
-
-- `packages/compat/compat-prisma` → `@prisma-next/compat-prisma`
+- `packages/adapter-postgres` → `@prisma-next/adapter-postgres`
+- `packages/driver-postgres` → `@prisma-next/driver-postgres`
+- `packages/compat-prisma` → `@prisma-next/compat-prisma`
 
 ## TypeScript Path Aliases (dev-time)
 
@@ -45,14 +45,18 @@ Use published package names as canonical import specifiers. Map them to `src/` e
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@prisma-next/contract": ["packages/core/contract/src/index.ts"],
-      "@prisma-next/plan": ["packages/core/plan/src/index.ts"],
-      "@prisma-next/operations": ["packages/core/operations/src/index.ts"],
+      "@prisma-next/contract": ["packages/contract/src/exports/types.ts"],
+      "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
+      "@prisma-next/operations": ["packages/framework/core-operations/src/index.ts"],
 
-      "@prisma-next/contract-authoring": ["packages/authoring/contract-authoring/src/index.ts"],
-      "@prisma-next/contract-ts": ["packages/authoring/contract-ts/src/index.ts"],
-      "@prisma-next/contract-psl": ["packages/authoring/contract-psl/src/index.ts"],
+      "@prisma-next/contract-authoring": ["packages/framework/authoring/contract-authoring/src/index.ts"],
+      "@prisma-next/contract-ts": ["packages/framework/authoring/contract-ts/src/index.ts"],
+      "@prisma-next/contract-psl": ["packages/framework/authoring/contract-psl/src/index.ts"],
+      "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
+      "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
+      "@prisma-next/runtime-core": ["packages/framework/runtime-core/src/index.ts"],
 
+      "@prisma-next/sql-contract-ts": ["packages/sql/authoring/sql-contract-ts/src/exports/index.ts"],
       "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
       "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],
       "@prisma-next/sql-contract-emitter": ["packages/targets/sql/emitter/src/index.ts"],
@@ -61,30 +65,30 @@ Use published package names as canonical import specifiers. Map them to `src/` e
       "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
       "@prisma-next/sql-orm-lane": ["packages/sql/lanes/orm-lane/src/index.ts"],
 
-      "@prisma-next/runtime-core": ["packages/runtime/core/src/index.ts"],
       "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/index.ts"],
 
-      "@prisma-next/adapter-postgres": ["packages/sql/postgres/postgres-adapter/src/index.ts"],
-      "@prisma-next/driver-postgres": ["packages/sql/postgres/postgres-driver/src/index.ts"],
+      "@prisma-next/adapter-postgres": ["packages/adapter-postgres/src/exports/index.ts"],
+      "@prisma-next/driver-postgres": ["packages/driver-postgres/src/exports/index.ts"],
 
-      "@prisma-next/compat-prisma": ["packages/compat/compat-prisma/src/index.ts"]
+      "@prisma-next/compat-prisma": ["packages/compat-prisma/src/exports/index.ts"]
     }
   }
 }
 ```
 
-Optional ring/group aliases for ergonomics (not for published imports):
+Optional layer/group aliases for ergonomics (not for published imports):
 
 ```jsonc
 {
   "compilerOptions": {
     "paths": {
-      "@core/*": ["packages/core/*/src"],
-      "@authoring/*": ["packages/authoring/*/src"],
+      "@framework/core/*": ["packages/framework/core-*/src"],
+      "@framework/authoring/*": ["packages/framework/authoring/*/src"],
+      "@framework/tooling/*": ["packages/framework/tooling/*/src"],
+      "@framework/runtime-core": ["packages/framework/runtime-core/src"],
       "@targets/sql/*": ["packages/targets/sql/*/src"],
       "@sql/*": ["packages/sql/*/src"],
-      "@runtime/*": ["packages/runtime/*/src"],
-      "@adapters/*": ["packages/sql/*/*/src"]
+      "@adapters/*": ["packages/adapter-*/src"]
     }
   }
 }
@@ -94,16 +98,16 @@ Optional ring/group aliases for ergonomics (not for published imports):
 
 ```yaml
 packages:
-  - packages/core/*
-  - packages/authoring/*
+  - packages/framework/**
   - packages/targets/sql/*
   - packages/sql/**
   - packages/runtime/*
   - packages/compat/*
+  - packages/*
 ```
 
 ## Enforcement
 
-- Use ESLint `import/no-restricted-paths` (or `boundaries`) to enforce dependency direction: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`.
-- Add a CI import-graph check (e.g., madge) to ensure inner rings never import outer rings and families don’t cross-import.
+- Use `scripts/check-imports.mjs` with `architecture.config.json` to enforce dependency direction: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`.
+- The import validation script enforces domain/layer/plane rules: same-layer imports allowed, downward imports allowed, upward imports denied, cross-domain imports denied except framework domain, migration→runtime imports denied, runtime→migration imports allowed for artifacts only.
 

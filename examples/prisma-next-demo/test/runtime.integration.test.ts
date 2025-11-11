@@ -5,11 +5,13 @@ import { loadContractFromTs } from '@prisma-next/cli';
 import type { ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
-import { param } from '@prisma-next/sql-query/param';
-import { schema, validateContract } from '@prisma-next/sql-query/schema';
-import { sql } from '@prisma-next/sql-query/sql';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
+import { sql } from '@prisma-next/sql-lane';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -22,7 +24,7 @@ let contract: ReturnType<typeof validateContract>;
 beforeAll(async () => {
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
-  const adapterPath = resolve(__dirname, '../../../packages/adapter-postgres');
+  const adapterPath = resolve(__dirname, '../../../packages/sql/runtime/adapters/postgres');
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, []);
@@ -480,8 +482,9 @@ describe('runtime execute integration', () => {
             .from(userTable)
             .includeMany(
               postTable,
-              (on) => on.eqCol(userTable.columns['id']!, postTable.columns['userId']!),
-              (child) =>
+              (on: JoinOnBuilder) =>
+                on.eqCol(userTable.columns['id']!, postTable.columns['userId']!),
+              (child: IncludeChildBuilder) =>
                 child
                   .select({
                     id: postTable.columns['id']!,

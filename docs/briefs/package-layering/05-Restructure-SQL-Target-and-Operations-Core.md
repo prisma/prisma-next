@@ -1,38 +1,67 @@
-## Slice 5 — Restructure SQL Target & Operations Core
+## Slice 5 — Restructure SQL Target & Operations Core (Domain: SQL, Layer: targets, Plane: migration)
 
 ### Context
-- With lanes separated, the SQL target package (`@prisma-next/sql-target`) still lumps contract types, emitter hooks, and operation registry logic together.
-- We also want a target-neutral operations core so both authoring validation and lanes share one implementation (per ADR 140 + Slice 11 brief).
+- Even after slicing lanes, `@prisma-next/sql-target` still combines SQL contract types, emitter hook logic, and operation registry behavior. The operation registry also has fragments living in lane packages.
+- ADR 140 + the Operation Registry brief (Slice 11) require us to extract target-agnostic operation helpers and split SQL target concerns into well-scoped packages (`contract-types`, `operations`, `emitter`).
+- This slice prepares the codebase for future targets by centralizing shared logic in `@prisma-next/operations` and slimming `@prisma-next/sql-target` down to curated subpackages.
 
 ### Goals
-1. Move SQL contract-type definitions, emitter hook, and target-specific helpers into `packages/targets/sql/{contract-types,emitter,operations}` with curated exports.
-2. Extract a `@prisma-next/operations` (core) package hosting the operation registry interfaces, capability gating helpers, and execution entry point.
-3. Update `@prisma-next/sql-relational-core` and the SQL target packages to consume the core operations module instead of duplicating logic.
-4. Ensure extension packs/adapters register operations via the new module.
-5. Keep runtime + authoring surfaces compiling with the new imports.
+1. **Stand up `@prisma-next/operations` (core layer)**
+   - Move operation registry types, capability gating helpers, and the canonical `executeOperation` code from lane packages into `packages/core/operations`.
+   - Keep this package target-neutral; it should depend only on `@prisma-next/contract` types.
+   - Provide exports used by authoring, relational core, lanes, runtime, and adapters.
+2. **Split SQL target responsibilities**
+   - Create/complete `packages/targets/sql/contract-types`, `packages/targets/sql/operations`, and `packages/targets/sql/emitter` with their own build/test configs.
+   - Move the relevant files from `packages/sql-target/src` into those packages.
+   - Keep curated exports so consumers import only what they need.
+3. **Update consumers**
+   - Change authoring packages, relational core, lanes, runtime, and adapters to import from `@prisma-next/operations` and the new SQL packages.
+   - Keep transitional re-exports in `@prisma-next/sql-target` with TODO comments referencing Slice 7.
+4. **Verify extension packs and adapters register operations through the new module.**
+
+### Filesystem changes (explicit)
+- Create target packages under `packages/targets/sql/`:
+  - `packages/targets/sql/contract-types/src/index.ts` (exports `SqlContract`, `SqlStorage`, mappings)
+  - `packages/targets/sql/operations/src/index.ts` (exports SQL op manifests + lowering metadata)
+  - `packages/targets/sql/emitter/src/index.ts` (SQL emitter hook implementation)
+- Move code from `packages/sql-target/src/*` into the new packages:
+  - `contract-types.ts` → `targets/sql/contract-types/src`
+  - `operations-registry.ts` (manifests) → `targets/sql/operations/src`
+  - `emitter-hook.ts` → `targets/sql/emitter/src`
+- Update `packages/sql-target/src/exports/*` to re-export from the new packages temporarily (with TODO: Slice 7 removal).
+- Update `tsconfig.base.json` paths for the three new packages and add them to `pnpm-workspace.yaml`.
 
 ### Non-goals
-- Changing operation behavior beyond import paths.
+- Changing how operations behave or lowering templates work.
 - Touching runtime verification logic (Slice 6 handles runtime split).
-- Removing SQL-specific exports from `@prisma-next/sql-target` until downstream packages switch to the new structure.
+- Removing the legacy `@prisma-next/sql-target` entry point entirely (Slice 7).
 
 ### Deliverables
-- `packages/core/operations` package with build/test config.
-- Reorganized SQL target folder with separate packages or subpath exports for contract types, emitter hook, and operation manifests.
-- Updated imports across repo to use the new locations.
+- `packages/core/operations` populated with shared registry helpers and tests.
+- `packages/targets/sql/{contract-types,operations,emitter}` containing the SQL-specific pieces with independent build/test configs.
+- Updated imports throughout the repo pointing at the new packages, plus transitional re-exports.
+- Documentation (Slice 12, ADR 140) reflecting the new boundaries.
 
 ### Step Outline
-1. Create `@prisma-next/operations` package; move shared types/helpers there.
-2. Split `@prisma-next/sql-target` contents into sub-packages or subpath exports as outlined in Slice 12 / ADR 140.
-3. Update authoring, lanes, runtime, and adapter code to import from the new modules.
-4. Run relevant unit/integration tests (emitter, operation registry, adapter lowering).
+1. Scaffold/verify the SQL target subpackages and ensure they are listed in `pnpm-workspace.yaml`, `tsconfig.base.json`, and `turbo.json`.
+2. Move target-neutral operation helpers into `@prisma-next/operations` and update relational core/authoring to import from it.
+3. Move SQL-specific files into the new target subpackages, fixing relative imports and adjusting exports.
+4. Update consumers (authoring, lanes, runtime, adapters, emitter tests) to reference the new packages. Add transitional re-exports in `@prisma-next/sql-target`.
+5. Run all relevant test suites (SQL target unit tests, emitter tests, lane tests) plus lint/typecheck/dependency checks.
+
+### API stability
+- No API changes besides new entry points. Legacy `@prisma-next/sql-target` continues to re-export until Slice 7.
 
 ### Testing / Verification
 - `pnpm --filter @prisma-next/operations test`
-- `pnpm --filter @prisma-next/sql-target test`
+- `pnpm --filter @prisma-next/sql-contract-types test`
+- `pnpm --filter @prisma-next/sql-operations test`
+- `pnpm --filter @prisma-next/sql-contract-emitter test`
 - `pnpm --filter @prisma-next/emitter test`
 - `pnpm --filter @prisma-next/sql-lane test`
+- `pnpm lint`, `pnpm lint:deps`, `pnpm typecheck`
 
 ### Notes
-- Keep compatibility exports in `@prisma-next/sql-target` if necessary, but mark them deprecated for removal in Slice 7.
-- Coordinate with the existing Slice 11 brief (Operation Registry Type Alignment) to ensure type/runtime alignment stays intact.
+- Keep compatibility exports in `@prisma-next/sql-target` but annotate them for removal in Slice 7.
+- Coordinate with Slice 11 to ensure type-level guarantees remain intact after the move.
+- Document any temporary suppressions so subsequent slices know what to clean up.

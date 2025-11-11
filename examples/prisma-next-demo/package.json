@@ -6,15 +6,16 @@
     "stamp-marker": "pnpm esr src/prisma/scripts/stamp-marker.ts",
     "start": "pnpm esr src/main.ts",
     "seed": "pnpm esr scripts/seed.ts",
-    "emit": "prisma-next emit --contract prisma/contract.ts --out src/prisma --adapter ../../packages/adapter-postgres",
+    "emit": "prisma-next emit --contract prisma/contract.ts --out src/prisma --adapter ../../packages/sql/runtime/adapters/postgres",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@prisma-next/runtime": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/sql-query": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
     "pg": "^8.11.5"
   },
   "devDependencies": {

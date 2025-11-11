@@ -70,8 +70,8 @@ Deliver a lane‑agnostic budgets plugin integrated via the runtime plugin frame
 Minimal sketch of wiring in app runtime (illustrative; implementation will be separate):
 
 ```ts
-import { createRuntime } from '@prisma-next/runtime'
-import { budgets } from '@prisma-next/runtime/plugins/budgets'
+import { createRuntime } from '@prisma-next/sql-runtime'
+import { budgets } from '@prisma-next/sql-runtime'
 
 const runtime = createRuntime({
   contract,

@@ -1,0 +1,45 @@
+{
+  "name": "@prisma-next/sql-runtime",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "SQL runtime implementation for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
+    "clean": "node ../../../scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/operations": "workspace:*",
+    "@prisma-next/runtime-core": "workspace:*",
+    "@prisma-next/sql-contract-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@prisma/dev": "^0.1.1",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.11.5",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.1"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./test/utils": {
+      "types": "./test/utils.ts",
+      "import": "./test/utils.ts"
+    }
+  }
+}

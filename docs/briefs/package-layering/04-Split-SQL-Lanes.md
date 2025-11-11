@@ -1,38 +1,68 @@
-## Slice 4 — Split SQL Lanes
+## Slice 4 — Split SQL Lanes (Domain: SQL, Layer: lanes, Plane: runtime)
 
 ### Context
-- After Slice 3, relational primitives live in `@prisma-next/sql-relational-core`, but the SQL DSL + ORM builder still share a single `@prisma-next/sql-query` package.
-- We want separate lane packages: `@prisma-next/sql-lane` (relational DSL + raw) and `@prisma-next/sql-orm-lane` (ORM builder + helpers) so future targets can consume the DSL independently.
+- With Slice 3 complete, `@prisma-next/sql-relational-core` now provides shared table/column/param primitives. However, the actual SQL query lanes (relational DSL + raw helpers + ORM builder) are still bundled inside `@prisma-next/sql-query`.
+- We need two dedicated packages under `packages/sql/lanes/`:
+  - `@prisma-next/sql-lane`: the relational DSL (fluent builder, raw lane helpers, AST lowering utilities, plan factory glue).
+  - `@prisma-next/sql-orm-lane`: the ORM builder (`orm-builder.ts`, include helpers, relation filters, ORM-specific type utilities).
+- This separation lets consumers opt into only the lane(s) they need and prepares us for future families that may reuse the relational DSL but not the ORM.
 
 ### Goals
-1. Move `sql.ts`, raw lane helpers, AST lowering utilities, and related tests into `packages/sql/lanes/sql-lane`.
-2. Move `orm-builder.ts`, `orm-types.ts`, include/relations helpers, and ORM-specific tests into `packages/sql/lanes/orm-lane`.
-3. Keep existing public exports (e.g., `@prisma-next/sql-query/sql`) by re-exporting from the new packages during migration.
-4. Ensure each lane depends only on `@prisma-next/sql-relational-core` + target contracts, not on each other.
-5. Update docs/tests/examples to import from the new packages when possible (with transitional shims where necessary until Slice 7).
+1. Scaffold `packages/sql/lanes/sql-lane` and `packages/sql/lanes/orm-lane` with package metadata, tsconfig, vitest config, and curated exports mirroring today’s entrypoints (`sql`, `schema`, `param`, `orm`).
+2. Move DSL-specific files (`sql.ts`, `sql.ts` helpers, `raw.ts`, AST lowering utilities, plan builder helpers) and their tests into `sql-lane`.
+3. Move ORM-specific files (`orm-builder.ts`, `orm-types.ts`, `orm-include-child.ts`, `orm-relation-filter.ts`, any include/projection helpers) plus their tests into `orm-lane`.
+4. Update imports so each lane package depends only on:
+   - `@prisma-next/sql-relational-core`
+   - Target types (`@prisma-next/sql-contract-types`, `@prisma-next/sql-operations`, etc.)
+   - Shared utilities (errors, plan types) as needed.
+   Neither package should import from the other.
+5. Preserve existing public APIs by adding transitional re-exports in `@prisma-next/sql-query` (e.g., `export * from '@prisma-next/sql-lane/sql'`). These shims stay until Slice 7 removes the legacy package.
+6. Update examples/tests/CLI references to import from the new packages where practical (or via the shims if needed for incremental rollout).
 
 ### Non-goals
-- Removing the `@prisma-next/sql-query` facade (Slice 7).
-- Refactoring ORM internals beyond moving files (performance/feature work is out of scope).
-- Changing runtime adapters or plan factories.
+- Removing `@prisma-next/sql-query` entirely (Slice 7).
+- Introducing ORM behavior changes, new features, or performance tweaks.
+- Touching runtime/adapters—this slice only reorganizes lane packages.
 
 ### Deliverables
-- `@prisma-next/sql-lane` and `@prisma-next/sql-orm-lane` packages with build/test configs.
-- Transitional re-export module(s) inside `@prisma-next/sql-query` to avoid breaking existing imports.
-- Updated examples/tests referencing the new packages (or the bridge) where appropriate.
+- Two fully-configured packages:
+  - `@prisma-next/sql-lane` exporting the relational DSL (and raw lane) with tests running in its own suite.
+  - `@prisma-next/sql-orm-lane` exporting the ORM builder and helpers with its own tests.
+- Transitional re-export modules inside `@prisma-next/sql-query`.
+- Updated documentation (Slice 12 brief, README references, examples) describing the new package locations.
 
 ### Step Outline
-1. Move DSL files into `sql-lane`, update package exports + path aliases.
-2. Move ORM files into `orm-lane`, update imports.
-3. Ensure tests run per package; update fixtures accordingly.
-4. Provide re-export modules (with TODO comments) for backwards compatibility.
+1. **Scaffold packages**
+   - Add package.json/tsconfig/vitest configs for both packages.
+   - Configure `exports` blocks so consumers can import `@prisma-next/sql-lane/sql`, `@prisma-next/sql-lane/schema`, etc.
+
+2. **Move files**
+   - For `sql-lane`: move `sql.ts`, `schema.ts` entry proxies (if any remain), raw helpers, AST lowering utilities, plan builder helpers, and associated type definitions/tests.
+   - For `orm-lane`: move `orm-builder.ts`, include helpers, relation filter builders, ORM type utilities, and their tests/fixtures.
+   - Adjust relative imports to reference `@prisma-next/sql-relational-core` and the new package paths.
+
+3. **Update references**
+   - Modify CLI/examples/tests to import from the new packages (or transitional shims).
+   - Update `tsconfig.base.json` paths, `pnpm-workspace.yaml`, and `turbo` pipelines to include the new packages.
+
+4. **Add transitional re-exports**
+   - In `packages/sql-query/src/exports`, add modules that re-export from the new packages. Include TODO comments referencing Slice 7 for removal.
+   - Ensure `@prisma-next/sql-query` tests continue to pass by importing through the shims where necessary.
+
+5. **Run verification commands (see below)** and fix any lint/dep violations.
 
 ### Testing / Verification
 - `pnpm --filter @prisma-next/sql-lane test`
 - `pnpm --filter @prisma-next/sql-orm-lane test`
 - `pnpm --filter @prisma-next/sql-query test`
-- Scenario tests in `examples/` still pass (especially ORM integration tests).
+- `pnpm --filter examples/prisma-next-demo test` (or whichever example exercises both lanes)
+- `pnpm lint`, `pnpm lint:deps`, `pnpm typecheck`
 
 ### Notes
-- Keep build outputs tree-shakeable; only export curated entry points.
-- Document remaining references to `@prisma-next/sql-query` so Slice 7 knows what to remove.
+- Keep the new packages tree-shakeable: export only curated entry points, avoid wildcard exports from `src`.
+- Document any remaining references to `@prisma-next/sql-query` so Slice 7 can remove the shims confidently.
+- Coordinate with Slice 5 to ensure operation registry imports still work after the package split.
+
+### Known Issues
+
+**ORM-lane dependency on sql-lane**: Currently, `orm-lane` imports from `sql-lane` to build queries, which violates Goal 4 (neither package should import from the other). This is tracked with a temporary exception in `scripts/check-imports.mjs`. The `orm-lane` package should be refactored to build AST nodes directly instead of using the SQL lane builder. See TODO comment in `scripts/check-imports.mjs` for details.

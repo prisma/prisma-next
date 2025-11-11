@@ -1,0 +1,177 @@
+---
+description: Import validation and package layering rules
+alwaysApply: false
+tags: [architecture, layering, imports]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: warn
+---
+
+# Import Validation
+
+## Overview
+
+The repository uses a domain/layer/plane package layering architecture with unidirectional dependencies enforced by Dependency Cruiser. The import validation uses data-driven configuration from `architecture.config.json` to validate that packages follow dependency rules.
+
+## Domain/Layer/Plane Structure
+
+Packages are organized by:
+- **Domains**: framework (target-agnostic) and target families (sql, document, etc.)
+- **Layers**: core → authoring → targets → lanes → runtime → adapters (dependency direction)
+- **Planes**: migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters)
+
+Dependencies flow inward (toward core) within a domain:
+
+```
+core → authoring → targets → lanes → runtime → adapters
+```
+
+## Import Validation Configuration
+
+Dependency Cruiser (`dependency-cruiser.config.mjs`) uses data-driven configuration from `architecture.config.json`:
+
+1. **Package Configs**: Maps package glob patterns to domain/layer/plane
+   ```json
+   {
+     "glob": "packages/framework/core-plan/**",
+     "domain": "framework",
+     "layer": "core",
+     "plane": "shared"
+   }
+   ```
+
+2. **Layer Order**: Defines dependency direction within domains
+   ```json
+   {
+     "layerOrder": {
+       "framework": ["core", "authoring", "tooling", "runtime-core"],
+       "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters"]
+     }
+   }
+   ```
+
+3. **Rules**: Defines allowed/denied dependency patterns
+   ```json
+   {
+     "rules": {
+       "sameLayer": "allow",
+       "downward": "allow",
+       "upward": "deny",
+       "crossDomain": "denyExceptFramework",
+       "migrationToRuntime": "deny",
+       "runtimeToMigration": "allowArtifactsOnly"
+     }
+   }
+   ```
+
+## Rules
+
+### Same-Layer Imports
+
+Packages in the same layer can import from each other. For example, `orm-lane` can import from `sql-relational-core` (both are in the `lanes` layer).
+
+**✅ CORRECT: Same-layer imports**
+```typescript
+// packages/sql/lanes/orm-lane/src/orm-builder.ts
+import { schema } from '@prisma-next/sql-relational-core/schema';
+```
+
+### Cross-Layer Imports
+
+Packages can only import from inner layers (layers closer to core). Outer layers cannot import from inner layers.
+
+**✅ CORRECT: Import from inner layer**
+```typescript
+// packages/sql/lanes/orm-lane/src/orm-builder.ts (lanes layer)
+import { planInvalid } from '@prisma-next/plan'; // core layer - allowed
+```
+
+**❌ WRONG: Import from outer layer**
+```typescript
+// packages/framework/core-plan/src/plan.ts (core layer)
+import { sql } from '@prisma-next/sql-lane'; // lanes layer - NOT allowed
+```
+
+### Temporary Exceptions
+
+When a package violates dependency rules but needs to temporarily import from another package (e.g., during refactoring), add a temporary exception in `dependency-cruiser.config.mjs` with a TODO comment:
+
+```javascript
+// Temporary exception: CLI → SQL targets (for hooks)
+// TODO: Refactor CLI to be target-family-agnostic (use plugin system or dynamic loading)
+// See: docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4
+if (
+  sourceGroup.domain === 'framework' &&
+  sourceGroup.layer === 'tooling' &&
+  sourceGroup.patterns.some((p) => p.includes('tooling/cli')) &&
+  targetGroup.domain === 'sql' &&
+  targetGroup.layer === 'targets'
+) {
+  continue; // Temporary: allow CLI → SQL targets until refactor
+}
+```
+
+**Important**: Temporary exceptions must:
+- Include a TODO comment explaining why the exception exists
+- Reference the relevant brief or issue
+- Be removed once the refactoring is complete
+
+## Adding New Packages
+
+When adding a new package:
+
+1. **Add to `architecture.config.json`**: Add a package config entry with glob pattern, domain, layer, and plane
+   ```json
+   {
+     "glob": "packages/framework/tooling/new-tool/**",
+     "domain": "framework",
+     "layer": "tooling",
+     "plane": "migration"
+   }
+   ```
+
+2. **Update `tsconfig.base.json`**: Add path mappings and project references if needed
+
+3. **Update `pnpm-workspace.yaml`**: Add package glob pattern if needed
+
+4. **Run `pnpm lint:deps`**: Verify no violations
+
+## Running Import Validation
+
+```bash
+pnpm lint:deps
+```
+
+This command:
+- Scans all TypeScript files in `packages/`
+- Validates imports against domain/layer/plane rules
+- Reports violations with detailed context
+- Can be run locally or in CI
+
+## Common Issues
+
+### Package Not Found in Config
+
+If a package is not in `architecture.config.json`, it will be treated as a legacy package (allows all imports). Add it to the config to enforce proper dependency rules.
+
+### Path Matching Issues
+
+Dependency Cruiser uses regex pattern matching to find the most specific package match. Patterns are derived from glob patterns in `architecture.config.json` and converted to regex patterns in `dependency-cruiser.config.mjs`.
+
+### Domain/Layer/Plane Structure
+
+Packages are organized by:
+- **Domain**: framework (target-agnostic) or target families (sql, document, etc.)
+- **Layer**: core → authoring → targets → lanes → runtime → adapters (dependency direction)
+- **Plane**: migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters)
+
+Dependency Cruiser enforces:
+- Same-layer imports: allowed
+- Downward imports (toward core): allowed
+- Upward imports (away from core): denied
+- Cross-domain imports: denied except framework domain
+- Migration → Runtime imports: denied
+- Runtime → Migration imports: denied (artifacts are consumed out-of-band)
+
+See `dependency-cruiser.config.mjs` for the complete rule definitions.

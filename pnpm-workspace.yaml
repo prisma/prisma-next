@@ -1,4 +1,11 @@
 packages:
+  - packages/framework/**
+  - packages/targets/sql/*
+  - packages/sql/**
+  - packages/extensions/**
+  - packages/compat/*
+  - packages/document
   - packages/*
   - examples/*
+  - test/**
 

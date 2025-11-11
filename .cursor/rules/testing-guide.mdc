@@ -1,6 +1,11 @@
 ---
 description: Testing guide and best practices for Prisma Next
 alwaysApply: false
+tags: [testing]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
 ---
 
 # Testing Guide
@@ -35,6 +40,13 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - Use `expectTypeOf` from Vitest
 - Located in `**/*.test-d.ts` files
 - See `.cursor/rules/vitest-expect-typeof.mdc` for details
+
+**Test Fixtures:**
+- Test fixtures should not depend on specific adapters (e.g., `@prisma-next/adapter-postgres`)
+- Define `CodecTypes` inline in test fixtures to remain adapter-agnostic
+- Use `createStubAdapter()` from `@prisma-next/runtime/test/utils` instead of specific adapter factories in tests
+- This prevents cyclic dependencies and keeps tests adapter-agnostic
+- See `AGENT_ONBOARDING.md` for details
 
 ## Common Patterns
 
@@ -336,14 +348,58 @@ type Row = ResultType<typeof plan>;  // Optional: for type tests
 
 ### Bundling external dependencies
 
-**Issue:** When bundling packages that use dependencies with native modules or data files (e.g., `@prisma/dev` with pglite), bundling can cause runtime errors.
+**Issue:** When bundling packages that use dependencies with native modules or data files (e.g., `@prisma/dev` with pglite), bundling can cause runtime errors. Bundling CommonJS dependencies into ESM bundles also causes Vite parsing errors.
 
 **Solution:** Mark dependencies as external in `tsup.config.ts`:
 ```typescript
 export default defineConfig({
-  external: ['@prisma/dev'],
+  external: [
+    /^@prisma-next\//,  // All workspace packages
+    'pg',
+    '@types/pg',
+    '@prisma/dev',
+    '@prisma/get-platform',
+    'arktype',
+  ],
 });
 ```
+
+**Why?**
+- Workspace packages should be imported, not bundled
+- External dependencies (especially CommonJS) should not be bundled into ESM bundles
+- Vite cannot parse mixed ESM/CommonJS bundles
+
+### Coverage Configuration
+
+**Issue:** Coverage reports show 0% for files that are imported from package exports instead of source files.
+
+**Solution:**
+1. **Import from source in tests** - Test files should import from source (`../src/index`) not from package exports
+2. **Add explicit include in vitest config** - Add `include: ['src/**/*.ts']` to coverage configuration
+
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    coverage: {
+      include: ['src/**/*.ts'],  // Explicitly include source files
+      exclude: [
+        'dist/**',
+        'test/**',
+        '**/*.test.ts',
+        '**/*.test-d.ts',
+        '**/*.config.ts',
+        '**/exports/**',
+      ],
+    },
+  },
+});
+```
+
+**Why?**
+- Tests importing from package exports resolve to dist files, which may not be tracked for coverage
+- Explicit include ensures source files are tracked
+- Importing from source ensures tests run against actual implementation
 
 ### Test timeout configuration
 

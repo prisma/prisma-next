@@ -5,7 +5,7 @@ This spec defines a single, coherent MVP for the two‑week spike. It reflects t
 ## Goals (two‑week spike)
 - Compatibility import‑swap for a minimal Prisma ORM example app with zero query edits via a compatibility layer
 - Safety and coaching value via the budgets plugin blocking an unbounded read and surfacing a clear fix
-- Extensibility demonstrated by installing and using a `pgvector` pack without core changes
+- Extensibility demonstrated by installing and using a true extension pack `@prisma-next/extension-pgvector` (in `packages/extensions/extension-pgvector`) without core changes
 
 Supporting goals for developer experience and verification:
 - No manual generate: PSL → contract artifacts on save
@@ -14,10 +14,48 @@ Supporting goals for developer experience and verification:
 ## Acceptance Criteria
 - Example app runs unchanged on PN via a compatibility layer (import‑swap, zero query edits)
 - Budgets plugin blocks an unbounded read with an actionable fix
-- `pgvector` pack installed and used in the demo without core changes
+- `@prisma-next/extension-pgvector` installed as a pack and used in the demo without core changes
 
 Supporting acceptance
 - Vite plugin auto‑emits contract and blocks on contract errors
+
+## Validation Roadmap (Architecture Confidence)
+
+To de‑risk package organization and prove extensibility across planes and families, we will complete the following validations in order. These do not change the MVP demo goals; they harden the architecture while we develop features.
+
+1) SQL Extension Pack: PGVector (SQL domain — Targets + Lanes + Adapters)
+- Scope: add vector scalar + ops in `@prisma-next/sql-contract-types`/`@prisma-next/sql-operations`; expose ops in lanes; ensure adapter lowering executes successfully.
+- Acceptance: write vector queries through DSL/ORM, produce valid Plans, lower to SQL, execute via Postgres adapter, decode results with codecs.
+
+2) Migration Plane MVP (Framework Tooling + SQL Targets)
+- Framework Tooling: a minimal contract diff + planner engine that loads current/next contracts, diffs at a neutral IR level, and delegates to family hooks.
+- SQL Targets: planner hooks convert diffs to SQL DDL ops (add/remove/alter table/column subset).
+- Apply orchestration: CLI invokes runtime‑core SPI to execute ops via SQL runtime; no direct adapter imports from tooling.
+- Acceptance: migrate a schema (DDL subset) end‑to‑end; artifacts use `@prisma-next/plan`; migration plane does not import runtime plane code.
+
+3) PSL Authoring Parity (Framework Authoring)
+- Scope: minimal PSL parser in `@prisma-next/contract-psl` producing the same contract IR as TS builders for a representative schema.
+- Equivalence harness: emit JSON from TS and PSL; compare byte equality (canonicalization + hash equality).
+- Optional: Vite/TS plugin validates equivalence in dev/CI.
+- Acceptance: TS and PSL authoring produce byte‑identical contract.json for non‑trivial schema (relations, indexes, codecs).
+
+4) New Database Target Scaffolding (e.g., MySQL)
+- Scope: scaffold `packages/targets/mysql/{contract-types,operations,emitter}`; minimal lowering templates for CRUD; thin adapter stub if needed.
+- Acceptance: planner calls MySQL family hooks for DDL diffs; lanes lower a basic Plan to MySQL SQL (execution optional); confirms Domains/Layers/Planes generalize beyond SQL.
+
+5) Views Extension (SQL domain — Targets + Tooling)
+- Scope: Views extension pack adds schema‑level features; emitter validates; lanes can select from view sources.
+- Acceptance: add view in extension → emit contract → query via DSL/ORM; confirms schema‑level extension path works.
+
+6) Example App + PPg (End‑to‑End)
+- Scope: agent‑assisted demo using authoring → planner/apply → runtime lanes with PGVector.
+- Acceptance: PPg marker checks succeed; plans execute; guardrails/telemetry recorded; demonstrates authoring + migration + runtime planes working together.
+
+Guardrails (CI)
+- Enforce Domains/Layers/Planes via `architecture.config.json` and `pnpm lint:deps`:
+  - Migration → Runtime code imports forbidden; Runtime consumes artifacts only via runtime‑core SPI.
+  - Cross‑family imports forbidden except into Framework packages.
+  - ORM lane must not import SQL lane (04a criterion).
 
 ## Example App (ESM) — `examples/prisma-next-demo/`
 - `src/prisma/schema.psl` ([Data Contract](./architecture%20docs/subsystems/1.%20Data%20Contract.md)).
@@ -27,7 +65,7 @@ Supporting acceptance
 - `src/prisma/scripts/seed.ts` (esr runner; idempotent top‑up).
 - `migrations/YYYYMMDDThhmm_snake_case/` ([Migration System](./architecture%20docs/subsystems/7.%20Migration%20System.md); [ADR 009 — Deterministic Naming Scheme](./architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md)).
 - `vite.config.ts` (plugin wired; [ADR 032 — Dev Auto Emit Integration](./architecture%20docs/adrs/ADR%20032%20-%20Dev%20Auto%20Emit%20Integration.md)).
-- `prisma-next.config.ts` (CLI‑only config; [Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 097 — Tooling runs on canonical JSON only](./architecture%20docs/adrs/ADR%20097%20-%20Tooling%20runs%20on%20canonical%20JSON%20only.md)).
+- `prisma-next.config.ts` (CLI‑only config; [Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 097 — Tooling runs on canonical JSON only](./architecture%20docs/adrs/ADR%20097%20-%20Tooling%20runs%20on%20canonical%20JSON%20only.md)). Includes packs array with `'@prisma-next/extension-pgvector'` to register vector types/ops/codecs.
 - `test/*` (Vitest, single‑threaded).
 
 ### Scripts (package.json)
@@ -41,7 +79,7 @@ Supporting acceptance
 ## Vite Plugin — `@prisma/vite-plugin-prisma-next`
 - Watches `src/prisma/schema.psl`.
 - Emits `contract.json` + `.d.ts` deterministically ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 010](./architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)).
-- Blocks dev server on parse/validate/hash mismatch ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 006 — Dual Authoring Modes](./architecture%20docs/adrs/ADR%20006%20-%20Dual%20Authoring%20Modes.md)).
+- Blocks dev server on parse/validate/hash mismatch ([Contract Emitter & Types](./architecture%20docs/subsystems/2.%20Contract%20Emitter%20%26%20Types.md); [ADR 006 — Dual Authoring Modes](./architecture%20docs/adrs/ADR%20006%20-%20Dual%20Authoring%20Modes.md)). Loads configured packs (e.g., `@prisma-next/extension-pgvector`) for emission and type generation.
 - No guardrails/budgets here (runtime concern; [Runtime & Plugin Framework](./architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md)).
 
 ## Query Lanes & API

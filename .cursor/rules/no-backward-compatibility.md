@@ -1,3 +1,13 @@
+---
+description: Do not add backward-compatibility shims or migration scaffolding
+alwaysApply: false
+tags: [maintenance]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: warn
+---
+
 # No Backward Compatibility or Migration Paths
 
 ## Rule
@@ -35,4 +45,3 @@ Since this project has no external consumers, maintaining backward compatibility
 - Update all references immediately
 - Update design docs to show current state only
 - Tests only exercise current patterns
-

@@ -1,34 +1,50 @@
 #!/usr/bin/env node
 
-import { readdir, readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { exec } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
 const ROOT = resolve(process.cwd());
-const PACKAGES_DIR = join(ROOT, 'packages');
 
-const EXCLUDED_PACKAGES = ['integration-tests', 'e2e-tests'];
+const EXCLUDED_PATHS = ['examples/', 'test/'];
 
 async function getPackages() {
-  const entries = await readdir(PACKAGES_DIR, { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((name) => !EXCLUDED_PACKAGES.includes(name));
+  // Use pnpm to get all packages recursively
+  const { stdout } = await execAsync('pnpm -r list --json', { cwd: ROOT });
+  const packages = JSON.parse(stdout);
+
+  // Filter to only packages in packages/ directory, exclude examples and test packages
+  const packagePaths = packages
+    .map((pkg) => {
+      if (!pkg.path) return null;
+      const relativePath = pkg.path.replace(`${ROOT}/`, '');
+      return relativePath;
+    })
+    .filter((path) => {
+      if (!path) return false;
+      // Only include packages in packages/ directory
+      if (!path.startsWith('packages/')) return false;
+      // Exclude test packages and examples
+      if (EXCLUDED_PATHS.some((excluded) => path.startsWith(excluded))) return false;
+      return true;
+    })
+    .map((path) => path.replace('packages/', ''));
+
+  return packagePaths;
 }
 
-async function runCoverage(packageName) {
-  const packageDir = join(PACKAGES_DIR, packageName);
+async function runCoverage(packagePath) {
+  const packageDir = join(ROOT, 'packages', packagePath);
   const packageJsonPath = join(packageDir, 'package.json');
 
   try {
     const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf-8'));
 
     if (!packageJson.scripts?.['test:coverage']) {
-      return { package: packageName, skipped: true, reason: 'No test:coverage script' };
+      return { package: packagePath, skipped: true, reason: 'No test:coverage script' };
     }
 
     const command = `pnpm --filter ${packageJson.name} test:coverage`;
@@ -53,7 +69,7 @@ async function runCoverage(packageName) {
       const coverageReport = await parseCoverageReport(packageDir).catch(() => null);
 
       return {
-        package: packageName,
+        package: packagePath,
         testPassed: !testFailed,
         coveragePassed: !coverageFailed,
         coverageReport,
@@ -74,7 +90,7 @@ async function runCoverage(packageName) {
       const coverageReport = await parseCoverageReport(packageDir).catch(() => null);
 
       return {
-        package: packageName,
+        package: packagePath,
         testPassed: !testFailed,
         coveragePassed: !coverageFailed,
         coverageReport,
@@ -84,7 +100,7 @@ async function runCoverage(packageName) {
     }
   } catch (error) {
     return {
-      package: packageName,
+      package: packagePath,
       skipped: true,
       reason: error.message,
     };
@@ -98,7 +114,7 @@ async function parseCoverageReport(packageDir) {
     const coverageData = JSON.parse(await readFile(coverageJsonPath, 'utf-8'));
 
     const fileCoverage = Object.entries(coverageData).map(([filePath, data]) => {
-      const relativePath = filePath.replace(packageDir + '/', '');
+      const relativePath = filePath.replace(`${packageDir}/`, '');
       const statementMap = data.s || {};
       const branchMap = data.b || {};
       const functionMap = data.f || {};
@@ -107,7 +123,6 @@ async function parseCoverageReport(packageDir) {
       const coveredStatements = Object.values(statementMap).filter((v) => v > 0).length;
       const statementPct = statements > 0 ? (coveredStatements / statements) * 100 : 100;
 
-      const branches = Object.keys(branchMap).length;
       const branchHits = Object.values(branchMap).flat();
       const coveredBranches = branchHits.filter((v) => v > 0).length;
       const totalBranchPoints = branchHits.length;
@@ -126,7 +141,7 @@ async function parseCoverageReport(packageDir) {
     });
 
     return fileCoverage;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -245,8 +260,8 @@ function suggestThresholdIncreases(overallCoverage, thresholds, margin = 5) {
   return hasSuggestions ? suggestions : null;
 }
 
-async function getThresholds(packageName) {
-  const vitestConfigPath = join(PACKAGES_DIR, packageName, 'vitest.config.ts');
+async function getThresholds(packagePath) {
+  const vitestConfigPath = join(ROOT, 'packages', packagePath, 'vitest.config.ts');
 
   try {
     const configContent = await readFile(vitestConfigPath, 'utf-8');
@@ -280,9 +295,9 @@ async function formatResults(results) {
   const passed = results.filter((r) => !r.skipped && r.testPassed && r.coveragePassed);
   const skipped = results.filter((r) => r.skipped);
 
-  console.log('\n' + '='.repeat(80));
+  console.log(`\n${'='.repeat(80)}`);
   console.log('COVERAGE REPORT SUMMARY');
-  console.log('='.repeat(80) + '\n');
+  console.log(`${'='.repeat(80)}\n`);
 
   if (testFailures.length > 0) {
     console.log('❌ PACKAGES WITH TEST FAILURES:');
@@ -306,7 +321,7 @@ async function formatResults(results) {
       if (thresholds && result.coverageReport) {
         const fileFailures = checkThresholds(result.coverageReport, thresholds);
         if (fileFailures.length > 0) {
-          console.log(`    Files below thresholds:`);
+          console.log('    Files below thresholds:');
           for (const failure of fileFailures) {
             console.log(`      - ${failure.file}`);
             for (const fail of failure.failures) {
@@ -354,7 +369,7 @@ async function formatResults(results) {
     console.log('-'.repeat(80));
     for (const item of thresholdSuggestions) {
       console.log(`  • ${item.package}`);
-      console.log(`    Current coverage:`);
+      console.log('    Current coverage:');
       if (item.suggestions.statements) {
         console.log(
           `      statements: ${item.overallCoverage.statements.pct.toFixed(2)}% (threshold: ${item.suggestions.statements.current}%)`,
@@ -370,7 +385,7 @@ async function formatResults(results) {
           `      functions: ${item.overallCoverage.functions.pct.toFixed(2)}% (threshold: ${item.suggestions.functions.current}%)`,
         );
       }
-      console.log(`    Suggested thresholds:`);
+      console.log('    Suggested thresholds:');
       const suggestedThresholds = [];
       if (item.suggestions.statements) {
         suggestedThresholds.push(`statements: ${item.suggestions.statements.suggested}`);
@@ -399,7 +414,7 @@ async function formatResults(results) {
   console.log(
     `Total: ${results.length} | Passed: ${passed.length} | Test Failures: ${testFailures.length} | Coverage Failures: ${coverageFailures.length} | Threshold Suggestions: ${thresholdSuggestions.length} | Skipped: ${skipped.length}`,
   );
-  console.log('='.repeat(80) + '\n');
+  console.log(`${'='.repeat(80)}\n`);
 
   return {
     testFailures: testFailures.length,
@@ -415,9 +430,9 @@ async function main() {
   console.log(`Running coverage for ${packages.length} packages...\n`);
 
   const results = [];
-  for (const packageName of packages) {
-    process.stdout.write(`Running coverage for ${packageName}... `);
-    const result = await runCoverage(packageName);
+  for (const packagePath of packages) {
+    process.stdout.write(`Running coverage for ${packagePath}... `);
+    const result = await runCoverage(packagePath);
     results.push(result);
 
     if (result.skipped) {

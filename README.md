@@ -148,19 +148,86 @@ Start with the [Architecture Overview](./docs/Architecture%20Overview.md) for a 
 
 Key difference: Prisma Next emits types and a contract rather than generating an executable client.
 
+## Clean Architecture Layers
+
+Prisma Next follows Clean Architecture principles, organizing packages by **Domains → Layers → Planes**:
+
+- **Domains**: Framework (target-agnostic) vs target families (SQL, document, etc.)
+- **Layers**: Core → Authoring → Targets → Lanes → Runtime Core → Family Runtime → Adapters
+- **Planes**: Migration (authoring, tooling, targets) vs Runtime (lanes, runtime, adapters)
+
+### Layer Structure
+
+Dependencies flow downward (toward core); lateral dependencies within the same layer are permitted:
+
+```
+Core → Authoring → Targets → Lanes → Runtime Core → Family Runtime → Adapters
+         (lateral deps allowed within each layer)
+```
+
+### Layer Diagram
+
+```mermaid
+graph LR
+  Core[Core] --> Authoring
+  Authoring --> Targets
+  Targets --> Lanes
+  Lanes --> RuntimeCore[Runtime Core]
+  RuntimeCore --> FamilyRuntime[Family Runtime]
+  FamilyRuntime --> Adapters
+
+  %% lateral relationships (same layer) shown as loops
+  Core --> Core
+  Authoring --> Authoring
+  Targets --> Targets
+  Lanes --> Lanes
+  RuntimeCore --> RuntimeCore
+  FamilyRuntime --> FamilyRuntime
+  Adapters --> Adapters
+
+  style Core fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+  style Authoring fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+  style Targets fill:#fff3e0,stroke:#e65100,stroke-width:2px
+  style Lanes fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+  style RuntimeCore fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+  style FamilyRuntime fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+  style Adapters fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+```
+
+For detailed information about package layering, see:
+- [ADR 140 - Package Layering & Target-Family Namespacing](docs/architecture%20docs/adrs/ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md)
+- [Package Layering Guide](docs/architecture%20docs/Package-Layering.md)
+
 ## Packages
 
-- **`@prisma/relational-ir`** - Schema contract definition, validation, and serialization
-- **`@prisma/psl`** - PSL lexer, recursive descent parser, and CLI
-- **`@prisma/schema-emitter`** - AST → IR transformation and TypeScript code generation
-- **`@prisma/sql`** - Type-safe query builder and PostgreSQL SQL compiler
-- **`@prisma/runtime`** - Database connection, query execution, contract verification, and plugin hooks
-- **`@prisma/orm`** - Optional ORM layer with relations and higher-level abstractions
+### Framework Domain (Target-Agnostic)
 
-### Test Packages
+- **`@prisma-next/contract`** - Core contract types (`ContractBase`, `Source`)
+- **`@prisma-next/plan`** - Plan helpers, diagnostics, and shared errors
+- **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers
+- **`@prisma-next/contract-authoring`** - TS builders, canonicalization, schema DSL
+- **`@prisma-next/cli`** - CLI tooling for contract emission
+- **`@prisma-next/emitter`** - Contract emission engine
+- **`@prisma-next/runtime-core`** - Target-agnostic runtime kernel (verification, plugin lifecycle, telemetry)
 
-- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages
-- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database
+### SQL Target Family Domain
+
+- **`@prisma-next/sql-contract-ts`** - SQL-specific TypeScript contract authoring surface
+- **`@prisma-next/sql-contract-types`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
+- **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly
+- **`@prisma-next/sql-contract-emitter`** - SQL emitter hook implementation
+- **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types
+- **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers
+- **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives
+- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-core with SQL adapters
+- **`@prisma-next/adapter-postgres`** - Postgres adapter implementation
+- **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
+
+### Test Packages (located in `test/` directory)
+
+- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages (located at `test/integration/`)
+- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database (located at `test/e2e/framework/`)
+- **`@prisma-next/test-utils`** - Shared test utilities for all test suites (located at `test/utils/`)
 
 ## Quick Start
 
@@ -193,11 +260,14 @@ pnpm generate && pnpm start
 ### All Packages
 
 **Tests:**
-- `pnpm test` - Run all tests
-- `pnpm test:packages` - Test only packages (exclude examples)
-- `pnpm test:examples` - Test only examples
+- `pnpm test` - Run all tests via Turbo
+- `pnpm test:all` - Run all test suites explicitly (packages → examples → integration → e2e)
+- `pnpm test:packages` - Test only source packages (excludes examples and test suites)
+- `pnpm test:examples` - Test only example apps
+- `pnpm test:integration` - Test only integration tests
+- `pnpm test:e2e` - Test only e2e tests
 - `pnpm test:coverage` - Run tests with coverage
-- `pnpm coverage:packages` - Coverage for packages only
+- `pnpm coverage:packages` - Coverage for packages only (excludes examples and test suites)
 
 **Type Checking:**
 - `pnpm typecheck` - Type check all packages

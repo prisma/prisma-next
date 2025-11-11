@@ -1,4 +1,4 @@
-import { param } from '@prisma-next/sql-query/param';
+import { param } from '@prisma-next/sql-relational-core/param';
 import { orm } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
 

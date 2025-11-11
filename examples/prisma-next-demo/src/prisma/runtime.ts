@@ -6,8 +6,8 @@ import {
   createRuntimeContext,
   type Runtime,
   type RuntimeContext,
-} from '@prisma-next/runtime';
-import { validateContract } from '@prisma-next/sql-query/schema';
+} from '@prisma-next/sql-runtime';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { Pool } from 'pg';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };

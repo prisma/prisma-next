@@ -1,0 +1,124 @@
+{
+  "packages": [
+    {
+      "glob": "packages/framework/core-plan/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/framework/core-operations/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/framework/authoring/contract-authoring/**",
+      "domain": "framework",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/framework/authoring/contract-ts/**",
+      "domain": "framework",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/framework/authoring/contract-psl/**",
+      "domain": "framework",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/framework/tooling/cli/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/framework/tooling/emitter/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/framework/runtime-core/**",
+      "domain": "framework",
+      "layer": "runtime-core",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/targets/sql/**",
+      "domain": "sql",
+      "layer": "targets",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/sql/authoring/**",
+      "domain": "sql",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/sql/lanes/**",
+      "domain": "sql",
+      "layer": "lanes",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/sql/sql-runtime/**",
+      "domain": "sql",
+      "layer": "runtime",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/sql/postgres/**",
+      "domain": "sql",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/compat/**",
+      "domain": "sql",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/sql/runtime/adapters/postgres/**",
+      "domain": "sql",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/sql/runtime/drivers/postgres/**",
+      "domain": "sql",
+      "layer": "drivers",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/extensions/compat-prisma/**",
+      "domain": "extensions",
+      "layer": "compat",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/framework/core-contract/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    }
+  ],
+  "rules": {
+    "sameLayer": "allow",
+    "downward": "allow",
+    "upward": "deny",
+    "crossDomain": "denyExceptFramework",
+    "migrationToRuntime": "deny",
+    "runtimeToMigration": "allowArtifactsOnly"
+  },
+  "layerOrder": {
+    "framework": ["core", "authoring", "tooling", "runtime-core"],
+    "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters", "drivers"]
+  }
+}

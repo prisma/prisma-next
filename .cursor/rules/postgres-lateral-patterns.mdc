@@ -1,3 +1,13 @@
+---
+description: PostgreSQL LATERAL and json_agg rendering patterns
+alwaysApply: false
+tags: [sql, postgres, query]
+appliesTo: ["packages/sql/**"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
+---
+
 # PostgreSQL LATERAL Join Patterns
 
 ## Identifier Quoting

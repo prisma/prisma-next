@@ -1,0 +1,210 @@
+import { describe, expect, it } from 'vitest';
+import { canonicalizeContract } from '../src/canonicalization';
+import { createContractIR } from './utils';
+
+describe('canonicalization', () => {
+  it('orders top-level sections correctly', () => {
+    const ir = createContractIR({
+      capabilities: { postgres: { jsonAgg: true } },
+      meta: { source: 'test' },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+
+    const keys = Object.keys(parsed);
+    const schemaVersionIndex = keys.indexOf('schemaVersion');
+    const targetFamilyIndex = keys.indexOf('targetFamily');
+    const targetIndex = keys.indexOf('target');
+    const modelsIndex = keys.indexOf('models');
+    const storageIndex = keys.indexOf('storage');
+    const capabilitiesIndex = keys.indexOf('capabilities');
+    const metaIndex = keys.indexOf('meta');
+
+    expect(schemaVersionIndex).toBeLessThan(targetFamilyIndex);
+    expect(targetFamilyIndex).toBeLessThan(targetIndex);
+    expect(targetIndex).toBeLessThan(modelsIndex);
+    expect(modelsIndex).toBeLessThan(storageIndex);
+    expect(storageIndex).toBeLessThan(capabilitiesIndex);
+    expect(capabilitiesIndex).toBeLessThan(metaIndex);
+  });
+
+  it('omits nullable false from columns', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: true },
+            },
+          },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const id = columns['id'] as Record<string, unknown>;
+    const email = columns['email'] as Record<string, unknown>;
+    expect(id['nullable']).toBeUndefined();
+    expect(email['nullable']).toBe(true);
+  });
+
+  it('omits empty arrays and objects except required ones', () => {
+    const ir = createContractIR();
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result);
+    expect(parsed).toMatchObject({
+      models: expect.anything(),
+      storage: {
+        tables: expect.anything(),
+      },
+    });
+    // Required top-level fields (capabilities, extensions, meta, relations, sources) are preserved even when empty
+    // because they are required by ContractIR and needed for round-trip tests
+    expect(parsed).toMatchObject({
+      capabilities: expect.anything(),
+      extensions: expect.anything(),
+      meta: expect.anything(),
+      relations: expect.anything(),
+      sources: expect.anything(),
+    });
+  });
+
+  it('preserves semantic array order for column lists', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              first: { type: 'pg/text@1' },
+              second: { type: 'pg/text@1' },
+            },
+            primaryKey: {
+              columns: ['second', 'first'],
+            },
+          },
+        },
+      },
+    });
+
+    const result1 = canonicalizeContract(ir);
+
+    const ir2 = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              first: { type: 'pg/text@1' },
+              second: { type: 'pg/text@1' },
+            },
+            primaryKey: {
+              columns: ['first', 'second'],
+            },
+          },
+        },
+      },
+    });
+
+    const result2 = canonicalizeContract(ir2);
+
+    expect(result1).not.toBe(result2);
+  });
+
+  it('sorts non-semantic arrays by canonical name', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1' },
+            },
+            indexes: [
+              { columns: ['id'], name: 'user_email_idx' },
+              { columns: ['id'], name: 'user_name_idx' },
+            ],
+          },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const indexes = user['indexes'] as Array<{ name: string }>;
+    const indexNames = indexes.map((idx) => idx.name);
+    expect(indexNames).toEqual(['user_email_idx', 'user_name_idx']);
+  });
+
+  it('sorts nested object keys lexicographically', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              z_field: { type: 'pg/text@1' },
+              a_field: { type: 'pg/text@1' },
+              m_field: { type: 'pg/text@1' },
+            },
+          },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const columnKeys = Object.keys(columns);
+    expect(columnKeys).toEqual(['a_field', 'm_field', 'z_field']);
+  });
+
+  it('sorts extension namespaces lexicographically', () => {
+    const ir = createContractIR({
+      extensions: {
+        pgvector: { version: '1.0.0' },
+        postgres: { version: '15.0.0' },
+        another: { version: '1.0.0' },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const extensions = parsed['extensions'] as Record<string, unknown>;
+    const extensionKeys = Object.keys(extensions);
+    expect(extensionKeys).toEqual(['another', 'pgvector', 'postgres']);
+  });
+
+  it('omits generated false', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', generated: false },
+            },
+          },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const id = columns['id'] as Record<string, unknown>;
+    expect(id['generated']).toBeUndefined();
+  });
+});

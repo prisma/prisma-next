@@ -1,0 +1,44 @@
+{
+  "name": "@prisma-next/sql-orm-lane",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "ORM builder, include lowering, and relation filters for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "clean": "node ../../../../scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/plan": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^2.1.1"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/exports/orm.d.ts",
+      "import": "./dist/exports/orm.js"
+    },
+    "./orm": {
+      "types": "./dist/exports/orm.d.ts",
+      "import": "./dist/exports/orm.js"
+    }
+  }
+}

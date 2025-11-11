@@ -4,9 +4,9 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
 import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/runtime';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -20,7 +20,7 @@ let contract: Contract;
 beforeAll(async () => {
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
-  const adapterPath = resolve(__dirname, '../../../packages/adapter-postgres');
+  const adapterPath = resolve(__dirname, '../../../packages/sql/runtime/adapters/postgres');
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, []);

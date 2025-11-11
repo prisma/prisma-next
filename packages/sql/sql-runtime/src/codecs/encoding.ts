@@ -1,0 +1,76 @@
+import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+
+function resolveParamCodec(
+  paramDescriptor: ParamDescriptor,
+  plan: Plan,
+  registry: CodecRegistry,
+): Codec | null {
+  const paramName = paramDescriptor.name ?? `param_${paramDescriptor.index ?? 0}`;
+
+  const planCodecId = plan.meta.annotations?.codecs?.[paramName] as string | undefined;
+  if (planCodecId) {
+    const codec = registry.get(planCodecId);
+    if (codec) {
+      return codec;
+    }
+  }
+
+  if (paramDescriptor.type) {
+    const codec = registry.get(paramDescriptor.type);
+    if (codec) {
+      return codec;
+    }
+  }
+
+  return null;
+}
+
+export function encodeParam(
+  value: unknown,
+  paramDescriptor: ParamDescriptor,
+  plan: Plan,
+  registry: CodecRegistry,
+): unknown {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const codec = resolveParamCodec(paramDescriptor, plan, registry);
+  if (!codec) {
+    return value;
+  }
+
+  if (codec.encode) {
+    try {
+      return codec.encode(value);
+    } catch (error) {
+      throw new Error(
+        `Failed to encode parameter ${paramDescriptor.name ?? paramDescriptor.index}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return value;
+}
+
+export function encodeParams(plan: Plan, registry: CodecRegistry): readonly unknown[] {
+  if (plan.params.length === 0) {
+    return plan.params;
+  }
+
+  const encoded: unknown[] = [];
+
+  for (let i = 0; i < plan.params.length; i++) {
+    const paramValue = plan.params[i];
+    const paramDescriptor = plan.meta.paramDescriptors[i];
+
+    if (paramDescriptor) {
+      encoded.push(encodeParam(paramValue, paramDescriptor, plan, registry));
+    } else {
+      encoded.push(paramValue);
+    }
+  }
+
+  return Object.freeze(encoded);
+}

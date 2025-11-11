@@ -3,7 +3,7 @@ import type {
   PostgresContract,
   PostgresLoweredStatement,
 } from '@prisma-next/adapter-postgres/types';
-import type { Adapter, SelectAst } from '@prisma-next/sql-target';
+import type { Adapter, SelectAst } from '@prisma-next/sql-relational-core/ast';
 
 export const adapter: Adapter<SelectAst, PostgresContract, PostgresLoweredStatement> =
   Object.freeze(createPostgresAdapter());

@@ -1,0 +1,137 @@
+---
+description: Guidelines for moving packages and updating relative paths
+alwaysApply: false
+tags: [refactoring, architecture, maintenance]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: warn
+---
+
+# Moving Packages
+
+When moving packages to new locations, you must update all relative paths that reference root-level files or other packages.
+
+## Relative Path Calculation
+
+**Key Principle**: Count the directory depth from the package to the root, then use that many `../` segments.
+
+**Formula**: From `packages/domain/layer/package/` to root = 4 levels up (`../../../../`)
+
+### Common Paths to Update
+
+1. **`tsconfig.json`** - `extends` path to `tsconfig.base.json`
+   - From `packages/framework/tooling/cli/` → `../../../../tsconfig.base.json` (4 levels)
+   - From `test/integration/test/` → `../../../tsconfig.base.json` (3 levels)
+
+2. **`package.json`** - Script paths:
+   - `biome.json` config path
+   - `scripts/clean.mjs` path
+   - Any other root-level script references
+
+3. **Test files** - Paths to other packages:
+   - Extension pack manifests (e.g., `packages/sql/runtime/adapters/postgres/packs/manifest.json`)
+   - Fixture paths
+   - Import paths in test utilities
+
+## Examples
+
+### Moving from `packages/` to `test/`
+
+**Before** (from `packages/integration-tests/test/`):
+```typescript
+const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
+// Resolves to: packages/sql/runtime/adapters/postgres
+```
+
+**After** (from `test/integration/test/`):
+```typescript
+const packs = loadExtensionPacks(join(__dirname, '../../../packages/sql/runtime/adapters/postgres'), []);
+// Resolves to: packages/sql/runtime/adapters/postgres
+```
+
+**Why?** From `test/integration/test/`:
+- `../` → `test/integration/`
+- `../../` → `test/`
+- `../../../` → root
+- `../../../packages/` → `packages/`
+
+### Moving within `packages/`
+
+**Before** (from `packages/e2e-tests/`):
+```json
+{
+  "scripts": {
+    "lint": "biome check . --config-path ../../biome.json"
+  }
+}
+```
+
+**After** (from `test/e2e/framework/`):
+```json
+{
+  "scripts": {
+    "lint": "biome check . --config-path ../../../biome.json"
+  }
+}
+```
+
+## Checklist When Moving Packages
+
+1. **Update `tsconfig.json`** - `extends` path to `tsconfig.base.json`
+2. **Update `package.json`** - All script paths (`biome.json`, `clean.mjs`, etc.)
+3. **Update test files** - Paths to other packages, fixtures, manifests
+4. **Update `pnpm-workspace.yaml`** - Add/remove package globs if needed
+5. **Update `architecture.config.json`** - Add/remove package entries
+6. **Update `dependency-cruiser.config.mjs`** - Update exclude patterns if needed
+7. **Update CI workflows** - Update any hardcoded paths
+8. **Update documentation** - READMEs, AGENTS.md, etc.
+
+## Verification
+
+After moving a package, verify paths work:
+
+```bash
+# From the moved package directory
+node -e "const path = require('path'); console.log(path.resolve(__dirname, '../../packages/sql/runtime/adapters/postgres'))"
+```
+
+This should resolve to the correct absolute path.
+
+## Common Mistakes
+
+**❌ WRONG: Not updating paths after move**
+```typescript
+// Still using old path after moving from packages/ to test/
+const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/postgres'), []);
+// This resolves to test/sql/runtime/adapters/postgres (doesn't exist!)
+```
+
+**✅ CORRECT: Update paths based on new location**
+```typescript
+// Updated path after moving to test/
+const packs = loadExtensionPacks(join(__dirname, '../../../packages/sql/runtime/adapters/postgres'), []);
+// This resolves to packages/sql/runtime/adapters/postgres (correct!)
+```
+
+**❌ WRONG: Assuming same depth**
+```typescript
+// Assuming 2 levels up works for all packages
+const path = join(__dirname, '../../packages/...');
+```
+
+**✅ CORRECT: Calculate depth for each package**
+```typescript
+// Calculate based on actual location
+// From test/integration/test/ = 3 levels up
+const path = join(__dirname, '../../../packages/...');
+```
+
+## Test Packages Special Case
+
+Test packages moved to `test/` directory:
+- Still need to be in `pnpm-workspace.yaml` for dependency resolution
+- Use `workspace:*` protocol for dependencies
+- Marked as `private: true` in `package.json`
+- Not included in `architecture.config.json` (not source packages)
+- Excluded from dependency cruiser checks (via `exclude` patterns)

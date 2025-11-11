@@ -1,3 +1,13 @@
+---
+description: Extract TypeScript types from contract.d.ts and helpers
+alwaysApply: false
+tags: [types, contract]
+appliesTo: ["**/*"]
+owner: prisma-next-docs
+lastUpdated: 2025-11-10
+severity: info
+---
+
 # Type Extraction from Contract
 
 ## Pattern

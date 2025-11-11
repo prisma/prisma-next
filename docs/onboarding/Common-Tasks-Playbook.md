@@ -1,0 +1,14 @@
+# Common Tasks Playbook
+
+Add SQL Operation
+- Plan: `.cursor/plans/add-sql-operation.md`
+- See: `packages/sql/sql-runtime`, `packages/targets/sql`, rulecards in `.cursor/rules`
+
+Split Monolith into Modules
+- Plan: `.cursor/plans/split-into-modules.md`
+- See: `.cursor/rules/modular-refactoring-patterns.mdc`, `no-barrel-files.mdc`
+
+Fix Import Violation
+- Plan: `.cursor/plans/fix-import-violation.md`
+- See: `.cursor/rules/import-validation.mdc`, `architecture.config.json`
+
