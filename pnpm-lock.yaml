@@ -47,9 +47,15 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/targets/postgres-driver
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../packages/sql/authoring/sql-contract-ts
       '@prisma-next/sql-lane':
         specifier: workspace:*
         version: link:../../packages/sql/lanes/sql-lane
+      '@prisma-next/sql-orm-lane':
+        specifier: workspace:*
+        version: link:../../packages/sql/lanes/orm-lane
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../packages/sql/lanes/relational-core
@@ -102,6 +108,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/targets/postgres-driver
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../packages/sql/authoring/sql-contract-ts
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../packages/sql/sql-runtime
@@ -909,6 +918,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../packages/sql/sql-runtime
+      '@prisma-next/sql-tooling-assembly':
+        specifier: workspace:*
+        version: link:../../packages/sql/tooling/assembly
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
