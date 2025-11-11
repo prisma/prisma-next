@@ -9,7 +9,7 @@
 
 import config from './architecture.config.json' with { type: 'json' };
 
-const { packages: packageConfigs, layerOrder } = config;
+const { packages: packageConfigs, layerOrder, planeRules } = config;
 
 const normalizeGlob = (glob) => {
   let pattern = glob.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
@@ -48,6 +48,12 @@ const getLayerIndex = (domain, layer) => {
 
 const describeGroup = (group) => `${group.domain}/${group.layer}/${group.plane}`;
 const groupPattern = (group) => group.patterns.join('|');
+
+const matchesGlobPattern = (group, pattern) => {
+  const normalizedPattern = normalizeGlob(pattern);
+  const regex = new RegExp(normalizedPattern);
+  return group.globs.some((glob) => regex.test(glob));
+};
 
 const forbidden = [];
 
@@ -152,45 +158,40 @@ const createCrossDomainRules = () => {
 };
 
 const createPlaneRules = () => {
-  for (const sourceGroup of moduleGroups) {
-    if (sourceGroup.plane !== 'migration') continue;
+  if (!planeRules) return;
 
-    for (const targetGroup of moduleGroups) {
-      if (targetGroup.plane !== 'runtime') continue;
-      pushRule(
-        `migration-to-runtime-${sourceGroup.domain}-${sourceGroup.layer}-to-${targetGroup.layer}`,
-        `Migration → Runtime: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)}`,
-        sourceGroup,
-        targetGroup,
-      );
-    }
-  }
+  for (const [sourcePlaneName, planeRule] of Object.entries(planeRules)) {
+    if (!planeRule.forbid || planeRule.forbid.length === 0) continue;
 
-  for (const sourceGroup of moduleGroups) {
-    if (sourceGroup.plane !== 'runtime') continue;
+    for (const sourceGroup of moduleGroups) {
+      if (sourceGroup.plane !== sourcePlaneName) continue;
 
-    for (const targetGroup of moduleGroups) {
-      if (targetGroup.plane !== 'migration') continue;
+      for (const forbiddenPlaneName of planeRule.forbid) {
+        for (const targetGroup of moduleGroups) {
+          if (targetGroup.plane !== forbiddenPlaneName) continue;
 
-      // SQL contract types are now in shared plane (sql/contract), so runtime/lanes/adapters can import from shared
-      // No exception needed - runtime imports from shared, not targets
+          // Check if this import is allowed by an exception
+          const isException = planeRule.exceptions?.some((exception) => {
+            const sourceMatches = matchesGlobPattern(sourceGroup, exception.from);
+            const targetMatches = matchesGlobPattern(targetGroup, exception.to);
+            return sourceMatches && targetMatches;
+          });
 
-      // Extensions share compatibility layers with SQL targets tonight; revisit when the plane is decoupled
-      if (isExtensionsToSqlTargets(sourceGroup, targetGroup)) {
-        continue;
+          if (isException) continue;
+
+          const sourcePlaneLabel =
+            sourcePlaneName.charAt(0).toUpperCase() + sourcePlaneName.slice(1);
+          const targetPlaneLabel =
+            forbiddenPlaneName.charAt(0).toUpperCase() + forbiddenPlaneName.slice(1);
+
+          pushRule(
+            `plane-${sourcePlaneName}-to-${forbiddenPlaneName}-${sourceGroup.key}-to-${targetGroup.key}`,
+            `${sourcePlaneLabel} → ${targetPlaneLabel}: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)}`,
+            sourceGroup,
+            targetGroup,
+          );
+        }
       }
-
-      // TODO: compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API
-      if (isCompatPrismaToSql(sourceGroup, targetGroup)) {
-        continue;
-      }
-
-      pushRule(
-        `runtime-to-migration-${sourceGroup.domain}-${sourceGroup.layer}-to-${targetGroup.layer}`,
-        `Runtime → Migration: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)} (artifacts are consumed out of band)`,
-        sourceGroup,
-        targetGroup,
-      );
     }
   }
 };
