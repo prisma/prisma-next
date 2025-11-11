@@ -1,12 +1,13 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(__dirname, '../../../../../');
+const testWorkingDir = join(__dirname, 'emit-config-test-app');
 
 function createConfigFileContent(): string {
   // Use absolute paths to dist files to avoid import resolution issues in temp directories
@@ -36,118 +37,153 @@ export default defineConfig({
 }
 
 describe('emit command with config', () => {
-  let testDir: string;
-  let contractPath: string;
-  let outputDir: string;
-  let configPath: string;
+  const contractPath = join(testWorkingDir, 'contract.ts');
+  const outputDir = join(testWorkingDir, 'output');
+  const configPath = join(testWorkingDir, 'prisma-next.config.ts');
 
-  beforeEach(() => {
-    testDir = join(tmpdir(), `prisma-next-emit-config-test-${Date.now()}`);
-    mkdirSync(testDir, { recursive: true });
+  // Set up working directory with contract.ts before tests run
+  beforeAll(() => {
+    mkdirSync(testWorkingDir, { recursive: true });
 
-    contractPath = join(testDir, 'contract.ts');
-    outputDir = join(testDir, 'output');
-    configPath = join(testDir, 'prisma-next.config.ts');
-
-    // Create a minimal contract file
+    // Create contract.ts file
     writeFileSync(
       contractPath,
       `import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
-export const contract = defineContract<CodecTypes>()
+const contractObj = defineContract<CodecTypes>()
   .target('postgres')
   .table('user', (t) =>
     t
-      .column('id', 'int4', { nullable: false })
-      .column('email', 'text', { nullable: false })
+      .column('id', { type: 'pg/int4@1', nullable: false })
+      .column('email', { type: 'pg/text@1', nullable: false })
       .primaryKey(['id']),
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
   .build();
+
+export const contract = {
+  ...contractObj,
+  extensions: {
+    postgres: {
+      version: '15.0.0',
+    },
+    pg: {},
+  },
+};
 `,
       'utf-8',
     );
   });
 
   afterEach(() => {
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
+    // Clean up output directory and config file after each test
+    if (existsSync(outputDir)) {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+    if (existsSync(configPath)) {
+      rmSync(configPath, { force: true });
     }
   });
 
-  it('emits contract with config file', async () => {
-    // Create config file with absolute paths
-    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
-
-    const command = createEmitCommand();
-    const originalCwd = process.cwd();
-    try {
-      process.chdir(testDir);
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--config',
-        configPath,
-      ]);
-    } finally {
-      process.chdir(originalCwd);
-    }
-
-    expect(existsSync(join(outputDir, 'contract.json'))).toBe(true);
-    expect(existsSync(join(outputDir, 'contract.d.ts'))).toBe(true);
-  });
-
-  it('emits contract with default config path', async () => {
-    // Create config file at default location with absolute paths
-    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
-
-    const command = createEmitCommand();
-    // Change to testDir so default config path resolves
-    const originalCwd = process.cwd();
-    try {
-      process.chdir(testDir);
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        'contract.ts',
-        '--out',
-        'output',
-      ]);
-      expect(existsSync(join(testDir, 'output', 'contract.json'))).toBe(true);
-      expect(existsSync(join(testDir, 'output', 'contract.d.ts'))).toBe(true);
-    } finally {
-      process.chdir(originalCwd);
+  afterAll(() => {
+    // Clean up test working directory after all tests
+    if (existsSync(testWorkingDir)) {
+      rmSync(testWorkingDir, { recursive: true, force: true });
     }
   });
+
+  it(
+    'emits contract with config file',
+    async () => {
+      // Create config file with absolute paths
+      writeFileSync(configPath, createConfigFileContent(), 'utf-8');
+
+      const command = createEmitCommand();
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testWorkingDir);
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          'contract.ts',
+          '--out',
+          'output',
+          '--config',
+          'prisma-next.config.ts',
+        ]);
+      } finally {
+        try {
+          process.chdir(originalCwd);
+        } catch {
+          // Ignore if directory was cleaned up
+        }
+      }
+
+      expect(existsSync(join(outputDir, 'contract.json'))).toBe(true);
+      expect(existsSync(join(outputDir, 'contract.d.ts'))).toBe(true);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'emits contract with default config path',
+    async () => {
+      // Create config file at default location with absolute paths
+      writeFileSync(configPath, createConfigFileContent(), 'utf-8');
+
+      const command = createEmitCommand();
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testWorkingDir);
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          'contract.ts',
+          '--out',
+          'output',
+        ]);
+        expect(existsSync(join(testWorkingDir, 'output', 'contract.json'))).toBe(true);
+        expect(existsSync(join(testWorkingDir, 'output', 'contract.d.ts'))).toBe(true);
+      } finally {
+        try {
+          process.chdir(originalCwd);
+        } catch {
+          // Ignore if directory was cleaned up
+        }
+      }
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('throws error when config file is missing', async () => {
     const command = createEmitCommand();
     const originalCwd = process.cwd();
     try {
-      process.chdir(testDir);
+      process.chdir(testWorkingDir);
       await expect(
         command.parseAsync([
           'node',
           'cli.js',
           'emit',
           '--contract',
-          contractPath,
+          'contract.ts',
           '--out',
-          outputDir,
+          'output',
           '--config',
-          join(testDir, 'nonexistent.config.ts'),
+          'nonexistent.config.ts',
         ]),
       ).rejects.toThrow();
     } finally {
-      process.chdir(originalCwd);
+      try {
+        process.chdir(originalCwd);
+      } catch {
+        // Ignore if directory was cleaned up
+      }
     }
   });
 });
