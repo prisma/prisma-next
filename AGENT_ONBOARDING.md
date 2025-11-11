@@ -62,8 +62,8 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives in the SQL lanes ring
 - **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-executor with SQL adapters
 - **`@prisma-next/runtime-executor`** - Target-agnostic execution engine (verification, plugin lifecycle, telemetry)
-- **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers (core ring)
-- **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly (targets ring)
+- **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers (core ring, shared plane)
+- **`@prisma-next/sql-operations`** - SQL-specific operation types and registry helpers (sql/core layer, shared plane). Manifest assembly happens in CLI layer.
 - **`@prisma-next/sql-contract-types`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) (targets ring)
 - **`@prisma-next/sql-contract-emitter`** - SQL emitter hook implementation (targets ring)
 - **`@prisma-next/sql-target`** - SQL target family abstraction with transitional re-exports (will be removed in Slice 7). Provides backward-compatible re-exports from `@prisma-next/sql-contract-types`, `@prisma-next/sql-operations`, `@prisma-next/sql-contract-emitter`, and `@prisma-next/operations`
@@ -92,7 +92,7 @@ The repository is organized by **Domains → Layers → Planes**:
 
 **SQL Domain (Target‑Family)** (`packages/sql/**` and `packages/targets/sql/**`):
 - Family‑level types and schema: `@prisma-next/sql-contract-types` (dialect‑agnostic contract shapes)
-- Family‑level operations: `@prisma-next/sql-operations` (operation specs/registry)
+- Family‑level operations: `@prisma-next/sql-operations` (operation types/registry helpers, shared plane). Manifest assembly happens in CLI layer.
 - Family emitter hook: `@prisma-next/sql-contract-emitter` (`sqlTargetFamilyHook`)
 - Contract authoring (SQL family): `@prisma-next/sql-contract-ts` (`packages/sql/authoring/sql-contract-ts`), composes `@prisma-next/contract-authoring` + family types
 
@@ -596,21 +596,26 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
 
 **Key Design Decisions:**
 - **Target Family Hooks**: Each target family implements `TargetFamilyHook` with:
-  - `validateTypes`: Validates all type IDs come from referenced extensions
+  - `validateTypes`: Validates all type IDs come from referenced extensions (receives `ValidationContext` with `operationRegistry` and `extensionIds`)
   - `validateStructure`: Family-specific structural validation
-  - `generateContractTypes`: Generates `contract.d.ts` content
-  - `getTypesImports`: Determines required type imports from packs
+  - `generateContractTypes`: Generates `contract.d.ts` content (receives separate `codecTypeImports` and `operationTypeImports` arrays, not packs)
+- **Manifest-Agnostic Emitter**: The emitter is completely manifest-agnostic. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI, not extension packs. Manifest parsing and assembly happens in the CLI layer (`packages/framework/tooling/cli/src/pack-assembly.ts`). The emitter does not export pack loading functions or manifest types - pack loading and manifest types are CLI-only.
 - **Adapters as Extension Packs**: Adapters are treated identically to extension packs. Both use the same manifest structure (`packs/manifest.json`) with:
   - `types.codecTypes.import`: Package/named/alias for importing `CodecTypes`
+  - `types.operationTypes.import`: Package/named/alias for importing `OperationTypes`
+  - `operations`: Array of operation manifests that are assembled into `OperationRegistry` by the CLI
 - **Type Canonicalization**: Type canonicalization (shorthand → fully qualified IDs) happens at **authoring time** (PSL parser or TS builder), **not during emission**. The emitter only validates that all type IDs come from referenced extensions.
 - **I/O Decoupling**: The emitter is decoupled from file I/O. `emit()` returns strings (`contractJson`, `contractDts`); the caller handles all file operations.
 - **No Adapter Special Treatment**: The emitter treats all extension packs uniformly. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
+- **CLI Assembly**: The CLI loads extension packs using `loadExtensionPacks()` from `packages/framework/tooling/cli/src/pack-loading.ts`, assembles operation registries from manifests using `assembleOperationRegistryFromPacks()`, extracts codec type imports using `extractCodecTypeImports()`, extracts operation type imports using `extractOperationTypeImports()`, and extracts extension IDs using `extractExtensionIds()` before calling the emitter. This keeps manifest parsing and assembly logic in the tooling layer, not in shared/emitter core. Type imports are split into separate arrays at the CLI boundary, not in the hook.
 
 **Implementation:**
-- Core emitter: `packages/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
+- Core emitter: `packages/framework/tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
 - Target family SPI: The `emit()` function accepts a `targetFamily: TargetFamilyHook` parameter directly. Authoring surfaces (CLI, tests) determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry or auto-registration.
-- SQL target family SPI: `packages/targets/sql/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source). Transitional re-export available from `@prisma-next/sql-target` during migration (Slice 5-7).
-- Extension pack loading: `packages/emitter/src/extension-pack.ts` - loads manifests (uses local file I/O utilities)
+- SQL target family SPI: `packages/targets/sql/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
+- Extension pack loading: `packages/framework/tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
+- Manifest types: `packages/framework/tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
+- CLI pack assembly: `packages/framework/tooling/cli/src/pack-assembly.ts` - assembles operation registries from extension packs and extracts separate codec/operation type imports
 
 **Outputs:**
 - `contract.json`: Canonical JSON with `coreHash` and `profileHash`, all column types as fully qualified IDs (`ns/name@version`). Includes `_generated` metadata field to indicate it's a generated artifact (excluded from canonicalization/hashing).
@@ -1667,28 +1672,18 @@ const joinedPlan = sql
   .build({ params: { active: true } });
 ```
 
-**Emit a contract:**
+**Emit a contract (consumer-provided packs):**
 ```typescript
 import { emit } from '@prisma-next/emitter';
-import { loadExtensionPacks } from '@prisma-next/emitter';
-import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target'; // During migration (Slice 5-7), use transitional re-export. After Slice 7, import from '@prisma-next/sql-contract-emitter' directly.
+import type { ContractIR } from '@prisma-next/emitter';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import pgVectorExt from '@prisma-next/ext-pgvector';
 
-// Load extension packs (adapter + extensions)
-const packs = loadExtensionPacks(
-  './packages/adapter-postgres',
-  ['./packages/extension-pack']
-);
+// Consumer imports/instantiates the packs explicitly
+const packs = [pgVectorExt()];
 
-// Determine target family SPI based on contract's targetFamily
-// For SQL contracts, use sqlTargetFamilyHook
-const targetFamily = sqlTargetFamilyHook;
-
-// Emit contract (returns strings, caller handles file I/O)
-const result = await emit(ir, {
-  outputDir: './dist',
-  packs,
-}, targetFamily);
+// Emitter is family-agnostic; hook assembles operations from provided packs
+const result = await emit(ir, { outputDir: './dist', packs }, sqlTargetFamilyHook);
 
 // Write files (caller responsibility)
 await writeFile('./contract.json', result.contractJson);

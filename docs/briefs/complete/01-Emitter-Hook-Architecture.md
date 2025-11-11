@@ -36,25 +36,35 @@ Refactor the emitter to a hook-based architecture keyed by `targetFamily` (e.g.,
 File: `packages/emitter/src/target-family.ts`
 
 ```ts
+export interface ValidationContext {
+  readonly operationRegistry?: OperationRegistry;
+  readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
+  readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
+  readonly extensionIds?: ReadonlyArray<string>;
+}
+
 export interface TargetFamilyHook {
   // family id e.g. 'sql'
   readonly id: string;
 
   // Validate that all type IDs in the contract come from referenced extensions
-  validateTypes(ir: ContractIR, packManifests: ExtensionPackManifest[]): void;
+  validateTypes(ir: ContractIR, ctx: ValidationContext): void;
 
   // Additional family-specific structural validation over core checks
   validateStructure(ir: ContractIR): void;
 
   // Generate the complete contract.d.ts content for this family
-  generateContractTypes(ir: ContractIR, packs: ExtensionPack[]): string;
-
-  // Return types-only imports needed for .d.ts (e.g., adapter/pack CodecTypes)
-  getTypesImports(packs: ExtensionPack[]): TypesImportSpec[];
+  generateContractTypes(
+    ir: ContractIR,
+    codecTypeImports: ReadonlyArray<TypesImportSpec>,
+    operationTypeImports: ReadonlyArray<TypesImportSpec>,
+  ): string;
 }
 ```
 
-Core types (emitter): `ExtensionPackManifest`, `ExtensionPack`, `ContractIR`, `TypesImportSpec`, `EmitOptions`.
+**Note**: The emitter is manifest-agnostic. Hooks receive pre-assembled context (`ValidationContext` with `operationRegistry`, `codecTypeImports`, `operationTypeImports`, `extensionIds`), not extension packs. Manifest parsing and assembly happens in the CLI layer.
+
+Core types (emitter): `ContractIR`, `TypesImportSpec`, `EmitOptions`, `ValidationContext`, `TargetFamilyHook`.
 
 ### Treat Adapters as Extension Packs
 

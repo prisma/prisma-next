@@ -9,18 +9,16 @@ This package provides the SQL-specific emitter hook implementation for the Prism
 ## Responsibilities
 
 - **Contract Validation**: Validates SQL contract structure and types
-  - `validateTypes()`: Validates type IDs against extensions and packs
+  - `validateTypes()`: Validates type IDs against referenced extensions (receives `ValidationContext` with `extensionIds`)
   - `validateStructure()`: Validates SQL-specific contract structure (tables, models, constraints)
 
 - **Type Generation**: Generates TypeScript type definitions for SQL contracts
-  - `generateContractTypes()`: Generates `contract.d.ts` file content
-  - `getCodecTypesImports()`: Determines required codec type imports from packs
-  - `getOperationTypesImports()`: Determines required operation type imports from packs
+  - `generateContractTypes()`: Generates `contract.d.ts` file content (receives separate `codecTypeImports` and `operationTypeImports` arrays)
 
 ## Dependencies
 
 - **Depends on**:
-  - `@prisma-next/emitter` (contract IR and extension pack types)
+  - `@prisma-next/emitter` (contract IR, `TargetFamilyHook` SPI, `ValidationContext`, `TypesImportSpec`)
   - `@prisma-next/sql-contract` (SQL contract type definitions)
 - **Depended on by**:
   - `@prisma-next/cli` (uses for contract emission)
