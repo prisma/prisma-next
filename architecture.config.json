@@ -67,12 +67,6 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/postgres/**",
-      "domain": "sql",
-      "layer": "adapters",
-      "plane": "runtime"
-    },
-    {
       "glob": "packages/compat/**",
       "domain": "sql",
       "layer": "adapters",
