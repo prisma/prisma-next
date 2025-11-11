@@ -55,9 +55,20 @@ The SQL domain contains SQL-specific packages organized by layer:
 |-- runtime (runtime plane)
 |   |-- @prisma-next/sql-runtime
 |-- adapters (runtime plane)
-    |-- @prisma-next/adapter-postgres
     |-- @prisma-next/driver-postgres
     |-- @prisma-next/compat-prisma
+```
+
+### Targets Domain (Extension Packs)
+
+The targets domain contains concrete target extension packs (e.g., Postgres, MySQL):
+
+```
+* targets
+|-- sql/postgres (migration plane)
+|   |-- @prisma-next/targets-postgres
+|-- postgres-adapter (multi-plane: shared, migration, runtime)
+    |-- @prisma-next/adapter-postgres
 ```
 
 ### Layer Structure
@@ -380,15 +391,31 @@ Dependency Cruiser:
 
 When adding a new package:
 
-1. **Choose the correct domain** (framework or target family like sql)
+1. **Choose the correct domain** (framework or target family like sql, or targets for extension packs)
 2. **Choose the correct layer** based on dependencies and purpose
-3. **Choose the correct plane** (migration or runtime)
+3. **Choose the correct plane** (migration, runtime, or shared)
 4. **Follow naming conventions** - use hyphenated names, encode family in prefix
 5. **Add package mapping** to `architecture.config.json` with domain/layer/plane
+   - For multi-plane packages, add separate globs for each plane (e.g., `src/core/**` for shared, `src/exports/cli.ts` for migration, `src/exports/runtime.ts` for runtime)
 6. **Add path aliases** to `tsconfig.base.json` mapping published name to source
 7. **Add workspace pattern** to `pnpm-workspace.yaml` if needed
 8. **Create README.md** documenting purpose, dependencies, and architecture with domain/layer/plane labels
 9. **Run import check** to verify no violations
+
+## Multi-Plane Packages
+
+Some packages span multiple planes (e.g., adapters that have both CLI entry points and runtime code). These packages use a structured layout:
+
+- **`src/core/**`**: Shared plane code that can be imported by both migration and runtime planes
+- **`src/exports/cli.ts`**: Migration plane entry point (CLI descriptors)
+- **`src/exports/runtime.ts`**: Runtime plane entry point (runtime factories)
+
+**Example:** `@prisma-next/adapter-postgres` spans three planes:
+- `packages/targets/postgres-adapter/src/core/**` → domain: `targets`, layer: `adapters`, plane: `shared`
+- `packages/targets/postgres-adapter/src/exports/cli.ts` → domain: `targets`, layer: `adapters`, plane: `migration`
+- `packages/targets/postgres-adapter/src/exports/runtime.ts` → domain: `targets`, layer: `adapters`, plane: `runtime`
+
+This structure allows the same package to provide both CLI configuration (migration plane) and runtime implementation (runtime plane) while keeping shared code (core) accessible to both.
 
 ## Migration Notes
 

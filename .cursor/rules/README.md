@@ -17,6 +17,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 ## Imports & Layering
 - `.cursor/rules/import-validation.mdc` — Layering rules and exceptions
 - `.cursor/rules/shared-plane-packages.mdc` — Pattern for creating shared plane packages
+- `.cursor/rules/multi-plane-packages.mdc` — Packages that span multiple planes (shared, migration, runtime)
 - `.cursor/rules/declarative-config.mdc` — Prefer declarative configuration over hardcoded logic
 - `architecture.config.json` — Domain/Layer/Plane map
 
@@ -48,4 +49,3 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.
 - Keep `alwaysApply` minimal—default to scoped rules with `appliesTo` in frontmatter.
-

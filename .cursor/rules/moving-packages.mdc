@@ -74,14 +74,17 @@ const packs = loadExtensionPacks(join(__dirname, '../../../packages/sql/runtime/
 
 ## Checklist When Moving Packages
 
-1. **Update `tsconfig.json`** - `extends` path to `tsconfig.base.json`
-2. **Update `package.json`** - All script paths (`biome.json`, `clean.mjs`, etc.)
+1. **Update `tsconfig.json`** - `extends` path to `tsconfig.base.json` (count directory depth to root)
+2. **Update `package.json`** - All script paths (`biome.json`, `clean.mjs`, etc.) based on new depth
 3. **Update test files** - Paths to other packages, fixtures, manifests
 4. **Update `pnpm-workspace.yaml`** - Add/remove package globs if needed
 5. **Update `architecture.config.json`** - Add/remove package entries
-6. **Update `dependency-cruiser.config.mjs`** - Update exclude patterns if needed
-7. **Update CI workflows** - Update any hardcoded paths
-8. **Update documentation** - READMEs, AGENTS.md, etc.
+   - For multi-plane packages, add separate globs for each plane (see `.cursor/rules/multi-plane-packages.mdc`)
+6. **Update `tsconfig.base.json`** - Update path mappings and project references
+7. **Update `dependency-cruiser.config.mjs`** - Update exclude patterns if needed
+8. **Update CI workflows** - Update any hardcoded paths
+9. **Update documentation** - READMEs, AGENTS.md, etc.
+10. **Update relative paths in source files** - Manifest paths, import paths, etc.
 
 ## Verification
 
