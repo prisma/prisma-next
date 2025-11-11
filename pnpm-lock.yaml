@@ -317,18 +317,21 @@ importers:
 
   packages/framework/tooling/cli:
     dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../core-contract
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../sql/contract
       '@prisma-next/sql-contract-emitter':
         specifier: workspace:*
         version: link:../../../targets/sql/emitter
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../sql/authoring/sql-contract-ts
-      '@prisma-next/sql-contract-types':
-        specifier: workspace:*
-        version: link:../../../targets/sql/contract-types
       commander:
         specifier: ^12.0.0
         version: 12.1.0
@@ -360,6 +363,9 @@ importers:
 
   packages/framework/tooling/emitter:
     dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../core-contract
       arktype:
         specifier: ^2.0.0
         version: 2.1.25
@@ -391,9 +397,9 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:*
         version: link:../../../framework/authoring/contract-authoring
-      '@prisma-next/sql-contract-types':
+      '@prisma-next/sql-contract':
         specifier: workspace:*
-        version: link:../../../targets/sql/contract-types
+        version: link:../../contract
       arktype:
         specifier: ^2.1.25
         version: 2.1.25
@@ -496,9 +502,9 @@ importers:
       '@prisma-next/plan':
         specifier: workspace:*
         version: link:../../../framework/core-plan
-      '@prisma-next/sql-contract-types':
+      '@prisma-next/sql-contract':
         specifier: workspace:*
-        version: link:../../../targets/sql/contract-types
+        version: link:../../contract
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../../targets/sql/operations
@@ -570,12 +576,12 @@ importers:
 
   packages/sql/runtime/adapters/postgres:
     dependencies:
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../authoring/sql-contract-ts
-      '@prisma-next/sql-contract-types':
-        specifier: workspace:*
-        version: link:../../../../targets/sql/contract-types
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../../../targets/sql/operations
@@ -598,9 +604,9 @@ importers:
 
   packages/sql/runtime/drivers/postgres:
     dependencies:
-      '@prisma-next/sql-contract-types':
+      '@prisma-next/sql-contract':
         specifier: workspace:*
-        version: link:../../../../targets/sql/contract-types
+        version: link:../../../contract
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../../../targets/sql/operations
@@ -644,9 +650,9 @@ importers:
       '@prisma-next/runtime-core':
         specifier: workspace:*
         version: link:../../framework/runtime-core
-      '@prisma-next/sql-contract-types':
+      '@prisma-next/sql-contract':
         specifier: workspace:*
-        version: link:../../targets/sql/contract-types
+        version: link:../contract
     devDependencies:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
@@ -678,6 +684,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../framework/core-contract
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../sql/contract
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -697,9 +706,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../../framework/tooling/emitter
-      '@prisma-next/sql-contract-types':
+      '@prisma-next/sql-contract':
         specifier: workspace:*
-        version: link:../contract-types
+        version: link:../../../sql/contract
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

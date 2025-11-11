@@ -1,6 +1,6 @@
 import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   BinaryExpr,
   ExistsExpr,

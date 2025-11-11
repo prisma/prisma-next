@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/emitter';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 

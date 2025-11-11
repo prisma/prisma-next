@@ -1,5 +1,5 @@
 import { planInvalid } from '@prisma-next/plan';
-import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { OrmModelBuilderImpl } from './orm/builder';
 import type { OrmBuilderOptions, OrmRegistry } from './orm-types';
 

@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/emitter';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
@@ -78,7 +78,7 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, []);
     expect(types).toContain(
-      "import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-contract-types';",
+      "import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-contract/types';",
     );
     expect(types).not.toContain("from './contract-types'");
   });

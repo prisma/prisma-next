@@ -1,7 +1,7 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import { hasAllCapabilities } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
-import type { StorageColumn } from '@prisma-next/sql-contract-types';
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { OperationSignature } from '@prisma-next/sql-operations';
 import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from './ast/types';
 import type { AnyColumnBuilder, ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';

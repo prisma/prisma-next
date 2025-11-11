@@ -8,7 +8,7 @@ import type {
   SqlContract,
   SqlStorage,
   StorageColumn,
-} from '@prisma-next/sql-contract-types';
+} from '@prisma-next/sql-contract/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { TableRef } from './ast/types';
 import { attachOperationsToColumnBuilder } from './operations-registry';

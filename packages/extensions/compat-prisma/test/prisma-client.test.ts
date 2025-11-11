@@ -2,8 +2,8 @@ import type { StartServerOptions } from '@prisma/dev';
 import { unstable_startServer } from '@prisma/dev';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import {
   createRuntime,
   createRuntimeContext,

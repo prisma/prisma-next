@@ -1,4 +1,5 @@
-import type { ContractIR, ExtensionPackManifest } from '@prisma-next/emitter';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ExtensionPackManifest } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 

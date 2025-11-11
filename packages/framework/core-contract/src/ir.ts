@@ -1,4 +1,29 @@
-import type { ContractIR } from './types';
+/**
+ * ContractIR types and factories for building contract intermediate representation.
+ * ContractIR is family-agnostic and used by authoring, emitter, and no-emit runtime.
+ */
+
+/**
+ * ContractIR represents the intermediate representation of a contract.
+ * It is family-agnostic and contains generic storage, models, and relations.
+ * Note: coreHash and profileHash are computed by the emitter, not part of the IR.
+ */
+export interface ContractIR<
+  TStorage extends Record<string, unknown> = Record<string, unknown>,
+  TModels extends Record<string, unknown> = Record<string, unknown>,
+  TRelations extends Record<string, unknown> = Record<string, unknown>,
+> {
+  readonly schemaVersion: string;
+  readonly targetFamily: string;
+  readonly target: string;
+  readonly models: TModels;
+  readonly relations: TRelations;
+  readonly storage: TStorage;
+  readonly extensions: Record<string, unknown>;
+  readonly capabilities: Record<string, Record<string, boolean>>;
+  readonly meta: Record<string, unknown>;
+  readonly sources: Record<string, unknown>;
+}
 
 /**
  * Creates the header portion of a ContractIR.
@@ -74,7 +99,7 @@ export function contractIR<
   storage: TStorage;
   models: TModels;
   relations: TRelations;
-}): ContractIR {
+}): ContractIR<TStorage, TModels, TRelations> {
   // ContractIR doesn't include coreHash or profileHash (those are computed by emitter)
   return {
     schemaVersion: opts.header.schemaVersion,

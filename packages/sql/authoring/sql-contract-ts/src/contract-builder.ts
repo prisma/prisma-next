@@ -21,7 +21,7 @@ import type {
   SqlContract,
   SqlMappings,
   SqlStorage,
-} from '@prisma-next/sql-contract-types';
+} from '@prisma-next/sql-contract/types';
 import { computeMappings } from './contract';
 
 /**

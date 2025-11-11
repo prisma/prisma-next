@@ -1,4 +1,4 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type { ParamPlaceholder, RawFactory } from '@prisma-next/sql-relational-core/types';
 import type { DeleteBuilder, InsertBuilder, UpdateBuilder } from '../sql/mutation-builder';

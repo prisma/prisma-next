@@ -1,6 +1,6 @@
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SelectAst, TableRef } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {

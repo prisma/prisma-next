@@ -1,6 +1,6 @@
 // Contract type definitions for contract-with-relations.json
 
-import type { SqlContract } from '@prisma-next/sql-contract-types';
+import type { SqlContract } from '@prisma-next/sql-contract/types';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
 // Contract type representing the contract data structure with relations

@@ -110,10 +110,8 @@ const createUpwardRules = () => {
       const targetIndex = getLayerIndex(targetGroup.domain, targetGroup.layer);
       if (sourceIndex === -1 || targetIndex === -1 || targetIndex <= sourceIndex) continue;
 
-      // TODO: authoring must reference target contract types until the CLI/SQL split finishes (docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4)
-      if (isSqlAuthoringToTargets(sourceGroup, targetGroup)) {
-        continue;
-      }
+      // SQL contract types are now in shared plane (sql/contract), so authoring can import from shared
+      // No exception needed - authoring imports from shared, not targets
 
       // TODO: lanes are currently aligned with runtime contracts; revisit once the runtime plane is further isolated
       if (isSqlLanesToRuntime(sourceGroup, targetGroup)) {
@@ -184,10 +182,8 @@ const createPlaneRules = () => {
     for (const targetGroup of moduleGroups) {
       if (targetGroup.plane !== 'migration') continue;
 
-      // TODO: SQL runtime/lanes/adapters still consume migration contracts; remove once artifacts are split (docs/briefs/package-layering/10-Adopt-Dependency-Cruiser.md)
-      if (isSqlRuntimeOrAdaptersToTargets(sourceGroup, targetGroup)) {
-        continue;
-      }
+      // SQL contract types are now in shared plane (sql/contract), so runtime/lanes/adapters can import from shared
+      // No exception needed - runtime imports from shared, not targets
 
       // Extensions share compatibility layers with SQL targets tonight; revisit when the plane is decoupled
       if (isExtensionsToSqlTargets(sourceGroup, targetGroup)) {

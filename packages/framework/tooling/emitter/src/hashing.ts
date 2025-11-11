@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { canonicalizeContract } from './canonicalization';
-import type { ContractIR } from './types';
 
 type ContractInput = {
   schemaVersion: string;

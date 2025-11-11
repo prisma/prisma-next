@@ -1,5 +1,4 @@
-import { irHeader, irMeta } from '../src/factories';
-import type { ContractIR } from '../src/types';
+import { type ContractIR, irHeader, irMeta } from '@prisma-next/contract/ir';
 
 /**
  * Factory function for creating ContractIR objects in tests.

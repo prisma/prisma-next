@@ -1,4 +1,4 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
 
 export interface SqlContext<TContract extends SqlContract<SqlStorage>> {

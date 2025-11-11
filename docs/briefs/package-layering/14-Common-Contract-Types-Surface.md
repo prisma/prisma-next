@@ -5,7 +5,7 @@ We need a single, shared‑plane surface for SQL family contract types and valid
 
 This slice establishes:
 - A SQL family package mirroring the framework’s `core-contract` layout, but for SQL: types, validators, and SQL‑specific IR factories in the shared plane.
-- Family‑agnostic IR factories in the framework’s tooling to construct `ContractIR` payloads for tests and emitters (no family specifics), avoiding upward imports from authoring.
+- Family‑agnostic IR types and factories in the framework’s shared plane (not tooling) to construct `ContractIR` payloads for tests, emitters, and no‑emit runtime. IR is useful beyond the emitter and belongs in shared core.
 
 ### Rationale and Prior Pain
 - Runtime imported migration‑plane packages for type information. This violated plane rules and forced dep‑cruise exceptions.
@@ -20,7 +20,7 @@ This slice makes structure and flow predictable: shared types/validators in a de
 - Types source: Move SQL contract type aliases from `packages/targets/sql/contract-types` into `packages/sql/contract/src/types.ts`. Keep `@prisma-next/sql-contract-types` as a transitional re‑export until all imports are updated.
 - Validators: Implement Arktype validators in `packages/sql/contract/src/validators.ts` (side‑effect free).
 - SQL IR factories: Implement in `packages/sql/contract/src/factories.ts` (pure, normalized builders for storage/tables/columns/models/relations/mappings/contracts).
-- Family‑agnostic IR factories: Implement in `packages/framework/tooling/emitter/src/factories.ts` and export as a public test helper. Rationale: `ContractIR` is part of the emitter surface; placing factories in tooling avoids an upward import from authoring to tooling.
+- Family‑agnostic IR model + factories: Implement in the framework shared plane under `packages/framework/core-contract` and export via `@prisma-next/contract/exports/ir`. Rationale: IR is pure data with value across planes, including no‑emit runtime; it should live alongside `ContractBase`/plan types, not in tooling. The emitter depends on IR; it may temporarily re‑export for migration.
 - Framework package boundaries remain: `framework/core-contract` stays family‑agnostic; `framework/authoring/contract-authoring` remains the generic builder DSL without importing tooling; `framework/authoring/contract-ts` is a thin TS‑first helper layer (no family specifics).
 
 ### Related Framework Packages (for clarity)
@@ -40,8 +40,9 @@ This slice makes structure and flow predictable: shared types/validators in a de
   - `src/validators.ts`: Arktype validators for structural checks.
   - `src/factories.ts`: IR builders for SQL storage/models/relations/mappings/contracts.
   - `src/exports/{types,validators,factories}.ts`: barrel exports mirroring framework style.
-- `packages/framework/tooling/emitter/src/factories.ts`
-  - Family‑agnostic `ContractIR` factories (headers/meta/capabilities/extensions), accepting family sections as generic payloads.
+- `packages/framework/core-contract/src/exports/ir.ts`
+  - Family‑agnostic `ContractIR` types and factories (headers/meta/capabilities/extensions), accepting family sections as generic payloads. Side‑effect free; shared plane.
+  - Temporary re‑export from emitter allowed to smooth migration.
 - Transitional re‑export in `@prisma-next/sql-contract-types` with a deprecation note.
 - Updated imports in authoring/emitter/lanes/runtime to point to `@prisma-next/sql-contract` (types/validators/factories) or the emitter factories for `ContractIR`.
 - Dep‑cruise config updated; exceptions for contract packages removed when green.
@@ -52,10 +53,10 @@ This slice makes structure and flow predictable: shared types/validators in a de
   - After: `@prisma-next/sql-contract/exports/types` (+ optional `exports/validators` for JSON validation helpers)
 - Emitter (SQL):
   - Before: `@prisma-next/sql-contract-types`, ad‑hoc `ContractIR` literals in tests
-  - After: `@prisma-next/sql-contract/exports/types|validators` and `@prisma-next/emitter/factories` for IR wrappers
+  - After: `@prisma-next/sql-contract/exports/types|validators` and `@prisma-next/contract/exports/ir` for IR wrappers
 - Lanes/Runtime (SQL):
   - Before: may import `@prisma-next/sql-contract-types` (migration plane) for compile‑time types
-  - After: `@prisma-next/sql-contract/exports/types` only; runtime ingests `contract.json` and validates via `exports/validators`
+  - After: `@prisma-next/sql-contract/exports/types` only; runtime ingests `contract.json` and validates via `exports/validators`. In no‑emit mode, runtime may construct transient IR via `@prisma-next/contract/exports/ir`.
 - Extensions (compat/adapters):
   - Before: may import `sql-contract-types`
   - After: `@prisma-next/sql-contract/exports/types|validators`; no migration‑plane imports
@@ -82,12 +83,12 @@ This slice makes structure and flow predictable: shared types/validators in a de
   - `storage(tables: Record<string, StorageTable>): SqlStorage`
   - `contract(opts: { target: string; coreHash: string; storage: SqlStorage; models?: Record<string, ModelDefinition>; relations?: Record<string, unknown>; mappings?: Partial<SqlMappings>; schemaVersion?: '1'; targetFamily?: 'sql'; profileHash?: string; capabilities?: Record<string, Record<string, boolean>>; extensions?: Record<string, unknown>; meta?: Record<string, unknown>; sources?: Record<string, unknown> }): SqlContract`
 
-4) `packages/framework/tooling/emitter/src/factories.ts` (family‑agnostic `ContractIR`)
-- Builders for emitter IR envelope (no SQL specifics):
+4) `packages/framework/core-contract/src/exports/ir.ts` (family‑agnostic `ContractIR`)
+- IR types + builders (no SQL specifics):
   - `irHeader({ target, targetFamily, coreHash, profileHash? })`
   - `irMeta({ capabilities?, extensions?, meta?, sources? })`
   - `contractIR<TStorage, TModels, TRelations>({ header, meta, storage, models, relations }): ContractIR`
-- Usage: compose SQL sections created via SQL factories with generic IR envelope for emitter tests.
+- Usage: compose SQL sections created via SQL factories with generic IR envelope for emitter tests and no‑emit runtime.
 
 ### Example Usage (sketches)
 SQL IR factories (builders):
@@ -108,9 +109,9 @@ const m = { User: model('user', { id: { column: 'id' }, email: { column: 'email'
 const c = contract({ target: 'postgres', coreHash: 'sha256:...', storage: s, models: m });
 ```
 
-Emitter IR factories:
+Emitter/Shared IR factories:
 ```
-import { contractIR, irHeader, irMeta } from '@prisma-next/emitter/factories';
+import { contractIR, irHeader, irMeta } from '@prisma-next/contract/exports/ir';
 import { storage, model } from '@prisma-next/sql-contract/exports/factories';
 
 const header = irHeader({ target: 'postgres', targetFamily: 'sql', coreHash: 'sha256:...' });
@@ -129,11 +130,11 @@ validateSqlContract(c); // throws on structural mismatch
 1. Create `packages/sql/contract` with types/validators/factories and exports barrels.
 2. Move type aliases from `packages/targets/sql/contract-types/src/index.ts` → `packages/sql/contract/src/types.ts`.
 3. Convert `@prisma-next/sql-contract-types` to a transitional re‑export of `@prisma-next/sql-contract/exports/types` and add a deprecation notice in its README.
-4. Add `framework/tooling/emitter/src/factories.ts` and export factories via the emitter’s public API for tests.
+4. Add `framework/core-contract/exports/ir.ts` with IR types + factories and export from `@prisma-next/contract`. Optionally, temporarily re‑export from emitter to smooth migration.
 5. Update imports:
    - Authoring (`packages/sql/authoring/sql-contract-ts`) → `@prisma-next/sql-contract/exports/types` (and optionally validators for JSON validation helper).
-   - SQL emitter (`packages/targets/sql/emitter`) → SQL types/validators from `@prisma-next/sql-contract/exports/*`; use emitter factories for `ContractIR` where applicable.
-   - Lanes/runtime: compile‑time type imports, if any, switch to `@prisma-next/sql-contract/exports/types`. Runtime continues to ingest `contract.json` and can validate via `validateSqlContract` when needed.
+   - SQL emitter (`packages/targets/sql/emitter`) → SQL types/validators from `@prisma-next/sql-contract/exports/*`; use shared IR factories from `@prisma-next/contract/exports/ir` where applicable.
+   - Lanes/runtime: compile‑time type imports, if any, switch to `@prisma-next/sql-contract/exports/types`. Runtime continues to ingest `contract.json` and can validate via `validateSqlContract`; in no‑emit, construct IR via `@prisma-next/contract/exports/ir`.
 6. Refactor tests:
    - Replace ad‑hoc IR literals with SQL factories + emitter IR factories; keep a few negative literal cases.
 7. Dependency Cruiser:

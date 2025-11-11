@@ -1,5 +1,5 @@
+import { contractIR, irHeader, irMeta } from '@prisma-next/contract/ir';
 import { describe, expect, it } from 'vitest';
-import { contractIR, irHeader, irMeta } from '../src/factories';
 
 describe('emitter factories', () => {
   describe('irHeader', () => {

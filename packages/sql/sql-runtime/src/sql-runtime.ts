@@ -10,7 +10,7 @@ import type {
   TelemetryOutcome,
 } from '@prisma-next/runtime-core';
 import { createRuntimeCore } from '@prisma-next/runtime-core';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   CodecRegistry,

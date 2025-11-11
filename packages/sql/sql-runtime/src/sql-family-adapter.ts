@@ -5,7 +5,7 @@ import type {
   RuntimeFamilyAdapter,
 } from '@prisma-next/runtime-core';
 import { runtimeError } from '@prisma-next/runtime-core';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { readContractMarker } from './sql-marker';
 
 class SqlMarkerReader implements MarkerReader {

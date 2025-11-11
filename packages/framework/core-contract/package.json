@@ -29,6 +29,10 @@
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
     },
+    "./ir": {
+      "types": "./dist/exports/ir.d.ts",
+      "import": "./dist/exports/ir.js"
+    },
     "./schema-document": "./schemas/data-contract-document-v1.json"
   }
 }

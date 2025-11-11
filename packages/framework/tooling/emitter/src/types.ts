@@ -49,19 +49,6 @@ export interface ExtensionPack {
   readonly path: string;
 }
 
-export interface ContractIR {
-  readonly schemaVersion: string;
-  readonly targetFamily: string;
-  readonly target: string;
-  readonly models: Record<string, unknown>;
-  readonly relations: Record<string, unknown>;
-  readonly storage: Record<string, unknown>;
-  readonly extensions: Record<string, unknown>;
-  readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly meta: Record<string, unknown>;
-  readonly sources: Record<string, unknown>;
-}
-
 export interface EmitOptions {
   readonly outputDir: string;
   readonly packs: ReadonlyArray<ExtensionPack>;

@@ -1,4 +1,5 @@
-import type { ContractIR, ExtensionPack, ExtensionPackManifest, TypesImportSpec } from './types';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ExtensionPack, ExtensionPackManifest, TypesImportSpec } from './types';
 
 export interface TargetFamilyHook {
   readonly id: string;

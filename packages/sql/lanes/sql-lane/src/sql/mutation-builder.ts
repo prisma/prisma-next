@@ -1,5 +1,5 @@
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   ColumnRef,

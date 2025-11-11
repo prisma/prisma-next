@@ -3,7 +3,7 @@ import type {
   SqlContract,
   SqlMappings,
   SqlStorage,
-} from '@prisma-next/sql-contract-types';
+} from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { computeMappings, normalizeContract, validateContract } from '../src/contract';
 
