@@ -12,6 +12,15 @@ Provides functions to assemble operation registries and extract type imports fro
 - **Type Import Extraction**: Extracts codec and operation type imports from descriptor manifests
 - **Extension ID Extraction**: Extracts extension IDs in deterministic order (adapter → target → extensions)
 
+## Dependencies
+
+- **`@prisma-next/cli`**: CLI descriptor types (`AdapterDescriptor`, `TargetDescriptor`, `ExtensionDescriptor`)
+- **`@prisma-next/emitter`**: Operation registry types (`OperationRegistry`)
+- **`@prisma-next/sql-operations`**: SQL operation types (`OperationSignature`)
+
+**Dependents:**
+- **`@prisma-next/family-sql`**: Uses assembly helpers to process SQL family descriptors
+
 ## Usage
 
 ```typescript

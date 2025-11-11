@@ -8,6 +8,13 @@ This package contains the target-agnostic contract authoring builder core for Pr
 
 This package provides generic builder primitives that can be composed with target-family specific types (e.g., SQL) to create contract authoring surfaces. It is part of the authoring ring and depends only on `@prisma-next/contract` and core packages.
 
+## Responsibilities
+
+- **Generic Builder Core**: Provides target-agnostic builder state types and builder classes (`TableBuilder`, `ModelBuilder`, `ContractBuilder`)
+- **State Management**: Manages builder state for tables, columns, models, and relations without target-specific logic
+- **Type Helpers**: Provides generic type-level helpers for transforming builder states into contract structures
+- **Composition Surface**: Enables target-family specific packages (e.g., `@prisma-next/sql-contract-ts`) to compose generic core with family-specific types
+
 ## Package Status
 
 This package was created in Phase 2 of the contract authoring extraction. It contains the extracted target-neutral builder core from `@prisma-next/sql-contract-ts`. The SQL layer (`@prisma-next/sql-contract-ts`) composes this generic core with SQL-specific types.

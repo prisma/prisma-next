@@ -6,6 +6,13 @@ SQL contract types, validators, and IR factories for Prisma Next.
 
 This package provides TypeScript type definitions, Arktype validators, and factory functions for constructing SQL contract structures. It is located in the **shared plane**, making it available to both migration-plane (authoring, emitter) and runtime-plane (lanes, runtime) packages.
 
+## Responsibilities
+
+- **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, `SqlMappings`) that extend framework-level contract types
+- **Contract Validation**: Provides Arktype-based validators for structural validation of SQL contracts, storage, and models
+- **IR Factories**: Provides pure factory functions for constructing contract IR structures in tests and authoring
+- **Shared Plane Access**: Enables both migration-plane and runtime-plane packages to import SQL contract types without violating plane boundaries
+
 ## Package Contents
 
 - **TypeScript Types**: Type definitions for `SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, and related types
@@ -121,6 +128,18 @@ flowchart TD
     FACTORIES --> AUTHORING
     FACTORIES --> EMITTER
 ```
+
+## Dependencies
+
+- **`@prisma-next/contract`**: Framework-level contract types (`ContractBase`)
+- **`arktype`**: Runtime validation library
+
+**Dependents:**
+- **`@prisma-next/sql-contract-ts`**: Uses SQL contract types and validators for authoring
+- **`@prisma-next/sql-contract-emitter`**: Uses SQL contract types for emission
+- **`@prisma-next/sql-query`**: Uses SQL contract types for query building
+- **`@prisma-next/sql-runtime`**: Uses SQL contract types for runtime execution
+- **`@prisma-next/sql-lane`**: Uses SQL contract types for lane operations
 
 ## Related Packages
 

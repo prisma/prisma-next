@@ -6,6 +6,13 @@ Data contract type definitions and JSON schema for Prisma Next.
 
 This package provides TypeScript type definitions and JSON Schemas for Prisma Next data contracts. The data contract is the canonical description of an application's data model and storage layout, independent of any specific query language or database target.
 
+## Responsibilities
+
+- **Core Contract Types**: Defines framework-level contract types (`ContractBase`, `Source`) that are shared across all target families
+- **Document Family Types**: Provides TypeScript types for document target family contracts (`DocumentContract`)
+- **JSON Schema Validation**: Provides JSON Schemas for validating contract structure in IDEs and tooling
+- **Type Guards**: Provides runtime type guards for narrowing contract types (`isDocumentContract`)
+
 The contract supports document target families:
 - **Document**: For document databases (MongoDB, Firestore, etc.)
 
@@ -179,6 +186,17 @@ flowchart TD
 - [ADR 006 - Dual Authoring Modes](../../docs/architecture%20docs/adrs/ADR%20006%20-%20Dual%20Authoring%20Modes.md)
 - [ADR 010 - Canonicalization Rules](../../docs/architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)
 - [ADR 021 - Contract Marker Storage](../../docs/architecture%20docs/adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md)
+
+## Dependencies
+
+This package has no runtime dependencies (pure types and schemas).
+
+**Dependents:**
+- **`@prisma-next/contract-authoring`**: Uses core contract types for authoring
+- **`@prisma-next/sql-contract`**: Extends core contract types for SQL family
+- **`@prisma-next/emitter`**: Uses contract types for emission
+- **`@prisma-next/runtime`**: Uses contract types for runtime execution
+- **`@prisma-next/sql-query`**: Uses contract types for query building
 
 ## Related Packages
 
