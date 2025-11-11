@@ -51,16 +51,17 @@ Framework (target‑agnostic)
 |       |-- @prisma-next/runtime-core (target-neutral execution kernel)
 ```
 
-SQL Target Family
+SQL Family
 
 ```
-* sql target family
+* sql family
 |-- authoring (migration plane)
 |   |-- @prisma-next/sql-contract-ts
-|-- targets (migration→runtime boundary)
-|   |-- @prisma-next/sql-contract-types
-|   |-- @prisma-next/sql-operations
+|-- tooling (migration plane)
 |   |-- @prisma-next/sql-contract-emitter
+|-- core (shared plane)
+|   |-- @prisma-next/sql-contract
+|   |-- @prisma-next/sql-operations
 |   |-- (legacy) @prisma-next/sql-target
 |-- lanes (runtime plane)
 |   |-- @prisma-next/sql-relational-core

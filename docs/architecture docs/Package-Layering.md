@@ -35,18 +35,19 @@ The framework domain contains target-agnostic packages that work across all targ
     |-- @prisma-next/runtime-executor
 ```
 
-### SQL Target Family Domain
+### SQL Family Domain
 
 The SQL domain contains SQL-specific packages organized by layer:
 
 ```
-* sql target family
+* sql family
 |-- authoring (migration plane)
 |   |-- @prisma-next/sql-contract-ts
-|-- targets (migration→runtime boundary)
-|   |-- @prisma-next/sql-contract-types
-|   |-- @prisma-next/sql-operations
+|-- tooling (migration plane)
 |   |-- @prisma-next/sql-contract-emitter
+|-- core (shared plane)
+|   |-- @prisma-next/sql-contract
+|   |-- @prisma-next/sql-operations
 |-- lanes (runtime plane)
 |   |-- @prisma-next/sql-relational-core
 |   |-- @prisma-next/sql-lane

@@ -66,7 +66,7 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/sql-operations`** - SQL-specific operation types and registry helpers (sql/core layer, shared plane). Manifest assembly happens in CLI layer.
 - **`@prisma-next/sql-contract-types`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) (targets ring)
 - **`@prisma-next/sql-contract-emitter`** - SQL emitter hook implementation (targets ring)
-- **`@prisma-next/sql-target`** - SQL target family abstraction with transitional re-exports (will be removed in Slice 7). Provides backward-compatible re-exports from `@prisma-next/sql-contract-types`, `@prisma-next/sql-operations`, `@prisma-next/sql-contract-emitter`, and `@prisma-next/operations`
+- **`@prisma-next/sql-target`** - SQL family abstraction with transitional re-exports (will be removed in Slice 7). Provides backward-compatible re-exports from `@prisma-next/sql-contract-types`, `@prisma-next/sql-operations`, `@prisma-next/sql-contract-emitter`, and `@prisma-next/operations`
 - **`@prisma-next/adapter-postgres`** - Postgres adapter implementation (extension pack)
 - **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
 - **`@prisma-next/compat-prisma`** - Compatibility layer for Prisma ORM import-swap
@@ -612,7 +612,7 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
 **Implementation:**
 - Core emitter: `packages/framework/tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
 - Target family SPI: The `emit()` function accepts a `targetFamily: TargetFamilyHook` parameter directly. Authoring surfaces (CLI, tests) determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry or auto-registration.
-- SQL target family SPI: `packages/sql/tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
+- SQL family SPI: `packages/sql/tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
 - Extension pack loading: `packages/framework/tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
 - Manifest types: `packages/framework/tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
 - CLI pack assembly: `packages/framework/tooling/cli/src/pack-assembly.ts` - assembles operation registries from extension packs and extracts separate codec/operation type imports
@@ -1557,7 +1557,7 @@ pnpm coverage:packages
 ### Recent Implementation (Completed)
 
 1. **Query Patterns Standard Practice** - Established standard practice of exporting `tables` from `query.ts` as a convenience export (`export const tables = schema.tables`). This improves DX by making code shorter and more readable (`tables.user` instead of `schema.tables.user`). Users can import `tables` directly and optionally extract table/column variables for reuse. Pattern documented in `.cursor/rules/query-patterns.mdc` and updated in `AGENT_ONBOARDING.md`.
-2. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL target family SPI (`sqlTargetFamilyHook`) lives in `sql-target` package. Adapters treated identically to extension packs.
+2. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL family SPI (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` under `packages/sql/tooling/emitter`. Adapters are treated identically to extension packs.
 3. **Type Canonicalization at Authoring Time** - Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission or validation. Emitter only validates type IDs come from referenced extensions.
 4. **Removed Canonicalization from validateContract** - `validateContract()` no longer performs canonicalization. Contracts must always have fully qualified type IDs (`pg/int4@1`, not `int4`). This enforces the design principle that canonicalization happens at authoring time, not during validation.
 5. **Removed canonicalScalarMap** - Extension pack manifests no longer include `canonicalScalarMap`. Type canonicalization happens at authoring time using extension manifests, not via a scalar map. This keeps manifests focused on type imports for code generation.

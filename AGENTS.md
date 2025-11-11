@@ -37,7 +37,7 @@ cd examples/todo-app && pnpm demo  # End-to-end demo
 - Contract‑first: we emit `contract.json` and `contract.d.ts` only; queries compile at runtime.
 - Modular packages with domain/layer/plane guardrails: `architecture.config.json`.
 - Use Arktype for validation; extract types via `.infer` where needed: `.cursor/rules/arktype-usage.mdc`.
-- Directory layout: the entire SQL target family (all layers and planes) lives under `packages/sql/**`. The top-level `packages/targets/**` is reserved for concrete target extension packs (e.g., Postgres, MySQL), not for family internals.
+- Directory layout: the entire SQL family (all layers and planes) lives under `packages/sql/**`. The top-level `packages/targets/**` is reserved for concrete target extension packs (e.g., Postgres, MySQL), not for family internals.
 
 ## Frequent Tasks
 - Add SQL operation: see `docs/briefs/complete` and `.cursor/plans/add-sql-operation.md` (template).

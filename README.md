@@ -210,7 +210,7 @@ For detailed information about package layering, see:
 - **`@prisma-next/emitter`** - Contract emission engine
 - **`@prisma-next/runtime-executor`** - Target-agnostic execution engine (verification, plugin lifecycle, telemetry)
 
-### SQL Target Family Domain
+### SQL Family Domain
 
 - **`@prisma-next/sql-contract-ts`** - SQL-specific TypeScript contract authoring surface
 - **`@prisma-next/sql-contract`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
