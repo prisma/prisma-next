@@ -4,7 +4,8 @@
  * Dependency Cruiser configuration for Prisma Next.
  *
  * It derives module groups from architecture.config.json and encodes the same-layer/
- * downward-only semantics plus specific temporary exceptions described in the layering docs.
+ * downward-only semantics. Plane import constraints are defined declaratively in
+ * architecture.config.json under `planeRules` rather than hardcoded here.
  */
 
 import config from './architecture.config.json' with { type: 'json' };

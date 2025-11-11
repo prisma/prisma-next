@@ -113,6 +113,12 @@
       "domain": "sql",
       "layer": "core",
       "plane": "shared"
+    },
+    {
+      "glob": "packages/sql/operations/**",
+      "domain": "sql",
+      "layer": "core",
+      "plane": "shared"
     }
   ],
   "rules": {

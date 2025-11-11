@@ -1,25 +1,24 @@
 {
-  "name": "@prisma-next/sql-operations",
+  "name": "@prisma-next/sql-operations-types",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "description": "SQL-specific operations for Prisma Next",
+  "description": "SQL operation type definitions for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
     "clean": "node ../../../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/emitter": "workspace:*",
     "@prisma-next/operations": "workspace:*"
   },
   "devDependencies": {
-    "@prisma-next/emitter": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
+    "@vitest/coverage-v8": "^2.1.1",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.1"
@@ -28,9 +27,9 @@
     "dist"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
     }
   }
 }
