@@ -1,5 +1,5 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriver } from '@prisma-next/driver-postgres';
+import { createPostgresDriver } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';

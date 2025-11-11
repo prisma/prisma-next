@@ -78,7 +78,7 @@ flowchart TD
 ## Usage
 
 ```typescript
-import { createPostgresDriver } from '@prisma-next/driver-postgres';
+import { createPostgresDriver } from '@prisma-next/driver-postgres/runtime';
 import { createRuntime } from '@prisma-next/sql-runtime';
 
 const driver = createPostgresDriver({

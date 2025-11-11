@@ -1,5 +1,5 @@
 import type { Plan, ResultType } from '@prisma-next/contract/types';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,

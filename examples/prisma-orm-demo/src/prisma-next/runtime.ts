@@ -1,7 +1,7 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { Client } from 'pg';
 import contractJson from './contract.json' with { type: 'json' };
 

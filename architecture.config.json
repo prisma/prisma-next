@@ -97,8 +97,26 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/runtime/drivers/postgres/**",
-      "domain": "sql",
+      "glob": "packages/targets/postgres/src/exports/cli.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/targets/postgres/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/targets/postgres-driver/src/exports/cli.ts",
+      "domain": "targets",
+      "layer": "drivers",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/targets/postgres-driver/src/exports/runtime.ts",
+      "domain": "targets",
       "layer": "drivers",
       "plane": "runtime"
     },

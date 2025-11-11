@@ -46,7 +46,7 @@ importers:
         version: link:../../packages/targets/postgres-adapter
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../../packages/sql/runtime/drivers/postgres
+        version: link:../../packages/targets/postgres-driver
       '@prisma-next/sql-lane':
         specifier: workspace:*
         version: link:../../packages/sql/lanes/sql-lane
@@ -101,7 +101,7 @@ importers:
         version: link:../../packages/extensions/compat-prisma
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../../packages/sql/runtime/drivers/postgres
+        version: link:../../packages/targets/postgres-driver
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../packages/sql/sql-runtime
@@ -159,7 +159,7 @@ importers:
         version: link:../../framework/core-contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../../sql/runtime/drivers/postgres
+        version: link:../../targets/postgres-driver
       '@prisma-next/sql-lane':
         specifier: workspace:*
         version: link:../../sql/lanes/sql-lane
@@ -611,43 +611,6 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
-  packages/sql/runtime/drivers/postgres:
-    dependencies:
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../../contract
-      '@prisma-next/sql-operations':
-        specifier: workspace:*
-        version: link:../../../operations
-      pg:
-        specifier: ^8.11.5
-        version: 8.16.3
-      pg-cursor:
-        specifier: ^2.10.5
-        version: 2.15.3(pg@8.16.3)
-    devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../../test/utils
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.15.6
-      '@types/pg-cursor':
-        specifier: ^2.4.6
-        version: 2.7.2
-      pg-mem:
-        specifier: ^3.0.5
-        version: 3.0.5
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
-
   packages/sql/sql-runtime:
     dependencies:
       '@prisma-next/contract':
@@ -665,7 +628,7 @@ importers:
     devDependencies:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../runtime/drivers/postgres
+        version: link:../../targets/postgres-driver
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -766,6 +729,31 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
+  packages/targets/postgres:
+    dependencies:
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../framework/tooling/cli
+      '@prisma-next/sql-tooling-assembly':
+        specifier: workspace:*
+        version: link:../../sql/tooling/assembly
+      arktype:
+        specifier: ^2.0.0
+        version: 2.1.26
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
+
   packages/targets/postgres-adapter:
     dependencies:
       '@prisma-next/cli':
@@ -803,21 +791,33 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
 
-  packages/targets/sql/postgres:
+  packages/targets/postgres-driver:
     dependencies:
-      '@prisma-next/cli':
+      '@prisma-next/sql-contract':
         specifier: workspace:*
-        version: link:../../../framework/tooling/cli
-      '@prisma-next/sql-tooling-assembly':
+        version: link:../../sql/contract
+      '@prisma-next/sql-operations':
         specifier: workspace:*
-        version: link:../../../sql/tooling/assembly
-      arktype:
-        specifier: ^2.0.0
-        version: 2.1.26
+        version: link:../../sql/operations
+      pg:
+        specifier: ^8.11.5
+        version: 8.16.3
+      pg-cursor:
+        specifier: ^2.10.5
+        version: 2.15.3(pg@8.16.3)
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
-        version: link:../../../../test/utils
+        version: link:../../../test/utils
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.15.6
+      '@types/pg-cursor':
+        specifier: ^2.4.6
+        version: 2.7.2
+      pg-mem:
+        specifier: ^3.0.5
+        version: 3.0.5
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -838,7 +838,7 @@ importers:
         version: link:../../../packages/framework/tooling/cli
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../../../packages/sql/runtime/drivers/postgres
+        version: link:../../../packages/targets/postgres-driver
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../packages/sql/tooling/cli
@@ -853,7 +853,7 @@ importers:
         version: link:../../../packages/sql/sql-runtime
       '@prisma-next/targets-postgres':
         specifier: workspace:*
-        version: link:../../../packages/targets/sql/postgres
+        version: link:../../../packages/targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../utils
@@ -890,7 +890,7 @@ importers:
         version: link:../../packages/framework/core-contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
-        version: link:../../packages/sql/runtime/drivers/postgres
+        version: link:../../packages/targets/postgres-driver
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../packages/framework/tooling/emitter

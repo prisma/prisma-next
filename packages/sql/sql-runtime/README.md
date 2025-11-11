@@ -37,7 +37,7 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 ```typescript
 import { createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
-import { createPostgresDriver } from '@prisma-next/driver-postgres';
+import { createPostgresDriver } from '@prisma-next/driver-postgres/runtime';
 
 const contract = validateContract<Contract>(contractJson);
 const adapter = createPostgresAdapter();

@@ -24,10 +24,11 @@
         "packages/targets/postgres-adapter/src/exports/runtime.ts"
       ],
       "@prisma-next/adapter-postgres/*": ["packages/targets/postgres-adapter/src/exports/*.ts"],
-      "@prisma-next/driver-postgres": [
-        "packages/sql/runtime/drivers/postgres/src/exports/index.ts"
+      "@prisma-next/driver-postgres/cli": ["packages/targets/postgres-driver/src/exports/cli.ts"],
+      "@prisma-next/driver-postgres/runtime": [
+        "packages/targets/postgres-driver/src/exports/runtime.ts"
       ],
-      "@prisma-next/driver-postgres/*": ["packages/sql/runtime/drivers/postgres/src/exports/*.ts"],
+      "@prisma-next/driver-postgres/*": ["packages/targets/postgres-driver/src/exports/*.ts"],
       "@prisma-next/contract": ["packages/framework/core-contract/src/exports/types.ts"],
       "@prisma-next/contract/*": ["packages/framework/core-contract/src/exports/*.ts"],
       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
@@ -50,10 +51,8 @@
       "@prisma-next/sql-tooling-assembly": ["packages/sql/tooling/assembly/src/exports/index.ts"],
       "@prisma-next/family-sql/cli": ["packages/sql/tooling/cli/src/exports/cli.ts"],
       "@prisma-next/family-sql/runtime": ["packages/sql/tooling/cli/src/exports/runtime.ts"],
-      "@prisma-next/targets-postgres/cli": ["packages/targets/sql/postgres/src/exports/cli.ts"],
-      "@prisma-next/targets-postgres/runtime": [
-        "packages/targets/sql/postgres/src/exports/runtime.ts"
-      ],
+      "@prisma-next/targets-postgres/cli": ["packages/targets/postgres/src/exports/cli.ts"],
+      "@prisma-next/targets-postgres/runtime": ["packages/targets/postgres/src/exports/runtime.ts"],
       "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
       "@prisma-next/sql-relational-core/*": ["packages/sql/lanes/relational-core/src/exports/*.ts"],
       "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
@@ -68,7 +67,7 @@
   "references": [
     { "path": "./packages/relational-ir" },
     { "path": "./packages/psl" },
-    { "path": "./packages/sql/runtime/drivers/postgres" },
+    { "path": "./packages/targets/postgres-driver" },
     { "path": "./packages/targets/postgres-adapter" },
     { "path": "./packages/framework/core-contract" },
     { "path": "./packages/extensions/compat-prisma" },
@@ -84,7 +83,7 @@
     { "path": "./packages/sql/tooling/emitter" },
     { "path": "./packages/sql/tooling/assembly" },
     { "path": "./packages/sql/tooling/cli" },
-    { "path": "./packages/targets/sql/postgres" },
+    { "path": "./packages/targets/postgres" },
     { "path": "./packages/sql/lanes/relational-core" },
     { "path": "./packages/sql/lanes/sql-lane" },
     { "path": "./packages/sql/lanes/orm-lane" },
