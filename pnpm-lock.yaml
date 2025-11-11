@@ -47,6 +47,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/targets/postgres-driver
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../packages/sql/tooling/cli
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../packages/sql/authoring/sql-contract-ts
@@ -62,6 +65,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../packages/sql/sql-runtime
+      '@prisma-next/targets-postgres':
+        specifier: workspace:*
+        version: link:../../packages/targets/postgres
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -724,6 +730,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../contract
+      '@prisma-next/sql-tooling-assembly':
+        specifier: workspace:*
+        version: link:../assembly
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

@@ -19,6 +19,8 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/sql-orm-lane": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/targets-postgres": "workspace:*",
     "pg": "^8.11.5"
   },
   "devDependencies": {

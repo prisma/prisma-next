@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@prisma-next/emitter": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*"
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-tooling-assembly": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
