@@ -34,7 +34,7 @@ const ExtensionPackManifestSchema = type({
  * Loads the target manifest from packs/manifest.json.
  */
 function loadTargetManifest(): ExtensionPackManifest {
-  const manifestPath = join(__dirname, '../../../packs/manifest.json');
+  const manifestPath = join(__dirname, '../../packs/manifest.json');
   const manifestJson = JSON.parse(readFileSync(manifestPath, 'utf-8'));
 
   const result = ExtensionPackManifestSchema(manifestJson);
