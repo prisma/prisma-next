@@ -1,12 +1,11 @@
 # Recommendations
 
 ## Observations
-- `ContractBuilder`/`TableBuilder` depend on pervasive `as` casts when cloning builder state, eroding the compile-time guarantees this package should provide.
-- Runtime validation is limited to generic `Error` throws (e.g., `table-builder.ts` checking for `namespace/name@version`), so upstream consumers cannot produce structured diagnostics.
-- The tests under `test/` cover only the happy path; there are no negative cases for duplicate table names, invalid relations, or missing targets.
+- `TableBuilder.unique`, `.index`, and `.foreignKey` are no-ops—they return the builder instance but never record the constraint metadata, so storage state loses all uniqueness/index/foreign key information.
+- The corresponding tests only verify that the methods are callable, not that they mutate the builder state, so the missing functionality has gone unnoticed.
+- Many of the error cases in the builder classes still throw raw `Error`s instead of structured diagnostics, which makes it harder for consumers to react programmatically.
 
 ## Suggested Actions
-- Shift builder state to immutable data structures with explicit types so TypeScript can enforce invariants without `as`.
-- Replace ad-hoc `Error` throws with error helpers (possibly from `@prisma-next/plan`) that carry stable codes and context.
-- Expand the test suite with failure scenarios (duplicate tables, invalid relation wiring, missing target/core hash) and add property-based tests for column normalization.
-
+- Implement state tracking for uniques, indexes, and foreign keys so that `build()` returns tables with those arrays populated and consumers can rely on the metadata.
+- Add regression tests that assert the constraint arrays actually appear in the built table state and that invalid inputs (missing columns, duplicate names) throw structured errors.
+- Replace raw `Error` throws with the `planInvalid` helpers (or similar) so downstream runtimes can inspect the error codes/hints.

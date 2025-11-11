@@ -1,12 +1,11 @@
 # Recommendations
 
 ## Observations
-- Suites depend on a shared real database, so tests cannot run in parallel and occasionally interfere with each other.
-- Fixtures under `test/fixtures` don’t reset state automatically, leaving manual cleanup to contributors.
-- Only the SQL target is exercised; there’s no abstraction for future targets.
+- The suite spins up a single dev Postgres instance (with fixed port ranges) and relies on manual `DROP TABLE`/`CREATE TABLE` calls, which prevents the tests from running in parallel and makes cleanup brittle.
+- Fixtures do not automatically reset state, so each test must remember to drop tables and rewrite markers, leading to duplicated cleanup logic.
+- The package only tests the SQL runtime surface; there is no abstraction that would allow reusing these end-to-end flows for other lanes or adapters in the future.
 
 ## Suggested Actions
-- Adopt disposable schemas or provisioned Docker containers per test run to isolate state.
-- Add setup/teardown helpers that seed the database and clean up automatically.
-- Abstract adapter/runtime bootstrapping so additional targets can plug into the same suite later.
-
+- Adopt disposable schemas or ephemeral databases per test (unique schema names or random ports) so the suite can run concurrently without cross-test interference.
+- Provide centralized setup/teardown helpers that seed data and clean markers automatically instead of relying on inline `DROP TABLE` calls in every test.
+- Abstract runtime/context initialization (adapter + runtime builder + plan execution) so other targets/adapters can plug into the suite without duplicating boilerplate.

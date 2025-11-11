@@ -1,12 +1,11 @@
 # Recommendations
 
 ## Observations
-- `src/load-ts-contract.ts` (~230 LOC) combines bundling, allowlist enforcement, JSON serialization, and temp-file management in a single module.
-- Command handlers duplicate option parsing/validation logic because there is no shared helper or schema definition.
-- Few tests cover failure scenarios (esbuild errors, disallowed imports, impure exports).
+- `loadContractFromTs` bundles esbuild, import allowlisting, purity validation, temporary file management, and module loading all in one file, which makes it hard to unit-test the individual responsibilities.
+- The emit command performs manual option resolution and path normalization inside the handler instead of validating options through a shared schema, so extending the CLI means duplicating parsing logic.
+- There are no integration tests showing how CLI failures (disallowed imports, bundler errors, missing adapters/extensions) are surfaced to users.
 
 ## Suggested Actions
-- Refactor `load-ts-contract.ts` into smaller modules (allowlist plugin, bundler wrapper, purity validator) and unit-test each piece.
-- Introduce a shared command/option parser (zod/yargs) to eliminate duplicated flag validation across commands.
-- Add CLI integration tests asserting disallowed imports fail with actionable errors and bundler failures surface the esbuild diagnostics.
-
+- Split `loadContractFromTs` into smaller utilities (bundle/allowlist plugin, purity checker, module loader, cleanup helper) so each piece can be tested and reused by other loaders.
+- Introduce a shared validation schema (e.g., zod) for command options so the emit handler can reuse the same parsing logic and automatically reject invalid combinations.
+- Add CLI integration tests that simulate disallowed imports, bundler failures, and missing extension/adapters so the CLI messaging stays helpful as we evolve the toolchain.

@@ -1,12 +1,11 @@
 # Recommendations
 
 ## Observations
-- `src/postgres-driver.ts` (~225 LOC) couples pool management, statement execution, and streaming, which complicates unit testing.
-- Error handling wraps everything in generic messages instead of mapping to runtime error codes.
-- Test coverage for network/cursor failures is minimal.
+- `PostgresDriverImpl` mixes connection acquisition, cursor streaming, buffered fallback, and pooling management in one class, which makes it hard to test the streaming path independently of the buffered fallback path.
+- The driver exposes options like `cursorDisabled` and `batchSize`, but there is no documentation or targeted test proving that those options behave as expected.
+- Errors from `pg` are rethrown verbatim; there is no translation layer that wraps them in consistent runtime error codes or safe telemetry values.
 
 ## Suggested Actions
-- Split the driver into pool, execution, and cursor helpers so each piece can be unit-tested (possibly via dependency injection).
-- Implement an error mapper that translates pg errors into Prisma Next runtime codes.
-- Add tests simulating timeouts, cancellations, and cursor exhaustion (using pg-mock or injected clients).
-
+- Split the driver into focused helpers (client acquisition, cursor executor, buffered executor) and add unit tests for each path, including explicit coverage for when cursor execution fails and when `cursorDisabled` is true.
+- Document the available options (`cursorDisabled`, `batchSize`, `poolFactory`) and add tests that assert the driver honors them, making the behavior explicit for runtime integrators.
+- Introduce an error wrapper/mapping so driver errors are normalized (e.g., network timeout vs. query error) before bubbling up to the runtime, and add regression tests for the most common Postgres error codes.
