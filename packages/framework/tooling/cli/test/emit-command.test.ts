@@ -16,7 +16,7 @@ function createConfigFileContent(): string {
     workspaceRoot,
     'packages/targets/postgres-adapter/dist/exports/cli.js',
   );
-  const targetPath = resolve(workspaceRoot, 'packages/targets/sql/postgres/dist/exports/cli.js');
+  const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
   const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
   const configTypesPath = resolve(
     workspaceRoot,
