@@ -91,10 +91,12 @@ The repository is organized by **Domains → Layers → Planes**:
 - **Runtime-executor layer** (runtime plane): `@prisma-next/runtime-executor` lives in `packages/framework/runtime-executor`
 
 **SQL Domain (Target‑Family)** (`packages/sql/**`):
-- Family‑level types and schema: `@prisma-next/sql-contract-types` (dialect‑agnostic contract shapes)
-- Family‑level operations: `@prisma-next/sql-operations` (operation types/registry helpers, shared plane). Manifest assembly happens in CLI layer.
-- Family emitter hook: `@prisma-next/sql-contract-emitter` (`sqlTargetFamilyHook`)
-- Contract authoring (SQL family): `@prisma-next/sql-contract-ts` (`packages/sql/authoring/sql-contract-ts`), composes `@prisma-next/contract-authoring` + family types
+- **Core layer** (shared plane): `@prisma-next/sql-contract`, `@prisma-next/sql-operations` live in `packages/sql/{contract,operations}`
+- **Authoring layer** (migration plane): `@prisma-next/sql-contract-ts` lives in `packages/sql/authoring/sql-contract-ts`
+- **Tooling layer** (migration plane): `@prisma-next/sql-contract-emitter` lives in `packages/sql/tooling/emitter` (mirrors Framework domain organization)
+- **Lanes layer** (runtime plane): `@prisma-next/sql-relational-core`, `@prisma-next/sql-lane`, `@prisma-next/sql-orm-lane` live in `packages/sql/lanes/*`
+- **Runtime layer** (runtime plane): `@prisma-next/sql-runtime` lives in `packages/sql/sql-runtime`
+- **Adapters layer** (runtime plane): `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres` live in `packages/sql/runtime/{adapters,drivers}/*`
 
 **Extensions Domain (Concrete Targets & Packs)**:
 - Concrete adapters/drivers (e.g., Postgres) and ecosystem packs live under `packages/extensions/**` and implement SPIs from Framework/SQL family.
@@ -599,15 +601,15 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
   - `validateTypes`: Validates all type IDs come from referenced extensions (receives `ValidationContext` with `operationRegistry` and `extensionIds`)
   - `validateStructure`: Family-specific structural validation
   - `generateContractTypes`: Generates `contract.d.ts` content (receives separate `codecTypeImports` and `operationTypeImports` arrays, not packs)
-- **Manifest-Agnostic Emitter**: The emitter is completely manifest-agnostic. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI, not extension packs. Manifest parsing and assembly happens in the CLI layer (`packages/framework/tooling/cli/src/pack-assembly.ts`). The emitter does not export pack loading functions or manifest types - pack loading and manifest types are CLI-only.
-- **Adapters as Extension Packs**: Adapters are treated identically to extension packs. Both use the same manifest structure (`packs/manifest.json`) with:
+- **Manifest-Agnostic Emitter**: The emitter is completely manifest-agnostic. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI via family-provided helpers exposed through the config’s `family` export. The emitter does not export pack loading functions or manifest types.
+- **Adapters as Extension Packs**: Adapters are treated identically to extension packs. For CLI usage, packs expose `/cli` entrypoints that default-export descriptors (IR + helpers) used for emission. Packs may also ship a `packs/manifest.json` for other consumers (e.g., cloud/bundles), but the CLI does not read JSON manifests.
   - `types.codecTypes.import`: Package/named/alias for importing `CodecTypes`
   - `types.operationTypes.import`: Package/named/alias for importing `OperationTypes`
   - `operations`: Array of operation manifests that are assembled into `OperationRegistry` by the CLI
 - **Type Canonicalization**: Type canonicalization (shorthand → fully qualified IDs) happens at **authoring time** (PSL parser or TS builder), **not during emission**. The emitter only validates that all type IDs come from referenced extensions.
 - **I/O Decoupling**: The emitter is decoupled from file I/O. `emit()` returns strings (`contractJson`, `contractDts`); the caller handles all file operations.
 - **No Adapter Special Treatment**: The emitter treats all extension packs uniformly. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
-- **CLI Assembly**: The CLI loads extension packs using `loadExtensionPacks()` from `packages/framework/tooling/cli/src/pack-loading.ts`, assembles operation registries from manifests using `assembleOperationRegistryFromPacks()`, extracts codec type imports using `extractCodecTypeImports()`, extracts operation type imports using `extractOperationTypeImports()`, and extracts extension IDs using `extractExtensionIds()` before calling the emitter. This keeps manifest parsing and assembly logic in the tooling layer, not in shared/emitter core. Type imports are split into separate arrays at the CLI boundary, not in the hook.
+- **CLI Assembly**: The CLI loads only the user’s config module. It reads `family.hook` and calls family-provided helpers (exposed via `config.family`) to assemble the operation registry, extract codec/operation type imports, and derive extension IDs from `{ adapter, target, extensions }`. This keeps assembly logic in the family layer and the CLI family‑agnostic.
 
 **Implementation:**
 - Core emitter: `packages/framework/tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
@@ -641,7 +643,7 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
     }
   }
   ```
-  - `types.codecTypes.import`: Used by emitter to generate `contract.d.ts` imports
+  - `types.codecTypes.import`: Used to generate `contract.d.ts` imports when assembling types
   - **No `canonicalScalarMap`**: Extension manifests do not include scalar-to-type ID mappings. Type canonicalization happens at authoring time using extension manifests, not via a scalar map in the manifest.
 - Adapter appears first in `contract.extensions` but is otherwise identical to other packs
 

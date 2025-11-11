@@ -132,7 +132,7 @@ import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
 import { createOperationRegistry } from '@prisma-next/operations';
 
 // Determine target family SPI based on target family
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 
 // Emit contract
 const ir: ContractIR = {

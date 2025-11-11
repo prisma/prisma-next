@@ -1,6 +1,7 @@
 packages:
   - packages/framework/**
   - packages/sql/**
+  - packages/targets/**
   - packages/extensions/**
   - packages/compat/*
   - packages/document

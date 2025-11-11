@@ -19,6 +19,10 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
+      "@prisma-next/adapter-postgres/cli": ["packages/sql/runtime/adapters/postgres/src/cli.ts"],
+      "@prisma-next/adapter-postgres/runtime": [
+        "packages/sql/runtime/adapters/postgres/src/exports/runtime.ts"
+      ],
       "@prisma-next/adapter-postgres/*": [
         "packages/sql/runtime/adapters/postgres/src/exports/*.ts"
       ],
@@ -29,6 +33,7 @@
       "@prisma-next/contract": ["packages/framework/core-contract/src/exports/types.ts"],
       "@prisma-next/contract/*": ["packages/framework/core-contract/src/exports/*.ts"],
       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
+      "@prisma-next/cli/*": ["packages/framework/tooling/cli/src/exports/*.ts"],
       "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
       "@prisma-next/emitter/*": ["packages/framework/tooling/emitter/src/exports/*.ts"],
       "@prisma-next/compat-prisma": ["packages/extensions/compat-prisma/src/exports/index.ts"],
@@ -44,6 +49,13 @@
       "@prisma-next/sql-contract/*": ["packages/sql/contract/src/exports/*.ts"],
       "@prisma-next/sql-operations": ["packages/sql/operations/src/index.ts"],
       "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
+      "@prisma-next/sql-tooling-assembly": ["packages/sql/tooling/assembly/src/exports/index.ts"],
+      "@prisma-next/family-sql/cli": ["packages/sql/tooling/cli/src/exports/cli.ts"],
+      "@prisma-next/family-sql/runtime": ["packages/sql/tooling/cli/src/exports/runtime.ts"],
+      "@prisma-next/targets-postgres/cli": ["packages/targets/sql/postgres/src/exports/cli.ts"],
+      "@prisma-next/targets-postgres/runtime": [
+        "packages/targets/sql/postgres/src/exports/runtime.ts"
+      ],
       "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
       "@prisma-next/sql-relational-core/*": ["packages/sql/lanes/relational-core/src/exports/*.ts"],
       "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
@@ -72,6 +84,9 @@
     { "path": "./packages/sql/contract" },
     { "path": "./packages/sql/operations" },
     { "path": "./packages/sql/tooling/emitter" },
+    { "path": "./packages/sql/tooling/assembly" },
+    { "path": "./packages/sql/tooling/cli" },
+    { "path": "./packages/targets/sql/postgres" },
     { "path": "./packages/sql/lanes/relational-core" },
     { "path": "./packages/sql/lanes/sql-lane" },
     { "path": "./packages/sql/lanes/orm-lane" },

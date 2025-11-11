@@ -38,6 +38,7 @@ cd examples/todo-app && pnpm demo  # End-to-end demo
 - Modular packages with domain/layer/plane guardrails: `architecture.config.json`.
 - Use Arktype for validation; extract types via `.infer` where needed: `.cursor/rules/arktype-usage.mdc`.
 - Directory layout: the entire SQL family (all layers and planes) lives under `packages/sql/**`. The top-level `packages/targets/**` is reserved for concrete target extension packs (e.g., Postgres, MySQL), not for family internals.
+- **CLI Config**: Apps declare adapter and extension packs in `prisma-next.config.ts`. The CLI loads config and uses family-provided helpers to assemble operation registries and type imports. See `packages/framework/tooling/cli/README.md` for details.
 
 ## Frequent Tasks
 - Add SQL operation: see `docs/briefs/complete` and `.cursor/plans/add-sql-operation.md` (template).

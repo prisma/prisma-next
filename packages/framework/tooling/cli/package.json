@@ -39,6 +39,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./config-types": {
+      "types": "./dist/config-types.d.ts",
+      "import": "./dist/config-types.js"
     }
   }
 }

@@ -62,17 +62,16 @@ export interface TargetFamilyHook {
 }
 ```
 
-**Note**: The emitter is manifest-agnostic. Hooks receive pre-assembled context (`ValidationContext` with `operationRegistry`, `codecTypeImports`, `operationTypeImports`, `extensionIds`), not extension packs. Manifest parsing and assembly happens in the CLI layer.
+**Note**: The emitter is manifest-agnostic. Hooks receive pre-assembled context (`ValidationContext` with `operationRegistry`, `codecTypeImports`, `operationTypeImports`, `extensionIds`), not extension packs. Assembly happens in the family layer and is exposed via the app’s config (`family` export) so the CLI remains family‑agnostic.
 
 Core types (emitter): `ContractIR`, `TypesImportSpec`, `EmitOptions`, `ValidationContext`, `TargetFamilyHook`.
 
 ### Treat Adapters as Extension Packs
 
-- Adapters and extension packs use the same manifest shape and location:
-  - `types.codecTypes.import` (package/named/alias)
+- Adapters and extension packs share a common descriptor shape on `/cli` entrypoints. For non-CLI consumers, they may also publish a JSON manifest carrying type import hints (e.g., `types.codecTypes.import`).
 - The adapter is treated identically to extension packs and appears in `contract.extensions.<adapter-namespace>` (e.g., `extensions.postgres`).
 - The adapter is the first extension in the collection, identified by `contract.target`.
-- Manifest path example: `packages/adapter-postgres/packs/manifest.json`
+  - For CLI consumption, use `/cli` entrypoints (no JSON reads).
 - **Note**: Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission. The emitter only validates that all type IDs come from referenced extensions.
 
 ### SQL Family Hook (MVP)
@@ -95,8 +94,8 @@ File: `packages/sql-target/src/emitter-hook.ts` (or `packages/emitter/src/famili
 
 File: `packages/emitter/src/emitter.ts`
 
-1) Load extension packs (adapter + all extensions) manifests
-2) Resolve and load `targetFamily` hook
+1) Resolve `targetFamily` hook (from `family` export in app config)
+2) Use family helpers (from app config) to assemble `operationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds`
 3) Core structural validation (family-agnostic)
 4) Family type validation (ensure all type IDs come from referenced extensions)
 5) Family structural validation

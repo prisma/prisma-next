@@ -13,10 +13,13 @@
     "clean": "node ../../scripts/clean.mjs"
   },
   "dependencies": {
+    "@prisma-next/cli": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
-    "@prisma-next/sql-relational-core": "workspace:*"
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-tooling-assembly": "workspace:*",
+    "arktype": "^2.0.0"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -36,6 +39,14 @@
     "./codec-types": {
       "types": "./dist/exports/codec-types.d.ts",
       "import": "./dist/exports/codec-types.js"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
     }
   }
 }

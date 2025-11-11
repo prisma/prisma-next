@@ -28,7 +28,7 @@ export async function loadContractFromDisk<
 export async function emitAndVerifyContract(
   cliPath: string,
   contractTsPath: string,
-  adapterPath: string,
+  configPath: string,
   outputDir: string,
   expectedContractJsonPath: string,
 ): Promise<SqlContract<SqlStorage>> {
@@ -39,8 +39,8 @@ export async function emitAndVerifyContract(
     contractTsPath,
     '--out',
     outputDir,
-    '--adapter',
-    adapterPath,
+    '--config',
+    configPath,
   ]);
 
   const emittedContractJsonPath = join(outputDir, 'contract.json');

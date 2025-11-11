@@ -27,21 +27,37 @@ Provide a command-line interface that:
 
 Emit `contract.json` and `contract.d.ts` from a TypeScript contract file.
 
-**Usage:**
+Config-only surface (no pack flags):
 ```bash
-prisma-next emit --contract <path> --out <dir> [--target postgres] [--adapter <path>] [--extensions <path...>]
+prisma-next emit --contract <path> --out <dir> [--config <path>]
 ```
 
-**Options:**
+Options:
 - `--contract <path>`: Required. Path to TypeScript contract file
 - `--out <dir>`: Required. Output directory for emitted artifacts
-- `--target <target>`: Optional. Target (default: inferred from contract)
-- `--adapter <path>`: Optional. Adapter package path (default: `packages/adapter-postgres`)
-- `--extensions <path...>`: Optional. Extension pack paths (can be specified multiple times)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 
-**Example:**
+Example:
 ```bash
-prisma-next emit --contract src/contract.ts --out dist
+prisma-next emit --contract src/contract.ts --out dist --config prisma-next.config.ts
+```
+
+**Config File (`prisma-next.config.ts`):**
+
+The CLI uses a config file to specify the target family, target, adapter, and extensions:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/cli';
+import sql from '@prisma-next/family-sql/cli';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+});
 ```
 
 **Output:**
@@ -83,33 +99,23 @@ flowchart TD
 
 ### Emit Command (`commands/emit.ts`)
 - Command implementation using commander
-- Loads extension packs using `loadExtensionPacks()` from `pack-loading.ts` (CLI-only)
-- Assembles operation registry using `assembleOperationRegistryFromPacks()` from `pack-assembly.ts`
-- Extracts codec type imports using `extractCodecTypeImports()` from `pack-assembly.ts`
-- Extracts operation type imports using `extractOperationTypeImports()` from `pack-assembly.ts`
-- Extracts extension IDs using `extractExtensionIds()` from `pack-assembly.ts`
+- Loads the user’s config module (`prisma-next.config.ts`)
+- Reads family hook and family helpers (`assembleOperationRegistry`, `extractCodecTypeImports`, `extractOperationTypeImports`) from `config.family`
+- Calls family helpers with `{ adapter, target, extensions }` to assemble inputs for emission; manifests are treated as opaque by the CLI
 - Loads TS contract using `loadContractFromTs()` utility
-- Calls `emit()` from emitter (returns strings) with pre-assembled context (separate codec/operation type imports)
+- Calls `emit()` from emitter with the assembled inputs and `family.hook`
 - Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact
 - Writes `contract.json` and `contract.d.ts` to output directory
 
-### Pack Loading (`pack-loading.ts`)
-- Loads extension pack manifests from file paths
-- Validates manifest structure using Arktype schemas
-- Returns `ExtensionPack[]` with manifest and path
+### Family Helpers (provided by family /cli entrypoint)
+- The SQL family (and other families) provide helper functions used by the CLI to assemble inputs for emission:
+  - `assembleOperationRegistry(descriptors)`
+  - `extractCodecTypeImports(descriptors)`
+  - `extractOperationTypeImports(descriptors)`
+- These helpers move family-specific assembly logic out of the CLI so the CLI remains family‑agnostic.
 
-### Pack Assembly (`pack-assembly.ts`)
-- Converts `OperationManifest` to `SqlOperationSignature` using `operationManifestToSignature()`
-- Assembles `OperationRegistry` from extension packs using `assembleOperationRegistryFromPacks()`
-- Extracts codec type imports using `extractCodecTypeImports()` (separate from operation types)
-- Extracts operation type imports using `extractOperationTypeImports()` (separate from codec types)
-- Extracts extension IDs using `extractExtensionIds()`
-- **Deprecated**: `extractTypeImports()` is kept for backward compatibility but should be replaced with separate extract functions
-
-### Pack Manifest Types (`pack-manifest-types.ts`)
-- Defines manifest type interfaces: `ExtensionPack`, `ExtensionPackManifest`, `OperationManifest`
-- Defines manifest spec types: `ArgSpecManifest`, `ReturnSpecManifest`, `LoweringSpecManifest`
-- **Canonical Source**: Manifest types are CLI-only. The emitter does not export manifest types.
+### Pack Manifest Types (IR)
+- Families define their manifest IR and related types under their own tooling packages. CLI treats manifests as opaque data.
 
 ## Dependencies
 
@@ -136,6 +142,4 @@ This package is part of the **framework domain**, **tooling layer**, **migration
 ## See Also
 
 - [`@prisma-next/emitter`](../emitter/README.md) - Contract emission engine
-- [`@prisma-next/sql-query`](../../../sql-query/README.md) - Contract builder and query DSL
-- [`docs/briefs/03-TS-Contract-Loader-and-CLI.md`](../../../../docs/briefs/03-TS-Contract-Loader-and-CLI.md) - Implementation brief
-
+- Project Brief — CLI Support for Extension Packs: `docs/briefs/complete/20-CLI-Support-for-Extension-Packs.md`

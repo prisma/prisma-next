@@ -4,7 +4,7 @@ SQL emitter hook for Prisma Next.
 
 ## Overview
 
-This package provides the SQL-specific emitter hook implementation for the Prisma Next emitter. It validates SQL contracts and generates TypeScript type definitions for SQL contracts. It's part of the targets ring and implements the `TargetFamilyHook` interface.
+This package provides the SQL-specific emitter hook implementation for the Prisma Next emitter. It validates SQL contracts and generates TypeScript type definitions for SQL contracts. It's part of the SQL tooling layer (migration plane) and implements the `TargetFamilyHook` interface.
 
 ## Responsibilities
 
@@ -28,17 +28,17 @@ This package provides the SQL-specific emitter hook implementation for the Prism
 
 ```mermaid
 flowchart TD
-    subgraph "Tooling Ring"
+    subgraph "Framework Tooling Layer"
         EMITTER[@prisma-next/emitter]
-    end
-
-    subgraph "Targets Ring"
-        SQL_EMITTER[@prisma-next/sql-contract-emitter]
-        CT[@prisma-next/sql-contract]
-    end
-
-    subgraph "Tooling Ring"
         CLI[@prisma-next/cli]
+    end
+
+    subgraph "SQL Tooling Layer"
+        SQL_EMITTER[@prisma-next/sql-contract-emitter]
+    end
+
+    subgraph "SQL Core Layer (Shared Plane)"
+        CT[@prisma-next/sql-contract]
     end
 
     EMITTER --> SQL_EMITTER

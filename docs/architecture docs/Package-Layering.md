@@ -152,9 +152,10 @@ Contract authoring surfaces for creating contracts programmatically.
 
 ### Tooling Layer (SQL Domain, Migration Plane)
 
-Target-family specific emitter hooks.
+Target-family specific emitter hooks and family‑provided helpers for CLI assembly.
 
 - `packages/sql/tooling/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
+- Pack entrypoints: use `/cli` for IR descriptors and helpers (no runtime), `/runtime` for factories (runtime only). The app config imports from `/cli` to keep emit pure.
 
 **Dependency Rules:** Can import from `core/*` and `authoring/*` only.
 
@@ -211,8 +212,8 @@ Database adapters, drivers, and optional compatibility shims. These packages may
 | `packages/framework/tooling/cli/` | `@prisma-next/cli` |
 | `packages/framework/tooling/emitter/` | `@prisma-next/emitter` |
 | `packages/framework/runtime-executor/` | `@prisma-next/runtime-executor` |
-| `packages/targets/sql/contract-types/` | `@prisma-next/sql-contract-types` |
-| `packages/targets/sql/operations/` | `@prisma-next/sql-operations` |
+| `packages/sql/contract/` | `@prisma-next/sql-contract` |
+| `packages/sql/operations/` | `@prisma-next/sql-operations` |
 | `packages/sql/tooling/emitter/` | `@prisma-next/sql-contract-emitter` |
 | `packages/sql/lanes/relational-core/` | `@prisma-next/sql-relational-core` |
 | `packages/sql/lanes/sql-lane/` | `@prisma-next/sql-lane` |
