@@ -1,7 +1,7 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { OperationSignature } from '@prisma-next/sql-operations';
+import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type {
   Adapter,
   CodecRegistry,
@@ -23,7 +23,7 @@ export interface RuntimeContext<
 
 export interface Extension {
   codecs?(): CodecRegistry;
-  operations?(): ReadonlyArray<OperationSignature>;
+  operations?(): ReadonlyArray<SqlOperationSignature>;
 }
 
 export interface CreateRuntimeContextOptions<

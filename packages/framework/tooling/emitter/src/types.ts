@@ -1,3 +1,5 @@
+import type { OperationRegistry } from '@prisma-next/operations';
+
 export interface TypesImportSpec {
   readonly package: string;
   readonly named: string;
@@ -51,7 +53,9 @@ export interface ExtensionPack {
 
 export interface EmitOptions {
   readonly outputDir: string;
-  readonly packs: ReadonlyArray<ExtensionPack>;
+  readonly operationRegistry?: OperationRegistry;
+  readonly typeImports?: ReadonlyArray<TypesImportSpec>;
+  readonly extensionIds?: ReadonlyArray<string>;
 }
 
 export interface EmitResult {

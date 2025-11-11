@@ -17,6 +17,11 @@ import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { loadContractFromTs } from '../src/load-ts-contract';
+import {
+  assembleOperationRegistryFromPacks,
+  extractExtensionIds,
+  extractTypeImports,
+} from '../src/pack-assembly';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
@@ -66,11 +71,18 @@ describe('emit integration', () => {
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
 
+      // Assemble operation registry and extract type imports from packs
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const typeImports = extractTypeImports(packs);
+      const extensionIds = extractExtensionIds(packs);
+
       const result = await emit(
         contract,
         {
           outputDir,
-          packs,
+          operationRegistry,
+          typeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );

@@ -1,5 +1,5 @@
 import type { ReturnSpec } from '@prisma-next/operations';
-import type { LoweringSpec } from '@prisma-next/sql-operations';
+import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
 // SQL-specific AST types and supporting types
 // These types are needed by adapters and runtime for SQL query execution
@@ -35,7 +35,7 @@ export interface OperationExpr {
   readonly self: ColumnRef | OperationExpr;
   readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr | OperationExpr>;
   readonly returns: ReturnSpec;
-  readonly lowering: LoweringSpec;
+  readonly lowering: SqlLoweringSpec;
 }
 
 export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is OperationExpr {

@@ -1,5 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ExtensionPack, ExtensionPackManifest, TypesImportSpec } from '@prisma-next/emitter';
+import type { ValidationContext } from '@prisma-next/emitter';
 import type {
   ModelDefinition,
   ModelField,
@@ -10,28 +10,35 @@ import type {
 export const sqlTargetFamilyHook = {
   id: 'sql',
 
-  validateTypes(ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>): void {
+  validateTypes(ir: ContractIR, ctx: ValidationContext): void {
     const storage = ir.storage as SqlStorage | undefined;
     if (!storage || !storage.tables) {
       return;
     }
 
     const referencedNamespaces = new Set<string>();
+    
+    // Collect namespaces from ir.extensions
     const extensions = ir.extensions as Record<string, unknown> | undefined;
     if (extensions) {
       for (const namespace of Object.keys(extensions)) {
         referencedNamespaces.add(namespace);
       }
     }
-
-    const packNamespaces = new Set<string>();
-    for (const pack of packManifests) {
-      packNamespaces.add(pack.id);
+    
+    // Also validate against extensionIds from context for consistency
+    if (ctx.extensionIds) {
+      for (const extensionId of ctx.extensionIds) {
+        // Extract namespace from extension ID (format: namespace/name@version or just namespace)
+        const namespaceMatch = extensionId.match(/^([^/]+)/);
+        if (namespaceMatch && namespaceMatch[1]) {
+          referencedNamespaces.add(namespaceMatch[1]);
+        }
+      }
     }
 
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
-    const usedTypeIds = new Set<string>();
     for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
       const table = tableUnknown as StorageTable;
       for (const [colName, colUnknown] of Object.entries(table.columns)) {
@@ -46,17 +53,15 @@ export const sqlTargetFamilyHook = {
           );
         }
 
-        usedTypeIds.add(col.type);
-
         const match = col.type.match(typeIdRegex);
         if (!match || !match[1]) {
           continue;
         }
 
         const namespace = match[1];
-        if (!referencedNamespaces.has(namespace) && !packNamespaces.has(namespace)) {
+        if (!referencedNamespaces.has(namespace)) {
           throw new Error(
-            `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions or available in loaded packs`,
+            `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions`,
           );
         }
       }
@@ -221,9 +226,26 @@ export const sqlTargetFamilyHook = {
     }
   },
 
-  generateContractTypes(ir: ContractIR, packs: ReadonlyArray<ExtensionPack>): string {
-    const codecImports = this.getCodecTypesImports(packs);
-    const operationImports = this.getOperationTypesImports(packs);
+  generateContractTypes(ir: ContractIR, typeImports: ReadonlyArray<TypesImportSpec>): string {
+    const codecImports: TypesImportSpec[] = [];
+    const operationImports: TypesImportSpec[] = [];
+
+    // Separate codec and operation type imports based on package path patterns
+    // This is a heuristic - in practice, CLI should separate them when extracting
+    for (const imp of typeImports) {
+      if (imp.package.includes('codec-types') || imp.package.includes('codecTypes')) {
+        codecImports.push(imp);
+      } else if (
+        imp.package.includes('operation-types') ||
+        imp.package.includes('operationTypes')
+      ) {
+        operationImports.push(imp);
+      } else {
+        // Default to codec types if unclear
+        codecImports.push(imp);
+      }
+    }
+
     const allImports = [...codecImports, ...operationImports];
     const importLines = allImports.map(
       (imp) => `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`,
@@ -262,32 +284,6 @@ export type Tables = Contract['storage']['tables'];
 export type Models = Contract['models'];
 export type Relations = Contract['relations'];
 `;
-  },
-
-  getCodecTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec> {
-    const imports: TypesImportSpec[] = [];
-    for (const pack of packs) {
-      const codecTypes = pack.manifest.types?.codecTypes;
-      if (codecTypes?.import) {
-        imports.push(codecTypes.import);
-      }
-    }
-    return imports;
-  },
-
-  getOperationTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec> {
-    const imports: TypesImportSpec[] = [];
-    for (const pack of packs) {
-      const operationTypes = pack.manifest.types?.operationTypes;
-      if (operationTypes?.import) {
-        imports.push(operationTypes.import);
-      }
-    }
-    return imports;
-  },
-
-  getTypesImports(packs: ReadonlyArray<ExtensionPack>): ReadonlyArray<TypesImportSpec> {
-    return [...this.getCodecTypesImports(packs), ...this.getOperationTypesImports(packs)];
   },
 
   generateStorageType(storage: SqlStorage): string {

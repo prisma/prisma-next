@@ -1,11 +1,14 @@
-import { createOperationRegistry } from '@prisma-next/operations';
 import { describe, expect, it } from 'vitest';
-import type { OperationSignature } from '../src/index';
+import {
+  createSqlOperationRegistry,
+  register,
+  type SqlOperationSignature,
+} from '../src/index';
 
 describe('SQL OperationRegistry', () => {
   it('registers operation with SQL lowering spec', () => {
-    const registry = createOperationRegistry();
-    const signature: OperationSignature = {
+    const registry = createSqlOperationRegistry();
+    const signature: SqlOperationSignature = {
       forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pg/vector@1' }],
@@ -18,7 +21,7 @@ describe('SQL OperationRegistry', () => {
       },
     };
 
-    registry.register(signature);
+    register(registry, signature);
     const operations = registry.byType('pg/vector@1');
     expect(operations).toHaveLength(1);
     expect(operations[0]?.lowering).toEqual({
@@ -30,8 +33,8 @@ describe('SQL OperationRegistry', () => {
   });
 
   it('supports function strategy lowering', () => {
-    const registry = createOperationRegistry();
-    const signature: OperationSignature = {
+    const registry = createSqlOperationRegistry();
+    const signature: SqlOperationSignature = {
       forTypeId: 'pg/vector@1',
       method: 'normalize',
       args: [],
@@ -44,7 +47,7 @@ describe('SQL OperationRegistry', () => {
       },
     };
 
-    registry.register(signature);
+    register(registry, signature);
     const operations = registry.byType('pg/vector@1');
     expect(operations[0]?.lowering.strategy).toBe('function');
   });

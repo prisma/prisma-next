@@ -1,16 +1,17 @@
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
+import { createOperationRegistry } from '@prisma-next/operations';
 import { describe, expect, it } from 'vitest';
 import type { ContractIR } from '../../../core-contract/src/ir';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { TargetFamilyHook } from '../src/target-family';
-import type { EmitOptions, ExtensionPackManifest } from '../src/types';
+import type { EmitOptions, TypesImportSpec } from '../src/types';
 import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>) => {
+  validateTypes: (ir: ContractIR, _operationRegistry?) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
       | undefined;
@@ -18,7 +19,6 @@ const mockSqlHook: TargetFamilyHook = {
       return;
     }
 
-    const packNamespaces = new Set(packManifests.map((p) => p.id));
     const referencedNamespaces = new Set<string>();
     const extensions = ir.extensions as Record<string, unknown> | undefined;
     if (extensions) {
@@ -45,12 +45,12 @@ const mockSqlHook: TargetFamilyHook = {
         const match = col.type.match(typeIdRegex);
         if (match?.[1]) {
           const namespace = match[1];
-          if (!referencedNamespaces.has(namespace) && !packNamespaces.has(namespace)) {
-            if (namespace === 'pg' && packNamespaces.has('postgres')) {
+          if (!referencedNamespaces.has(namespace)) {
+            if (namespace === 'pg' && referencedNamespaces.has('postgres')) {
               continue;
             }
             throw new Error(
-              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions or available in loaded packs`,
+              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions`,
             );
           }
         }
@@ -62,14 +62,13 @@ const mockSqlHook: TargetFamilyHook = {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }
   },
-  generateContractTypes: () => {
+  generateContractTypes: (_ir, _typeImports) => {
     return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type Contract = unknown;
 `;
   },
-  getTypesImports: () => [],
 };
 
 describe('emitter round-trip', () => {
@@ -100,9 +99,24 @@ describe('emitter round-trip', () => {
         join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
         [],
       );
+      const operationRegistry = createOperationRegistry();
+      const typeImports: TypesImportSpec[] = [];
+      for (const pack of packs) {
+        const codecTypes = pack.manifest.types?.codecTypes;
+        if (codecTypes?.import) {
+          typeImports.push(codecTypes.import);
+        }
+        const operationTypes = pack.manifest.types?.operationTypes;
+        if (operationTypes?.import) {
+          typeImports.push(operationTypes.import);
+        }
+      }
+      const extensionIds = packs.map((p) => p.manifest.id);
       const options: EmitOptions = {
         outputDir: '',
-        packs,
+        operationRegistry,
+        typeImports,
+        extensionIds,
       };
 
       const result1 = await emit(ir, options, mockSqlHook);

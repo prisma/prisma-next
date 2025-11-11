@@ -1,7 +1,7 @@
 import type { Plan, PlanRefs } from '@prisma-next/contract/types';
 import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
-import type { LoweringSpec } from '@prisma-next/sql-operations';
+import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { ColumnRef, Direction, OperationExpr, ParamRef, QueryAst } from './ast/types';
 
@@ -105,7 +105,7 @@ type ExtractCodecOutputType<
 export type OperationTypeSignature = {
   readonly args: ReadonlyArray<ArgSpec>;
   readonly returns: ReturnSpec;
-  readonly lowering: LoweringSpec;
+  readonly lowering: SqlLoweringSpec;
   readonly capabilities?: ReadonlyArray<string>;
 };
 

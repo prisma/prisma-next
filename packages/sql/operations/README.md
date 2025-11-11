@@ -1,6 +1,6 @@
 # @prisma-next/sql-operations
 
-SQL-specific operation definitions and assembly for Prisma Next.
+SQL-specific operation types and registry helpers for Prisma Next.
 
 ## Package Classification
 
@@ -10,33 +10,27 @@ SQL-specific operation definitions and assembly for Prisma Next.
 
 ## Overview
 
-This package provides SQL-specific operation logic, including operation assembly from operation manifests and SQL-specific lowering specifications. It lives in the shared plane to allow both migration-plane (emitter/CLI) and runtime-plane (lanes/runtime) packages to import operation types without violating plane boundaries. The package contains only types and pure assembly functions (no pack I/O); pack reading/resolution is handled by the emitter/CLI.
+This package provides SQL-specific operation types and typed registry helpers. It lives in the shared plane to allow both migration-plane (emitter/CLI) and runtime-plane (lanes/runtime) packages to import operation types without violating plane boundaries. The package contains only types and pure helpers (no pack I/O, no manifest assembly); manifest assembly is handled by the CLI/tooling layer.
 
 ## Responsibilities
 
-- **Operation Assembly**: Assembles operation registries from operation manifests
-  - `assembleOperationRegistry()`: Creates operation registry from plain manifest objects
-  - `OperationManifestLike`: Interface for operation manifest objects
-  - `OperationSignature`: SQL-specific operation signature (extends core with lowering specs)
-  - `LoweringSpec`: SQL-specific lowering specification (strategy, template)
+- **SQL Operation Types**: SQL-specific operation signature types
+  - `SqlOperationSignature`: SQL-specific operation signature (extends core `OperationSignature` with lowering specs)
+  - `SqlLoweringSpec`: SQL-specific lowering specification (target family, strategy, template)
+  - `SqlOperationRegistry`: Typed registry alias for SQL operations
 
-- **Manifest Validation**: Optional Arktype validators for operation manifests
-  - `validateOperationManifest()`: Validates a single operation manifest
-  - `validateOperationManifests()`: Validates an array of operation manifests
-
-- **SQL Lowering**: Defines how operations are lowered to SQL
-  - `LoweringStrategy`: 'infix' or 'function' lowering strategies
-  - `LoweringSpec`: Target family, strategy, and template for SQL lowering
+- **Registry Helpers**: Typed helpers for creating and using SQL operation registries
+  - `createSqlOperationRegistry()`: Creates a typed SQL operation registry
+  - `register()`: Typed wrapper for registering operations in a registry
 
 ## Dependencies
 
 - **Depends on**:
   - `@prisma-next/operations` (core operation registry types)
-  - `arktype` (for manifest validation)
 - **Depended on by**:
   - `@prisma-next/sql-relational-core` (uses for operation execution)
   - `@prisma-next/sql-runtime` (uses for operation signature types)
-  - `@prisma-next/emitter` (uses for pack-based assembly via `assembleOperationRegistryFromPacks`)
+  - `@prisma-next/cli` (uses types when assembling registries from packs)
 
 ## Architecture
 
@@ -48,7 +42,7 @@ flowchart TD
     end
 
     subgraph "Tooling Ring (Migration Plane)"
-        EMITTER[@prisma-next/emitter]
+        CLI[@prisma-next/cli]
     end
 
     subgraph "Lanes Ring (Runtime Plane)"
@@ -60,50 +54,44 @@ flowchart TD
     end
 
     OPS --> SQL_OPS
-    EMITTER --> SQL_OPS
+    CLI --> SQL_OPS
     SQL_OPS --> REL_CORE
     SQL_OPS --> SQL_RUNTIME
 ```
 
 ## Usage
 
-### Assembling Operations from Manifests
+### Creating and Using SQL Operation Registries
 
 ```typescript
 import {
-  assembleOperationRegistry,
-  type OperationManifestLike,
+  createSqlOperationRegistry,
+  register,
+  type SqlOperationSignature,
 } from '@prisma-next/sql-operations';
 
-const manifests: OperationManifestLike[] = [
-  {
-    for: 'pgvector/vector@1',
-    method: 'cosineDistance',
-    args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
-    returns: { kind: 'builtin', type: 'number' },
-    lowering: {
-      strategy: 'infix',
-      template: '${self} <=> ${arg0}',
-    },
+const registry = createSqlOperationRegistry();
+
+const signature: SqlOperationSignature = {
+  forTypeId: 'pgvector/vector@1',
+  method: 'cosineDistance',
+  args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+  returns: { kind: 'builtin', type: 'number' },
+  lowering: {
+    targetFamily: 'sql',
+    strategy: 'infix',
+    template: '${self} <=> ${arg0}',
   },
-];
+};
 
-const registry = assembleOperationRegistry(manifests);
+register(registry, signature);
+
+const operations = registry.byType('pgvector/vector@1');
 ```
 
-### Assembling Operations from Extension Packs (Emitter/CLI)
+### Assembling Operations from Extension Packs (CLI/Tooling)
 
-For tooling code that works with extension packs, use the emitter's `assembleOperationRegistryFromPacks` function:
-
-```typescript
-import { assembleOperationRegistryFromPacks } from '@prisma-next/emitter';
-import type { ExtensionPack } from '@prisma-next/emitter';
-
-const packs: ExtensionPack[] = [/* ... */];
-const registry = assembleOperationRegistryFromPacks(packs);
-```
-
-This function extracts operation manifests from packs, validates them, and calls the shared `assembleOperationRegistry` function.
+For tooling code that works with extension packs, manifest assembly happens in the CLI layer. See `@prisma-next/cli` for pack assembly utilities.
 
 ## Related Documentation
 

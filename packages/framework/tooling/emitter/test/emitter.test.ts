@@ -1,16 +1,17 @@
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
+import { createOperationRegistry } from '@prisma-next/operations';
 import { describe, expect, it } from 'vitest';
 import type { ContractIR } from '../../../core-contract/src/ir';
 import { emit } from '../src/emitter';
 import { loadExtensionPacks } from '../src/extension-pack';
 import type { TargetFamilyHook } from '../src/target-family';
-import type { EmitOptions, ExtensionPack, ExtensionPackManifest } from '../src/types';
+import type { EmitOptions, ExtensionPack, TypesImportSpec } from '../src/types';
 import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>) => {
+  validateTypes: (ir: ContractIR, _operationRegistry?) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
       | undefined;
@@ -18,7 +19,6 @@ const mockSqlHook: TargetFamilyHook = {
       return;
     }
 
-    const packNamespaces = new Set(packManifests.map((p) => p.id));
     const referencedNamespaces = new Set<string>();
     const extensions = ir.extensions as Record<string, unknown> | undefined;
     if (extensions) {
@@ -45,9 +45,9 @@ const mockSqlHook: TargetFamilyHook = {
         const match = col.type.match(typeIdRegex);
         if (match?.[1]) {
           const namespace = match[1];
-          if (!referencedNamespaces.has(namespace) && !packNamespaces.has(namespace)) {
+          if (!referencedNamespaces.has(namespace)) {
             throw new Error(
-              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions or available in loaded packs`,
+              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions`,
             );
           }
         }
@@ -59,16 +59,16 @@ const mockSqlHook: TargetFamilyHook = {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }
   },
-  generateContractTypes: (ir: ContractIR) => {
+  generateContractTypes: (ir: ContractIR, typeImports) => {
     // Access ir properties to satisfy lint rules, but we don't use them in the mock
     void ir;
+    void typeImports;
     return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type Contract = unknown;
 `;
   },
-  getTypesImports: () => [],
 };
 
 describe('emitter', () => {
@@ -112,9 +112,25 @@ describe('emitter', () => {
         join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
         [],
       );
+      // Create empty registry and extract type imports/extension IDs from packs for tests
+      const operationRegistry = createOperationRegistry();
+      const typeImports: TypesImportSpec[] = [];
+      for (const pack of packs) {
+        const codecTypes = pack.manifest.types?.codecTypes;
+        if (codecTypes?.import) {
+          typeImports.push(codecTypes.import);
+        }
+        const operationTypes = pack.manifest.types?.operationTypes;
+        if (operationTypes?.import) {
+          typeImports.push(operationTypes.import);
+        }
+      }
+      const extensionIds = packs.map((p) => p.manifest.id);
       const options: EmitOptions = {
         outputDir: '',
-        packs,
+        operationRegistry,
+        typeImports,
+        extensionIds,
       };
 
       const result = await emit(ir, options, mockSqlHook);
@@ -147,13 +163,12 @@ describe('emitter', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
@@ -176,13 +191,12 @@ describe('emitter', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('invalid type ID format');
@@ -205,13 +219,12 @@ describe('emitter', () => {
       },
     }) as ContractIR;
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
@@ -236,13 +249,12 @@ describe('emitter', () => {
       },
     }) as ContractIR;
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have target');
@@ -264,13 +276,12 @@ describe('emitter', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     // validateTypes runs before validateExtensions, so it will throw about type ID first
@@ -293,13 +304,12 @@ describe('emitter', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     // validateTypes runs before validateExtensions, so it will throw about type ID first
@@ -322,10 +332,12 @@ describe('emitter', () => {
       },
     });
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
@@ -336,10 +348,12 @@ describe('emitter', () => {
       schemaVersion: undefined as unknown as string,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
@@ -352,10 +366,12 @@ describe('emitter', () => {
       models: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have models');
@@ -366,10 +382,12 @@ describe('emitter', () => {
       models: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have models');
@@ -380,10 +398,12 @@ describe('emitter', () => {
       storage: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have storage');
@@ -394,10 +414,12 @@ describe('emitter', () => {
       storage: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have storage');
@@ -408,10 +430,12 @@ describe('emitter', () => {
       relations: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have relations');
@@ -422,10 +446,12 @@ describe('emitter', () => {
       relations: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have relations');
@@ -436,10 +462,12 @@ describe('emitter', () => {
       extensions: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have extensions');
@@ -450,10 +478,12 @@ describe('emitter', () => {
       extensions: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have extensions');
@@ -464,10 +494,12 @@ describe('emitter', () => {
       capabilities: undefined as unknown as Record<string, Record<string, boolean>>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
@@ -480,10 +512,12 @@ describe('emitter', () => {
       capabilities: 'not-an-object' as unknown as Record<string, Record<string, boolean>>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
@@ -496,10 +530,12 @@ describe('emitter', () => {
       meta: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have meta');
@@ -510,10 +546,12 @@ describe('emitter', () => {
       meta: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have meta');
@@ -524,10 +562,12 @@ describe('emitter', () => {
       sources: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
@@ -538,10 +578,12 @@ describe('emitter', () => {
       sources: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const packs: ExtensionPack[] = [];
+    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      typeImports: [],
+      extensionIds: [],
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
@@ -565,31 +607,24 @@ describe('emitter', () => {
           throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
         }
       },
-      generateContractTypes: () => {
+      generateContractTypes: (_ir, _typeImports) => {
         return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type Contract = unknown;
 `;
       },
-      getTypesImports: () => [],
-    };
-
-    const mockPack: ExtensionPack = {
-      manifest: {
-        id: 'missing-pack',
-        version: '1.0.0',
-      },
-      path: '/mock/path',
     };
 
     const options: EmitOptions = {
       outputDir: '',
-      packs: [mockPack],
+      operationRegistry: createOperationRegistry(),
+      typeImports: [],
+      extensionIds: ['missing-pack'],
     };
 
     await expect(emit(ir, options, mockHookNoTypeValidation)).rejects.toThrow(
-      'Extension pack "missing-pack" (loaded from manifest) must appear in contract.extensions.missing-pack',
+      'Extension "missing-pack" must appear in contract.extensions.missing-pack',
     );
   });
 });

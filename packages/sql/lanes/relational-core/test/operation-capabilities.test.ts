@@ -1,6 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { OperationSignature } from '@prisma-next/sql-operations';
+import type { SqlSqlOperationSignature } from '@prisma-next/sql-operations';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
@@ -34,7 +34,7 @@ describe('Operation capability gating', () => {
       mappings: {},
     });
 
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
@@ -89,7 +89,7 @@ describe('Operation capability gating', () => {
       mappings: {},
     });
 
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
@@ -144,7 +144,7 @@ describe('Operation capability gating', () => {
       mappings: {},
     });
 
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
@@ -202,7 +202,7 @@ describe('Operation capability gating', () => {
       mappings: {},
     });
 
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],

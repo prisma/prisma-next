@@ -6,6 +6,11 @@ import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { Command } from 'commander';
 import { loadContractFromTs } from '../load-ts-contract';
+import {
+  assembleOperationRegistryFromPacks,
+  extractExtensionIds,
+  extractTypeImports,
+} from '../pack-assembly';
 
 export function createEmitCommand(): Command {
   const command = new Command('emit');
@@ -37,6 +42,11 @@ export function createEmitCommand(): Command {
 
           const packs = loadExtensionPacks(adapterPath, extensionPaths);
 
+          // Assemble operation registry and extract type imports from packs
+          const operationRegistry = assembleOperationRegistryFromPacks(packs);
+          const typeImports = extractTypeImports(packs);
+          const extensionIds = extractExtensionIds(packs);
+
           const contractRaw = await loadContractFromTs(contractPath);
 
           // Normalize the contract to ensure all required fields are present
@@ -53,7 +63,9 @@ export function createEmitCommand(): Command {
             contractIR as unknown as typeof contractRaw,
             {
               outputDir,
-              packs,
+              operationRegistry,
+              typeImports,
+              extensionIds,
             },
             targetFamily,
           );

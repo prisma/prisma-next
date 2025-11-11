@@ -2,7 +2,7 @@ import type { OperationRegistry } from '@prisma-next/operations';
 import { hasAllCapabilities } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
-import type { OperationSignature } from '@prisma-next/sql-operations';
+import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from './ast/types';
 import type { AnyColumnBuilder, ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
 
@@ -38,7 +38,7 @@ function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
  * @returns A column-shaped builder with the operation expression attached
  */
 function executeOperation(
-  signature: OperationSignature,
+  signature: SqlOperationSignature,
   selfBuilder: AnyColumnBuilder,
   args: unknown[],
   columnMeta: StorageColumn,
@@ -195,7 +195,7 @@ export function attachOperationsToColumnBuilder<
 
   const typeId = columnMeta.type;
 
-  const operations = registry.byType(typeId) as OperationSignature[];
+  const operations = registry.byType(typeId) as SqlOperationSignature[];
   if (operations.length === 0) {
     return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
