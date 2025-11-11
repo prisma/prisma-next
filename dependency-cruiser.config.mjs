@@ -66,10 +66,6 @@ const isCliGroup = (group) =>
   group.layer === 'tooling' &&
   group.globs.some((glob) => glob.includes('tooling/cli'));
 
-const isSqlAuthoringToTargets = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'sql' &&
-  sourceGroup.layer === 'authoring' &&
-  targetGroup.layer === 'targets';
 
 const isSqlLanesToRuntime = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'sql' &&
@@ -94,12 +90,6 @@ const isCompatPrismaToSql = (sourceGroup, targetGroup) =>
   sourceGroup.layer === 'compat' &&
   sourceGroup.globs.some((glob) => glob.includes('compat-prisma')) &&
   targetGroup.domain === 'sql';
-
-const isSqlRuntimeOrAdaptersToTargets = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'sql' &&
-  ['runtime', 'lanes', 'adapters'].includes(sourceGroup.layer) &&
-  targetGroup.domain === 'sql' &&
-  targetGroup.layer === 'targets';
 
 const createUpwardRules = () => {
   for (const sourceGroup of moduleGroups) {
