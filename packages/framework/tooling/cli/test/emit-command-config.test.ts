@@ -1,9 +1,39 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { Command } from 'commander';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const workspaceRoot = resolve(__dirname, '../../../../');
+
+function createConfigFileContent(): string {
+  // Use absolute paths to dist files to avoid import resolution issues in temp directories
+  const adapterPath = resolve(
+    workspaceRoot,
+    'packages/sql/runtime/adapters/postgres/dist/exports/cli.js',
+  );
+  const targetPath = resolve(workspaceRoot, 'packages/targets/sql/postgres/dist/exports/cli.js');
+  const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
+  const configTypesPath = resolve(
+    workspaceRoot,
+    'packages/framework/tooling/cli/dist/exports/config-types.js',
+  );
+
+  return `import { defineConfig } from '${configTypesPath}';
+import postgresAdapter from '${adapterPath}';
+import postgres from '${targetPath}';
+import sql from '${familyPath}';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+});
+`;
+}
 
 describe('emit command with config', () => {
   let testDir: string;
@@ -47,71 +77,50 @@ export const contract = defineContract<CodecTypes>()
   });
 
   it('emits contract with config file', async () => {
-    // Create config file
-    writeFileSync(
-      configPath,
-      `import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-});
-`,
-      'utf-8',
-    );
+    // Create config file with absolute paths
+    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
 
     const command = createEmitCommand();
-    const program = new Command();
-    program.addCommand(command);
-
-    await program.parseAsync([
-      'node',
-      'emit',
-      '--contract',
-      contractPath,
-      '--out',
-      outputDir,
-      '--config',
-      configPath,
-    ]);
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(testDir);
+      await command.parseAsync([
+        'node',
+        'cli.js',
+        'emit',
+        '--contract',
+        contractPath,
+        '--out',
+        outputDir,
+        '--config',
+        configPath,
+      ]);
+    } finally {
+      process.chdir(originalCwd);
+    }
 
     expect(existsSync(join(outputDir, 'contract.json'))).toBe(true);
     expect(existsSync(join(outputDir, 'contract.d.ts'))).toBe(true);
   });
 
   it('emits contract with default config path', async () => {
-    // Create config file at default location
-    writeFileSync(
-      configPath,
-      `import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-});
-`,
-      'utf-8',
-    );
+    // Create config file at default location with absolute paths
+    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
 
     const command = createEmitCommand();
-    const program = new Command();
-    program.addCommand(command);
-
     // Change to testDir so default config path resolves
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
-      await program.parseAsync(['node', 'emit', '--contract', 'contract.ts', '--out', 'output']);
+      await command.parseAsync([
+        'node',
+        'cli.js',
+        'emit',
+        '--contract',
+        'contract.ts',
+        '--out',
+        'output',
+      ]);
       expect(existsSync(join(testDir, 'output', 'contract.json'))).toBe(true);
       expect(existsSync(join(testDir, 'output', 'contract.d.ts'))).toBe(true);
     } finally {
@@ -121,20 +130,24 @@ export default defineConfig({
 
   it('throws error when config file is missing', async () => {
     const command = createEmitCommand();
-    const program = new Command();
-    program.addCommand(command);
-
-    await expect(
-      program.parseAsync([
-        'node',
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--config',
-        join(testDir, 'nonexistent.config.ts'),
-      ]),
-    ).rejects.toThrow();
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(testDir);
+      await expect(
+        command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          contractPath,
+          '--out',
+          outputDir,
+          '--config',
+          join(testDir, 'nonexistent.config.ts'),
+        ]),
+      ).rejects.toThrow();
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 });

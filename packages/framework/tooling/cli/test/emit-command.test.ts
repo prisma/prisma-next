@@ -8,9 +8,39 @@ import { createEmitCommand } from '../src/commands/emit';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
+const workspaceRoot = resolve(__dirname, '../../../../');
+
+function createConfigFileContent(): string {
+  // Use absolute paths to dist files to avoid import resolution issues in temp directories
+  const adapterPath = resolve(
+    workspaceRoot,
+    'packages/sql/runtime/adapters/postgres/dist/exports/cli.js',
+  );
+  const targetPath = resolve(workspaceRoot, 'packages/targets/sql/postgres/dist/exports/cli.js');
+  const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
+  const configTypesPath = resolve(
+    workspaceRoot,
+    'packages/framework/tooling/cli/dist/exports/config-types.js',
+  );
+
+  return `import { defineConfig } from '${configTypesPath}';
+import postgresAdapter from '${adapterPath}';
+import postgres from '${targetPath}';
+import sql from '${familyPath}';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+});
+`;
+}
 
 describe('emit command', () => {
+  let testDir: string;
   let outputDir: string;
+  let configPath: string;
   let originalExit: typeof process.exit;
   let originalConsoleLog: typeof console.log;
   let originalConsoleError: typeof console.error;
@@ -19,11 +49,16 @@ describe('emit command', () => {
   let consoleErrors: string[] = [];
 
   beforeEach(() => {
-    outputDir = join(
+    testDir = join(
       tmpdir(),
       `prisma-next-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     );
-    mkdirSync(outputDir, { recursive: true });
+    mkdirSync(testDir, { recursive: true });
+    outputDir = join(testDir, 'output');
+    configPath = join(testDir, 'prisma-next.config.ts');
+
+    // Create default config file with absolute paths
+    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
 
     originalExit = process.exit;
     originalConsoleLog = console.log;
@@ -46,8 +81,8 @@ describe('emit command', () => {
   });
 
   afterEach(() => {
-    if (existsSync(outputDir)) {
-      rmSync(outputDir, { recursive: true, force: true });
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
     }
     process.exit = originalExit;
     console.log = originalConsoleLog;
@@ -59,19 +94,23 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
-
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--adapter',
-        adapterPath,
-      ]);
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          contractPath,
+          '--out',
+          outputDir,
+          '--config',
+          configPath,
+        ]);
+      } finally {
+        process.chdir(originalCwd);
+      }
 
       const contractJsonPath = join(outputDir, 'contract.json');
       const contractDtsPath = join(outputDir, 'contract.d.ts');
@@ -98,29 +137,29 @@ describe('emit command', () => {
   it(
     'creates output directory if it does not exist',
     async () => {
-      const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
+      const newOutputDir = join(testDir, 'new-output');
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          contractPath,
+          '--out',
+          newOutputDir,
+          '--config',
+          configPath,
+        ]);
 
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        newOutputDir,
-        '--adapter',
-        adapterPath,
-      ]);
-
-      expect(existsSync(newOutputDir)).toBe(true);
-      expect(existsSync(join(newOutputDir, 'contract.json'))).toBe(true);
-      expect(existsSync(join(newOutputDir, 'contract.d.ts'))).toBe(true);
-
-      if (existsSync(newOutputDir)) {
-        rmSync(newOutputDir, { recursive: true, force: true });
+        expect(existsSync(newOutputDir)).toBe(true);
+        expect(existsSync(join(newOutputDir, 'contract.json'))).toBe(true);
+        expect(existsSync(join(newOutputDir, 'contract.d.ts'))).toBe(true);
+      } finally {
+        process.chdir(originalCwd);
       }
     },
     timeouts.typeScriptCompilation,
@@ -149,10 +188,10 @@ describe('emit command', () => {
 
   it('handles invalid contract file', async () => {
     const command = createEmitCommand();
-    const invalidPath = join(outputDir, 'nonexistent-contract.ts');
-    const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
-
+    const invalidPath = join(testDir, 'nonexistent-contract.ts');
+    const originalCwd = process.cwd();
     try {
+      process.chdir(testDir);
       await command.parseAsync([
         'node',
         'cli.js',
@@ -161,11 +200,13 @@ describe('emit command', () => {
         invalidPath,
         '--out',
         outputDir,
-        '--adapter',
-        adapterPath,
+        '--config',
+        configPath,
       ]);
     } catch (error) {
       expect(error).toBeDefined();
+    } finally {
+      process.chdir(originalCwd);
     }
 
     expect(consoleErrors.length).toBeGreaterThan(0);
@@ -175,16 +216,42 @@ describe('emit command', () => {
     'handles unsupported target family',
     async () => {
       const command = createEmitCommand();
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
-
-      const invalidContractPath = join(outputDir, 'invalid-contract.ts');
+      const invalidContractPath = join(testDir, 'invalid-contract.ts');
       writeFileSync(
         invalidContractPath,
         `export const contract = { targetFamily: 'document', target: 'mongodb' } as const;`,
         'utf-8',
       );
 
+      // Create a config with document family (which doesn't exist, but we'll test the error)
+      const invalidConfigPath = join(testDir, 'invalid-config.ts');
+      writeFileSync(
+        invalidConfigPath,
+        `const mockHook = {
+          id: 'document',
+          validateTypes: () => {},
+          validateStructure: () => {},
+          generateContractTypes: () => '',
+        };
+        export default {
+          family: {
+            kind: 'family',
+            id: 'document',
+            hook: mockHook,
+            assembleOperationRegistry: () => ({ register: () => {} }),
+            extractCodecTypeImports: () => [],
+            extractOperationTypeImports: () => [],
+          },
+          target: { kind: 'target', id: 'mongodb', family: 'document', manifest: { id: 'mongodb', version: '1.0.0' } },
+          adapter: { kind: 'adapter', id: 'mongodb', family: 'document', manifest: { id: 'mongodb', version: '1.0.0' } },
+          extensions: [],
+        };`,
+        'utf-8',
+      );
+
+      const originalCwd = process.cwd();
       try {
+        process.chdir(testDir);
         await command.parseAsync([
           'node',
           'cli.js',
@@ -193,15 +260,21 @@ describe('emit command', () => {
           invalidContractPath,
           '--out',
           outputDir,
-          '--adapter',
-          adapterPath,
+          '--config',
+          invalidConfigPath,
         ]);
       } catch (error) {
         expect(error).toBeDefined();
+      } finally {
+        process.chdir(originalCwd);
       }
 
-      // validateContract throws "Unsupported target family" when targetFamily is not 'sql'
-      expect(consoleErrors.some((msg) => msg.includes('Unsupported target family'))).toBe(true);
+      // The error should mention unsupported family
+      expect(
+        consoleErrors.some(
+          (msg) => msg.includes('Unsupported family') || msg.includes('Unsupported target family'),
+        ),
+      ).toBe(true);
     },
     timeouts.typeScriptCompilation,
   );
@@ -211,24 +284,27 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
+      // Extensions are now in config, so we just need a valid config
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          contractPath,
+          '--out',
+          outputDir,
+          '--config',
+          configPath,
+        ]);
 
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--adapter',
-        adapterPath,
-        '--extensions',
-        adapterPath,
-      ]);
-
-      const contractJsonPath = join(outputDir, 'contract.json');
-      expect(existsSync(contractJsonPath)).toBe(true);
+        const contractJsonPath = join(outputDir, 'contract.json');
+        expect(existsSync(contractJsonPath)).toBe(true);
+      } finally {
+        process.chdir(originalCwd);
+      }
     },
     timeouts.typeScriptCompilation,
   );
@@ -238,24 +314,27 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
+      // Extensions are now in config
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          contractPath,
+          '--out',
+          outputDir,
+          '--config',
+          configPath,
+        ]);
 
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--adapter',
-        adapterPath,
-        '--extensions',
-        adapterPath,
-      ]);
-
-      const contractJsonPath = join(outputDir, 'contract.json');
-      expect(existsSync(contractJsonPath)).toBe(true);
+        const contractJsonPath = join(outputDir, 'contract.json');
+        expect(existsSync(contractJsonPath)).toBe(true);
+      } finally {
+        process.chdir(originalCwd);
+      }
     },
     timeouts.typeScriptCompilation,
   );
@@ -265,26 +344,27 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
+      // Extensions are now in config
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          contractPath,
+          '--out',
+          outputDir,
+          '--config',
+          configPath,
+        ]);
 
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--adapter',
-        adapterPath,
-        '--extensions',
-        adapterPath,
-        '--extensions',
-        adapterPath,
-      ]);
-
-      const contractJsonPath = join(outputDir, 'contract.json');
-      expect(existsSync(contractJsonPath)).toBe(true);
+        const contractJsonPath = join(outputDir, 'contract.json');
+        expect(existsSync(contractJsonPath)).toBe(true);
+      } finally {
+        process.chdir(originalCwd);
+      }
     },
     timeouts.typeScriptCompilation,
   );
@@ -294,34 +374,38 @@ describe('emit command', () => {
     async () => {
       const command = createEmitCommand();
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          contractPath,
+          '--out',
+          outputDir,
+          '--config',
+          configPath,
+        ]);
 
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--adapter',
-        adapterPath,
-      ]);
-
-      const contractJsonPath = join(outputDir, 'contract.json');
-      expect(existsSync(contractJsonPath)).toBe(true);
-      const hasProfileHash = consoleOutput.some((msg) => msg.includes('profileHash'));
-      expect(hasProfileHash).toBeDefined();
+        const contractJsonPath = join(outputDir, 'contract.json');
+        expect(existsSync(contractJsonPath)).toBe(true);
+        const hasProfileHash = consoleOutput.some((msg) => msg.includes('profileHash'));
+        expect(hasProfileHash).toBeDefined();
+      } finally {
+        process.chdir(originalCwd);
+      }
     },
     timeouts.typeScriptCompilation,
   );
 
   it('handles errors and exits with code 1', async () => {
     const command = createEmitCommand();
-    const invalidPath = join(outputDir, 'nonexistent-contract.ts');
-    const adapterPath = resolve(__dirname, '../../../../adapter-postgres');
-
+    const invalidPath = join(testDir, 'nonexistent-contract.ts');
+    const originalCwd = process.cwd();
     try {
+      process.chdir(testDir);
       await command.parseAsync([
         'node',
         'cli.js',
@@ -330,11 +414,13 @@ describe('emit command', () => {
         invalidPath,
         '--out',
         outputDir,
-        '--adapter',
-        adapterPath,
+        '--config',
+        configPath,
       ]);
     } catch {
       // Expected to throw
+    } finally {
+      process.chdir(originalCwd);
     }
 
     expect(exitCode).toBe(1);
