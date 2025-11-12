@@ -183,11 +183,20 @@ export default defineConfig({
 
 The adapter declares the following PostgreSQL capabilities:
 
+- **`orderBy: true`** - Supports ORDER BY clauses
+- **`limit: true`** - Supports LIMIT clauses
 - **`lateral: true`** - Supports LATERAL joins for `includeMany` nested array includes
 - **`jsonAgg: true`** - Supports JSON aggregation functions (`json_agg`) for `includeMany`
 - **`returning: true`** - Supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE)
 
-These capabilities are declared in the adapter's `defaultCapabilities` and must be present in the contract's capabilities for the corresponding features to work.
+**Important**: Capabilities must be declared in **both** places:
+
+1. **`packs/manifest.json`**: Capabilities are read by the CLI during emission and included in the contract
+2. **`src/core/adapter.ts`**: The `defaultCapabilities` constant is used at runtime via `adapter.profile.capabilities`
+
+The capabilities in the manifest must match the capabilities in code. If they don't match, the contract won't include the capabilities, causing runtime capability checks to fail.
+
+See `.cursor/rules/adapter-capability-declaration.mdc` for detailed guidelines.
 
 ## includeMany Support
 
