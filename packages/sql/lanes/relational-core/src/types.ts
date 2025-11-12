@@ -60,7 +60,9 @@ export interface BinaryBuilder<
 }
 
 // Helper aliases for usage sites where the specific column parameters are irrelevant
-export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, OperationTypes>;
+// Uses a permissive operation types structure that accepts any operation types
+// biome-ignore lint/suspicious/noExplicitAny: AnyColumnBuilder needs to accept column builders with any operation types
+export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, any>;
 export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
 export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
 
@@ -260,10 +262,10 @@ export type ComputeColumnJsType<
  * Extracts the inferred JsType carried by a ColumnBuilder.
  */
 type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends ColumnBuilder<
-  string,
-  StorageColumn,
+  infer _ColumnName extends string,
+  infer _ColumnMeta extends StorageColumn,
   infer JsType,
-  infer _Ops extends OperationTypes
+  infer _Ops
 >
   ? JsType
   : never;

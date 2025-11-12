@@ -1,4 +1,3 @@
-import type { ResultType } from '@prisma-next/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { sql, tables } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
@@ -13,20 +12,18 @@ export async function similaritySearch(queryVector: number[], limit = 10) {
   const postTable = tables.post;
 
   const queryParam = param('queryVector');
+  const distanceExpr = postTable.columns.embedding.cosineDistance(queryParam);
 
   const plan = sql
     .from(postTable)
     .select({
       id: postTable.columns.id,
       title: postTable.columns.title,
-      distance: postTable.columns.embedding.cosineDistance(queryParam),
+      distance: distanceExpr,
     })
-    .orderBy(postTable.columns.embedding.cosineDistance(queryParam).asc())
+    .orderBy(distanceExpr.asc())
     .limit(limit)
     .build({ params: { queryVector } });
-  type Row = ResultType<typeof plan>;
-  // Type-level test: verify distance is correctly inferred as number
-  type _distance = Row['distance'];
 
   return collect(runtime.execute(plan));
 }
