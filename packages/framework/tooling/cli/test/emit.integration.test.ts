@@ -14,14 +14,15 @@ import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-rela
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '@prisma-next/sql-tooling-assembly';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import sqlFamilyDescriptor from '../../../../sql/tooling/cli/src/exports/cli';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '../src/exports/pack-assembly';
 import { loadContractFromTs } from '../src/load-ts-contract';
 import { loadExtensionPacks } from '../src/pack-loading';
 
@@ -74,10 +75,10 @@ describe('emit integration', () => {
       const packs = loadExtensionPacks(adapterPath, []);
 
       // Assemble operation registry and extract type imports from packs
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImports(packs);
-      const operationTypeImports = extractOperationTypeImports(packs);
-      const extensionIds = extractExtensionIds(packs);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
 
       const result = await emit(
         contract,
@@ -145,10 +146,10 @@ describe('emit integration', () => {
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImports(packs);
-      const operationTypeImports = extractOperationTypeImports(packs);
-      const extensionIds = extractExtensionIds(packs);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
 
       const result1 = await emit(
         contract1,

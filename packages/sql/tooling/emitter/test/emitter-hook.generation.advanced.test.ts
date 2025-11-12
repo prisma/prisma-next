@@ -1,9 +1,9 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import {
-  type ExtensionPackManifest,
-  extractCodecTypeImports,
-  extractOperationTypeImports,
-} from '@prisma-next/sql-tooling-assembly';
+  extractCodecTypeImportsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '@prisma-next/cli/pack-assembly';
+import type { ExtensionPackManifest } from '@prisma-next/cli/pack-manifest-types';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
@@ -243,8 +243,8 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const codecTypeImports = extractCodecTypeImports(packs);
-    const operationTypeImports = extractOperationTypeImports(packs);
+    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
     const types = sqlTargetFamilyHook.generateContractTypes(
       ir,
       codecTypeImports,
@@ -291,8 +291,8 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const codecTypeImports = extractCodecTypeImports(packs);
-    const operationTypeImports = extractOperationTypeImports(packs);
+    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
     const types = sqlTargetFamilyHook.generateContractTypes(
       ir,
       codecTypeImports,

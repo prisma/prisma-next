@@ -44,6 +44,14 @@
     "./config-types": {
       "types": "./dist/config-types.d.ts",
       "import": "./dist/config-types.js"
+    },
+    "./pack-manifest-types": {
+      "types": "./dist/pack-manifest-types.d.ts",
+      "import": "./dist/pack-manifest-types.js"
+    },
+    "./pack-assembly": {
+      "types": "./dist/pack-assembly.d.ts",
+      "import": "./dist/pack-assembly.js"
     }
   }
 }

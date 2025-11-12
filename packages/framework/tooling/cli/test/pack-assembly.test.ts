@@ -1,19 +1,19 @@
+import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
+import { describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
-  type ExtensionPackManifest,
-  extractExtensionIds,
-  extractTypeImports,
-  type OperationManifest,
-  operationManifestToSignature,
-} from '@prisma-next/sql-tooling-assembly';
-import { describe, expect, it } from 'vitest';
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '../src/exports/pack-assembly';
+import type { ExtensionPackManifest, OperationManifest } from '../src/exports/pack-manifest-types';
 
 type ExtensionPack = {
   readonly manifest: ExtensionPackManifest;
   readonly path: string;
 };
 
-describe('operationManifestToSignature', () => {
+describe('operationManifestToSignature via SQL family', () => {
   it('converts OperationManifest to SqlOperationSignature', () => {
     const manifest: OperationManifest = {
       for: 'pgvector/vector@1',
@@ -28,12 +28,12 @@ describe('operationManifestToSignature', () => {
       },
     };
 
-    const signature = operationManifestToSignature(manifest);
+    const signature = sqlFamilyDescriptor.convertOperationManifest(manifest);
     expect(signature.forTypeId).toBe('pgvector/vector@1');
     expect(signature.method).toBe('cosineDistance');
     expect(signature.args).toEqual([{ kind: 'typeId', type: 'pgvector/vector@1' }]);
     expect(signature.returns).toEqual({ kind: 'builtin', type: 'number' });
-    expect(signature.lowering).toEqual({
+    expect((signature as { lowering?: unknown }).lowering).toEqual({
       targetFamily: 'sql',
       strategy: 'infix',
       // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
@@ -55,7 +55,7 @@ describe('operationManifestToSignature', () => {
       },
     };
 
-    const signature = operationManifestToSignature(manifest);
+    const signature = sqlFamilyDescriptor.convertOperationManifest(manifest);
     expect(signature.args).toEqual([{ kind: 'param' }, { kind: 'literal' }]);
   });
 
@@ -73,7 +73,7 @@ describe('operationManifestToSignature', () => {
       },
     };
 
-    const signature = operationManifestToSignature(manifest);
+    const signature = sqlFamilyDescriptor.convertOperationManifest(manifest);
     expect(signature.returns).toEqual({ kind: 'typeId', type: 'pg/text@1' });
   });
 
@@ -92,7 +92,7 @@ describe('operationManifestToSignature', () => {
       capabilities: ['test.capability'],
     };
 
-    const signature = operationManifestToSignature(manifest);
+    const signature = sqlFamilyDescriptor.convertOperationManifest(manifest);
     expect(signature.capabilities).toEqual(['test.capability']);
   });
 
@@ -111,7 +111,7 @@ describe('operationManifestToSignature', () => {
     };
 
     expect(() => {
-      operationManifestToSignature(manifest);
+      sqlFamilyDescriptor.convertOperationManifest(manifest);
     }).toThrow('typeId arg must have type property');
   });
 
@@ -130,7 +130,7 @@ describe('operationManifestToSignature', () => {
     };
 
     expect(() => {
-      operationManifestToSignature(manifest);
+      sqlFamilyDescriptor.convertOperationManifest(manifest);
     }).toThrow('Invalid arg kind: invalid');
   });
 
@@ -149,7 +149,7 @@ describe('operationManifestToSignature', () => {
     };
 
     expect(() => {
-      operationManifestToSignature(manifest);
+      sqlFamilyDescriptor.convertOperationManifest(manifest);
     }).toThrow('Invalid return kind: invalid');
   });
 });
@@ -178,7 +178,7 @@ describe('assembleOperationRegistryFromPacks', () => {
       path: '/test/pack1',
     };
 
-    const registry = assembleOperationRegistryFromPacks([pack1]);
+    const registry = assembleOperationRegistryFromPacks([pack1], sqlFamilyDescriptor);
     const operations = registry.byType('pgvector/vector@1');
     expect(operations).toHaveLength(1);
     expect(operations[0]?.method).toBe('cosineDistance');
@@ -229,7 +229,7 @@ describe('assembleOperationRegistryFromPacks', () => {
       path: '/test/pack2',
     };
 
-    const registry = assembleOperationRegistryFromPacks([pack1, pack2]);
+    const registry = assembleOperationRegistryFromPacks([pack1, pack2], sqlFamilyDescriptor);
     const operations = registry.byType('pgvector/vector@1');
     expect(operations).toHaveLength(2);
     expect(operations.map((op) => op.method)).toEqual(['cosineDistance', 'l2Distance']);
@@ -244,12 +244,12 @@ describe('assembleOperationRegistryFromPacks', () => {
       path: '/test/pack',
     };
 
-    const registry = assembleOperationRegistryFromPacks([pack]);
+    const registry = assembleOperationRegistryFromPacks([pack], sqlFamilyDescriptor);
     expect(registry.byType('pgvector/vector@1')).toEqual([]);
   });
 
   it('handles empty packs array', () => {
-    const registry = assembleOperationRegistryFromPacks([]);
+    const registry = assembleOperationRegistryFromPacks([], sqlFamilyDescriptor);
     expect(registry.byType('pgvector/vector@1')).toEqual([]);
   });
 
@@ -289,7 +289,7 @@ describe('assembleOperationRegistryFromPacks', () => {
     };
 
     expect(() => {
-      assembleOperationRegistryFromPacks([pack]);
+      assembleOperationRegistryFromPacks([pack], sqlFamilyDescriptor);
     }).toThrow(
       'Operation method "cosineDistance" already registered for typeId "pgvector/vector@1"',
     );
@@ -315,7 +315,7 @@ describe('extractTypeImports', () => {
       path: '/test/pack',
     };
 
-    const imports = extractTypeImports([pack]);
+    const imports = extractCodecTypeImportsFromPacks([pack]);
     expect(imports).toHaveLength(1);
     expect(imports[0]).toEqual({
       package: '@prisma-next/adapter-postgres/exports/codec-types',
@@ -342,7 +342,7 @@ describe('extractTypeImports', () => {
       path: '/test/pack',
     };
 
-    const imports = extractTypeImports([pack]);
+    const imports = extractOperationTypeImportsFromPacks([pack]);
     expect(imports).toHaveLength(1);
     expect(imports[0]).toEqual({
       package: '@prisma-next/ext-pgvector/exports/operation-types',
@@ -376,14 +376,16 @@ describe('extractTypeImports', () => {
       path: '/test/pack',
     };
 
-    const imports = extractTypeImports([pack]);
-    expect(imports).toHaveLength(2);
-    expect(imports[0]).toEqual({
+    const codecImports = extractCodecTypeImportsFromPacks([pack]);
+    const operationImports = extractOperationTypeImportsFromPacks([pack]);
+    expect(codecImports).toHaveLength(1);
+    expect(codecImports[0]).toEqual({
       package: '@prisma-next/adapter-postgres/exports/codec-types',
       named: 'CodecTypes',
       alias: 'PgTypes',
     });
-    expect(imports[1]).toEqual({
+    expect(operationImports).toHaveLength(1);
+    expect(operationImports[0]).toEqual({
       package: '@prisma-next/ext-pgvector/exports/operation-types',
       named: 'OperationTypes',
       alias: 'PgVectorTypes',
@@ -399,17 +401,21 @@ describe('extractTypeImports', () => {
       path: '/test/pack',
     };
 
-    const imports = extractTypeImports([pack]);
-    expect(imports).toEqual([]);
+    const codecImports = extractCodecTypeImportsFromPacks([pack]);
+    const operationImports = extractOperationTypeImportsFromPacks([pack]);
+    expect(codecImports).toEqual([]);
+    expect(operationImports).toEqual([]);
   });
 
   it('handles empty packs array', () => {
-    const imports = extractTypeImports([]);
-    expect(imports).toEqual([]);
+    const codecImports = extractCodecTypeImportsFromPacks([]);
+    const operationImports = extractOperationTypeImportsFromPacks([]);
+    expect(codecImports).toEqual([]);
+    expect(operationImports).toEqual([]);
   });
 });
 
-describe('extractExtensionIds', () => {
+describe('extractExtensionIdsFromPacks', () => {
   it('extracts extension IDs from packs', () => {
     const pack1: { readonly manifest: ExtensionPackManifest; readonly path: string } = {
       manifest: {
@@ -427,12 +433,12 @@ describe('extractExtensionIds', () => {
       path: '/test/pack2',
     };
 
-    const ids = extractExtensionIds([pack1, pack2]);
+    const ids = extractExtensionIdsFromPacks([pack1, pack2]);
     expect(ids).toEqual(['test-pack-1', 'test-pack-2']);
   });
 
   it('handles empty packs array', () => {
-    const ids = extractExtensionIds([]);
+    const ids = extractExtensionIdsFromPacks([]);
     expect(ids).toEqual([]);
   });
 });

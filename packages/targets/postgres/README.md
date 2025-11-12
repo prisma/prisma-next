@@ -49,8 +49,7 @@ This package provides both CLI and runtime entry points for the Postgres target.
 
 ## Dependencies
 
-- **`@prisma-next/cli`**: CLI descriptor types (`TargetDescriptor`)
-- **`@prisma-next/sql-tooling-assembly`**: Assembly helpers for processing descriptors
+- **`@prisma-next/cli`**: CLI descriptor types (`TargetDescriptor`, `ExtensionPackManifest`)
 - **`arktype`**: Runtime validation
 
 **Dependents:**

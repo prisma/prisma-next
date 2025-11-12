@@ -2,9 +2,16 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '@prisma-next/cli/pack-assembly';
 import type { ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
@@ -12,12 +19,6 @@ import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
-import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '@prisma-next/sql-tooling-assembly';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -35,10 +36,10 @@ beforeAll(async () => {
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, []);
-  const operationRegistry = assembleOperationRegistryFromPacks(packs);
-  const codecTypeImports = extractCodecTypeImports(packs);
-  const operationTypeImports = extractOperationTypeImports(packs);
-  const extensionIds = extractExtensionIds(packs);
+  const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+  const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+  const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+  const extensionIds = extractExtensionIdsFromPacks(packs);
 
   const result = await emit(
     contractIR,

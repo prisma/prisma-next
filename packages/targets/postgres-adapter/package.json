@@ -18,7 +18,6 @@
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
-    "@prisma-next/sql-tooling-assembly": "workspace:*",
     "arktype": "^2.0.0"
   },
   "devDependencies": {

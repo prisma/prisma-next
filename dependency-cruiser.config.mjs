@@ -75,11 +75,6 @@ const isSqlLanesToRuntime = (sourceGroup, targetGroup) =>
   targetGroup.layer === 'runtime' &&
   targetGroup.plane === 'runtime';
 
-const isExtensionsToSqlTargets = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'extensions' &&
-  targetGroup.domain === 'sql' &&
-  targetGroup.layer === 'targets';
-
 const isCompatPrismaToSql = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'extensions' &&
   sourceGroup.layer === 'compat' &&
@@ -118,10 +113,6 @@ const createCrossDomainRules = () => {
     for (const targetGroup of moduleGroups) {
       if (sourceGroup.domain === targetGroup.domain) continue;
       if (targetGroup.domain === 'framework') continue;
-
-      if (isExtensionsToSqlTargets(sourceGroup, targetGroup)) {
-        continue;
-      }
 
       // TODO: compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API
       if (isCompatPrismaToSql(sourceGroup, targetGroup)) {

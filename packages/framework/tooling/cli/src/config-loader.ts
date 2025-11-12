@@ -78,14 +78,11 @@ function validateConfig(config: unknown): asserts config is PrismaNextConfig {
   if (!family['hook'] || typeof family['hook'] !== 'object') {
     throw new Error('Config.family must have hook: TargetFamilyHook');
   }
-  if (typeof family['assembleOperationRegistry'] !== 'function') {
-    throw new Error('Config.family must have assembleOperationRegistry: function');
+  if (typeof family['convertOperationManifest'] !== 'function') {
+    throw new Error('Config.family must have convertOperationManifest: function');
   }
-  if (typeof family['extractCodecTypeImports'] !== 'function') {
-    throw new Error('Config.family must have extractCodecTypeImports: function');
-  }
-  if (typeof family['extractOperationTypeImports'] !== 'function') {
-    throw new Error('Config.family must have extractOperationTypeImports: function');
+  if (typeof family['validateContractIR'] !== 'function') {
+    throw new Error('Config.family must have validateContractIR: function');
   }
 
   // Validate target descriptor

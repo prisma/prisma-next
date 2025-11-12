@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
-    "@prisma-next/sql-tooling-assembly": "workspace:*",
     "arktype": "^2.0.0"
   },
   "devDependencies": {

@@ -168,8 +168,8 @@ Contract authoring surfaces for creating contracts programmatically.
 Target-family specific emitter hooks and family‑provided helpers for CLI assembly.
 
 - `packages/sql/tooling/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
-- `packages/sql/tooling/assembly/` → `@prisma-next/sql-tooling-assembly` - SQL family assembly helpers (operation registry, type imports)
-- `packages/sql/tooling/cli/` → `@prisma-next/family-sql` - SQL family CLI entry point (exports `FamilyDescriptor` with hook and helpers)
+- `packages/sql/tooling/cli/` → `@prisma-next/family-sql` - SQL family CLI entry point (exports `FamilyDescriptor` with hook and `convertOperationManifest`)
+- `packages/framework/tooling/cli/src/pack-assembly.ts` - Generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for conversion
 - Pack entrypoints: use `/cli` for IR descriptors and helpers (no runtime), `/runtime` for factories (runtime only). The app config imports from `/cli` to keep emit pure.
 
 **Dependency Rules:** Can import from `core/*` and `authoring/*` only.

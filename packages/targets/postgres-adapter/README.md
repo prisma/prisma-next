@@ -134,8 +134,7 @@ flowchart TD
 
 - **`@prisma-next/sql-contract`**: SQL contract types
 - **`@prisma-next/sql-relational-core`**: SQL AST types and codec registry
-- **`@prisma-next/sql-tooling-assembly`**: Extension pack manifest types
-- **`@prisma-next/cli`**: CLI config types
+- **`@prisma-next/cli`**: CLI config types and extension pack manifest types
 
 ## Related Subsystems
 

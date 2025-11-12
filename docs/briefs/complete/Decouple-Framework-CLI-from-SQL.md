@@ -42,8 +42,9 @@ Introduce a single indirection layer via the existing FamilyDescriptor and move 
   - family hook passed to emitter
 
 3) Relocate SQL‑specific helpers to SQL family packages
-- Keep assembly and type import helpers in `@prisma-next/sql-tooling-assembly` and expose via `@prisma-next/family-sql/cli`.
-- Remove `packages/framework/tooling/cli/src/pack-assembly.ts` or replace with thin re‑exports guarded by `framework` domain (prefer removal).
+- Generic assembly logic (looping over descriptors) moved to `packages/framework/tooling/cli/src/pack-assembly.ts`.
+- Family-specific conversion (manifest → signature) delegated to `family.convertOperationManifest()` in SQL family CLI package.
+- `@prisma-next/sql-tooling-assembly` package removed.
 
 4) Update examples/tests to consume family exports
 - Replace imports of framework `pack-assembly` with `@prisma-next/family-sql/cli` or use the config path.

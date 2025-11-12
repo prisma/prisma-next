@@ -113,14 +113,14 @@ packages/
 
 ## Migration Plan (High-Level)
 
-1) Scaffold the new folder skeleton and path aliases; add import guardrails and CI checks.
-2) Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/framework/authoring/contract-authoring`.
-3) Stand up `lanes/relational-core` and move schema/column builders and operation attachment there.
-4) Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.
+1) ✅  Scaffold the new folder skeleton and path aliases; add import guardrails and CI checks.
+2) ✅  Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/framework/authoring/contract-authoring`.
+3) ✅  Stand up `lanes/relational-core` and move schema/column builders and operation attachment there.
+4) ✅  Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.
 5) ✅ Restructure `sql-target` under `sql/tooling` and keep a curated entrypoint for adapters. **Complete**
 6) ✅ Extract `framework/runtime-core` and move SQL-specific execution into `sql/sql-runtime`. **Complete**
 7) ✅ Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated. **Complete** - `@prisma-next/sql-query` removed in Slice 7.
-8) ✅ Move pack assembly from framework CLI to family-provided helpers. **Complete** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL) - Pack assembly logic moved to `@prisma-next/sql-tooling-assembly` and exported via `@prisma-next/family-sql/cli`. Contract validation also decoupled via `family.validateContractIR()` hook. All CLI→SQL dependency exceptions removed.
+8) ✅ Move pack assembly from framework CLI to family-provided helpers. **Complete** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL) - Generic assembly logic (looping over descriptors) moved to `packages/framework/tooling/cli/src/pack-assembly.ts`. Family-specific conversion delegated to `family.convertOperationManifest()`. Contract validation also decoupled via `family.validateContractIR()` hook. All CLI→SQL dependency exceptions removed. `@prisma-next/sql-tooling-assembly` package removed.
 9) ✅ Migrate Postgres adapter from SQL domain to Targets domain. **Complete** (Briefs: Separate-Dialect-Adapter-Driver, Migrate-Postgres-Adapter-to-Targets-Domain) - Adapter, target, and driver are now separate packages under `packages/targets/**` with multi-plane entrypoints.
 
 ## Alternatives Considered

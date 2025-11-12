@@ -100,24 +100,31 @@ flowchart TD
 ### Emit Command (`commands/emit.ts`)
 - Command implementation using commander
 - Loads the user's config module (`prisma-next.config.ts`)
-- Reads family hook and family helpers from `config.family`:
-  - `assembleOperationRegistry`, `extractCodecTypeImports`, `extractOperationTypeImports` for assembly
-  - `validateContractIR` for contract validation and normalization
-- Calls family helpers with `{ adapter, target, extensions }` to assemble inputs for emission; manifests are treated as opaque by the CLI
-- Loads TS contract using `loadContractFromTs()` utility
-- Validates contract using `config.family.validateContractIR()` which returns ContractIR without mappings
+- Uses framework CLI assembly functions to loop over descriptors:
+  - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, calls `family.convertOperationManifest()` for each
+  - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
+  - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
+  - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
+- Calls `config.family.validateContractIR()` to validate and normalize contract, returns ContractIR without mappings
 - Calls `emit()` from emitter with the assembled inputs and `family.hook`
 - Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact
 - Writes `contract.json` and `contract.d.ts` to output directory
 
-### Family Helpers (provided by family /cli entrypoint)
-- The SQL family (and other families) provide helper functions used by the CLI to assemble inputs for emission:
-  - `assembleOperationRegistry(descriptors)` - Assembles operation registry from adapter/target/extension descriptors
+### Pack Assembly (`pack-assembly.ts`)
+- Generic assembly functions that loop over descriptors/packs:
+  - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, delegates to `family.convertOperationManifest()` for conversion
   - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
   - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
+  - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
+  - Pack-based versions for tests: `assembleOperationRegistryFromPacks`, `extractCodecTypeImportsFromPacks`, etc.
+- These functions handle the generic looping logic; family-specific conversion is delegated to `family.convertOperationManifest()`.
+
+### Family Descriptor (provided by family /cli entrypoint)
+- The SQL family (and other families) provide:
+  - `convertOperationManifest(manifest)` - Converts `OperationManifest` to `OperationSignature` (family-specific, e.g., SQL adds lowering spec)
   - `validateContractIR(contractJson)` - Validates and normalizes contract, returns ContractIR without mappings
   - `stripMappings?(contract)` - Optionally strips runtime-only mappings from contract
-- These helpers move family-specific assembly and validation logic out of the CLI so the CLI remains family‑agnostic.
+- The framework CLI handles generic looping; families provide conversion logic.
 
 ### Pack Manifest Types (IR)
 - Families define their manifest IR and related types under their own tooling packages. CLI treats manifests as opaque data.

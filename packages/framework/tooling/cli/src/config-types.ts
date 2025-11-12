@@ -1,6 +1,6 @@
-import type { TargetFamilyHook, TypesImportSpec } from '@prisma-next/emitter';
-import type { OperationRegistry } from '@prisma-next/operations';
-import type { ExtensionPackManifest } from './pack-manifest-types';
+import type { TargetFamilyHook } from '@prisma-next/emitter';
+import type { OperationSignature } from '@prisma-next/operations';
+import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
 
 /**
  * Descriptor for a target family (e.g., SQL).
@@ -10,15 +10,11 @@ export interface FamilyDescriptor {
   readonly kind: 'family';
   readonly id: string;
   readonly hook: TargetFamilyHook;
-  readonly assembleOperationRegistry: (
-    descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-  ) => OperationRegistry;
-  readonly extractCodecTypeImports: (
-    descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-  ) => ReadonlyArray<TypesImportSpec>;
-  readonly extractOperationTypeImports: (
-    descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-  ) => ReadonlyArray<TypesImportSpec>;
+  /**
+   * Converts an OperationManifest to an OperationSignature.
+   * Family-specific conversion logic (e.g., SQL adds lowering spec).
+   */
+  readonly convertOperationManifest: (manifest: OperationManifest) => OperationSignature;
   /**
    * Validates a contract JSON and returns a validated ContractIR (without mappings).
    * Mappings are runtime-only and should not be part of ContractIR.

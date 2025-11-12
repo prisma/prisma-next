@@ -617,7 +617,7 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
 - SQL family SPI: `packages/sql/tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
 - Extension pack loading: `packages/framework/tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
 - Manifest types: `packages/framework/tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
-- SQL family assembly: `packages/sql/tooling/assembly/` → `@prisma-next/sql-tooling-assembly` - assembles operation registries from extension pack descriptors and extracts separate codec/operation type imports (SQL family package, not framework CLI)
+- Framework CLI assembly: `packages/framework/tooling/cli/src/pack-assembly.ts` - generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for family-specific conversion
 
 **Outputs:**
 - `contract.json`: Canonical JSON with `coreHash` and `profileHash`, all column types as fully qualified IDs (`ns/name@version`). Includes `_generated` metadata field to indicate it's a generated artifact (excluded from canonicalization/hashing).

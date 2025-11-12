@@ -4,6 +4,12 @@ import { emit } from '@prisma-next/emitter';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { loadContractFromTs } from '../load-ts-contract';
+import {
+  assembleOperationRegistry,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
+} from '../pack-assembly';
 
 export function createEmitCommand(): Command {
   const command = new Command('emit');
@@ -31,42 +37,18 @@ export function createEmitCommand(): Command {
           );
         }
 
-        // Build descriptors array for family helpers
+        // Build descriptors array for assembly
         const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
 
-        // Use family helpers to assemble registry and extract imports
-        const operationRegistry = config.family.assembleOperationRegistry(descriptors);
-        const codecTypeImports = config.family.extractCodecTypeImports(descriptors);
-        const operationTypeImports = config.family.extractOperationTypeImports(descriptors);
-
-        // Build extensionIds in deterministic order: [adapter.id, target.id, ...extensions.map(e => e.id)]
-        // Deduplicates while preserving stable order
-        const extensionIds = (() => {
-          const ids: string[] = [];
-          const seen = new Set<string>();
-
-          // Add adapter first
-          if (!seen.has(config.adapter.id)) {
-            ids.push(config.adapter.id);
-            seen.add(config.adapter.id);
-          }
-
-          // Add target second
-          if (!seen.has(config.target.id)) {
-            ids.push(config.target.id);
-            seen.add(config.target.id);
-          }
-
-          // Add extensions in order
-          for (const ext of config.extensions ?? []) {
-            if (!seen.has(ext.id)) {
-              ids.push(ext.id);
-              seen.add(ext.id);
-            }
-          }
-
-          return ids;
-        })();
+        // Use framework CLI assembly functions (loops over descriptors, delegates to family for conversion)
+        const operationRegistry = assembleOperationRegistry(descriptors, config.family);
+        const codecTypeImports = extractCodecTypeImports(descriptors);
+        const operationTypeImports = extractOperationTypeImports(descriptors);
+        const extensionIds = extractExtensionIds(
+          config.adapter,
+          config.target,
+          config.extensions ?? [],
+        );
 
         const contractRaw = await loadContractFromTs(contractPath);
 
