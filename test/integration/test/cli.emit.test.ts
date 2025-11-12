@@ -70,17 +70,23 @@ export const contract = defineContract<CodecTypes>()
 `;
 
     const configContent = `import { defineConfig } from '@prisma-next/cli/config-types';
-    import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-    import postgres from '@prisma-next/targets-postgres/cli';
-    import sql from '@prisma-next/family-sql/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/cli';
+import sql from '@prisma-next/family-sql/cli';
+import { contract } from './contract';
 
-    export default defineConfig({
-      family: sql,
-      target: postgres,
-      adapter: postgresAdapter,
-      extensions: [],
-    });
-    `;
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+  contract: {
+    source: contract,
+    output: '${join(outputDir, 'contract.json').replace(/\\/g, '/')}',
+    types: '${join(outputDir, 'contract.d.ts').replace(/\\/g, '/')}',
+  },
+});
+`;
 
     await writeFile(contractPath, contractContent, 'utf-8');
     await writeFile(configPath, configContent, 'utf-8');
@@ -97,16 +103,7 @@ export const contract = defineContract<CodecTypes>()
     const configPath = join(testDir, 'prisma-next.config.ts');
 
     try {
-      await execFileAsync('node', [
-        cliPath,
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--config',
-        configPath,
-      ]);
+      await execFileAsync('node', [cliPath, 'emit', '--config', configPath]);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'stderr' in error) {
         console.error('CLI stderr:', error.stderr);
@@ -152,16 +149,7 @@ export const contract = defineContract<CodecTypes>()
     const configPath = join(testDir, 'prisma-next.config.ts');
 
     try {
-      await execFileAsync('node', [
-        cliPath,
-        'emit',
-        '--contract',
-        contractPath,
-        '--out',
-        outputDir,
-        '--config',
-        configPath,
-      ]);
+      await execFileAsync('node', [cliPath, 'emit', '--config', configPath]);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'stderr' in error) {
         console.error('CLI stderr:', error.stderr);

@@ -13,6 +13,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/vitest-expect-typeof.mdc` — Type test patterns
 - `.cursor/rules/prefer-object-matcher.mdc` — Prefer object matchers over multiple individual expect().toBe() calls
 - `.cursor/rules/use-ast-factories.mdc` — Use factory functions for creating AST nodes instead of manual object creation
+- `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns (throw errors, don't call process.exit)
 
 ## Imports & Layering
 - `.cursor/rules/import-validation.mdc` — Layering rules and exceptions
@@ -46,6 +47,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Responsibilities
 - `.cursor/rules/adapter-capability-declaration.mdc` — Adapter capability declaration (manifest + code)
+- `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.

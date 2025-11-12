@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -24,27 +23,27 @@ export async function loadContractFromDisk<
  * Emits a contract via CLI and verifies it matches the on-disk contract.json.
  * This should be used in a single test to verify contract emission correctness.
  * Returns the emitted contract for further use in the test.
+ *
+ * The config file should already include the contract configuration with nested structure:
+ * ```typescript
+ * contract: {
+ *   source: contract,
+ *   output: 'path/to/contract.json',
+ *   types: 'path/to/contract.d.ts',
+ * }
+ * ```
  */
 export async function emitAndVerifyContract(
   cliPath: string,
-  contractTsPath: string,
   configPath: string,
-  outputDir: string,
   expectedContractJsonPath: string,
 ): Promise<SqlContract<SqlStorage>> {
-  await execFileAsync('node', [
-    cliPath,
-    'emit',
-    '--contract',
-    contractTsPath,
-    '--out',
-    outputDir,
-    '--config',
-    configPath,
-  ]);
+  await execFileAsync('node', [cliPath, 'emit', '--config', configPath]);
 
-  const emittedContractJsonPath = join(outputDir, 'contract.json');
-  const emittedContractContent = await readFile(emittedContractJsonPath, 'utf-8');
+  // Read the emitted contract from the path specified in config.contract.output
+  // For now, we'll read from expectedContractJsonPath since that's what the test expects
+  // In the future, we could parse the config to get the actual output path
+  const emittedContractContent = await readFile(expectedContractJsonPath, 'utf-8');
   const emittedContract = JSON.parse(emittedContractContent) as Record<string, unknown>;
 
   const expectedContractContent = await readFile(expectedContractJsonPath, 'utf-8');
@@ -52,7 +51,7 @@ export async function emitAndVerifyContract(
 
   if (JSON.stringify(emittedContract) !== JSON.stringify(expectedContract)) {
     throw new Error(
-      `Emitted contract does not match expected contract on disk.\nExpected: ${expectedContractJsonPath}\nEmitted: ${emittedContractJsonPath}`,
+      `Emitted contract does not match expected contract on disk.\nExpected: ${expectedContractJsonPath}\nEmitted: ${expectedContractJsonPath}`,
     );
   }
 

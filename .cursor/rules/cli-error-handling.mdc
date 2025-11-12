@@ -1,0 +1,110 @@
+---
+description: CLI command error handling patterns
+globs:
+alwaysApply: true
+---
+
+# CLI Error Handling
+
+## Pattern: Throw Errors, Don't Call process.exit()
+
+**CRITICAL**: CLI commands should throw errors instead of calling `process.exit()`. Commander.js automatically handles errors and exits with the appropriate code.
+
+## The Problem
+
+Calling `process.exit()` directly in commands:
+- Makes testing difficult (requires mocking `process.exit`)
+- Bypasses Commander.js's error handling
+- Prevents proper error propagation
+- Makes it harder to test error cases
+
+## The Solution
+
+**❌ WRONG: Calling process.exit() in commands**
+
+```typescript
+export function createEmitCommand(): Command {
+  return new Command('emit')
+    .action(async (options) => {
+      try {
+        // ... command logic ...
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error(`Error: ${error.message}`);
+          process.exit(1);  // ❌ Don't do this
+        }
+        throw error;
+      }
+    });
+}
+```
+
+**✅ CORRECT: Throw errors and let Commander.js handle them**
+
+```typescript
+export function createEmitCommand(): Command {
+  return new Command('emit')
+    .action(async (options) => {
+      try {
+        // ... command logic ...
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error(`Error: ${error.message}`);
+        }
+        // Let commander.js handle the error (it will exit with code 1)
+        throw error;
+      }
+    });
+}
+```
+
+## Testing
+
+**❌ WRONG: Mocking process.exit in tests**
+
+```typescript
+let originalExit: typeof process.exit;
+let exitCode: number | null = null;
+
+beforeEach(() => {
+  originalExit = process.exit;
+  exitCode = null;
+  process.exit = vi.fn((code?: number) => {
+    exitCode = code ?? 0;
+  }) as typeof process.exit;
+});
+
+it('handles errors and exits with code 1', async () => {
+  // ... test code ...
+  expect(exitCode).toBe(1);
+});
+```
+
+**✅ CORRECT: Test that errors are thrown**
+
+```typescript
+it('handles errors and throws', async () => {
+  const command = createEmitCommand();
+  await expect(
+    command.parseAsync(['node', 'cli.js', 'emit', '--contract', invalidPath, '--out', outputDir]),
+  ).rejects.toThrow();
+
+  expect(consoleErrors.length).toBeGreaterThan(0);
+});
+```
+
+## Why This Matters
+
+1. **Simpler tests**: No need to mock `process.exit`
+2. **Better error handling**: Commander.js provides consistent error handling
+3. **Proper exit codes**: Commander.js automatically exits with code 1 on errors
+4. **Easier debugging**: Errors propagate naturally through the call stack
+
+## Exception: CLI Entry Point
+
+The main CLI entry point (`cli.ts`) may still need to handle `process.exit` for cases where Commander.js doesn't catch errors (e.g., unhandled promise rejections). However, individual commands should throw errors.
+
+## Related Patterns
+
+- `.cursor/rules/testing-guide.mdc`: Testing best practices
+- Commander.js documentation: Error handling in commands

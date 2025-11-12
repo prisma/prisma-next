@@ -21,14 +21,12 @@ const repoRoot = resolve(__dirname, '../../../../');
 describe('end-to-end basic queries', () => {
   const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
   const cliPath = resolve(repoRoot, 'packages/framework/tooling/cli/dist/cli.js');
-  const contractTsPath = resolve(__dirname, 'fixtures/contract.ts');
   const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
   it(
     'emits contract and verifies it matches on-disk artifacts',
     async () => {
-      const outputDir = resolve(__dirname, '../.tmp-output');
-      await emitAndVerifyContract(cliPath, contractTsPath, configPath, outputDir, contractJsonPath);
+      await emitAndVerifyContract(cliPath, configPath, contractJsonPath);
     },
     timeouts.typeScriptCompilation,
   );

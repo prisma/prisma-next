@@ -1,3 +1,5 @@
+// This is illustrative only. The actual contract is in prisma/contract.ts.
+
 generator client {
   provider = "prisma-client-js"
 }

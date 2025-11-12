@@ -7,7 +7,7 @@
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
-    "emit": "prisma-next emit --contract test/fixtures/contract.ts --out test/fixtures/generated",
+    "emit": "prisma-next emit",
     "clean": "node ../../../scripts/clean.mjs"
   },
   "devDependencies": {

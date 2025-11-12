@@ -21,17 +21,24 @@ function createConfigFileContent(): string {
     workspaceRoot,
     'packages/framework/tooling/cli/dist/config-types.js',
   );
+  const contractPath = resolve(testWorkingDir, 'contract.ts');
 
   return `import { defineConfig } from '${configTypesPath}';
 import postgresAdapter from '${adapterPath}';
 import postgres from '${targetPath}';
 import sql from '${familyPath}';
+import { contract } from '${contractPath}';
 
 export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
   extensions: [],
+  contract: {
+    source: contract,
+    output: 'output/contract.json',
+    types: 'output/contract.d.ts',
+  },
 });
 `;
 }
@@ -103,17 +110,7 @@ export const contract = {
       const originalCwd = process.cwd();
       try {
         process.chdir(testWorkingDir);
-        await command.parseAsync([
-          'node',
-          'cli.js',
-          'emit',
-          '--contract',
-          'contract.ts',
-          '--out',
-          'output',
-          '--config',
-          'prisma-next.config.ts',
-        ]);
+        await command.parseAsync(['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']);
       } finally {
         try {
           process.chdir(originalCwd);
@@ -138,15 +135,7 @@ export const contract = {
       const originalCwd = process.cwd();
       try {
         process.chdir(testWorkingDir);
-        await command.parseAsync([
-          'node',
-          'cli.js',
-          'emit',
-          '--contract',
-          'contract.ts',
-          '--out',
-          'output',
-        ]);
+        await command.parseAsync(['node', 'cli.js', 'emit']);
         expect(existsSync(join(testWorkingDir, 'output', 'contract.json'))).toBe(true);
         expect(existsSync(join(testWorkingDir, 'output', 'contract.d.ts'))).toBe(true);
       } finally {
@@ -166,17 +155,7 @@ export const contract = {
     try {
       process.chdir(testWorkingDir);
       await expect(
-        command.parseAsync([
-          'node',
-          'cli.js',
-          'emit',
-          '--contract',
-          'contract.ts',
-          '--out',
-          'output',
-          '--config',
-          'nonexistent.config.ts',
-        ]),
+        command.parseAsync(['node', 'cli.js', 'emit', '--config', 'nonexistent.config.ts']),
       ).rejects.toThrow();
     } finally {
       try {
@@ -186,4 +165,51 @@ export const contract = {
       }
     }
   });
+
+  it(
+    'handles config with extensions',
+    async () => {
+      // Create config file with extensions
+      const configWithExtensions = `import { defineConfig } from '${resolve(
+        workspaceRoot,
+        'packages/framework/tooling/cli/dist/config-types.js',
+      )}';
+import postgresAdapter from '${resolve(
+        workspaceRoot,
+        'packages/targets/postgres-adapter/dist/exports/cli.js',
+      )}';
+import postgres from '${resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js')}';
+import sql from '${resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js')}';
+import { contract } from '${contractPath}';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+  contract: {
+    source: contract,
+    output: 'output/contract.json',
+    types: 'output/contract.d.ts',
+  },
+});
+`;
+      writeFileSync(configPath, configWithExtensions, 'utf-8');
+
+      const command = createEmitCommand();
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testWorkingDir);
+        await command.parseAsync(['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']);
+        expect(existsSync(join(outputDir, 'contract.json'))).toBe(true);
+      } finally {
+        try {
+          process.chdir(originalCwd);
+        } catch {
+          // Ignore if directory was cleaned up
+        }
+      }
+    },
+    timeouts.typeScriptCompilation,
+  );
 });

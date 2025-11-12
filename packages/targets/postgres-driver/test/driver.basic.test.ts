@@ -49,154 +49,174 @@ describe('@prisma-next/driver-postgres', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('streams rows using cursor mode when enabled', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+  it(
+    'streams rows using cursor mode when enabled',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as import('pg').Pool },
-      cursor: { batchSize: 1 },
-    });
-
-    cleanup = async () => {
-      await driver.close();
-    };
-
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1), ($2), ($3)', ['a', 'b', 'c']);
-
-    const rows: Array<{ id: number; name: string }> = [];
-    for await (const row of driver.execute<{ id: number; name: string }>({
-      sql: 'select id, name from items order by id asc',
-    })) {
-      rows.push(row);
-    }
-
-    expect(rows).toEqual([
-      { id: 1, name: 'a' },
-      { id: 2, name: 'b' },
-      { id: 3, name: 'c' },
-    ]);
-  });
-
-  it('uses custom cursor batch size', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
-
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as import('pg').Pool },
-      cursor: { batchSize: 2 },
-    });
-
-    cleanup = async () => {
-      await driver.close();
-    };
-
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1), ($2), ($3), ($4)', [
-      'a',
-      'b',
-      'c',
-      'd',
-    ]);
-
-    const rows: Array<{ id: number; name: string }> = [];
-    for await (const row of driver.execute<{ id: number; name: string }>({
-      sql: 'select id, name from items order by id asc',
-    })) {
-      rows.push(row);
-    }
-
-    expect(rows).toHaveLength(4);
-    expect(rows[0]).toEqual({ id: 1, name: 'a' });
-    expect(rows[3]).toEqual({ id: 4, name: 'd' });
-  });
-
-  it('executes explain query', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
-
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as import('pg').Pool },
-    });
-
-    cleanup = async () => {
-      await driver.close();
-    };
-
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-
-    // pg-mem doesn't support EXPLAIN (FORMAT JSON), so we test that explain() is callable
-    // In a real environment, this would return explain results
-    try {
-      const result = await driver.explain?.({
-        sql: 'select id, name from items',
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as import('pg').Pool },
+        cursor: { batchSize: 1 },
       });
-      if (result) {
-        expect(result).toBeDefined();
-        expect(result.rows).toBeDefined();
-        expect(Array.isArray(result.rows)).toBe(true);
+
+      cleanup = async () => {
+        await driver.close();
+      };
+
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1), ($2), ($3)', ['a', 'b', 'c']);
+
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from items order by id asc',
+      })) {
+        rows.push(row);
       }
-    } catch {
-      // pg-mem doesn't support EXPLAIN, so we just verify the method exists
-      expect(driver.explain).toBeDefined();
-    }
-  });
 
-  it('executes query with params', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+      expect(rows).toEqual([
+        { id: 1, name: 'a' },
+        { id: 2, name: 'b' },
+        { id: 3, name: 'c' },
+      ]);
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as import('pg').Pool },
-    });
+  it(
+    'uses custom cursor batch size',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    cleanup = async () => {
-      await driver.close();
-    };
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as import('pg').Pool },
+        cursor: { batchSize: 2 },
+      });
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1)', ['test']);
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    const result = await driver.query<{ id: number; name: string }>(
-      'select id, name from items where name = $1',
-      ['test'],
-    );
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1), ($2), ($3), ($4)', [
+        'a',
+        'b',
+        'c',
+        'd',
+      ]);
 
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0]?.name).toBe('test');
-  });
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from items order by id asc',
+      })) {
+        rows.push(row);
+      }
 
-  it('handles direct client connection', async () => {
-    const db = newDb();
-    const { Client } = db.adapters.createPg();
-    const client = new Client();
+      expect(rows).toHaveLength(4);
+      expect(rows[0]).toEqual({ id: 1, name: 'a' });
+      expect(rows[3]).toEqual({ id: 4, name: 'd' });
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { client: client as unknown as import('pg').Client },
-    });
+  it(
+    'executes explain query',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    cleanup = async () => {
-      await driver.close();
-    };
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as import('pg').Pool },
+      });
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1)', ['test']);
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    const result = await driver.query<{ id: number; name: string }>('select id, name from items');
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
 
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0]?.name).toBe('test');
-  });
+      // pg-mem doesn't support EXPLAIN (FORMAT JSON), so we test that explain() is callable
+      // In a real environment, this would return explain results
+      try {
+        const result = await driver.explain?.({
+          sql: 'select id, name from items',
+        });
+        if (result) {
+          expect(result).toBeDefined();
+          expect(result.rows).toBeDefined();
+          expect(Array.isArray(result.rows)).toBe(true);
+        }
+      } catch {
+        // pg-mem doesn't support EXPLAIN, so we just verify the method exists
+        expect(driver.explain).toBeDefined();
+      }
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'executes query with params',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
+
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as import('pg').Pool },
+      });
+
+      cleanup = async () => {
+        await driver.close();
+      };
+
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1)', ['test']);
+
+      const result = await driver.query<{ id: number; name: string }>(
+        'select id, name from items where name = $1',
+        ['test'],
+      );
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]?.name).toBe('test');
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'handles direct client connection',
+    async () => {
+      const db = newDb();
+      const { Client } = db.adapters.createPg();
+      const client = new Client();
+
+      const driver = createPostgresDriverFromOptions({
+        connect: { client: client as unknown as import('pg').Client },
+      });
+
+      cleanup = async () => {
+        await driver.close();
+      };
+
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1)', ['test']);
+
+      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]?.name).toBe('test');
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('handles already connected client', async () => {
     const db = newDb();
@@ -220,105 +240,121 @@ describe('@prisma-next/driver-postgres', () => {
     expect(result.rows).toBeDefined();
   });
 
-  it('closes pool connection', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+  it(
+    'closes pool connection',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as import('pg').Pool },
-    });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as import('pg').Pool },
+      });
 
-    await driver.connect();
-    await driver.close();
-
-    // pg-mem Pool doesn't have an 'ended' property, so we just verify close() doesn't throw
-    expect(driver).toBeDefined();
-  });
-
-  it('handles empty result set', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
-
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as import('pg').Pool },
-    });
-
-    cleanup = async () => {
+      await driver.connect();
       await driver.close();
-    };
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
+      // pg-mem Pool doesn't have an 'ended' property, so we just verify close() doesn't throw
+      expect(driver).toBeDefined();
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-    const rows: Array<{ id: number; name: string }> = [];
-    for await (const row of driver.execute<{ id: number; name: string }>({
-      sql: 'select id, name from items',
-    })) {
-      rows.push(row);
-    }
+  it(
+    'handles empty result set',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    expect(rows).toEqual([]);
-  });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as import('pg').Pool },
+      });
 
-  it('creates driver from connection string', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    // Mock the Pool constructor to use our pg-mem pool
-    const MockPool = class extends Pool {
-      constructor() {
-        super();
-        // Use the pg-mem pool instance
-        Object.assign(this, pool);
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from items',
+      })) {
+        rows.push(row);
       }
-    };
 
-    const driver = createPostgresDriver('postgresql://test', {
-      poolFactory: MockPool as typeof import('pg').Pool,
-    });
+      expect(rows).toEqual([]);
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-    cleanup = async () => {
-      await driver.close();
-    };
+  it(
+    'creates driver from connection string',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1)', ['test']);
+      // Mock the Pool constructor to use our pg-mem pool
+      const MockPool = class extends Pool {
+        constructor() {
+          super();
+          // Use the pg-mem pool instance
+          Object.assign(this, pool);
+        }
+      };
 
-    const result = await driver.query<{ id: number; name: string }>('select id, name from items');
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0]?.name).toBe('test');
-  });
+      const driver = createPostgresDriver('postgresql://test', {
+        poolFactory: MockPool as typeof import('pg').Pool,
+      });
 
-  it('creates driver with custom poolFactory', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    let customPoolFactoryCalled = false;
-    const CustomPool = class extends Pool {
-      constructor() {
-        super();
-        customPoolFactoryCalled = true;
-        Object.assign(this, pool);
-      }
-    };
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1)', ['test']);
 
-    const driver = createPostgresDriver('postgresql://test', {
-      poolFactory: CustomPool as typeof import('pg').Pool,
-    });
+      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]?.name).toBe('test');
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-    cleanup = async () => {
-      await driver.close();
-    };
+  it(
+    'creates driver with custom poolFactory',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    expect(customPoolFactoryCalled).toBe(true);
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    const result = await driver.query<{ id: number; name: string }>('select id, name from items');
-    expect(result.rows).toBeDefined();
-  });
+      let customPoolFactoryCalled = false;
+      const CustomPool = class extends Pool {
+        constructor() {
+          super();
+          customPoolFactoryCalled = true;
+          Object.assign(this, pool);
+        }
+      };
+
+      const driver = createPostgresDriver('postgresql://test', {
+        poolFactory: CustomPool as typeof import('pg').Pool,
+      });
+
+      cleanup = async () => {
+        await driver.close();
+      };
+
+      expect(customPoolFactoryCalled).toBe(true);
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
+      expect(result.rows).toBeDefined();
+    },
+    timeouts.spinUpPpgDev,
+  );
 });

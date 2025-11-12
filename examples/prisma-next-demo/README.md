@@ -9,11 +9,55 @@ This demo shows:
 - Creating Plans and executing them via the Runtime
 - Contract verification and marker management
 - Native Prisma Next patterns and best practices
+- **Two workflows**: Emit workflow (JSON-based) and No-Emit workflow (TypeScript-based)
 
 ## Comparison
 
 - **`prisma-next-demo`** (this example): Shows Prisma Next native APIs
 - **`prisma-orm-demo`**: Shows using Prisma Next via the compatibility layer (mimics legacy Prisma Client API)
+
+## Workflows
+
+This demo includes two runtime implementations demonstrating different approaches:
+
+### 1. Emit Workflow (Default)
+
+Uses emitted `contract.json` and `contract.d.ts` files:
+
+- **Files**: `src/prisma/runtime.ts`, `src/prisma/query.ts`, `src/main.ts`
+- **Contract source**: `src/prisma/contract.json` (emitted from `prisma/contract.ts`)
+- **Usage**: `pnpm start -- [command]`
+- **Benefits**:
+  - Contract is validated and normalized at emit time
+  - JSON can be loaded from external sources
+  - Type definitions are separate from runtime code
+
+**Setup**:
+```bash
+# Emit contract artifacts first
+pnpm emit
+
+# Then run the app
+pnpm start -- users
+```
+
+### 2. No-Emit Workflow
+
+Uses contract directly from TypeScript:
+
+- **Files**: `src/prisma/runtime-no-emit.ts`, `src/prisma/query-no-emit.ts`, `src/main-no-emit.ts`
+- **Contract source**: `prisma/contract.ts` (direct import)
+- **Usage**: `pnpm start:no-emit -- [command]`
+- **Benefits**:
+  - No emit step required - contract is used directly
+  - Full type safety from TypeScript
+  - Simpler workflow for development
+
+**Usage**:
+```bash
+# No emit step needed - just run the app
+pnpm start:no-emit -- users
+```
 
 ## Setup
 
@@ -43,7 +87,11 @@ This demo shows:
 
 ## Key Files
 
-- `src/prisma/contract.json` - Static contract definition
+- `prisma/contract.ts` - Contract definition (source of truth)
+- `src/prisma/contract.json` - Emitted contract (emit workflow only)
+- `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
+- `src/prisma/runtime.ts` - Runtime using emitted contract
+- `src/prisma/runtime-no-emit.ts` - Runtime using contract directly
 - `scripts/stamp-marker.ts` - Contract marker management
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)
 - `src/queries/similarity-search.ts` - Example vector similarity search query
