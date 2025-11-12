@@ -1,0 +1,86 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import {
+  budgets,
+  createRuntime,
+  createRuntimeContext,
+  type Runtime,
+  type RuntimeContext,
+} from '@prisma-next/sql-runtime';
+import { Pool } from 'pg';
+import { contract } from '../../prisma/contract';
+
+let runtime: Runtime | undefined;
+let context: RuntimeContext<typeof contract> | undefined;
+let pool: Pool | undefined;
+
+export function getRuntime() {
+  if (!runtime) {
+    const connectionString = process.env['DATABASE_URL'];
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is required');
+    }
+
+    // Use contract directly from TypeScript - no emit needed!
+    // The contract is already validated at build time via the builder API
+
+    pool = new Pool({ connectionString });
+
+    const driver = createPostgresDriverFromOptions({
+      connect: { pool },
+      cursor: { disabled: true },
+    });
+
+    const adapter = createPostgresAdapter();
+
+    // Create context with contract and adapter (adapter provides codecs via profile.codecs())
+    // Extensions can be added programmatically when available
+    context = createRuntimeContext({
+      contract,
+      adapter,
+      extensions: [],
+    });
+
+    runtime = createRuntime({
+      adapter,
+      driver,
+      verify: {
+        mode: 'onFirstUse',
+        requireMarker: false,
+      },
+      context,
+      plugins: [
+        budgets({
+          maxRows: 10_000,
+          defaultTableRows: 10_000,
+          tableRows: { user: 10_000, post: 10_000 },
+          maxLatencyMs: 1_000,
+        }),
+      ],
+    });
+  }
+  return runtime;
+}
+
+export function getContext() {
+  if (!context) {
+    getRuntime();
+  }
+  if (!context) {
+    throw new Error('Context not initialized');
+  }
+  return context;
+}
+
+export async function closeRuntime() {
+  if (runtime) {
+    await runtime.close();
+    runtime = undefined;
+  }
+  // Pool is closed by runtime.close() -> driver.close(), so we just clear the reference
+  if (pool) {
+    pool = undefined;
+  }
+  // Clear context reference as well
+  context = undefined;
+}

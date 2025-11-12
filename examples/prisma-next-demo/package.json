@@ -7,6 +7,7 @@
     "stamp-marker": "tsx scripts/stamp-marker.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/main.ts",
+    "start:no-emit": "tsx src/main-no-emit.ts",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../biome.json --error-on-warnings"
