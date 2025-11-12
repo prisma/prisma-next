@@ -1,10 +1,10 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
+import { describe, expect, it } from 'vitest';
 import {
   extractCodecTypeImportsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '@prisma-next/cli/pack-assembly';
-import type { ExtensionPackManifest } from '@prisma-next/cli/pack-manifest-types';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import { describe, expect, it } from 'vitest';
+} from '../../../../framework/tooling/cli/src/pack-assembly';
+import type { ExtensionPackManifest } from '../../../../framework/tooling/cli/src/pack-manifest-types';
 import { sqlTargetFamilyHook } from '../src/index';
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {
@@ -575,8 +575,8 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const codecImports = extractCodecTypeImports(packs);
-    const operationImports = extractOperationTypeImports(packs);
+    const codecImports = extractCodecTypeImportsFromPacks(packs);
+    const operationImports = extractOperationTypeImportsFromPacks(packs);
     expect(codecImports.length).toBe(2);
     expect(codecImports[0]?.package).toBe('@test/adapter/codec-types');
     expect(codecImports[1]?.package).toBe('@test/extension/codec-types');
@@ -594,8 +594,8 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const codecImports = extractCodecTypeImports(packs);
-    const operationImports = extractOperationTypeImports(packs);
+    const codecImports = extractCodecTypeImportsFromPacks(packs);
+    const operationImports = extractOperationTypeImportsFromPacks(packs);
     expect(codecImports.length).toBe(0);
     expect(operationImports.length).toBe(0);
   });
@@ -627,8 +627,8 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const codecImports = extractCodecTypeImports(packs);
-    const operationImports = extractOperationTypeImports(packs);
+    const codecImports = extractCodecTypeImportsFromPacks(packs);
+    const operationImports = extractOperationTypeImportsFromPacks(packs);
     expect(codecImports.length).toBe(1);
     expect(codecImports[0]?.package).toBe('@test/adapter/codec-types');
     expect(operationImports.length).toBe(1);

@@ -9,5 +9,5 @@ export type {
   TablesOf,
 } from '@prisma-next/sql-relational-core/types';
 export { rawOptions } from './raw';
-export type { IncludeChildBuilder } from './sql/builder';
-export { createJoinOnBuilder, SelectBuilder, sql } from './sql/builder';
+export type { IncludeChildBuilder, SelectBuilder } from './sql/builder';
+export { createJoinOnBuilder, sql } from './sql/builder';

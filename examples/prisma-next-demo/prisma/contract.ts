@@ -64,6 +64,7 @@ export const contract = defineContract<CodecTypes>()
     postgres: {
       lateral: true,
       jsonAgg: true,
+      returning: true,
     },
   })
   .build();

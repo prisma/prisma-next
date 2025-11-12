@@ -6,7 +6,15 @@
       "minVersion": "12"
     }
   },
-  "capabilities": {},
+  "capabilities": {
+    "postgres": {
+      "orderBy": true,
+      "limit": true,
+      "lateral": true,
+      "jsonAgg": true,
+      "returning": true
+    }
+  },
   "types": {
     "codecTypes": {
       "import": {

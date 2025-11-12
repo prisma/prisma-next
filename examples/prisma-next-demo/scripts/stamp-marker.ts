@@ -1,3 +1,7 @@
+import 'dotenv/config';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -47,17 +51,28 @@ export async function stampMarker(options: StampMarkerOptions) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const connectionString = process.env['DATABASE_URL'];
-  const coreHash = process.env['CONTRACT_CORE_HASH'];
-  const profileHash = process.env['CONTRACT_PROFILE_HASH'];
-
-  if (!connectionString || !coreHash || !profileHash) {
-    console.error(
-      'DATABASE_URL, CONTRACT_CORE_HASH, and CONTRACT_PROFILE_HASH environment variables are required',
-    );
+  if (!connectionString) {
+    console.error('DATABASE_URL environment variable is required');
     process.exit(1);
   }
 
-  stampMarker({ connectionString, coreHash, profileHash }).then(
+  // Read contract.json from src/prisma/contract.json relative to this script
+  const scriptDir = dirname(fileURLToPath(import.meta.url));
+  const contractJsonPath = join(scriptDir, '../src/prisma/contract.json');
+  const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as {
+    coreHash?: string;
+    profileHash?: string;
+  };
+
+  const coreHash = contractJson.coreHash;
+  const profileHash = contractJson.profileHash;
+
+  if (!coreHash || !profileHash) {
+    console.error(`Contract JSON at ${contractJsonPath} is missing coreHash or profileHash`);
+    process.exit(1);
+  }
+
+  stampMarker({ connectionString, coreHash, profileHash, contractJson }).then(
     () => {
       console.log('Marker stamped');
     },

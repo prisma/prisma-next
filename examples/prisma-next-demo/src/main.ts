@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { closeRuntime } from './prisma/runtime';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
@@ -7,7 +8,7 @@ import { getUsersWithPosts } from './queries/get-users-with-posts';
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
 
-(async () => {
+async function main() {
   try {
     if (cmd === 'users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
@@ -47,4 +48,6 @@ const [cmd, ...args] = argv;
   } finally {
     await closeRuntime();
   }
-})();
+}
+
+await main();

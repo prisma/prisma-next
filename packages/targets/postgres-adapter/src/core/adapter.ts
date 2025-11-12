@@ -24,6 +24,8 @@ const defaultCapabilities = Object.freeze({
   postgres: {
     orderBy: true,
     limit: true,
+    lateral: true,
+    jsonAgg: true,
     returning: true,
   },
 });

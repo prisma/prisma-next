@@ -1,10 +1,10 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
+import { describe, expect, it } from 'vitest';
 import {
   extractCodecTypeImportsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '@prisma-next/cli/pack-assembly';
-import type { ExtensionPackManifest } from '@prisma-next/cli/pack-manifest-types';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import { describe, expect, it } from 'vitest';
+} from '../../../../framework/tooling/cli/src/pack-assembly';
+import type { ExtensionPackManifest } from '../../../../framework/tooling/cli/src/pack-manifest-types';
 import { sqlTargetFamilyHook } from '../src/index';
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {
@@ -168,8 +168,8 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const codecTypeImports = extractCodecTypeImports(packs);
-    const operationTypeImports = extractOperationTypeImports(packs);
+    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
     const types = sqlTargetFamilyHook.generateContractTypes(
       ir,
       codecTypeImports,

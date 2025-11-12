@@ -23,9 +23,8 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
-
+import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
-import { stampMarker } from '../src/prisma/scripts/stamp-marker';
 
 let contract: ReturnType<typeof validateContract>;
 
