@@ -1,3 +1,9 @@
+---
+description: Adapters must declare capabilities in both manifest and code
+globs:
+alwaysApply: true
+---
+
 # Adapter Capability Declaration
 
 ## Overview
