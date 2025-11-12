@@ -60,8 +60,12 @@ export interface BinaryBuilder<
 }
 
 // Helper aliases for usage sites where the specific column parameters are irrelevant
-// Uses a permissive operation types structure that accepts any operation types
-// biome-ignore lint/suspicious/noExplicitAny: AnyColumnBuilder needs to accept column builders with any operation types
+// Accepts any ColumnBuilder regardless of its Operations parameter
+// Note: We use `any` here because TypeScript's variance rules don't allow us to express
+// "any type that extends OperationTypes" in a way that works for assignment.
+// Contract-specific OperationTypes (e.g., PgVectorOperationTypes) are not assignable
+// to the base OperationTypes in generic parameter position, even though they extend it structurally.
+// biome-ignore lint/suspicious/noExplicitAny: AnyColumnBuilder must accept column builders with any operation types
 export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, any>;
 export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
 export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
