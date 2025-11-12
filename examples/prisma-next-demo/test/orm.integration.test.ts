@@ -10,6 +10,7 @@ import {
 } from '@prisma-next/cli/pack-assembly';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
+import pgvector from '@prisma-next/extension-pgvector/runtime';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -28,9 +29,10 @@ beforeAll(async () => {
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
   const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+  const pgvectorPath = resolve(__dirname, '../../../packages/extensions/pgvector');
 
   const contractIR = await loadContractFromTs(contractPath);
-  const packs = loadExtensionPacks(adapterPath, []);
+  const packs = loadExtensionPacks(adapterPath, [pgvectorPath]);
   const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
   const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
   const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
@@ -71,7 +73,7 @@ describe('ORM integration tests', () => {
         await closeRuntime();
 
         const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
@@ -142,7 +144,7 @@ describe('ORM integration tests', () => {
         process.env['DATABASE_URL'] = connectionString;
         await closeRuntime();
         const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
@@ -209,7 +211,7 @@ describe('ORM integration tests', () => {
         process.env['DATABASE_URL'] = connectionString;
         await closeRuntime();
         const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
@@ -283,7 +285,7 @@ describe('ORM integration tests', () => {
         process.env['DATABASE_URL'] = connectionString;
         await closeRuntime();
         const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
@@ -361,7 +363,7 @@ describe('ORM integration tests', () => {
         await closeRuntime();
 
         const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
@@ -432,7 +434,7 @@ describe('ORM integration tests', () => {
         process.env['DATABASE_URL'] = connectionString;
         await closeRuntime();
         const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
@@ -508,7 +510,7 @@ describe('ORM integration tests', () => {
         // Reset cached runtime so it uses the new connection string
         await closeRuntime();
         const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
