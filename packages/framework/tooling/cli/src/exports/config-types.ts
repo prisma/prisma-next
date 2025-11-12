@@ -1,5 +1,6 @@
 export type {
   AdapterDescriptor,
+  ContractConfig,
   ExtensionDescriptor,
   FamilyDescriptor,
   PrismaNextConfig,

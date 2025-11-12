@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "emit": "prisma-next emit --contract prisma/contract.ts --out src/prisma",
+    "emit": "prisma-next emit",
     "stamp-marker": "tsx scripts/stamp-marker.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/main.ts",

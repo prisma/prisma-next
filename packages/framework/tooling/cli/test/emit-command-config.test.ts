@@ -21,17 +21,24 @@ function createConfigFileContent(): string {
     workspaceRoot,
     'packages/framework/tooling/cli/dist/config-types.js',
   );
+  const contractPath = resolve(testWorkingDir, 'contract.ts');
 
   return `import { defineConfig } from '${configTypesPath}';
 import postgresAdapter from '${adapterPath}';
 import postgres from '${targetPath}';
 import sql from '${familyPath}';
+import { contract } from '${contractPath}';
 
 export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
   extensions: [],
+  contract: {
+    source: contract,
+    output: 'output/contract.json',
+    types: 'output/contract.d.ts',
+  },
 });
 `;
 }
@@ -103,17 +110,7 @@ export const contract = {
       const originalCwd = process.cwd();
       try {
         process.chdir(testWorkingDir);
-        await command.parseAsync([
-          'node',
-          'cli.js',
-          'emit',
-          '--contract',
-          'contract.ts',
-          '--out',
-          'output',
-          '--config',
-          'prisma-next.config.ts',
-        ]);
+        await command.parseAsync(['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']);
       } finally {
         try {
           process.chdir(originalCwd);
@@ -138,15 +135,7 @@ export const contract = {
       const originalCwd = process.cwd();
       try {
         process.chdir(testWorkingDir);
-        await command.parseAsync([
-          'node',
-          'cli.js',
-          'emit',
-          '--contract',
-          'contract.ts',
-          '--out',
-          'output',
-        ]);
+        await command.parseAsync(['node', 'cli.js', 'emit']);
         expect(existsSync(join(testWorkingDir, 'output', 'contract.json'))).toBe(true);
         expect(existsSync(join(testWorkingDir, 'output', 'contract.d.ts'))).toBe(true);
       } finally {
@@ -170,8 +159,6 @@ export const contract = {
           'node',
           'cli.js',
           'emit',
-          '--contract',
-          'contract.ts',
           '--out',
           'output',
           '--config',

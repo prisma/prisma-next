@@ -148,4 +148,21 @@ function validateConfig(config: unknown): asserts config is PrismaNextConfig {
       }
     }
   }
+
+  // Validate contract config if present (structure validation - defineConfig() handles normalization)
+  if (configObj['contract'] !== undefined) {
+    const contract = configObj['contract'] as Record<string, unknown>;
+    if (!contract || typeof contract !== 'object') {
+      throw new Error('Config.contract must be an object');
+    }
+    if (!('source' in contract)) {
+      throw new Error('Config.contract.source is required when contract is provided');
+    }
+    if (contract['output'] !== undefined && typeof contract['output'] !== 'string') {
+      throw new Error('Config.contract.output must be a string when provided');
+    }
+    if (contract['types'] !== undefined && typeof contract['types'] !== 'string') {
+      throw new Error('Config.contract.types must be a string when provided');
+    }
+  }
 }

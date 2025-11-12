@@ -1,9 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { emit } from '@prisma-next/emitter';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
-import { loadContractFromTs } from '../load-ts-contract';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
@@ -15,20 +14,47 @@ export function createEmitCommand(): Command {
   const command = new Command('emit');
 
   command
-    .description('Emit contract.json and contract.d.ts from a TypeScript contract file')
-    .requiredOption('--contract <path>', 'Path to TypeScript contract file')
-    .requiredOption('--out <dir>', 'Output directory for emitted artifacts')
+    .description('Emit contract.json and contract.d.ts from config.contract')
     .option(
       '--config <path>',
       'Path to prisma-next.config.ts (defaults to ./prisma-next.config.ts if present)',
     )
-    .action(async (options: { contract: string; out: string; config?: string }) => {
+    .action(async (options: { config?: string }) => {
       try {
-        const contractPath = resolve(options.contract);
-        const outputDir = resolve(options.out);
-
         // Load config (explicit via --config or default)
         const config = await loadConfig(options.config);
+
+        // Resolve contract from config
+        if (!config.contract) {
+          throw new Error(
+            'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
+          );
+        }
+
+        // Contract config is already normalized by defineConfig() with defaults applied
+        const contractConfig = config.contract;
+
+        // Resolve contract source
+        let contractRaw: unknown;
+        if (typeof contractConfig.source === 'function') {
+          contractRaw = await contractConfig.source();
+        } else {
+          contractRaw = contractConfig.source;
+        }
+
+        // Resolve artifact paths (already normalized by defineConfig(), but resolve relative paths)
+        const contractJsonPath = resolve(contractConfig.output);
+        const contractDtsPath = resolve(contractConfig.types);
+
+        // Strip mappings if family provides stripMappings function
+        const contractWithoutMappings = config.family.stripMappings
+          ? config.family.stripMappings(contractRaw)
+          : contractRaw;
+
+        // Validate and normalize the contract using family-specific validation
+        // This ensures consistency between CLI emit and programmatic emit
+        // validateContractIR returns ContractIR without mappings (mappings are runtime-only)
+        const contractIR = config.family.validateContractIR(contractWithoutMappings);
 
         // Validate family is supported (for now, only 'sql' is supported)
         if (config.family.id !== 'sql') {
@@ -50,20 +76,13 @@ export function createEmitCommand(): Command {
           config.extensions ?? [],
         );
 
-        const contractRaw = await loadContractFromTs(contractPath);
-
-        // Validate and normalize the contract using family-specific validation
-        // This ensures consistency between CLI emit and programmatic emit
-        // validateContractIR returns ContractIR without mappings (mappings are runtime-only)
-        const contractIR = config.family.validateContractIR(contractRaw);
-
         // Use family hook from config
         const targetFamily = config.family.hook;
 
         const result = await emit(
           contractIR as unknown as typeof contractRaw,
           {
-            outputDir,
+            outputDir: dirname(contractJsonPath),
             operationRegistry,
             codecTypeImports,
             operationTypeImports,
@@ -72,10 +91,9 @@ export function createEmitCommand(): Command {
           targetFamily,
         );
 
-        mkdirSync(outputDir, { recursive: true });
-
-        const contractJsonPath = join(outputDir, 'contract.json');
-        const contractDtsPath = join(outputDir, 'contract.d.ts');
+        // Create directories if needed
+        mkdirSync(dirname(contractJsonPath), { recursive: true });
+        mkdirSync(dirname(contractDtsPath), { recursive: true });
 
         // The emitter already includes _generated metadata in both contractJson and contractDts
         // Just write the results directly

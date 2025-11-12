@@ -5,7 +5,7 @@
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev --name init",
-    "emit": "prisma-next emit --contract prisma/contract.ts --out src/prisma-next",
+    "emit": "prisma-next emit",
     "stamp-marker": "tsx scripts/stamp-marker.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/index.ts",
