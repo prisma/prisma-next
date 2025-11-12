@@ -1,9 +1,18 @@
 import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
 import { describe, expect, it } from 'vitest';
+import type {
+  AdapterDescriptor,
+  ExtensionDescriptor,
+  TargetDescriptor,
+} from '../src/exports/config-types';
 import {
+  assembleOperationRegistry,
   assembleOperationRegistryFromPacks,
+  extractCodecTypeImports,
   extractCodecTypeImportsFromPacks,
+  extractExtensionIds,
   extractExtensionIdsFromPacks,
+  extractOperationTypeImports,
   extractOperationTypeImportsFromPacks,
 } from '../src/exports/pack-assembly';
 import type { ExtensionPackManifest, OperationManifest } from '../src/exports/pack-manifest-types';
@@ -440,5 +449,202 @@ describe('extractExtensionIdsFromPacks', () => {
   it('handles empty packs array', () => {
     const ids = extractExtensionIdsFromPacks([]);
     expect(ids).toEqual([]);
+  });
+});
+
+describe('descriptor-based functions', () => {
+  it('extractExtensionIds deduplicates while preserving order', () => {
+    const adapter: AdapterDescriptor = {
+      kind: 'adapter',
+      id: 'adapter-1',
+      family: 'sql',
+      manifest: { id: 'adapter-1', version: '1.0.0' },
+    };
+
+    const target: TargetDescriptor = {
+      kind: 'target',
+      id: 'target-1',
+      family: 'sql',
+      manifest: { id: 'target-1', version: '1.0.0' },
+    };
+
+    const extensions: ReadonlyArray<ExtensionDescriptor> = [
+      {
+        kind: 'extension',
+        id: 'ext-1',
+        family: 'sql',
+        manifest: { id: 'ext-1', version: '1.0.0' },
+      },
+      {
+        kind: 'extension',
+        id: 'ext-2',
+        family: 'sql',
+        manifest: { id: 'ext-2', version: '1.0.0' },
+      },
+    ];
+
+    const ids = extractExtensionIds(adapter, target, extensions);
+    expect(ids).toEqual(['adapter-1', 'target-1', 'ext-1', 'ext-2']);
+  });
+
+  it('extractExtensionIds handles duplicate adapter id', () => {
+    const adapter: AdapterDescriptor = {
+      kind: 'adapter',
+      id: 'duplicate',
+      family: 'sql',
+      manifest: { id: 'duplicate', version: '1.0.0' },
+    };
+
+    const target: TargetDescriptor = {
+      kind: 'target',
+      id: 'duplicate',
+      family: 'sql',
+      manifest: { id: 'duplicate', version: '1.0.0' },
+    };
+
+    const extensions: ReadonlyArray<ExtensionDescriptor> = [];
+
+    const ids = extractExtensionIds(adapter, target, extensions);
+    expect(ids).toEqual(['duplicate']);
+  });
+
+  it('extractExtensionIds handles duplicate extension ids', () => {
+    const adapter: AdapterDescriptor = {
+      kind: 'adapter',
+      id: 'adapter-1',
+      family: 'sql',
+      manifest: { id: 'adapter-1', version: '1.0.0' },
+    };
+
+    const target: TargetDescriptor = {
+      kind: 'target',
+      id: 'target-1',
+      family: 'sql',
+      manifest: { id: 'target-1', version: '1.0.0' },
+    };
+
+    const extensions: ReadonlyArray<ExtensionDescriptor> = [
+      {
+        kind: 'extension',
+        id: 'ext-1',
+        family: 'sql',
+        manifest: { id: 'ext-1', version: '1.0.0' },
+      },
+      {
+        kind: 'extension',
+        id: 'ext-1',
+        family: 'sql',
+        manifest: { id: 'ext-1', version: '1.0.0' },
+      },
+    ];
+
+    const ids = extractExtensionIds(adapter, target, extensions);
+    expect(ids).toEqual(['adapter-1', 'target-1', 'ext-1']);
+  });
+
+  it('assembleOperationRegistry from descriptors', () => {
+    const target: TargetDescriptor = {
+      kind: 'target',
+      id: 'target-1',
+      family: 'sql',
+      manifest: {
+        id: 'target-1',
+        version: '1.0.0',
+        operations: [
+          {
+            for: 'pgvector/vector@1',
+            method: 'cosineDistance',
+            args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+            returns: { kind: 'builtin', type: 'number' },
+            lowering: {
+              targetFamily: 'sql',
+              strategy: 'infix',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+              template: '${self} <=> ${arg0}',
+            },
+          },
+        ],
+      },
+    };
+
+    const registry = assembleOperationRegistry([target], sqlFamilyDescriptor);
+    const operations = registry.byType('pgvector/vector@1');
+    expect(operations).toHaveLength(1);
+    expect(operations[0]?.method).toBe('cosineDistance');
+  });
+
+  it('extractCodecTypeImports from descriptors', () => {
+    const adapter: AdapterDescriptor = {
+      kind: 'adapter',
+      id: 'adapter-1',
+      family: 'sql',
+      manifest: {
+        id: 'adapter-1',
+        version: '1.0.0',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@prisma-next/adapter-postgres/exports/codec-types',
+              named: 'CodecTypes',
+              alias: 'PgTypes',
+            },
+          },
+        },
+      },
+    };
+
+    const imports = extractCodecTypeImports([adapter]);
+    expect(imports).toHaveLength(1);
+    expect(imports[0]).toEqual({
+      package: '@prisma-next/adapter-postgres/exports/codec-types',
+      named: 'CodecTypes',
+      alias: 'PgTypes',
+    });
+  });
+
+  it('extractOperationTypeImports from descriptors', () => {
+    const extension: ExtensionDescriptor = {
+      kind: 'extension',
+      id: 'ext-1',
+      family: 'sql',
+      manifest: {
+        id: 'ext-1',
+        version: '1.0.0',
+        types: {
+          operationTypes: {
+            import: {
+              package: '@prisma-next/ext-pgvector/exports/operation-types',
+              named: 'OperationTypes',
+              alias: 'PgVectorTypes',
+            },
+          },
+        },
+      },
+    };
+
+    const imports = extractOperationTypeImports([extension]);
+    expect(imports).toHaveLength(1);
+    expect(imports[0]).toEqual({
+      package: '@prisma-next/ext-pgvector/exports/operation-types',
+      named: 'OperationTypes',
+      alias: 'PgVectorTypes',
+    });
+  });
+
+  it('handles descriptors without type imports', () => {
+    const adapter: AdapterDescriptor = {
+      kind: 'adapter',
+      id: 'adapter-1',
+      family: 'sql',
+      manifest: {
+        id: 'adapter-1',
+        version: '1.0.0',
+      },
+    };
+
+    const codecImports = extractCodecTypeImports([adapter]);
+    const operationImports = extractOperationTypeImports([adapter]);
+    expect(codecImports).toEqual([]);
+    expect(operationImports).toEqual([]);
   });
 });
