@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "stamp-marker": "tsx scripts/stamp-marker.ts",
-    "start": "tsx src/main.ts",
-    "seed": "tsx scripts/seed.ts",
     "emit": "prisma-next emit --contract prisma/contract.ts --out src/prisma",
+    "stamp-marker": "tsx scripts/stamp-marker.ts",
+    "seed": "tsx scripts/seed.ts",
+    "start": "tsx src/main.ts",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../biome.json --error-on-warnings"

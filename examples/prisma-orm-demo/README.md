@@ -21,7 +21,7 @@ Minimal Prisma ORM example app with simple read and write queries. This app demo
 
 4. (Optional) Stamp the Prisma Next contract marker:
    ```bash
-   pnpm prisma-next:stamp
+   pnpm stamp-marker
    ```
 
 5. Seed the database:
@@ -70,7 +70,7 @@ To switch to Prisma Next, set the `USE_COMPAT=true` environment variable:
 
 1. Make sure you've stamped the contract marker:
    ```bash
-   pnpm prisma-next:stamp
+   pnpm stamp-marker
    ```
 
 2. Run your queries with the compat flag:
