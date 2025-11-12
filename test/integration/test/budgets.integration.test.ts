@@ -123,6 +123,39 @@ describe('budgets plugin integration', () => {
     });
   });
 
+  it('blocks unbounded DSL SELECT when estimated equals budget', async () => {
+    const adapter = createPostgresAdapter();
+    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      plugins: [
+        budgets({
+          maxRows: 10_000, // Same as tableRows to test edge case
+          defaultTableRows: 10_000,
+          tableRows: { user: 10_000 },
+        }),
+      ],
+    });
+
+    const context = createTestContext(fixtureContract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables['user']!;
+    const userColumns = userTable.columns;
+    const builder = sql({ context });
+    const plan = builder
+      .from(userTable)
+      .select({ id: userColumns['id']!, email: userColumns['email']! })
+      .build();
+
+    // Unbounded SELECT should be blocked pre-exec even when estimated === maxRows
+    // (estimated 10_000 >= maxRows 10_000)
+    await expect(async () => {
+      await drainPlanExecution(runtime, plan);
+    }).rejects.toMatchObject({
+      code: 'BUDGET.ROWS_EXCEEDED',
+      category: 'BUDGET',
+    });
+  });
+
   it('allows bounded DSL SELECT within budget', async () => {
     const adapter = createPostgresAdapter();
     const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {

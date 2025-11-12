@@ -66,7 +66,8 @@ async function main() {
       console.log('Running unbounded query to demonstrate budget violation...');
       console.log('This query has no LIMIT clause and will trigger BUDGET.ROWS_EXCEEDED error.\n');
       try {
-        await getAllPostsUnbounded();
+        const result = await getAllPostsUnbounded();
+        console.log(JSON.stringify(result, null, 2));
       } catch (error) {
         console.error('Budget violation caught:');
         if (error instanceof Error) {
