@@ -23,31 +23,53 @@ Provide a command-line interface that:
 
 ## Commands
 
-### `prisma-next emit`
+### `prisma-next contract emit` (canonical)
 
 Emit `contract.json` and `contract.d.ts` from `config.contract`.
 
-Config-only surface:
+**Canonical command:**
+```bash
+prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+**Legacy alias:**
 ```bash
 prisma-next emit [--config <path>]
 ```
 
 Options:
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--timestamps`: Add timestamps to output
+- `--color/--no-color`: Force/disable color output
 
-Example:
+Examples:
 ```bash
-prisma-next emit --config prisma-next.config.ts
+# Use config defaults
+prisma-next contract emit
+
+# JSON output
+prisma-next contract emit --json
+
+# Verbose output with timestamps
+prisma-next contract emit -v --timestamps
 ```
+
+**Note:** The `contract emit` command is the canonical form. The `emit` command is kept as a legacy alias for backward compatibility.
 
 **Config File (`prisma-next.config.ts`):**
 
-The CLI uses a config file to specify the target family, target, adapter, extensions, and contract. The config path can be:
-- Relative to the current working directory (e.g., `./prisma-next.config.ts`)
-- Absolute path (e.g., `/path/to/prisma-next.config.ts`)
-- Omitted to use the default `./prisma-next.config.ts` in the current directory
+The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.
 
-The `c12` library handles both relative and absolute paths automatically:
+**Config Discovery:**
+- `--config <path>`: Explicit path (relative or absolute)
+- Default: `./prisma-next.config.ts` in current working directory
+- No upward search (stays in CWD)
+
+**Note:** The CLI uses `c12` for config loading, but constrains it to the current working directory (no upward search) to match the style guide's discovery precedence.
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
@@ -115,10 +137,43 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - Main entry point using commander
 - Parses arguments and routes to command handlers
 - Handles global flags (`--help`, `--version`)
-- Exit codes: 0 (success), 1 (error)
-- **Error Handling**: Commands throw errors; Commander.js automatically handles them and exits with code 1
+- Exit codes: 0 (success), 1 (runtime error), 2 (usage/config error)
+- **Error Handling**: Uses `exitOverride()` to map error envelopes to appropriate exit codes
+- **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
+- **Legacy Commands**: Legacy `emit` command is available as alias alongside canonical `contract emit`
 
-### Emit Command (`commands/emit.ts`)
+### Contract Emit Command (`commands/contract-emit.ts`)
+- Canonical command implementation using commander
+- Supports global flags (JSON, verbosity, color, timestamps)
+- **Error Handling**: Maps errors to PN-CLI-4xxx envelopes with Why/Fix/Where and docs URLs. Throws errors instead of calling `process.exit()`. Commander.js handles errors and exits with appropriate codes (1 for runtime errors, 2 for usage/config errors).
+- Loads the user's config module (`prisma-next.config.ts`)
+- Resolves contract from config:
+  - Uses `config.contract.source` (supports sync and async functions)
+  - User's config is responsible for loading the contract (can use `loadContractFromTs` or any other method)
+  - Throws error if `config.contract` is missing
+- Uses artifact paths from `config.contract.output/types` (already normalized by `defineConfig()` with defaults applied)
+- Strips mappings if family provides `stripMappings()` function
+- Uses framework CLI assembly functions to loop over descriptors
+- Calls `config.family.validateContractIR()` to validate and normalize contract
+- Passes resolved contract IR, paths, and assembly data to programmatic API (`emitContract()`)
+- Outputs human-readable or JSON format based on flags
+
+### Programmatic API (`api/emit-contract.ts`)
+- **`emitContract(options)`**: Programmatic API for emitting contracts
+  - Accepts resolved contract IR, output paths, and assembly data
+  - Caller is responsible for loading the contract and resolving paths
+  - Returns result with hashes, file paths, and timings
+  - Used by CLI command internally
+
+### Error Handling (`utils/errors.ts`)
+- **Error Envelopes**: All errors are mapped to standardized `CliErrorEnvelope` with PN-CLI-4xxx codes
+- **Exit Code Mapping**:
+  - Usage/config errors (PN-CLI-4001, PN-CLI-4002) → exit code 2
+  - Runtime errors → exit code 1
+  - Success → exit code 0
+- **Commander.js Integration**: Uses `exitOverride()` to handle custom exit codes from error envelopes
+
+### Legacy Emit Command (`commands/emit.ts`)
 - Command implementation using commander
 - **Error Handling**: Throws errors instead of calling `process.exit()`. Commander.js handles errors and exits with code 1 automatically.
 - Loads the user's config module (`prisma-next.config.ts`)

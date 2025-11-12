@@ -113,10 +113,8 @@ export function createEmitCommand(): Command {
         console.log(`✓ Emitted contract.d.ts to ${contractDtsPath}`);
         // eslint-disable-next-line no-undef
         console.log(`  coreHash: ${result.coreHash}`);
-        if (result.profileHash) {
-          // eslint-disable-next-line no-undef
-          console.log(`  profileHash: ${result.profileHash}`);
-        }
+        // eslint-disable-next-line no-undef
+        console.log(`  profileHash: ${result.profileHash}`);
       } catch (error) {
         if (error instanceof Error) {
           // eslint-disable-next-line no-undef

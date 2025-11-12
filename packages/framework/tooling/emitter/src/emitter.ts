@@ -92,7 +92,7 @@ export async function emit(
     ...ir,
     schemaVersion: contractJson.schemaVersion,
     coreHash,
-    ...(profileHash ? { profileHash } : {}),
+    profileHash,
   };
 
   // Add _generated metadata to indicate this is a generated artifact
