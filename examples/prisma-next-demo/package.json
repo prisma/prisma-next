@@ -14,6 +14,7 @@
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",

@@ -1,5 +1,6 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   budgets,
@@ -34,12 +35,13 @@ export function getRuntime() {
 
     const adapter = createPostgresAdapter();
 
-    // Create context with contract and adapter (adapter provides codecs via profile.codecs())
-    // Extensions can be added programmatically when available
+    // Create context with contract, adapter, and extensions
+    // Adapter provides codecs via profile.codecs()
+    // pgvector extension provides vector codec and operations
     context = createRuntimeContext({
       contract,
       adapter,
-      extensions: [],
+      extensions: [pgvector()],
     });
 
     runtime = createRuntime({

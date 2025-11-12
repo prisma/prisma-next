@@ -121,6 +121,42 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/extensions/pgvector/src/core/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/extensions/pgvector/src/types/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/extensions/pgvector/src/exports/cli.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/extensions/pgvector/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/extensions/pgvector/src/exports/codec-types.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/extensions/pgvector/src/exports/operation-types.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/framework/core-contract/**",
       "domain": "framework",
       "layer": "core",

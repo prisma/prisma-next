@@ -24,6 +24,9 @@ async function setupTables() {
   await client.connect();
 
   try {
+    // Create pgvector extension
+    await client.query('create extension if not exists vector');
+
     // Create user table
     await client.query(`
       create table if not exists "user" (
@@ -33,13 +36,14 @@ async function setupTables() {
       )
     `);
 
-    // Create post table
+    // Create post table with embedding column
     await client.query(`
       create table if not exists "post" (
         id serial primary key,
         title text not null,
         "userId" int4 not null,
         "createdAt" timestamptz not null default now(),
+        embedding vector(1536),
         constraint post_userId_fkey foreign key ("userId") references "user"(id)
       )
     `);
@@ -94,17 +98,28 @@ async function main() {
   console.log(`Created user: ${alice.email} (id: ${alice.id})`);
   console.log(`Created user: ${bob.email} (id: ${bob.id})`);
 
-  // Insert posts
+  // Generate sample embedding vectors (1536 dimensions, matching common embedding models)
+  const generateEmbedding = (seed: number): number[] => {
+    const embedding: number[] = [];
+    for (let i = 0; i < 1536; i++) {
+      embedding.push(Math.sin(seed + i) * 0.1);
+    }
+    return embedding;
+  };
+
+  // Insert posts with embeddings
   const post1Plan = sql
     .insert(postTable, {
       title: param('title'),
       userId: param('userId'),
+      embedding: param('embedding'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
     .build({
       params: {
         title: 'First Post',
         userId: alice.id,
+        embedding: generateEmbedding(1),
       },
     });
 
@@ -114,12 +129,14 @@ async function main() {
     .insert(postTable, {
       title: param('title'),
       userId: param('userId'),
+      embedding: param('embedding'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
     .build({
       params: {
         title: 'Second Post',
         userId: alice.id,
+        embedding: generateEmbedding(2),
       },
     });
 
@@ -129,12 +146,14 @@ async function main() {
     .insert(postTable, {
       title: param('title'),
       userId: param('userId'),
+      embedding: param('embedding'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
     .build({
       params: {
         title: 'Third Post',
         userId: bob.id,
+        embedding: generateEmbedding(3),
       },
     });
 
