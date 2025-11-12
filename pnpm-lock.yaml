@@ -712,9 +712,6 @@ importers:
         specifier: workspace:*
         version: link:../../contract
     devDependencies:
-      '@prisma-next/cli':
-        specifier: workspace:*
-        version: link:../../../framework/tooling/cli
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
