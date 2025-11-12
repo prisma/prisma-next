@@ -11,7 +11,7 @@ describe('pgvector operations', () => {
 
     const vectorCodec = codecs?.get('pg/vector@1');
     expect(vectorCodec).toBeDefined();
-    expect(vectorCodec?.typeId).toBe('pg/vector@1');
+    expect(vectorCodec?.id).toBe('pg/vector@1');
   });
 
   it('provides operation signatures', () => {
@@ -24,7 +24,7 @@ describe('pgvector operations', () => {
     expect(cosineDistanceOp).toBeDefined();
     expect(cosineDistanceOp?.forTypeId).toBe('pg/vector@1');
     expect(cosineDistanceOp?.method).toBe('cosineDistance');
-    expect(cosineDistanceOp?.args).toEqual([{ kind: 'typeId', type: 'pg/vector@1' }]);
+    expect(cosineDistanceOp?.args).toEqual([{ kind: 'param' }]);
     expect(cosineDistanceOp?.returns).toEqual({ kind: 'builtin', type: 'number' });
     expect(cosineDistanceOp?.lowering).toEqual({
       targetFamily: 'sql',
@@ -60,6 +60,6 @@ describe('pgvector operations', () => {
 
     const vectorCodec = registry.get('pg/vector@1');
     expect(vectorCodec).toBeDefined();
-    expect(vectorCodec?.typeId).toBe('pg/vector@1');
+    expect(vectorCodec?.id).toBe('pg/vector@1');
   });
 });

@@ -8,7 +8,8 @@ import {
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
-import { createCodecRegistry, createOperationRegistry } from '@prisma-next/sql-relational-core/ast';
+import { createOperationRegistry } from '@prisma-next/operations';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,8 +22,9 @@ describe('pgvector extension pack integration', () => {
 
     expect(packs.length).toBe(1);
     const pack = packs[0];
-    expect(pack.manifest.id).toBe('pgvector');
-    expect(pack.manifest.version).toBe('1.0.0');
+    expect(pack).toBeDefined();
+    expect(pack?.manifest.id).toBe('pgvector');
+    expect(pack?.manifest.version).toBe('1.0.0');
   });
 
   it('extracts codec type imports from pack', () => {
@@ -61,13 +63,11 @@ describe('pgvector extension pack integration', () => {
     expect(operations.length).toBe(1);
     expect(operations[0]?.method).toBe('cosineDistance');
     expect(operations[0]?.forTypeId).toBe('pg/vector@1');
-    expect(operations[0]?.args).toEqual([{ kind: 'typeId', type: 'pg/vector@1' }]);
+    expect(operations[0]?.args).toEqual([{ kind: 'param' }]);
     expect(operations[0]?.returns).toEqual({ kind: 'builtin', type: 'number' });
-    expect(operations[0]?.lowering).toEqual({
-      targetFamily: 'sql',
-      strategy: 'function',
-      template: '1 - ({{self}} <=> {{arg0}})',
-    });
+    // Note: lowering is SQL-specific and not part of core OperationSignature
+    // The SQL family descriptor converts manifests to SqlOperationSignature with lowering
+    // but the registry returns core OperationSignature types
   });
 
   it('runtime extension provides codecs', () => {
@@ -77,7 +77,7 @@ describe('pgvector extension pack integration', () => {
 
     const vectorCodec = codecs?.get('pg/vector@1');
     expect(vectorCodec).toBeDefined();
-    expect(vectorCodec?.typeId).toBe('pg/vector@1');
+    expect(vectorCodec?.id).toBe('pg/vector@1');
     expect(vectorCodec?.targetTypes).toEqual(['vector']);
   });
 
@@ -104,7 +104,7 @@ describe('pgvector extension pack integration', () => {
 
     const vectorCodec = registry.get('pg/vector@1');
     expect(vectorCodec).toBeDefined();
-    expect(vectorCodec?.typeId).toBe('pg/vector@1');
+    expect(vectorCodec?.id).toBe('pg/vector@1');
   });
 
   it('operations can be registered in registry', () => {

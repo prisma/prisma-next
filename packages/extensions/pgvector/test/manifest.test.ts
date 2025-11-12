@@ -13,8 +13,11 @@ describe('pgvector manifest', () => {
 
     expect(manifest.id).toBe('pgvector');
     expect(manifest.version).toBe('1.0.0');
-    expect(manifest.targets?.postgres?.minVersion).toBe('12');
-    expect(manifest.capabilities?.postgres?.['pgvector/cosine']).toBe(true);
+    expect(manifest.targets?.['postgres']?.minVersion).toBe('12');
+    const postgresCapabilities = manifest.capabilities?.['postgres'] as
+      | Record<string, unknown>
+      | undefined;
+    expect(postgresCapabilities?.['pgvector/cosine']).toBe(true);
   });
 
   it('has codec types import', () => {
@@ -47,11 +50,12 @@ describe('pgvector manifest', () => {
     expect(manifest.operations?.length).toBeGreaterThan(0);
 
     const cosineDistanceOp = manifest.operations?.find(
-      (op) => op.for === 'pg/vector@1' && op.method === 'cosineDistance',
+      (op: { for: string; method: string }) =>
+        op.for === 'pg/vector@1' && op.method === 'cosineDistance',
     );
 
     expect(cosineDistanceOp).toBeDefined();
-    expect(cosineDistanceOp?.args).toEqual([{ kind: 'typeId', type: 'pg/vector@1' }]);
+    expect(cosineDistanceOp?.args).toEqual([{ kind: 'param' }]);
     expect(cosineDistanceOp?.returns).toEqual({ kind: 'builtin', type: 'number' });
     expect(cosineDistanceOp?.lowering).toEqual({
       targetFamily: 'sql',
@@ -61,14 +65,14 @@ describe('pgvector manifest', () => {
   });
 
   it('codec types are importable', async () => {
-    // Verify the codec types module can be imported
-    const codecTypes = await import('../src/exports/codec-types');
-    expect(codecTypes).toHaveProperty('CodecTypes');
+    // Verify the codec types module can be imported (type-only export)
+    // Type-only exports don't exist at runtime, so we just verify the import succeeds
+    await expect(import('../src/exports/codec-types')).resolves.toBeDefined();
   });
 
   it('operation types are importable', async () => {
-    // Verify the operation types module can be imported
-    const operationTypes = await import('../src/exports/operation-types');
-    expect(operationTypes).toHaveProperty('OperationTypes');
+    // Verify the operation types module can be imported (type-only export)
+    // Type-only exports don't exist at runtime, so we just verify the import succeeds
+    await expect(import('../src/exports/operation-types')).resolves.toBeDefined();
   });
 });

@@ -13,8 +13,8 @@ export default function pgvector(): Extension {
     codecs(): CodecRegistry {
       const registry = createCodecRegistry();
       // Register all codecs from codecDefinitions
-      for (const codec of codecDefinitions.values()) {
-        registry.register(codec);
+      for (const def of Object.values(codecDefinitions)) {
+        registry.register(def.codec);
       }
       return registry;
     },
@@ -23,7 +23,7 @@ export default function pgvector(): Extension {
         {
           forTypeId: 'pg/vector@1',
           method: 'cosineDistance',
-          args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+          args: [{ kind: 'param' }],
           returns: { kind: 'builtin', type: 'number' },
           lowering: {
             targetFamily: 'sql',

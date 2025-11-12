@@ -2,8 +2,8 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:9e84a4d5fc3504d0fb60037867bc1076ad8089e9d0cefdeff01177ed92feda8e",
-  "profileHash": "sha256:5a8d9c14e9293be728f50dac2c2872f0873788bec000cde2cc745e2c92e33a72",
+  "coreHash": "sha256:ce9ed581529d07b9a2b9cdd49112887d8830683f5571248f4cde25eb43915688",
+  "profileHash": "sha256:685b5ca1c6135f0c44f6545694b75a136addc2d74f3a76e22428cd66e293c4a8",
   "models": {
     "Post": {
       "fields": {
@@ -49,6 +49,10 @@
         "columns": {
           "createdAt": {
             "type": "pg/timestamptz@1"
+          },
+          "embedding": {
+            "nullable": true,
+            "type": "pg/vector@1"
           },
           "id": {
             "type": "pg/int4@1"
@@ -96,11 +100,13 @@
     "postgres": {
       "jsonAgg": true,
       "lateral": true,
+      "pgvector/cosine": true,
       "returning": true
     }
   },
   "extensions": {
     "pg": {},
+    "pgvector": {},
     "postgres": {
       "version": "15.0.0"
     }

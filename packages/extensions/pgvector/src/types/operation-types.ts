@@ -14,8 +14,7 @@ export type OperationTypes = {
     readonly cosineDistance: {
       readonly args: readonly [
         {
-          readonly kind: 'typeId';
-          readonly type: 'pg/vector@1';
+          readonly kind: 'param';
         },
       ];
       readonly returns: {

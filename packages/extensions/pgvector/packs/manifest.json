@@ -33,8 +33,7 @@
       "method": "cosineDistance",
       "args": [
         {
-          "kind": "typeId",
-          "type": "pg/vector@1"
+          "kind": "param"
         }
       ],
       "returns": {
