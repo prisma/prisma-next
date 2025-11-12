@@ -19,7 +19,7 @@ function createConfigFileContent(): string {
   const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
   const configTypesPath = resolve(
     workspaceRoot,
-    'packages/framework/tooling/cli/dist/exports/config-types.js',
+    'packages/framework/tooling/cli/dist/config-types.js',
   );
 
   return `import { defineConfig } from '${configTypesPath}';

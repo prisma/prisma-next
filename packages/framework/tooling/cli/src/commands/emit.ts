@@ -96,9 +96,8 @@ export function createEmitCommand(): Command {
         if (error instanceof Error) {
           // eslint-disable-next-line no-undef
           console.error(`Error: ${error.message}`);
-          // eslint-disable-next-line no-undef
-          process.exit(1);
         }
+        // Let commander.js handle the error (it will exit with code 1)
         throw error;
       }
     });

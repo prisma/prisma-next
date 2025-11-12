@@ -20,7 +20,7 @@ function createConfigFileContent(): string {
   const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
   const configTypesPath = resolve(
     workspaceRoot,
-    'packages/framework/tooling/cli/dist/exports/config-types.js',
+    'packages/framework/tooling/cli/dist/config-types.js',
   );
 
   return `import { defineConfig } from '${configTypesPath}';
@@ -41,10 +41,8 @@ describe('emit command', () => {
   let testDir: string;
   let outputDir: string;
   let configPath: string;
-  let originalExit: typeof process.exit;
   let originalConsoleLog: typeof console.log;
   let originalConsoleError: typeof console.error;
-  let exitCode: number | null = null;
   let consoleOutput: string[] = [];
   let consoleErrors: string[] = [];
 
@@ -60,16 +58,10 @@ describe('emit command', () => {
     // Create default config file with absolute paths
     writeFileSync(configPath, createConfigFileContent(), 'utf-8');
 
-    originalExit = process.exit;
     originalConsoleLog = console.log;
     originalConsoleError = console.error;
-    exitCode = null;
     consoleOutput = [];
     consoleErrors = [];
-
-    process.exit = vi.fn((code?: number) => {
-      exitCode = code ?? 0;
-    }) as unknown as typeof process.exit;
 
     console.log = vi.fn((...args: unknown[]) => {
       consoleOutput.push(args.map(String).join(' '));
@@ -84,7 +76,6 @@ describe('emit command', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    process.exit = originalExit;
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
   });
@@ -399,29 +390,29 @@ describe('emit command', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('handles errors and exits with code 1', async () => {
+  it('handles errors and throws', async () => {
     const command = createEmitCommand();
     const invalidPath = join(testDir, 'nonexistent-contract.ts');
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
-      await command.parseAsync([
-        'node',
-        'cli.js',
-        'emit',
-        '--contract',
-        invalidPath,
-        '--out',
-        outputDir,
-        '--config',
-        configPath,
-      ]);
-    } catch {
-      // Expected to throw
+      await expect(
+        command.parseAsync([
+          'node',
+          'cli.js',
+          'emit',
+          '--contract',
+          invalidPath,
+          '--out',
+          outputDir,
+          '--config',
+          configPath,
+        ]),
+      ).rejects.toThrow();
     } finally {
       process.chdir(originalCwd);
     }
 
-    expect(exitCode).toBe(1);
+    expect(consoleErrors.length).toBeGreaterThan(0);
   });
 });
