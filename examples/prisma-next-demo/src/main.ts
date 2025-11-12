@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { closeRuntime } from './prisma/runtime';
+import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
@@ -61,9 +62,29 @@ async function main() {
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const results = await similaritySearch(queryVector, limit);
       console.log(JSON.stringify(results, null, 2));
+    } else if (cmd === 'budget-violation') {
+      console.log('Running unbounded query to demonstrate budget violation...');
+      console.log('This query has no LIMIT clause and will trigger BUDGET.ROWS_EXCEEDED error.\n');
+      try {
+        await getAllPostsUnbounded();
+      } catch (error) {
+        console.error('Budget violation caught:');
+        if (error instanceof Error) {
+          const budgetError = error as { code?: string; category?: string; details?: unknown };
+          console.error('  Code:', budgetError.code);
+          console.error('  Category:', budgetError.category);
+          console.error('  Message:', error.message);
+          if (budgetError.details) {
+            console.error('  Details:', JSON.stringify(budgetError.details, null, 2));
+          }
+        } else {
+          console.error('  Error:', error);
+        }
+        throw error; // Re-throw to show the full error stack
+      }
     } else {
       console.log(
-        'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | users-with-posts [limit] | similarity-search <queryVector> [limit]]',
+        'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | users-with-posts [limit] | similarity-search <queryVector> [limit] | budget-violation]',
       );
       process.exit(1);
     }
