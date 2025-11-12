@@ -1,4 +1,4 @@
-import type { ContractIR } from './types';
+import type { ContractIR } from '@prisma-next/contract/ir';
 
 type NormalizedContract = {
   schemaVersion: string;

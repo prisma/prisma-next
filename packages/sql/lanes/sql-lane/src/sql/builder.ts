@@ -3,7 +3,7 @@ import type {
   ExtractOperationTypes,
   SqlContract,
   SqlStorage,
-} from '@prisma-next/sql-contract-types';
+} from '@prisma-next/sql-contract/types';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import { createJoinOnBuilder } from '@prisma-next/sql-relational-core/ast';
 import type { ParamPlaceholder, SqlBuilderOptions } from '@prisma-next/sql-relational-core/types';

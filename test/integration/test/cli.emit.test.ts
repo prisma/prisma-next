@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
+import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract-types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 type EmittedContract = SqlContract<
@@ -52,6 +52,7 @@ describe('CLI emit command', () => {
 
     contractPath = join(testDir, 'contract.ts');
     outputDir = join(testDir, 'output');
+    const configPath = join(testDir, 'prisma-next.config.ts');
 
     const contractContent = `import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
@@ -68,7 +69,21 @@ export const contract = defineContract<CodecTypes>()
   .build();
 `;
 
+    const configContent = `import { defineConfig } from '@prisma-next/cli/config-types';
+    import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+    import postgres from '@prisma-next/targets-postgres/cli';
+    import sql from '@prisma-next/family-sql/cli';
+
+    export default defineConfig({
+      family: sql,
+      target: postgres,
+      adapter: postgresAdapter,
+      extensions: [],
+    });
+    `;
+
     await writeFile(contractPath, contractContent, 'utf-8');
+    await writeFile(configPath, configContent, 'utf-8');
   });
 
   afterEach(async () => {
@@ -78,8 +93,8 @@ export const contract = defineContract<CodecTypes>()
   });
 
   it('executes CLI to emit contract and verifies artifacts', async () => {
-    const cliPath = resolve('packages/cli/dist/cli.js');
-    const adapterPath = resolve('packages/sql/runtime/adapters/postgres');
+    const cliPath = resolve('packages/framework/tooling/cli/dist/cli.js');
+    const configPath = join(testDir, 'prisma-next.config.ts');
 
     try {
       await execFileAsync('node', [
@@ -89,8 +104,8 @@ export const contract = defineContract<CodecTypes>()
         contractPath,
         '--out',
         outputDir,
-        '--adapter',
-        adapterPath,
+        '--config',
+        configPath,
       ]);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'stderr' in error) {
@@ -131,11 +146,10 @@ export const contract = defineContract<CodecTypes>()
   });
 
   it('round-trip test: TS contract → CLI emit → parse JSON → compare with loaded TS contract', async () => {
-    const adapterPath = resolve('packages/sql/runtime/adapters/postgres');
-
     const originalContract = await loadContractFromTs(contractPath);
 
-    const cliPath = resolve('packages/cli/dist/cli.js');
+    const cliPath = resolve('packages/framework/tooling/cli/dist/cli.js');
+    const configPath = join(testDir, 'prisma-next.config.ts');
 
     try {
       await execFileAsync('node', [
@@ -145,8 +159,8 @@ export const contract = defineContract<CodecTypes>()
         contractPath,
         '--out',
         outputDir,
-        '--adapter',
-        adapterPath,
+        '--config',
+        configPath,
       ]);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'stderr' in error) {

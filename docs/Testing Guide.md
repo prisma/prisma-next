@@ -491,6 +491,49 @@ const literalExpr: LiteralExpr = { kind: 'literal', value: 'test' };
 
 See `.cursor/rules/use-ast-factories.mdc` for detailed guidelines.
 
+### ContractIR Factory Functions
+
+When creating `ContractIR` objects in tests, use factory functions instead of manual object creation:
+
+```typescript
+// ✅ CORRECT: Use factory function
+import { createContractIR } from './utils';
+
+const ir = createContractIR({
+  storage: {
+    tables: {
+      user: {
+        columns: {
+          id: { type: 'pg/int4@1', nullable: false },
+        },
+      },
+    },
+  },
+});
+```
+
+```typescript
+// ❌ WRONG: Manual object creation
+const ir: ContractIR = {
+  schemaVersion: '1',
+  targetFamily: 'sql',
+  target: 'postgres',
+  models: {},
+  relations: {},
+  storage: { tables: {} },
+  extensions: {},
+  capabilities: {},
+  meta: {},
+  sources: {},
+};
+```
+
+**Why?** Factory functions ensure all required fields are present with proper defaults, making tests more maintainable and less error-prone.
+
+**Note:** The `capabilities` field in `ContractIR` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`. When creating `ExtensionPack` objects, both `manifest` and `path` properties are required.
+
+See `.cursor/rules/use-contract-ir-factories.mdc` for detailed guidelines.
+
 ---
 
 ## Type Testing

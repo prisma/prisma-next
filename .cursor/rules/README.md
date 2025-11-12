@@ -16,6 +16,9 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 
 ## Imports & Layering
 - `.cursor/rules/import-validation.mdc` — Layering rules and exceptions
+- `.cursor/rules/shared-plane-packages.mdc` — Pattern for creating shared plane packages
+- `.cursor/rules/multi-plane-packages.mdc` — Packages that span multiple planes (shared, migration, runtime)
+- `.cursor/rules/declarative-config.mdc` — Prefer declarative configuration over hardcoded logic
 - `architecture.config.json` — Domain/Layer/Plane map
 
 ## SQL & Query Patterns
@@ -35,11 +38,15 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/moving-packages.mdc` — Guidelines for moving packages and updating relative paths
 - `.cursor/rules/no-barrel-files.mdc` — Avoid barrels
 
+## Testing
+- `.cursor/rules/use-ast-factories.mdc` — Use factory functions for AST nodes in tests
+- `.cursor/rules/use-contract-ir-factories.mdc` — Use factory functions for ContractIR objects in tests
+
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Responsibilities
+- `.cursor/rules/adapter-capability-declaration.mdc` — Adapter capability declaration (manifest + code)
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.
 - Keep `alwaysApply` minimal—default to scoped rules with `appliesTo` in frontmatter.
-

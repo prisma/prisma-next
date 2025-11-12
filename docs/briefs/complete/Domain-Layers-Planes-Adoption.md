@@ -51,16 +51,17 @@ Framework (target‑agnostic)
 |       |-- @prisma-next/runtime-core (target-neutral execution kernel)
 ```
 
-SQL Target Family
+SQL Family
 
 ```
-* sql target family
+* sql family
 |-- authoring (migration plane)
 |   |-- @prisma-next/sql-contract-ts
-|-- targets (migration→runtime boundary)
-|   |-- @prisma-next/sql-contract-types
-|   |-- @prisma-next/sql-operations
+|-- tooling (migration plane)
 |   |-- @prisma-next/sql-contract-emitter
+|-- core (shared plane)
+|   |-- @prisma-next/sql-contract
+|   |-- @prisma-next/sql-operations
 |   |-- (legacy) @prisma-next/sql-target
 |-- lanes (runtime plane)
 |   |-- @prisma-next/sql-relational-core
@@ -117,7 +118,7 @@ Rules to enforce
     { "glob": "packages/emitter/**",              "domain": "framework", "layer": "tooling",       "plane": "migration" },
     { "glob": "packages/runtime/core/**",         "domain": "framework", "layer": "runtime-core",  "plane": "runtime" },
 
-    { "glob": "packages/targets/sql/**",          "domain": "sql",       "layer": "targets",      "plane": "migration" },
+    { "glob": "packages/sql/tooling/**",          "domain": "sql",       "layer": "tooling",      "plane": "migration" },
     { "glob": "packages/sql/authoring/**",        "domain": "sql",       "layer": "authoring",    "plane": "migration" },
     { "glob": "packages/sql/lanes/**",            "domain": "sql",       "layer": "lanes",        "plane": "runtime" },
     { "glob": "packages/sql/sql-runtime/**",      "domain": "sql",       "layer": "runtime",      "plane": "runtime" },

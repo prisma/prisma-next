@@ -1,11 +1,7 @@
 ---
 description: Never branch on target - use adapters instead
+globs:
 alwaysApply: true
-tags: [architecture, adapters]
-appliesTo: ["**/*"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: warn
 ---
 
 # No Target-Specific Branches

@@ -8,9 +8,9 @@ import type {
   RuntimeTelemetryEvent,
   RuntimeVerifyOptions,
   TelemetryOutcome,
-} from '@prisma-next/runtime-core';
-import { createRuntimeCore } from '@prisma-next/runtime-core';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+} from '@prisma-next/runtime-executor';
+import { createRuntimeCore } from '@prisma-next/runtime-executor';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   CodecRegistry,

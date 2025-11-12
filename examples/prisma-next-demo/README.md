@@ -39,6 +39,6 @@ This demo shows:
 ## Key Files
 
 - `src/prisma/contract.json` - Static contract definition
-- `src/prisma/scripts/stamp-marker.ts` - Contract marker management
+- `scripts/stamp-marker.ts` - Contract marker management
 - `test/` - Integration tests demonstrating Prisma Next usage
 

@@ -2,7 +2,7 @@
   "$id": "https://prisma.dev/schemas/data-contract-sql-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Prisma Next Data Contract SQL v1",
-  "description": "Schema for Prisma Next contract.json files for SQL target family (postgres, mysql, sqlite, etc.)",
+  "description": "Schema for Prisma Next contract.json files for the SQL family (postgres, mysql, sqlite, etc.)",
   "type": "object",
   "additionalProperties": false,
   "properties": {

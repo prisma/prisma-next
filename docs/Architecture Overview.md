@@ -42,7 +42,7 @@ Prisma Next is organized around two planes that share the contract and a pinned 
 - **Migration Plane** (build time): authoring, planning, verifying, and applying contract changes
 - **Query Plane** (runtime): authoring, validating, and executing query plans against live data
 
-Both planes operate on the same shared artifacts:
+Both planes operate on the same shared artifacts (produced and consumed via a small Common "shared" plane):
 
 - **Data Contract:** Generated from PSL + TypeScript builders + extension manifests and distributed as JSON alongside TypeScript definitions
 - **Capability profile:** The contract declares required capabilities (and optional adapter pins) and emits a pinned `profileHash`. The runner verifies the database satisfies the contract and writes the same `profileHash` to the marker (ADR 117, ADR 021)
@@ -166,6 +166,17 @@ sequenceDiagram
   DB-->>Runner: Success
   Runner->>Marker: Update coreHash/profileHash, write ledger
 ```
+
+## Domains and Responsibilities
+
+- Framework: Target‑agnostic core (contract base types, plan model, runtime SPI, tooling/CLI).
+- SQL (Target‑Family): Dialect‑agnostic SQL family building blocks (contract shape/types, operations specs, emitter hook, lanes). This domain defines how SQL targets integrate but does not include a concrete dialect.
+- Extensions: Concrete target and ecosystem packs (e.g., Postgres adapter/driver, codec packs, compat layers). Extensions implement Framework/Family SPIs and are dynamically composed.
+
+Notes
+- Family vs Target: “Target‑family” (SQL) applies to any SQL dialect; “target” is a concrete dialect (Postgres, MySQL). Family code lives in the SQL domain; dialect code lives in Extensions.
+- Repository layout: concrete targets (dialects), adapters, and drivers live under `packages/targets/**`. Adapters commonly expose multiple entrypoints from a single package — `./adapter` (shared core), `./cli` (migration), `./runtime` (runtime) — mapped to planes via subpath globs in `architecture.config.json`.
+- Plane boundaries: Shared plane hosts type‑only code and validators safe for both planes. Migration and Runtime must not import code across planes; runtime consumes artifacts and shared‑plane types only.
 ## Query Plane — Runtime Assertions
 
 **Authoring**
@@ -253,35 +264,40 @@ To make the "thin core, fat targets" principle enforceable in code, the reposito
 
 Key points:
 - Core owns contracts, plan model, and a target-agnostic runtime kernel.
-- Family packages (e.g., `sql/`) contain family-specific contract types/emitter hooks, lanes, runtime implementation, and adapters.
+- Family packages (e.g., `sql/`) contain family-specific contract types/emitter hooks, lanes, and runtime implementation. Concrete adapters and targets live in the `targets/` domain.
+- CLI is family-agnostic: framework CLI reads config and calls family-provided helpers; pack assembly logic lives in family packages, not the framework CLI.
 - No long-lived transitional shims are maintained; there are no external consumers. Short-lived internal bridges are allowed only during migration.
 
 Example layout
 
 ```
 packages/
-  core/
-    contract/            # contract types + plan metadata
-    plan/                # diagnostics, shared errors
-    operations/          # target-neutral operation registry + helpers
-  authoring/
-    contract-authoring/  # TS builders, canonicalization, schema DSL
-  targets/
-    sql/
-      contract-types/
-      operations/
-      emitter/
-  lanes/
-    relational-core/     # schema + column builders, operation attachment
-    sql-lane/            # relational DSL + raw lane
-    orm-lane/            # ORM builder, includes, relation filters
-  runtime/
-    core/                # target-agnostic runtime kernel (verification, plugins, SPI)
+  framework/
+    core-contract/       # contract types + plan metadata
+    core-plan/           # diagnostics, shared errors
+    core-operations/     # target-neutral operation registry + helpers
+    authoring/
+      contract-authoring/  # TS builders, canonicalization, schema DSL
+    tooling/
+      cli/               # framework CLI (config-only, family-agnostic)
+      emitter/           # contract emitter with family hooks
+    runtime-executor/    # target-agnostic runtime kernel (verification, plugins, SPI)
   sql/
+    contract/            # SQL contract types (shared plane)
+    operations/          # SQL operation types (shared plane)
+    tooling/
+      emitter/           # SQL emitter hook
+      assembly/          # SQL family assembly helpers
+      cli/               # SQL family CLI entry point
+    lanes/
+      relational-core/   # schema + column builders, operation attachment
+      sql-lane/          # relational DSL + raw lane
+      orm-lane/          # ORM builder, includes, relation filters
     sql-runtime/         # SQL runtime implementing the runtime SPI
-    postgres/
-      postgres-adapter/
-      postgres-driver/
+  targets/
+    postgres/            # Postgres target descriptor
+    postgres-adapter/    # Postgres adapter (multi-plane: shared, migration, runtime)
+    postgres-driver/     # Postgres driver
 ```
 
 Dependency direction is strictly one-way: `core → authoring → targets → lanes → runtime(core) → family runtime → adapters`. Inner rings never import outer rings. Enforce with tsconfig path groups, ESLint path rules, and an import-graph CI check.

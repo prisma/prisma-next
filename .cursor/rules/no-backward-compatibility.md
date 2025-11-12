@@ -1,11 +1,7 @@
 ---
 description: Do not add backward-compatibility shims or migration scaffolding
-alwaysApply: false
-tags: [maintenance]
-appliesTo: ["**/*"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: warn
+globs:
+alwaysApply: true
 ---
 
 # No Backward Compatibility or Migration Paths

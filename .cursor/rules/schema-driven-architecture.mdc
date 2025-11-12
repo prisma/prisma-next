@@ -1,12 +1,7 @@
 ---
 description: Read the architecture overview first
-globs: ["**/*"]
-tags: [architecture]
-appliesTo: ["**/*"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
-alwaysApply: false
+globs:
+alwaysApply: true
 ---
 
 Read the architecture overview in docs/Architecture%20Overview.md before writing code.

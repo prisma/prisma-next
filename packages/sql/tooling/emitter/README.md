@@ -1,0 +1,66 @@
+# @prisma-next/sql-contract-emitter
+
+SQL emitter hook for Prisma Next.
+
+## Overview
+
+This package provides the SQL-specific emitter hook implementation for the Prisma Next emitter. It validates SQL contracts and generates TypeScript type definitions for SQL contracts. It's part of the SQL tooling layer (migration plane) and implements the `TargetFamilyHook` interface.
+
+## Responsibilities
+
+- **Contract Validation**: Validates SQL contract structure and types
+  - `validateTypes()`: Validates type IDs against referenced extensions (receives `ValidationContext` with `extensionIds`)
+  - `validateStructure()`: Validates SQL-specific contract structure (tables, models, constraints)
+
+- **Type Generation**: Generates TypeScript type definitions for SQL contracts
+  - `generateContractTypes()`: Generates `contract.d.ts` file content (receives separate `codecTypeImports` and `operationTypeImports` arrays)
+
+## Dependencies
+
+- **Depends on**:
+  - `@prisma-next/emitter` (contract IR, `TargetFamilyHook` SPI, `ValidationContext`, `TypesImportSpec`)
+  - `@prisma-next/sql-contract` (SQL contract type definitions)
+- **Depended on by**:
+  - `@prisma-next/cli` (uses for contract emission)
+  - `@prisma-next/integration-tests` (uses for contract emission tests)
+
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph "Framework Tooling Layer"
+        EMITTER[@prisma-next/emitter]
+        CLI[@prisma-next/cli]
+    end
+
+    subgraph "SQL Tooling Layer"
+        SQL_EMITTER[@prisma-next/sql-contract-emitter]
+    end
+
+    subgraph "SQL Core Layer (Shared Plane)"
+        CT[@prisma-next/sql-contract]
+    end
+
+    EMITTER --> SQL_EMITTER
+    CT --> SQL_EMITTER
+    SQL_EMITTER --> CLI
+```
+
+## Usage
+
+### Using the SQL Emitter Hook
+
+```typescript
+import { emit } from '@prisma-next/emitter';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+
+const result = await emit(contractIR, options, sqlTargetFamilyHook);
+
+// result.contractDts contains generated TypeScript types
+// result.contractJson contains validated contract JSON
+```
+
+## Related Documentation
+
+- [Package Layering](../../../../docs/architecture docs/Package-Layering.md)
+- [ADR 140 - Package Layering & Target-Family Namespacing](../../../../docs/architecture docs/adrs/ADR 140 - Package Layering & Target-Family Namespacing.md)

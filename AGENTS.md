@@ -37,6 +37,10 @@ cd examples/todo-app && pnpm demo  # End-to-end demo
 - Contract‑first: we emit `contract.json` and `contract.d.ts` only; queries compile at runtime.
 - Modular packages with domain/layer/plane guardrails: `architecture.config.json`.
 - Use Arktype for validation; extract types via `.infer` where needed: `.cursor/rules/arktype-usage.mdc`.
+- Directory layout: the entire SQL family (all layers and planes) lives under `packages/sql/**`. The top-level `packages/targets/**` is reserved for concrete target extension packs (e.g., `packages/targets/postgres` for target, `packages/targets/postgres-adapter` for adapter, `packages/targets/postgres-driver` for driver), not for family internals.
+- Targets domain separation: keep dialect, adapter, and driver as separate packages under `packages/targets/**` so consumers can mix and match.
+- Single adapter package, multi-plane entrypoints: adapters expose `./adapter` (shared core), `./cli` (migration), and `./runtime` (runtime). We map these entrypoints to planes via subpath globs in `architecture.config.json`. See `.cursor/rules/multi-plane-entrypoints.mdc` and `.cursor/rules/directory-layout.mdc`.
+- **CLI Config**: Apps declare adapter and extension packs in `prisma-next.config.ts`. The CLI loads config and uses family-provided helpers to assemble operation registries and type imports. See `packages/framework/tooling/cli/README.md` for details.
 
 ## Frequent Tasks
 - Add SQL operation: see `docs/briefs/complete` and `.cursor/plans/add-sql-operation.md` (template).
@@ -48,4 +52,3 @@ cd examples/todo-app && pnpm demo  # End-to-end demo
 - Changes that affect demo, examples, or CI.
 
 That’s it—follow links above for deep dives.
-

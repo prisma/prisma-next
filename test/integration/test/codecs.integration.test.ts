@@ -1,8 +1,8 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { Plan } from '@prisma-next/contract/types';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';

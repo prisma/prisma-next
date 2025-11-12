@@ -43,16 +43,10 @@
       "plane": "migration"
     },
     {
-      "glob": "packages/framework/runtime-core/**",
+      "glob": "packages/framework/runtime-executor/**",
       "domain": "framework",
-      "layer": "runtime-core",
+      "layer": "runtime-executor",
       "plane": "runtime"
-    },
-    {
-      "glob": "packages/targets/sql/**",
-      "domain": "sql",
-      "layer": "targets",
-      "plane": "migration"
     },
     {
       "glob": "packages/sql/authoring/**",
@@ -73,26 +67,50 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/postgres/**",
-      "domain": "sql",
-      "layer": "adapters",
-      "plane": "runtime"
-    },
-    {
       "glob": "packages/compat/**",
       "domain": "sql",
       "layer": "adapters",
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/runtime/adapters/postgres/**",
-      "domain": "sql",
+      "glob": "packages/targets/postgres-adapter/src/core/**",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/targets/postgres-adapter/src/exports/cli.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/targets/postgres-adapter/src/exports/runtime.ts",
+      "domain": "targets",
       "layer": "adapters",
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/runtime/drivers/postgres/**",
-      "domain": "sql",
+      "glob": "packages/targets/postgres/src/exports/cli.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/targets/postgres/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/targets/postgres-driver/src/exports/cli.ts",
+      "domain": "targets",
+      "layer": "drivers",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/targets/postgres-driver/src/exports/runtime.ts",
+      "domain": "targets",
       "layer": "drivers",
       "plane": "runtime"
     },
@@ -107,6 +125,24 @@
       "domain": "framework",
       "layer": "core",
       "plane": "shared"
+    },
+    {
+      "glob": "packages/sql/contract/**",
+      "domain": "sql",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/sql/operations/**",
+      "domain": "sql",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/sql/tooling/**",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "migration"
     }
   ],
   "rules": {
@@ -117,8 +153,31 @@
     "migrationToRuntime": "deny",
     "runtimeToMigration": "allowArtifactsOnly"
   },
+  "planeRules": {
+    "shared": {
+      "allow": ["shared"],
+      "forbid": ["migration", "runtime"],
+      "exceptions": []
+    },
+    "migration": {
+      "allow": ["shared", "migration"],
+      "forbid": ["runtime"],
+      "exceptions": []
+    },
+    "runtime": {
+      "allow": ["shared", "runtime"],
+      "forbid": ["migration"],
+      "exceptions": [
+        {
+          "from": "packages/extensions/compat-prisma/**",
+          "to": "packages/sql/**",
+          "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
+        }
+      ]
+    }
+  },
   "layerOrder": {
-    "framework": ["core", "authoring", "tooling", "runtime-core"],
-    "sql": ["core", "authoring", "targets", "lanes", "runtime", "adapters", "drivers"]
+    "framework": ["core", "authoring", "tooling", "runtime-executor"],
+    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"]
   }
 }

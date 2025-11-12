@@ -1,11 +1,7 @@
 ---
 description: Use factory functions for creating AST nodes instead of manual object creation
-alwaysApply: false
-tags: [testing, ast]
-appliesTo: ["**/*.test.ts", "**/*.spec.ts"]
-owner: prisma-next-docs
-lastUpdated: 2025-01-27
-severity: error
+globs: ["**/*.test.ts", "**/*.spec.ts"]
+alwaysApply: true
 ---
 
 # Use Factory Functions for AST Nodes

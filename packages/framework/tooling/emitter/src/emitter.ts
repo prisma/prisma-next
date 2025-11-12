@@ -1,8 +1,9 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { format } from 'prettier';
 import { canonicalizeContract } from './canonicalization';
 import { computeCoreHash, computeProfileHash } from './hashing';
-import type { TargetFamilyHook } from './target-family';
-import type { ContractIR, EmitOptions, EmitResult, ExtensionPack } from './types';
+import type { TargetFamilyHook, ValidationContext } from './target-family';
+import type { EmitOptions, EmitResult } from './types';
 
 function validateCoreStructure(ir: ContractIR): void {
   if (!ir.targetFamily) {
@@ -37,13 +38,12 @@ function validateCoreStructure(ir: ContractIR): void {
   }
 }
 
-function validateExtensions(ir: ContractIR, packs: ReadonlyArray<ExtensionPack>): void {
+function validateExtensions(ir: ContractIR, extensionIds: ReadonlyArray<string>): void {
   const extensions = ir.extensions as Record<string, unknown>;
-  for (const pack of packs) {
-    const packId = pack.manifest.id;
-    if (!extensions[packId]) {
+  for (const extensionId of extensionIds) {
+    if (!extensions[extensionId]) {
       throw new Error(
-        `Extension pack "${packId}" (loaded from manifest) must appear in contract.extensions.${packId}`,
+        `Extension "${extensionId}" must appear in contract.extensions.${extensionId}`,
       );
     }
   }
@@ -54,17 +54,23 @@ export async function emit(
   options: EmitOptions,
   targetFamily: TargetFamilyHook,
 ): Promise<EmitResult> {
-  const { packs } = options;
-
-  const packManifests = packs.map((p) => p.manifest);
+  const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } = options;
 
   validateCoreStructure(ir);
 
-  targetFamily.validateTypes(ir, packManifests);
+  const ctx: ValidationContext = {
+    ...(operationRegistry ? { operationRegistry } : {}),
+    ...(codecTypeImports ? { codecTypeImports } : {}),
+    ...(operationTypeImports ? { operationTypeImports } : {}),
+    ...(extensionIds ? { extensionIds } : {}),
+  };
+  targetFamily.validateTypes(ir, ctx);
 
   targetFamily.validateStructure(ir);
 
-  validateExtensions(ir, packs);
+  if (extensionIds) {
+    validateExtensions(ir, extensionIds);
+  }
 
   const contractJson = {
     schemaVersion: ir.schemaVersion,
@@ -106,7 +112,11 @@ export async function emit(
   };
   const contractJsonString = JSON.stringify(contractJsonWithMeta, null, 2);
 
-  const contractDtsRaw = targetFamily.generateContractTypes(ir, packs);
+  const contractDtsRaw = targetFamily.generateContractTypes(
+    ir,
+    codecTypeImports ?? [],
+    operationTypeImports ?? [],
+  );
   const contractDts = await format(contractDtsRaw, {
     parser: 'typescript',
     singleQuote: true,

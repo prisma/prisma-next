@@ -1,11 +1,7 @@
 ---
 description: Test file organization and splitting guidelines
-alwaysApply: false
-tags: [testing]
-appliesTo: ["**/*.test.ts", "**/*.spec.ts"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
+globs: ["**/*.test.ts", "**/*.spec.ts"]
+alwaysApply: true
 ---
 
 # Test File Organization

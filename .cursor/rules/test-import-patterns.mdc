@@ -1,11 +1,7 @@
 ---
 description: Test import patterns and conventions
-alwaysApply: false
-tags: [testing]
-appliesTo: ["**/*.test.ts", "**/*.spec.ts"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
+globs: ["**/*.test.ts", "**/*.spec.ts"]
+alwaysApply: true
 ---
 
 # Test Import Patterns
@@ -152,7 +148,7 @@ When extracting code from one package to another:
 
 **Example:**
 - Old: `packages/sql-target/src/operations-registry.ts`
-- New: `packages/framework/core-operations/src/index.ts` (core types) + `packages/targets/sql/operations/src/index.ts` (SQL-specific)
+- New: `packages/framework/core-operations/src/index.ts` (core types) + `packages/sql/operations/src/index.ts` (SQL-specific)
 - Action:
   1. Move implementation to new packages
   2. Move tests to new packages with updated imports (`../src/index`)
@@ -210,3 +206,48 @@ import { sql } from '../src/sql';
 **❌ WRONG:** Leaving old implementation files after migration
 
 **✅ CORRECT:** Delete old source files after verifying all imports are updated
+
+### Importing from Sibling Packages in the Same Domain
+
+**❌ WRONG: Import from sibling package using workspace package name**
+
+```typescript
+// packages/framework/tooling/emitter/test/emitter.test.ts
+import type { ContractIR } from '@prisma-next/contract/ir';
+```
+
+**Problem:**
+- Tests should use relative paths for packages within the same domain/framework structure
+- Workspace package imports can cause resolution issues in test environments
+- Relative paths are more explicit and don't depend on package build state
+- Makes it clear that these are internal dependencies within the same codebase
+
+**✅ CORRECT: Use relative paths for sibling packages**
+
+```typescript
+// packages/framework/tooling/emitter/test/emitter.test.ts
+import type { ContractIR } from '../../../core-contract/src/ir';
+```
+
+**Rule:** When importing from a sibling package within the same domain (e.g., both in `packages/framework/` or both in `packages/sql/`), use relative paths instead of workspace package names. This applies to:
+- Tests importing from sibling packages in the same domain
+- Tests importing from parent domain packages (e.g., framework tests importing from core-contract)
+- Any test file that can reach the source via relative path
+
+**Exception:** Integration tests in `test/integration/` or `test/e2e/` should use workspace package names when testing the public API of packages they're integrating, but should still use relative paths when importing from sibling packages within the same domain (e.g., framework domain packages).
+
+**Examples:**
+
+```typescript
+// ✅ CORRECT: Relative path for sibling package
+// packages/framework/tooling/emitter/test/emitter.test.ts
+import type { ContractIR } from '../../../core-contract/src/ir';
+
+// ✅ CORRECT: Relative path for parent domain package
+// test/integration/test/contract-imports.integration.test.ts
+import type { ContractIR } from '../../../packages/framework/core-contract/src/ir';
+
+// ✅ CORRECT: Workspace package name for integration tests
+// test/integration/test/cross-package.test.ts
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+```

@@ -18,12 +18,40 @@ export function errorChildProjectionMustBeSpecified(): never {
   throw planInvalid('Child projection must be specified');
 }
 
-export function errorIncludeRequiresCapabilities(): never {
-  throw planInvalid('includeMany requires lateral and jsonAgg capabilities');
+export function errorIncludeRequiresCapabilities(target?: string): never {
+  throw planInvalid(
+    'includeMany requires lateral and jsonAgg capabilities',
+    target ? { target } : undefined,
+    [
+      'Enable capabilities for your target in contract.capabilities[target]',
+      "For SQL includes, set both 'lateral' and 'jsonAgg' to true",
+      'If your database lacks lateral/json_agg, use explicit joins + group aggregates',
+    ],
+    [
+      'docs/Architecture Overview.md',
+      'docs/reference/extensions-glossary.md',
+      'packages/targets/postgres-adapter/README.md',
+    ],
+  );
 }
 
-export function errorIncludeCapabilitiesNotTrue(): never {
-  throw planInvalid('includeMany requires lateral and jsonAgg capabilities to be true');
+export function errorIncludeCapabilitiesNotTrue(
+  target?: string,
+  values?: { lateral?: unknown; jsonAgg?: unknown },
+): never {
+  throw planInvalid(
+    'includeMany requires lateral and jsonAgg capabilities to be true',
+    target ? { target, values } : undefined,
+    [
+      'Set contract.capabilities[target].lateral = true and .jsonAgg = true',
+      'If the target does not support these, avoid includeMany and compose a two-step plan',
+    ],
+    [
+      'docs/Architecture Overview.md',
+      'docs/reference/extensions-glossary.md',
+      'packages/targets/postgres-adapter/README.md',
+    ],
+  );
 }
 
 export function errorUnknownTable(tableName: string): never {
@@ -90,12 +118,37 @@ export function errorProjectionEmpty(): never {
   throw planInvalid('select() requires at least one column or include');
 }
 
-export function errorReturningRequiresCapability(): never {
-  throw planInvalid('returning() requires returning capability');
+export function errorReturningRequiresCapability(target?: string): never {
+  throw planInvalid(
+    'returning() requires returning capability',
+    target ? { target } : undefined,
+    [
+      "Enable 'returning' for your target in contract.capabilities[target]",
+      'PostgreSQL supports RETURNING; MySQL does not',
+      'If unsupported, remove returning() and fetch with a follow-up select()',
+    ],
+    [
+      'docs/Architecture Overview.md',
+      'docs/reference/extensions-glossary.md',
+      'packages/targets/postgres-adapter/README.md',
+    ],
+  );
 }
 
-export function errorReturningCapabilityNotTrue(): never {
-  throw planInvalid('returning() requires returning capability to be true');
+export function errorReturningCapabilityNotTrue(target?: string, value?: unknown): never {
+  throw planInvalid(
+    'returning() requires returning capability to be true',
+    target ? { target, value } : undefined,
+    [
+      'Set contract.capabilities[target].returning = true',
+      'If your database/adapter cannot support RETURNING, remove returning() and select after',
+    ],
+    [
+      'docs/Architecture Overview.md',
+      'docs/reference/extensions-glossary.md',
+      'packages/targets/postgres-adapter/README.md',
+    ],
+  );
 }
 
 export function errorUnknownColumn(columnName: string, tableName: string): never {

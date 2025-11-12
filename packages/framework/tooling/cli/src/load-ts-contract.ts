@@ -1,7 +1,7 @@
 import { unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ContractIR } from '@prisma-next/emitter';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { Plugin } from 'esbuild';
 import { build } from 'esbuild';
 

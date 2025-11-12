@@ -1,10 +1,11 @@
 # Recommendations
 
 ## Observations
-- Another placeholder (`src/index.ts` is empty) even though the workspace exposes `@prisma-next/contract-ts`.
-- Downstream documentation still mentions this package without clarifying that SQL-specific code lives elsewhere.
+- The package is intentionally empty (`src/index.ts` only exports nothing) yet it is published and still mentioned in docs, which confuses contributors who expect an actual authoring surface.
+- There are no tests or validation, so nothing prevents someone from accidentally dropping SQL-specific code into this placeholder package.
+- Downstream README references still point users to `@prisma-next/contract-ts` even though the SQL surface lives in `@prisma-next/sql-contract-ts`.
 
 ## Suggested Actions
-- Update the README to explain that this package is reserved for a future target-agnostic TS surface and point contributors to `@prisma-next/sql-contract-ts` for now.
-- Add a failing test or TODO to prevent new code from accidentally landing in the stub.
-
+- Clearly demarcate this package as a placeholder in the README and link to `@prisma-next/sql-contract-ts` for the current SQL-specific surface; consider renaming the README section to signal this.
+- Add a simple test or lint rule that fails if new modules are added here until the target-agnostic surface is actually implemented.
+- Once the generic authoring core is ready, document the intended responsibilities and the migration path from the SQL-only builder to the target-neutral one.

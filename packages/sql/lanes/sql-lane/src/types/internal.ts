@@ -1,5 +1,5 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,

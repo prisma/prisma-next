@@ -1,11 +1,7 @@
 ---
 description: Avoid barrel files and unnecessary re-exports
-alwaysApply: false
-tags: [refactoring]
-appliesTo: ["**/*"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
+globs:
+alwaysApply: true
 ---
 
 # Avoid Barrel Files and Re-exports

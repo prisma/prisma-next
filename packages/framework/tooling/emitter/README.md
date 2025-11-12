@@ -21,7 +21,7 @@ Provide a deterministic, verifiable representation of the application's data con
 - **Validate**: Core structure validation plus family-specific type and structure validation via hooks
 - **Canonicalize**: Compute `coreHash` (schema meaning) and `profileHash` (capabilities/pins) from canonical JSON
 - **Emit**: Generate `contract.json` and `contract.d.ts` with family-specific type generation
-- **Extension Pack Loading**: Load and validate extension pack manifests (via utilities)
+- **Manifest-Agnostic**: The emitter is completely manifest-agnostic. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI, not extension packs. Manifest parsing and assembly happens in the CLI layer (`packages/framework/tooling/cli/src/pack-assembly.ts`).
 
 **Note**: The emitter does NOT normalize contracts. Normalization must happen in the contract builder when the contract is created. The emitter assumes contracts are already normalized (all required fields present, including `schemaVersion`, `models`, `relations`, `storage`, `extensions`, `capabilities`, `meta`, and `sources`). All fields can be empty objects/arrays, but they must be present.
 
@@ -81,12 +81,12 @@ flowchart TD
 
 ### Target Family Hook (`target-family.ts`)
 - SPI interface (`TargetFamilyHook`) for extending emission with family-specific logic:
-  - `validateTypes`: Validate type IDs against extensions and packs
+  - `validateTypes`: Validate type IDs against referenced extensions (receives `ValidationContext` with `operationRegistry` and `extensionIds`)
   - `validateStructure`: Family-specific structural validation
-  - `generateContractTypes`: Generate `contract.d.ts` content
-  - `getTypesImports`: Determine required type imports from packs
+  - `generateContractTypes`: Generate `contract.d.ts` content (receives separate `codecTypeImports` and `operationTypeImports` arrays)
 - Authoring surfaces determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly to `emit()`
 - No global registry or auto-registration - dependencies are explicit and passed directly
+- **Manifest-Agnostic**: Hooks receive pre-assembled context (operation registry, type imports, extension IDs), not extension packs. Manifest parsing and assembly happens in the CLI layer.
 
 ### Hashing (`hashing.ts`)
 - `computeCoreHash`: SHA-256 of schema structure (models, storage, relations)
@@ -97,9 +97,7 @@ flowchart TD
 - Excludes `_generated` metadata field from canonicalization to ensure determinism
 - Sorts object keys, omits default values, and orders top-level fields consistently
 
-### Extension Pack Utilities (`extension-pack.ts`)
-- Load extension pack manifests from file paths
-- Validate manifest structure using Arktype schemas
+**Note**: Extension pack loading and manifest parsing are CLI-only responsibilities. The emitter does not export pack loading functions. Import `loadExtensionPacks` from `@prisma-next/cli` or use the CLI's `pack-loading.ts` module directly. Manifest types (`ExtensionPack`, `ExtensionPackManifest`, `OperationManifest`) are defined in `packages/framework/tooling/cli/src/pack-manifest-types.ts`.
 
 ## Dependencies
 
@@ -130,17 +128,11 @@ This package is part of the **framework domain**, **tooling layer**, **migration
 
 ```typescript
 import { emit } from '@prisma-next/emitter';
-import { loadExtensionPacks } from '@prisma-next/emitter';
 import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
-
-// Load extension packs
-const packs = loadExtensionPacks(
-  './packages/adapter-postgres',
-  ['./packages/extension-pack']
-);
+import { createOperationRegistry } from '@prisma-next/operations';
 
 // Determine target family SPI based on target family
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 
 // Emit contract
 const ir: ContractIR = {
@@ -150,10 +142,13 @@ const ir: ContractIR = {
   // ... contract structure
 };
 
-// Pass target family SPI directly to emit()
+// Pass pre-assembled context to emit() (pack loading happens in CLI layer)
 const result = await emit(ir, {
   outputDir: './dist',
-  packs,
+  operationRegistry: createOperationRegistry(), // Pre-assembled from packs
+  codecTypeImports: [], // Extracted from packs (codec types)
+  operationTypeImports: [], // Extracted from packs (operation types)
+  extensionIds: ['postgres', 'pg'], // Extracted from packs
 }, sqlTargetFamilyHook);
 
 // result.contractJson: string (JSON) - canonical JSON without _generated metadata
@@ -164,7 +159,30 @@ const result = await emit(ir, {
 
 **Note**: The emitter returns canonical JSON without `_generated` metadata. Callers (e.g., CLI) may add `_generated` metadata to the JSON before writing to disk. The `_generated` field is excluded from canonicalization/hashing to ensure determinism.
 
+## Test Utilities
+
+When writing tests that create `ContractIR` objects, use the factory function from test utilities:
+
+```typescript
+import { createContractIR } from './test/utils';
+
+const ir = createContractIR({
+  storage: {
+    tables: {
+      user: {
+        columns: {
+          id: { type: 'pg/int4@1', nullable: false },
+        },
+      },
+    },
+  },
+});
+```
+
+This ensures all required fields are present with sensible defaults. See `.cursor/rules/use-contract-ir-factories.mdc` for guidelines.
+
 ## Exports
 
-- `.`: Main emitter API (`emit`, `loadExtensionPacks`, types)
+- `.`: Main emitter API (`emit`, types)
+- **Note**: Pack loading functions (`loadExtensionPacks`, `loadExtensionPackManifest`) are CLI-only and not exported from the emitter. Import them from `@prisma-next/cli` or use the CLI's `pack-loading.ts` module directly.
 

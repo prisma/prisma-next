@@ -1,5 +1,5 @@
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import type { AnyBinaryBuilder, BuildOptions } from '@prisma-next/sql-relational-core/types';
 import type { OrmContext } from '../orm/context';

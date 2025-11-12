@@ -2,8 +2,8 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,7 +28,7 @@ export async function loadContractFromDisk<
 export async function emitAndVerifyContract(
   cliPath: string,
   contractTsPath: string,
-  adapterPath: string,
+  configPath: string,
   outputDir: string,
   expectedContractJsonPath: string,
 ): Promise<SqlContract<SqlStorage>> {
@@ -39,8 +39,8 @@ export async function emitAndVerifyContract(
     contractTsPath,
     '--out',
     outputDir,
-    '--adapter',
-    adapterPath,
+    '--config',
+    configPath,
   ]);
 
   const emittedContractJsonPath = join(outputDir, 'contract.json');

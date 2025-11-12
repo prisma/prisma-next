@@ -4,11 +4,20 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '@prisma-next/cli/pack-assembly';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { EmitOptions } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
 const execFileAsync = promisify(execFile);
 
@@ -89,12 +98,19 @@ describe('contract.d.ts imports resolution', () => {
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
+      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
       const options: EmitOptions = {
         outputDir: testDir,
-        packs,
+        operationRegistry,
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
       };
 
       const result = await emit(ir, options, sqlTargetFamilyHook);
@@ -107,7 +123,7 @@ describe('contract.d.ts imports resolution', () => {
 
       // Verify the generated contract.d.ts contains the correct import
       const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
-      expect(contractDtsContent).toContain("from '@prisma-next/sql-contract-types'");
+      expect(contractDtsContent).toContain("from '@prisma-next/sql-contract/types'");
       expect(contractDtsContent).toContain('SqlContract');
       expect(contractDtsContent).toContain('SqlStorage');
       expect(contractDtsContent).toContain('SqlMappings');
@@ -116,7 +132,7 @@ describe('contract.d.ts imports resolution', () => {
 
       // Create a test TypeScript file that imports the generated contract.d.ts
       const testFileContent = `import type { Contract, CodecTypes } from './contract.d.ts';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 
 // Verify we can use the Contract type
 // biome-ignore lint/suspicious/noExplicitAny: test code with type assertions
@@ -151,14 +167,14 @@ type UserIdColumn = UserColumns['id'];
           types: [],
           baseUrl: '.',
           paths: {
-            '@prisma-next/sql-contract-types': [
-              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/index.d.ts`,
+            '@prisma-next/sql-contract/types': [
+              `${relativeToWorkspace}/packages/sql/contract/dist/exports/types.d.ts`,
             ],
-            '@prisma-next/sql-contract-types/*': [
-              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/*`,
+            '@prisma-next/sql-contract/types/*': [
+              `${relativeToWorkspace}/packages/sql/contract/dist/exports/types/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/sql/runtime/adapters/postgres/dist/exports/*`,
+              `${relativeToWorkspace}/packages/targets/postgres-adapter/dist/exports/*`,
             ],
           },
         },
@@ -256,12 +272,19 @@ type UserIdColumn = UserColumns['id'];
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
+      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
       const options: EmitOptions = {
         outputDir: testDir,
-        packs,
+        operationRegistry,
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
       };
 
       const result = await emit(ir, options, sqlTargetFamilyHook);
@@ -274,7 +297,7 @@ type UserIdColumn = UserColumns['id'];
 
       // Verify the contract.d.ts imports are correct
       const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
-      expect(contractDtsContent).toContain("from '@prisma-next/sql-contract-types'");
+      expect(contractDtsContent).toContain("from '@prisma-next/sql-contract/types'");
       expect(contractDtsContent).toContain("from '@prisma-next/adapter-postgres/codec-types'");
 
       // Create a comprehensive test file that uses all exported types
@@ -324,14 +347,14 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/sql-contract-ts/*': [
               `${relativeToWorkspace}/packages/sql/authoring/sql-contract-ts/dist/exports/*.d.ts`,
             ],
-            '@prisma-next/sql-contract-types': [
-              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/index.d.ts`,
+            '@prisma-next/sql-contract/types': [
+              `${relativeToWorkspace}/packages/sql/contract/dist/exports/types.d.ts`,
             ],
-            '@prisma-next/sql-contract-types/*': [
-              `${relativeToWorkspace}/packages/targets/sql/contract-types/dist/*`,
+            '@prisma-next/sql-contract/types/*': [
+              `${relativeToWorkspace}/packages/sql/contract/dist/exports/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/sql/runtime/adapters/postgres/dist/exports/*`,
+              `${relativeToWorkspace}/packages/targets/postgres-adapter/dist/exports/*`,
             ],
             '@prisma-next/sql-query/*': [
               `${relativeToWorkspace}/packages/sql-query/dist/exports/*.d.ts`,

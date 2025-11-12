@@ -1,5 +1,8 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres';
+import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { sql } from '@prisma-next/sql-lane';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import {
   budgets,
   createRuntime,
@@ -8,9 +11,6 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { sql } from '@prisma-next/sql-lane';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import { withDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { describe, expect, it } from 'vitest';

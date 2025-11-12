@@ -1,4 +1,4 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   errorIncludeCapabilitiesNotTrue,
   errorIncludeRequiresCapabilities,
@@ -8,13 +8,21 @@ import {
 
 export function checkIncludeCapabilities(contract: SqlContract<SqlStorage>): void {
   const target = contract.target;
-  const capabilities = contract.capabilities;
-  if (!capabilities || !capabilities[target]) {
-    errorIncludeRequiresCapabilities();
+  const contractCapabilities = contract.capabilities;
+  const declaredTargetCapabilities = contractCapabilities?.[target];
+
+  if (!contractCapabilities || !declaredTargetCapabilities) {
+    errorIncludeRequiresCapabilities(target);
   }
-  const targetCapabilities = capabilities[target];
-  if (capabilities[target]['lateral'] !== true || targetCapabilities['jsonAgg'] !== true) {
-    errorIncludeCapabilitiesNotTrue();
+
+  if (
+    declaredTargetCapabilities['lateral'] !== true ||
+    declaredTargetCapabilities['jsonAgg'] !== true
+  ) {
+    errorIncludeCapabilitiesNotTrue(target, {
+      lateral: declaredTargetCapabilities['lateral'],
+      jsonAgg: declaredTargetCapabilities['jsonAgg'],
+    });
   }
 }
 
@@ -22,10 +30,10 @@ export function checkReturningCapability(contract: SqlContract<SqlStorage>): voi
   const target = contract.target;
   const capabilities = contract.capabilities;
   if (!capabilities || !capabilities[target]) {
-    errorReturningRequiresCapability();
+    errorReturningRequiresCapability(target);
   }
   const targetCapabilities = capabilities[target];
   if (targetCapabilities['returning'] !== true) {
-    errorReturningCapabilityNotTrue();
+    errorReturningCapabilityNotTrue(target, targetCapabilities['returning']);
   }
 }

@@ -12,7 +12,7 @@ import type {
   StorageColumn,
   StorageTable,
   UniqueConstraint,
-} from '@prisma-next/sql-contract-types';
+} from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -479,7 +479,7 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
  *
  * **Incorrect:**
  * ```typescript
- * import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+ * import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
  * const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
  * // ❌ Types will be inferred as 'unknown' - this won't work!
  * ```

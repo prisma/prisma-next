@@ -1,6 +1,6 @@
+import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract-types';
-import type { OperationSignature } from '@prisma-next/sql-operations';
+import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
@@ -70,7 +70,7 @@ describe('operations-registry', () => {
   });
 
   it('attaches operations when registry is provided', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
@@ -111,7 +111,7 @@ describe('operations-registry', () => {
   });
 
   it('filters operations by capabilities when capabilities are required', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
@@ -207,7 +207,7 @@ describe('operations-registry', () => {
   });
 
   it('filters operations when capabilities are missing', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
@@ -266,7 +266,7 @@ describe('operations-registry', () => {
   });
 
   it('handles operations with multiple capability requirements', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
@@ -369,7 +369,7 @@ describe('operations-registry', () => {
   });
 
   it('handles operations with no capabilities requirement', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
@@ -399,7 +399,7 @@ describe('operations-registry', () => {
   });
 
   it('handles operations when contractCapabilities is undefined', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
@@ -453,7 +453,7 @@ describe('operations-registry', () => {
   });
 
   it('throws error for wrong number of arguments', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
@@ -490,7 +490,7 @@ describe('operations-registry', () => {
   });
 
   it('throws error for invalid param argument', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
@@ -523,7 +523,7 @@ describe('operations-registry', () => {
   });
 
   it('throws error for invalid column builder argument', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
@@ -556,7 +556,7 @@ describe('operations-registry', () => {
   });
 
   it('handles literal arguments', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pg/int4@1',
       method: 'add',
       args: [{ kind: 'literal' }],
@@ -611,7 +611,7 @@ describe('operations-registry', () => {
   });
 
   it('handles operations with returnTypeId that attach operations recursively', () => {
-    const firstSignature: OperationSignature = {
+    const firstSignature: SqlOperationSignature = {
       forTypeId: 'pg/int4@1',
       method: 'add',
       args: [{ kind: 'literal' }],
@@ -624,7 +624,7 @@ describe('operations-registry', () => {
       },
     };
 
-    const secondSignature: OperationSignature = {
+    const secondSignature: SqlOperationSignature = {
       forTypeId: 'pg/int4@1',
       method: 'multiply',
       args: [{ kind: 'literal' }],
@@ -682,7 +682,7 @@ describe('operations-registry', () => {
   });
 
   it('handles column builder with existing operation expression', () => {
-    const firstSignature: OperationSignature = {
+    const firstSignature: SqlOperationSignature = {
       forTypeId: 'pg/int4@1',
       method: 'add',
       args: [{ kind: 'typeId', type: 'pg/int4@1' }],
@@ -738,7 +738,7 @@ describe('operations-registry', () => {
   });
 
   it('handles operations with eq, asc, and desc methods on result', () => {
-    const signature: OperationSignature = {
+    const signature: SqlOperationSignature = {
       forTypeId: 'pg/int4@1',
       method: 'add',
       args: [{ kind: 'literal' }],

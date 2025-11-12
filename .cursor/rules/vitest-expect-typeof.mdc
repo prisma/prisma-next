@@ -1,11 +1,7 @@
 ---
 description: When writing type tests
-alwaysApply: false
-tags: [testing, types]
-appliesTo: ["**/*.test.ts", "**/*.spec.ts"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
+globs: ["**/*.test.ts", "**/*.spec.ts"]
+alwaysApply: true
 ---
 # Vitest expectTypeOf API
 

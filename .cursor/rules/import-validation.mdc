@@ -1,11 +1,7 @@
 ---
 description: Import validation and package layering rules
-alwaysApply: false
-tags: [architecture, layering, imports]
-appliesTo: ["**/*"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: warn
+globs:
+alwaysApply: true
 ---
 
 # Import Validation
@@ -19,7 +15,7 @@ The repository uses a domain/layer/plane package layering architecture with unid
 Packages are organized by:
 - **Domains**: framework (target-agnostic) and target families (sql, document, etc.)
 - **Layers**: core → authoring → targets → lanes → runtime → adapters (dependency direction)
-- **Planes**: migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters)
+- **Planes**: migration (authoring, tooling, targets), runtime (lanes, runtime, adapters), and shared — cross‑plane code and prebuilt artifacts safe for both
 
 Dependencies flow inward (toward core) within a domain:
 
@@ -65,6 +61,35 @@ Dependency Cruiser (`dependency-cruiser.config.mjs`) uses data-driven configurat
    }
    ```
 
+4. **Plane Rules**: Declarative plane import constraints with exceptions
+   ```json
+   {
+     "planeRules": {
+       "shared": {
+         "allow": ["shared"],
+         "forbid": ["migration", "runtime"],
+         "exceptions": []
+       },
+       "migration": {
+         "allow": ["shared", "migration"],
+         "forbid": ["runtime"],
+         "exceptions": []
+       },
+       "runtime": {
+         "allow": ["shared", "runtime"],
+         "forbid": ["migration"],
+         "exceptions": [
+           {
+             "from": "packages/extensions/compat-prisma/**",
+             "to": "packages/sql/**",
+             "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages"
+           }
+         ]
+       }
+     }
+   }
+   ```
+
 ## Rules
 
 ### Same-Layer Imports
@@ -93,29 +118,40 @@ import { planInvalid } from '@prisma-next/plan'; // core layer - allowed
 import { sql } from '@prisma-next/sql-lane'; // lanes layer - NOT allowed
 ```
 
-### Temporary Exceptions
+### Plane Rules and Exceptions
 
-When a package violates dependency rules but needs to temporarily import from another package (e.g., during refactoring), add a temporary exception in `dependency-cruiser.config.mjs` with a TODO comment:
+Plane import constraints are defined declaratively in `architecture.config.json` under `planeRules`. Each plane specifies:
+- `allow`: List of planes that can be imported from
+- `forbid`: List of planes that cannot be imported from
+- `exceptions`: Array of glob pattern exceptions with `from`, `to`, and `reason` fields
 
-```javascript
-// Temporary exception: CLI → SQL targets (for hooks)
-// TODO: Refactor CLI to be target-family-agnostic (use plugin system or dynamic loading)
-// See: docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4
-if (
-  sourceGroup.domain === 'framework' &&
-  sourceGroup.layer === 'tooling' &&
-  sourceGroup.patterns.some((p) => p.includes('tooling/cli')) &&
-  targetGroup.domain === 'sql' &&
-  targetGroup.layer === 'targets'
-) {
-  continue; // Temporary: allow CLI → SQL targets until refactor
+**Adding Plane Exceptions**:
+
+When a package needs to temporarily import across plane boundaries (e.g., during refactoring), add an exception to the appropriate plane rule in `architecture.config.json`:
+
+```json
+{
+  "planeRules": {
+    "runtime": {
+      "allow": ["shared", "runtime"],
+      "forbid": ["migration"],
+      "exceptions": [
+        {
+          "from": "packages/extensions/compat-prisma/**",
+          "to": "packages/sql/**",
+          "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
+        }
+      ]
+    }
+  }
 }
 ```
 
-**Important**: Temporary exceptions must:
-- Include a TODO comment explaining why the exception exists
-- Reference the relevant brief or issue
+**Important**: Plane exceptions must:
+- Include a clear `reason` explaining why the exception exists
+- Reference the relevant brief or issue in the reason
 - Be removed once the refactoring is complete
+- Use glob patterns that match the package paths in `architecture.config.json`
 
 ## Adding New Packages
 
@@ -171,7 +207,9 @@ Dependency Cruiser enforces:
 - Downward imports (toward core): allowed
 - Upward imports (away from core): denied
 - Cross-domain imports: denied except framework domain
-- Migration → Runtime imports: denied
-- Runtime → Migration imports: denied (artifacts are consumed out-of-band)
+- Plane boundaries: enforced via declarative `planeRules` in `architecture.config.json`
+  - Shared plane: cannot import from migration or runtime
+  - Migration plane: cannot import from runtime
+  - Runtime plane: cannot import from migration (with documented exceptions)
 
-See `dependency-cruiser.config.mjs` for the complete rule definitions.
+Plane rules are defined declaratively in `architecture.config.json` and enforced by `dependency-cruiser.config.mjs`. See `architecture.config.json` for the complete plane rule definitions.

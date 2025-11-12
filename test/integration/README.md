@@ -32,7 +32,7 @@ This package depends on all packages under test via workspace protocol:
 - `@prisma-next/runtime` - Execution runtime
 - `@prisma-next/sql-contract-ts` - SQL contract authoring (for integration tests)
 - `@prisma-next/sql-query` - Query builders
-- `@prisma-next/sql-target` - SQL target family
+- `@prisma-next/sql-target` - SQL family (legacy transitional package; see `@prisma-next/sql-*` packages)
 
 ## Location
 
@@ -79,4 +79,3 @@ flowchart TD
     EMIT --> LANES
     LANES --> RUNTIME
 ```
-

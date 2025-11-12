@@ -27,21 +27,37 @@ Provide a command-line interface that:
 
 Emit `contract.json` and `contract.d.ts` from a TypeScript contract file.
 
-**Usage:**
+Config-only surface (no pack flags):
 ```bash
-prisma-next emit --contract <path> --out <dir> [--target postgres] [--adapter <path>] [--extensions <path...>]
+prisma-next emit --contract <path> --out <dir> [--config <path>]
 ```
 
-**Options:**
+Options:
 - `--contract <path>`: Required. Path to TypeScript contract file
 - `--out <dir>`: Required. Output directory for emitted artifacts
-- `--target <target>`: Optional. Target (default: inferred from contract)
-- `--adapter <path>`: Optional. Adapter package path (default: `packages/adapter-postgres`)
-- `--extensions <path...>`: Optional. Extension pack paths (can be specified multiple times)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 
-**Example:**
+Example:
 ```bash
-prisma-next emit --contract src/contract.ts --out dist
+prisma-next emit --contract src/contract.ts --out dist --config prisma-next.config.ts
+```
+
+**Config File (`prisma-next.config.ts`):**
+
+The CLI uses a config file to specify the target family, target, adapter, and extensions:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/cli';
+import sql from '@prisma-next/family-sql/cli';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+});
 ```
 
 **Output:**
@@ -83,11 +99,35 @@ flowchart TD
 
 ### Emit Command (`commands/emit.ts`)
 - Command implementation using commander
-- Loads extension packs using `loadExtensionPacks()` from emitter
-- Loads TS contract using `loadContractFromTs()` utility
-- Calls `emit()` from emitter (returns strings)
+- Loads the user's config module (`prisma-next.config.ts`)
+- Uses framework CLI assembly functions to loop over descriptors:
+  - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, calls `family.convertOperationManifest()` for each
+  - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
+  - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
+  - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
+- Calls `config.family.validateContractIR()` to validate and normalize contract, returns ContractIR without mappings
+- Calls `emit()` from emitter with the assembled inputs and `family.hook`
 - Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact
 - Writes `contract.json` and `contract.d.ts` to output directory
+
+### Pack Assembly (`pack-assembly.ts`)
+- Generic assembly functions that loop over descriptors/packs:
+  - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, delegates to `family.convertOperationManifest()` for conversion
+  - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
+  - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
+  - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
+  - Pack-based versions for tests: `assembleOperationRegistryFromPacks`, `extractCodecTypeImportsFromPacks`, etc.
+- These functions handle the generic looping logic; family-specific conversion is delegated to `family.convertOperationManifest()`.
+
+### Family Descriptor (provided by family /cli entrypoint)
+- The SQL family (and other families) provide:
+  - `convertOperationManifest(manifest)` - Converts `OperationManifest` to `OperationSignature` (family-specific, e.g., SQL adds lowering spec)
+  - `validateContractIR(contractJson)` - Validates and normalizes contract, returns ContractIR without mappings
+  - `stripMappings?(contract)` - Optionally strips runtime-only mappings from contract
+- The framework CLI handles generic looping; families provide conversion logic.
+
+### Pack Manifest Types (IR)
+- Families define their manifest IR and related types under their own tooling packages. CLI treats manifests as opaque data.
 
 ## Dependencies
 
@@ -114,6 +154,4 @@ This package is part of the **framework domain**, **tooling layer**, **migration
 ## See Also
 
 - [`@prisma-next/emitter`](../emitter/README.md) - Contract emission engine
-- [`@prisma-next/sql-query`](../../../sql-query/README.md) - Contract builder and query DSL
-- [`docs/briefs/03-TS-Contract-Loader-and-CLI.md`](../../../../docs/briefs/03-TS-Contract-Loader-and-CLI.md) - Implementation brief
-
+- Project Brief — CLI Support for Extension Packs: `docs/briefs/complete/20-CLI-Support-for-Extension-Packs.md`

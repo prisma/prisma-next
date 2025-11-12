@@ -1,5 +1,5 @@
-import { runtimeError } from '@prisma-next/runtime-core';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import { runtimeError } from '@prisma-next/runtime-executor';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
 export function extractTypeIds(contract: SqlContract<SqlStorage>): Set<string> {

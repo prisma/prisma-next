@@ -19,16 +19,20 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@prisma-next/adapter-postgres/*": [
-        "packages/sql/runtime/adapters/postgres/src/exports/*.ts"
+      "@prisma-next/adapter-postgres/cli": ["packages/targets/postgres-adapter/src/exports/cli.ts"],
+      "@prisma-next/adapter-postgres/runtime": [
+        "packages/targets/postgres-adapter/src/exports/runtime.ts"
       ],
-      "@prisma-next/driver-postgres": [
-        "packages/sql/runtime/drivers/postgres/src/exports/index.ts"
+      "@prisma-next/adapter-postgres/*": ["packages/targets/postgres-adapter/src/exports/*.ts"],
+      "@prisma-next/driver-postgres/cli": ["packages/targets/postgres-driver/src/exports/cli.ts"],
+      "@prisma-next/driver-postgres/runtime": [
+        "packages/targets/postgres-driver/src/exports/runtime.ts"
       ],
-      "@prisma-next/driver-postgres/*": ["packages/sql/runtime/drivers/postgres/src/exports/*.ts"],
+      "@prisma-next/driver-postgres/*": ["packages/targets/postgres-driver/src/exports/*.ts"],
       "@prisma-next/contract": ["packages/framework/core-contract/src/exports/types.ts"],
       "@prisma-next/contract/*": ["packages/framework/core-contract/src/exports/*.ts"],
       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
+      "@prisma-next/cli/*": ["packages/framework/tooling/cli/src/exports/*.ts"],
       "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
       "@prisma-next/emitter/*": ["packages/framework/tooling/emitter/src/exports/*.ts"],
       "@prisma-next/compat-prisma": ["packages/extensions/compat-prisma/src/exports/index.ts"],
@@ -40,16 +44,21 @@
       ],
       "@prisma-next/contract-ts": ["packages/framework/authoring/contract-ts/src/index.ts"],
       "@prisma-next/contract-psl": ["packages/framework/authoring/contract-psl/src/index.ts"],
-      "@prisma-next/sql-contract-types": ["packages/targets/sql/contract-types/src/index.ts"],
-      "@prisma-next/sql-operations": ["packages/targets/sql/operations/src/index.ts"],
-      "@prisma-next/sql-contract-emitter": ["packages/targets/sql/emitter/src/index.ts"],
+      "@prisma-next/sql-contract": ["packages/sql/contract/src/index.ts"],
+      "@prisma-next/sql-contract/*": ["packages/sql/contract/src/exports/*.ts"],
+      "@prisma-next/sql-operations": ["packages/sql/operations/src/index.ts"],
+      "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
+      "@prisma-next/family-sql/cli": ["packages/sql/tooling/cli/src/exports/cli.ts"],
+      "@prisma-next/family-sql/runtime": ["packages/sql/tooling/cli/src/exports/runtime.ts"],
+      "@prisma-next/targets-postgres/cli": ["packages/targets/postgres/src/exports/cli.ts"],
+      "@prisma-next/targets-postgres/runtime": ["packages/targets/postgres/src/exports/runtime.ts"],
       "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
       "@prisma-next/sql-relational-core/*": ["packages/sql/lanes/relational-core/src/exports/*.ts"],
       "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
       "@prisma-next/sql-lane/*": ["packages/sql/lanes/sql-lane/src/exports/*.ts"],
       "@prisma-next/sql-orm-lane": ["packages/sql/lanes/orm-lane/src/index.ts"],
       "@prisma-next/sql-contract-ts/*": ["packages/sql/authoring/sql-contract-ts/src/exports/*.ts"],
-      "@prisma-next/runtime-core": ["packages/framework/runtime-core/src/index.ts"],
+      "@prisma-next/runtime-executor": ["packages/framework/runtime-executor/src/index.ts"],
       "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/exports/index.ts"],
       "@prisma-next/sql-runtime/test/utils": ["packages/sql/sql-runtime/test/utils.ts"]
     }
@@ -57,8 +66,8 @@
   "references": [
     { "path": "./packages/relational-ir" },
     { "path": "./packages/psl" },
-    { "path": "./packages/sql/runtime/drivers/postgres" },
-    { "path": "./packages/sql/runtime/adapters/postgres" },
+    { "path": "./packages/targets/postgres-driver" },
+    { "path": "./packages/targets/postgres-adapter" },
     { "path": "./packages/framework/core-contract" },
     { "path": "./packages/extensions/compat-prisma" },
     { "path": "./packages/schema-emitter" },
@@ -68,14 +77,16 @@
     { "path": "./packages/framework/authoring/contract-authoring" },
     { "path": "./packages/framework/authoring/contract-ts" },
     { "path": "./packages/framework/authoring/contract-psl" },
-    { "path": "./packages/targets/sql/contract-types" },
-    { "path": "./packages/targets/sql/operations" },
-    { "path": "./packages/targets/sql/emitter" },
+    { "path": "./packages/sql/contract" },
+    { "path": "./packages/sql/operations" },
+    { "path": "./packages/sql/tooling/emitter" },
+    { "path": "./packages/sql/tooling/cli" },
+    { "path": "./packages/targets/postgres" },
     { "path": "./packages/sql/lanes/relational-core" },
     { "path": "./packages/sql/lanes/sql-lane" },
     { "path": "./packages/sql/lanes/orm-lane" },
     { "path": "./packages/sql/authoring/sql-contract-ts" },
-    { "path": "./packages/framework/runtime-core" },
+    { "path": "./packages/framework/runtime-executor" },
     { "path": "./packages/sql/sql-runtime" }
   ]
 }

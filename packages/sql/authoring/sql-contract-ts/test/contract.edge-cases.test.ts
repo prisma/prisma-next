@@ -1,5 +1,5 @@
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { describe, expect, it } from 'vitest';
 
 describe('validateContract edge cases', () => {

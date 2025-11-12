@@ -1,8 +1,8 @@
 import { dataTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { ResultType } from '@prisma-next/contract/types';
+import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-contract-types';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';

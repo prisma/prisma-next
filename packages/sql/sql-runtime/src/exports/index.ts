@@ -5,8 +5,8 @@ export type {
   Log,
   Plugin,
   PluginContext,
-} from '@prisma-next/runtime-core';
-export { budgets, lints } from '@prisma-next/runtime-core';
+} from '@prisma-next/runtime-executor';
+export { budgets, lints } from '@prisma-next/runtime-executor';
 export {
   extractTypeIds,
   validateCodecRegistryCompleteness,

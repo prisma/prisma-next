@@ -2,12 +2,20 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '@prisma-next/cli/pack-assembly';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ResultType } from '@prisma-next/contract/types';
-import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import type { EmitOptions } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -15,6 +23,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
@@ -90,12 +99,19 @@ describe('emitter → lanes integration', () => {
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+        join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
+      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
       const options: EmitOptions = {
         outputDir: testDir,
-        packs,
+        operationRegistry,
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
       };
 
       const result = await emit(ir, options, sqlTargetFamilyHook);
@@ -186,12 +202,19 @@ describe('emitter → lanes integration', () => {
     };
 
     const packs = loadExtensionPacks(
-      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
+    const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+    const extensionIds = extractExtensionIdsFromPacks(packs);
     const options: EmitOptions = {
       outputDir: testDir,
-      packs,
+      operationRegistry,
+      codecTypeImports,
+      operationTypeImports,
+      extensionIds,
     };
 
     const result = await emit(ir, options, sqlTargetFamilyHook);
@@ -261,12 +284,19 @@ describe('emitter → lanes integration', () => {
     };
 
     const packs = loadExtensionPacks(
-      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
+    const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+    const extensionIds = extractExtensionIdsFromPacks(packs);
     const options: EmitOptions = {
       outputDir: testDir,
-      packs,
+      operationRegistry,
+      codecTypeImports,
+      operationTypeImports,
+      extensionIds,
     };
 
     const result1 = await emit(ir, options, sqlTargetFamilyHook);
@@ -277,12 +307,19 @@ describe('emitter → lanes integration', () => {
     const ir2 = validatedContract as unknown as ContractIR;
 
     const packs2 = loadExtensionPacks(
-      join(__dirname, '../../../packages/sql/runtime/adapters/postgres'),
+      join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
+    const operationRegistry2 = assembleOperationRegistryFromPacks(packs2, sqlFamilyDescriptor);
+    const codecTypeImports2 = extractCodecTypeImportsFromPacks(packs2);
+    const operationTypeImports2 = extractOperationTypeImportsFromPacks(packs2);
+    const extensionIds2 = extractExtensionIdsFromPacks(packs2);
     const options2: EmitOptions = {
       outputDir: testDir,
-      packs: packs2,
+      operationRegistry: operationRegistry2,
+      codecTypeImports: codecTypeImports2,
+      operationTypeImports: operationTypeImports2,
+      extensionIds: extensionIds2,
     };
 
     const result2 = await emit(ir2, options2, sqlTargetFamilyHook);

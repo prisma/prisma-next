@@ -1,0 +1,27 @@
+{
+  "id": "postgres",
+  "version": "15.0.0",
+  "targets": {
+    "postgres": {
+      "minVersion": "12"
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "orderBy": true,
+      "limit": true,
+      "lateral": true,
+      "jsonAgg": true,
+      "returning": true
+    }
+  },
+  "types": {
+    "codecTypes": {
+      "import": {
+        "package": "@prisma-next/adapter-postgres/codec-types",
+        "named": "CodecTypes",
+        "alias": "PgTypes"
+      }
+    }
+  }
+}

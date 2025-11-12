@@ -1,11 +1,7 @@
 ---
 description: Patterns for refactoring large monolithic files into modular structures
-alwaysApply: false
-tags: [refactoring, architecture]
-appliesTo: ["**/*"]
-owner: prisma-next-docs
-lastUpdated: 2025-11-10
-severity: info
+globs:
+alwaysApply: true
 ---
 
 # Modular Refactoring Patterns

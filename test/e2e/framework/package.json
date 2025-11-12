@@ -7,7 +7,7 @@
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
-    "emit": "prisma-next emit --contract test/fixtures/contract.ts --out test/fixtures/generated --adapter ../../../packages/sql/runtime/adapters/postgres",
+    "emit": "prisma-next emit --contract test/fixtures/contract.ts --out test/fixtures/generated",
     "clean": "node ../../../scripts/clean.mjs"
   },
   "devDependencies": {
@@ -25,6 +25,8 @@
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/targets-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*"
   }
 }

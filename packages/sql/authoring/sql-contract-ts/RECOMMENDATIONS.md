@@ -1,12 +1,11 @@
 # Recommendations
 
 ## Observations
-- `src/contract-builder.ts` is ~500 lines and intertwines builder orchestration, normalization, and schema emission.
-- The implementation relies on `Mutable` + multiple `as` casts instead of using the target-agnostic core directly.
-- Tests cover only normalization success paths; there are no failure-mode tests or d.ts smoke tests.
+- `src/contract-builder.ts` is ~500 lines and still hand-rolls builder orchestration, normalization, and storage mapping while relying on `Mutable` plus casts to keep TypeScript happy, which makes each change risky.
+- The validation helpers (`validateContractStructure`, `validateContractLogic`) throw plain `Error` instances built from concatenated messages, so CLIs or runtimes cannot react with stable diagnostics or partner hints.
+- The test suite validates normalization and logical paths, but there are no `.test-d.ts` regression checks that pin the public inference surface produced by `defineContract` (codec types, extensions, capabilities, etc.).
 
 ## Suggested Actions
-- Leverage `@prisma-next/contract-authoring` so SQL-specific code only defines storage/model adapters, reducing duplication.
-- Extract normalization helpers into their own module so they can be unit-tested and reused by other targets.
-- Add negative tests (missing target, invalid column types, mismatched relations) and type tests to lock inference behavior.
-
+- Break the builder into focused modules (normalization, mapping, column helpers) so the SQL layer can reuse smaller pieces and we can drop the `Mutable`/`as` juggling that currently saturates `contract-builder.ts`.
+- Wrap validation failures in structured diagnostics (e.g., `planInvalid`/`planUnsupported`) that carry codes, hints, and docs so the CLI/runtime can present actionable errors instead of unstructured strings.
+- Add TypeScript inference regression tests (`*.test-d.ts`) that assert the exported API (builders, `Contract` shape) stays stable when new fields or extensions are introduced.

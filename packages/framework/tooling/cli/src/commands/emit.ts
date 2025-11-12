@@ -1,11 +1,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
+import { emit } from '@prisma-next/emitter';
 import { Command } from 'commander';
+import { loadConfig } from '../config-loader';
 import { loadContractFromTs } from '../load-ts-contract';
+import {
+  assembleOperationRegistry,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
+} from '../pack-assembly';
 
 export function createEmitCommand(): Command {
   const command = new Command('emit');
@@ -14,81 +18,89 @@ export function createEmitCommand(): Command {
     .description('Emit contract.json and contract.d.ts from a TypeScript contract file')
     .requiredOption('--contract <path>', 'Path to TypeScript contract file')
     .requiredOption('--out <dir>', 'Output directory for emitted artifacts')
-    .option('--target <target>', 'Target (default: inferred from contract)')
-    .option('--adapter <path>', 'Adapter package path', 'packages/adapter-postgres')
-    .option('--extensions <paths...>', 'Extension pack paths (can be specified multiple times)')
-    .action(
-      async (options: {
-        contract: string;
-        out: string;
-        target?: string;
-        adapter?: string;
-        extensions?: string | string[];
-      }) => {
-        try {
-          const contractPath = resolve(options.contract);
-          const outputDir = resolve(options.out);
-          const adapterPath = options.adapter ? resolve(options.adapter) : undefined;
-          const extensionPaths: string[] = Array.isArray(options.extensions)
-            ? options.extensions.map((p: string) => resolve(p))
-            : options.extensions
-              ? [resolve(options.extensions)]
-              : [];
+    .option(
+      '--config <path>',
+      'Path to prisma-next.config.ts (defaults to ./prisma-next.config.ts if present)',
+    )
+    .action(async (options: { contract: string; out: string; config?: string }) => {
+      try {
+        const contractPath = resolve(options.contract);
+        const outputDir = resolve(options.out);
 
-          const packs = loadExtensionPacks(adapterPath, extensionPaths);
+        // Load config (explicit via --config or default)
+        const config = await loadConfig(options.config);
 
-          const contractRaw = await loadContractFromTs(contractPath);
-
-          // Normalize the contract to ensure all required fields are present
-          // This ensures consistency between CLI emit and programmatic emit
-          const contract = validateContract<SqlContract<SqlStorage>>(contractRaw);
-
-          const targetFamily = sqlTargetFamilyHook;
-
-          // Strip mappings before emitting - mappings are not part of ContractIR
-          // They are computed at runtime and should not be persisted to contract.json
-          const { mappings: _mappings, ...contractIR } = contract;
-
-          const result = await emit(
-            contractIR as unknown as typeof contractRaw,
-            {
-              outputDir,
-              packs,
-            },
-            targetFamily,
+        // Validate family is supported (for now, only 'sql' is supported)
+        if (config.family.id !== 'sql') {
+          throw new Error(
+            `Unsupported family '${config.family.id}'; expected 'sql'. Please update your config to use a supported family.`,
           );
-
-          mkdirSync(outputDir, { recursive: true });
-
-          const contractJsonPath = join(outputDir, 'contract.json');
-          const contractDtsPath = join(outputDir, 'contract.d.ts');
-
-          // The emitter already includes _generated metadata in both contractJson and contractDts
-          // Just write the results directly
-          writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
-          writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
-
-          // eslint-disable-next-line no-undef
-          console.log(`✓ Emitted contract.json to ${contractJsonPath}`);
-          // eslint-disable-next-line no-undef
-          console.log(`✓ Emitted contract.d.ts to ${contractDtsPath}`);
-          // eslint-disable-next-line no-undef
-          console.log(`  coreHash: ${result.coreHash}`);
-          if (result.profileHash) {
-            // eslint-disable-next-line no-undef
-            console.log(`  profileHash: ${result.profileHash}`);
-          }
-        } catch (error) {
-          if (error instanceof Error) {
-            // eslint-disable-next-line no-undef
-            console.error(`Error: ${error.message}`);
-            // eslint-disable-next-line no-undef
-            process.exit(1);
-          }
-          throw error;
         }
-      },
-    );
+
+        // Build descriptors array for assembly
+        const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
+
+        // Use framework CLI assembly functions (loops over descriptors, delegates to family for conversion)
+        const operationRegistry = assembleOperationRegistry(descriptors, config.family);
+        const codecTypeImports = extractCodecTypeImports(descriptors);
+        const operationTypeImports = extractOperationTypeImports(descriptors);
+        const extensionIds = extractExtensionIds(
+          config.adapter,
+          config.target,
+          config.extensions ?? [],
+        );
+
+        const contractRaw = await loadContractFromTs(contractPath);
+
+        // Validate and normalize the contract using family-specific validation
+        // This ensures consistency between CLI emit and programmatic emit
+        // validateContractIR returns ContractIR without mappings (mappings are runtime-only)
+        const contractIR = config.family.validateContractIR(contractRaw);
+
+        // Use family hook from config
+        const targetFamily = config.family.hook;
+
+        const result = await emit(
+          contractIR as unknown as typeof contractRaw,
+          {
+            outputDir,
+            operationRegistry,
+            codecTypeImports,
+            operationTypeImports,
+            extensionIds,
+          },
+          targetFamily,
+        );
+
+        mkdirSync(outputDir, { recursive: true });
+
+        const contractJsonPath = join(outputDir, 'contract.json');
+        const contractDtsPath = join(outputDir, 'contract.d.ts');
+
+        // The emitter already includes _generated metadata in both contractJson and contractDts
+        // Just write the results directly
+        writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
+        writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
+
+        // eslint-disable-next-line no-undef
+        console.log(`✓ Emitted contract.json to ${contractJsonPath}`);
+        // eslint-disable-next-line no-undef
+        console.log(`✓ Emitted contract.d.ts to ${contractDtsPath}`);
+        // eslint-disable-next-line no-undef
+        console.log(`  coreHash: ${result.coreHash}`);
+        if (result.profileHash) {
+          // eslint-disable-next-line no-undef
+          console.log(`  profileHash: ${result.profileHash}`);
+        }
+      } catch (error) {
+        if (error instanceof Error) {
+          // eslint-disable-next-line no-undef
+          console.error(`Error: ${error.message}`);
+        }
+        // Let commander.js handle the error (it will exit with code 1)
+        throw error;
+      }
+    });
 
   return command;
 }

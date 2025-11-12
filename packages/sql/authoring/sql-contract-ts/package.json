@@ -16,7 +16,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/contract-authoring": "workspace:*",
-    "@prisma-next/sql-contract-types": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
     "arktype": "^2.1.25",
     "ts-toolbelt": "^9.6.0"
   },

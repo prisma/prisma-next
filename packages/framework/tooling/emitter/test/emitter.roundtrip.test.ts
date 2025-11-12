@@ -1,15 +1,15 @@
-import { join } from 'node:path';
+import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import type { ContractIR } from '../../../core-contract/src/ir';
 import { emit } from '../src/emitter';
-import { loadExtensionPacks } from '../src/extension-pack';
-import type { TargetFamilyHook } from '../src/target-family';
-import type { ContractIR, EmitOptions, ExtensionPackManifest } from '../src/types';
+import type { TargetFamilyHook, ValidationContext } from '../src/target-family';
+import type { EmitOptions, TypesImportSpec } from '../src/types';
 import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR, packManifests: ReadonlyArray<ExtensionPackManifest>) => {
+  validateTypes: (ir: ContractIR, _ctx: ValidationContext) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
       | undefined;
@@ -17,7 +17,6 @@ const mockSqlHook: TargetFamilyHook = {
       return;
     }
 
-    const packNamespaces = new Set(packManifests.map((p) => p.id));
     const referencedNamespaces = new Set<string>();
     const extensions = ir.extensions as Record<string, unknown> | undefined;
     if (extensions) {
@@ -44,12 +43,12 @@ const mockSqlHook: TargetFamilyHook = {
         const match = col.type.match(typeIdRegex);
         if (match?.[1]) {
           const namespace = match[1];
-          if (!referencedNamespaces.has(namespace) && !packNamespaces.has(namespace)) {
-            if (namespace === 'pg' && packNamespaces.has('postgres')) {
+          if (!referencedNamespaces.has(namespace)) {
+            if (namespace === 'pg' && referencedNamespaces.has('postgres')) {
               continue;
             }
             throw new Error(
-              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions or available in loaded packs`,
+              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions`,
             );
           }
         }
@@ -61,14 +60,15 @@ const mockSqlHook: TargetFamilyHook = {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }
   },
-  generateContractTypes: () => {
+  generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports) => {
+    void _codecTypeImports;
+    void _operationTypeImports;
     return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type Contract = unknown;
 `;
   },
-  getTypesImports: () => [],
 };
 
 describe('emitter round-trip', () => {
@@ -95,13 +95,17 @@ describe('emitter round-trip', () => {
         },
       });
 
-      const packs = loadExtensionPacks(
-        join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-        [],
-      );
+      // Create minimal test data (emitter tests don't load packs)
+      const operationRegistry = createOperationRegistry();
+      const codecTypeImports: TypesImportSpec[] = [];
+      const operationTypeImports: TypesImportSpec[] = [];
+      const extensionIds = ['postgres', 'pg'];
       const options: EmitOptions = {
         outputDir: '',
-        packs,
+        operationRegistry,
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
       };
 
       const result1 = await emit(ir, options, mockSqlHook);
@@ -188,13 +192,17 @@ describe('emitter round-trip', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    // Create minimal test data (emitter tests don't load packs)
+    const operationRegistry = createOperationRegistry();
+    const codecTypeImports: TypesImportSpec[] = [];
+    const operationTypeImports: TypesImportSpec[] = [];
+    const extensionIds = ['postgres'];
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      codecTypeImports,
+      operationTypeImports,
+      extensionIds,
     };
 
     const result1 = await emit(ir, options, mockSqlHook);
@@ -243,13 +251,17 @@ describe('emitter round-trip', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    // Create minimal test data (emitter tests don't load packs)
+    const operationRegistry = createOperationRegistry();
+    const codecTypeImports: TypesImportSpec[] = [];
+    const operationTypeImports: TypesImportSpec[] = [];
+    const extensionIds = ['postgres', 'pg'];
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      codecTypeImports,
+      operationTypeImports,
+      extensionIds,
     };
 
     const result1 = await emit(ir, options, mockSqlHook);
@@ -314,13 +326,17 @@ describe('emitter round-trip', () => {
       },
     });
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../../../packages/sql/runtime/adapters/postgres'),
-      [],
-    );
+    // Create minimal test data (emitter tests don't load packs)
+    const operationRegistry = createOperationRegistry();
+    const codecTypeImports: TypesImportSpec[] = [];
+    const operationTypeImports: TypesImportSpec[] = [];
+    const extensionIds = ['postgres', 'pg'];
     const options: EmitOptions = {
       outputDir: '',
-      packs,
+      operationRegistry,
+      codecTypeImports,
+      operationTypeImports,
+      extensionIds,
     };
 
     const result1 = await emit(ir, options, mockSqlHook);

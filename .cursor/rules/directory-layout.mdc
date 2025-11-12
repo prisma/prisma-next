@@ -1,0 +1,26 @@
+---
+description: Directory layout rules for SQL family vs concrete targets
+globs:
+alwaysApply: true
+---
+
+# Directory Layout — SQL Family vs Targets
+
+Rule: Place all SQL target-family packages (all layers and planes) under `packages/sql/**`. Place concrete dialects, adapters, and drivers under `packages/targets/**`.
+
+- Family internals: contract types, operations, emitter hooks, and lanes live under `packages/sql/**` in their respective layer folders. The SQL family is target‑agnostic; do not place concrete dialect code here.
+- Tooling layer: SQL family uses a `tooling` layer (migration plane) to mirror Framework domain organization. Emitter hooks live in `packages/sql/tooling/**`.
+- Concrete targets (dialects), adapters, and drivers: The top‑level `packages/targets/**` is reserved for concrete target implementations (e.g., `packages/targets/postgres`, `packages/targets/postgres-adapter`, `packages/targets/postgres-driver`). These packs contribute manifests, adapter cores, CLI descriptors, and runtime pieces per the extension SPI.
+
+Examples
+- Family emitter hook: `packages/sql/tooling/emitter` → `@prisma-next/sql-contract-emitter`
+- Contract types: `packages/sql/contract` → `@prisma-next/sql-contract`
+- Operations: `packages/sql/operations` → `@prisma-next/sql-operations`
+- Postgres pack (concrete target): `packages/targets/postgres` → `@prisma-next/targets-postgres`
+- Postgres adapter (single package, multi‑entry): `packages/targets/postgres-adapter` → `@prisma-next/adapter-postgres/{adapter,cli,runtime}`
+- Postgres driver: `packages/targets/postgres-driver` → `@prisma-next/driver-postgres`
+
+Notes
+- Avoid placing SQL family internals under `packages/targets/**`. Likewise, avoid placing concrete target code under `packages/sql/**`.
+- A single package may expose multiple plane‑specific entrypoints (e.g., `./cli` for migration, `./runtime` for runtime, `./adapter` for shared). Use subpath globs in `architecture.config.json` to map those files to their respective planes.
+- When moving existing code to conform, update `architecture.config.json`, `tsconfig.base.json` path aliases, and docs alongside the move.

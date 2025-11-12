@@ -1,7 +1,7 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { Plan, ResultType } from '@prisma-next/contract/types';
+import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract } from '@prisma-next/sql-contract-types';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { JoinOnBuilder, TableKey, TablesOf } from '@prisma-next/sql-relational-core/types';

@@ -4,12 +4,13 @@
  * Dependency Cruiser configuration for Prisma Next.
  *
  * It derives module groups from architecture.config.json and encodes the same-layer/
- * downward-only semantics plus specific temporary exceptions described in the layering docs.
+ * downward-only semantics. Plane import constraints are defined declaratively in
+ * architecture.config.json under `planeRules` rather than hardcoded here.
  */
 
 import config from './architecture.config.json' with { type: 'json' };
 
-const { packages: packageConfigs, layerOrder } = config;
+const { packages: packageConfigs, layerOrder, planeRules } = config;
 
 const normalizeGlob = (glob) => {
   let pattern = glob.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
@@ -49,6 +50,12 @@ const getLayerIndex = (domain, layer) => {
 const describeGroup = (group) => `${group.domain}/${group.layer}/${group.plane}`;
 const groupPattern = (group) => group.patterns.join('|');
 
+const matchesGlobPattern = (group, pattern) => {
+  const normalizedPattern = normalizeGlob(pattern);
+  const regex = new RegExp(normalizedPattern);
+  return group.globs.some((glob) => regex.test(glob));
+};
+
 const forbidden = [];
 
 const pushRule = (name, comment, sourceGroup, targetGroup) => {
@@ -61,16 +68,6 @@ const pushRule = (name, comment, sourceGroup, targetGroup) => {
   });
 };
 
-const isCliGroup = (group) =>
-  group.domain === 'framework' &&
-  group.layer === 'tooling' &&
-  group.globs.some((glob) => glob.includes('tooling/cli'));
-
-const isSqlAuthoringToTargets = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'sql' &&
-  sourceGroup.layer === 'authoring' &&
-  targetGroup.layer === 'targets';
-
 const isSqlLanesToRuntime = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'sql' &&
   sourceGroup.layer === 'lanes' &&
@@ -78,28 +75,11 @@ const isSqlLanesToRuntime = (sourceGroup, targetGroup) =>
   targetGroup.layer === 'runtime' &&
   targetGroup.plane === 'runtime';
 
-const isCliToSqlTargets = (sourceGroup, targetGroup) =>
-  isCliGroup(sourceGroup) && targetGroup.domain === 'sql' && targetGroup.layer === 'targets';
-
-const isCliToSqlAuthoring = (sourceGroup, targetGroup) =>
-  isCliGroup(sourceGroup) && targetGroup.domain === 'sql' && targetGroup.layer === 'authoring';
-
-const isExtensionsToSqlTargets = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'extensions' &&
-  targetGroup.domain === 'sql' &&
-  targetGroup.layer === 'targets';
-
 const isCompatPrismaToSql = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'extensions' &&
   sourceGroup.layer === 'compat' &&
   sourceGroup.globs.some((glob) => glob.includes('compat-prisma')) &&
   targetGroup.domain === 'sql';
-
-const isSqlRuntimeOrAdaptersToTargets = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'sql' &&
-  ['runtime', 'lanes', 'adapters'].includes(sourceGroup.layer) &&
-  targetGroup.domain === 'sql' &&
-  targetGroup.layer === 'targets';
 
 const createUpwardRules = () => {
   for (const sourceGroup of moduleGroups) {
@@ -110,10 +90,8 @@ const createUpwardRules = () => {
       const targetIndex = getLayerIndex(targetGroup.domain, targetGroup.layer);
       if (sourceIndex === -1 || targetIndex === -1 || targetIndex <= sourceIndex) continue;
 
-      // TODO: authoring must reference target contract types until the CLI/SQL split finishes (docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4)
-      if (isSqlAuthoringToTargets(sourceGroup, targetGroup)) {
-        continue;
-      }
+      // SQL contract types are now in shared plane (sql/contract), so authoring can import from shared
+      // No exception needed - authoring imports from shared, not targets
 
       // TODO: lanes are currently aligned with runtime contracts; revisit once the runtime plane is further isolated
       if (isSqlLanesToRuntime(sourceGroup, targetGroup)) {
@@ -136,18 +114,6 @@ const createCrossDomainRules = () => {
       if (sourceGroup.domain === targetGroup.domain) continue;
       if (targetGroup.domain === 'framework') continue;
 
-      // TODO: CLI tooling uses SQL targets/authoring hooks until the plugin split is complete (docs/briefs/package-layering/04-Split-SQL-Lanes.md Goal 4)
-      if (
-        isCliToSqlTargets(sourceGroup, targetGroup) ||
-        isCliToSqlAuthoring(sourceGroup, targetGroup)
-      ) {
-        continue;
-      }
-
-      if (isExtensionsToSqlTargets(sourceGroup, targetGroup)) {
-        continue;
-      }
-
       // TODO: compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API
       if (isCompatPrismaToSql(sourceGroup, targetGroup)) {
         continue;
@@ -164,47 +130,40 @@ const createCrossDomainRules = () => {
 };
 
 const createPlaneRules = () => {
-  for (const sourceGroup of moduleGroups) {
-    if (sourceGroup.plane !== 'migration') continue;
+  if (!planeRules) return;
 
-    for (const targetGroup of moduleGroups) {
-      if (targetGroup.plane !== 'runtime') continue;
-      pushRule(
-        `migration-to-runtime-${sourceGroup.domain}-${sourceGroup.layer}-to-${targetGroup.layer}`,
-        `Migration → Runtime: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)}`,
-        sourceGroup,
-        targetGroup,
-      );
-    }
-  }
+  for (const [sourcePlaneName, planeRule] of Object.entries(planeRules)) {
+    if (!planeRule.forbid || planeRule.forbid.length === 0) continue;
 
-  for (const sourceGroup of moduleGroups) {
-    if (sourceGroup.plane !== 'runtime') continue;
+    for (const sourceGroup of moduleGroups) {
+      if (sourceGroup.plane !== sourcePlaneName) continue;
 
-    for (const targetGroup of moduleGroups) {
-      if (targetGroup.plane !== 'migration') continue;
+      for (const forbiddenPlaneName of planeRule.forbid) {
+        for (const targetGroup of moduleGroups) {
+          if (targetGroup.plane !== forbiddenPlaneName) continue;
 
-      // TODO: SQL runtime/lanes/adapters still consume migration contracts; remove once artifacts are split (docs/briefs/package-layering/10-Adopt-Dependency-Cruiser.md)
-      if (isSqlRuntimeOrAdaptersToTargets(sourceGroup, targetGroup)) {
-        continue;
+          // Check if this import is allowed by an exception
+          const isException = planeRule.exceptions?.some((exception) => {
+            const sourceMatches = matchesGlobPattern(sourceGroup, exception.from);
+            const targetMatches = matchesGlobPattern(targetGroup, exception.to);
+            return sourceMatches && targetMatches;
+          });
+
+          if (isException) continue;
+
+          const sourcePlaneLabel =
+            sourcePlaneName.charAt(0).toUpperCase() + sourcePlaneName.slice(1);
+          const targetPlaneLabel =
+            forbiddenPlaneName.charAt(0).toUpperCase() + forbiddenPlaneName.slice(1);
+
+          pushRule(
+            `plane-${sourcePlaneName}-to-${forbiddenPlaneName}-${sourceGroup.key}-to-${targetGroup.key}`,
+            `${sourcePlaneLabel} → ${targetPlaneLabel}: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)}`,
+            sourceGroup,
+            targetGroup,
+          );
+        }
       }
-
-      // Extensions share compatibility layers with SQL targets tonight; revisit when the plane is decoupled
-      if (isExtensionsToSqlTargets(sourceGroup, targetGroup)) {
-        continue;
-      }
-
-      // TODO: compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API
-      if (isCompatPrismaToSql(sourceGroup, targetGroup)) {
-        continue;
-      }
-
-      pushRule(
-        `runtime-to-migration-${sourceGroup.domain}-${sourceGroup.layer}-to-${targetGroup.layer}`,
-        `Runtime → Migration: ${describeGroup(sourceGroup)} cannot import from ${describeGroup(targetGroup)} (artifacts are consumed out of band)`,
-        sourceGroup,
-        targetGroup,
-      );
     }
   }
 };

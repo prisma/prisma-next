@@ -1,11 +1,7 @@
 ---
 description: Prohibit inline type imports in source files
-alwaysApply: false
-tags: [typescript, imports, code-quality]
-appliesTo: ["packages/**/*.ts", "!packages/**/*.test.ts", "!packages/**/test/**/*.ts"]
-owner: prisma-next-docs
-lastUpdated: 2025-01-27
-severity: error
+globs: ["packages/**/*.ts", "!packages/**/*.test.ts", "!packages/**/test/**/*.ts"]
+alwaysApply: true
 ---
 
 # No Inline Type Imports

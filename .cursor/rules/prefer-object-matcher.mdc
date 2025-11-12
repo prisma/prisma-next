@@ -1,11 +1,7 @@
 ---
 description: Prefer object matchers over multiple individual expect().toBe() calls
-alwaysApply: false
-tags: [testing, assertions]
-appliesTo: ["**/*.test.ts", "**/*.spec.ts"]
-owner: prisma-next-docs
-lastUpdated: 2025-01-27
-severity: error
+globs: ["**/*.test.ts", "**/*.spec.ts"]
+alwaysApply: true
 ---
 
 # Prefer Object Matchers Over Multiple Individual Assertions

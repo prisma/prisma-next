@@ -3,12 +3,12 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ResultType } from '@prisma-next/contract/types';
-import type { ContractIR } from '@prisma-next/emitter';
-import { emit, loadExtensionPacks } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract-types';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -16,7 +16,15 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import sqlFamilyDescriptor from '../../../../sql/tooling/cli/src/exports/cli';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '../src/exports/pack-assembly';
 import { loadContractFromTs } from '../src/load-ts-contract';
+import { loadExtensionPacks } from '../src/pack-loading';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
@@ -61,16 +69,25 @@ describe('emit integration', () => {
     'loads TS contract, emits artifacts, and uses them with lanes',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
+      const adapterPath = resolve(__dirname, '../../../../targets/postgres-adapter');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
+
+      // Assemble operation registry and extract type imports from packs
+      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
 
       const result = await emit(
         contract,
         {
           outputDir,
-          packs,
+          operationRegistry,
+          codecTypeImports,
+          operationTypeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );
@@ -125,16 +142,23 @@ describe('emit integration', () => {
     'round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../sql/runtime/adapters/postgres');
+      const adapterPath = resolve(__dirname, '../../../../targets/postgres-adapter');
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
 
       const result1 = await emit(
         contract1,
         {
           outputDir,
-          packs,
+          operationRegistry,
+          codecTypeImports,
+          operationTypeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );
@@ -152,7 +176,10 @@ describe('emit integration', () => {
         contract2,
         {
           outputDir,
-          packs,
+          operationRegistry,
+          codecTypeImports,
+          operationTypeImports,
+          extensionIds,
         },
         sqlTargetFamilyHook,
       );

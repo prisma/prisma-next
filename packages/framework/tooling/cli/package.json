@@ -16,10 +16,14 @@
     "prisma-next": "./dist/cli.js"
   },
   "dependencies": {
+    "@prisma-next/contract": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/sql-contract-types": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*",
+    "arktype": "^2.0.0",
+    "c12": "^3.3.2",
     "commander": "^12.0.0",
     "esbuild": "^0.19.0"
   },
@@ -36,6 +40,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./config-types": {
+      "types": "./dist/config-types.d.ts",
+      "import": "./dist/config-types.js"
+    },
+    "./pack-manifest-types": {
+      "types": "./dist/pack-manifest-types.d.ts",
+      "import": "./dist/pack-manifest-types.js"
+    },
+    "./pack-assembly": {
+      "types": "./dist/pack-assembly.d.ts",
+      "import": "./dist/pack-assembly.js"
     }
   }
 }

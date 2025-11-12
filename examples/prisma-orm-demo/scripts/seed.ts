@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { getPrisma } from '../src/prisma/client';
 
 async function main() {

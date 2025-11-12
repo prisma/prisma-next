@@ -2,7 +2,7 @@
 
 Add SQL Operation
 - Plan: `.cursor/plans/add-sql-operation.md`
-- See: `packages/sql/sql-runtime`, `packages/targets/sql`, rulecards in `.cursor/rules`
+- See: `packages/sql/sql-runtime`, SQL family packages under `packages/sql/**`, and rulecards in `.cursor/rules`. The top-level `packages/targets/**` is reserved for concrete target packs (e.g., postgres, mysql).
 
 Split Monolith into Modules
 - Plan: `.cursor/plans/split-into-modules.md`
@@ -11,4 +11,3 @@ Split Monolith into Modules
 Fix Import Violation
 - Plan: `.cursor/plans/fix-import-violation.md`
 - See: `.cursor/rules/import-validation.mdc`, `architecture.config.json`
-

@@ -208,18 +208,18 @@ For detailed information about package layering, see:
 - **`@prisma-next/contract-authoring`** - TS builders, canonicalization, schema DSL
 - **`@prisma-next/cli`** - CLI tooling for contract emission
 - **`@prisma-next/emitter`** - Contract emission engine
-- **`@prisma-next/runtime-core`** - Target-agnostic runtime kernel (verification, plugin lifecycle, telemetry)
+- **`@prisma-next/runtime-executor`** - Target-agnostic execution engine (verification, plugin lifecycle, telemetry)
 
-### SQL Target Family Domain
+### SQL Family Domain
 
 - **`@prisma-next/sql-contract-ts`** - SQL-specific TypeScript contract authoring surface
-- **`@prisma-next/sql-contract-types`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
+- **`@prisma-next/sql-contract`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
 - **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly
 - **`@prisma-next/sql-contract-emitter`** - SQL emitter hook implementation
 - **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types
 - **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers
 - **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives
-- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-core with SQL adapters
+- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-executor with SQL adapters
 - **`@prisma-next/adapter-postgres`** - Postgres adapter implementation
 - **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
 

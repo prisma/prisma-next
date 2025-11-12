@@ -10,7 +10,7 @@ SQL runtime implementation for Prisma Next.
 
 ## Overview
 
-The SQL runtime package implements the SQL family runtime by composing `@prisma-next/runtime-core` with SQL-specific adapters, drivers, and codecs. It provides the public runtime API for SQL-based databases.
+The SQL runtime package implements the SQL family runtime by composing `@prisma-next/runtime-executor` with SQL-specific adapters, drivers, and codecs. It provides the public runtime API for SQL-based databases.
 
 ## Purpose
 
@@ -23,13 +23,13 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 - **Codec Encoding/Decoding**: Encode parameters and decode rows using SQL codec registries
 - **Codec Validation**: Validate that codec registries contain all required codecs
 - **SQL Family Adapter**: Implement `RuntimeFamilyAdapter` for SQL contracts
-- **SQL Runtime**: Compose runtime-core with SQL-specific logic
+- **SQL Runtime**: Compose runtime-executor with SQL-specific logic
 
 ## Dependencies
 
-- `@prisma-next/runtime-core` - Target-neutral runtime kernel
-- `@prisma-next/sql-contract-types` - SQL contract types
-- `@prisma-next/sql-target` - SQL target family interfaces (adapters, drivers, codecs)
+- `@prisma-next/runtime-executor` - Target-neutral execution engine
+- `@prisma-next/sql-contract` - SQL contract types
+- `@prisma-next/sql-target` - SQL family interfaces (legacy transitional package)
 - `@prisma-next/operations` - Operation registry
 
 ## Usage
@@ -37,7 +37,7 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 ```typescript
 import { createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
-import { createPostgresDriver } from '@prisma-next/driver-postgres';
+import { createPostgresDriver } from '@prisma-next/driver-postgres/runtime';
 
 const contract = validateContract<Contract>(contractJson);
 const adapter = createPostgresAdapter();
@@ -66,14 +66,14 @@ for await (const row of runtime.execute(plan)) {
 - `createRuntime` - Create a SQL runtime instance
 - `createRuntimeContext` - Create a SQL runtime context
 - `RuntimeContext`, `Extension` - Context types
-- `budgets`, `lints` - SQL-compatible plugins (re-exported from runtime-core)
+- `budgets`, `lints` - SQL-compatible plugins (re-exported from runtime-executor)
 - `readContractMarker`, `writeContractMarker` - SQL marker statements
 - `encodeParams`, `decodeRow` - Codec encoding/decoding utilities
 - `validateCodecRegistryCompleteness` - Codec validation
 
 ## Architecture
 
-The SQL runtime composes runtime-core with SQL-specific implementations:
+The SQL runtime composes runtime-executor with SQL-specific implementations:
 
 1. **SqlFamilyAdapter**: Implements `RuntimeFamilyAdapter` for SQL contracts
 2. **SqlRuntime**: Wraps `RuntimeCore` and adds SQL-specific encoding/decoding

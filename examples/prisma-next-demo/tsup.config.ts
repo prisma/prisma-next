@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/prisma/scripts/stamp-marker.ts'],
+  entry: [],
   format: ['esm'],
   sourcemap: true,
   clean: true,

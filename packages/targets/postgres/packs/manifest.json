@@ -1,0 +1,10 @@
+{
+  "id": "postgres",
+  "version": "15.0.0",
+  "targets": {
+    "postgres": {
+      "minVersion": "12"
+    }
+  },
+  "capabilities": {}
+}

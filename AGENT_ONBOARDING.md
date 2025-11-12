@@ -60,13 +60,13 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 - **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers for building SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives in the SQL lanes ring
-- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-core with SQL adapters
-- **`@prisma-next/runtime-core`** - Target-agnostic runtime kernel (verification, plugin lifecycle, telemetry)
-- **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers (core ring)
-- **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly (targets ring)
+- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-executor with SQL adapters
+- **`@prisma-next/runtime-executor`** - Target-agnostic execution engine (verification, plugin lifecycle, telemetry)
+- **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers (core ring, shared plane)
+- **`@prisma-next/sql-operations`** - SQL-specific operation types and registry helpers (sql/core layer, shared plane). Manifest assembly happens in CLI layer.
 - **`@prisma-next/sql-contract-types`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) (targets ring)
 - **`@prisma-next/sql-contract-emitter`** - SQL emitter hook implementation (targets ring)
-- **`@prisma-next/sql-target`** - SQL target family abstraction with transitional re-exports (will be removed in Slice 7). Provides backward-compatible re-exports from `@prisma-next/sql-contract-types`, `@prisma-next/sql-operations`, `@prisma-next/sql-contract-emitter`, and `@prisma-next/operations`
+- **`@prisma-next/sql-target`** - SQL family abstraction with transitional re-exports (will be removed in Slice 7). Provides backward-compatible re-exports from `@prisma-next/sql-contract-types`, `@prisma-next/sql-operations`, `@prisma-next/sql-contract-emitter`, and `@prisma-next/operations`
 - **`@prisma-next/adapter-postgres`** - Postgres adapter implementation (extension pack)
 - **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
 - **`@prisma-next/compat-prisma`** - Compatibility layer for Prisma ORM import-swap
@@ -82,19 +82,25 @@ The repository is organized by **Domains → Layers → Planes**:
 
 - **Domains**: Framework (target-agnostic) and target families (SQL, document, etc.)
 - **Layers**: Core → Authoring → Targets → Lanes → Runtime → Adapters (dependency direction enforced)
-- **Planes**: Migration (authoring, tooling, targets) vs Runtime (lanes, runtime, adapters)
+- **Planes**: Migration (authoring, tooling, targets), Runtime (lanes, runtime, adapters), and Shared — cross‑plane code and artifacts safe for both
 
 **Framework Domain** (`packages/framework/**`):
 - **Core layer** (shared plane): `@prisma-next/plan`, `@prisma-next/operations` live in `packages/framework/core-*`
 - **Authoring layer** (migration plane): `@prisma-next/contract-authoring`, `@prisma-next/contract-ts`, `@prisma-next/contract-psl` live in `packages/framework/authoring/*`
 - **Tooling layer** (migration plane): `@prisma-next/cli`, `@prisma-next/emitter` live in `packages/framework/tooling/*`
-- **Runtime-core layer** (runtime plane): `@prisma-next/runtime-core` lives in `packages/framework/runtime-core`
+- **Runtime-executor layer** (runtime plane): `@prisma-next/runtime-executor` lives in `packages/framework/runtime-executor`
 
-**SQL Domain** (`packages/sql/**` and `packages/targets/sql/**`):
-- **SQL-specific types** (`SqlContract`, `SqlStorage`, etc.) live in `@prisma-next/sql-contract-types` (targets layer)
-- **SQL-specific operations** (operation assembly, lowering specs) live in `@prisma-next/sql-operations` (targets layer)
-- **SQL emitter hook** (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` (targets layer)
-- **SQL contract authoring** (`defineContract`, `validateContract`) lives in `@prisma-next/sql-contract-ts` in `packages/sql/authoring/sql-contract-ts`. It composes `@prisma-next/contract-authoring` with SQL-specific types.
+**SQL Domain (Target‑Family)** (`packages/sql/**`):
+- **Core layer** (shared plane): `@prisma-next/sql-contract`, `@prisma-next/sql-operations` live in `packages/sql/{contract,operations}`
+- **Authoring layer** (migration plane): `@prisma-next/sql-contract-ts` lives in `packages/sql/authoring/sql-contract-ts`
+- **Tooling layer** (migration plane): `@prisma-next/sql-contract-emitter` lives in `packages/sql/tooling/emitter` (mirrors Framework domain organization)
+- **Lanes layer** (runtime plane): `@prisma-next/sql-relational-core`, `@prisma-next/sql-lane`, `@prisma-next/sql-orm-lane` live in `packages/sql/lanes/*`
+- **Runtime layer** (runtime plane): `@prisma-next/sql-runtime` lives in `packages/sql/sql-runtime`
+- **Adapters layer** (runtime plane): `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres` live in `packages/sql/runtime/{adapters,drivers}/*`
+
+**Extensions Domain (Concrete Targets & Packs)**:
+- Concrete adapters/drivers (e.g., Postgres) and ecosystem packs live under `packages/extensions/**` and implement SPIs from Framework/SQL family.
+- Examples: `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`, `@prisma-next/compat-prisma`.
 
 **General Principles**:
 - **Core contract types** (`ContractBase`) live in `@prisma-next/contract` (legacy package, will be migrated)
@@ -592,21 +598,26 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
 
 **Key Design Decisions:**
 - **Target Family Hooks**: Each target family implements `TargetFamilyHook` with:
-  - `validateTypes`: Validates all type IDs come from referenced extensions
+  - `validateTypes`: Validates all type IDs come from referenced extensions (receives `ValidationContext` with `operationRegistry` and `extensionIds`)
   - `validateStructure`: Family-specific structural validation
-  - `generateContractTypes`: Generates `contract.d.ts` content
-  - `getTypesImports`: Determines required type imports from packs
-- **Adapters as Extension Packs**: Adapters are treated identically to extension packs. Both use the same manifest structure (`packs/manifest.json`) with:
+  - `generateContractTypes`: Generates `contract.d.ts` content (receives separate `codecTypeImports` and `operationTypeImports` arrays, not packs)
+- **Manifest-Agnostic Emitter**: The emitter is completely manifest-agnostic. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI via family-provided helpers exposed through the config’s `family` export. The emitter does not export pack loading functions or manifest types.
+- **Adapters as Extension Packs**: Adapters are treated identically to extension packs. For CLI usage, packs expose `/cli` entrypoints that default-export descriptors (IR + helpers) used for emission. Packs may also ship a `packs/manifest.json` for other consumers (e.g., cloud/bundles), but the CLI does not read JSON manifests.
   - `types.codecTypes.import`: Package/named/alias for importing `CodecTypes`
+  - `types.operationTypes.import`: Package/named/alias for importing `OperationTypes`
+  - `operations`: Array of operation manifests that are assembled into `OperationRegistry` by the CLI
 - **Type Canonicalization**: Type canonicalization (shorthand → fully qualified IDs) happens at **authoring time** (PSL parser or TS builder), **not during emission**. The emitter only validates that all type IDs come from referenced extensions.
 - **I/O Decoupling**: The emitter is decoupled from file I/O. `emit()` returns strings (`contractJson`, `contractDts`); the caller handles all file operations.
 - **No Adapter Special Treatment**: The emitter treats all extension packs uniformly. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
+- **CLI Assembly**: The CLI loads only the user’s config module. It reads `family.hook` and calls family-provided helpers (exposed via `config.family`) to assemble the operation registry, extract codec/operation type imports, and derive extension IDs from `{ adapter, target, extensions }`. This keeps assembly logic in the family layer and the CLI family‑agnostic.
 
 **Implementation:**
-- Core emitter: `packages/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
+- Core emitter: `packages/framework/tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
 - Target family SPI: The `emit()` function accepts a `targetFamily: TargetFamilyHook` parameter directly. Authoring surfaces (CLI, tests) determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry or auto-registration.
-- SQL target family SPI: `packages/targets/sql/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source). Transitional re-export available from `@prisma-next/sql-target` during migration (Slice 5-7).
-- Extension pack loading: `packages/emitter/src/extension-pack.ts` - loads manifests (uses local file I/O utilities)
+- SQL family SPI: `packages/sql/tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
+- Extension pack loading: `packages/framework/tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
+- Manifest types: `packages/framework/tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
+- Framework CLI assembly: `packages/framework/tooling/cli/src/pack-assembly.ts` - generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for family-specific conversion
 
 **Outputs:**
 - `contract.json`: Canonical JSON with `coreHash` and `profileHash`, all column types as fully qualified IDs (`ns/name@version`). Includes `_generated` metadata field to indicate it's a generated artifact (excluded from canonicalization/hashing).
@@ -620,7 +631,15 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
     "id": "postgres",
     "version": "15.0.0",
     "targets": { "postgres": { "minVersion": "12" } },
-    "capabilities": {},
+    "capabilities": {
+      "postgres": {
+        "orderBy": true,
+        "limit": true,
+        "lateral": true,
+        "jsonAgg": true,
+        "returning": true
+      }
+    },
     "types": {
       "codecTypes": {
         "import": {
@@ -632,7 +651,8 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
     }
   }
   ```
-  - `types.codecTypes.import`: Used by emitter to generate `contract.d.ts` imports
+  - `types.codecTypes.import`: Used to generate `contract.d.ts` imports when assembling types
+  - **`capabilities`**: Adapters must declare capabilities in the manifest (for CLI emission) and in code (for runtime). The manifest capabilities are read during emission and included in the contract. See `.cursor/rules/adapter-capability-declaration.mdc` for details.
   - **No `canonicalScalarMap`**: Extension manifests do not include scalar-to-type ID mappings. Type canonicalization happens at authoring time using extension manifests, not via a scalar map in the manifest.
 - Adapter appears first in `contract.extensions` but is otherwise identical to other packs
 
@@ -1050,7 +1070,7 @@ See `test/utils/README.md` for full documentation of generic helpers, `packages/
 - `pnpm lint:deps` - Validates that packages follow domain/layer/plane dependency rules
 - Uses Dependency Cruiser with declarative package-to-domain/layer/plane mapping in `architecture.config.json`
 - Configuration in `dependency-cruiser.config.mjs` loads `architecture.config.json` and defines rules
-- Enforces unidirectional dependencies: `core → authoring → targets → lanes → runtime-core → family-runtime → adapters`
+- Enforces unidirectional dependencies: `core → authoring → targets → lanes → runtime-executor → family-runtime → adapters`
 - Packages in the same layer can import from each other
 - Temporary exceptions are allowed with TODO comments in `dependency-cruiser.config.mjs` for known violations that need refactoring
 
@@ -1358,7 +1378,7 @@ When moving packages to reflect domain/layer/plane structure (e.g., moving frame
 
 **Key Learnings:**
 - Relative paths in `tsconfig.json`, `biome.json`, and `clean.mjs` scripts must be recalculated based on new package depth
-- Framework domain packages are organized as: `packages/framework/{core-*,authoring/*,tooling/*,runtime-core}`
+- Framework domain packages are organized as: `packages/framework/{core-*,authoring/*,tooling/*,runtime-executor}`
 - Always use `git mv` to preserve history
 - Published package names (`@prisma-next/*`) remain unchanged - only filesystem paths change
 
@@ -1548,7 +1568,7 @@ pnpm coverage:packages
 ### Recent Implementation (Completed)
 
 1. **Query Patterns Standard Practice** - Established standard practice of exporting `tables` from `query.ts` as a convenience export (`export const tables = schema.tables`). This improves DX by making code shorter and more readable (`tables.user` instead of `schema.tables.user`). Users can import `tables` directly and optionally extract table/column variables for reuse. Pattern documented in `.cursor/rules/query-patterns.mdc` and updated in `AGENT_ONBOARDING.md`.
-2. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL target family SPI (`sqlTargetFamilyHook`) lives in `sql-target` package. Adapters treated identically to extension packs.
+2. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL family SPI (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` under `packages/sql/tooling/emitter`. Adapters are treated identically to extension packs.
 3. **Type Canonicalization at Authoring Time** - Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission or validation. Emitter only validates type IDs come from referenced extensions.
 4. **Removed Canonicalization from validateContract** - `validateContract()` no longer performs canonicalization. Contracts must always have fully qualified type IDs (`pg/int4@1`, not `int4`). This enforces the design principle that canonicalization happens at authoring time, not during validation.
 5. **Removed canonicalScalarMap** - Extension pack manifests no longer include `canonicalScalarMap`. Type canonicalization happens at authoring time using extension manifests, not via a scalar map. This keeps manifests focused on type imports for code generation.
@@ -1663,28 +1683,18 @@ const joinedPlan = sql
   .build({ params: { active: true } });
 ```
 
-**Emit a contract:**
+**Emit a contract (consumer-provided packs):**
 ```typescript
 import { emit } from '@prisma-next/emitter';
-import { loadExtensionPacks } from '@prisma-next/emitter';
-import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-target'; // During migration (Slice 5-7), use transitional re-export. After Slice 7, import from '@prisma-next/sql-contract-emitter' directly.
+import type { ContractIR } from '@prisma-next/emitter';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import pgVectorExt from '@prisma-next/ext-pgvector';
 
-// Load extension packs (adapter + extensions)
-const packs = loadExtensionPacks(
-  './packages/adapter-postgres',
-  ['./packages/extension-pack']
-);
+// Consumer imports/instantiates the packs explicitly
+const packs = [pgVectorExt()];
 
-// Determine target family SPI based on contract's targetFamily
-// For SQL contracts, use sqlTargetFamilyHook
-const targetFamily = sqlTargetFamilyHook;
-
-// Emit contract (returns strings, caller handles file I/O)
-const result = await emit(ir, {
-  outputDir: './dist',
-  packs,
-}, targetFamily);
+// Emitter is family-agnostic; hook assembles operations from provided packs
+const result = await emit(ir, { outputDir: './dist', packs }, sqlTargetFamilyHook);
 
 // Write files (caller responsibility)
 await writeFile('./contract.json', result.contractJson);
@@ -2222,6 +2232,12 @@ const ir2: ContractIR = {
 ```
 
 **Key Point:** Match the pattern used for `capabilities` - always provide fallback empty objects for optional properties that must be objects.
+
+**Note:** In tests, use the `createContractIR()` factory function instead of manually constructing `ContractIR` objects. This ensures all required fields are present with proper defaults. See `.cursor/rules/use-contract-ir-factories.mdc` for guidelines.
+
+**Type Notes:**
+- `capabilities` in `ContractIR` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`
+- `ExtensionPack` requires both `manifest` and `path` properties
 
 ## Modular Refactoring Patterns
 
