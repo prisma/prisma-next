@@ -11,7 +11,12 @@ import {
 } from '../pack-assembly';
 import { parseGlobalFlags } from '../utils/global-flags';
 import { mapErrorToCliEnvelope } from '../utils/errors';
-import { formatEmitOutput, formatEmitJson, formatErrorOutput, formatErrorJson } from '../utils/output';
+import {
+  formatEmitOutput,
+  formatEmitJson,
+  formatErrorOutput,
+  formatErrorJson,
+} from '../utils/output';
 
 interface ContractEmitOptions {
   readonly config?: string;
@@ -143,4 +148,3 @@ export function createContractEmitCommand(): Command {
 
   return command;
 }
-

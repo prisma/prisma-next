@@ -47,6 +47,35 @@ export function createCliError(
 }
 
 /**
+ * Creates a runtime error envelope with PN-RTM-3xxx code.
+ */
+export function createRtmError(
+  code: string,
+  summary: string,
+  options?: {
+    readonly why?: string;
+    readonly fix?: string;
+    readonly where?: { readonly path?: string; readonly line?: number };
+    readonly meta?: Record<string, unknown>;
+    readonly docsUrl?: string;
+    readonly exitCode?: number;
+  },
+): CliErrorEnvelope {
+  return {
+    code: `PN-RTM-${code}`,
+    domain: 'RTM',
+    severity: 'error',
+    summary,
+    why: options?.why,
+    fix: options?.fix,
+    where: options?.where,
+    meta: options?.meta,
+    docsUrl: options?.docsUrl,
+    exitCode: options?.exitCode ?? 1,
+  };
+}
+
+/**
  * Maps common errors to CLI error envelopes.
  */
 export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
@@ -74,7 +103,10 @@ export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
     }
 
     // Contract validation errors
-    if (message.includes('Contract') && (message.includes('invalid') || message.includes('validation'))) {
+    if (
+      message.includes('Contract') &&
+      (message.includes('invalid') || message.includes('validation'))
+    ) {
       return createCliError('4003', 'Contract validation failed', {
         why: message,
         fix: 'Check your contract file for errors',
@@ -83,10 +115,23 @@ export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
     }
 
     // File I/O errors
-    if (message.includes('ENOENT') || message.includes('Cannot find') || message.includes('No such file')) {
+    if (
+      message.includes('ENOENT') ||
+      message.includes('Cannot find') ||
+      message.includes('No such file')
+    ) {
       return createCliError('4004', 'File not found', {
         why: message,
         fix: 'Check that the file path is correct',
+      });
+    }
+
+    // Database URL missing (usage/config error - exit code 2)
+    if (message.includes('Database URL is required')) {
+      return createCliError('4005', 'Database URL is required', {
+        why: message,
+        fix: 'Provide --db flag, config.db.url, or DATABASE_URL environment variable',
+        exitCode: 2,
       });
     }
 
@@ -104,4 +149,3 @@ export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
     exitCode: 1,
   });
 }
-

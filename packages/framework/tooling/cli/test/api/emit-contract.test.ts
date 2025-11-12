@@ -381,4 +381,3 @@ describe('emitContract API', () => {
     timeouts.typeScriptCompilation,
   );
 });
-

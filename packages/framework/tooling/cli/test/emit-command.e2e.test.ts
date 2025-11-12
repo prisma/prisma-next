@@ -297,4 +297,3 @@ describe('contract emit command (e2e)', () => {
     timeouts.typeScriptCompilation,
   );
 });
-

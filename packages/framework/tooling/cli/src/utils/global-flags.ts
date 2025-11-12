@@ -66,4 +66,3 @@ export function parseGlobalFlags(options: CliOptions): GlobalFlags {
 
   return flags;
 }
-
