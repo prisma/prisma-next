@@ -1,5 +1,6 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+// Use relative import to avoid module resolution issues in test context
+import { defineContract } from '../../../../../packages/sql/authoring/sql-contract-ts/src/exports/contract-builder';
 
 export const contract = defineContract<CodecTypes>()
   .target('postgres')

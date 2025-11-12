@@ -88,7 +88,7 @@ it('handles errors and throws', async () => {
   await expect(
     command.parseAsync(['node', 'cli.js', 'emit', '--contract', invalidPath, '--out', outputDir]),
   ).rejects.toThrow();
-  
+
   expect(consoleErrors.length).toBeGreaterThan(0);
 });
 ```

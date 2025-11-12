@@ -27,8 +27,16 @@ Implement TS-only contract loading and a CLI command that produces `contract.jso
 
 ### CLI Surface (initial)
 
-- `prisma-next emit --contract <path/to/contract.ts> --out <dir> [--target postgres]`
-  - Loads TS contract via the loader, runs Slice 1, writes artifacts to `--out`.
+- `prisma-next emit [--config <path>]`
+  - Contract is defined in `prisma-next.config.ts` with nested structure:
+    ```typescript
+    contract: {
+      source: contract, // or () => import('./contract').then(m => m.contract)
+      output: 'path/to/contract.json', // optional, defaults to 'src/prisma/contract.json'
+      types: 'path/to/contract.d.ts', // optional, defaults to output with .d.ts extension
+    }
+    ```
+  - Loads contract from config, runs Slice 1, writes artifacts to paths specified in config.
   - Optionally prints `coreHash`/`profileHash`.
 
 ### Policies
@@ -68,7 +76,7 @@ Implement TS-only contract loading and a CLI command that produces `contract.jso
 
 ### Open Questions
 
-1) TS contract entry default path and CLI flag names (confirm `--contract`, `--out`).
+1) ~~TS contract entry default path and CLI flag names (confirm `--contract`, `--out`).~~ **Resolved**: Contract is defined in `prisma-next.config.ts` with nested structure. No flags needed.
 2) Do we need a watch mode (dev) now, or only a one-shot CLI for MVP?
 
 

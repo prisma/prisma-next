@@ -169,7 +169,7 @@ export function defineConfig(config: PrismaNextConfig): PrismaNextConfig {
     const types =
       config.contract.types ??
       (output.endsWith('.json')
-        ? output.slice(0, -5) + '.d.ts'
+        ? `${output.slice(0, -5)}.d.ts`
         : join(dirname(output), 'contract.d.ts'));
 
     const normalizedContract: ContractConfig = {

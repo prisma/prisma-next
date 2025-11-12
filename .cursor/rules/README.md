@@ -47,6 +47,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Responsibilities
 - `.cursor/rules/adapter-capability-declaration.mdc` — Adapter capability declaration (manifest + code)
+- `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.

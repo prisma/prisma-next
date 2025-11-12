@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { emit } from '@prisma-next/emitter';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -42,9 +43,10 @@ export function createEmitCommand(): Command {
           contractRaw = contractConfig.source;
         }
 
-        // Resolve artifact paths (already normalized by defineConfig(), but resolve relative paths)
-        const contractJsonPath = resolve(contractConfig.output);
-        const contractDtsPath = resolve(contractConfig.types);
+        // Resolve artifact paths (already normalized by defineConfig() with defaults, but resolve relative paths)
+        // defineConfig() ensures output and types are always present (defaults applied)
+        const contractJsonPath = resolve(contractConfig.output!);
+        const contractDtsPath = resolve(contractConfig.types!);
 
         // Strip mappings if family provides stripMappings function
         const contractWithoutMappings = config.family.stripMappings
@@ -80,7 +82,7 @@ export function createEmitCommand(): Command {
         const targetFamily = config.family.hook;
 
         const result = await emit(
-          contractIR as unknown as typeof contractRaw,
+          contractIR as ContractIR,
           {
             outputDir: dirname(contractJsonPath),
             operationRegistry,

@@ -99,6 +99,16 @@ flowchart TD
     CMD --> FS
 ```
 
+## Config Validation and Normalization
+
+The `defineConfig()` function validates and normalizes configs using Arktype:
+
+- **Validation**: Validates config structure using Arktype schemas
+- **Normalization**: Applies default values (e.g., `contract.output` defaults to `'src/prisma/contract.json'`)
+- **Error Messages**: Provides clear, actionable error messages on validation failure
+
+See `.cursor/rules/config-validation-and-normalization.mdc` for detailed patterns.
+
 ## Components
 
 ### CLI Entry Point (`cli.ts`)
