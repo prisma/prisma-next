@@ -6,6 +6,20 @@ PostgreSQL pgvector extension pack for Prisma Next.
 
 This extension pack adds support for the `vector` data type and vector similarity operations (e.g., cosine distance) for PostgreSQL databases with the pgvector extension installed.
 
+## Responsibilities
+
+- **Vector Codec**: Provides codec for `pg/vector@1` type ID mapping to `number[]` JavaScript type
+- **Vector Operations**: Registers vector similarity operations (e.g., `cosineDistance`) for use in queries
+- **CLI Integration**: Provides extension descriptor for `prisma-next.config.ts` configuration
+- **Runtime Extension**: Registers codecs and operations at runtime for vector column operations
+
+## Dependencies
+
+- **`@prisma-next/cli`**: CLI config types and extension descriptor interface
+- **`@prisma-next/sql-operations`**: SQL operation signature types
+- **`@prisma-next/sql-relational-core`**: Codec registry and AST types
+- **`arktype`**: Schema validation for manifest structure
+
 ## Installation
 
 ```bash

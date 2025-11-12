@@ -685,7 +685,7 @@ type BuildStorage<
 
 ### JSON Imports
 
-**Pattern**: Use `import` statements with `assert { type: 'json' }` instead of `require()` for JSON files.
+**Pattern**: Use `import` statements with `with { type: 'json' }` instead of `require()` for JSON files.
 
 **❌ WRONG: Using `require()` for JSON files**
 
@@ -696,19 +696,112 @@ const fixtureContract = validateContract<Contract>(
 );
 ```
 
-**✅ CORRECT: Use `import` with `assert { type: 'json' }`**
+**✅ CORRECT: Use `import` with `with { type: 'json' }`**
 
 ```typescript
-import contractJson from './fixtures/contract.json' assert { type: 'json' };
+import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 const fixtureContract = validateContract<Contract>(contractJson);
 ```
 
 **Why this matters:**
 - `require()` is CommonJS and doesn't work well with ESM
-- `import` with `assert { type: 'json' }` is the ESM way to import JSON
+- `import` with `with { type: 'json' }` is the ESM way to import JSON (ES2022+)
+- `assert { type: 'json' }` is deprecated in favor of `with { type: 'json' }`
 - Avoids linting errors about `require()` and undefined globals
 - Better type safety and module resolution
+
+## Type Extraction from Column Builders
+
+**Pattern**: When extracting types from `ColumnBuilder` instances, use `infer` for all type parameters to allow correct type inference.
+
+### The Problem
+
+When extracting the `JsType` from a `ColumnBuilder`, constraining type parameters too strictly prevents TypeScript from correctly inferring types from column builders with specific operation types.
+
+**❌ WRONG: Constraining type parameters too strictly**
+
+```typescript
+type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends ColumnBuilder<
+  string,
+  StorageColumn,
+  infer JsType,
+  infer _Ops extends OperationTypes
+>
+  ? JsType
+  : never;
+```
+
+**Problem**: The constraint `infer _Ops extends OperationTypes` prevents TypeScript from matching column builders with specific operation types (e.g., `PgVectorOperationTypes`).
+
+### The Solution
+
+**✅ CORRECT: Use `infer` for all type parameters without constraints**
+
+```typescript
+type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends ColumnBuilder<
+  infer _ColumnName extends string,
+  infer _ColumnMeta extends StorageColumn,
+  infer JsType,
+  infer _Ops
+>
+  ? JsType
+  : never;
+```
+
+**Why?**
+- Using `infer` for all parameters allows TypeScript to match any `ColumnBuilder` structure
+- The `extends` constraints on inferred types (e.g., `infer _ColumnName extends string`) provide type safety without preventing matches
+- This allows correct type inference for column builders with any operation types structure
+
+### When This Pattern Applies
+
+- Extracting `JsType` from `ColumnBuilder` instances in projection type inference
+- Creating helper types that extract information from generic types with multiple parameters
+- When you need to match types with specific generic parameters without constraining them too strictly
+
+## AnyColumnBuilder and Generic Variance
+
+**Pattern**: `AnyColumnBuilder` must use `any` for the `Operations` parameter due to TypeScript's variance limitations.
+
+### The Problem
+
+TypeScript's variance rules don't allow expressing "any type that extends `OperationTypes`" in a way that works for assignment. Contract-specific `OperationTypes` (e.g., `PgVectorOperationTypes`) are not assignable to the base `OperationTypes` in generic parameter position, even though they extend it structurally.
+
+**❌ WRONG: Using `OperationTypes` directly**
+
+```typescript
+export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, OperationTypes>;
+```
+
+**Problem**: `ColumnBuilder<..., PgVectorOperationTypes>` is not assignable to `ColumnBuilder<..., OperationTypes>` due to variance rules, even though `PgVectorOperationTypes` extends `OperationTypes`.
+
+### The Solution
+
+**✅ CORRECT: Use `any` with documented explanation**
+
+```typescript
+// Helper aliases for usage sites where the specific column parameters are irrelevant
+// Accepts any ColumnBuilder regardless of its Operations parameter
+// Note: We use `any` here because TypeScript's variance rules don't allow us to express
+// "any type that extends OperationTypes" in a way that works for assignment.
+// Contract-specific OperationTypes (e.g., PgVectorOperationTypes) are not assignable
+// to the base OperationTypes in generic parameter position, even though they extend it structurally.
+// biome-ignore lint/suspicious/noExplicitAny: AnyColumnBuilder must accept column builders with any operation types
+export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, any>;
+```
+
+**Why?**
+- `AnyColumnBuilder` is intentionally permissive - it needs to accept column builders with any operation types
+- The constraint is still checked at the `ColumnBuilder` level - `any` only bypasses the assignment check for `AnyColumnBuilder`
+- The `any` is only in the type definition, not in runtime code
+- This is a known TypeScript limitation with generic variance
+
+### When This Pattern Applies
+
+- Creating helper types that need to accept instances with any specific type parameter
+- When TypeScript's variance rules prevent expressing the needed type relationship
+- When the constraint is checked elsewhere (e.g., at the generic type definition level)
 
 ## Query Patterns
 

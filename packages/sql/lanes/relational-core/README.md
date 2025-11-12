@@ -84,8 +84,9 @@ flowchart TD
 
 ### Type Definitions (`types.ts`)
 - Defines TypeScript types for column builders, operations, projections
-- Provides type inference utilities for extracting JavaScript types from codec types
+- Provides type inference utilities for extracting JavaScript types from codec types (e.g., `ExtractJsTypeFromColumnBuilder`)
 - Defines projection row inference types
+- Defines `AnyColumnBuilder` helper type for accepting column builders with any operation types
 
 ## Dependencies
 

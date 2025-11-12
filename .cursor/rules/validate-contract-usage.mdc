@@ -16,7 +16,7 @@ alwaysApply: true
 ```typescript
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { Contract } from './contract.d';
-import contractJson from './contract.json' assert { type: 'json' };
+import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
 // Now contract has full type information: contract.storage.tables.user.columns.id.type === 'pg/int4@1'
@@ -71,7 +71,7 @@ const contract = validateContract<MyContract>({
 ```typescript
 import { validateContract } from '@prisma-next/sql-query/schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
-import contractJson from './contract.json' assert { type: 'json' };
+import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
 // ❌ Types will be inferred as 'unknown' - this won't work!
