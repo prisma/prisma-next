@@ -686,6 +686,72 @@ describe('config loader', () => {
     );
   });
 
+  it('throws error when contract output is not a string', async () => {
+    const configPath = join(testDir, 'prisma-next.config.ts');
+    const mockHook = {
+      id: 'sql',
+      validateTypes: () => {},
+      validateStructure: () => {},
+      generateContractTypes: () => '',
+    };
+    writeFileSync(
+      configPath,
+      `const mockHook = ${JSON.stringify(mockHook)};
+      export default {
+        family: {
+          kind: 'family',
+          id: 'sql',
+          hook: mockHook,
+          convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
+          validateContractIR: (contract: unknown) => contract,
+        },
+        target: { kind: 'target', id: 'postgres', family: 'sql', manifest: { id: 'postgres', version: '1.0.0' } },
+        adapter: { kind: 'adapter', id: 'postgres', family: 'sql', manifest: { id: 'postgres', version: '1.0.0' } },
+        contract: {
+          source: { target: 'postgres' },
+          output: 123,
+        },
+      };`,
+      'utf-8',
+    );
+    await expect(loadConfig(configPath)).rejects.toThrow(
+      'Config.contract.output must be a string when provided',
+    );
+  });
+
+  it('throws error when contract types is not a string', async () => {
+    const configPath = join(testDir, 'prisma-next.config.ts');
+    const mockHook = {
+      id: 'sql',
+      validateTypes: () => {},
+      validateStructure: () => {},
+      generateContractTypes: () => '',
+    };
+    writeFileSync(
+      configPath,
+      `const mockHook = ${JSON.stringify(mockHook)};
+      export default {
+        family: {
+          kind: 'family',
+          id: 'sql',
+          hook: mockHook,
+          convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
+          validateContractIR: (contract: unknown) => contract,
+        },
+        target: { kind: 'target', id: 'postgres', family: 'sql', manifest: { id: 'postgres', version: '1.0.0' } },
+        adapter: { kind: 'adapter', id: 'postgres', family: 'sql', manifest: { id: 'postgres', version: '1.0.0' } },
+        contract: {
+          source: { target: 'postgres' },
+          types: 123,
+        },
+      };`,
+      'utf-8',
+    );
+    await expect(loadConfig(configPath)).rejects.toThrow(
+      'Config.contract.types must be a string when provided',
+    );
+  });
+
   it('throws error when extension family is not a string', async () => {
     const configPath = join(testDir, 'prisma-next.config.ts');
     const mockHook = {

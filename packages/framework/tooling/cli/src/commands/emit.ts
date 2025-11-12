@@ -45,8 +45,13 @@ export function createEmitCommand(): Command {
 
         // Resolve artifact paths (already normalized by defineConfig() with defaults, but resolve relative paths)
         // defineConfig() ensures output and types are always present (defaults applied)
-        const contractJsonPath = resolve(contractConfig.output!);
-        const contractDtsPath = resolve(contractConfig.types!);
+        if (!contractConfig.output || !contractConfig.types) {
+          throw new Error(
+            'Contract config must have output and types paths. This should not happen if defineConfig() was used.',
+          );
+        }
+        const contractJsonPath = resolve(contractConfig.output);
+        const contractDtsPath = resolve(contractConfig.types);
 
         // Strip mappings if family provides stripMappings function
         const contractWithoutMappings = config.family.stripMappings

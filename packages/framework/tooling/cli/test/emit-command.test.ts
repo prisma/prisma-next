@@ -435,4 +435,168 @@ export default defineConfig({
     // Commander.js may handle errors differently, so we just verify it throws
     expect(true).toBe(true); // Test passes if we reach here (error was thrown)
   });
+
+  it(
+    'handles async contract source function',
+    async () => {
+      const command = createEmitCommand();
+      const asyncConfigPath = join(testDir, 'async-config.ts');
+      const contractPath = resolve(__dirname, 'fixtures/valid-contract.ts');
+      const adapterPath = resolve(
+        workspaceRoot,
+        'packages/targets/postgres-adapter/dist/exports/cli.js',
+      );
+      const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
+      const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
+      const configTypesPath = resolve(
+        workspaceRoot,
+        'packages/framework/tooling/cli/dist/config-types.js',
+      );
+
+      writeFileSync(
+        asyncConfigPath,
+        `import { defineConfig } from '${configTypesPath}';
+import postgresAdapter from '${adapterPath}';
+import postgres from '${targetPath}';
+import sql from '${familyPath}';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+  contract: {
+    source: async () => {
+      const { contract } = await import('${contractPath}');
+      return contract;
+    },
+    output: '${join(outputDir, 'contract.json')}',
+    types: '${join(outputDir, 'contract.d.ts')}',
+  },
+});
+`,
+        'utf-8',
+      );
+
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await command.parseAsync(['node', 'cli.js', 'emit', '--config', asyncConfigPath]);
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      const contractJsonPath = join(outputDir, 'contract.json');
+      expect(existsSync(contractJsonPath)).toBe(true);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'handles sync contract source function',
+    async () => {
+      const command = createEmitCommand();
+      const syncConfigPath = join(testDir, 'sync-config.ts');
+      const contractPath = resolve(__dirname, 'fixtures/valid-contract.ts');
+      const adapterPath = resolve(
+        workspaceRoot,
+        'packages/targets/postgres-adapter/dist/exports/cli.js',
+      );
+      const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
+      const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
+      const configTypesPath = resolve(
+        workspaceRoot,
+        'packages/framework/tooling/cli/dist/config-types.js',
+      );
+
+      writeFileSync(
+        syncConfigPath,
+        `import { defineConfig } from '${configTypesPath}';
+import postgresAdapter from '${adapterPath}';
+import postgres from '${targetPath}';
+import sql from '${familyPath}';
+import { contract } from '${contractPath}';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+  contract: {
+    source: () => contract,
+    output: '${join(outputDir, 'contract.json')}',
+    types: '${join(outputDir, 'contract.d.ts')}',
+  },
+});
+`,
+        'utf-8',
+      );
+
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await command.parseAsync(['node', 'cli.js', 'emit', '--config', syncConfigPath]);
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      const contractJsonPath = join(outputDir, 'contract.json');
+      expect(existsSync(contractJsonPath)).toBe(true);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'throws error when contract config missing output or types',
+    async () => {
+      const command = createEmitCommand();
+      const invalidConfigPath = join(testDir, 'invalid-contract-config.ts');
+      const adapterPath = resolve(
+        workspaceRoot,
+        'packages/targets/postgres-adapter/dist/exports/cli.js',
+      );
+      const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
+      const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
+      const configTypesPath = resolve(
+        workspaceRoot,
+        'packages/framework/tooling/cli/dist/config-types.js',
+      );
+      const contractPath = resolve(__dirname, 'fixtures/valid-contract.ts');
+
+      // Create config with contract missing output/types (shouldn't happen with defineConfig, but test the error path)
+      writeFileSync(
+        invalidConfigPath,
+        `import { defineConfig } from '${configTypesPath}';
+import postgresAdapter from '${adapterPath}';
+import postgres from '${targetPath}';
+import sql from '${familyPath}';
+import { contract } from '${contractPath}';
+
+// Manually create config without using defineConfig to test error path
+export default {
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+  contract: {
+    source: contract,
+    // Missing output and types to test error path
+  },
+};
+`,
+        'utf-8',
+      );
+
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await expect(
+          command.parseAsync(['node', 'cli.js', 'emit', '--config', invalidConfigPath]),
+        ).rejects.toThrow();
+      } finally {
+        process.chdir(originalCwd);
+      }
+    },
+    timeouts.typeScriptCompilation,
+  );
 });
