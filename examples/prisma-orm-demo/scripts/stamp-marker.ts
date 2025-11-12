@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -7,7 +8,7 @@ import {
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
 import { Client } from 'pg';
-import contract from './contract.json' with { type: 'json' };
+import contract from '../src/prisma-next/contract.json' with { type: 'json' };
 
 const contractData = validateContract<SqlContract>(contract);
 
