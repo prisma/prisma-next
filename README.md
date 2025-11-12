@@ -25,12 +25,29 @@ pnpm install && pnpm build
 # 2. Start database (or however you start a local postgres DB)
 docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:15
 
-# 3. Run the complete demo
-cd examples/todo-app
-pnpm demo  # This does everything: generate, migrate, test
+# 3. Set up and run the demo
+cd examples/prisma-next-demo
+
+# Create .env file with your database connection
+echo 'DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?schema=public' > .env
+
+# Emit the contract (generates contract.json and contract.d.ts)
+pnpm emit
+
+# Seed the database
+pnpm seed
+
+# Run example queries
+pnpm start -- users 10           # Get users with limit
+pnpm start -- user 1             # Get user by ID
+pnpm start -- users-with-posts   # Get users with nested posts
+pnpm start -- budget-violation   # Demonstrate budget enforcement
+
+# Or run the integration tests
+pnpm test
 ```
 
-What you'll see: Type-safe queries, contract verification, and the migration system in action.
+What you'll see: Type-safe queries, contract verification, budget enforcement, and vector similarity search in action.
 
 ## Why This Matters
 
@@ -251,8 +268,8 @@ docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgre
 psql -h localhost -U postgres -c "CREATE TABLE \"user\" (id SERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, active BOOLEAN DEFAULT true, \"createdAt\" TIMESTAMP DEFAULT NOW());"
 
 # Run the example
-cd examples/todo-app
-pnpm generate && pnpm start
+cd examples/prisma-next-demo
+pnpm emit && pnpm seed && pnpm start -- users 10
 ```
 
 ## Common Commands
@@ -443,10 +460,10 @@ pnpm test
 # Test specific package
 cd packages/sql && pnpm test
 
-# Example app utilities
-cd examples/todo-app && pnpm test-planner
-# Or run the end-to-end demo
-cd examples/todo-app && pnpm demo
+# Example app tests
+cd examples/prisma-next-demo && pnpm test
+# Or run example queries
+cd examples/prisma-next-demo && pnpm start -- users 10
 ```
 
 ## Troubleshooting
@@ -462,16 +479,16 @@ pnpm build
 ### Migration Issues
 ```bash
 # Reset everything and start fresh
-cd examples/todo-app
-pnpm reset-db
-pnpm migrate
+cd examples/prisma-next-demo
+# Drop and recreate tables manually, then:
+pnpm seed
 ```
 
 ### Type Errors
 ```bash
-# Regenerate types
-cd examples/todo-app
-pnpm generate
+# Regenerate contract and types
+cd examples/prisma-next-demo
+pnpm emit
 pnpm typecheck
 ```
 
@@ -503,7 +520,8 @@ prisma-next/
 │   ├── sql/               # Query builder and SQL compiler
 │   └── runtime/           # Database runtime
 ├── examples/
-│   └── todo-app/          # Example application with integration tests
+│   ├── prisma-next-demo/  # Native Prisma Next demo with integration tests
+│   └── prisma-orm-demo/   # Prisma ORM compatibility layer demo
 ```
 
 ### Available Scripts
