@@ -24,12 +24,16 @@ async function setupTables() {
   await client.connect();
 
   try {
+    // Drop all tables to reset the database
+    await client.query('drop table if exists "post" cascade');
+    await client.query('drop table if exists "user" cascade');
+
     // Create pgvector extension
     await client.query('create extension if not exists vector');
 
     // Create user table
     await client.query(`
-      create table if not exists "user" (
+      create table "user" (
         id serial primary key,
         email text not null unique,
         "createdAt" timestamptz not null default now()
@@ -38,7 +42,7 @@ async function setupTables() {
 
     // Create post table with embedding column
     await client.query(`
-      create table if not exists "post" (
+      create table "post" (
         id serial primary key,
         title text not null,
         "userId" int4 not null,
@@ -47,9 +51,6 @@ async function setupTables() {
         constraint post_userId_fkey foreign key ("userId") references "user"(id)
       )
     `);
-
-    // Clear existing data
-    await client.query('truncate table "post", "user" restart identity cascade');
   } finally {
     await client.end();
   }
