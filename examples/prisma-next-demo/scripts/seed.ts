@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
+import { Client } from 'pg';
 import { schema, sql } from '../src/prisma/query';
 import { closeRuntime, getRuntime } from '../src/prisma/runtime';
 
@@ -13,7 +14,46 @@ async function collectRows<P extends Plan>(plan: P): Promise<ResultType<P>[]> {
   return rows;
 }
 
+async function setupTables() {
+  const connectionString = process.env['DATABASE_URL'];
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required');
+  }
+
+  const client = new Client({ connectionString });
+  await client.connect();
+
+  try {
+    // Create user table
+    await client.query(`
+      create table if not exists "user" (
+        id serial primary key,
+        email text not null unique,
+        "createdAt" timestamptz not null default now()
+      )
+    `);
+
+    // Create post table
+    await client.query(`
+      create table if not exists "post" (
+        id serial primary key,
+        title text not null,
+        "userId" int4 not null,
+        "createdAt" timestamptz not null default now(),
+        constraint post_userId_fkey foreign key ("userId") references "user"(id)
+      )
+    `);
+
+    // Clear existing data
+    await client.query('truncate table "post", "user" restart identity cascade');
+  } finally {
+    await client.end();
+  }
+}
+
 async function main() {
+  // Setup tables first
+  await setupTables();
   const tables = schema.tables;
   const userTable = tables.user;
   const postTable = tables.post;
