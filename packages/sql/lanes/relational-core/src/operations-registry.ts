@@ -205,9 +205,7 @@ export function attachOperationsToColumnBuilder<
     ColumnMeta,
     JsType,
     Operations
-  > & {
-    [method: string]: (...args: unknown[]) => ColumnBuilder<string, StorageColumn, unknown>;
-  };
+  >;
 
   for (const operation of operations) {
     if (operation.capabilities && operation.capabilities.length > 0) {

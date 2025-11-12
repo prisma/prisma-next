@@ -1,7 +1,10 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 
-export const contract = defineContract<CodecTypes>()
+type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
+
+export const contract = defineContract<AllCodecTypes>()
   .target('postgres')
   .table('user', (t) =>
     t
@@ -16,6 +19,7 @@ export const contract = defineContract<CodecTypes>()
       .column('title', { type: 'pg/text@1', nullable: false })
       .column('userId', { type: 'pg/int4@1', nullable: false })
       .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
+      .column('embedding', { type: 'pg/vector@1', nullable: true })
       .primaryKey(['id'])
       .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),
   )
@@ -59,12 +63,14 @@ export const contract = defineContract<CodecTypes>()
       version: '15.0.0',
     },
     pg: {},
+    pgvector: {},
   })
   .capabilities({
     postgres: {
       lateral: true,
       jsonAgg: true,
       returning: true,
+      'pgvector/cosine': true,
     },
   })
   .build();

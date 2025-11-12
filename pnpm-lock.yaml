@@ -47,6 +47,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/targets/postgres-driver
+      '@prisma-next/extension-pgvector':
+        specifier: workspace:*
+        version: link:../../packages/extensions/pgvector
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../packages/sql/tooling/cli
@@ -200,6 +203,37 @@ importers:
       pg:
         specifier: ^8.11.5
         version: 8.16.3
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite-tsconfig-paths:
+        specifier: ^5.1.4
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
+
+  packages/extensions/pgvector:
+    dependencies:
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../framework/tooling/cli
+      '@prisma-next/sql-operations':
+        specifier: workspace:*
+        version: link:../../sql/operations
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../../sql/lanes/relational-core
+      arktype:
+        specifier: ^2.0.0
+        version: 2.1.26
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -887,6 +921,12 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../packages/framework/tooling/emitter
+      '@prisma-next/extension-pgvector':
+        specifier: workspace:*
+        version: link:../../packages/extensions/pgvector
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../packages/sql/tooling/cli
       '@prisma-next/sql-contract-emitter':
         specifier: workspace:*
         version: link:../../packages/sql/tooling/emitter

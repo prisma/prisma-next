@@ -11,6 +11,7 @@ import {
 import type { ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
+import pgvector from '@prisma-next/extension-pgvector/runtime';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -32,9 +33,10 @@ beforeAll(async () => {
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
   const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+  const pgvectorPath = resolve(__dirname, '../../../packages/extensions/pgvector');
 
   const contractIR = await loadContractFromTs(contractPath);
-  const packs = loadExtensionPacks(adapterPath, []);
+  const packs = loadExtensionPacks(adapterPath, [pgvectorPath]);
   const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
   const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
   const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
@@ -73,7 +75,7 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const runtime = createRuntime({
           context,
           adapter,
@@ -192,7 +194,7 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const runtime = createRuntime({
           context,
           adapter,
@@ -291,7 +293,7 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const runtime = createRuntime({
           context,
           adapter,
@@ -377,7 +379,7 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const runtime = createRuntime({
           context,
           adapter,
@@ -448,7 +450,7 @@ describe('runtime execute integration', () => {
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const runtime = createRuntime({
           context,
           adapter,

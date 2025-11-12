@@ -1,5 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import { defineConfig } from '@prisma-next/cli/config-types';
+import pgvector from '@prisma-next/extension-pgvector/cli';
 import sql from '@prisma-next/family-sql/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
 
@@ -7,5 +8,5 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensions: [],
+  extensions: [pgvector],
 });

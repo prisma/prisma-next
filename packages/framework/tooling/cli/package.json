@@ -52,6 +52,10 @@
     "./pack-assembly": {
       "types": "./dist/pack-assembly.d.ts",
       "import": "./dist/pack-assembly.js"
+    },
+    "./pack-loading": {
+      "types": "./dist/pack-loading.d.ts",
+      "import": "./dist/pack-loading.js"
     }
   }
 }

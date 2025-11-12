@@ -17,6 +17,7 @@ import type {
   CodecTypes as CodecTypesType,
   ColumnBuilder,
   ComputeColumnJsType,
+  OperationTypeSignature,
   OperationTypes,
   OrderBuilder,
   ParamPlaceholder,
@@ -266,10 +267,18 @@ export type SchemaHandle<
 type SchemaReturnType<Contract extends SqlContract<SqlStorage>> = SchemaHandle<
   Contract,
   ExtractCodecTypes<Contract>,
-  OperationTypes
+  ToOperationTypes<ExtractOperationTypes<Contract>>
 >;
 
-type ToOperationTypes<T> = T & OperationTypes;
+type NormalizeOperationTypes<T> = {
+  [TypeId in keyof T]: {
+    [Method in keyof T[TypeId]]: T[TypeId][Method] extends OperationTypeSignature
+      ? T[TypeId][Method]
+      : OperationTypeSignature;
+  };
+};
+
+type ToOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationTypes<T>;
 
 /**
  * Creates a schema handle for building SQL queries.

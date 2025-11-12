@@ -60,7 +60,13 @@ export interface BinaryBuilder<
 }
 
 // Helper aliases for usage sites where the specific column parameters are irrelevant
-export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, OperationTypes>;
+// Accepts any ColumnBuilder regardless of its Operations parameter
+// Note: We use `any` here because TypeScript's variance rules don't allow us to express
+// "any type that extends OperationTypes" in a way that works for assignment.
+// Contract-specific OperationTypes (e.g., PgVectorOperationTypes) are not assignable
+// to the base OperationTypes in generic parameter position, even though they extend it structurally.
+// biome-ignore lint/suspicious/noExplicitAny: AnyColumnBuilder must accept column builders with any operation types
+export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, any>;
 export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
 export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
 
@@ -260,10 +266,10 @@ export type ComputeColumnJsType<
  * Extracts the inferred JsType carried by a ColumnBuilder.
  */
 type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends ColumnBuilder<
-  string,
-  StorageColumn,
+  infer _ColumnName extends string,
+  infer _ColumnMeta extends StorageColumn,
   infer JsType,
-  infer _Ops extends OperationTypes
+  infer _Ops
 >
   ? JsType
   : never;
