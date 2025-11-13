@@ -14,6 +14,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/prefer-object-matcher.mdc` — Prefer object matchers over multiple individual expect().toBe() calls
 - `.cursor/rules/use-ast-factories.mdc` — Use factory functions for creating AST nodes instead of manual object creation
 - `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns (throw errors, don't call process.exit)
+- `.cursor/rules/cli-e2e-test-patterns.mdc` — CLI e2e test fixture patterns using shared fixture app
 
 ## Imports & Layering
 - `.cursor/rules/import-validation.mdc` — Layering rules and exceptions

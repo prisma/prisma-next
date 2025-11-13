@@ -6,105 +6,210 @@ alwaysApply: true
 
 # CLI Error Handling
 
-## Pattern: Throw Errors, Don't Call process.exit()
+## Pattern: Structured Errors + Result Pattern + process.exit()
 
-**CRITICAL**: CLI commands should throw errors instead of calling `process.exit()`. Commander.js automatically handles errors and exits with the appropriate code.
+**CRITICAL**: CLI commands use structured errors (`CliStructuredError`), the Result pattern (`performAction`), and `process.exit()` for exit codes. Commands never throw errors (except unhandled failures that fail fast).
 
-## The Problem
+## The Architecture
 
-Calling `process.exit()` directly in commands:
-- Makes testing difficult (requires mocking `process.exit`)
-- Bypasses Commander.js's error handling
-- Prevents proper error propagation
-- Makes it harder to test error cases
+1. **Structured Errors**: Call sites throw `CliStructuredError` instances with full context (why, fix, docsUrl, etc.)
+2. **Result Pattern**: Commands wrap logic in `performAction()` which only catches `CliStructuredError` instances
+3. **Error Handling**: `handleResult()` processes Results, formats output, and returns exit codes
+4. **Exit**: Commands call `process.exit(exitCode)` directly - never throw errors
+5. **Fail Fast**: Non-structured errors propagate (fail fast) and are caught by Commander.js's `exitOverride`
 
 ## The Solution
 
-**❌ WRONG: Calling process.exit() in commands**
+**✅ CORRECT: Structured errors + Result pattern + process.exit()**
 
 ```typescript
+import { performAction } from '../utils/result';
+import { handleResult } from '../utils/result-handler';
+import { errorContractConfigMissing } from '../utils/cli-errors';
+
 export function createEmitCommand(): Command {
   return new Command('emit')
     .action(async (options) => {
-      try {
-        // ... command logic ...
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error(`Error: ${error.message}`);
-          process.exit(1);  // ❌ Don't do this
+      const flags = parseGlobalFlags(options);
+
+      const result = await performAction(async () => {
+        // Command logic - throw CliStructuredError instances
+        const config = await loadConfig(options.config);
+        if (!config.contract) {
+          throw errorContractConfigMissing({
+            why: 'Config.contract is required for emit',
+          });
         }
-        throw error;
-      }
+        // ... more logic ...
+        return emitResult;
+      });
+
+      // Handle result - formats output and returns exit code
+      const exitCode = handleResult(result, flags, (emitResult) => {
+        // Success output
+        console.log(formatEmitOutput(emitResult, flags));
+      });
+      process.exit(exitCode);
     });
 }
 ```
 
-**✅ CORRECT: Throw errors and let Commander.js handle them**
+**Why?**
+- **Structured errors**: Call sites have full context to provide better error messages, fixes, and metadata
+- **Result pattern**: Clean separation between action logic and error handling
+- **process.exit()**: Commands control exit codes directly, no throwing needed
+- **Fail fast**: Unhandled errors (non-structured) propagate and are caught by Commander.js
+
+## Structured Error Factories
+
+Use factory functions from `utils/cli-errors.ts` to create structured errors:
 
 ```typescript
-export function createEmitCommand(): Command {
-  return new Command('emit')
-    .action(async (options) => {
-      try {
-        // ... command logic ...
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error(`Error: ${error.message}`);
-        }
-        // Let commander.js handle the error (it will exit with code 1)
-        throw error;
-      }
-    });
+import {
+  errorConfigFileNotFound,
+  errorContractConfigMissing,
+  errorDatabaseUrlRequired,
+  errorMarkerMissing,
+  errorHashMismatch,
+} from '../utils/cli-errors';
+
+// Config errors (PN-CLI-4xxx)
+throw errorConfigFileNotFound(configPath);
+throw errorContractConfigMissing({ why: '...' });
+throw errorDatabaseUrlRequired();
+
+// Runtime errors (PN-RTM-3xxx)
+throw errorMarkerMissing();
+throw errorHashMismatch({ expected: '...', actual: '...' });
+```
+
+**Why factory functions?**
+- Type-safe error creation
+- Consistent error structure
+- Call sites have context to provide better messages
+- No fragile string matching in error mapper
+
+## performAction() Behavior
+
+`performAction()` only catches `CliStructuredError` instances:
+
+```typescript
+export async function performAction<T>(fn: () => Promise<T>): Promise<Result<T>> {
+  try {
+    const value = await fn();
+    return ok(value);
+  } catch (error) {
+    // Only catch structured errors - let other errors propagate (fail fast)
+    if (error instanceof CliStructuredError) {
+      return err(error);
+    }
+    // Re-throw non-structured errors to fail fast
+    throw error;
+  }
 }
 ```
+
+**Why?**
+- Structured errors are handled gracefully with formatted output
+- Non-structured errors (bugs, unexpected failures) fail fast with stack traces
+- Clear separation between expected errors and unexpected failures
+
+## handleResult() Behavior
+
+`handleResult()` processes Results and returns exit codes:
+
+```typescript
+export function handleResult<T>(
+  result: Result<T>,
+  flags: GlobalFlags,
+  onSuccess?: (value: T) => void,
+): number {
+  if (result.ok) {
+    if (onSuccess) {
+      onSuccess(result.value);
+    }
+    return 0;
+  }
+
+  // Error case - map to CLI envelope and format output
+  const envelope = mapErrorToCliEnvelope(result.error);
+  // ... format and output error ...
+  return envelope.exitCode ?? 1;
+}
+```
+
+**Why?**
+- Never throws - returns exit code for `process.exit()`
+- Formats output based on flags (JSON vs human-readable)
+- Handles both success and error cases consistently
+
+## Error Mapping
+
+`mapErrorToCliEnvelope()` extracts fields from structured errors:
+
+```typescript
+export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
+  // Structured errors contain all the information we need
+  if (error instanceof CliStructuredError) {
+    const codePrefix = error.domain === 'CLI' ? 'PN-CLI-' : 'PN-RTM-';
+    return {
+      code: `${codePrefix}${error.code}`,
+      domain: error.domain,
+      severity: error.severity,
+      summary: error.message,
+      why: error.why,
+      fix: error.fix,
+      where: error.where,
+      meta: error.meta,
+      docsUrl: error.docsUrl,
+      exitCode: error.exitCode,
+    };
+  }
+  // Fallback for non-structured errors (should be rare)
+  // ...
+}
+```
+
+**Why?**
+- No string matching - direct field extraction
+- Type-safe error handling
+- Call sites define errors, mapper extracts them
 
 ## Testing
 
-**❌ WRONG: Mocking process.exit in tests**
+**✅ CORRECT: Test that commands exit with correct codes**
 
 ```typescript
-let originalExit: typeof process.exit;
-let exitCode: number | null = null;
-
-beforeEach(() => {
-  originalExit = process.exit;
-  exitCode = null;
-  process.exit = vi.fn((code?: number) => {
-    exitCode = code ?? 0;
-  }) as typeof process.exit;
-});
-
-it('handles errors and exits with code 1', async () => {
-  // ... test code ...
-  expect(exitCode).toBe(1);
-});
-```
-
-**✅ CORRECT: Test that errors are thrown**
-
-```typescript
-it('handles errors and throws', async () => {
+it('exits with code 2 for config errors', async () => {
   const command = createEmitCommand();
-  await expect(
-    command.parseAsync(['node', 'cli.js', 'emit', '--contract', invalidPath, '--out', outputDir]),
-  ).rejects.toThrow();
+  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+    throw new Error('process.exit called');
+  });
 
-  expect(consoleErrors.length).toBeGreaterThan(0);
+  await expect(
+    command.parseAsync(['node', 'cli.js', 'emit', '--config', invalidPath]),
+  ).rejects.toThrow('process.exit called');
+
+  expect(exitSpy).toHaveBeenCalledWith(2);
 });
 ```
+
+**Why?**
+- Commands call `process.exit()` directly, so we can spy on it
+- No need to mock Commander.js error handling
+- Clear test expectations
 
 ## Why This Matters
 
-1. **Simpler tests**: No need to mock `process.exit`
-2. **Better error handling**: Commander.js provides consistent error handling
-3. **Proper exit codes**: Commander.js automatically exits with code 1 on errors
-4. **Easier debugging**: Errors propagate naturally through the call stack
-
-## Exception: CLI Entry Point
-
-The main CLI entry point (`cli.ts`) may still need to handle `process.exit` for cases where Commander.js doesn't catch errors (e.g., unhandled promise rejections). However, individual commands should throw errors.
+1. **Better error messages**: Call sites have context to provide actionable fixes
+2. **Type safety**: Structured errors are type-safe, no string matching
+3. **Clean separation**: Action logic separate from error handling
+4. **Fail fast**: Unhandled errors propagate with stack traces
+5. **Testable**: Easy to test exit codes and error output
 
 ## Related Patterns
 
 - `.cursor/rules/testing-guide.mdc`: Testing best practices
-- Commander.js documentation: Error handling in commands
+- `packages/framework/tooling/cli/src/utils/cli-errors.ts`: Structured error factories
+- `packages/framework/tooling/cli/src/utils/result.ts`: Result pattern utilities
+- `packages/framework/tooling/cli/src/utils/result-handler.ts`: Result processing

@@ -44,6 +44,12 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - This prevents cyclic dependencies and keeps tests adapter-agnostic
 - See `AGENT_ONBOARDING.md` for details
 
+**CLI E2E Test Fixtures:**
+- Use shared `cli-e2e-test-app` directory with static `package.json` at root
+- Organize fixtures by command in subdirectories (e.g., `fixtures/emit/`, `fixtures/db-verify/`)
+- Use `setupTestDirectoryFromFixtures()` helper to create ephemeral test directories
+- See `.cursor/rules/cli-e2e-test-patterns.mdc` for details
+
 ## Common Patterns
 
 ### Shared Test Utilities
