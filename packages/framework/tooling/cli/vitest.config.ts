@@ -20,6 +20,10 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
         'src/cli.ts',
+        // Exclude formatting/wrangling files - these are tested via e2e tests
+        'src/utils/output.ts',
+        'src/utils/command-helpers.ts',
+        'src/utils/global-flags.ts',
       ],
       thresholds: {
         lines: 95,
