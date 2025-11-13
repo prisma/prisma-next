@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emitContract } from '../../src/api/emit-contract';
@@ -58,7 +59,6 @@ ${contractField}
 
 describe('emitContract API', () => {
   let testDir: string;
-  let _outputDir: string;
   let configPath: string;
 
   beforeEach(() => {
@@ -67,7 +67,6 @@ describe('emitContract API', () => {
       `prisma-next-api-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     );
     mkdirSync(testDir, { recursive: true });
-    _outputDir = join(testDir, 'output');
     configPath = join(testDir, 'prisma-next.config.ts');
 
     // Create default config file with absolute paths
@@ -118,7 +117,7 @@ describe('emitContract API', () => {
       );
 
       const result = await emitContract({
-        contractIR: contractIR as typeof contractIR,
+        contractIR: contractIR as ContractIR,
         outputJsonPath: resolve(contractConfig.output),
         outputDtsPath: resolve(contractConfig.types),
         targetFamily: config.family.hook,
@@ -192,7 +191,7 @@ describe('emitContract API', () => {
       );
 
       const result = await emitContract({
-        contractIR: contractIR as typeof contractIR,
+        contractIR: contractIR as ContractIR,
         outputJsonPath: resolve(contractConfig.output),
         outputDtsPath: resolve(contractConfig.types),
         targetFamily: config.family.hook,
@@ -255,7 +254,7 @@ describe('emitContract API', () => {
       );
 
       const result = await emitContract({
-        contractIR: contractIR as typeof contractIR,
+        contractIR: contractIR as ContractIR,
         outputJsonPath: resolve(contractConfig.output),
         outputDtsPath: resolve(contractConfig.types),
         targetFamily: config.family.hook,
@@ -310,7 +309,7 @@ describe('emitContract API', () => {
       );
 
       const result = await emitContract({
-        contractIR: contractIR as typeof contractIR,
+        contractIR: contractIR as ContractIR,
         outputJsonPath: resolve(contractConfig.output),
         outputDtsPath: resolve(contractConfig.types),
         targetFamily: config.family.hook,
@@ -365,7 +364,7 @@ describe('emitContract API', () => {
       );
 
       const result = await emitContract({
-        contractIR: contractIR as typeof contractIR,
+        contractIR: contractIR as ContractIR,
         outputJsonPath: resolve(contractConfig.output),
         outputDtsPath: resolve(contractConfig.types),
         targetFamily: config.family.hook,

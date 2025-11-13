@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -97,9 +98,7 @@ function createQueryRunnerFactoryCode(): string {
 
 describe('verifyDatabase API', () => {
   let testDir: string;
-  let outputDir: string;
   let configPath: string;
-  let _contractJsonPath: string;
   let contract: SqlContract<SqlStorage>;
 
   beforeEach(async () => {
@@ -108,9 +107,7 @@ describe('verifyDatabase API', () => {
       `prisma-next-verify-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     );
     mkdirSync(testDir, { recursive: true });
-    outputDir = join(testDir, 'output');
     configPath = join(testDir, 'prisma-next.config.ts');
-    _contractJsonPath = join(outputDir, 'contract.json');
 
     // Create config file
     writeFileSync(configPath, createConfigFileContent(), 'utf-8');
@@ -133,9 +130,7 @@ describe('verifyDatabase API', () => {
       ? config.family.stripMappings(contractRaw)
       : contractRaw;
 
-    const contractIR = config.family.validateContractIR(
-      contractWithoutMappings,
-    ) as SqlContract<SqlStorage>;
+    const contractIR = config.family.validateContractIR(contractWithoutMappings);
 
     // Emit contract to get proper hashes
     const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
@@ -149,7 +144,7 @@ describe('verifyDatabase API', () => {
     );
 
     const emitResult = await emitContract({
-      contractIR,
+      contractIR: contractIR as ContractIR,
       outputJsonPath: resolve(contractConfig.output ?? 'src/prisma/contract.json'),
       outputDtsPath: resolve(contractConfig.types ?? 'src/prisma/contract.d.ts'),
       targetFamily: config.family.hook,
