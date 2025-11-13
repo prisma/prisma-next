@@ -35,12 +35,24 @@ export class CliStructuredError extends Error {
     this.code = code;
     this.domain = options?.domain ?? 'CLI';
     this.severity = options?.severity ?? 'error';
-    this.why = options?.why;
-    this.fix = options?.fix;
-    this.where = options?.where;
-    this.meta = options?.meta;
-    this.docsUrl = options?.docsUrl;
-    this.exitCode = options?.exitCode;
+    if (options?.why !== undefined) {
+      this.why = options.why;
+    }
+    if (options?.fix !== undefined) {
+      this.fix = options.fix;
+    }
+    if (options?.where !== undefined) {
+      this.where = options.where;
+    }
+    if (options?.meta !== undefined) {
+      this.meta = options.meta;
+    }
+    if (options?.docsUrl !== undefined) {
+      this.docsUrl = options.docsUrl;
+    }
+    if (options?.exitCode !== undefined) {
+      this.exitCode = options.exitCode;
+    }
   }
 }
 
@@ -59,9 +71,7 @@ export function errorConfigFileNotFound(
 ): CliStructuredError {
   return new CliStructuredError('4001', 'Config file not found', {
     domain: 'CLI',
-    why:
-      options?.why ??
-      (configPath ? `Config file not found at ${configPath}` : 'Config file not found'),
+    ...(options?.why ? { why: options.why } : { why: 'Config file not found' }),
     fix: "Run 'prisma-next init' to create a config file",
     docsUrl: 'https://prisma-next.dev/docs/cli/config',
     exitCode: 2,
@@ -98,7 +108,7 @@ export function errorContractValidationFailed(
     why: reason,
     fix: 'Check your contract file for errors',
     docsUrl: 'https://prisma-next.dev/docs/contracts',
-    where: options?.where,
+    ...(options?.where ? { where: options.where } : {}),
   });
 }
 
@@ -256,10 +266,10 @@ export function errorRuntime(
 ): CliStructuredError {
   return new CliStructuredError('3000', summary, {
     domain: 'RTM',
-    why: options?.why ?? 'Verification failed',
-    fix: options?.fix ?? 'Check contract and database state',
+    ...(options?.why ? { why: options.why } : { why: 'Verification failed' }),
+    ...(options?.fix ? { fix: options.fix } : { fix: 'Check contract and database state' }),
     exitCode: 1,
-    meta: options?.meta,
+    ...(options?.meta ? { meta: options.meta } : {}),
   });
 }
 

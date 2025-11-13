@@ -299,14 +299,14 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - Parses arguments and routes to command handlers
 - Handles global flags (`--help`, `--version`)
 - Exit codes: 0 (success), 1 (runtime error), 2 (usage/config error)
-- **Error Handling**: Uses `exitOverride()` to map error envelopes to appropriate exit codes
+- **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
 - **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
 - **Legacy Commands**: Legacy `emit` command is available as alias alongside canonical `contract emit`
 
 ### Contract Emit Command (`commands/contract-emit.ts`)
 - Canonical command implementation using commander
 - Supports global flags (JSON, verbosity, color, timestamps)
-- **Error Handling**: Maps errors to PN-CLI-4xxx envelopes with Why/Fix/Where and docs URLs. Throws errors instead of calling `process.exit()`. Commander.js handles errors and exits with appropriate codes (1 for runtime errors, 2 for usage/config errors).
+- **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern (`performAction`), and `process.exit()`. Commands wrap logic in `performAction()`, process results with `handleResult()`, and call `process.exit(exitCode)` directly. See `.cursor/rules/cli-error-handling.mdc` for details.
 - Loads the user's config module (`prisma-next.config.ts`)
 - Resolves contract from config:
   - Uses `config.contract.source` (supports sync and async functions)
@@ -326,17 +326,21 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
   - Returns result with hashes, file paths, and timings
   - Used by CLI command internally
 
-### Error Handling (`utils/errors.ts`)
-- **Error Envelopes**: All errors are mapped to standardized `CliErrorEnvelope` with PN-CLI-4xxx codes
-- **Exit Code Mapping**:
-  - Usage/config errors (PN-CLI-4001, PN-CLI-4002) → exit code 2
-  - Runtime errors → exit code 1
+### Error Handling (`utils/errors.ts`, `utils/cli-errors.ts`, `utils/result.ts`, `utils/result-handler.ts`)
+- **Structured Errors**: Call sites throw `CliStructuredError` instances with full context (why, fix, docsUrl, etc.)
+- **Result Pattern**: Commands wrap logic in `performAction()` which only catches `CliStructuredError` instances
+- **Error Mapping**: `mapErrorToCliEnvelope()` extracts fields from structured errors (no string matching)
+- **Result Processing**: `handleResult()` processes Results, formats output, and returns exit codes
+- **Exit Codes**:
+  - Usage/config errors (PN-CLI-4001-4007) → exit code 2
+  - Runtime errors (PN-RTM-3xxx) → exit code 1
   - Success → exit code 0
-- **Commander.js Integration**: Uses `exitOverride()` to handle custom exit codes from error envelopes
+- **Fail Fast**: Non-structured errors propagate and are caught by Commander.js's `exitOverride()` with stack traces
+- See `.cursor/rules/cli-error-handling.mdc` for detailed patterns
 
 ### Legacy Emit Command (`commands/emit.ts`)
 - Command implementation using commander
-- **Error Handling**: Throws errors instead of calling `process.exit()`. Commander.js handles errors and exits with code 1 automatically.
+- **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern (`performAction`), and `process.exit()`. See `.cursor/rules/cli-error-handling.mdc` for details.
 - Loads the user's config module (`prisma-next.config.ts`)
 - Resolves contract from config:
   - If `config.contract.source` is a function, calls it (supports sync and async functions)

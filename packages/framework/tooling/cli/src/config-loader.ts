@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import { loadConfig as loadConfigC12 } from 'c12';
 import type { PrismaNextConfig } from './config-types';
 import {
@@ -28,9 +27,9 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
 
     // Check if config is missing or empty (c12 may return empty object when file doesn't exist)
     if (!result.config || Object.keys(result.config).length === 0) {
-      const cwd = process.cwd();
-      const expectedPath = configPath || resolve(cwd, 'prisma-next.config.ts');
-      throw errorConfigFileNotFound(expectedPath);
+      // Use c12's configFile if available, otherwise use explicit configPath, otherwise omit path
+      const displayPath = result.configFile || configPath;
+      throw errorConfigFileNotFound(displayPath);
     }
 
     // Validate config structure
@@ -54,9 +53,9 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
         error.message.includes('Cannot find') ||
         error.message.includes('ENOENT')
       ) {
-        const cwd = process.cwd();
-        const expectedPath = configPath || resolve(cwd, 'prisma-next.config.ts');
-        throw errorConfigFileNotFound(expectedPath, {
+        // Don't assume path - c12 has its own search logic
+        // Only include path if explicitly provided via --config flag
+        throw errorConfigFileNotFound(configPath, {
           why: error.message,
         });
       }
