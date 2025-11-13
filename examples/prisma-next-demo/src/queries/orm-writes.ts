@@ -1,15 +1,12 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';
-import { getRuntime } from '../prisma/runtime';
 
-export async function ormCreateUser(email: string, runtime?: Runtime) {
-  const rt = runtime ?? getRuntime();
-
+export async function ormCreateUser(email: string, runtime: Runtime) {
   const plan = orm.user().create({ email });
 
   // Drain the result stream (DML operations don't return rows without RETURNING)
-  for await (const _row of rt.execute(plan)) {
+  for await (const _row of runtime.execute(plan)) {
     // DML operations without RETURNING don't yield rows
   }
 
@@ -18,15 +15,13 @@ export async function ormCreateUser(email: string, runtime?: Runtime) {
   return 1;
 }
 
-export async function ormUpdateUser(userId: number, newEmail: string, runtime?: Runtime) {
-  const rt = runtime ?? getRuntime();
-
+export async function ormUpdateUser(userId: number, newEmail: string, runtime: Runtime) {
   const plan = orm
     .user()
     .update((u) => u.id.eq(param('userId')), { email: newEmail }, { params: { userId } });
 
   // Drain the result stream (DML operations don't return rows without RETURNING)
-  for await (const _row of rt.execute(plan)) {
+  for await (const _row of runtime.execute(plan)) {
     // DML operations without RETURNING don't yield rows
   }
 
@@ -35,13 +30,11 @@ export async function ormUpdateUser(userId: number, newEmail: string, runtime?: 
   return 1;
 }
 
-export async function ormDeleteUser(userId: number, runtime?: Runtime) {
-  const rt = runtime ?? getRuntime();
-
+export async function ormDeleteUser(userId: number, runtime: Runtime) {
   const plan = orm.user().delete((u) => u.id.eq(param('userId')), { params: { userId } });
 
   // Drain the result stream (DML operations don't return rows without RETURNING)
-  for await (const _row of rt.execute(plan)) {
+  for await (const _row of runtime.execute(plan)) {
     // DML operations without RETURNING don't yield rows
   }
 

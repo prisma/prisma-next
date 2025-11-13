@@ -1,11 +1,8 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';
-import { getRuntime } from '../prisma/runtime';
 import { collect } from './utils';
 
-export async function ormGetUsers(limit = 10, runtime?: Runtime) {
-  const rt = runtime ?? getRuntime();
-
+export async function ormGetUsers(limit, runtime: Runtime) {
   const plan = orm
     .user()
     .select((u) => ({
@@ -17,5 +14,5 @@ export async function ormGetUsers(limit = 10, runtime?: Runtime) {
     .take(limit)
     .findMany();
 
-  return collect(rt.execute(plan));
+  return collect(runtime.execute(plan));
 }
