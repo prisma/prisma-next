@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ControlPlaneDriver, DriverDescriptor } from '@prisma-next/control-plane/types';
 import type { ExtensionPackManifest } from '@prisma-next/control-plane/pack-manifest-types';
+import type { ControlPlaneDriver, DriverDescriptor } from '@prisma-next/control-plane/types';
 import { type } from 'arktype';
 import { Client } from 'pg';
 

@@ -1,5 +1,5 @@
-import { type } from 'arktype';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import { type } from 'arktype';
 
 // Re-export for backward compatibility
 export type { ContractMarkerRecord } from '@prisma-next/contract/types';
