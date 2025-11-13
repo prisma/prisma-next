@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -21,11 +22,13 @@ import {
   extractOperationTypeImports,
 } from '../src/pack-assembly';
 import {
-  createContractFile,
   executeCommand,
   setupCommandMocks,
-  setupTestDirectory,
+  setupTestDirectoryFromFixtures,
 } from './utils/test-helpers';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixturesDir = join(__dirname, 'db-verify-app/fixtures');
 
 /**
  * Emits the contract to disk using the config file.
@@ -76,62 +79,6 @@ async function emitContractFromConfig(
   return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
 
-function createConfigFileContent(
-  includeContract = true,
-  outputOverride?: string,
-  queryRunnerFactoryCode?: string,
-  dbUrl?: string,
-): string {
-  const contractImport = includeContract ? `import { contract } from './contract';` : '';
-  const contractField = includeContract
-    ? `  contract: {
-    source: contract,
-    output: '${outputOverride ?? 'output/contract.json'}',
-    types: '${outputOverride ? outputOverride.replace('.json', '.d.ts') : 'output/contract.d.ts'}',
-  },`
-    : '';
-
-  const dbField = queryRunnerFactoryCode
-    ? `  db: {
-    ${dbUrl ? `url: '${dbUrl}',` : ''}
-    queryRunnerFactory: ${queryRunnerFactoryCode},
-  },`
-    : '';
-
-  return `import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
-${contractImport}
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-${contractField}${dbField}
-});
-`;
-}
-
-function createQueryRunnerFactoryCode(): string {
-  return `async (url) => {
-    const pg = await import('pg');
-    const { Client } = pg;
-    const client = new Client({ connectionString: url });
-    await client.connect();
-    return {
-      query: async (sql, params) => {
-        const result = await client.query(sql, params);
-        return { rows: result.rows };
-      },
-      close: async () => {
-        await client.end();
-      },
-    };
-  }`;
-}
-
 describe('db verify command (e2e)', () => {
   let testDir: string;
   let configPath: string;
@@ -146,19 +93,10 @@ describe('db verify command (e2e)', () => {
     consoleOutput = mocks.consoleOutput;
     consoleErrors = mocks.consoleErrors;
     cleanupMocks = mocks.cleanup;
-
-    // Set up test directory with contract file
-    const testSetup = setupTestDirectory();
-    testDir = testSetup.testDir;
-    configPath = testSetup.configPath;
-    cleanupDir = testSetup.cleanup;
-
-    // Create contract file in temp directory
-    createContractFile(testDir);
   });
 
   afterEach(() => {
-    cleanupDir();
+    cleanupDir?.();
     cleanupMocks();
   });
 
@@ -167,14 +105,15 @@ describe('db verify command (e2e)', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          // Update config with queryRunnerFactory and db.url
-          const configContent = createConfigFileContent(
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
-            connectionString,
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixturesDir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
           );
-          writeFileSync(configPath, configContent, 'utf-8');
+          testDir = testSetup.testDir;
+          configPath = testSetup.configPath;
+          cleanupDir = testSetup.cleanup;
 
           // Emit contract using the config
           const contract = await emitContractFromConfig(configPath, testDir);
@@ -220,21 +159,22 @@ describe('db verify command (e2e)', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixturesDir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          testDir = testSetup.testDir;
+          configPath = testSetup.configPath;
+          cleanupDir = testSetup.cleanup;
+
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table but don't write marker
             await executeStatement(client, ensureSchemaStatement);
             await executeStatement(client, ensureTableStatement);
             // withClient will close the client after this callback returns
           });
-
-          // Update config with queryRunnerFactory and db.url (after client is closed)
-          const configContent = createConfigFileContent(
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
-            connectionString,
-          );
-          writeFileSync(configPath, configContent, 'utf-8');
 
           // Emit contract using the config
           await emitContractFromConfig(configPath, testDir);
@@ -269,6 +209,19 @@ describe('db verify command (e2e)', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixturesDir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          testDir = testSetup.testDir;
+          configPath = testSetup.configPath;
+          cleanupDir = testSetup.cleanup;
+
+          // Emit contract using the config
+          const contract = await emitContractFromConfig(configPath, testDir);
+
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table
             await executeStatement(client, ensureSchemaStatement);
@@ -284,18 +237,6 @@ describe('db verify command (e2e)', () => {
             await executeStatement(client, write.insert);
             // withClient will close the client after this callback returns
           });
-
-          // Update config with queryRunnerFactory and db.url (after client is closed)
-          const configContent = createConfigFileContent(
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
-            connectionString,
-          );
-          writeFileSync(configPath, configContent, 'utf-8');
-
-          // Emit contract using the config
-          const contract = await emitContractFromConfig(configPath, testDir);
 
           const command = createDbVerifyCommand();
           const originalCwd = process.cwd();
@@ -341,21 +282,22 @@ describe('db verify command (e2e)', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixturesDir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          testDir = testSetup.testDir;
+          configPath = testSetup.configPath;
+          cleanupDir = testSetup.cleanup;
+
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table but don't write marker
             await executeStatement(client, ensureSchemaStatement);
             await executeStatement(client, ensureTableStatement);
             // withClient will close the client after this callback returns
           });
-
-          // Update config with queryRunnerFactory (after client is closed)
-          const configContent = createConfigFileContent(
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
-            connectionString,
-          );
-          writeFileSync(configPath, configContent, 'utf-8');
 
           // Emit contract using the config
           await emitContractFromConfig(configPath, testDir);
@@ -393,6 +335,19 @@ describe('db verify command (e2e)', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
+          // Set up test directory from fixtures with config that has db.url but no queryRunnerFactory
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixturesDir,
+            'prisma-next.config.no-query-runner.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          testDir = testSetup.testDir;
+          configPath = testSetup.configPath;
+          cleanupDir = testSetup.cleanup;
+
+          // Emit contract using the config
+          const contract = await emitContractFromConfig(configPath, testDir);
+
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table
             await executeStatement(client, ensureSchemaStatement);
@@ -409,18 +364,6 @@ describe('db verify command (e2e)', () => {
             // withClient will close the client after this callback returns
           });
 
-          // Create config WITHOUT queryRunnerFactory (after client is closed)
-          const configContent = createConfigFileContent(
-            true,
-            undefined,
-            undefined,
-            connectionString,
-          );
-          writeFileSync(configPath, configContent, 'utf-8');
-
-          // Emit contract using the config
-          const contract = await emitContractFromConfig(configPath, testDir);
-
           const command = createDbVerifyCommand();
           const originalCwd = process.cwd();
           try {
@@ -428,12 +371,7 @@ describe('db verify command (e2e)', () => {
             // Commands don't throw - they call process.exit() with non-zero exit code
             // executeCommand will catch the process.exit error and re-throw for non-zero codes
             await expect(
-              executeCommand(command, [
-                '--db',
-                connectionString,
-                '--config',
-                'prisma-next.config.ts',
-              ]),
+              executeCommand(command, ['--config', 'prisma-next.config.ts']),
             ).rejects.toThrow('process.exit called');
           } finally {
             process.chdir(originalCwd);
@@ -441,7 +379,7 @@ describe('db verify command (e2e)', () => {
 
           const errorOutput = consoleErrors.join('\n');
           expect(errorOutput).toContain('PN-CLI-4006');
-          expect(errorOutput).toContain('Query runner factory is required');
+          expect(errorOutput).toContain('db.queryRunnerFactory is required');
           expect(errorOutput).toContain('Add db.queryRunnerFactory to prisma-next.config.ts');
         },
         { acceleratePort: 54082, databasePort: 54083, shadowDatabasePort: 54084 },
@@ -455,42 +393,15 @@ describe('db verify command (e2e)', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          // Create config with queryRunnerFactory but family without verify.readMarkerSql
-          // This test needs a custom family descriptor, so we use package imports but create a custom family
-          const queryRunnerFactoryCode = createQueryRunnerFactoryCode();
-          const configContent = `import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sqlTargetFamilyHook from '@prisma-next/sql-contract-emitter';
-import { contract } from './contract';
-
-// Create family descriptor without verify.readMarkerSql
-const sqlFamilyWithoutVerify = {
-  kind: 'family' as const,
-  id: 'sql',
-  hook: sqlTargetFamilyHook,
-  convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
-  validateContractIR: (contract: unknown) => contract,
-  // verify property is missing
-};
-
-export default defineConfig({
-  family: sqlFamilyWithoutVerify,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-  contract: {
-    source: contract,
-    output: 'output/contract.json',
-    types: 'output/contract.d.ts',
-  },
-  db: {
-    url: '${connectionString}',
-    queryRunnerFactory: ${queryRunnerFactoryCode},
-  },
-});
-`;
-          writeFileSync(configPath, configContent, 'utf-8');
+          // Set up test directory from fixtures with config that has family without verify
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixturesDir,
+            'prisma-next.config.no-verify.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          testDir = testSetup.testDir;
+          configPath = testSetup.configPath;
+          cleanupDir = testSetup.cleanup;
 
           // Emit contract using the config
           const contract = await emitContractFromConfig(configPath, testDir);

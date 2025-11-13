@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Command } from 'commander';
@@ -122,7 +122,55 @@ export function setupCommandMocks(): {
 }
 
 /**
+ * Sets up a test directory by copying files from a fixture directory.
+ * Optionally copies a specific config file and replaces placeholders.
+ * Returns paths and cleanup function.
+ */
+export function setupTestDirectoryFromFixtures(
+  fixturesDir: string,
+  configFileName = 'prisma-next.config.ts',
+  replacements?: Record<string, string>,
+) {
+  const testDir = createTestDir();
+  const outputDir = join(testDir, 'output');
+  mkdirSync(outputDir, { recursive: true });
+
+  // Copy contract.ts
+  const contractPath = join(testDir, 'contract.ts');
+  copyFileSync(join(fixturesDir, 'contract.ts'), contractPath);
+
+  // Copy package.json if it exists
+  const fixturePackageJson = join(fixturesDir, 'package.json');
+  if (existsSync(fixturePackageJson)) {
+    copyFileSync(fixturePackageJson, join(testDir, 'package.json'));
+  }
+
+  // Copy and process config file
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  const fixtureConfigPath = join(fixturesDir, configFileName);
+  if (existsSync(fixtureConfigPath)) {
+    let configContent = readFileSync(fixtureConfigPath, 'utf-8');
+    // Replace placeholders if provided
+    if (replacements) {
+      for (const [key, value] of Object.entries(replacements)) {
+        configContent = configContent.replace(new RegExp(key, 'g'), value);
+      }
+    }
+    writeFileSync(configPath, configContent, 'utf-8');
+  }
+
+  const cleanup = () => {
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  };
+
+  return { testDir, contractPath, outputDir, configPath, cleanup };
+}
+
+/**
  * Sets up a test directory with contract.ts file and returns paths.
+ * @deprecated Use setupTestDirectoryFromFixtures instead
  */
 export function setupTestDirectory(): {
   testDir: string;
