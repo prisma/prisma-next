@@ -1,6 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadConfig } from '../config-loader';
+import {
+  errorDatabaseUrlRequired,
+  errorFamilyReadMarkerSqlRequired,
+  errorFileNotFound,
+  errorQueryRunnerFactoryRequired,
+  errorUnexpected,
+} from '../utils/cli-errors';
 import { parseContractMarkerRow } from '../utils/marker-parser';
 
 export interface VerifyDatabaseOptions {
@@ -101,23 +108,31 @@ export async function verifyDatabase(
     // Resolve database URL
     const dbUrl = options.dbUrl ?? config.db?.url;
     if (!dbUrl) {
-      throw new Error(
-        'Database URL is required. Provide --db flag or config.db.url in prisma-next.config.ts',
-      );
+      throw errorDatabaseUrlRequired();
     }
 
     // Check for queryRunnerFactory
     if (!config.db?.queryRunnerFactory) {
-      throw new Error(
-        'Config.db.queryRunnerFactory is required for db verify. Provide a factory function that returns a query runner.',
-      );
+      throw errorQueryRunnerFactoryRequired();
     }
 
     // Load contract from emitted artifacts
     // Resolve contract path relative to current working directory (project root)
     const contractPath = config.contract?.output ?? 'src/prisma/contract.json';
     const contractJsonPath = resolve(contractPath);
-    const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+    let contractJsonContent: string;
+    try {
+      contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+    } catch (error) {
+      if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+        throw errorFileNotFound(contractJsonPath, {
+          why: `Contract file not found at ${contractJsonPath}`,
+        });
+      }
+      throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
     const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
     // Validate contract using family validator
@@ -132,7 +147,10 @@ export async function verifyDatabase(
       typeof contractIR.coreHash !== 'string' ||
       typeof contractIR.target !== 'string'
     ) {
-      throw new Error('Invalid contract: missing coreHash or target');
+      throw errorUnexpected('Invalid contract structure', {
+        why: 'Contract is missing required fields: coreHash or target',
+        fix: 'Re-emit the contract using `prisma-next contract emit`',
+      });
     }
 
     // Extract contract hashes and target
@@ -149,9 +167,7 @@ export async function verifyDatabase(
     try {
       // Get marker SQL from family verify helper
       if (!config.family.verify?.readMarkerSql) {
-        throw new Error(
-          'Family verify.readMarkerSql is required for db verify. The family must provide a readMarkerSql() function.',
-        );
+        throw errorFamilyReadMarkerSqlRequired();
       }
 
       const markerStatement = config.family.verify.readMarkerSql();
@@ -214,7 +230,9 @@ export async function verifyDatabase(
       // Parse marker row
       const markerRow = queryResult.rows[0];
       if (!markerRow) {
-        throw new Error('Unexpected: query returned rows but first row is undefined');
+        throw errorUnexpected('Query returned rows but first row is undefined', {
+          why: 'Database query returned unexpected result structure',
+        });
       }
       const marker = parseContractMarkerRow(markerRow);
 

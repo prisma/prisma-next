@@ -2,6 +2,12 @@ import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { verifyDatabase } from '../api/verify-database';
 import { loadConfig } from '../config-loader';
+import {
+  errorHashMismatch,
+  errorMarkerMissing,
+  errorRuntime,
+  errorTargetMismatch,
+} from '../utils/cli-errors';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatStyledHeader,
@@ -9,14 +15,8 @@ import {
   formatVerifyJson,
   formatVerifyOutput,
 } from '../utils/output';
-import { wrapAsync } from '../utils/result';
-import { handleResultOrThrow } from '../utils/result-handler';
-import {
-  errorMarkerMissing,
-  errorHashMismatch,
-  errorTargetMismatch,
-  errorRuntime,
-} from '../utils/cli-errors';
+import { performAction } from '../utils/result';
+import { handleResult } from '../utils/result-handler';
 
 interface DbVerifyOptions {
   readonly db?: string;
@@ -52,7 +52,7 @@ export function createDbVerifyCommand(): Command {
     .action(async (options: DbVerifyOptions) => {
       const flags = parseGlobalFlags(options);
 
-      const result = await wrapAsync(async () => {
+      const result = await performAction(async () => {
         // Load config to get paths for header
         const config = await loadConfig(options.config);
         const configPath = options.config || './prisma-next.config.ts';
@@ -107,8 +107,8 @@ export function createDbVerifyCommand(): Command {
         return verifyResult;
       });
 
-      // Handle result - formats output and throws if error
-      handleResultOrThrow(result, flags, (verifyResult) => {
+      // Handle result - formats output and returns exit code
+      const exitCode = handleResult(result, flags, (verifyResult) => {
         // Output based on flags
         if (flags.json === 'object') {
           // JSON output to stdout
@@ -125,6 +125,7 @@ export function createDbVerifyCommand(): Command {
           }
         }
       });
+      process.exit(exitCode);
     });
 
   return command;

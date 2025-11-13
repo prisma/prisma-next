@@ -9,6 +9,7 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../pack-assembly';
+import { errorContractConfigMissing } from '../utils/cli-errors';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatEmitJson,
@@ -16,9 +17,8 @@ import {
   formatStyledHeader,
   formatSuccessMessage,
 } from '../utils/output';
-import { wrapAsync } from '../utils/result';
-import { handleResultOrThrow } from '../utils/result-handler';
-import { errorContractConfigMissing } from '../utils/cli-errors';
+import { performAction } from '../utils/result';
+import { handleResult } from '../utils/result-handler';
 
 interface ContractEmitOptions {
   readonly config?: string;
@@ -52,7 +52,7 @@ export function createContractEmitCommand(): Command {
     .action(async (options: ContractEmitOptions) => {
       const flags = parseGlobalFlags(options);
 
-      const result = await wrapAsync(async () => {
+      const result = await performAction(async () => {
         // Load config
         const config = await loadConfig(options.config);
 
@@ -136,8 +136,8 @@ export function createContractEmitCommand(): Command {
         return emitResult;
       });
 
-      // Handle result - formats output and throws if error
-      handleResultOrThrow(result, flags, (emitResult) => {
+      // Handle result - formats output and returns exit code
+      const exitCode = handleResult(result, flags, (emitResult) => {
         // Output based on flags
         if (flags.json === 'object') {
           // JSON output to stdout
@@ -154,6 +154,7 @@ export function createContractEmitCommand(): Command {
           }
         }
       });
+      process.exit(exitCode);
     });
 
   return command;

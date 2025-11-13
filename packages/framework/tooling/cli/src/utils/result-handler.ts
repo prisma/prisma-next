@@ -5,18 +5,19 @@ import type { Result } from './result';
 
 /**
  * Processes a CLI command result, handling both success and error cases.
- * Formats output appropriately and exits with the correct exit code.
+ * Formats output appropriately and returns the exit code.
+ * Never throws - returns exit code for commands to use with process.exit().
  *
  * @param result - The result from a CLI command
  * @param flags - Global flags for output formatting
  * @param onSuccess - Optional callback for successful results (for custom success output)
- * @returns The exit code that should be used (or undefined if command should continue)
+ * @returns The exit code that should be used (0 for success, non-zero for errors)
  */
 export function handleResult<T>(
   result: Result<T>,
   flags: GlobalFlags,
   onSuccess?: (value: T) => void,
-): number | undefined {
+): number {
   if (result.ok) {
     // Success case
     if (onSuccess) {
@@ -37,46 +38,6 @@ export function handleResult<T>(
     console.error(formatErrorOutput(envelope, flags));
   }
 
-  // Return exit code for Commander.js to use
+  // Return exit code for commands to use with process.exit()
   return envelope.exitCode ?? 1;
-}
-
-/**
- * Processes a CLI command result and throws an error with exit code attached.
- * This is used when you need to throw the error for Commander.js to handle.
- * The error output has already been formatted and displayed.
- *
- * @param result - The result from a CLI command
- * @param flags - Global flags for output formatting
- * @param onSuccess - Optional callback for successful results
- * @throws Error with exitCode property if result is an error
- */
-export function handleResultOrThrow<T>(
-  result: Result<T>,
-  flags: GlobalFlags,
-  onSuccess?: (value: T) => void,
-): T {
-  if (result.ok) {
-    if (onSuccess) {
-      onSuccess(result.value);
-    }
-    return result.value;
-  }
-
-  // Error case - map to CLI envelope
-  const envelope = mapErrorToCliEnvelope(result.error);
-
-  // Output error based on flags
-  if (flags.json === 'object') {
-    // JSON error to stderr
-    console.error(formatErrorJson(envelope));
-  } else {
-    // Human-readable error to stderr
-    console.error(formatErrorOutput(envelope, flags));
-  }
-
-  // Throw error with exit code attached for Commander.js
-  const cliError = new Error(envelope.summary);
-  (cliError as { exitCode?: number }).exitCode = envelope.exitCode ?? 1;
-  throw cliError;
 }

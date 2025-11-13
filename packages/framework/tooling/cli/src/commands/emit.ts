@@ -12,8 +12,8 @@ import {
 } from '../pack-assembly';
 import { parseGlobalFlags } from '../utils/global-flags';
 import { formatStyledHeader, formatSuccessMessage } from '../utils/output';
-import { wrapAsync } from '../utils/result';
-import { handleResultOrThrow } from '../utils/result-handler';
+import { performAction } from '../utils/result';
+import { handleResult } from '../utils/result-handler';
 
 export function createEmitCommand(): Command {
   const command = new Command('emit');
@@ -27,7 +27,7 @@ export function createEmitCommand(): Command {
     .action(async (options: { config?: string }) => {
       const flags = parseGlobalFlags({});
 
-      const result = await wrapAsync(async () => {
+      const result = await performAction(async () => {
         // Load config (explicit via --config or default)
         const config = await loadConfig(options.config);
 
@@ -139,22 +139,27 @@ export function createEmitCommand(): Command {
         };
       });
 
-      // Handle result - formats output and throws if error
-      handleResultOrThrow(result, flags, ({ emitResult, contractJsonPath, contractDtsPath }) => {
-        // eslint-disable-next-line no-console
-        console.log(`✓ Emitted contract.json to ${contractJsonPath}`);
-        // eslint-disable-next-line no-console
-        console.log(`✓ Emitted contract.d.ts to ${contractDtsPath}`);
-        // eslint-disable-next-line no-console
-        console.log(`  coreHash: ${emitResult.coreHash}`);
-        // eslint-disable-next-line no-console
-        console.log(`  profileHash: ${emitResult.profileHash}`);
-        // Output success message
-        if (!flags.quiet) {
+      // Handle result - formats output and returns exit code
+      const exitCode = handleResult(
+        result,
+        flags,
+        ({ emitResult, contractJsonPath, contractDtsPath }) => {
           // eslint-disable-next-line no-console
-          console.log(formatSuccessMessage(flags));
-        }
-      });
+          console.log(`✓ Emitted contract.json to ${contractJsonPath}`);
+          // eslint-disable-next-line no-console
+          console.log(`✓ Emitted contract.d.ts to ${contractDtsPath}`);
+          // eslint-disable-next-line no-console
+          console.log(`  coreHash: ${emitResult.coreHash}`);
+          // eslint-disable-next-line no-console
+          console.log(`  profileHash: ${emitResult.profileHash}`);
+          // Output success message
+          if (!flags.quiet) {
+            // eslint-disable-next-line no-console
+            console.log(formatSuccessMessage(flags));
+          }
+        },
+      );
+      process.exit(exitCode);
     });
 
   return command;

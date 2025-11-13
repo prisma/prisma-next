@@ -77,8 +77,6 @@ export function createRtmError(
   };
 }
 
-import { CliStructuredError } from './cli-errors';
-
 /**
  * Maps errors to CLI error envelopes.
  * If the error is a CliStructuredError, extracts fields directly.
