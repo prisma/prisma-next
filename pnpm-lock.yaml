@@ -393,12 +393,24 @@ importers:
       c12:
         specifier: ^3.3.2
         version: 3.3.2(magicast@0.3.5)
+      colorette:
+        specifier: ^2.0.20
+        version: 2.0.20
       commander:
         specifier: ^12.0.0
         version: 12.1.0
       esbuild:
         specifier: ^0.19.0
         version: 0.19.12
+      string-width:
+        specifier: ^7.2.0
+        version: 7.2.0
+      strip-ansi:
+        specifier: ^7.1.2
+        version: 7.1.2
+      wrap-ansi:
+        specifier: ^9.0.2
+        version: 9.0.2
     devDependencies:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
@@ -421,6 +433,69 @@ importers:
       vitest:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@20.19.24)
+
+  packages/framework/tooling/cli/test/cli-e2e-test-app:
+    dependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../../../../targets/postgres-adapter
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../..
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../../../../sql/tooling/cli
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../../../../sql/authoring/sql-contract-ts
+      '@prisma-next/targets-postgres':
+        specifier: workspace:*
+        version: link:../../../../../targets/postgres
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
+
+  packages/framework/tooling/cli/test/cli-integration-test-app:
+    dependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../../../../targets/postgres-adapter
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../..
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../../../../sql/tooling/cli
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../../../../sql/authoring/sql-contract-ts
+      '@prisma-next/targets-postgres':
+        specifier: workspace:*
+        version: link:../../../../../targets/postgres
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
+
+  packages/framework/tooling/cli/test/fixtures/cli-test-app:
+    dependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../../../../../targets/postgres-adapter
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../..
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../../../../../sql/tooling/cli
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../../../../../sql/authoring/sql-contract-ts
+      '@prisma-next/targets-postgres':
+        specifier: workspace:*
+        version: link:../../../../../../targets/postgres
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
 
   packages/framework/tooling/emitter:
     dependencies:

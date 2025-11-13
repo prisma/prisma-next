@@ -19,8 +19,9 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 
 ## Output Style
 - Tone: friendly‑approachable, polished, concise. Symbols only (no emojis).
-- Symbols: success `✔`, error `✖`, warn `⚠`, info `ℹ`, step `›`, arrow `→`.
+- Symbols: success `✓`, error `✖`, warn `⚠`, info `ℹ`, step `›`, arrow `→`.
 - Colors: success=green, error=red, warn=yellow, info=cyan, accent=magenta, secondary text=dim.
+- Paths: Show relative paths from current working directory (not absolute paths) for better readability
 - Banners: only for `init` (first‑run experience). Otherwise, focus on getting work done.
 - Respect `NO_COLOR`/`FORCE_COLOR`, auto‑disable color/spinners in non‑TTY and CI.
 
@@ -34,10 +35,18 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - Env toggles: `PRISMA_NEXT_DEBUG=1` ≅ `-v`, `PRISMA_NEXT_TRACE=1` ≅ `-vv`.
 
 ## Help & Usage
-- Default help is concise: Usage → Description → Subcommands → Options → Examples → Environment → Config → See also.
+- **Styled Help Output**: Help output uses the same styled format as normal command output for consistency:
+  - Root help (`prisma-next --help`): Shows "prisma next" title with subcommands listed
+  - Command help (`prisma-next db verify --help`): Shows "next <command> ➜ <description>" with options, subcommands, and docs URLs
+  - Help formatters are in `packages/framework/tooling/cli/src/utils/output.ts` and use `configureHelp()` in `cli.ts`
+- **Fixed-Width Columns**: All two-column output (help, styled headers) uses fixed 20-character left column width for consistent alignment
+- **Text Wrapping**: Right column wraps at 90 characters using `wrap-ansi` for ANSI-aware wrapping that preserves color codes
+- **Default Values**: Options with default values display `default: <value>` on the following line (dimmed)
+- **ANSI-Aware Formatting**: Uses `string-width` and `strip-ansi` to measure and pad text correctly, accounting for ANSI escape codes
+- **Parameter Labels**: Styled headers show parameter labels with colons (e.g., `config:`, `contract:`)
 - Include 1–2 copy‑pastable examples by default.
 - Show aliases and defaults inline for options.
-- Enable “Did you mean …” command suggestions.
+- Enable "Did you mean …" command suggestions.
 
 ## Errors
 - Codes: `PN-<DOMAIN>-<NNNN>` (e.g., `PN-CLI-4002`, `PN-MIG-2001`, `PN-RTM-3005`, `PN-CON-1001`).
@@ -123,7 +132,10 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - Node CLI best practices: short flags, colored output that respects environment, and robust help/usage.
 
 ## Testing & Accessibility
-- Width/wrapping: measure visible width, wrap long lines (use `string-width`, `wrap-ansi`, `cli-truncate`).
+- Width/wrapping: measure visible width, wrap long lines (use `string-width`, `wrap-ansi`, `strip-ansi`).
+  - Fixed 20-character left column width for all two-column output (help, styled headers)
+  - Right column wraps at 90 characters using `wrap-ansi` for ANSI-aware wrapping
+  - Use `string-width` to measure display width and `strip-ansi` to remove ANSI codes when needed
 - Non‑TTY: disable animations/spinners; fall back to plain lines.
 - i18n readiness: avoid baked‑in ASCII art; keep text compact and translatable.
 - Security: never print secrets; scrub parameters and connection strings.

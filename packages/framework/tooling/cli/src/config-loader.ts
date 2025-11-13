@@ -1,6 +1,11 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { loadConfig as loadConfigC12 } from 'c12';
 import type { PrismaNextConfig } from './config-types';
+import {
+  errorConfigFileNotFound,
+  errorConfigValidation,
+  errorUnexpected,
+} from './utils/cli-errors';
 
 /**
  * Loads the Prisma Next config from a TypeScript file.
@@ -14,18 +19,21 @@ import type { PrismaNextConfig } from './config-types';
 export async function loadConfig(configPath?: string): Promise<PrismaNextConfig> {
   try {
     const cwd = process.cwd();
+    // Resolve config path to absolute path and set cwd to config directory when path is provided
+    const resolvedConfigPath = configPath ? resolve(cwd, configPath) : undefined;
+    const configCwd = resolvedConfigPath ? dirname(resolvedConfigPath) : cwd;
 
     const result = await loadConfigC12<PrismaNextConfig>({
       name: 'prisma-next',
-      ...(configPath ? { configFile: configPath } : {}),
-      cwd,
+      ...(resolvedConfigPath ? { configFile: resolvedConfigPath } : {}),
+      cwd: configCwd,
     });
 
-    if (!result.config) {
-      const expectedPath = configPath || resolve(cwd, 'prisma-next.config.ts');
-      throw new Error(
-        `Config file not found at ${expectedPath}. Please create prisma-next.config.ts or specify a path with --config.`,
-      );
+    // Check if config is missing or empty (c12 may return empty object when file doesn't exist)
+    if (!result.config || Object.keys(result.config).length === 0) {
+      // Use c12's configFile if available, otherwise use explicit configPath, otherwise omit path
+      const displayPath = result.configFile || resolvedConfigPath || configPath;
+      throw errorConfigFileNotFound(displayPath);
     }
 
     // Validate config structure
@@ -33,24 +41,34 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
 
     return result.config;
   } catch (error) {
+    // Re-throw structured errors as-is
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      typeof (error as { code: string }).code === 'string'
+    ) {
+      throw error;
+    }
+
     if (error instanceof Error) {
-      // Preserve c12's error messages but provide context
-      const cwd = process.cwd();
-      const expectedPath = configPath || resolve(cwd, 'prisma-next.config.ts');
       // Check for file not found errors
       if (
         error.message.includes('not found') ||
         error.message.includes('Cannot find') ||
         error.message.includes('ENOENT')
       ) {
-        throw new Error(
-          `Config file not found at ${expectedPath}. Please create prisma-next.config.ts or specify a path with --config.`,
-        );
+        // Use resolved path if available, otherwise use original configPath
+        const displayPath = configPath ? resolve(process.cwd(), configPath) : undefined;
+        throw errorConfigFileNotFound(displayPath, {
+          why: error.message,
+        });
       }
-      // For other errors, include the original error message for debugging
-      throw new Error(`Failed to load config: ${error.message}`);
+      // For other errors, wrap in unexpected error
+      throw errorUnexpected(error.message, {
+        why: `Failed to load config: ${error.message}`,
+      });
     }
-    throw error;
+    throw errorUnexpected(String(error));
   }
 }
 
@@ -59,92 +77,132 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
  */
 function validateConfig(config: unknown): asserts config is PrismaNextConfig {
   if (!config || typeof config !== 'object') {
-    throw new Error('Config must be an object');
+    throw errorConfigValidation('object', {
+      why: 'Config must be an object',
+    });
   }
 
   const configObj = config as Record<string, unknown>;
 
   if (!configObj['family']) {
-    throw new Error('Config must have a "family" field');
+    throw errorConfigValidation('family');
   }
 
   if (!configObj['target']) {
-    throw new Error('Config must have a "target" field');
+    throw errorConfigValidation('target');
   }
 
   if (!configObj['adapter']) {
-    throw new Error('Config must have an "adapter" field');
+    throw errorConfigValidation('adapter');
   }
 
   // Validate family descriptor
   const family = configObj['family'] as Record<string, unknown>;
   if (family['kind'] !== 'family') {
-    throw new Error('Config.family must have kind: "family"');
+    throw errorConfigValidation('family.kind', {
+      why: 'Config.family must have kind: "family"',
+    });
   }
   if (typeof family['id'] !== 'string') {
-    throw new Error('Config.family must have id: string');
+    throw errorConfigValidation('family.id', {
+      why: 'Config.family must have id: string',
+    });
   }
   if (!family['hook'] || typeof family['hook'] !== 'object') {
-    throw new Error('Config.family must have hook: TargetFamilyHook');
+    throw errorConfigValidation('family.hook', {
+      why: 'Config.family must have hook: TargetFamilyHook',
+    });
   }
   if (typeof family['convertOperationManifest'] !== 'function') {
-    throw new Error('Config.family must have convertOperationManifest: function');
+    throw errorConfigValidation('family.convertOperationManifest', {
+      why: 'Config.family must have convertOperationManifest: function',
+    });
   }
   if (typeof family['validateContractIR'] !== 'function') {
-    throw new Error('Config.family must have validateContractIR: function');
+    throw errorConfigValidation('family.validateContractIR', {
+      why: 'Config.family must have validateContractIR: function',
+    });
   }
 
   // Validate target descriptor
   const target = configObj['target'] as Record<string, unknown>;
   if (target['kind'] !== 'target') {
-    throw new Error('Config.target must have kind: "target"');
+    throw errorConfigValidation('target.kind', {
+      why: 'Config.target must have kind: "target"',
+    });
   }
   if (typeof target['id'] !== 'string') {
-    throw new Error('Config.target must have id: string');
+    throw errorConfigValidation('target.id', {
+      why: 'Config.target must have id: string',
+    });
   }
   if (typeof target['family'] !== 'string') {
-    throw new Error('Config.target must have family: string');
+    throw errorConfigValidation('target.family', {
+      why: 'Config.target must have family: string',
+    });
   }
   if (!target['manifest'] || typeof target['manifest'] !== 'object') {
-    throw new Error('Config.target must have manifest: ExtensionPackManifest');
+    throw errorConfigValidation('target.manifest', {
+      why: 'Config.target must have manifest: ExtensionPackManifest',
+    });
   }
 
   // Validate adapter descriptor
   const adapter = configObj['adapter'] as Record<string, unknown>;
   if (adapter['kind'] !== 'adapter') {
-    throw new Error('Config.adapter must have kind: "adapter"');
+    throw errorConfigValidation('adapter.kind', {
+      why: 'Config.adapter must have kind: "adapter"',
+    });
   }
   if (typeof adapter['id'] !== 'string') {
-    throw new Error('Config.adapter must have id: string');
+    throw errorConfigValidation('adapter.id', {
+      why: 'Config.adapter must have id: string',
+    });
   }
   if (typeof adapter['family'] !== 'string') {
-    throw new Error('Config.adapter must have family: string');
+    throw errorConfigValidation('adapter.family', {
+      why: 'Config.adapter must have family: string',
+    });
   }
   if (!adapter['manifest'] || typeof adapter['manifest'] !== 'object') {
-    throw new Error('Config.adapter must have manifest: ExtensionPackManifest');
+    throw errorConfigValidation('adapter.manifest', {
+      why: 'Config.adapter must have manifest: ExtensionPackManifest',
+    });
   }
 
   // Validate extensions array if present
   if (configObj['extensions'] !== undefined) {
     if (!Array.isArray(configObj['extensions'])) {
-      throw new Error('Config.extensions must be an array');
+      throw errorConfigValidation('extensions', {
+        why: 'Config.extensions must be an array',
+      });
     }
     for (const ext of configObj['extensions']) {
       if (!ext || typeof ext !== 'object') {
-        throw new Error('Config.extensions must contain ExtensionDescriptor objects');
+        throw errorConfigValidation('extensions[]', {
+          why: 'Config.extensions must contain ExtensionDescriptor objects',
+        });
       }
       const extObj = ext as Record<string, unknown>;
       if (extObj['kind'] !== 'extension') {
-        throw new Error('Config.extensions items must have kind: "extension"');
+        throw errorConfigValidation('extensions[].kind', {
+          why: 'Config.extensions items must have kind: "extension"',
+        });
       }
       if (typeof extObj['id'] !== 'string') {
-        throw new Error('Config.extensions items must have id: string');
+        throw errorConfigValidation('extensions[].id', {
+          why: 'Config.extensions items must have id: string',
+        });
       }
       if (typeof extObj['family'] !== 'string') {
-        throw new Error('Config.extensions items must have family: string');
+        throw errorConfigValidation('extensions[].family', {
+          why: 'Config.extensions items must have family: string',
+        });
       }
       if (!extObj['manifest'] || typeof extObj['manifest'] !== 'object') {
-        throw new Error('Config.extensions items must have manifest: ExtensionPackManifest');
+        throw errorConfigValidation('extensions[].manifest', {
+          why: 'Config.extensions items must have manifest: ExtensionPackManifest',
+        });
       }
     }
   }
@@ -153,16 +211,24 @@ function validateConfig(config: unknown): asserts config is PrismaNextConfig {
   if (configObj['contract'] !== undefined) {
     const contract = configObj['contract'] as Record<string, unknown>;
     if (!contract || typeof contract !== 'object') {
-      throw new Error('Config.contract must be an object');
+      throw errorConfigValidation('contract', {
+        why: 'Config.contract must be an object',
+      });
     }
     if (!('source' in contract)) {
-      throw new Error('Config.contract.source is required when contract is provided');
+      throw errorConfigValidation('contract.source', {
+        why: 'Config.contract.source is required when contract is provided',
+      });
     }
     if (contract['output'] !== undefined && typeof contract['output'] !== 'string') {
-      throw new Error('Config.contract.output must be a string when provided');
+      throw errorConfigValidation('contract.output', {
+        why: 'Config.contract.output must be a string when provided',
+      });
     }
     if (contract['types'] !== undefined && typeof contract['types'] !== 'string') {
-      throw new Error('Config.contract.types must be a string when provided');
+      throw errorConfigValidation('contract.types', {
+        why: 'Config.contract.types must be a string when provided',
+      });
     }
   }
 }

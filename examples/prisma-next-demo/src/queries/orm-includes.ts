@@ -1,11 +1,9 @@
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';
-import { getRuntime } from '../prisma/runtime';
 import { collect } from './utils';
 
-export async function ormGetUsersWithPosts(limit = 10) {
-  const runtime = getRuntime();
-
+export async function ormGetUsersWithPosts(limit: number, runtime: Runtime) {
   const plan = orm
     .user()
     .include.posts((child) =>

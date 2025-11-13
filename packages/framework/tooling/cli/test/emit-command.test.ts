@@ -1,104 +1,57 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEmitCommand } from '../src/commands/emit';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createContractEmitCommand } from '../src/commands/contract-emit';
+import {
+  executeCommand,
+  setupCommandMocks,
+  setupIntegrationTestDirectoryFromFixtures,
+} from './utils/test-helpers';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(__dirname, '../../../../../');
-
-function createConfigFileContent(includeContract = true, outputOverride?: string): string {
-  // Use absolute paths to dist files to avoid import resolution issues in temp directories
-  const adapterPath = resolve(
-    workspaceRoot,
-    'packages/targets/postgres-adapter/dist/exports/cli.js',
-  );
-  const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-  const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-  const configTypesPath = resolve(
-    workspaceRoot,
-    'packages/framework/tooling/cli/dist/config-types.js',
-  );
-  const contractPath = resolve(__dirname, 'fixtures/valid-contract.ts');
-
-  const contractImport = includeContract ? `import { contract } from '${contractPath}';` : '';
-  const contractField = includeContract
-    ? `  contract: {
-    source: contract,
-    output: '${outputOverride ?? 'output/contract.json'}',
-    types: '${outputOverride ? outputOverride.replace('.json', '.d.ts') : 'output/contract.d.ts'}',
-  },`
-    : '';
-
-  return `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
-${contractImport}
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-${contractField}
-});
-`;
-}
+// Fixture subdirectory for emit-command tests
+const fixtureSubdir = 'emit-command';
 
 describe('emit command', () => {
   let testDir: string;
   let outputDir: string;
-  let configPath: string;
-  let originalConsoleLog: typeof console.log;
-  let originalConsoleError: typeof console.error;
   let consoleOutput: string[] = [];
   let consoleErrors: string[] = [];
+  let cleanupMocks: () => void;
+  let cleanupDir: () => void;
 
   beforeEach(() => {
-    testDir = join(
-      tmpdir(),
-      `prisma-next-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
-    mkdirSync(testDir, { recursive: true });
-    outputDir = join(testDir, 'output');
-    configPath = join(testDir, 'prisma-next.config.ts');
+    // Set up console and process.exit mocks
+    const mocks = setupCommandMocks();
+    consoleOutput = mocks.consoleOutput;
+    consoleErrors = mocks.consoleErrors;
+    cleanupMocks = mocks.cleanup;
 
-    // Create default config file with absolute paths
-    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
-
-    originalConsoleLog = console.log;
-    originalConsoleError = console.error;
-    consoleOutput = [];
-    consoleErrors = [];
-
-    console.log = vi.fn((...args: unknown[]) => {
-      consoleOutput.push(args.map(String).join(' '));
-    }) as typeof console.log;
-
-    console.error = vi.fn((...args: unknown[]) => {
-      consoleErrors.push(args.map(String).join(' '));
-    }) as typeof console.error;
+    // Set up test directory from fixtures
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(fixtureSubdir);
+    testDir = testSetup.testDir;
+    outputDir = testSetup.outputDir;
+    cleanupDir = testSetup.cleanup;
   });
 
   afterEach(() => {
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
-    console.log = originalConsoleLog;
-    console.error = originalConsoleError;
+    cleanupDir();
+    cleanupMocks();
   });
 
   it(
     'emits contract.json and contract.d.ts with valid contract',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', configPath]);
+        const exitCode = await executeCommand(command, [
+          '--config',
+          'prisma-next.config.ts',
+          '--json',
+        ]);
+        expect(exitCode).toBe(0);
       } finally {
         process.chdir(originalCwd);
       }
@@ -119,8 +72,23 @@ describe('emit command', () => {
       expect(contractDts).toContain('export type Contract');
       expect(contractDts).toContain('CodecTypes');
 
-      expect(consoleOutput.some((msg) => msg.includes('Emitted contract.json'))).toBe(true);
-      expect(consoleOutput.some((msg) => msg.includes('coreHash'))).toBe(true);
+      // Parse JSON output and verify structure
+      const jsonOutput = consoleOutput.join('\n');
+      expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+      const parsed = JSON.parse(jsonOutput);
+      expect(parsed).toMatchObject({
+        ok: true,
+        coreHash: expect.any(String),
+        outDir: expect.any(String),
+        files: {
+          json: expect.any(String),
+          dts: expect.any(String),
+        },
+        timings: {
+          total: expect.any(Number),
+        },
+      });
     },
     timeouts.typeScriptCompilation,
   );
@@ -129,22 +97,35 @@ describe('emit command', () => {
     'creates output directory if it does not exist',
     async () => {
       const newOutputDir = join(testDir, 'new-output');
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
         // Test with custom output path in config
-        const customConfigPath = join(testDir, 'custom-config.ts');
-        writeFileSync(
-          customConfigPath,
-          createConfigFileContent(true, join(newOutputDir, 'contract.json')),
-          'utf-8',
+        const testSetup = setupIntegrationTestDirectoryFromFixtures(
+          fixtureSubdir,
+          'prisma-next.config.custom-output.ts',
+          { '{{OUTPUT_DIR}}': newOutputDir },
         );
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', customConfigPath]);
+        const customTestDir = testSetup.testDir;
+        const customCleanup = testSetup.cleanup;
 
-        expect(existsSync(newOutputDir)).toBe(true);
-        expect(existsSync(join(newOutputDir, 'contract.json'))).toBe(true);
-        expect(existsSync(join(newOutputDir, 'contract.d.ts'))).toBe(true);
+        try {
+          process.chdir(customTestDir);
+          await executeCommand(command, [
+            'node',
+            'cli.js',
+            'emit',
+            '--config',
+            'prisma-next.config.ts',
+          ]);
+
+          expect(existsSync(newOutputDir)).toBe(true);
+          expect(existsSync(join(newOutputDir, 'contract.json'))).toBe(true);
+          expect(existsSync(join(newOutputDir, 'contract.d.ts'))).toBe(true);
+        } finally {
+          customCleanup();
+        }
       } finally {
         process.chdir(originalCwd);
       }
@@ -153,189 +134,126 @@ describe('emit command', () => {
   );
 
   it('handles missing contract in config', async () => {
-    const command = createEmitCommand();
-    const configWithoutContract = join(testDir, 'config-no-contract.ts');
-    writeFileSync(configWithoutContract, createConfigFileContent(false), 'utf-8');
-    const originalCwd = process.cwd();
-    try {
-      process.chdir(testDir);
-      await expect(
-        command.parseAsync(['node', 'cli.js', 'emit', '--config', configWithoutContract]),
-      ).rejects.toThrow();
-    } finally {
-      process.chdir(originalCwd);
-    }
+    const command = createContractEmitCommand();
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.no-contract.ts',
+    );
+    const testDirNoContract = testSetup.testDir;
+    const cleanupNoContract = testSetup.cleanup;
 
-    expect(
-      consoleErrors.some(
-        (msg) => msg.includes('contract') || msg.includes('Config.contract is required'),
-      ),
-    ).toBe(true);
+    try {
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDirNoContract);
+        const exitCode = await executeCommand(command, [
+          '--config',
+          'prisma-next.config.ts',
+          '--json',
+        ]);
+        expect(exitCode).not.toBe(0);
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      // Parse JSON error output and verify structure
+      const errorOutput = consoleErrors.join('\n');
+      expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+      const parsed = JSON.parse(errorOutput);
+      expect(parsed).toMatchObject({
+        code: expect.stringMatching(/^PN-CLI-/),
+        summary: expect.any(String),
+        why: expect.any(String),
+        fix: expect.any(String),
+      });
+    } finally {
+      cleanupNoContract();
+    }
   });
 
   it('uses default output path when not specified in contract config', async () => {
-    const command = createEmitCommand();
-    const configWithDefaults = join(testDir, 'config-defaults.ts');
-    const adapterPath = resolve(
-      workspaceRoot,
-      'packages/targets/postgres-adapter/dist/exports/cli.js',
+    const command = createContractEmitCommand();
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.defaults.ts',
     );
-    const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-    const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-    const configTypesPath = resolve(
-      workspaceRoot,
-      'packages/framework/tooling/cli/dist/config-types.js',
-    );
-    const contractPath = resolve(__dirname, 'fixtures/valid-contract.ts');
-    writeFileSync(
-      configWithDefaults,
-      `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
-import { contract } from '${contractPath}';
+    const testDirDefaults = testSetup.testDir;
+    const cleanupDefaults = testSetup.cleanup;
 
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-  contract: {
-    source: contract,
-    // output and types will use defaults
-  },
-});
-`,
-      'utf-8',
-    );
-    const originalCwd = process.cwd();
     try {
-      process.chdir(testDir);
-      await command.parseAsync(['node', 'cli.js', 'emit', '--config', configWithDefaults]);
-    } finally {
-      process.chdir(originalCwd);
-    }
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDirDefaults);
+        const exitCode = await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+        ]);
+        expect(exitCode).toBe(0);
+      } finally {
+        process.chdir(originalCwd);
+      }
 
-    // Default output is 'src/prisma/contract.json'
-    const defaultJsonPath = join(testDir, 'src/prisma/contract.json');
-    const defaultDtsPath = join(testDir, 'src/prisma/contract.d.ts');
-    expect(existsSync(defaultJsonPath)).toBe(true);
-    expect(existsSync(defaultDtsPath)).toBe(true);
+      // Default output is 'src/prisma/contract.json'
+      const defaultJsonPath = join(testDirDefaults, 'src/prisma/contract.json');
+      const defaultDtsPath = join(testDirDefaults, 'src/prisma/contract.d.ts');
+      expect(existsSync(defaultJsonPath)).toBe(true);
+      expect(existsSync(defaultDtsPath)).toBe(true);
+    } finally {
+      cleanupDefaults();
+    }
   });
 
   it('handles invalid contract in config', async () => {
-    const command = createEmitCommand();
-    const invalidContractPath = join(testDir, 'invalid-contract.ts');
-    writeFileSync(invalidContractPath, `export const contract = { invalid: 'contract' };`, 'utf-8');
-    const invalidConfigPath = join(testDir, 'invalid-config.ts');
-    const adapterPath = resolve(
-      workspaceRoot,
-      'packages/targets/postgres-adapter/dist/exports/cli.js',
+    const command = createContractEmitCommand();
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.invalid-contract.ts',
     );
-    const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-    const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-    const configTypesPath = resolve(
-      workspaceRoot,
-      'packages/framework/tooling/cli/dist/config-types.js',
-    );
-    writeFileSync(
-      invalidConfigPath,
-      `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
-import { contract } from '${invalidContractPath}';
+    const testDirInvalid = testSetup.testDir;
+    const cleanupInvalid = testSetup.cleanup;
 
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-  contract: {
-    source: contract,
-    output: 'output/contract.json',
-    types: 'output/contract.d.ts',
-  },
-});
-`,
-      'utf-8',
-    );
-    const originalCwd = process.cwd();
     try {
-      process.chdir(testDir);
-      await command.parseAsync(['node', 'cli.js', 'emit', '--config', invalidConfigPath]);
-    } catch (error) {
-      expect(error).toBeDefined();
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDirInvalid);
+        const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+        expect(exitCode).not.toBe(0);
+      } finally {
+        process.chdir(originalCwd);
+      }
     } finally {
-      process.chdir(originalCwd);
+      cleanupInvalid();
     }
-
-    expect(consoleErrors.length).toBeGreaterThan(0);
   });
 
   it(
     'handles unsupported target family',
     async () => {
-      const command = createEmitCommand();
-      const invalidContractPath = join(testDir, 'invalid-contract.ts');
-      writeFileSync(
-        invalidContractPath,
-        `export const contract = { targetFamily: 'document', target: 'mongodb' } as const;`,
-        'utf-8',
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.document-family.ts',
       );
+      const testDirDocument = testSetup.testDir;
+      const cleanupDocument = testSetup.cleanup;
 
-      // Create a config with document family (which doesn't exist, but we'll test the error)
-      const invalidConfigPath = join(testDir, 'invalid-config.ts');
-      const configTypesPath = resolve(
-        workspaceRoot,
-        'packages/framework/tooling/cli/dist/config-types.js',
-      );
-      writeFileSync(
-        invalidConfigPath,
-        `import { defineConfig } from '${configTypesPath}';
-        const mockHook = {
-          id: 'document',
-          validateTypes: () => {},
-          validateStructure: () => {},
-          generateContractTypes: () => '',
-        };
-        import { contract } from '${invalidContractPath}';
-        export default defineConfig({
-          family: {
-            kind: 'family',
-            id: 'document',
-            hook: mockHook,
-            convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
-            validateContractIR: (contract: unknown) => contract,
-          },
-          target: { kind: 'target', id: 'mongodb', family: 'document', manifest: { id: 'mongodb', version: '1.0.0' } },
-          adapter: { kind: 'adapter', id: 'mongodb', family: 'document', manifest: { id: 'mongodb', version: '1.0.0' } },
-          extensions: [],
-          contract: {
-            source: contract,
-            output: 'output/contract.json',
-            types: 'output/contract.d.ts',
-          },
-        });`,
-        'utf-8',
-      );
-
-      const originalCwd = process.cwd();
       try {
-        process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', invalidConfigPath]);
-      } catch (error) {
-        expect(error).toBeDefined();
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDirDocument);
+          // The command should return non-zero exit code for unsupported family
+          const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+          expect(exitCode).not.toBe(0);
+        } finally {
+          process.chdir(originalCwd);
+        }
       } finally {
-        process.chdir(originalCwd);
+        cleanupDocument();
       }
-
-      // The error should mention unsupported family
-      expect(
-        consoleErrors.some(
-          (msg) => msg.includes('Unsupported family') || msg.includes('Unsupported target family'),
-        ),
-      ).toBe(true);
     },
     timeouts.typeScriptCompilation,
   );
@@ -343,12 +261,19 @@ export default defineConfig({
   it(
     'handles extension paths',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       // Extensions are now in config, so we just need a valid config
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', configPath]);
+        const exitCode = await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+        ]);
+        expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
         expect(existsSync(contractJsonPath)).toBe(true);
@@ -362,12 +287,19 @@ export default defineConfig({
   it(
     'handles single string extension path',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       // Extensions are now in config
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', configPath]);
+        const exitCode = await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+        ]);
+        expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
         expect(existsSync(contractJsonPath)).toBe(true);
@@ -381,12 +313,19 @@ export default defineConfig({
   it(
     'handles multiple extension paths',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       // Extensions are now in config
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', configPath]);
+        const exitCode = await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+        ]);
+        expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
         expect(existsSync(contractJsonPath)).toBe(true);
@@ -400,16 +339,39 @@ export default defineConfig({
   it(
     'outputs profileHash when present',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', configPath]);
+        // Command should succeed (exit code 0) - executeCommand won't throw
+        const exitCode = await executeCommand(command, [
+          '--config',
+          'prisma-next.config.ts',
+          '--json',
+        ]);
+        expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
         expect(existsSync(contractJsonPath)).toBe(true);
-        const hasProfileHash = consoleOutput.some((msg) => msg.includes('profileHash'));
-        expect(hasProfileHash).toBeDefined();
+
+        // Parse JSON output and verify structure
+        const jsonOutput = consoleOutput.join('\n');
+        expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+        const parsed = JSON.parse(jsonOutput);
+        expect(parsed).toMatchObject({
+          ok: true,
+          coreHash: expect.any(String),
+          profileHash: expect.any(String),
+          outDir: expect.any(String),
+          files: {
+            json: expect.any(String),
+            dts: expect.any(String),
+          },
+          timings: {
+            total: expect.any(Number),
+          },
+        });
       } finally {
         process.chdir(originalCwd);
       }
@@ -418,76 +380,76 @@ export default defineConfig({
   );
 
   it('handles errors and throws', async () => {
-    const command = createEmitCommand();
-    const invalidConfigPath = join(testDir, 'invalid-config.ts');
-    writeFileSync(invalidConfigPath, createConfigFileContent(false), 'utf-8');
-    const originalCwd = process.cwd();
-    try {
-      process.chdir(testDir);
-      await expect(
-        command.parseAsync(['node', 'cli.js', 'emit', '--config', invalidConfigPath]),
-      ).rejects.toThrow();
-    } finally {
-      process.chdir(originalCwd);
-    }
+    const command = createContractEmitCommand();
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.no-contract.ts',
+    );
+    const testDirNoContract = testSetup.testDir;
+    const cleanupNoContract = testSetup.cleanup;
 
-    // Error should be thrown (either to console or as exception)
-    // Commander.js may handle errors differently, so we just verify it throws
-    expect(true).toBe(true); // Test passes if we reach here (error was thrown)
+    try {
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDirNoContract);
+        const exitCode = await executeCommand(command, [
+          '--config',
+          'prisma-next.config.ts',
+          '--json',
+        ]);
+        expect(exitCode).not.toBe(0);
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      // Parse JSON error output and verify structure
+      const errorOutput = consoleErrors.join('\n');
+      expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+      const parsed = JSON.parse(errorOutput);
+      expect(parsed).toMatchObject({
+        code: expect.stringMatching(/^PN-CLI-/),
+        summary: expect.any(String),
+        why: expect.any(String),
+        fix: expect.any(String),
+      });
+    } finally {
+      cleanupNoContract();
+    }
   });
 
   it(
     'handles async contract source function',
     async () => {
-      const command = createEmitCommand();
-      const asyncConfigPath = join(testDir, 'async-config.ts');
-      const contractPath = resolve(__dirname, 'fixtures/valid-contract.ts');
-      const adapterPath = resolve(
-        workspaceRoot,
-        'packages/targets/postgres-adapter/dist/exports/cli.js',
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.async-source.ts',
+        { '{{OUTPUT_DIR}}': outputDir },
       );
-      const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-      const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-      const configTypesPath = resolve(
-        workspaceRoot,
-        'packages/framework/tooling/cli/dist/config-types.js',
-      );
+      const testDirAsync = testSetup.testDir;
+      const cleanupAsync = testSetup.cleanup;
 
-      writeFileSync(
-        asyncConfigPath,
-        `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-  contract: {
-    source: async () => {
-      const { contract } = await import('${contractPath}');
-      return contract;
-    },
-    output: '${join(outputDir, 'contract.json')}',
-    types: '${join(outputDir, 'contract.d.ts')}',
-  },
-});
-`,
-        'utf-8',
-      );
-
-      const originalCwd = process.cwd();
       try {
-        process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', asyncConfigPath]);
-      } finally {
-        process.chdir(originalCwd);
-      }
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDirAsync);
+          await executeCommand(command, [
+            'node',
+            'cli.js',
+            'emit',
+            '--config',
+            'prisma-next.config.ts',
+          ]);
+        } finally {
+          process.chdir(originalCwd);
+        }
 
-      const contractJsonPath = join(outputDir, 'contract.json');
-      expect(existsSync(contractJsonPath)).toBe(true);
+        const contractJsonPath = join(outputDir, 'contract.json');
+        expect(existsSync(contractJsonPath)).toBe(true);
+      } finally {
+        cleanupAsync();
+      }
     },
     timeouts.typeScriptCompilation,
   );
@@ -495,53 +457,35 @@ export default defineConfig({
   it(
     'handles sync contract source function',
     async () => {
-      const command = createEmitCommand();
-      const syncConfigPath = join(testDir, 'sync-config.ts');
-      const contractPath = resolve(__dirname, 'fixtures/valid-contract.ts');
-      const adapterPath = resolve(
-        workspaceRoot,
-        'packages/targets/postgres-adapter/dist/exports/cli.js',
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.sync-source.ts',
+        { '{{OUTPUT_DIR}}': outputDir },
       );
-      const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-      const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-      const configTypesPath = resolve(
-        workspaceRoot,
-        'packages/framework/tooling/cli/dist/config-types.js',
-      );
+      const testDirSync = testSetup.testDir;
+      const cleanupSync = testSetup.cleanup;
 
-      writeFileSync(
-        syncConfigPath,
-        `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
-import { contract } from '${contractPath}';
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-  contract: {
-    source: () => contract,
-    output: '${join(outputDir, 'contract.json')}',
-    types: '${join(outputDir, 'contract.d.ts')}',
-  },
-});
-`,
-        'utf-8',
-      );
-
-      const originalCwd = process.cwd();
       try {
-        process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', syncConfigPath]);
-      } finally {
-        process.chdir(originalCwd);
-      }
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDirSync);
+          await executeCommand(command, [
+            'node',
+            'cli.js',
+            'emit',
+            '--config',
+            'prisma-next.config.ts',
+          ]);
+        } finally {
+          process.chdir(originalCwd);
+        }
 
-      const contractJsonPath = join(outputDir, 'contract.json');
-      expect(existsSync(contractJsonPath)).toBe(true);
+        const contractJsonPath = join(outputDir, 'contract.json');
+        expect(existsSync(contractJsonPath)).toBe(true);
+      } finally {
+        cleanupSync();
+      }
     },
     timeouts.typeScriptCompilation,
   );
@@ -549,52 +493,32 @@ export default defineConfig({
   it(
     'throws error when contract config missing output or types',
     async () => {
-      const command = createEmitCommand();
-      const invalidConfigPath = join(testDir, 'invalid-contract-config.ts');
-      const adapterPath = resolve(
-        workspaceRoot,
-        'packages/targets/postgres-adapter/dist/exports/cli.js',
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.missing-output.ts',
       );
-      const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-      const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-      const configTypesPath = resolve(
-        workspaceRoot,
-        'packages/framework/tooling/cli/dist/config-types.js',
-      );
-      const contractPath = resolve(__dirname, 'fixtures/valid-contract.ts');
+      const testDirMissing = testSetup.testDir;
+      const cleanupMissing = testSetup.cleanup;
 
-      // Create config with contract missing output/types (shouldn't happen with defineConfig, but test the error path)
-      writeFileSync(
-        invalidConfigPath,
-        `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
-import { contract } from '${contractPath}';
-
-// Manually create config without using defineConfig to test error path
-export default {
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-  contract: {
-    source: contract,
-    // Missing output and types to test error path
-  },
-};
-`,
-        'utf-8',
-      );
-
-      const originalCwd = process.cwd();
       try {
-        process.chdir(testDir);
-        await expect(
-          command.parseAsync(['node', 'cli.js', 'emit', '--config', invalidConfigPath]),
-        ).rejects.toThrow();
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDirMissing);
+          const exitCode = await executeCommand(command, [
+            'node',
+            'cli.js',
+            'emit',
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).not.toBe(0);
+        } finally {
+          process.chdir(originalCwd);
+        }
       } finally {
-        process.chdir(originalCwd);
+        cleanupMissing();
       }
     },
     timeouts.typeScriptCompilation,

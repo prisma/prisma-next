@@ -44,6 +44,12 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - This prevents cyclic dependencies and keeps tests adapter-agnostic
 - See `AGENT_ONBOARDING.md` for details
 
+**CLI E2E Test Fixtures:**
+- Use shared `cli-e2e-test-app` directory with static `package.json` at root
+- Organize fixtures by command in subdirectories (e.g., `fixtures/emit/`, `fixtures/db-verify/`)
+- Use `setupTestDirectoryFromFixtures()` helper to create ephemeral test directories
+- See `.cursor/rules/cli-e2e-test-patterns.mdc` for details
+
 ## Common Patterns
 
 ### Shared Test Utilities
@@ -212,6 +218,60 @@ it('test', async () => {
 - ✅ Check `@prisma-next/test-utils` first before creating a new helper
 - ❌ Don't duplicate helpers that already exist in the shared packages
 - ❌ Don't add dependencies to `@prisma-next/test-utils` on other `@prisma-next/*` packages (it must remain dependency-free)
+
+## Testing Validation Logic
+
+**CRITICAL**: Don't test exhaustive validation logic through integration tests with file I/O. Validation logic should be unit tested directly, not through loading/parsing workflows.
+
+**❌ WRONG: Exhaustive validation tests through file I/O**
+
+```typescript
+// Don't test every validation rule through config loading
+it('throws error when family is missing', async () => {
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  writeFileSync(configPath, `export default { target: {...}, adapter: {...} };`, 'utf-8');
+  await expect(loadConfig(configPath)).rejects.toThrow('Config must have a "family" field');
+});
+
+it('throws error when family kind is invalid', async () => {
+  // ... 25+ more similar tests
+});
+```
+
+**✅ CORRECT: Focus integration tests on loading behavior, unit test validation separately**
+
+```typescript
+// Integration test: Focus on loading behavior
+it('loads config with default export', async () => {
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  writeFileSync(configPath, validConfig, 'utf-8');
+  const config = await loadConfig(configPath);
+  expect(config).toBeDefined();
+});
+
+it('throws error for invalid config structure', async () => {
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  writeFileSync(configPath, `export default {};`, 'utf-8');
+  await expect(loadConfig(configPath)).rejects.toThrow();
+});
+
+// Unit test: Test validation logic directly (if validation function is exported)
+it('validates required fields', () => {
+  expect(() => validateConfig({})).toThrow('Config must have a "family" field');
+  expect(() => validateConfig({ family: { kind: 'invalid' } })).toThrow('Config.family must have kind: "family"');
+});
+```
+
+**Why?**
+- Integration tests should verify component interactions (loading, file I/O, error handling)
+- Validation logic is straightforward and doesn't need exhaustive testing through file I/O
+- Unit tests are faster and more focused on the validation logic itself
+- Reduces test maintenance burden (fewer tests to update when validation changes)
+
+**When to test validation in integration tests:**
+- ✅ Test that validation errors are properly surfaced (e.g., "throws error for invalid config")
+- ✅ Test that valid configs pass validation
+- ❌ Don't test every single validation rule through file I/O
 
 ## Test File Organization
 
@@ -523,6 +583,56 @@ describe('tests', () => {
 - Adapter is fully initialized
 - No timing/initialization issues
 - Tests are isolated and independent
+
+### Testing Example Apps with Module-Level Initialization
+
+**Issue:** Example apps often have production code that initializes at module load time (e.g., `query.ts` calling `getContext()` which requires `DATABASE_URL`). Tests that import these modules will fail if environment variables aren't set before import.
+
+**Solution:** Set environment variables BEFORE importing modules that depend on them. Maintain the production structure of example apps - don't change query files for tests.
+
+**❌ WRONG: Importing modules before setting environment variables**
+
+```typescript
+import { ormGetUsers } from '../src/queries/orm-get-users';  // Fails - query.ts calls getContext() which needs DATABASE_URL
+
+it('test', async () => {
+  process.env['DATABASE_URL'] = connectionString;  // Too late!
+  const users = await ormGetUsers(2, runtime);
+});
+```
+
+**❌ WRONG: Changing example app structure for tests**
+
+```typescript
+// Don't modify query files to accept context parameter
+export async function ormGetUsers(limit: number, runtime: Runtime, context: RuntimeContext) {
+  const o = orm<Contract>({ context });  // Changed structure for tests
+  // ...
+}
+```
+
+**✅ CORRECT: Set environment variables before importing**
+
+```typescript
+it('test', async () => {
+  await withDevDatabase(async ({ connectionString }) => {
+    // Set environment variable BEFORE importing query modules
+    process.env['DATABASE_URL'] = connectionString;
+
+    // Now import - query.ts can initialize properly
+    const { ormGetUsers } = await import('../src/queries/orm-get-users');
+    const users = await ormGetUsers(2, runtime);
+  });
+});
+```
+
+**Why?**
+- Example apps should maintain their production structure (query files import from centralized locations)
+- Environment variables must be set before module initialization
+- Tests should adapt to production code, not the other way around
+- Dynamic imports (`await import()`) allow setting env vars before module load
+
+**Key Principle:** Example apps demonstrate production patterns. Tests should work with the production structure, not require changes to it.
 
 ## Testing Anti-Patterns
 

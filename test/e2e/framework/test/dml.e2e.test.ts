@@ -109,7 +109,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
           }
         });
       },
-      { acceleratePort: 54030, databasePort: 54031, shadowDatabasePort: 54032 },
+      { acceleratePort: 54036, databasePort: 54037, shadowDatabasePort: 54038 },
     );
   });
 });

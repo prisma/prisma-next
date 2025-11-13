@@ -18,5 +18,5 @@ export interface EmitResult {
   readonly contractJson: string;
   readonly contractDts: string;
   readonly coreHash: string;
-  readonly profileHash?: string;
+  readonly profileHash: string;
 }

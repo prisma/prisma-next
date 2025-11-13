@@ -13,6 +13,24 @@ export interface FamilyDescriptor {
   readonly id: string;
   readonly hook: TargetFamilyHook;
   /**
+   * Family-specific verification helpers for DB-connected commands.
+   * Must remain in the migration/tooling plane (no runtime imports).
+   */
+  readonly verify?: {
+    /**
+     * Returns the SQL statement to read the contract marker.
+     * Family implementations should return a parameterized statement.
+     */
+    readMarkerSql: () => { readonly sql: string; readonly params: readonly unknown[] };
+    /**
+     * Optionally collects supported codec typeIds from adapter/extension manifests
+     * to enable coverage checks.
+     */
+    collectSupportedCodecTypeIds?: (
+      descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+    ) => readonly string[];
+  };
+  /**
    * Converts an OperationManifest to an OperationSignature.
    * Family-specific conversion logic (e.g., SQL adds lowering spec).
    */
@@ -95,7 +113,26 @@ export interface PrismaNextConfig {
   readonly extensions?: ReadonlyArray<ExtensionDescriptor>;
   readonly db?: {
     readonly url?: string;
-    readonly [key: string]: unknown;
+    /**
+     * Family-agnostic minimal query runner factory for DB-connected CLI commands.
+     * The CLI will call this to obtain a runner with a single query method.
+     * Can be async to support dynamic imports in ESM contexts.
+     */
+    readonly queryRunnerFactory?: (url: string) =>
+      | {
+          readonly query: <Row = Record<string, unknown>>(
+            sql: string,
+            params?: readonly unknown[],
+          ) => Promise<{ readonly rows: Row[] }>;
+          readonly close?: () => Promise<void>;
+        }
+      | Promise<{
+          readonly query: <Row = Record<string, unknown>>(
+            sql: string,
+            params?: readonly unknown[],
+          ) => Promise<{ readonly rows: Row[] }>;
+          readonly close?: () => Promise<void>;
+        }>;
   };
   /**
    * Contract configuration. Specifies source and artifact locations.

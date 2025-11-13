@@ -1,0 +1,13 @@
+{
+  "name": "cli-e2e-test-app",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/targets-postgres": "workspace:*",
+    "pg": "^8.16.3"
+  }
+}

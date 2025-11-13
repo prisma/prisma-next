@@ -20,34 +20,227 @@ Provide a command-line interface that:
 - **CLI Command Interface**: Parse arguments and route to command handlers using commander
 - **File I/O**: Read TS contracts, write emitted artifacts (`contract.json`, `contract.d.ts`)
 - **Extension Pack Loading**: Load adapter and extension pack manifests for emission
+- **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
+
+## Command Descriptions
+
+Commands use separate short and long descriptions via `setCommandDescriptions()`:
+
+- **Short description**: One-liner used in command trees and headers (e.g., "Emit signed contract artifacts")
+- **Long description**: Multiline text shown at the bottom of help output with detailed context
+
+See `.cursor/rules/cli-command-descriptions.mdc` for details.
 
 ## Commands
 
-### `prisma-next emit`
+### `prisma-next contract emit` (canonical)
 
 Emit `contract.json` and `contract.d.ts` from `config.contract`.
 
-Config-only surface:
+**Canonical command:**
+```bash
+prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+**Legacy alias:**
 ```bash
 prisma-next emit [--config <path>]
 ```
 
 Options:
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--timestamps`: Add timestamps to output
+- `--color/--no-color`: Force/disable color output
 
-Example:
+Examples:
 ```bash
-prisma-next emit --config prisma-next.config.ts
+# Use config defaults
+prisma-next contract emit
+
+# JSON output
+prisma-next contract emit --json
+
+# Verbose output with timestamps
+prisma-next contract emit -v --timestamps
 ```
+
+**Note:** The `contract emit` command is the canonical form. The `emit` command is kept as a legacy alias for backward compatibility.
+
+### `prisma-next db verify`
+
+Verify that a database instance matches the emitted contract by checking marker presence, hash equality, and target compatibility.
+
+**Command:**
+```bash
+prisma-next db verify [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+Options:
+- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--timestamps`: Add timestamps to output
+- `--color/--no-color`: Force/disable color output
+
+Examples:
+```bash
+# Use config defaults
+prisma-next db verify
+
+# Specify database URL
+prisma-next db verify --db postgresql://user:pass@localhost/db
+
+# JSON output
+prisma-next db verify --json
+
+# Verbose output with timestamps
+prisma-next db verify -v --timestamps
+```
+
+**Config File Requirements:**
+
+The `db verify` command requires a `queryRunnerFactory` in the config to connect to the database:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/cli';
+import sql from '@prisma-next/family-sql/cli';
+import { contract } from './prisma/contract';
+import { Client } from 'pg';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+  contract: {
+    source: contract,
+    output: 'src/prisma/contract.json',
+    types: 'src/prisma/contract.d.ts',
+  },
+  db: {
+    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    queryRunnerFactory: (url: string) => {
+      const client = new Client({ connectionString: url });
+      client.connect();
+      return {
+        query: async <Row = Record<string, unknown>>(
+          sql: string,
+          params?: readonly unknown[],
+        ): Promise<{ readonly rows: Row[] }> => {
+          const result = await client.query<Row>(sql, params as unknown[]);
+          return { rows: result.rows };
+        },
+        close: async (): Promise<void> => {
+          await client.end();
+        },
+      };
+    },
+  },
+});
+```
+
+The `queryRunnerFactory` must return an object with:
+- `query<Row>(sql: string, params?: readonly unknown[]): Promise<{ readonly rows: Row[] }>` - Execute a SQL query
+- `close?(): Promise<void>` - Optional cleanup method
+
+**Verification Process:**
+
+1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
+2. **Connect to Database**: Uses `config.db.queryRunnerFactory(url)` to create a query runner
+3. **Read Marker**: Executes the marker SELECT statement provided by `config.family.verify.readMarkerSql()`
+4. **Compare**:
+   - Marker presence: Returns `PN-RTM-3001` if marker is missing
+   - Target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
+   - Core hash: Returns `PN-RTM-3002` if `coreHash` doesn't match
+   - Profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
+5. **Codec Coverage** (optional): If `config.family.verify.collectSupportedCodecTypeIds` is provided, compares contract column types against supported codec types and reports missing codecs
+
+**Output Format (TTY):**
+
+Success:
+```
+✔ Database matches contract
+  coreHash: sha256:abc123...
+  profileHash: sha256:def456...
+```
+
+Failure:
+```
+✖ Marker missing (PN-RTM-3001)
+  Why: Contract marker not found in database
+  Fix: Run `prisma-next db sign --db <url>` to create marker
+```
+
+**Output Format (JSON):**
+
+```json
+{
+  "ok": true,
+  "summary": "Database matches contract",
+  "contract": {
+    "coreHash": "sha256:abc123...",
+    "profileHash": "sha256:def456..."
+  },
+  "marker": {
+    "coreHash": "sha256:abc123...",
+    "profileHash": "sha256:def456..."
+  },
+  "target": {
+    "expected": "postgres"
+  },
+  "missingCodecs": [],
+  "meta": {
+    "configPath": "/path/to/prisma-next.config.ts",
+    "contractPath": "/path/to/src/prisma/contract.json"
+  },
+  "timings": {
+    "total": 42
+  }
+}
+```
+
+**Error Codes:**
+
+- `PN-CLI-4006`: Missing db.queryRunnerFactory in config — provide a query runner factory
+- `PN-CLI-4007`: Missing family.verify.readMarkerSql() — ensure family verify helpers are exported
+- `PN-RTM-3001`: Marker missing - Contract marker not found in database
+- `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
+- `PN-RTM-3003`: Target mismatch - Contract target does not match config target
+
+**Family Requirements:**
+
+The family must provide a `verify` helper in the family descriptor:
+
+```typescript
+{
+  verify: {
+    readMarkerSql: () => ({ sql: string, params: readonly unknown[] }),
+    collectSupportedCodecTypeIds?: (descriptors) => readonly string[],
+  },
+}
+```
+
+The SQL family provides this via `@prisma-next/family-sql/cli`.
 
 **Config File (`prisma-next.config.ts`):**
 
-The CLI uses a config file to specify the target family, target, adapter, extensions, and contract. The config path can be:
-- Relative to the current working directory (e.g., `./prisma-next.config.ts`)
-- Absolute path (e.g., `/path/to/prisma-next.config.ts`)
-- Omitted to use the default `./prisma-next.config.ts` in the current directory
+The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.
 
-The `c12` library handles both relative and absolute paths automatically:
+**Config Discovery:**
+- `--config <path>`: Explicit path (relative or absolute)
+- Default: `./prisma-next.config.ts` in current working directory
+- No upward search (stays in CWD)
+
+**Note:** The CLI uses `c12` for config loading, but constrains it to the current working directory (no upward search) to match the style guide's discovery precedence.
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
@@ -115,28 +308,47 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - Main entry point using commander
 - Parses arguments and routes to command handlers
 - Handles global flags (`--help`, `--version`)
-- Exit codes: 0 (success), 1 (error)
-- **Error Handling**: Commands throw errors; Commander.js automatically handles them and exits with code 1
+- Exit codes: 0 (success), 1 (runtime error), 2 (usage/config error)
+- **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
+- **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
+- **Legacy Commands**: Legacy `emit` command is available as alias alongside canonical `contract emit`
+- **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma-next" title with command tree; command help shows "prisma-next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
+- **Command Descriptions**: Commands use `setCommandDescriptions()` to set separate short and long descriptions. See `utils/command-helpers.ts` and `.cursor/rules/cli-command-descriptions.mdc`.
 
-### Emit Command (`commands/emit.ts`)
-- Command implementation using commander
-- **Error Handling**: Throws errors instead of calling `process.exit()`. Commander.js handles errors and exits with code 1 automatically.
+### Contract Emit Command (`commands/contract-emit.ts`)
+- Canonical command implementation using commander
+- Supports global flags (JSON, verbosity, color, timestamps)
+- **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern (`performAction`), and `process.exit()`. Commands wrap logic in `performAction()`, process results with `handleResult()`, and call `process.exit(exitCode)` directly. See `.cursor/rules/cli-error-handling.mdc` for details.
 - Loads the user's config module (`prisma-next.config.ts`)
 - Resolves contract from config:
-  - If `config.contract.source` is a function, calls it (supports sync and async functions)
-  - Otherwise uses `config.contract.source` directly
+  - Uses `config.contract.source` (supports sync and async functions)
+  - User's config is responsible for loading the contract (can use `loadContractFromTs` or any other method)
   - Throws error if `config.contract` is missing
-- Uses artifact paths from `config.contract.output` and `config.contract.types` (already normalized by `defineConfig()` with defaults applied)
+- Uses artifact paths from `config.contract.output/types` (already normalized by `defineConfig()` with defaults applied)
 - Strips mappings if family provides `stripMappings()` function
-- Uses framework CLI assembly functions to loop over descriptors:
-  - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, calls `family.convertOperationManifest()` for each
-  - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
-  - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
-  - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
-- Calls `config.family.validateContractIR()` to validate and normalize contract, returns ContractIR without mappings
-- Calls `emit()` from emitter with the assembled inputs and `family.hook`
-- Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact
-- Writes `contract.json` and `contract.d.ts` to the paths specified in `config.contract.output` and `config.contract.types`
+- Uses framework CLI assembly functions to loop over descriptors
+- Calls `config.family.validateContractIR()` to validate and normalize contract
+- Passes resolved contract IR, paths, and assembly data to programmatic API (`emitContract()`)
+- Outputs human-readable or JSON format based on flags
+
+### Programmatic API (`api/emit-contract.ts`)
+- **`emitContract(options)`**: Programmatic API for emitting contracts
+  - Accepts resolved contract IR, output paths, and assembly data
+  - Caller is responsible for loading the contract and resolving paths
+  - Returns result with hashes, file paths, and timings
+  - Used by CLI command internally
+
+### Error Handling (`utils/errors.ts`, `utils/cli-errors.ts`, `utils/result.ts`, `utils/result-handler.ts`)
+- **Structured Errors**: Call sites throw `CliStructuredError` instances with full context (why, fix, docsUrl, etc.)
+- **Result Pattern**: Commands wrap logic in `performAction()` which only catches `CliStructuredError` instances
+- **Error Conversion**: `CliStructuredError.toEnvelope()` converts errors to envelopes for output formatting
+- **Result Processing**: `handleResult()` processes Results, formats output, and returns exit codes
+- **Exit Codes**:
+  - Usage/config errors (PN-CLI-4001-4007) → exit code 2
+  - Runtime errors (PN-RTM-3xxx) → exit code 1
+  - Success → exit code 0
+- **Fail Fast**: Non-structured errors propagate and are caught by Commander.js's `exitOverride()` with stack traces
+- See `.cursor/rules/cli-error-handling.mdc` for detailed patterns
 
 ### Pack Assembly (`pack-assembly.ts`)
 - Generic assembly functions that loop over descriptors/packs:
@@ -146,6 +358,26 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
   - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
   - Pack-based versions for tests: `assembleOperationRegistryFromPacks`, `extractCodecTypeImportsFromPacks`, etc.
 - These functions handle the generic looping logic; family-specific conversion is delegated to `family.convertOperationManifest()`.
+
+### Output Formatting (`utils/output.ts`)
+- **Command Output Formatters**: Format human-readable output for commands (emit, verify, etc.)
+  - Paths are shown as relative paths from current working directory (using `relative(process.cwd(), path)`)
+  - Success indicators use consistent checkmark (✓) throughout
+- **Error Output Formatters**: Format error output for human-readable and JSON display
+- **Styled Headers**: `formatStyledHeader()` creates styled headers for command output with "prisma-next <command> ➜ <description>" format
+  - Parameter labels include colons (e.g., `config:`, `contract:`)
+  - Uses fixed 20-character left column width for consistent alignment
+- **Help Formatters**:
+  - `formatRootHelp()` - Formats root help with "prisma-next" title, command tree, and multiline description
+  - `formatCommandHelp()` - Formats command help with "prisma-next <command> ➜ <description>", options, subcommands, docs URLs, and multiline description
+  - `renderCommandTree()` - Shared function to render hierarchical command trees with tree characters (├─, └─, │)
+  - **Fixed-Width Formatting**: All two-column output (help, styled headers) uses fixed 20-character left column width
+  - **Text Wrapping**: Right column wraps at 90 characters using `wrap-ansi` for ANSI-aware wrapping
+  - **Default Values**: Options with default values display `default: <value>` on the following line (dimmed)
+  - **ANSI-Aware Padding**: Uses `string-width` and `strip-ansi` to measure and pad text correctly with ANSI codes
+  - Help formatters use the same styling system as normal command output (colors, dim text, badges)
+  - Short descriptions appear in command trees and headers; long descriptions appear at the bottom of help output
+  - Help formatting is configured via `configureHelp()` in `cli.ts` to apply to all commands
 
 ### Family Descriptor (provided by family /cli entrypoint)
 - The SQL family (and other families) provide:
@@ -170,6 +402,48 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 3. **CLI Framework**: Use `commander` library for robust CLI argument parsing.
 4. **File I/O**: CLI handles all I/O; emitter returns strings (no file operations in emitter).
 5. **Generated File Metadata**: Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact. This field is excluded from canonicalization/hashing to ensure determinism. The `contract.d.ts` file includes warning header comments generated by the emitter hook.
+
+## Testing
+
+The CLI package includes unit tests, integration tests, and e2e tests:
+
+- **Unit tests**: Test individual functions and utilities in isolation
+- **Integration tests**: Test component interactions (e.g., config loading, pack assembly)
+- **E2E tests**: Test complete command execution with real config files
+
+### E2E Test Patterns
+
+E2E tests use a shared fixture app pattern to ensure proper module resolution:
+
+- **Shared fixture app**: `test/cli-e2e-test-app/` contains a static `package.json` with dependencies
+- **Fixture organization**: Fixtures are organized by command in subdirectories (e.g., `fixtures/emit/`, `fixtures/db-verify/`)
+- **Ephemeral test directories**: Each test creates an isolated directory with files copied from fixtures
+- **Helper function**: `setupTestDirectoryFromFixtures()` handles directory setup and cleanup
+
+**Example:**
+```typescript
+import { setupTestDirectoryFromFixtures } from './utils/test-helpers';
+
+const fixtureSubdir = 'emit';
+
+it('test description', async () => {
+  const testSetup = setupTestDirectoryFromFixtures(
+    fixtureSubdir,
+    'prisma-next.config.emit.ts',
+  );
+  // ... test code ...
+});
+```
+
+See `.cursor/rules/cli-e2e-test-patterns.mdc` for detailed patterns and examples.
+
+Run tests:
+```bash
+pnpm test                    # Run all tests
+pnpm test:unit              # Run unit tests only
+pnpm test:integration       # Run integration tests only
+pnpm test:e2e               # Run e2e tests only
+```
 
 ## Package Location
 
