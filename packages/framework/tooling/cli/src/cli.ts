@@ -57,7 +57,11 @@ program.exitOverride((err) => {
 
 // Register contract subcommand
 const contractCommand = new Command('contract')
-  .description('Contract management commands')
+  .description(
+    'Contract management commands\n' +
+      'Define and emit your application data contract. The contract describes your schema as a\n' +
+      'declarative data structure that can be signed and verified against your database.',
+  )
   .configureHelp({
     formatHelp: (cmd) => {
       const flags = parseGlobalFlags({});
@@ -73,12 +77,18 @@ contractCommand.addCommand(contractEmitCommand);
 program.addCommand(contractCommand);
 
 // Register db subcommand
-const dbCommand = new Command('db').description('Database management commands').configureHelp({
-  formatHelp: (cmd) => {
-    const flags = parseGlobalFlags({});
-    return formatCommandHelp({ command: cmd, flags });
-  },
-});
+const dbCommand = new Command('db')
+  .description(
+    'Database management commands\n' +
+      'Verify and sign your database with your contract. Ensure your database schema matches\n' +
+      'your contract, and sign it to record the contract hash for future verification.',
+  )
+  .configureHelp({
+    formatHelp: (cmd) => {
+      const flags = parseGlobalFlags({});
+      return formatCommandHelp({ command: cmd, flags });
+    },
+  });
 
 // Add verify subcommand to db
 const dbVerifyCommand = createDbVerifyCommand();

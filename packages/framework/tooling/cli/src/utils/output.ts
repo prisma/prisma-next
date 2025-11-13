@@ -204,8 +204,96 @@ export function formatVerifyJson(result: VerifyDatabaseResult): string {
 /**
  * Creates a simple arrow marker.
  */
-function createNextBadge(useColor: boolean): string {
-  return useColor ? bold(green('next')) : 'next';
+function createPrismaNextBadge(useColor: boolean): string {
+  return useColor ? bold(green('prisma-next')) : 'prisma-next';
+}
+
+/**
+ * Creates a padding function.
+ */
+function createPadFunction(): (s: string, w: number) => string {
+  return (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+}
+
+/**
+ * Formats a header line: brand + operation + intent
+ */
+function formatHeaderLine(options: {
+  readonly brand: string;
+  readonly operation: string;
+  readonly intent: string;
+}): string {
+  if (options.operation) {
+    return `${options.brand} ${options.operation} ➜ ${options.intent}`;
+  }
+  return `${options.brand} ➜ ${options.intent}`;
+}
+
+/**
+ * Formats a label/value line with padding and coloring.
+ */
+function formatLabelValueLine(options: {
+  readonly label: string;
+  readonly value: string;
+  readonly maxLabelWidth: number;
+  readonly useColor: boolean;
+  readonly formatDimText: (text: string) => string;
+}): string {
+  const pad = createPadFunction();
+  const labelPadded = pad(options.label, options.maxLabelWidth);
+  const labelColored = options.useColor ? cyan(labelPadded) : labelPadded;
+  return `${options.formatDimText('│')} ${labelColored}  ${options.value}`;
+}
+
+/**
+ * Formats an option flag with placeholder coloring.
+ */
+function formatOptionFlag(flags: string, maxWidth: number, useColor: boolean): string {
+  const pad = createPadFunction();
+  const flagsPadded = pad(flags, maxWidth);
+  if (useColor) {
+    // Color placeholders in magenta, then wrap in cyan
+    const flagsWithPlaceholders = flagsPadded.replace(/(<[^>]+>)/g, (match: string) =>
+      magenta(match),
+    );
+    return cyan(flagsWithPlaceholders);
+  }
+  return flagsPadded;
+}
+
+/**
+ * Formats a "Read more" URL line.
+ * The "Read more" label is in default color (not cyan), and the URL is blue.
+ */
+function formatReadMoreLine(options: {
+  readonly url: string;
+  readonly maxLabelWidth: number;
+  readonly useColor: boolean;
+  readonly formatDimText: (text: string) => string;
+}): string {
+  const pad = createPadFunction();
+  const labelPadded = pad('Read more', options.maxLabelWidth);
+  // Label is default color (not cyan)
+  const valueColored = options.useColor ? blue(options.url) : options.url;
+  return `${options.formatDimText('│')} ${labelPadded}  ${valueColored}`;
+}
+
+/**
+ * Formats multiline description with "Prisma Next" in green.
+ */
+function formatMultilineDescription(options: {
+  readonly descriptionLines: readonly string[];
+  readonly useColor: boolean;
+  readonly formatDimText: (text: string) => string;
+}): string[] {
+  const lines: string[] = [];
+  const formatGreen = (text: string) => (options.useColor ? green(text) : text);
+  for (const descLine of options.descriptionLines) {
+    // Replace "Prisma Next" with green version if present
+    const formattedLine = descLine.replace(/Prisma Next/g, (match) => formatGreen(match));
+    lines.push(`${options.formatDimText('│')} ${formattedLine}`);
+  }
+  return lines;
 }
 
 /**
@@ -225,29 +313,40 @@ export function formatStyledHeader(options: {
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   // Header: arrow + operation badge + intent
-  const brand = createNextBadge(useColor);
+  const brand = createPrismaNextBadge(useColor);
   const opName = options.command.split(' ').slice(-1)[0] || 'emit';
   const operation = useColor ? bold(opName) : opName;
   const intent = formatDimText(options.description);
-  lines.push(`${brand} ${operation} ➜ ${intent}`);
+  lines.push(formatHeaderLine({ brand, operation, intent }));
+  lines.push(formatDimText('│')); // Vertical line separator between command and params
 
-  // Parameters box
-  const maxLabel = options.details.reduce((n, d) => Math.max(n, d.label.length), 0);
-  const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+  // Calculate max label width (including "Read more" if URL is present)
+  const allLabels = options.url
+    ? [...options.details.map((d) => d.label), 'Read more']
+    : options.details.map((d) => d.label);
+  const maxLabel = allLabels.reduce((n, label) => Math.max(n, label.length), 0);
 
-  const details: Array<{
-    label: string;
-    value: string;
-    color?: (s: string) => string;
-  }> = options.url
-    ? [...options.details, { label: 'docs', value: options.url, color: blue }]
-    : [...options.details];
-
-  for (const detail of details) {
-    const label = pad(detail.label, maxLabel);
-    const value = useColor && detail.color ? detail.color(detail.value) : detail.value;
-    lines.push(`${formatDimText('│')} ${label}  ${value}`);
+  // Format details (same style as help text options)
+  for (const detail of options.details) {
+    lines.push(
+      formatLabelValueLine({
+        label: detail.label,
+        value: detail.value,
+        maxLabelWidth: maxLabel,
+        useColor,
+        formatDimText,
+      }),
+    );
   }
+
+  // Add "Read more" URL if present (same style as help text)
+  if (options.url) {
+    lines.push(formatDimText('│')); // Separator line before "Read more"
+    lines.push(
+      formatReadMoreLine({ url: options.url, maxLabelWidth: maxLabel, useColor, formatDimText }),
+    );
+  }
+
   lines.push(formatDimText('└'));
 
   return `${lines.join('\n')}\n`;
@@ -309,27 +408,12 @@ export function formatCommandHelp(options: {
   const shortDescription = descriptionLines[0] || '';
   const longDescription = descriptionLines.slice(1);
 
-  // Header: "next <full-command-path> ➜ <short-description>"
-  const brand = createNextBadge(useColor);
+  // Header: "prisma-next <full-command-path> ➜ <short-description>"
+  const brand = createPrismaNextBadge(useColor);
   const operation = useColor ? bold(commandPath) : commandPath;
   const intent = formatDimText(shortDescription);
-  lines.push(`${brand} ${operation} ➜ ${intent}`);
-
-  // Multi-line description (if present)
-  if (longDescription.length > 0) {
-    // Empty line before description
-    lines.push(formatDimText('│'));
-
-    // Multi-line description (white, not dimmed)
-    const formatGreen = (text: string) => (useColor ? green(text) : text);
-    for (const descLine of longDescription) {
-      // Replace "Prisma Next" with green version if present
-      const formattedLine = descLine.replace(/Prisma Next/g, (match) => formatGreen(match));
-      lines.push(`${formatDimText('│')} ${formattedLine}`);
-    }
-  }
-
-  lines.push(formatDimText('│')); // Vertical line separator between description and params
+  lines.push(formatHeaderLine({ brand, operation, intent }));
+  lines.push(formatDimText('│')); // Vertical line separator between command and params
 
   // Extract options and format them
   const optionsList = command.options.map((opt) => {
@@ -349,37 +433,52 @@ export function formatCommandHelp(options: {
 
   // Extract subcommands if any
   const subcommands = command.commands.filter((cmd) => !cmd.name().startsWith('_'));
+
+  // Helper function for padding
+  const pad = createPadFunction();
+
+  // Format subcommands as a tree if present
   if (subcommands.length > 0) {
+    // Find max subcommand name length for alignment
+    let maxSubcommandNameLength = 0;
     for (const subcmd of subcommands) {
-      labelLengths.push(subcmd.name().length);
+      maxSubcommandNameLength = Math.max(maxSubcommandNameLength, subcmd.name().length);
+    }
+
+    // Format each subcommand with tree structure
+    for (let j = 0; j < subcommands.length; j++) {
+      const subcmd = subcommands[j];
+      if (!subcmd) continue;
+
+      const isLastSubcommand = j === subcommands.length - 1 && optionsList.length === 0;
+      const subcommandName = pad(subcmd.name(), maxSubcommandNameLength);
+      const subcommandNameColored = useColor ? cyan(subcommandName) : subcommandName;
+      // Extract only the first line of description for subcommand listings
+      const fullDescription = subcmd.description() || '';
+      const shortDescription = fullDescription.split('\n')[0] || '';
+
+      // Use tree characters: └─ for last subcommand, ├─ for others
+      const treeChar = isLastSubcommand ? '└' : '├';
+      lines.push(
+        `${formatDimText('│')} ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${shortDescription}`,
+      );
     }
   }
 
-  // Calculate max label width from all labels (before colorization)
-  const maxLabel = labelLengths.length > 0 ? Math.max(...labelLengths) : 0;
-  const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+  // Calculate max label width for options
+  const maxLabel =
+    optionsList.length > 0 ? Math.max(...optionsList.map((opt) => opt.flags.length)) : 0;
 
-  // Format details using shared logic
-  const details = formatHelpDetails({
-    subcommands,
-    options: optionsList,
-    useColor,
-    pad,
-    maxLabel,
-  });
+  // Add separator between subcommands and options if both exist
+  if (subcommands.length > 0 && optionsList.length > 0) {
+    lines.push(formatDimText('│'));
+  }
 
-  // Format all details (subcommands, separator, options)
-  // Labels are already colorized and padded when added to details array
-  if (details.length > 0) {
-    for (const detail of details) {
-      // Check if this is a separator marker (empty label and value)
-      if (detail.label === '' && detail.value === '') {
-        lines.push(formatDimText('│')); // Separator line
-        continue;
-      }
-      const label = detail.label;
-      const value = useColor && detail.color ? detail.color(detail.value) : detail.value;
-      lines.push(`${formatDimText('│')} ${label}  ${value}`);
+  // Format options
+  if (optionsList.length > 0) {
+    for (const opt of optionsList) {
+      const flagsColored = formatOptionFlag(opt.flags, maxLabel, useColor);
+      lines.push(`${formatDimText('│')} ${flagsColored}  ${opt.description}`);
     }
   }
 
@@ -387,78 +486,22 @@ export function formatCommandHelp(options: {
   const docsUrl = getCommandDocsUrl(commandPath);
   if (docsUrl) {
     lines.push(formatDimText('│')); // Separator line between params and docs
-    // Use the same maxLabel calculated earlier (before colorization) for alignment
-    const label = pad('Read more', maxLabel);
-    const value = useColor ? blue(docsUrl) : docsUrl;
-    lines.push(`${formatDimText('│')} ${label}  ${value}`);
+    lines.push(
+      formatReadMoreLine({ url: docsUrl, maxLabelWidth: maxLabel, useColor, formatDimText }),
+    );
+  }
+
+  // Multi-line description (if present) - shown after all other content
+  if (longDescription.length > 0) {
+    lines.push(formatDimText('│')); // Separator line before description
+    lines.push(
+      ...formatMultilineDescription({ descriptionLines: longDescription, useColor, formatDimText }),
+    );
   }
 
   lines.push(formatDimText('└'));
 
   return `${lines.join('\n')}\n`;
-}
-
-/**
- * Formats subcommands and options into a details array with consistent formatting.
- * Shared logic used by both root help and command help.
- */
-function formatHelpDetails(options: {
-  readonly subcommands: readonly Command[];
-  readonly options: ReadonlyArray<{ flags: string; description: string }>;
-  readonly useColor: boolean;
-  readonly pad: (s: string, w: number) => string;
-  readonly maxLabel: number;
-}): Array<{
-  label: string;
-  value: string;
-  color?: (s: string) => string;
-}> {
-  const { subcommands, options: optionsList, useColor, pad, maxLabel } = options;
-  const details: Array<{
-    label: string;
-    value: string;
-    color?: (s: string) => string;
-  }> = [];
-
-  // Format subcommands first (if any) with color coding
-  if (subcommands.length > 0) {
-    for (const subcmd of subcommands) {
-      // Pad the subcommand name first
-      const paddedName = pad(subcmd.name(), maxLabel);
-      // Colorize in cyan
-      const label = useColor ? cyan(paddedName) : paddedName;
-      const desc = subcmd.description() || '';
-      details.push({ label, value: desc });
-    }
-  }
-
-  // Add separator between subcommands and options
-  const hasSubcommands = subcommands.length > 0;
-  const hasOptions = optionsList.length > 0;
-  if (hasSubcommands && hasOptions) {
-    details.push({ label: '', value: '' }); // Marker for separator
-  }
-
-  // Format options with color coding
-  if (optionsList.length > 0) {
-    for (const opt of optionsList) {
-      // Pad the original flags first (based on original length)
-      const paddedFlags = pad(opt.flags, maxLabel);
-      // Then colorize: placeholders in magenta, whole thing in cyan
-      let label = paddedFlags;
-      if (useColor) {
-        // Color placeholders in magenta first, then wrap the whole thing in cyan
-        label = paddedFlags.replace(/(<[^>]+>)/g, (match) => magenta(match));
-        label = cyan(label);
-      }
-      details.push({
-        label,
-        value: opt.description,
-      });
-    }
-  }
-
-  return details;
 }
 
 /**
@@ -473,26 +516,12 @@ export function formatRootHelp(options: {
   const useColor = flags.color !== false;
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  // Header: "prisma next → Manage your data layer"
-  const title = useColor ? green(bold('prisma next')) : 'prisma next';
+  // Header: "prisma-next → Manage your data layer"
+  const brand = createPrismaNextBadge(useColor);
   const shortDescription = 'Manage your data layer';
   const intent = formatDimText(shortDescription);
-  lines.push(`${title} → ${intent}`);
-
-  // Empty line before description
-  lines.push(formatDimText('│'));
-
-  // Multi-line description (white, not dimmed, with "Prisma Next" in green)
-  const formatGreen = (text: string) => (useColor ? green(text) : text);
-  const descriptionLines = [
-    `Use ${formatGreen('Prisma Next')} to define your application's data layer in a declarative contract. Describe your schema as`,
-    "a data contract. Sign your database and application with the same contract to guarantee they're compatible.",
-    'Write migrations to change your contract and database safely.',
-  ];
-  for (const descLine of descriptionLines) {
-    lines.push(`${formatDimText('│')} ${descLine}`);
-  }
-  lines.push(formatDimText('│')); // Vertical line separator between description and params
+  lines.push(formatHeaderLine({ brand, operation: '', intent }));
+  lines.push(formatDimText('│')); // Vertical line separator between command and params
 
   // Extract top-level commands (exclude hidden commands starting with '_' and the 'help' command)
   const topLevelCommands = program.commands.filter(
@@ -521,7 +550,7 @@ export function formatRootHelp(options: {
       }
     }
 
-    const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+    const pad = createPadFunction();
 
     // Format each top-level command
     for (let i = 0; i < topLevelCommands.length; i++) {
@@ -544,14 +573,26 @@ export function formatRootHelp(options: {
           const isLastSubcommand = j === subcommands.length - 1;
           const subcommandName = pad(subcmd.name(), maxSubcommandNameLength);
           const subcommandNameColored = useColor ? cyan(subcommandName) : subcommandName;
-          const description = subcmd.description() || '';
+          const fullDescription = subcmd.description() || '';
+          const descriptionLines = fullDescription
+            .split('\n')
+            .filter((line) => line.trim().length > 0);
+          const shortDescription = descriptionLines[0] || '';
+          const longDescription = descriptionLines.slice(1);
 
           // Use tree characters: └─ for last subcommand, ├─ for others
           const treeChar = isLastSubcommand ? '└' : '├';
           const continuation = isLastCommand && isLastSubcommand ? ' ' : formatDimText('│');
           lines.push(
-            `${formatDimText('│')} ${continuation}  ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${description}`,
+            `${formatDimText('│')} ${continuation}  ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${shortDescription}`,
           );
+
+          // Add multiline description if present
+          if (longDescription.length > 0) {
+            for (const descLine of longDescription) {
+              lines.push(`${formatDimText('│')} ${continuation}     ${descLine}`);
+            }
+          }
         }
       } else {
         // Standalone command - show command name and description on same line
@@ -572,17 +613,31 @@ export function formatRootHelp(options: {
   // Format global options
   if (globalOptions.length > 0) {
     const maxOptionLength = Math.max(...globalOptions.map((opt) => opt.flags.length));
-    const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+    const pad = createPadFunction();
 
     for (const opt of globalOptions) {
       const flagsPadded = pad(opt.flags, maxOptionLength);
       let flagsColored = flagsPadded;
       if (useColor) {
         // Color placeholders in magenta, then wrap in cyan
-        flagsColored = flagsPadded.replace(/(<[^>]+>)/g, (match) => magenta(match));
+        flagsColored = flagsPadded.replace(/(<[^>]+>)/g, (match: string) => magenta(match));
         flagsColored = cyan(flagsColored);
       }
       lines.push(`${formatDimText('│')} ${flagsColored}  ${opt.description}`);
+    }
+  }
+
+  // Multi-line description (white, not dimmed, with "Prisma Next" in green) - shown at bottom
+  const formatGreen = (text: string) => (useColor ? green(text) : text);
+  const descriptionLines = [
+    `Use ${formatGreen('Prisma Next')} to define your application's data layer in a declarative contract. Describe your schema as`,
+    "a data contract. Sign your database and application with the same contract to guarantee they're compatible.",
+    'Write migrations to change your contract and database safely.',
+  ];
+  if (descriptionLines.length > 0) {
+    lines.push(formatDimText('│')); // Separator line before description
+    for (const descLine of descriptionLines) {
+      lines.push(`${formatDimText('│')} ${descLine}`);
     }
   }
 

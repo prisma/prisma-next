@@ -37,7 +37,12 @@ interface ContractEmitOptions {
 
 export function createContractEmitCommand(): Command {
   const command = new Command('emit')
-    .description('Emit contract.json and contract.d.ts from config.contract')
+    .description(
+      'Emit signed contract artifacts\n' +
+        'Reads your contract source (TypeScript or Prisma schema) and emits contract.json and\n' +
+        'contract.d.ts. The contract.json contains the canonical contract structure, and\n' +
+        'contract.d.ts provides TypeScript types for type-safe query building.',
+    )
     .configureHelp({
       formatHelp: (cmd) => {
         const flags = parseGlobalFlags({});

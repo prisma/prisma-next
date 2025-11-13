@@ -36,7 +36,11 @@ interface DbVerifyOptions {
 
 export function createDbVerifyCommand(): Command {
   const command = new Command('verify')
-    .description('Verify database matches emitted contract')
+    .description(
+      'Check the database satisfies your contract\n' +
+        'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
+        'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
+    )
     .configureHelp({
       formatHelp: (cmd) => {
         const flags = parseGlobalFlags({});
