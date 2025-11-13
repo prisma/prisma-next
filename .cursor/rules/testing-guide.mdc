@@ -219,6 +219,60 @@ it('test', async () => {
 - ❌ Don't duplicate helpers that already exist in the shared packages
 - ❌ Don't add dependencies to `@prisma-next/test-utils` on other `@prisma-next/*` packages (it must remain dependency-free)
 
+## Testing Validation Logic
+
+**CRITICAL**: Don't test exhaustive validation logic through integration tests with file I/O. Validation logic should be unit tested directly, not through loading/parsing workflows.
+
+**❌ WRONG: Exhaustive validation tests through file I/O**
+
+```typescript
+// Don't test every validation rule through config loading
+it('throws error when family is missing', async () => {
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  writeFileSync(configPath, `export default { target: {...}, adapter: {...} };`, 'utf-8');
+  await expect(loadConfig(configPath)).rejects.toThrow('Config must have a "family" field');
+});
+
+it('throws error when family kind is invalid', async () => {
+  // ... 25+ more similar tests
+});
+```
+
+**✅ CORRECT: Focus integration tests on loading behavior, unit test validation separately**
+
+```typescript
+// Integration test: Focus on loading behavior
+it('loads config with default export', async () => {
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  writeFileSync(configPath, validConfig, 'utf-8');
+  const config = await loadConfig(configPath);
+  expect(config).toBeDefined();
+});
+
+it('throws error for invalid config structure', async () => {
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  writeFileSync(configPath, `export default {};`, 'utf-8');
+  await expect(loadConfig(configPath)).rejects.toThrow();
+});
+
+// Unit test: Test validation logic directly (if validation function is exported)
+it('validates required fields', () => {
+  expect(() => validateConfig({})).toThrow('Config must have a "family" field');
+  expect(() => validateConfig({ family: { kind: 'invalid' } })).toThrow('Config.family must have kind: "family"');
+});
+```
+
+**Why?**
+- Integration tests should verify component interactions (loading, file I/O, error handling)
+- Validation logic is straightforward and doesn't need exhaustive testing through file I/O
+- Unit tests are faster and more focused on the validation logic itself
+- Reduces test maintenance burden (fewer tests to update when validation changes)
+
+**When to test validation in integration tests:**
+- ✅ Test that validation errors are properly surfaced (e.g., "throws error for invalid config")
+- ✅ Test that valid configs pass validation
+- ❌ Don't test every single validation rule through file I/O
+
 ## Test File Organization
 
 **Maximum file size: 500 lines**
