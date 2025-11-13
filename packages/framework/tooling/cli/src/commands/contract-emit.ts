@@ -37,7 +37,6 @@ interface ContractEmitOptions {
 export function createContractEmitCommand(): Command {
   const command = new Command('emit')
     .description('Emit contract.json and contract.d.ts from config.contract')
-    .allowExcessArguments(false)
     .option(
       '--config <path>',
       'Path to prisma-next.config.ts (defaults to ./prisma-next.config.ts if present)',

@@ -1,10 +1,11 @@
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
 import { collect } from './utils';
 
-export async function ormGetUsersWithPosts() {
-  const runtime = getRuntime();
+export async function ormGetUsersWithPosts(runtime?: Runtime) {
+  const rt = runtime ?? getRuntime();
 
   const plan = orm
     .user()
@@ -18,11 +19,11 @@ export async function ormGetUsersWithPosts() {
       params: { postId: 1 },
     });
 
-  return collect(runtime.execute(plan));
+  return collect(rt.execute(plan));
 }
 
-export async function ormGetUsersWithoutPosts() {
-  const runtime = getRuntime();
+export async function ormGetUsersWithoutPosts(runtime?: Runtime) {
+  const rt = runtime ?? getRuntime();
 
   const plan = orm
     .user()
@@ -36,11 +37,11 @@ export async function ormGetUsersWithoutPosts() {
       params: { postId: 1 },
     });
 
-  return collect(runtime.execute(plan));
+  return collect(rt.execute(plan));
 }
 
-export async function ormGetUsersWhereAllPostsMatch() {
-  const runtime = getRuntime();
+export async function ormGetUsersWhereAllPostsMatch(runtime?: Runtime) {
+  const rt = runtime ?? getRuntime();
 
   const plan = orm
     .user()
@@ -54,5 +55,5 @@ export async function ormGetUsersWhereAllPostsMatch() {
       params: { userId: 1 },
     });
 
-  return collect(runtime.execute(plan));
+  return collect(rt.execute(plan));
 }

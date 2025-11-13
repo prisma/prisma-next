@@ -21,7 +21,6 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
-import { closeRuntime } from '../src/prisma/runtime';
 
 let contract: Contract;
 
@@ -67,11 +66,6 @@ describe('ORM integration tests', () => {
     'orm.getUsers returns users with selected fields, respects limit and ordering',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        // Set DATABASE_URL for getRuntime() used by query functions
-        const originalDatabaseUrl = process.env['DATABASE_URL'];
-        process.env['DATABASE_URL'] = connectionString;
-        await closeRuntime();
-
         const adapter = createPostgresAdapter();
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
@@ -112,7 +106,7 @@ describe('ORM integration tests', () => {
           });
 
           const { ormGetUsers } = await import('../src/queries/orm-get-users');
-          const users = await ormGetUsers(2);
+          const users = await ormGetUsers(2, runtime);
 
           expect(users).toHaveLength(2);
           expect(users[0]).toHaveProperty('id');
@@ -123,12 +117,6 @@ describe('ORM integration tests', () => {
           expect(typeof (users[0] as { email: unknown }).email).toBe('string');
         } finally {
           await runtime.close();
-          await closeRuntime();
-          if (originalDatabaseUrl !== undefined) {
-            process.env['DATABASE_URL'] = originalDatabaseUrl;
-          } else {
-            delete process.env['DATABASE_URL'];
-          }
         }
       }, {});
     },
@@ -139,10 +127,6 @@ describe('ORM integration tests', () => {
     'orm.getUserById returns single user by ID',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        // Set DATABASE_URL for getRuntime() used by query functions
-        const originalDatabaseUrl = process.env['DATABASE_URL'];
-        process.env['DATABASE_URL'] = connectionString;
-        await closeRuntime();
         const adapter = createPostgresAdapter();
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
@@ -182,7 +166,7 @@ describe('ORM integration tests', () => {
           });
 
           const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
-          const user = await ormGetUserById(1);
+          const user = await ormGetUserById(1, runtime);
 
           expect(user).not.toBeNull();
           expect(user).toHaveProperty('id', 1);
@@ -190,12 +174,6 @@ describe('ORM integration tests', () => {
           expect(user).toHaveProperty('createdAt');
         } finally {
           await runtime.close();
-          await closeRuntime();
-          if (originalDatabaseUrl !== undefined) {
-            process.env['DATABASE_URL'] = originalDatabaseUrl;
-          } else {
-            delete process.env['DATABASE_URL'];
-          }
         }
       }, {});
     },
@@ -206,10 +184,6 @@ describe('ORM integration tests', () => {
     'orm relation filters: where.related.posts.some() returns users with at least one post',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        // Set DATABASE_URL for getRuntime() used by query functions
-        const originalDatabaseUrl = process.env['DATABASE_URL'];
-        process.env['DATABASE_URL'] = connectionString;
-        await closeRuntime();
         const adapter = createPostgresAdapter();
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
@@ -257,19 +231,13 @@ describe('ORM integration tests', () => {
           });
 
           const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
-          const users = await ormGetUsersWithPosts();
+          const users = await ormGetUsersWithPosts(runtime);
 
           expect(users.length).toBeGreaterThan(0);
           expect(users[0]).toHaveProperty('id');
           expect(users[0]).toHaveProperty('email');
         } finally {
           await runtime.close();
-          await closeRuntime();
-          if (originalDatabaseUrl !== undefined) {
-            process.env['DATABASE_URL'] = originalDatabaseUrl;
-          } else {
-            delete process.env['DATABASE_URL'];
-          }
         }
       }, {});
     },
@@ -280,10 +248,6 @@ describe('ORM integration tests', () => {
     'orm includes: include.posts() returns users with nested posts arrays',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        // Set DATABASE_URL for getRuntime() used by query functions
-        const originalDatabaseUrl = process.env['DATABASE_URL'];
-        process.env['DATABASE_URL'] = connectionString;
-        await closeRuntime();
         const adapter = createPostgresAdapter();
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
@@ -331,7 +295,7 @@ describe('ORM integration tests', () => {
           });
 
           const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
-          const users = await ormGetUsersWithPosts(10);
+          const users = await ormGetUsersWithPosts(10, runtime);
 
           expect(users.length).toBeGreaterThan(0);
           expect(users[0]).toHaveProperty('id');
@@ -340,12 +304,6 @@ describe('ORM integration tests', () => {
           expect(Array.isArray((users[0] as { posts: unknown }).posts)).toBe(true);
         } finally {
           await runtime.close();
-          await closeRuntime();
-          if (originalDatabaseUrl !== undefined) {
-            process.env['DATABASE_URL'] = originalDatabaseUrl;
-          } else {
-            delete process.env['DATABASE_URL'];
-          }
         }
       }, {});
     },
@@ -356,12 +314,6 @@ describe('ORM integration tests', () => {
     'orm writes: create() inserts a user',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        // Set DATABASE_URL for getRuntime() used by query functions
-        const originalDatabaseUrl = process.env['DATABASE_URL'];
-        process.env['DATABASE_URL'] = connectionString;
-        // Reset cached runtime so it uses the new connection string
-        await closeRuntime();
-
         const adapter = createPostgresAdapter();
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
@@ -398,7 +350,7 @@ describe('ORM integration tests', () => {
           });
 
           const { ormCreateUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormCreateUser('alice@example.com');
+          const affectedRows = await ormCreateUser('alice@example.com', runtime);
 
           expect(affectedRows).toBe(1);
 
@@ -412,13 +364,6 @@ describe('ORM integration tests', () => {
           expect(rowCount).toBe(1);
         } finally {
           await runtime.close();
-          await closeRuntime(); // Clean up runtime created by getRuntime()
-          // Restore original DATABASE_URL
-          if (originalDatabaseUrl !== undefined) {
-            process.env['DATABASE_URL'] = originalDatabaseUrl;
-          } else {
-            delete process.env['DATABASE_URL'];
-          }
         }
       }, {});
     },
@@ -429,10 +374,6 @@ describe('ORM integration tests', () => {
     'orm writes: update() updates a user',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        // Set DATABASE_URL for getRuntime() used by query functions
-        const originalDatabaseUrl = process.env['DATABASE_URL'];
-        process.env['DATABASE_URL'] = connectionString;
-        await closeRuntime();
         const adapter = createPostgresAdapter();
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
@@ -471,12 +412,8 @@ describe('ORM integration tests', () => {
             ]);
           });
 
-          // Ensure DATABASE_URL is still set before calling the function
-          if (!process.env['DATABASE_URL']) {
-            process.env['DATABASE_URL'] = connectionString;
-          }
           const { ormUpdateUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com');
+          const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
 
           expect(affectedRows).toBe(1);
 
@@ -487,13 +424,6 @@ describe('ORM integration tests', () => {
           expect(email).toBe('alice-updated@example.com');
         } finally {
           await runtime.close();
-          await closeRuntime(); // Clean up runtime created by getRuntime()
-          // Restore original DATABASE_URL
-          if (originalDatabaseUrl !== undefined) {
-            process.env['DATABASE_URL'] = originalDatabaseUrl;
-          } else {
-            delete process.env['DATABASE_URL'];
-          }
         }
       }, {});
     },
@@ -504,11 +434,6 @@ describe('ORM integration tests', () => {
     'orm writes: delete() deletes a user',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        // Set DATABASE_URL for getRuntime() used by query functions
-        const originalDatabaseUrl = process.env['DATABASE_URL'];
-        process.env['DATABASE_URL'] = connectionString;
-        // Reset cached runtime so it uses the new connection string
-        await closeRuntime();
         const adapter = createPostgresAdapter();
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const pool = new Pool({ connectionString });
@@ -548,7 +473,7 @@ describe('ORM integration tests', () => {
           });
 
           const { ormDeleteUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormDeleteUser(1);
+          const affectedRows = await ormDeleteUser(1, runtime);
 
           expect(affectedRows).toBe(1);
 
@@ -562,12 +487,6 @@ describe('ORM integration tests', () => {
           expect(rowCount).toBe(0);
         } finally {
           await runtime.close();
-          await closeRuntime();
-          if (originalDatabaseUrl !== undefined) {
-            process.env['DATABASE_URL'] = originalDatabaseUrl;
-          } else {
-            delete process.env['DATABASE_URL'];
-          }
         }
       }, {});
     },

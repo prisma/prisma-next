@@ -161,14 +161,18 @@ describe('contract emit command (e2e)', () => {
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
+      // Commands don't throw - they call process.exit() with non-zero exit code
+      // executeCommand will catch the process.exit error and re-throw for non-zero codes
+      // Match the pattern from emit-command.test.ts: include command name in args
       await expect(
-        command.parseAsync(['node', 'cli.js', 'emit', '--config', 'nonexistent.config.ts']),
-      ).rejects.toThrow();
+        executeCommand(command, ['node', 'cli.js', 'emit', '--config', 'nonexistent.config.ts']),
+      ).rejects.toThrow('process.exit called');
     } finally {
       process.chdir(originalCwd);
     }
 
     // Check that error output contains PN-CLI code
+    // handleResult should have logged the error to console.error before process.exit was called
     const errorOutput = consoleErrors.join('\n');
     expect(errorOutput).toContain('PN-CLI-');
     // Config errors should have exit code 2 (usage/config error)
@@ -183,14 +187,18 @@ describe('contract emit command (e2e)', () => {
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
+      // Commands don't throw - they call process.exit() with non-zero exit code
+      // executeCommand will catch the process.exit error and re-throw for non-zero codes
+      // Match the pattern from emit-command.test.ts: include command name in args
       await expect(
-        command.parseAsync(['node', 'cli.js', 'emit', '--config', 'no-contract-config.ts']),
-      ).rejects.toThrow();
+        executeCommand(command, ['node', 'cli.js', 'emit', '--config', 'no-contract-config.ts']),
+      ).rejects.toThrow('process.exit called');
     } finally {
       process.chdir(originalCwd);
     }
 
     // Check that error output contains PN-CLI code
+    // handleResult should have logged the error to console.error before process.exit was called
     const errorOutput = consoleErrors.join('\n');
     expect(errorOutput).toContain('PN-CLI-');
   });
