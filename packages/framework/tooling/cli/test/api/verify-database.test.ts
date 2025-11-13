@@ -13,6 +13,7 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emitContract } from '../../src/api/emit-contract';
 import { verifyDatabase } from '../../src/api/verify-database';
+import { CliStructuredError } from '../../src/utils/cli-errors';
 import { loadConfig } from '../../src/config-loader';
 import {
   assembleOperationRegistry,
@@ -336,32 +337,20 @@ describe('verifyDatabase API', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          // Use a config that has db.url but no driver
-          // We'll need to create a minimal config for this test
+          // Use a fixture config that has family with readMarker but no driver
+          // Emit doesn't need driver, so we can use the no-driver config for everything
           const testSetup = setupIntegrationTestDirectoryFromFixtures(
             fixtureSubdir,
-            'prisma-next.config.ts',
+            'prisma-next.config.no-driver.ts',
             { '{{DB_URL}}': connectionString },
           );
-          const testDirWithDb = testSetup.testDir;
-          const configPathWithDb = testSetup.configPath;
-          const cleanupWithDb = testSetup.cleanup;
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
+          const cleanup = testSetup.cleanup;
 
           try {
-            // Emit contract using the original config (needs driver for emit, but we'll use the fixture)
-            // Actually, emit doesn't need driver, so we can use the fixture config
-            await emitContractFromConfig(configPathWithDb, testDirWithDb);
-
-            // Create a modified config without driver for verification
-            const { readFileSync, writeFileSync } = await import('node:fs');
-            const { join } = await import('node:path');
-            const configContent = readFileSync(configPathWithDb, 'utf-8');
-            // Remove driver import and usage
-            const modifiedConfig = configContent
-              .replace(/import postgresDriver from '@prisma-next\/driver-postgres\/cli';\s*/g, '')
-              .replace(/driver: postgresDriver,\s*/g, '');
-            const noDriverConfigPath = join(testDirWithDb, 'prisma-next.config.no-driver.ts');
-            writeFileSync(noDriverConfigPath, modifiedConfig, 'utf-8');
+            // Emit contract using the config (emit doesn't need driver)
+            await emitContractFromConfig(configPath, testDir);
 
             await withClient(connectionString, async (client) => {
               // Setup marker schema and table
@@ -370,21 +359,29 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            // Change to test directory and try to verify with config that has no driver
+            // Try to verify with config that has no driver
             const originalCwd = process.cwd();
             try {
-              process.chdir(testDirWithDb);
-              await expect(
-                verifyDatabase({
+              process.chdir(testDir);
+              try {
+                await verifyDatabase({
                   dbUrl: connectionString,
-                  configPath: 'prisma-next.config.no-driver.ts',
-                }),
-              ).rejects.toThrow('PN-CLI-4010');
+                  configPath: 'prisma-next.config.ts',
+                });
+                throw new Error('Expected verifyDatabase to throw');
+              } catch (error) {
+                // Verify it's the correct error code
+                expect(error).toBeInstanceOf(CliStructuredError);
+                if (error instanceof CliStructuredError) {
+                  expect(error.code).toBe('4010');
+                  expect(error.toEnvelope().code).toBe('PN-CLI-4010');
+                }
+              }
             } finally {
               process.chdir(originalCwd);
             }
           } finally {
-            cleanupWithDb();
+            cleanup();
           }
         },
         { acceleratePort: 54062, databasePort: 54063, shadowDatabasePort: 54064 },

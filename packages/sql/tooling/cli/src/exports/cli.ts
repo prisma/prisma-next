@@ -1,5 +1,5 @@
 import type { FamilyDescriptor } from '@prisma-next/cli/config-types';
-import type { OperationManifest } from '@prisma-next/cli/pack-manifest-types';
+import type { OperationManifest } from '@prisma-next/control-plane/pack-manifest-types';
 import type { OperationSignature } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "arktype": "^2.0.0",
     "c12": "^3.3.2",

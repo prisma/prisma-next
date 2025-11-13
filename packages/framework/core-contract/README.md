@@ -18,7 +18,7 @@ The contract supports document target families:
 
 ## Package Contents
 
-- **TypeScript Types**: Type definitions for `DocumentContract` and related types
+- **TypeScript Types**: Type definitions for `DocumentContract`, `ContractMarkerRecord`, and related types
 - **JSON Schemas**: Schema definitions for validating `contract.json` files in IDEs and tooling
   - `data-contract-document-v1.json` (Document family)
 
@@ -29,7 +29,7 @@ The contract supports document target families:
 Import contract types in your TypeScript code:
 
 ```typescript
-import type { DocumentContract } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, DocumentContract } from '@prisma-next/contract/types';
 import { isDocumentContract } from '@prisma-next/contract/types';
 
 // Use type guards to narrow the contract type
@@ -38,6 +38,11 @@ function processContract(contract: DocumentContract) {
     // contract is DocumentContract
     console.log(contract.storage.document.collections);
   }
+}
+
+// Use ContractMarkerRecord for database marker operations
+function processMarker(marker: ContractMarkerRecord) {
+  console.log(marker.coreHash, marker.profileHash);
 }
 ```
 

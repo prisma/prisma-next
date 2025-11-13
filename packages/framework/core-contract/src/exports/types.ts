@@ -3,6 +3,7 @@
 // Plan types - target-family agnostic execution types
 export type {
   ContractBase,
+  ContractMarkerRecord,
   DocCollection,
   DocIndex,
   DocumentContract,

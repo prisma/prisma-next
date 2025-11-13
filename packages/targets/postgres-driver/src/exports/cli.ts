@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CliDriver, DriverDescriptor } from '@prisma-next/cli/config-types';
-import type { ExtensionPackManifest } from '@prisma-next/cli/pack-manifest-types';
+import type { ControlPlaneDriver, DriverDescriptor } from '@prisma-next/control-plane/types';
+import type { ExtensionPackManifest } from '@prisma-next/control-plane/pack-manifest-types';
 import { type } from 'arktype';
 import { Client } from 'pg';
 
@@ -55,7 +55,7 @@ const postgresDriverDescriptor: DriverDescriptor = {
   id: 'postgres',
   family: 'sql',
   manifest: loadDriverManifest(),
-  async create(url: string): Promise<CliDriver> {
+  async create(url: string): Promise<ControlPlaneDriver> {
     const client = new Client({ connectionString: url });
     await client.connect();
     return {

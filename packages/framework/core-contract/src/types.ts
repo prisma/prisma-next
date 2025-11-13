@@ -129,3 +129,17 @@ export function isDocumentContract(contract: unknown): contract is DocumentContr
     contract.targetFamily === 'document'
   );
 }
+
+/**
+ * Contract marker record stored in the database.
+ * Represents the current contract identity for a database.
+ */
+export interface ContractMarkerRecord {
+  readonly coreHash: string;
+  readonly profileHash: string;
+  readonly contractJson: unknown | null;
+  readonly canonicalVersion: number | null;
+  readonly updatedAt: Date;
+  readonly appTag: string | null;
+  readonly meta: Record<string, unknown>;
+}

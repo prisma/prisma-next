@@ -1,10 +1,85 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   AdapterDescriptor,
-  CliDriver,
+  ControlPlaneDriver,
   ExtensionDescriptor,
   TargetDescriptor,
-} from '@prisma-next/cli/config-types';
-import { type ContractMarkerRecord, parseContractMarkerRow } from '@prisma-next/cli/marker-parser';
+} from '@prisma-next/control-plane/types';
+import { type } from 'arktype';
+
+const MetaSchema = type({ '[string]': 'unknown' });
+
+function parseMeta(meta: unknown): Record<string, unknown> {
+  if (meta === null || meta === undefined) {
+    return {};
+  }
+
+  let parsed: unknown;
+  if (typeof meta === 'string') {
+    try {
+      parsed = JSON.parse(meta);
+    } catch {
+      return {};
+    }
+  } else {
+    parsed = meta;
+  }
+
+  const result = MetaSchema(parsed);
+  if (result instanceof type.errors) {
+    return {};
+  }
+
+  return result as Record<string, unknown>;
+}
+
+const ContractMarkerRowSchema = type({
+  core_hash: 'string',
+  profile_hash: 'string',
+  'contract_json?': 'unknown | null',
+  'canonical_version?': 'number | null',
+  'updated_at?': 'Date | string',
+  'app_tag?': 'string | null',
+  'meta?': 'unknown | null',
+});
+
+/**
+ * Parses a contract marker row from database query result.
+ * This is SQL-specific parsing logic (handles SQL row structure with snake_case columns).
+ */
+export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
+  const result = ContractMarkerRowSchema(row);
+  if (result instanceof type.errors) {
+    const messages = result.map((p: { message: string }) => p.message).join('; ');
+    throw new Error(`Invalid contract marker row: ${messages}`);
+  }
+
+  const validatedRow = result as {
+    core_hash: string;
+    profile_hash: string;
+    contract_json?: unknown | null;
+    canonical_version?: number | null;
+    updated_at?: Date | string;
+    app_tag?: string | null;
+    meta?: unknown | null;
+  };
+
+  const updatedAt = validatedRow.updated_at
+    ? validatedRow.updated_at instanceof Date
+      ? validatedRow.updated_at
+      : new Date(validatedRow.updated_at)
+    : new Date();
+
+  return {
+    coreHash: validatedRow.core_hash,
+    profileHash: validatedRow.profile_hash,
+    contractJson: validatedRow.contract_json ?? null,
+    canonicalVersion: validatedRow.canonical_version ?? null,
+    updatedAt,
+    appTag: validatedRow.app_tag ?? null,
+    meta: parseMeta(validatedRow.meta),
+  };
+}
 
 /**
  * Returns the SQL statement to read the contract marker.
@@ -32,10 +107,10 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
  * Returns the parsed marker record or null if no marker is found.
  * This abstracts SQL-specific details from the Control Plane.
  *
- * @param driver - CliDriver instance for executing queries
+ * @param driver - ControlPlaneDriver instance for executing queries
  * @returns Promise resolving to ContractMarkerRecord or null if marker not found
  */
-export async function readMarker(driver: CliDriver): Promise<ContractMarkerRecord | null> {
+export async function readMarker(driver: ControlPlaneDriver): Promise<ContractMarkerRecord | null> {
   const markerStatement = readMarkerSql();
   const queryResult = await driver.query<{
     core_hash: string;

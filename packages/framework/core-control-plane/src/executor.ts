@@ -1,62 +1,117 @@
-import type { VerifyDatabaseResult } from '../api/verify-database';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   AdapterDescriptor,
-  CliDriver,
+  ControlPlaneDriver,
   ExtensionDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
-} from '../config-types';
-import type { ContractMarkerRecord } from '../utils/marker-parser';
+} from './types';
+
+/**
+ * Result type for database verification operations.
+ * Returned by ControlExecutor.verifyAgainst().
+ */
+export interface VerifyDatabaseResult {
+  readonly ok: boolean;
+  readonly code?: string;
+  readonly summary: string;
+  readonly contract: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+  readonly marker?: {
+    readonly coreHash?: string;
+    readonly profileHash?: string;
+  };
+  readonly target: {
+    readonly expected: string;
+    readonly actual?: string;
+  };
+  readonly missingCodecs?: readonly string[];
+  readonly codecCoverageSkipped?: boolean;
+  readonly meta?: {
+    readonly configPath?: string;
+    readonly contractPath: string;
+  };
+  readonly timings: {
+    readonly total: number;
+  };
+}
+
+type CreateVerifyResultOptions = {
+  ok: boolean;
+  code?: string;
+  summary: string;
+  contractCoreHash: string;
+  contractProfileHash?: string;
+  marker?: ContractMarkerRecord;
+  expectedTargetId: string;
+  actualTargetId?: string;
+  missingCodecs?: readonly string[];
+  codecCoverageSkipped?: boolean;
+  configPath?: string;
+  contractPath: string;
+  totalTime: number;
+};
 
 /**
  * Creates a VerifyDatabaseResult object with common structure.
  * Centralizes result construction to reduce duplication.
  */
-function createVerifyResult(options: {
-  readonly ok: boolean;
-  readonly code?: string;
-  readonly summary: string;
-  readonly contractCoreHash: string;
-  readonly contractProfileHash?: string;
-  readonly marker?: ContractMarkerRecord;
-  readonly expectedTargetId: string;
-  readonly actualTargetId?: string;
-  readonly missingCodecs?: readonly string[];
-  readonly codecCoverageSkipped?: boolean;
-  readonly configPath?: string;
-  readonly contractPath: string;
-  readonly totalTime: number;
-}): VerifyDatabaseResult {
-  return {
+function createVerifyResult(options: CreateVerifyResultOptions): VerifyDatabaseResult {
+  const contract: { coreHash: string; profileHash?: string } = {
+    coreHash: options.contractCoreHash,
+  };
+  if (options.contractProfileHash) {
+    contract.profileHash = options.contractProfileHash;
+  }
+
+  const target: { expected: string; actual?: string } = {
+    expected: options.expectedTargetId,
+  };
+  if (options.actualTargetId) {
+    target.actual = options.actualTargetId;
+  }
+
+  const meta: { contractPath: string; configPath?: string } = {
+    contractPath: options.contractPath,
+  };
+  if (options.configPath) {
+    meta.configPath = options.configPath;
+  }
+
+  const result: VerifyDatabaseResult = {
     ok: options.ok,
-    ...(options.code ? { code: options.code } : {}),
     summary: options.summary,
-    contract: {
-      coreHash: options.contractCoreHash,
-      ...(options.contractProfileHash ? { profileHash: options.contractProfileHash } : {}),
-    },
-    ...(options.marker
-      ? {
-          marker: {
-            coreHash: options.marker.coreHash,
-            profileHash: options.marker.profileHash,
-          },
-        }
-      : {}),
-    target: {
-      expected: options.expectedTargetId,
-      ...(options.actualTargetId ? { actual: options.actualTargetId } : {}),
-    },
-    ...(options.missingCodecs ? { missingCodecs: options.missingCodecs } : {}),
-    ...(options.codecCoverageSkipped ? { codecCoverageSkipped: options.codecCoverageSkipped } : {}),
-    meta: {
-      ...(options.configPath ? { configPath: options.configPath } : {}),
-      contractPath: options.contractPath,
-    },
+    contract,
+    target,
+    meta,
     timings: {
       total: options.totalTime,
     },
   };
+
+  if (options.code) {
+    (result as { code?: string }).code = options.code;
+  }
+
+  if (options.marker) {
+    (result as { marker?: { coreHash: string; profileHash: string } }).marker = {
+      coreHash: options.marker.coreHash,
+      profileHash: options.marker.profileHash,
+    };
+  }
+
+  if (options.missingCodecs) {
+    (result as { missingCodecs?: readonly string[] }).missingCodecs = options.missingCodecs;
+  }
+
+  if (options.codecCoverageSkipped) {
+    (result as { codecCoverageSkipped?: boolean }).codecCoverageSkipped =
+      options.codecCoverageSkipped;
+  }
+
+  return result;
 }
 
 /**
@@ -110,7 +165,7 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
  * Provides thin control-only operations (no encode/decode, no runtime plugins).
  */
 export class ControlExecutor {
-  private readonly driver: CliDriver;
+  private readonly driver: ControlPlaneDriver;
   private readonly familyVerify: FamilyDescriptor['verify'];
   private readonly adapter: AdapterDescriptor;
   private readonly target: TargetDescriptor;
@@ -118,7 +173,7 @@ export class ControlExecutor {
   private readonly contractIR: unknown;
 
   constructor(options: {
-    readonly driver: CliDriver;
+    readonly driver: ControlPlaneDriver;
     readonly familyVerify: FamilyDescriptor['verify'];
     readonly adapter: AdapterDescriptor;
     readonly target: TargetDescriptor;
@@ -201,64 +256,67 @@ export class ControlExecutor {
     // Check marker presence
     if (!marker) {
       const totalTime = Date.now() - startTime;
-      return createVerifyResult({
+      const options: CreateVerifyResultOptions = {
         ok: false,
         code: 'PN-RTM-3001',
         summary: 'Marker missing',
         contractCoreHash,
-        ...(contractProfileHash ? { contractProfileHash } : {}),
         expectedTargetId,
-        ...(missingCodecs ? { missingCodecs } : {}),
-        ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-        ...(configPath ? { configPath } : {}),
         contractPath,
         totalTime,
-      });
+      };
+      if (contractProfileHash) options.contractProfileHash = contractProfileHash;
+      if (missingCodecs) options.missingCodecs = missingCodecs;
+      if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
+      if (configPath) options.configPath = configPath;
+      return createVerifyResult(options);
     }
 
     // Compare target
     if (contractTarget !== expectedTargetId) {
       const totalTime = Date.now() - startTime;
-      return createVerifyResult({
+      const options: CreateVerifyResultOptions = {
         ok: false,
         code: 'PN-RTM-3003',
         summary: 'Target mismatch',
         contractCoreHash,
-        ...(contractProfileHash ? { contractProfileHash } : {}),
         marker,
         expectedTargetId,
         actualTargetId: contractTarget,
-        ...(missingCodecs ? { missingCodecs } : {}),
-        ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-        ...(configPath ? { configPath } : {}),
         contractPath,
         totalTime,
-      });
+      };
+      if (contractProfileHash) options.contractProfileHash = contractProfileHash;
+      if (missingCodecs) options.missingCodecs = missingCodecs;
+      if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
+      if (configPath) options.configPath = configPath;
+      return createVerifyResult(options);
     }
 
     // Compare hashes
     if (marker.coreHash !== contractCoreHash) {
       const totalTime = Date.now() - startTime;
-      return createVerifyResult({
+      const options: CreateVerifyResultOptions = {
         ok: false,
         code: 'PN-RTM-3002',
         summary: 'Hash mismatch',
         contractCoreHash,
-        ...(contractProfileHash ? { contractProfileHash } : {}),
         marker,
         expectedTargetId,
-        ...(missingCodecs ? { missingCodecs } : {}),
-        ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-        ...(configPath ? { configPath } : {}),
         contractPath,
         totalTime,
-      });
+      };
+      if (contractProfileHash) options.contractProfileHash = contractProfileHash;
+      if (missingCodecs) options.missingCodecs = missingCodecs;
+      if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
+      if (configPath) options.configPath = configPath;
+      return createVerifyResult(options);
     }
 
     // Compare profile hash if present
     if (contractProfileHash && marker.profileHash !== contractProfileHash) {
       const totalTime = Date.now() - startTime;
-      return createVerifyResult({
+      const options: CreateVerifyResultOptions = {
         ok: false,
         code: 'PN-RTM-3002',
         summary: 'Hash mismatch',
@@ -266,29 +324,31 @@ export class ControlExecutor {
         contractProfileHash,
         marker,
         expectedTargetId,
-        ...(missingCodecs ? { missingCodecs } : {}),
-        ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-        ...(configPath ? { configPath } : {}),
         contractPath,
         totalTime,
-      });
+      };
+      if (missingCodecs) options.missingCodecs = missingCodecs;
+      if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
+      if (configPath) options.configPath = configPath;
+      return createVerifyResult(options);
     }
 
     // Success - all checks passed
     const totalTime = Date.now() - startTime;
-    return createVerifyResult({
+    const options: CreateVerifyResultOptions = {
       ok: true,
       summary: 'Database matches contract',
       contractCoreHash,
-      ...(contractProfileHash ? { contractProfileHash } : {}),
       marker,
       expectedTargetId,
-      ...(missingCodecs ? { missingCodecs } : {}),
-      ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-      ...(configPath ? { configPath } : {}),
       contractPath,
       totalTime,
-    });
+    };
+    if (contractProfileHash) options.contractProfileHash = contractProfileHash;
+    if (missingCodecs) options.missingCodecs = missingCodecs;
+    if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
+    if (configPath) options.configPath = configPath;
+    return createVerifyResult(options);
   }
 
   /**

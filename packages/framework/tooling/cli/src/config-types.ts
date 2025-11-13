@@ -1,122 +1,28 @@
 import { dirname, join } from 'node:path';
-import type { TargetFamilyHook } from '@prisma-next/emitter';
-import type { OperationSignature } from '@prisma-next/operations';
+import type {
+  AdapterDescriptor,
+  ControlPlaneDriver,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/control-plane/types';
 import { type } from 'arktype';
-import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
-import type { ContractMarkerRecord } from './utils/marker-parser';
+
+// Re-export control plane types for backward compatibility
+export type {
+  AdapterDescriptor,
+  ControlPlaneDriver,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/control-plane/types';
 
 /**
- * Minimal driver interface for Control Plane database operations.
- * Provides query execution and connection management.
+ * @deprecated Use ControlPlaneDriver from @prisma-next/control-plane/types instead
  */
-export interface CliDriver {
-  /**
-   * Executes a SQL query with optional parameters.
-   * @returns Promise resolving to query results with rows array
-   */
-  query<Row = Record<string, unknown>>(
-    sql: string,
-    params?: readonly unknown[],
-  ): Promise<{ readonly rows: Row[] }>;
-  /**
-   * Closes the database connection.
-   */
-  close(): Promise<void>;
-}
-
-/**
- * Descriptor for a driver pack (e.g., Postgres driver).
- */
-export interface DriverDescriptor {
-  readonly kind: 'driver';
-  readonly id: string;
-  readonly family: string;
-  readonly manifest: ExtensionPackManifest;
-  /**
-   * Creates a CliDriver instance from a connection URL.
-   * @param url - Database connection URL
-   * @returns Promise resolving to a CliDriver instance
-   */
-  create(url: string): Promise<CliDriver>;
-}
-
-/**
- * Descriptor for a target family (e.g., SQL).
- * Provides the family hook and assembly helpers.
- */
-export interface FamilyDescriptor {
-  readonly kind: 'family';
-  readonly id: string;
-  readonly hook: TargetFamilyHook;
-  /**
-   * Family-specific verification helpers for DB-connected commands.
-   * Must remain in the migration/tooling plane (no runtime imports).
-   */
-  readonly verify?: {
-    /**
-     * Reads the contract marker from the database using the provided driver.
-     * Returns the parsed marker record or null if no marker is found.
-     * This abstracts SQL-specific details from the Control Plane.
-     */
-    readMarker: (driver: CliDriver) => Promise<ContractMarkerRecord | null>;
-    /**
-     * Optionally collects supported codec typeIds from adapter/extension manifests
-     * to enable coverage checks.
-     */
-    collectSupportedCodecTypeIds?: (
-      descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-    ) => readonly string[];
-  };
-  /**
-   * Converts an OperationManifest to an OperationSignature.
-   * Family-specific conversion logic (e.g., SQL adds lowering spec).
-   */
-  readonly convertOperationManifest: (manifest: OperationManifest) => OperationSignature;
-  /**
-   * Validates a contract JSON and returns a validated ContractIR (without mappings).
-   * Mappings are runtime-only and should not be part of ContractIR.
-   */
-  readonly validateContractIR: (contractJson: unknown) => unknown;
-  /**
-   * Optionally strips mappings from a contract.
-   * Default implementation is a no-op (returns contract as-is).
-   * SQL family overrides this to strip mappings before emitting ContractIR.
-   */
-  readonly stripMappings?: (contract: unknown) => unknown;
-}
-
-/**
- * Descriptor for a target pack (e.g., Postgres target).
- */
-export interface TargetDescriptor {
-  readonly kind: 'target';
-  readonly id: string;
-  readonly family: string;
-  readonly manifest: ExtensionPackManifest;
-}
-
-/**
- * Descriptor for an adapter pack (e.g., Postgres adapter).
- * May optionally provide a runtime factory for DB-connected commands.
- */
-export interface AdapterDescriptor {
-  readonly kind: 'adapter';
-  readonly id: string;
-  readonly family: string;
-  readonly manifest: ExtensionPackManifest;
-  readonly create?: (...args: unknown[]) => unknown;
-  readonly adapter?: unknown;
-}
-
-/**
- * Descriptor for an extension pack (e.g., pgvector).
- */
-export interface ExtensionDescriptor {
-  readonly kind: 'extension';
-  readonly id: string;
-  readonly family: string;
-  readonly manifest: ExtensionPackManifest;
-}
+export type CliDriver = ControlPlaneDriver;
 
 /**
  * Contract configuration specifying source and artifact locations.
@@ -151,8 +57,9 @@ export interface PrismaNextConfig {
   /**
    * Driver descriptor for DB-connected CLI commands.
    * Required for DB-connected commands (e.g., db verify).
+   * Optional for commands that don't need database access (e.g., emit).
    */
-  readonly driver: DriverDescriptor;
+  readonly driver?: DriverDescriptor;
   readonly db?: {
     readonly url?: string;
   };
@@ -182,7 +89,7 @@ const PrismaNextConfigSchema = type({
   target: 'unknown', // TargetDescriptor - validated separately
   adapter: 'unknown', // AdapterDescriptor - validated separately
   'extensions?': 'unknown[]',
-  'driver?': 'unknown', // DriverDescriptor - validated separately
+  'driver?': 'unknown', // DriverDescriptor - validated separately (optional)
   'db?': 'unknown',
   'contract?': ContractConfigSchema,
 });

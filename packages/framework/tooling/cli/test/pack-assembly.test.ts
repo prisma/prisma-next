@@ -1,3 +1,7 @@
+import type {
+  ExtensionPackManifest,
+  OperationManifest,
+} from '@prisma-next/control-plane/pack-manifest-types';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
 import { describe, expect, it } from 'vitest';
 import type {
@@ -15,7 +19,6 @@ import {
   extractOperationTypeImports,
   extractOperationTypeImportsFromPacks,
 } from '../src/exports/pack-assembly';
-import type { ExtensionPackManifest, OperationManifest } from '../src/exports/pack-manifest-types';
 
 type ExtensionPack = {
   readonly manifest: ExtensionPackManifest;

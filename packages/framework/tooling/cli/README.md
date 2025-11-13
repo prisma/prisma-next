@@ -204,7 +204,7 @@ The family must provide a `verify` helper in the family descriptor:
 ```typescript
 {
   verify: {
-    readMarker: (driver: CliDriver) => Promise<ContractMarkerRecord | null>,
+    readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>,
     collectSupportedCodecTypeIds?: (descriptors) => readonly string[],
   },
 }

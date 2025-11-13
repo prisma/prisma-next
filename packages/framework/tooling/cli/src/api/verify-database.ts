@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import type { VerifyDatabaseResult } from '@prisma-next/control-plane/executor';
+import { ControlExecutor } from '@prisma-next/control-plane/executor';
 import { loadConfig } from '../config-loader';
-import type { CliDriver } from '../config-types';
-import { ControlExecutor } from '../control/executor';
 import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
@@ -16,32 +16,8 @@ export interface VerifyDatabaseOptions {
   readonly configPath?: string;
 }
 
-export interface VerifyDatabaseResult {
-  readonly ok: boolean;
-  readonly code?: string;
-  readonly summary: string;
-  readonly contract: {
-    readonly coreHash: string;
-    readonly profileHash?: string;
-  };
-  readonly marker?: {
-    readonly coreHash?: string;
-    readonly profileHash?: string;
-  };
-  readonly target: {
-    readonly expected: string;
-    readonly actual?: string;
-  };
-  readonly missingCodecs?: readonly string[];
-  readonly codecCoverageSkipped?: boolean;
-  readonly meta?: {
-    readonly configPath?: string;
-    readonly contractPath: string;
-  };
-  readonly timings: {
-    readonly total: number;
-  };
-}
+// Re-export for backward compatibility
+export type { VerifyDatabaseResult } from '@prisma-next/control-plane/executor';
 
 /**
  * Programmatic API for verifying database contract markers.
