@@ -249,22 +249,6 @@ function formatHeaderLine(options: {
 }
 
 /**
- * Formats a label/value line with padding and coloring.
- */
-function _formatLabelValueLine(options: {
-  readonly label: string;
-  readonly value: string;
-  readonly maxLabelWidth: number;
-  readonly useColor: boolean;
-  readonly formatDimText: (text: string) => string;
-}): string {
-  const pad = createPadFunction();
-  const labelPadded = pad(options.label, options.maxLabelWidth);
-  const labelColored = options.useColor ? cyan(labelPadded) : labelPadded;
-  return `${options.formatDimText('│')} ${labelColored}  ${options.value}`;
-}
-
-/**
  * Formats a "Read more" URL line.
  * The "Read more" label is in default color (not cyan), and the URL is blue.
  */
@@ -387,7 +371,9 @@ function renderCommandTree(options: {
 
 /**
  * Formats multiline description with "Prisma Next" in green.
- * If a single long line is provided, it will be wrapped to fit the terminal width.
+ * Wraps at the same right-hand boundary as the right column.
+ * The right edge is defined by: left column (20) + gap (2) + right column (90) = 112 characters total.
+ * Since the description line starts with "│ " (2 chars), the text wraps at 112 - 2 = 110 characters.
  */
 function formatMultilineDescription(options: {
   readonly descriptionLines: readonly string[];
@@ -397,17 +383,17 @@ function formatMultilineDescription(options: {
   const lines: string[] = [];
   const formatGreen = (text: string) => (options.useColor ? green(text) : text);
 
-  // Terminal width, defaulting to 80 if not available
-  // Account for "│ " prefix (2 characters)
-  const terminalWidth = process.stdout.columns || 80;
-  const availableWidth = terminalWidth - 2; // Subtract "│ " prefix
+  // Calculate wrap width: left column (20) + gap (2) + right column (90) = 112 total
+  // Description line has "│ " prefix (2 chars), so text wraps at 112 - 2 = 110 characters
+  const totalWidth = LEFT_COLUMN_WIDTH + 2 + RIGHT_COLUMN_MAX_WIDTH; // 20 + 2 + 90 = 112
+  const wrapWidth = totalWidth - 2; // Subtract "│ " prefix = 110
 
   for (const descLine of options.descriptionLines) {
     // Replace "Prisma Next" with green version if present
     const formattedLine = descLine.replace(/Prisma Next/g, (match) => formatGreen(match));
 
-    // Wrap the line if it's longer than available width
-    const wrappedLines = wrapTextAnsi(formattedLine, availableWidth);
+    // Wrap the line at the same right edge as the right column
+    const wrappedLines = wrapTextAnsi(formattedLine, wrapWidth);
     for (const wrappedLine of wrappedLines) {
       lines.push(`${options.formatDimText('│')} ${wrappedLine}`);
     }
