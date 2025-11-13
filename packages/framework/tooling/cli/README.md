@@ -381,12 +381,20 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 
 ### Output Formatting (`utils/output.ts`)
 - **Command Output Formatters**: Format human-readable output for commands (emit, verify, etc.)
+  - Paths are shown as relative paths from current working directory (using `relative(process.cwd(), path)`)
+  - Success indicators use consistent checkmark (✓) throughout
 - **Error Output Formatters**: Format error output for human-readable and JSON display
 - **Styled Headers**: `formatStyledHeader()` creates styled headers for command output with "prisma-next <command> ➜ <description>" format
+  - Parameter labels include colons (e.g., `config:`, `contract:`)
+  - Uses fixed 20-character left column width for consistent alignment
 - **Help Formatters**:
   - `formatRootHelp()` - Formats root help with "prisma-next" title, command tree, and multiline description
   - `formatCommandHelp()` - Formats command help with "prisma-next <command> ➜ <description>", options, subcommands, docs URLs, and multiline description
   - `renderCommandTree()` - Shared function to render hierarchical command trees with tree characters (├─, └─, │)
+  - **Fixed-Width Formatting**: All two-column output (help, styled headers) uses fixed 20-character left column width
+  - **Text Wrapping**: Right column wraps at 90 characters using `wrap-ansi` for ANSI-aware wrapping
+  - **Default Values**: Options with default values display `default: <value>` on the following line (dimmed)
+  - **ANSI-Aware Padding**: Uses `string-width` and `strip-ansi` to measure and pad text correctly with ANSI codes
   - Help formatters use the same styling system as normal command output (colors, dim text, badges)
   - Short descriptions appear in command trees and headers; long descriptions appear at the bottom of help output
   - Help formatting is configured via `configureHelp()` in `cli.ts` to apply to all commands

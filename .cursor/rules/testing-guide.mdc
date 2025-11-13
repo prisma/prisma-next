@@ -584,6 +584,56 @@ describe('tests', () => {
 - No timing/initialization issues
 - Tests are isolated and independent
 
+### Testing Example Apps with Module-Level Initialization
+
+**Issue:** Example apps often have production code that initializes at module load time (e.g., `query.ts` calling `getContext()` which requires `DATABASE_URL`). Tests that import these modules will fail if environment variables aren't set before import.
+
+**Solution:** Set environment variables BEFORE importing modules that depend on them. Maintain the production structure of example apps - don't change query files for tests.
+
+**❌ WRONG: Importing modules before setting environment variables**
+
+```typescript
+import { ormGetUsers } from '../src/queries/orm-get-users';  // Fails - query.ts calls getContext() which needs DATABASE_URL
+
+it('test', async () => {
+  process.env['DATABASE_URL'] = connectionString;  // Too late!
+  const users = await ormGetUsers(2, runtime);
+});
+```
+
+**❌ WRONG: Changing example app structure for tests**
+
+```typescript
+// Don't modify query files to accept context parameter
+export async function ormGetUsers(limit: number, runtime: Runtime, context: RuntimeContext) {
+  const o = orm<Contract>({ context });  // Changed structure for tests
+  // ...
+}
+```
+
+**✅ CORRECT: Set environment variables before importing**
+
+```typescript
+it('test', async () => {
+  await withDevDatabase(async ({ connectionString }) => {
+    // Set environment variable BEFORE importing query modules
+    process.env['DATABASE_URL'] = connectionString;
+
+    // Now import - query.ts can initialize properly
+    const { ormGetUsers } = await import('../src/queries/orm-get-users');
+    const users = await ormGetUsers(2, runtime);
+  });
+});
+```
+
+**Why?**
+- Example apps should maintain their production structure (query files import from centralized locations)
+- Environment variables must be set before module initialization
+- Tests should adapt to production code, not the other way around
+- Dynamic imports (`await import()`) allow setting env vars before module load
+
+**Key Principle:** Example apps demonstrate production patterns. Tests should work with the production structure, not require changes to it.
+
 ## Testing Anti-Patterns
 
 **❌ Copy-Paste Cascade:** Same code block appears 5+ times
