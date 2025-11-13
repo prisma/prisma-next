@@ -297,3 +297,54 @@ export function setupTestDirectory(): {
 
   return { testDir, contractPath, outputDir, configPath, cleanup };
 }
+
+/**
+ * Cleans up all ephemeral test directories in the fixture app directories.
+ * This is a safety mechanism to ensure test directories are deleted even if tests fail.
+ * Test directories match the pattern: test-{timestamp}-{random}
+ */
+export function cleanupAllTestDirectories(): void {
+  // Clean up e2e test directories
+  if (existsSync(fixtureAppDir)) {
+    try {
+      const entries = readdirSync(fixtureAppDir);
+      for (const entry of entries) {
+        if (entry.startsWith('test-') && /^test-\d+-[a-z0-9]+$/.test(entry)) {
+          const testDirPath = join(fixtureAppDir, entry);
+          try {
+            const stat = statSync(testDirPath);
+            if (stat.isDirectory()) {
+              rmSync(testDirPath, { recursive: true, force: true });
+            }
+          } catch {
+            // Ignore errors when cleaning up (directory might already be deleted)
+          }
+        }
+      }
+    } catch {
+      // Ignore errors when reading directory
+    }
+  }
+
+  // Clean up integration test directories
+  if (existsSync(integrationFixtureAppDir)) {
+    try {
+      const entries = readdirSync(integrationFixtureAppDir);
+      for (const entry of entries) {
+        if (entry.startsWith('test-') && /^test-\d+-[a-z0-9]+$/.test(entry)) {
+          const testDirPath = join(integrationFixtureAppDir, entry);
+          try {
+            const stat = statSync(testDirPath);
+            if (stat.isDirectory()) {
+              rmSync(testDirPath, { recursive: true, force: true });
+            }
+          } catch {
+            // Ignore errors when cleaning up (directory might already be deleted)
+          }
+        }
+      }
+    } catch {
+      // Ignore errors when reading directory
+    }
+  }
+}
