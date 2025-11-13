@@ -1,77 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
+import {
+  executeCommand,
+  setupCommandMocks,
+  setupTestDirectory,
+} from './utils/test-helpers';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// Use a shared fixture package directory that has the necessary dependencies
-// This allows jiti to resolve workspace packages when loading config files
-// The fixture app can be used by any CLI test that needs to load config files
-const fixtureAppDir = join(__dirname, 'fixtures/cli-test-app');
-
-/**
- * Executes a command and catches process.exit errors (which are expected in tests).
- * For success cases (exit code 0), swallows the error.
- * For error cases (non-zero exit codes), re-throws the error so tests can check console errors.
- */
-async function executeCommand(
-  command: ReturnType<typeof createEmitCommand>,
-  args: string[],
-): Promise<void> {
-  try {
-    await command.parseAsync(args);
-  } catch (error) {
-    // process.exit throws an error in tests - check the exit code
-    if (error instanceof Error && error.message === 'process.exit called') {
-      const exitCall = (process.exit as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-      const exitCode = exitCall?.[0];
-      // For success (exit code 0), swallow the error
-      // For errors (non-zero), re-throw so tests can check console errors
-      if (exitCode !== 0) {
-        throw error;
-      }
-      // Exit code 0 - success, don't throw
-    } else {
-      // Real error (not process.exit), re-throw
-      throw error;
-    }
-  }
-}
-
-function createContractFile(testDir: string): string {
-  const contractPath = join(testDir, 'contract.ts');
-  writeFileSync(
-    contractPath,
-    `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-
-const contractObj = defineContract<CodecTypes>()
-  .target('postgres')
-  .table('user', (t) =>
-    t
-      .column('id', { type: 'pg/int4@1', nullable: false })
-      .column('email', { type: 'pg/text@1', nullable: false })
-      .primaryKey(['id']),
-  )
-  .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-  .build();
-
-export const contract = {
-  ...contractObj,
-  extensions: {
-    postgres: {
-      version: '15.0.0',
-    },
-    pg: {},
-  },
-};
-`,
-    'utf-8',
-  );
-  return contractPath;
-}
 
 function createConfigFileContent(includeContract = true, outputOverride?: string): string {
   const contractImport = includeContract ? `import { contract } from './contract';` : '';
@@ -103,55 +40,32 @@ describe('emit command', () => {
   let testDir: string;
   let outputDir: string;
   let configPath: string;
-  let originalConsoleLog: typeof console.log;
-  let originalConsoleError: typeof console.error;
-  let originalExit: typeof process.exit;
   let consoleOutput: string[] = [];
   let consoleErrors: string[] = [];
+  let cleanupMocks: () => void;
+  let cleanupDir: () => void;
 
   beforeEach(() => {
-    // Reset arrays before each test
-    consoleOutput = [];
-    consoleErrors = [];
+    // Set up console and process.exit mocks
+    const mocks = setupCommandMocks();
+    consoleOutput = mocks.consoleOutput;
+    consoleErrors = mocks.consoleErrors;
+    cleanupMocks = mocks.cleanup;
 
-    // Mock console first (before process.exit) so errors are captured
-    originalConsoleLog = console.log;
-    originalConsoleError = console.error;
-    console.log = vi.fn((...args: unknown[]) => {
-      consoleOutput.push(args.map(String).join(' '));
-    }) as typeof console.log;
-
-    console.error = vi.fn((...args: unknown[]) => {
-      consoleErrors.push(args.map(String).join(' '));
-    }) as typeof console.error;
-
-    // Mock process.exit to throw instead of actually exiting (Vitest doesn't allow process.exit)
-    originalExit = process.exit;
-    process.exit = vi.fn(() => {
-      throw new Error('process.exit called');
-    }) as unknown as typeof process.exit;
-
-    // Create temp dir within fixture app directory
-    // The fixture app has the necessary dependencies, so jiti can resolve packages
-    testDir = join(fixtureAppDir, `test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(testDir, { recursive: true });
-    outputDir = join(testDir, 'output');
-    configPath = join(testDir, 'prisma-next.config.ts');
-
-    // Create contract.ts file in temp directory
-    createContractFile(testDir);
+    // Set up test directory with contract file
+    const testSetup = setupTestDirectory();
+    testDir = testSetup.testDir;
+    outputDir = testSetup.outputDir;
+    configPath = testSetup.configPath;
+    cleanupDir = testSetup.cleanup;
 
     // Create default config file using package names
     writeFileSync(configPath, createConfigFileContent(), 'utf-8');
   });
 
   afterEach(() => {
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
-    console.log = originalConsoleLog;
-    console.error = originalConsoleError;
-    process.exit = originalExit;
+    cleanupDir();
+    cleanupMocks();
   });
 
   it(

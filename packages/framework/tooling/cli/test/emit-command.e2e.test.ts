@@ -1,31 +1,22 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Command } from 'commander';
 import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createEmitCommand } from '../src/commands/emit';
+import {
+  executeCommand,
+  setupCommandMocks,
+  setupTestDirectory,
+} from './utils/test-helpers';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(__dirname, '../../../../../');
-const fixturesDir = join(__dirname, 'fixtures');
-
-function createConfigFileContent(includeContract = true, outputOverride?: string): string {
-  // Use absolute paths to dist files to avoid import resolution issues in temp directories
-  const adapterPath = resolve(
-    workspaceRoot,
-    'packages/targets/postgres-adapter/dist/exports/cli.js',
-  );
-  const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-  const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-  const configTypesPath = resolve(
-    workspaceRoot,
-    'packages/framework/tooling/cli/dist/config-types.js',
-  );
-  const contractPath = resolve(fixturesDir, 'valid-contract.ts');
-
-  const contractImport = includeContract ? `import { contract } from '${contractPath}';` : '';
+function createConfigFileContent(
+  testDir: string,
+  includeContract = true,
+  outputOverride?: string,
+): string {
+  const contractImport = includeContract ? `import { contract } from './contract';` : '';
   const contractField = includeContract
     ? `  contract: {
     source: contract,
@@ -34,10 +25,10 @@ function createConfigFileContent(includeContract = true, outputOverride?: string
   },`
     : '';
 
-  return `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
+  return `import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/cli';
+import sql from '@prisma-next/family-sql/cli';
 ${contractImport}
 
 export default defineConfig({
@@ -54,53 +45,44 @@ describe('contract emit command (e2e)', () => {
   let testDir: string;
   let outputDir: string;
   let configPath: string;
-  let originalConsoleLog: typeof console.log;
-  let originalConsoleError: typeof console.error;
   let consoleOutput: string[] = [];
   let consoleErrors: string[] = [];
+  let cleanupMocks: () => void;
+  let cleanupDir: () => void;
 
   beforeEach(() => {
-    testDir = join(
-      tmpdir(),
-      `prisma-next-e2e-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
-    mkdirSync(testDir, { recursive: true });
-    outputDir = join(testDir, 'output');
-    configPath = join(testDir, 'prisma-next.config.ts');
+    // Set up console and process.exit mocks
+    const mocks = setupCommandMocks();
+    consoleOutput = mocks.consoleOutput;
+    consoleErrors = mocks.consoleErrors;
+    cleanupMocks = mocks.cleanup;
 
-    // Create default config file with absolute paths
-    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
+    // Set up test directory with contract file
+    const testSetup = setupTestDirectory();
+    testDir = testSetup.testDir;
+    outputDir = testSetup.outputDir;
+    configPath = testSetup.configPath;
+    cleanupDir = testSetup.cleanup;
 
-    originalConsoleLog = console.log;
-    originalConsoleError = console.error;
-    consoleOutput = [];
-    consoleErrors = [];
-
-    console.log = vi.fn((...args: unknown[]) => {
-      consoleOutput.push(args.map(String).join(' '));
-    }) as typeof console.log;
-
-    console.error = vi.fn((...args: unknown[]) => {
-      consoleErrors.push(args.map(String).join(' '));
-    }) as typeof console.error;
+    // Create default config file using package names
+    writeFileSync(configPath, createConfigFileContent(testDir), 'utf-8');
   });
 
   afterEach(() => {
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
-    console.log = originalConsoleLog;
-    console.error = originalConsoleError;
+    cleanupDir();
+    cleanupMocks();
   });
 
   it(
     'emits contract.json and contract.d.ts with canonical command',
     async () => {
-      const command = createContractEmitCommand();
+      const contractCommand = new Command('contract');
+      const emitCommand = createContractEmitCommand();
+      contractCommand.addCommand(emitCommand);
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'contract', 'emit', '--config', configPath]);
+        await executeCommand(contractCommand, ['emit', '--config', 'prisma-next.config.ts']);
       } finally {
         process.chdir(originalCwd);
       }
@@ -134,7 +116,7 @@ describe('contract emit command (e2e)', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync(['node', 'cli.js', 'emit', '--config', configPath]);
+        await executeCommand(command, ['emit', '--config', 'prisma-next.config.ts']);
       } finally {
         process.chdir(originalCwd);
       }
@@ -151,17 +133,16 @@ describe('contract emit command (e2e)', () => {
   it(
     'outputs JSON when --json flag is provided',
     async () => {
-      const command = createContractEmitCommand();
+      const contractCommand = new Command('contract');
+      const emitCommand = createContractEmitCommand();
+      contractCommand.addCommand(emitCommand);
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync([
-          'node',
-          'cli.js',
-          'contract',
+        await executeCommand(contractCommand, [
           'emit',
           '--config',
-          configPath,
+          'prisma-next.config.ts',
           '--json',
         ]);
       } finally {
@@ -190,15 +171,14 @@ describe('contract emit command (e2e)', () => {
   );
 
   it('throws error with PN-CLI code when config file is missing', async () => {
-    const command = createContractEmitCommand();
+    const contractCommand = new Command('contract');
+    const emitCommand = createContractEmitCommand();
+    contractCommand.addCommand(emitCommand);
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
       await expect(
-        command.parseAsync([
-          'node',
-          'cli.js',
-          'contract',
+        contractCommand.parseAsync([
           'emit',
           '--config',
           'nonexistent.config.ts',
@@ -217,17 +197,16 @@ describe('contract emit command (e2e)', () => {
 
   it('throws error with PN-CLI code when contract config is missing', async () => {
     const configWithoutContract = join(testDir, 'no-contract-config.ts');
-    writeFileSync(configWithoutContract, createConfigFileContent(false), 'utf-8');
+    writeFileSync(configWithoutContract, createConfigFileContent(testDir, false), 'utf-8');
 
-    const command = createContractEmitCommand();
+    const contractCommand = new Command('contract');
+    const emitCommand = createContractEmitCommand();
+    contractCommand.addCommand(emitCommand);
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
       await expect(
-        command.parseAsync([
-          'node',
-          'cli.js',
-          'contract',
+        contractCommand.parseAsync([
           'emit',
           '--config',
           configWithoutContract,
@@ -245,17 +224,16 @@ describe('contract emit command (e2e)', () => {
   it(
     'outputs timings in verbose mode',
     async () => {
-      const command = createContractEmitCommand();
+      const contractCommand = new Command('contract');
+      const emitCommand = createContractEmitCommand();
+      contractCommand.addCommand(emitCommand);
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync([
-          'node',
-          'cli.js',
-          'contract',
+        await executeCommand(contractCommand, [
           'emit',
           '--config',
-          configPath,
+          'prisma-next.config.ts',
           '--verbose',
         ]);
       } finally {
@@ -272,17 +250,16 @@ describe('contract emit command (e2e)', () => {
   it(
     'suppresses output in quiet mode',
     async () => {
-      const command = createContractEmitCommand();
+      const contractCommand = new Command('contract');
+      const emitCommand = createContractEmitCommand();
+      contractCommand.addCommand(emitCommand);
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await command.parseAsync([
-          'node',
-          'cli.js',
-          'contract',
+        await executeCommand(contractCommand, [
           'emit',
           '--config',
-          configPath,
+          'prisma-next.config.ts',
           '--quiet',
         ]);
       } finally {
