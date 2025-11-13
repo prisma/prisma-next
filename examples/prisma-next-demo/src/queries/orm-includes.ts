@@ -3,7 +3,7 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';
 import { collect } from './utils';
 
-export async function ormGetUsersWithPosts(limit, runtime: Runtime) {
+export async function ormGetUsersWithPosts(limit: number, runtime: Runtime) {
   const plan = orm
     .user()
     .include.posts((child) =>
