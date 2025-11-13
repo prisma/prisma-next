@@ -14,7 +14,12 @@ const sqlFamilyWithoutVerify = {
     forTypeId: '',
     method: '',
     args: [],
-    returns: { kind: 'builtin', type: 'string' },
+    returns: { kind: 'builtin' as const, type: 'string' as const },
+    lowering: {
+      targetFamily: 'sql' as const,
+      strategy: 'function' as const,
+      template: '',
+    },
   }),
   validateContractIR: (contract: unknown) => contract,
   // verify property is missing - this is what we're testing
@@ -33,6 +38,7 @@ export default defineConfig({
   db: {
     url: '{{DB_URL}}', // Placeholder to be replaced in tests
     queryRunnerFactory: async (url) => {
+      // @ts-expect-error - pg types are not available in test fixtures
       const pg = await import('pg');
       const { Client } = pg;
       const client = new Client({ connectionString: url });

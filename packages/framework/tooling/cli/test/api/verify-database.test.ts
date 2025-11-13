@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -20,132 +20,67 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../../src/pack-assembly';
-import { createContractFile, setupTestDirectory } from '../utils/test-helpers';
+import { setupIntegrationTestDirectoryFromFixtures } from '../utils/test-helpers';
 
-function createConfigFileContent(
-  testDir: string,
-  includeContract = true,
-  outputOverride?: string,
-  queryRunnerFactoryCode?: string,
-): string {
-  const contractImport = includeContract ? `import { contract } from './contract';` : '';
-  const contractField = includeContract
-    ? `  contract: {
-    source: contract,
-    output: '${outputOverride ?? 'output/contract.json'}',
-    types: '${outputOverride ? outputOverride.replace('.json', '.d.ts') : 'output/contract.d.ts'}',
-  },`
-    : '';
-
-  const dbField = queryRunnerFactoryCode
-    ? `  db: {
-    queryRunnerFactory: ${queryRunnerFactoryCode},
-  },`
-    : '';
-
-  return `import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
-${contractImport}
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-${contractField}${dbField}
-});
-`;
-}
+// Fixture subdirectory for verify-database tests
+const fixtureSubdir = 'verify-database';
 
 /**
- * Creates a query runner factory code string for use in config files.
- * This wraps a pg Client to provide the queryRunnerFactory interface.
+ * Emits the contract to disk using the config file.
+ * Returns the validated contract for use in tests.
  */
-function createQueryRunnerFactoryCode(): string {
-  return `async (url) => {
-    const pg = await import('pg');
-    const { Client } = pg;
-    const client = new Client({ connectionString: url });
-    await client.connect();
-    return {
-      query: async (sql, params) => {
-        const result = await client.query(sql, params);
-        return { rows: result.rows };
-      },
-      close: async () => {
-        await client.end();
-      },
-    };
-  }`;
+async function emitContractFromConfig(
+  configPath: string,
+  testDir: string,
+): Promise<SqlContract<SqlStorage>> {
+  const config = await loadConfig(configPath);
+  if (!config.contract) {
+    throw new Error('Config.contract is required');
+  }
+
+  const contractConfig = config.contract;
+  let contractRaw: unknown;
+  if (typeof contractConfig.source === 'function') {
+    contractRaw = await contractConfig.source();
+  } else {
+    contractRaw = contractConfig.source;
+  }
+
+  const contractWithoutMappings = config.family.stripMappings
+    ? config.family.stripMappings(contractRaw)
+    : contractRaw;
+
+  const contractIR = config.family.validateContractIR(contractWithoutMappings);
+
+  const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
+  const operationRegistry = assembleOperationRegistry(descriptors, config.family);
+  const codecTypeImports = extractCodecTypeImports(descriptors);
+  const operationTypeImports = extractOperationTypeImports(descriptors);
+  const extensionIds = extractExtensionIds(config.adapter, config.target, config.extensions ?? []);
+
+  const emitResult = await emitContract({
+    contractIR: contractIR as ContractIR,
+    outputJsonPath: resolve(testDir, contractConfig.output ?? 'output/contract.json'),
+    outputDtsPath: resolve(testDir, contractConfig.types ?? 'output/contract.d.ts'),
+    targetFamily: config.family.hook,
+    operationRegistry,
+    codecTypeImports,
+    operationTypeImports,
+    extensionIds,
+  });
+
+  const contractJsonContent = readFileSync(emitResult.files.json, 'utf-8');
+  const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
 
 describe('verifyDatabase API', () => {
-  let testDir: string;
-  let configPath: string;
-  let contract: SqlContract<SqlStorage>;
   let cleanupDir: () => void;
 
-  beforeEach(async () => {
-    // Set up test directory with contract file
-    const testSetup = setupTestDirectory();
-    testDir = testSetup.testDir;
-    configPath = testSetup.configPath;
+  beforeEach(() => {
+    // Set up test directory from fixtures (no contract emission needed in beforeEach)
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(fixtureSubdir);
     cleanupDir = testSetup.cleanup;
-
-    // Create contract file in temp directory
-    createContractFile(testDir);
-
-    // Create config file
-    writeFileSync(configPath, createConfigFileContent(testDir), 'utf-8');
-
-    // Load config and emit contract to get contract.json
-    const config = await loadConfig(configPath);
-    if (!config.contract) {
-      throw new Error('Config.contract is required');
-    }
-
-    const contractConfig = config.contract;
-    let contractRaw: unknown;
-    if (typeof contractConfig.source === 'function') {
-      contractRaw = await contractConfig.source();
-    } else {
-      contractRaw = contractConfig.source;
-    }
-
-    const contractWithoutMappings = config.family.stripMappings
-      ? config.family.stripMappings(contractRaw)
-      : contractRaw;
-
-    const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
-    // Emit contract to get proper hashes
-    const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-    const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-    const codecTypeImports = extractCodecTypeImports(descriptors);
-    const operationTypeImports = extractOperationTypeImports(descriptors);
-    const extensionIds = extractExtensionIds(
-      config.adapter,
-      config.target,
-      config.extensions ?? [],
-    );
-
-    const emitResult = await emitContract({
-      contractIR: contractIR as ContractIR,
-      outputJsonPath: resolve(contractConfig.output ?? 'src/prisma/contract.json'),
-      outputDtsPath: resolve(contractConfig.types ?? 'src/prisma/contract.d.ts'),
-      targetFamily: config.family.hook,
-      operationRegistry,
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    });
-
-    // Load the emitted contract
-    const contractJsonContent = readFileSync(emitResult.files.json, 'utf-8');
-    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-    contract = validateContract<SqlContract<SqlStorage>>(contractJson);
   });
 
   afterEach(() => {
@@ -153,48 +88,56 @@ describe('verifyDatabase API', () => {
   });
 
   it(
-    'returns success when marker matches contract',
+    'verifies database with matching marker',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-
-            // Write marker matching contract
-            const write = writeContractMarker({
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-              contractJson: contract,
-              canonicalVersion: 1,
-            });
-            await executeStatement(client, write.insert);
-            // withClient will close the client after this callback returns
-          });
-
-          // Update config with queryRunnerFactory (after client is closed)
-          const configContent = createConfigFileContent(
-            testDir,
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
+          // Update config with database URL
+          const testSetup = setupIntegrationTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.ts',
+            { '{{DB_URL}}': connectionString },
           );
-          writeFileSync(configPath, configContent, 'utf-8');
+          const testDirWithDb = testSetup.testDir;
+          const configPathWithDb = testSetup.configPath;
+          const cleanupWithDb = testSetup.cleanup;
 
-          const result = await verifyDatabase({
-            dbUrl: connectionString,
-            configPath,
-          });
+          try {
+            // Emit contract using the config
+            const contractWithDb = await emitContractFromConfig(configPathWithDb, testDirWithDb);
 
-          expect(result.ok).toBe(true);
-          expect(result.summary).toBe('Database matches contract');
-          expect(result.contract.coreHash).toBe(contract.coreHash);
-          if (contract.profileHash) {
-            expect(result.contract.profileHash).toBe(contract.profileHash);
+            await withClient(connectionString, async (client) => {
+              // Setup marker schema and table
+              await executeStatement(client, ensureSchemaStatement);
+              await executeStatement(client, ensureTableStatement);
+
+              // Write marker matching contract
+              const write = writeContractMarker({
+                coreHash: contractWithDb.coreHash,
+                profileHash: contractWithDb.profileHash ?? contractWithDb.coreHash,
+                contractJson: contractWithDb,
+                canonicalVersion: 1,
+              });
+              await executeStatement(client, write.insert);
+              // withClient will close the client after this callback returns
+            });
+
+            const result = await verifyDatabase({
+              dbUrl: connectionString,
+              configPath: configPathWithDb,
+            });
+
+            expect(result.ok).toBe(true);
+            expect(result.summary).toBe('Database matches contract');
+            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+            if (contractWithDb.profileHash) {
+              expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
+            }
+            expect(result.timings.total).toBeGreaterThanOrEqual(0);
+            expect(result.meta?.contractPath).toBeDefined();
+          } finally {
+            cleanupWithDb();
           }
-          expect(result.timings.total).toBeGreaterThanOrEqual(0);
-          expect(result.meta?.contractPath).toBeDefined();
         },
         { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
       );
@@ -207,32 +150,40 @@ describe('verifyDatabase API', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table but don't write marker
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-            // withClient will close the client after this callback returns
-          });
-
-          // Update config with queryRunnerFactory (after client is closed)
-          const configContent = createConfigFileContent(
-            testDir,
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
+          // Update config with database URL
+          const testSetup = setupIntegrationTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.ts',
+            { '{{DB_URL}}': connectionString },
           );
-          writeFileSync(configPath, configContent, 'utf-8');
+          const testDirWithDb = testSetup.testDir;
+          const configPathWithDb = testSetup.configPath;
+          const cleanupWithDb = testSetup.cleanup;
 
-          const result = await verifyDatabase({
-            dbUrl: connectionString,
-            configPath,
-          });
+          try {
+            // Emit contract using the config
+            const contractWithDb = await emitContractFromConfig(configPathWithDb, testDirWithDb);
 
-          expect(result.ok).toBe(false);
-          expect(result.code).toBe('PN-RTM-3001');
-          expect(result.summary).toBe('Marker missing');
-          expect(result.marker).toBeUndefined();
-          expect(result.contract.coreHash).toBe(contract.coreHash);
+            await withClient(connectionString, async (client) => {
+              // Setup marker schema and table but don't write marker
+              await executeStatement(client, ensureSchemaStatement);
+              await executeStatement(client, ensureTableStatement);
+              // withClient will close the client after this callback returns
+            });
+
+            const result = await verifyDatabase({
+              dbUrl: connectionString,
+              configPath: configPathWithDb,
+            });
+
+            expect(result.ok).toBe(false);
+            expect(result.code).toBe('PN-RTM-3001');
+            expect(result.summary).toBe('Marker missing');
+            expect(result.marker).toBeUndefined();
+            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+          } finally {
+            cleanupWithDb();
+          }
         },
         { acceleratePort: 54053, databasePort: 54054, shadowDatabasePort: 54055 },
       );
@@ -245,41 +196,49 @@ describe('verifyDatabase API', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-
-            // Write marker with different hash
-            const write = writeContractMarker({
-              coreHash: 'sha256:different-hash',
-              profileHash: contract.profileHash ?? contract.coreHash,
-              contractJson: contract,
-              canonicalVersion: 1,
-            });
-            await executeStatement(client, write.insert);
-            // withClient will close the client after this callback returns
-          });
-
-          // Update config with queryRunnerFactory (after client is closed)
-          const configContent = createConfigFileContent(
-            testDir,
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
+          // Update config with database URL
+          const testSetup = setupIntegrationTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.ts',
+            { '{{DB_URL}}': connectionString },
           );
-          writeFileSync(configPath, configContent, 'utf-8');
+          const testDirWithDb = testSetup.testDir;
+          const configPathWithDb = testSetup.configPath;
+          const cleanupWithDb = testSetup.cleanup;
 
-          const result = await verifyDatabase({
-            dbUrl: connectionString,
-            configPath,
-          });
+          try {
+            // Emit contract using the config
+            const contractWithDb = await emitContractFromConfig(configPathWithDb, testDirWithDb);
 
-          expect(result.ok).toBe(false);
-          expect(result.code).toBe('PN-RTM-3002');
-          expect(result.summary).toBe('Hash mismatch');
-          expect(result.contract.coreHash).toBe(contract.coreHash);
-          expect(result.marker?.coreHash).toBe('sha256:different-hash');
+            await withClient(connectionString, async (client) => {
+              // Setup marker schema and table
+              await executeStatement(client, ensureSchemaStatement);
+              await executeStatement(client, ensureTableStatement);
+
+              // Write marker with different hash
+              const write = writeContractMarker({
+                coreHash: 'sha256:different-hash',
+                profileHash: contractWithDb.profileHash ?? contractWithDb.coreHash,
+                contractJson: contractWithDb,
+                canonicalVersion: 1,
+              });
+              await executeStatement(client, write.insert);
+              // withClient will close the client after this callback returns
+            });
+
+            const result = await verifyDatabase({
+              dbUrl: connectionString,
+              configPath: configPathWithDb,
+            });
+
+            expect(result.ok).toBe(false);
+            expect(result.code).toBe('PN-RTM-3002');
+            expect(result.summary).toBe('Hash mismatch');
+            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+            expect(result.marker?.coreHash).toBe('sha256:different-hash');
+          } finally {
+            cleanupWithDb();
+          }
         },
         { acceleratePort: 54056, databasePort: 54057, shadowDatabasePort: 54058 },
       );
@@ -292,43 +251,51 @@ describe('verifyDatabase API', () => {
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-
-            // Write marker with matching coreHash but different profileHash
-            const write = writeContractMarker({
-              coreHash: contract.coreHash,
-              profileHash: 'sha256:different-profile-hash',
-              contractJson: contract,
-              canonicalVersion: 1,
-            });
-            await executeStatement(client, write.insert);
-            // withClient will close the client after this callback returns
-          });
-
-          // Update config with queryRunnerFactory (after client is closed)
-          const configContent = createConfigFileContent(
-            testDir,
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
+          // Update config with database URL
+          const testSetup = setupIntegrationTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.ts',
+            { '{{DB_URL}}': connectionString },
           );
-          writeFileSync(configPath, configContent, 'utf-8');
+          const testDirWithDb = testSetup.testDir;
+          const configPathWithDb = testSetup.configPath;
+          const cleanupWithDb = testSetup.cleanup;
 
-          const result = await verifyDatabase({
-            dbUrl: connectionString,
-            configPath,
-          });
+          try {
+            // Emit contract using the config
+            const contractWithDb = await emitContractFromConfig(configPathWithDb, testDirWithDb);
 
-          expect(result.ok).toBe(false);
-          expect(result.code).toBe('PN-RTM-3002');
-          expect(result.summary).toBe('Hash mismatch');
-          if (contract.profileHash) {
-            expect(result.contract.profileHash).toBe(contract.profileHash);
+            await withClient(connectionString, async (client) => {
+              // Setup marker schema and table
+              await executeStatement(client, ensureSchemaStatement);
+              await executeStatement(client, ensureTableStatement);
+
+              // Write marker with different profileHash
+              const write = writeContractMarker({
+                coreHash: contractWithDb.coreHash,
+                profileHash: 'sha256:different-profile-hash',
+                contractJson: contractWithDb,
+                canonicalVersion: 1,
+              });
+              await executeStatement(client, write.insert);
+              // withClient will close the client after this callback returns
+            });
+
+            const result = await verifyDatabase({
+              dbUrl: connectionString,
+              configPath: configPathWithDb,
+            });
+
+            expect(result.ok).toBe(false);
+            expect(result.code).toBe('PN-RTM-3002');
+            expect(result.summary).toBe('Hash mismatch');
+            if (contractWithDb.profileHash) {
+              expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
+            }
+            expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
+          } finally {
+            cleanupWithDb();
           }
-          expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
         },
         { acceleratePort: 54059, databasePort: 54060, shadowDatabasePort: 54061 },
       );
@@ -336,47 +303,10 @@ describe('verifyDatabase API', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it(
-    'includes timings in result',
-    async () => {
-      await withDevDatabase(
-        async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-
-            // Write marker matching contract
-            const write = writeContractMarker({
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-              contractJson: contract,
-              canonicalVersion: 1,
-            });
-            await executeStatement(client, write.insert);
-            // withClient will close the client after this callback returns
-          });
-
-          // Update config with queryRunnerFactory (after client is closed)
-          const configContent = createConfigFileContent(
-            testDir,
-            true,
-            undefined,
-            createQueryRunnerFactoryCode(),
-          );
-          writeFileSync(configPath, configContent, 'utf-8');
-
-          const result = await verifyDatabase({
-            dbUrl: connectionString,
-            configPath,
-          });
-
-          expect(result.timings).toBeDefined();
-          expect(result.timings.total).toBeGreaterThanOrEqual(0);
-        },
-        { acceleratePort: 54062, databasePort: 54063, shadowDatabasePort: 54064 },
-      );
-    },
-    timeouts.spinUpPpgDev,
-  );
+  // Note: Target mismatch test is difficult to simulate because:
+  // 1. The contract is emitted from the config, so they always match
+  // 2. Modifying the contract.json changes the hash, making the marker invalid
+  // 3. The target check happens before hash validation, but requires a valid contract structure
+  // This scenario would only occur if someone manually edits contract.json after emission,
+  // which is not a realistic use case. The target mismatch check is covered by the implementation.
 });

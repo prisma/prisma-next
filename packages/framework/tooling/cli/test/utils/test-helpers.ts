@@ -9,6 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // This allows jiti to resolve workspace packages when loading config files
 // The fixture app can be used by any CLI test that needs to load config files
 export const fixtureAppDir = join(__dirname, '../cli-e2e-test-app');
+export const integrationFixtureAppDir = join(__dirname, '../cli-integration-test-app');
 
 /**
  * Executes a command and catches process.exit errors (which are expected in tests).
@@ -42,6 +43,19 @@ export async function executeCommand(command: Command, args: string[]): Promise<
  */
 export function createTestDir(): string {
   const testDir = join(fixtureAppDir, `test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(testDir, { recursive: true });
+  return testDir;
+}
+
+/**
+ * Creates a test directory within the integration fixture app directory.
+ * The fixture app has the necessary dependencies, so jiti can resolve packages.
+ */
+export function createIntegrationTestDir(): string {
+  const testDir = join(
+    integrationFixtureAppDir,
+    `test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   mkdirSync(testDir, { recursive: true });
   return testDir;
 }
@@ -145,6 +159,64 @@ export function setupTestDirectoryFromFixtures(
 
   // Copy files from fixture subdirectory
   const fixturesSubdirPath = join(fixtureAppDir, 'fixtures', fixtureSubdir);
+  if (!existsSync(fixturesSubdirPath)) {
+    throw new Error(`Fixture subdirectory not found: ${fixturesSubdirPath}`);
+  }
+
+  // Copy contract.ts if it exists
+  const fixtureContractPath = join(fixturesSubdirPath, 'contract.ts');
+  if (existsSync(fixtureContractPath)) {
+    const contractPath = join(testDir, 'contract.ts');
+    copyFileSync(fixtureContractPath, contractPath);
+  }
+
+  // Copy and process config file
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  const fixtureConfigPath = join(fixturesSubdirPath, configFileName);
+  if (existsSync(fixtureConfigPath)) {
+    let configContent = readFileSync(fixtureConfigPath, 'utf-8');
+    // Replace placeholders if provided
+    if (replacements) {
+      for (const [key, value] of Object.entries(replacements)) {
+        configContent = configContent.replace(new RegExp(key, 'g'), value);
+      }
+    }
+    writeFileSync(configPath, configContent, 'utf-8');
+  }
+
+  const cleanup = () => {
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  };
+
+  return { testDir, contractPath: join(testDir, 'contract.ts'), outputDir, configPath, cleanup };
+}
+
+/**
+ * Sets up a test directory for integration tests by copying files from a fixture subdirectory.
+ * Copies the static package.json from the root of cli-integration-test-app,
+ * then copies all files from the specified fixture subdirectory.
+ * Optionally replaces placeholders in config files.
+ * Returns paths and cleanup function.
+ */
+export function setupIntegrationTestDirectoryFromFixtures(
+  fixtureSubdir: string,
+  configFileName = 'prisma-next.config.ts',
+  replacements?: Record<string, string>,
+) {
+  const testDir = createIntegrationTestDir();
+  const outputDir = join(testDir, 'output');
+  mkdirSync(outputDir, { recursive: true });
+
+  // Copy static package.json from root of cli-integration-test-app
+  const rootPackageJson = join(integrationFixtureAppDir, 'package.json');
+  if (existsSync(rootPackageJson)) {
+    copyFileSync(rootPackageJson, join(testDir, 'package.json'));
+  }
+
+  // Copy files from fixture subdirectory
+  const fixturesSubdirPath = join(integrationFixtureAppDir, 'fixtures', fixtureSubdir);
   if (!existsSync(fixturesSubdirPath)) {
     throw new Error(`Fixture subdirectory not found: ${fixturesSubdirPath}`);
   }

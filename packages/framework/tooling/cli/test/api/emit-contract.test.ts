@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { timeouts } from '@prisma-next/test-utils';
@@ -11,37 +11,10 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../../src/pack-assembly';
-import { createContractFile, setupTestDirectory } from '../utils/test-helpers';
+import { setupIntegrationTestDirectoryFromFixtures } from '../utils/test-helpers';
 
-function createConfigFileContent(
-  testDir: string,
-  includeContract = true,
-  outputOverride?: string,
-): string {
-  const contractImport = includeContract ? `import { contract } from './contract';` : '';
-  const contractField = includeContract
-    ? `  contract: {
-    source: contract,
-    output: '${outputOverride ?? 'output/contract.json'}',
-    types: '${outputOverride ? outputOverride.replace('.json', '.d.ts') : 'output/contract.d.ts'}',
-  },`
-    : '';
-
-  return `import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
-${contractImport}
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-${contractField}
-});
-`;
-}
+// Fixture subdirectory for emit-contract tests
+const fixtureSubdir = 'emit-contract';
 
 describe('emitContract API', () => {
   let testDir: string;
@@ -49,17 +22,11 @@ describe('emitContract API', () => {
   let cleanupDir: () => void;
 
   beforeEach(() => {
-    // Set up test directory with contract file
-    const testSetup = setupTestDirectory();
+    // Set up test directory from fixtures
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(fixtureSubdir);
     testDir = testSetup.testDir;
     configPath = testSetup.configPath;
     cleanupDir = testSetup.cleanup;
-
-    // Create contract file in temp directory
-    createContractFile(testDir);
-
-    // Create default config file using package names
-    writeFileSync(configPath, createConfigFileContent(testDir), 'utf-8');
   });
 
   afterEach(() => {
@@ -105,8 +72,8 @@ describe('emitContract API', () => {
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(contractConfig.output),
-        outputDtsPath: resolve(contractConfig.types),
+        outputJsonPath: resolve(testDir, contractConfig.output),
+        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
@@ -179,8 +146,8 @@ describe('emitContract API', () => {
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(contractConfig.output),
-        outputDtsPath: resolve(contractConfig.types),
+        outputJsonPath: resolve(testDir, contractConfig.output),
+        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
@@ -199,61 +166,68 @@ describe('emitContract API', () => {
     'creates output directory if it does not exist',
     async () => {
       const newOutputDir = join(testDir, 'new-output');
-      const customConfigPath = join(testDir, 'custom-config.ts');
-      writeFileSync(
-        customConfigPath,
-        createConfigFileContent(testDir, true, join(newOutputDir, 'contract.json')),
-        'utf-8',
+      // Set up test directory with custom output config
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.custom-output.ts',
+        { '{{OUTPUT_DIR}}': newOutputDir },
       );
+      const customTestDir = testSetup.testDir;
+      const customConfigPath = testSetup.configPath;
+      const customCleanup = testSetup.cleanup;
 
-      // Load config and resolve values
-      const config = await loadConfig(customConfigPath);
-      if (!config.contract) {
-        throw new Error('Config.contract is required');
+      try {
+        // Load config and resolve values
+        const config = await loadConfig(customConfigPath);
+        if (!config.contract) {
+          throw new Error('Config.contract is required');
+        }
+
+        const contractConfig = config.contract;
+        let contractRaw: unknown;
+        if (typeof contractConfig.source === 'function') {
+          contractRaw = await contractConfig.source();
+        } else {
+          contractRaw = contractConfig.source;
+        }
+
+        const contractWithoutMappings = config.family.stripMappings
+          ? config.family.stripMappings(contractRaw)
+          : contractRaw;
+
+        const contractIR = config.family.validateContractIR(contractWithoutMappings);
+
+        if (!contractConfig.output || !contractConfig.types) {
+          throw new Error('Contract config must have output and types paths');
+        }
+
+        const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
+        const operationRegistry = assembleOperationRegistry(descriptors, config.family);
+        const codecTypeImports = extractCodecTypeImports(descriptors);
+        const operationTypeImports = extractOperationTypeImports(descriptors);
+        const extensionIds = extractExtensionIds(
+          config.adapter,
+          config.target,
+          config.extensions ?? [],
+        );
+
+        const result = await emitContract({
+          contractIR: contractIR as ContractIR,
+          outputJsonPath: resolve(customTestDir, contractConfig.output),
+          outputDtsPath: resolve(customTestDir, contractConfig.types),
+          targetFamily: config.family.hook,
+          operationRegistry,
+          codecTypeImports,
+          operationTypeImports,
+          extensionIds,
+        });
+
+        expect(existsSync(newOutputDir)).toBe(true);
+        expect(existsSync(result.files.json)).toBe(true);
+        expect(existsSync(result.files.dts)).toBe(true);
+      } finally {
+        customCleanup();
       }
-
-      const contractConfig = config.contract;
-      let contractRaw: unknown;
-      if (typeof contractConfig.source === 'function') {
-        contractRaw = await contractConfig.source();
-      } else {
-        contractRaw = contractConfig.source;
-      }
-
-      const contractWithoutMappings = config.family.stripMappings
-        ? config.family.stripMappings(contractRaw)
-        : contractRaw;
-
-      const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
-      if (!contractConfig.output || !contractConfig.types) {
-        throw new Error('Contract config must have output and types paths');
-      }
-
-      const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-      const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-      const codecTypeImports = extractCodecTypeImports(descriptors);
-      const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(
-        config.adapter,
-        config.target,
-        config.extensions ?? [],
-      );
-
-      const result = await emitContract({
-        contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(contractConfig.output),
-        outputDtsPath: resolve(contractConfig.types),
-        targetFamily: config.family.hook,
-        operationRegistry,
-        codecTypeImports,
-        operationTypeImports,
-        extensionIds,
-      });
-
-      expect(existsSync(newOutputDir)).toBe(true);
-      expect(existsSync(result.files.json)).toBe(true);
-      expect(existsSync(result.files.dts)).toBe(true);
     },
     timeouts.typeScriptCompilation,
   );
@@ -297,8 +271,8 @@ describe('emitContract API', () => {
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(contractConfig.output),
-        outputDtsPath: resolve(contractConfig.types),
+        outputJsonPath: resolve(testDir, contractConfig.output),
+        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
@@ -352,8 +326,8 @@ describe('emitContract API', () => {
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(contractConfig.output),
-        outputDtsPath: resolve(contractConfig.types),
+        outputJsonPath: resolve(testDir, contractConfig.output),
+        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
