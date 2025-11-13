@@ -58,10 +58,9 @@ export async function executeCommand(command: Command, args: string[]): Promise<
       }
       // Exit code 0 - success, don't throw
       return 0;
-    } else {
-      // Real error (not process.exit), re-throw
-      throw error;
     }
+    // Real error (not process.exit), re-throw
+    throw error;
   }
 }
 
