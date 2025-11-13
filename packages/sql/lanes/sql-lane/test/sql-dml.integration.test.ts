@@ -62,9 +62,9 @@ describe('DML Integration Tests', () => {
 
   beforeAll(async () => {
     database = await createDevDatabase({
-      acceleratePort: 54020,
-      databasePort: 54021,
-      shadowDatabasePort: 54022,
+      acceleratePort: 54160,
+      databasePort: 54161,
+      shadowDatabasePort: 54162,
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();

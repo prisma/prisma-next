@@ -146,7 +146,7 @@ describe('verifyDatabase API', () => {
             cleanupWithDb();
           }
         },
-        { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
+        { acceleratePort: 54170, databasePort: 54171, shadowDatabasePort: 54172 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -199,7 +199,7 @@ describe('verifyDatabase API', () => {
             cleanupWithDb();
           }
         },
-        { acceleratePort: 54053, databasePort: 54054, shadowDatabasePort: 54055 },
+        { acceleratePort: 54173, databasePort: 54174, shadowDatabasePort: 54175 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -261,7 +261,7 @@ describe('verifyDatabase API', () => {
             cleanupWithDb();
           }
         },
-        { acceleratePort: 54056, databasePort: 54057, shadowDatabasePort: 54058 },
+        { acceleratePort: 54176, databasePort: 54177, shadowDatabasePort: 54178 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -325,7 +325,7 @@ describe('verifyDatabase API', () => {
             cleanupWithDb();
           }
         },
-        { acceleratePort: 54059, databasePort: 54060, shadowDatabasePort: 54061 },
+        { acceleratePort: 54179, databasePort: 54180, shadowDatabasePort: 54181 },
       );
     },
     timeouts.spinUpPpgDev,
