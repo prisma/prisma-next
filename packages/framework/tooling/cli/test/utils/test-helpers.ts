@@ -165,8 +165,9 @@ export function setupCommandMocks(): {
 
 /**
  * Sets up a test directory by copying files from a fixture subdirectory.
- * Copies the static package.json from the root of cli-e2e-test-app,
- * then copies all files from the specified fixture subdirectory.
+ * Test directories are subdirectories of cli-e2e-test-app and inherit workspace
+ * dependencies from the parent package.json at the root. jiti will resolve workspace
+ * packages by walking up to find the parent package.json.
  * Optionally replaces placeholders in config files.
  * Returns paths and cleanup function.
  */
@@ -178,12 +179,6 @@ export function setupTestDirectoryFromFixtures(
   const testDir = createTestDir();
   const outputDir = join(testDir, 'output');
   mkdirSync(outputDir, { recursive: true });
-
-  // Copy static package.json from root of cli-e2e-test-app
-  const rootPackageJson = join(fixtureAppDir, 'package.json');
-  if (existsSync(rootPackageJson)) {
-    copyFileSync(rootPackageJson, join(testDir, 'package.json'));
-  }
 
   // Copy files from fixture subdirectory
   const fixturesSubdirPath = join(fixtureAppDir, 'fixtures', fixtureSubdir);
@@ -223,8 +218,9 @@ export function setupTestDirectoryFromFixtures(
 
 /**
  * Sets up a test directory for integration tests by copying files from a fixture subdirectory.
- * Copies the static package.json from the root of cli-integration-test-app,
- * then copies all files from the specified fixture subdirectory.
+ * Test directories are subdirectories of cli-integration-test-app and inherit workspace
+ * dependencies from the parent package.json at the root. jiti will resolve workspace
+ * packages by walking up to find the parent package.json.
  * Optionally replaces placeholders in config files.
  * Returns paths and cleanup function.
  */
@@ -236,12 +232,6 @@ export function setupIntegrationTestDirectoryFromFixtures(
   const testDir = createIntegrationTestDir();
   const outputDir = join(testDir, 'output');
   mkdirSync(outputDir, { recursive: true });
-
-  // Copy static package.json from root of cli-integration-test-app
-  const rootPackageJson = join(integrationFixtureAppDir, 'package.json');
-  if (existsSync(rootPackageJson)) {
-    copyFileSync(rootPackageJson, join(testDir, 'package.json'));
-  }
 
   // Copy files from fixture subdirectory
   const fixturesSubdirPath = join(integrationFixtureAppDir, 'fixtures', fixtureSubdir);

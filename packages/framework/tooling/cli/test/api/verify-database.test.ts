@@ -13,7 +13,6 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emitContract } from '../../src/api/emit-contract';
 import { verifyDatabase } from '../../src/api/verify-database';
-import { CliStructuredError } from '../../src/utils/cli-errors';
 import { loadConfig } from '../../src/config-loader';
 import {
   assembleOperationRegistry,
@@ -21,6 +20,7 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../../src/pack-assembly';
+import { CliStructuredError } from '../../src/utils/cli-errors';
 import { setupIntegrationTestDirectoryFromFixtures } from '../utils/test-helpers';
 
 // Fixture subdirectory for verify-database tests
