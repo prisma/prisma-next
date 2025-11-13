@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createEmitCommand } from '../src/commands/emit';
+import { createContractEmitCommand } from '../src/commands/contract-emit';
 import {
   executeCommand,
   setupCommandMocks,
@@ -42,14 +42,11 @@ describe('emit command', () => {
   it(
     'emits contract.json and contract.d.ts with valid contract',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
         const exitCode = await executeCommand(command, [
-          'node',
-          'cli.js',
-          'emit',
           '--config',
           'prisma-next.config.ts',
           '--json',
@@ -100,7 +97,7 @@ describe('emit command', () => {
     'creates output directory if it does not exist',
     async () => {
       const newOutputDir = join(testDir, 'new-output');
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
@@ -137,7 +134,7 @@ describe('emit command', () => {
   );
 
   it('handles missing contract in config', async () => {
-    const command = createEmitCommand();
+    const command = createContractEmitCommand();
     const testSetup = setupIntegrationTestDirectoryFromFixtures(
       fixtureSubdir,
       'prisma-next.config.no-contract.ts',
@@ -150,9 +147,6 @@ describe('emit command', () => {
       try {
         process.chdir(testDirNoContract);
         const exitCode = await executeCommand(command, [
-          'node',
-          'cli.js',
-          'emit',
           '--config',
           'prisma-next.config.ts',
           '--json',
@@ -179,7 +173,7 @@ describe('emit command', () => {
   });
 
   it('uses default output path when not specified in contract config', async () => {
-    const command = createEmitCommand();
+    const command = createContractEmitCommand();
     const testSetup = setupIntegrationTestDirectoryFromFixtures(
       fixtureSubdir,
       'prisma-next.config.defaults.ts',
@@ -214,7 +208,7 @@ describe('emit command', () => {
   });
 
   it('handles invalid contract in config', async () => {
-    const command = createEmitCommand();
+    const command = createContractEmitCommand();
     const testSetup = setupIntegrationTestDirectoryFromFixtures(
       fixtureSubdir,
       'prisma-next.config.invalid-contract.ts',
@@ -226,9 +220,8 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDirInvalid);
-        await expect(
-          executeCommand(command, ['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']),
-        ).rejects.toThrow();
+        const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+        expect(exitCode).not.toBe(0);
       } finally {
         process.chdir(originalCwd);
       }
@@ -240,7 +233,7 @@ describe('emit command', () => {
   it(
     'handles unsupported target family',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
         fixtureSubdir,
         'prisma-next.config.document-family.ts',
@@ -252,16 +245,9 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirDocument);
-          // The command should throw an error for unsupported family
-          await expect(
-            executeCommand(command, [
-              'node',
-              'cli.js',
-              'emit',
-              '--config',
-              'prisma-next.config.ts',
-            ]),
-          ).rejects.toThrow();
+          // The command should return non-zero exit code for unsupported family
+          const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+          expect(exitCode).not.toBe(0);
         } finally {
           process.chdir(originalCwd);
         }
@@ -275,7 +261,7 @@ describe('emit command', () => {
   it(
     'handles extension paths',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       // Extensions are now in config, so we just need a valid config
       const originalCwd = process.cwd();
       try {
@@ -301,7 +287,7 @@ describe('emit command', () => {
   it(
     'handles single string extension path',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       // Extensions are now in config
       const originalCwd = process.cwd();
       try {
@@ -327,7 +313,7 @@ describe('emit command', () => {
   it(
     'handles multiple extension paths',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       // Extensions are now in config
       const originalCwd = process.cwd();
       try {
@@ -353,15 +339,12 @@ describe('emit command', () => {
   it(
     'outputs profileHash when present',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
         // Command should succeed (exit code 0) - executeCommand won't throw
         const exitCode = await executeCommand(command, [
-          'node',
-          'cli.js',
-          'emit',
           '--config',
           'prisma-next.config.ts',
           '--json',
@@ -397,7 +380,7 @@ describe('emit command', () => {
   );
 
   it('handles errors and throws', async () => {
-    const command = createEmitCommand();
+    const command = createContractEmitCommand();
     const testSetup = setupIntegrationTestDirectoryFromFixtures(
       fixtureSubdir,
       'prisma-next.config.no-contract.ts',
@@ -410,9 +393,6 @@ describe('emit command', () => {
       try {
         process.chdir(testDirNoContract);
         const exitCode = await executeCommand(command, [
-          'node',
-          'cli.js',
-          'emit',
           '--config',
           'prisma-next.config.ts',
           '--json',
@@ -441,7 +421,7 @@ describe('emit command', () => {
   it(
     'handles async contract source function',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
         fixtureSubdir,
         'prisma-next.config.async-source.ts',
@@ -477,7 +457,7 @@ describe('emit command', () => {
   it(
     'handles sync contract source function',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
         fixtureSubdir,
         'prisma-next.config.sync-source.ts',
@@ -513,7 +493,7 @@ describe('emit command', () => {
   it(
     'throws error when contract config missing output or types',
     async () => {
-      const command = createEmitCommand();
+      const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
         fixtureSubdir,
         'prisma-next.config.missing-output.ts',

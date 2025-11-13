@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createContractEmitCommand } from '../src/commands/contract-emit';
-import { createEmitCommand } from '../src/commands/emit';
 import {
   executeCommand,
   setupCommandMocks,
@@ -104,7 +103,7 @@ describe('contract emit command (e2e)', () => {
       const cleanupDir = testSetup.cleanup;
 
       try {
-        const command = createEmitCommand();
+        const command = createContractEmitCommand();
         const originalCwd = process.cwd();
         try {
           process.chdir(testDir);

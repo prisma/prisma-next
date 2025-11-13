@@ -350,26 +350,6 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Fail Fast**: Non-structured errors propagate and are caught by Commander.js's `exitOverride()` with stack traces
 - See `.cursor/rules/cli-error-handling.mdc` for detailed patterns
 
-### Legacy Emit Command (`commands/emit.ts`)
-- Command implementation using commander
-- **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern (`performAction`), and `process.exit()`. See `.cursor/rules/cli-error-handling.mdc` for details.
-- Loads the user's config module (`prisma-next.config.ts`)
-- Resolves contract from config:
-  - If `config.contract.source` is a function, calls it (supports sync and async functions)
-  - Otherwise uses `config.contract.source` directly
-  - Throws error if `config.contract` is missing
-- Uses artifact paths from `config.contract.output` and `config.contract.types` (already normalized by `defineConfig()` with defaults applied)
-- Strips mappings if family provides `stripMappings()` function
-- Uses framework CLI assembly functions to loop over descriptors:
-  - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, calls `family.convertOperationManifest()` for each
-  - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
-  - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
-  - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
-- Calls `config.family.validateContractIR()` to validate and normalize contract, returns ContractIR without mappings
-- Calls `emit()` from emitter with the assembled inputs and `family.hook`
-- Adds `_generated` metadata field to `contract.json` to indicate it's a generated artifact
-- Writes `contract.json` and `contract.d.ts` to the paths specified in `config.contract.output` and `config.contract.types`
-
 ### Pack Assembly (`pack-assembly.ts`)
 - Generic assembly functions that loop over descriptors/packs:
   - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, delegates to `family.convertOperationManifest()` for conversion
