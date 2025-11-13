@@ -106,16 +106,17 @@ describe('ORM integration tests', () => {
               );
             });
 
+            process.env['DATABASE_URL'] = connectionString;
             const { ormGetUsers } = await import('../src/queries/orm-get-users');
             const users = await ormGetUsers(2, runtime);
 
             expect(users).toHaveLength(2);
-            expect(users[0]).toHaveProperty('id');
-            expect(users[0]).toHaveProperty('email');
-            expect(users[0]).toHaveProperty('createdAt');
-            expect(users[0]).not.toHaveProperty('posts');
-            expect(typeof (users[0] as { id: unknown }).id).toBe('number');
-            expect(typeof (users[0] as { email: unknown }).email).toBe('string');
+            expect(users[0]).toMatchObject({
+              id: expect.any(Number),
+              email: expect.any(String),
+              createdAt: expect.anything(),
+            });
+            expect(users[0]).not.toMatchObject({ posts: expect.anything() });
           } finally {
             await runtime.close();
           }
@@ -169,13 +170,16 @@ describe('ORM integration tests', () => {
               ]);
             });
 
+            process.env['DATABASE_URL'] = connectionString;
             const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
             const user = await ormGetUserById(1, runtime);
 
             expect(user).not.toBeNull();
-            expect(user).toHaveProperty('id', 1);
-            expect(user).toHaveProperty('email', 'alice@example.com');
-            expect(user).toHaveProperty('createdAt');
+            expect(user).toMatchObject({
+              id: 1,
+              email: 'alice@example.com',
+              createdAt: expect.anything(),
+            });
           } finally {
             await runtime.close();
           }
@@ -237,12 +241,15 @@ describe('ORM integration tests', () => {
               );
             });
 
+            process.env['DATABASE_URL'] = connectionString;
             const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
             const users = await ormGetUsersWithPosts(runtime);
 
             expect(users.length).toBeGreaterThan(0);
-            expect(users[0]).toHaveProperty('id');
-            expect(users[0]).toHaveProperty('email');
+            expect(users[0]).toMatchObject({
+              id: expect.anything(),
+              email: expect.anything(),
+            });
           } finally {
             await runtime.close();
           }
@@ -304,14 +311,16 @@ describe('ORM integration tests', () => {
               );
             });
 
+            process.env['DATABASE_URL'] = connectionString;
             const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
             const users = await ormGetUsersWithPosts(10, runtime);
 
             expect(users.length).toBeGreaterThan(0);
-            expect(users[0]).toHaveProperty('id');
-            expect(users[0]).toHaveProperty('email');
-            expect(users[0]).toHaveProperty('posts');
-            expect(Array.isArray((users[0] as { posts: unknown }).posts)).toBe(true);
+            expect(users[0]).toMatchObject({
+              id: expect.anything(),
+              email: expect.anything(),
+              posts: expect.any(Array),
+            });
           } finally {
             await runtime.close();
           }
@@ -362,6 +371,7 @@ describe('ORM integration tests', () => {
               await client.query('truncate table "user" restart identity');
             });
 
+            process.env['DATABASE_URL'] = connectionString;
             const { ormCreateUser } = await import('../src/queries/orm-writes');
             const affectedRows = await ormCreateUser('alice@example.com', runtime);
 
@@ -428,6 +438,7 @@ describe('ORM integration tests', () => {
               ]);
             });
 
+            process.env['DATABASE_URL'] = connectionString;
             const { ormUpdateUser } = await import('../src/queries/orm-writes');
             const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
 
@@ -494,6 +505,7 @@ describe('ORM integration tests', () => {
               ]);
             });
 
+            process.env['DATABASE_URL'] = connectionString;
             const { ormDeleteUser } = await import('../src/queries/orm-writes');
             const affectedRows = await ormDeleteUser(1, runtime);
 
