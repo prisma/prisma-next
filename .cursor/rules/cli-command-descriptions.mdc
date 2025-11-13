@@ -1,3 +1,9 @@
+---
+description: Patterns for CLI command descriptions (short vs long)
+globs:
+alwaysApply: true
+---
+
 # CLI Command Descriptions
 
 ## Overview
