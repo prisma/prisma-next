@@ -304,6 +304,103 @@ function wrapText(text: string, width: number): string[] {
 }
 
 /**
+ * Renders a command tree structure.
+ * Handles both single-level (subcommands of a command) and multi-level (top-level commands with subcommands) trees.
+ */
+function renderCommandTree(options: {
+  readonly commands: readonly Command[];
+  readonly useColor: boolean;
+  readonly formatDimText: (text: string) => string;
+  readonly hasItemsAfter: boolean;
+  readonly showMultilineDescriptions: boolean;
+  readonly continuationPrefix?: string;
+}): string[] {
+  const {
+    commands,
+    useColor,
+    formatDimText,
+    hasItemsAfter,
+    showMultilineDescriptions,
+    continuationPrefix,
+  } = options;
+  const lines: string[] = [];
+  const pad = createPadFunction();
+
+  if (commands.length === 0) {
+    return lines;
+  }
+
+  // Find max command name length for alignment
+  let maxCommandNameLength = 0;
+  for (const cmd of commands) {
+    const subcommands = cmd.commands.filter((subcmd) => !subcmd.name().startsWith('_'));
+    for (const subcmd of subcommands) {
+      maxCommandNameLength = Math.max(maxCommandNameLength, subcmd.name().length);
+    }
+    // Also check the command itself if it has no subcommands
+    if (subcommands.length === 0) {
+      maxCommandNameLength = Math.max(maxCommandNameLength, cmd.name().length);
+    }
+  }
+
+  // Format each command
+  for (let i = 0; i < commands.length; i++) {
+    const cmd = commands[i];
+    if (!cmd) continue;
+
+    const subcommands = cmd.commands.filter((subcmd) => !subcmd.name().startsWith('_'));
+    const isLastCommand = i === commands.length - 1;
+    const commandName = useColor ? cyan(cmd.name()) : cmd.name();
+
+    if (subcommands.length > 0) {
+      // Command with subcommands - show command name, then tree-structured subcommands
+      const prefix = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
+      lines.push(`${formatDimText('│')} ${prefix}─ ${commandName}`);
+
+      for (let j = 0; j < subcommands.length; j++) {
+        const subcmd = subcommands[j];
+        if (!subcmd) continue;
+
+        const isLastSubcommand = j === subcommands.length - 1;
+        const subcommandName = pad(subcmd.name(), maxCommandNameLength);
+        const subcommandNameColored = useColor ? cyan(subcommandName) : subcommandName;
+        const fullDescription = subcmd.description() || '';
+        const descriptionLines = fullDescription
+          .split('\n')
+          .filter((line) => line.trim().length > 0);
+        const shortDescription = descriptionLines[0] || '';
+        const longDescription = descriptionLines.slice(1);
+
+        // Use tree characters: └─ for last subcommand, ├─ for others
+        const treeChar = isLastSubcommand ? '└' : '├';
+        const continuation =
+          continuationPrefix ??
+          (isLastCommand && isLastSubcommand && !hasItemsAfter ? ' ' : formatDimText('│'));
+        lines.push(
+          `${formatDimText('│')} ${continuation}  ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${shortDescription}`,
+        );
+
+        // Add multiline description if present and enabled
+        if (showMultilineDescriptions && longDescription.length > 0) {
+          for (const descLine of longDescription) {
+            lines.push(`${formatDimText('│')} ${continuation}     ${descLine}`);
+          }
+        }
+      }
+    } else {
+      // Standalone command - show command name and description on same line
+      const prefix = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
+      const commandNamePadded = pad(cmd.name(), maxCommandNameLength);
+      const commandNameColored = useColor ? cyan(commandNamePadded) : commandNamePadded;
+      const description = cmd.description() || '';
+      lines.push(`${formatDimText('│')} ${prefix}─ ${commandNameColored}  ${description}`);
+    }
+  }
+
+  return lines;
+}
+
+/**
  * Formats multiline description with "Prisma Next" in green.
  * If a single long line is provided, it will be wrapped to fit the terminal width.
  */
@@ -471,35 +568,17 @@ export function formatCommandHelp(options: {
   // Extract subcommands if any
   const subcommands = command.commands.filter((cmd) => !cmd.name().startsWith('_'));
 
-  // Helper function for padding
-  const pad = createPadFunction();
-
   // Format subcommands as a tree if present
   if (subcommands.length > 0) {
-    // Find max subcommand name length for alignment
-    let maxSubcommandNameLength = 0;
-    for (const subcmd of subcommands) {
-      maxSubcommandNameLength = Math.max(maxSubcommandNameLength, subcmd.name().length);
-    }
-
-    // Format each subcommand with tree structure
-    for (let j = 0; j < subcommands.length; j++) {
-      const subcmd = subcommands[j];
-      if (!subcmd) continue;
-
-      const isLastSubcommand = j === subcommands.length - 1 && optionsList.length === 0;
-      const subcommandName = pad(subcmd.name(), maxSubcommandNameLength);
-      const subcommandNameColored = useColor ? cyan(subcommandName) : subcommandName;
-      // Extract only the first line of description for subcommand listings
-      const fullDescription = subcmd.description() || '';
-      const shortDescription = fullDescription.split('\n')[0] || '';
-
-      // Use tree characters: └─ for last subcommand, ├─ for others
-      const treeChar = isLastSubcommand ? '└' : '├';
-      lines.push(
-        `${formatDimText('│')} ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${shortDescription}`,
-      );
-    }
+    const hasItemsAfter = optionsList.length > 0;
+    const treeLines = renderCommandTree({
+      commands: subcommands,
+      useColor,
+      formatDimText,
+      hasItemsAfter,
+      showMultilineDescriptions: false,
+    });
+    lines.push(...treeLines);
   }
 
   // Calculate max label width for options
@@ -574,72 +653,15 @@ export function formatRootHelp(options: {
 
   // Build command tree
   if (topLevelCommands.length > 0) {
-    // Find max subcommand name length for alignment
-    let maxSubcommandNameLength = 0;
-    for (const cmd of topLevelCommands) {
-      const subcommands = cmd.commands.filter((subcmd) => !subcmd.name().startsWith('_'));
-      for (const subcmd of subcommands) {
-        maxSubcommandNameLength = Math.max(maxSubcommandNameLength, subcmd.name().length);
-      }
-      // Also check the command itself if it has no subcommands
-      if (subcommands.length === 0) {
-        maxSubcommandNameLength = Math.max(maxSubcommandNameLength, cmd.name().length);
-      }
-    }
-
-    const pad = createPadFunction();
-
-    // Format each top-level command
-    for (let i = 0; i < topLevelCommands.length; i++) {
-      const cmd = topLevelCommands[i];
-      if (!cmd) continue;
-
-      const subcommands = cmd.commands.filter((subcmd) => !subcmd.name().startsWith('_'));
-      const commandName = useColor ? cyan(cmd.name()) : cmd.name();
-      const isLastCommand = i === topLevelCommands.length - 1;
-
-      if (subcommands.length > 0) {
-        // Command with subcommands - show command name, then tree-structured subcommands
-        const prefix = isLastCommand ? formatDimText('└') : formatDimText('├');
-        lines.push(`${formatDimText('│')} ${prefix}─ ${commandName}`);
-
-        for (let j = 0; j < subcommands.length; j++) {
-          const subcmd = subcommands[j];
-          if (!subcmd) continue;
-
-          const isLastSubcommand = j === subcommands.length - 1;
-          const subcommandName = pad(subcmd.name(), maxSubcommandNameLength);
-          const subcommandNameColored = useColor ? cyan(subcommandName) : subcommandName;
-          const fullDescription = subcmd.description() || '';
-          const descriptionLines = fullDescription
-            .split('\n')
-            .filter((line) => line.trim().length > 0);
-          const shortDescription = descriptionLines[0] || '';
-          const longDescription = descriptionLines.slice(1);
-
-          // Use tree characters: └─ for last subcommand, ├─ for others
-          const treeChar = isLastSubcommand ? '└' : '├';
-          const continuation = isLastCommand && isLastSubcommand ? ' ' : formatDimText('│');
-          lines.push(
-            `${formatDimText('│')} ${continuation}  ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${shortDescription}`,
-          );
-
-          // Add multiline description if present
-          if (longDescription.length > 0) {
-            for (const descLine of longDescription) {
-              lines.push(`${formatDimText('│')} ${continuation}     ${descLine}`);
-            }
-          }
-        }
-      } else {
-        // Standalone command - show command name and description on same line
-        const prefix = isLastCommand ? formatDimText('└') : formatDimText('├');
-        const commandNamePadded = pad(cmd.name(), maxSubcommandNameLength);
-        const commandNameColored = useColor ? cyan(commandNamePadded) : commandNamePadded;
-        const description = cmd.description() || '';
-        lines.push(`${formatDimText('│')} ${prefix}─ ${commandNameColored}  ${description}`);
-      }
-    }
+    const hasItemsAfter = globalOptions.length > 0;
+    const treeLines = renderCommandTree({
+      commands: topLevelCommands,
+      useColor,
+      formatDimText,
+      hasItemsAfter,
+      showMultilineDescriptions: true,
+    });
+    lines.push(...treeLines);
   }
 
   // Add separator between commands and options if both exist
