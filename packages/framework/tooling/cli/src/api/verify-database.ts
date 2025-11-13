@@ -1,10 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { createPostgresDriver } from '@prisma-next/driver-postgres/runtime';
-import { parseContractMarkerRow } from '@prisma-next/runtime-executor';
-import { readContractMarker } from '@prisma-next/sql-runtime';
 import { loadConfig } from '../config-loader';
+import { parseContractMarkerRow } from '../utils/marker-parser';
 
 export interface VerifyDatabaseOptions {
   readonly dbUrl?: string;
@@ -28,17 +25,67 @@ export interface VerifyDatabaseResult {
     readonly actual?: string;
   };
   readonly missingCodecs?: readonly string[];
+  readonly codecCoverageSkipped?: boolean;
+  readonly meta?: {
+    readonly configPath?: string;
+    readonly contractPath: string;
+  };
   readonly timings: {
     readonly total: number;
   };
 }
 
 /**
+ * Extracts codec type IDs used in contract storage tables.
+ * Uses type guards to safely access SQL-specific structure without importing SQL types.
+ */
+function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
+  const typeIds = new Set<string>();
+
+  // Type guard for SQL contract structure
+  if (
+    typeof contract === 'object' &&
+    contract !== null &&
+    'storage' in contract &&
+    typeof contract.storage === 'object' &&
+    contract.storage !== null &&
+    'tables' in contract.storage
+  ) {
+    const storage = contract.storage as { tables?: Record<string, unknown> };
+    if (storage.tables && typeof storage.tables === 'object') {
+      for (const table of Object.values(storage.tables)) {
+        if (
+          typeof table === 'object' &&
+          table !== null &&
+          'columns' in table &&
+          typeof table.columns === 'object' &&
+          table.columns !== null
+        ) {
+          const columns = table.columns as Record<string, { type?: string } | undefined>;
+          for (const column of Object.values(columns)) {
+            if (
+              column &&
+              typeof column === 'object' &&
+              'type' in column &&
+              typeof column.type === 'string'
+            ) {
+              typeIds.add(column.type);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return Array.from(typeIds).sort();
+}
+
+/**
  * Programmatic API for verifying database contract markers.
- * Loads config and contract, connects to database, reads marker, and compares hashes/target.
+ * Loads config and contract, uses config-provided query runner, reads marker via family helper, and compares hashes/target.
  *
  * @param options - Options for database verification
- * @returns Result with verification status, hashes, target info, and timings
+ * @returns Result with verification status, hashes, target info, codec coverage, meta, and timings
  * @throws Error if config/contract loading or database connection fails
  */
 export async function verifyDatabase(
@@ -49,12 +96,20 @@ export async function verifyDatabase(
   try {
     // Load config
     const config = await loadConfig(options.configPath);
+    const configPath = options.configPath;
 
     // Resolve database URL
     const dbUrl = options.dbUrl ?? config.db?.url ?? process.env.DATABASE_URL;
     if (!dbUrl) {
       throw new Error(
         'Database URL is required. Provide --db flag, config.db.url, or DATABASE_URL environment variable.',
+      );
+    }
+
+    // Check for queryRunnerFactory
+    if (!config.db?.queryRunnerFactory) {
+      throw new Error(
+        'Config.db.queryRunnerFactory is required for db verify. Provide a factory function that returns a query runner.',
       );
     }
 
@@ -66,20 +121,41 @@ export async function verifyDatabase(
     const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
     // Validate contract using family validator
-    const contractIR = config.family.validateContractIR(contractJson) as SqlContract<SqlStorage>;
+    const contractIR = config.family.validateContractIR(contractJson);
+
+    // Type guard to ensure contract has required properties
+    if (
+      typeof contractIR !== 'object' ||
+      contractIR === null ||
+      !('coreHash' in contractIR) ||
+      !('target' in contractIR) ||
+      typeof contractIR.coreHash !== 'string' ||
+      typeof contractIR.target !== 'string'
+    ) {
+      throw new Error('Invalid contract: missing coreHash or target');
+    }
 
     // Extract contract hashes and target
     const contractCoreHash = contractIR.coreHash;
-    const contractProfileHash = contractIR.profileHash;
+    const contractProfileHash =
+      'profileHash' in contractIR && typeof contractIR.profileHash === 'string'
+        ? contractIR.profileHash
+        : undefined;
     const contractTarget = contractIR.target;
 
-    // Connect to database and read marker
-    const driver = createPostgresDriver(dbUrl, { cursor: { disabled: true } });
-    try {
-      await driver.connect();
+    // Create query runner from factory
+    const queryRunner = config.db.queryRunnerFactory(dbUrl);
 
-      const markerStatement = readContractMarker();
-      const queryResult = await driver.query<{
+    try {
+      // Get marker SQL from family verify helper
+      if (!config.family.verify?.readMarkerSql) {
+        throw new Error(
+          'Family verify.readMarkerSql is required for db verify. The family must provide a readMarkerSql() function.',
+        );
+      }
+
+      const markerStatement = config.family.verify.readMarkerSql();
+      const queryResult = await queryRunner.query<{
         core_hash: string;
         profile_hash: string;
         contract_json: unknown | null;
@@ -87,7 +163,27 @@ export async function verifyDatabase(
         updated_at: Date | string;
         app_tag: string | null;
         meta: unknown | null;
-      }>(markerStatement.sql, [...markerStatement.params]);
+      }>(markerStatement.sql, markerStatement.params);
+
+      // Compute codec coverage (optional)
+      let missingCodecs: readonly string[] | undefined;
+      let codecCoverageSkipped = false;
+      if (config.family.verify?.collectSupportedCodecTypeIds) {
+        const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
+        const supportedTypeIds = config.family.verify.collectSupportedCodecTypeIds(descriptors);
+        if (supportedTypeIds.length === 0) {
+          // Helper is present but returns empty (MVP behavior)
+          // Coverage check is skipped - missingCodecs remains undefined
+          codecCoverageSkipped = true;
+        } else {
+          const supportedSet = new Set(supportedTypeIds);
+          const usedTypeIds = extractCodecTypeIdsFromContract(contractIR);
+          const missing = usedTypeIds.filter((id) => !supportedSet.has(id));
+          if (missing.length > 0) {
+            missingCodecs = missing;
+          }
+        }
+      }
 
       // Check marker presence
       if (queryResult.rows.length === 0) {
@@ -102,6 +198,12 @@ export async function verifyDatabase(
           },
           target: {
             expected: config.target.id,
+          },
+          missingCodecs,
+          codecCoverageSkipped,
+          meta: {
+            configPath,
+            contractPath: contractJsonPath,
           },
           timings: {
             total: totalTime,
@@ -136,6 +238,12 @@ export async function verifyDatabase(
             expected: expectedTarget,
             actual: contractTarget,
           },
+          missingCodecs,
+          codecCoverageSkipped,
+          meta: {
+            configPath,
+            contractPath: contractJsonPath,
+          },
           timings: {
             total: totalTime,
           },
@@ -159,6 +267,12 @@ export async function verifyDatabase(
           },
           target: {
             expected: expectedTarget,
+          },
+          missingCodecs,
+          codecCoverageSkipped,
+          meta: {
+            configPath,
+            contractPath: contractJsonPath,
           },
           timings: {
             total: totalTime,
@@ -184,6 +298,12 @@ export async function verifyDatabase(
           target: {
             expected: expectedTarget,
           },
+          missingCodecs,
+          codecCoverageSkipped,
+          meta: {
+            configPath,
+            contractPath: contractJsonPath,
+          },
           timings: {
             total: totalTime,
           },
@@ -206,12 +326,19 @@ export async function verifyDatabase(
         target: {
           expected: expectedTarget,
         },
+        missingCodecs,
+        meta: {
+          configPath,
+          contractPath: contractJsonPath,
+        },
         timings: {
           total: totalTime,
         },
       };
     } finally {
-      await driver.close();
+      if (queryRunner.close) {
+        await queryRunner.close();
+      }
     }
   } catch (error) {
     if (error instanceof Error) {
@@ -220,4 +347,3 @@ export async function verifyDatabase(
     throw new Error(`Failed to verify database: ${String(error)}`);
   }
 }
-

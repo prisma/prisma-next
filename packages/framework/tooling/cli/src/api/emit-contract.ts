@@ -1,9 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { OperationRegistry } from '@prisma-next/operations';
 import type { TargetFamilyHook, TypesImportSpec } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
+import type { OperationRegistry } from '@prisma-next/operations';
 
 export interface LoggerLike {
   readonly log: (message: string) => void;

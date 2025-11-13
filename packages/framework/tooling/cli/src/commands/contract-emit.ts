@@ -9,13 +9,13 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../pack-assembly';
-import { parseGlobalFlags } from '../utils/global-flags';
 import { mapErrorToCliEnvelope } from '../utils/errors';
+import { parseGlobalFlags } from '../utils/global-flags';
 import {
-  formatEmitOutput,
   formatEmitJson,
-  formatErrorOutput,
+  formatEmitOutput,
   formatErrorJson,
+  formatErrorOutput,
 } from '../utils/output';
 
 interface ContractEmitOptions {

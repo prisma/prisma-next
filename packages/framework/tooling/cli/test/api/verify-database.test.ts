@@ -4,10 +4,15 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '@prisma-next/sql-runtime';
+import {
+  ensureSchemaStatement,
+  ensureTableStatement,
+  writeContractMarker,
+} from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
-import { timeouts, withDevDatabase, withClient } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { emitContract } from '../../src/api/emit-contract';
 import { verifyDatabase } from '../../src/api/verify-database';
 import { loadConfig } from '../../src/config-loader';
 import {
@@ -16,13 +21,16 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../../src/pack-assembly';
-import { emitContract } from '../../src/api/emit-contract';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(__dirname, '../../../../../');
 const fixturesDir = join(__dirname, '../fixtures');
 
-function createConfigFileContent(includeContract = true, outputOverride?: string): string {
+function createConfigFileContent(
+  includeContract = true,
+  outputOverride?: string,
+  queryRunnerFactoryCode?: string,
+): string {
   const adapterPath = resolve(
     workspaceRoot,
     'packages/targets/postgres-adapter/dist/exports/cli.js',
@@ -44,6 +52,12 @@ function createConfigFileContent(includeContract = true, outputOverride?: string
   },`
     : '';
 
+  const dbField = queryRunnerFactoryCode
+    ? `  db: {
+    queryRunnerFactory: ${queryRunnerFactoryCode},
+  },`
+    : '';
+
   return `import { defineConfig } from '${configTypesPath}';
 import postgresAdapter from '${adapterPath}';
 import postgres from '${targetPath}';
@@ -55,16 +69,37 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   extensions: [],
-${contractField}
+${contractField}${dbField}
 });
 `;
+}
+
+/**
+ * Creates a query runner factory code string for use in config files.
+ * This wraps a pg Client to provide the queryRunnerFactory interface.
+ */
+function createQueryRunnerFactoryCode(): string {
+  return `(url) => {
+    const { Client } = require('pg');
+    const client = new Client({ connectionString: url });
+    client.connect();
+    return {
+      query: async (sql, params) => {
+        const result = await client.query(sql, params);
+        return { rows: result.rows };
+      },
+      close: async () => {
+        await client.end();
+      },
+    };
+  }`;
 }
 
 describe('verifyDatabase API', () => {
   let testDir: string;
   let outputDir: string;
   let configPath: string;
-  let contractJsonPath: string;
+  let _contractJsonPath: string;
   let contract: SqlContract<SqlStorage>;
 
   beforeEach(async () => {
@@ -75,7 +110,7 @@ describe('verifyDatabase API', () => {
     mkdirSync(testDir, { recursive: true });
     outputDir = join(testDir, 'output');
     configPath = join(testDir, 'prisma-next.config.ts');
-    contractJsonPath = join(outputDir, 'contract.json');
+    _contractJsonPath = join(outputDir, 'contract.json');
 
     // Create config file
     writeFileSync(configPath, createConfigFileContent(), 'utf-8');
@@ -98,7 +133,9 @@ describe('verifyDatabase API', () => {
       ? config.family.stripMappings(contractRaw)
       : contractRaw;
 
-    const contractIR = config.family.validateContractIR(contractWithoutMappings) as SqlContract<SqlStorage>;
+    const contractIR = config.family.validateContractIR(
+      contractWithoutMappings,
+    ) as SqlContract<SqlStorage>;
 
     // Emit contract to get proper hashes
     const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
@@ -153,6 +190,14 @@ describe('verifyDatabase API', () => {
             });
             await executeStatement(client, write.insert);
 
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
+
             const result = await verifyDatabase({
               dbUrl: connectionString,
               configPath,
@@ -165,6 +210,7 @@ describe('verifyDatabase API', () => {
               expect(result.contract.profileHash).toBe(contract.profileHash);
             }
             expect(result.timings.total).toBeGreaterThanOrEqual(0);
+            expect(result.meta?.contractPath).toBeDefined();
           });
         },
         { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
@@ -182,6 +228,14 @@ describe('verifyDatabase API', () => {
             // Setup marker schema and table but don't write marker
             await executeStatement(client, ensureSchemaStatement);
             await executeStatement(client, ensureTableStatement);
+
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
 
             const result = await verifyDatabase({
               dbUrl: connectionString,
@@ -220,6 +274,14 @@ describe('verifyDatabase API', () => {
             });
             await executeStatement(client, write.insert);
 
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
+
             const result = await verifyDatabase({
               dbUrl: connectionString,
               configPath,
@@ -256,6 +318,14 @@ describe('verifyDatabase API', () => {
               canonicalVersion: 1,
             });
             await executeStatement(client, write.insert);
+
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
 
             const result = await verifyDatabase({
               dbUrl: connectionString,
@@ -296,6 +366,14 @@ describe('verifyDatabase API', () => {
             });
             await executeStatement(client, write.insert);
 
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
+
             const result = await verifyDatabase({
               dbUrl: connectionString,
               configPath,
@@ -311,4 +389,3 @@ describe('verifyDatabase API', () => {
     timeouts.spinUpPpgDev,
   );
 });
-

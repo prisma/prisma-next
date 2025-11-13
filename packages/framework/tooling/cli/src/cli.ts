@@ -1,7 +1,8 @@
 import { Command } from 'commander';
-import { createEmitCommand } from './commands/emit';
 import { createContractEmitCommand } from './commands/contract-emit';
 import { createDbVerifyCommand } from './commands/db-verify';
+import { createEmitCommand } from './commands/emit';
+import { createTestStyleCommand } from './commands/test-style';
 
 const program = new Command();
 
@@ -39,5 +40,8 @@ program.addCommand(dbCommand);
 
 // Keep legacy emit command as alias
 program.addCommand(createEmitCommand());
+
+// Test command for experimenting with visual styles
+program.addCommand(createTestStyleCommand());
 
 program.parse();

@@ -1,12 +1,13 @@
 import { Command } from 'commander';
 import { verifyDatabase } from '../api/verify-database';
-import { parseGlobalFlags } from '../utils/global-flags';
+import type { CliErrorEnvelope } from '../utils/errors';
 import { createRtmError, mapErrorToCliEnvelope } from '../utils/errors';
+import { parseGlobalFlags } from '../utils/global-flags';
 import {
-  formatVerifyOutput,
-  formatVerifyJson,
-  formatErrorOutput,
   formatErrorJson,
+  formatErrorOutput,
+  formatVerifyJson,
+  formatVerifyOutput,
 } from '../utils/output';
 
 interface DbVerifyOptions {
@@ -63,7 +64,7 @@ export function createDbVerifyCommand(): Command {
 
         // If verification failed, throw error with appropriate code
         if (!result.ok && result.code) {
-          let errorEnvelope;
+          let errorEnvelope: CliErrorEnvelope;
           if (result.code === 'PN-RTM-3001') {
             errorEnvelope = createRtmError('3001', 'Marker missing', {
               why: 'Contract marker not found in database',
@@ -122,4 +123,3 @@ export function createDbVerifyCommand(): Command {
 
   return command;
 }
-

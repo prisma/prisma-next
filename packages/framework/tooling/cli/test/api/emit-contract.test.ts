@@ -58,7 +58,7 @@ ${contractField}
 
 describe('emitContract API', () => {
   let testDir: string;
-  let outputDir: string;
+  let _outputDir: string;
   let configPath: string;
 
   beforeEach(() => {
@@ -67,7 +67,7 @@ describe('emitContract API', () => {
       `prisma-next-api-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     );
     mkdirSync(testDir, { recursive: true });
-    outputDir = join(testDir, 'output');
+    _outputDir = join(testDir, 'output');
     configPath = join(testDir, 'prisma-next.config.ts');
 
     // Create default config file with absolute paths

@@ -60,6 +60,165 @@ prisma-next contract emit -v --timestamps
 
 **Note:** The `contract emit` command is the canonical form. The `emit` command is kept as a legacy alias for backward compatibility.
 
+### `prisma-next db verify`
+
+Verify that a database instance matches the emitted contract by checking marker presence, hash equality, and target compatibility.
+
+**Command:**
+```bash
+prisma-next db verify [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+Options:
+- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--timestamps`: Add timestamps to output
+- `--color/--no-color`: Force/disable color output
+
+Examples:
+```bash
+# Use config defaults
+prisma-next db verify
+
+# Specify database URL
+prisma-next db verify --db postgresql://user:pass@localhost/db
+
+# JSON output
+prisma-next db verify --json
+
+# Verbose output with timestamps
+prisma-next db verify -v --timestamps
+```
+
+**Config File Requirements:**
+
+The `db verify` command requires a `queryRunnerFactory` in the config to connect to the database:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/cli';
+import sql from '@prisma-next/family-sql/cli';
+import { contract } from './prisma/contract';
+import { Client } from 'pg';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+  contract: {
+    source: contract,
+    output: 'src/prisma/contract.json',
+    types: 'src/prisma/contract.d.ts',
+  },
+  db: {
+    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    queryRunnerFactory: (url: string) => {
+      const client = new Client({ connectionString: url });
+      client.connect();
+      return {
+        query: async <Row = Record<string, unknown>>(
+          sql: string,
+          params?: readonly unknown[],
+        ): Promise<{ readonly rows: Row[] }> => {
+          const result = await client.query<Row>(sql, params as unknown[]);
+          return { rows: result.rows };
+        },
+        close: async (): Promise<void> => {
+          await client.end();
+        },
+      };
+    },
+  },
+});
+```
+
+The `queryRunnerFactory` must return an object with:
+- `query<Row>(sql: string, params?: readonly unknown[]): Promise<{ readonly rows: Row[] }>` - Execute a SQL query
+- `close?(): Promise<void>` - Optional cleanup method
+
+**Verification Process:**
+
+1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
+2. **Connect to Database**: Uses `config.db.queryRunnerFactory(url)` to create a query runner
+3. **Read Marker**: Executes the marker SELECT statement provided by `config.family.verify.readMarkerSql()`
+4. **Compare**:
+   - Marker presence: Returns `PN-RTM-3001` if marker is missing
+   - Target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
+   - Core hash: Returns `PN-RTM-3002` if `coreHash` doesn't match
+   - Profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
+5. **Codec Coverage** (optional): If `config.family.verify.collectSupportedCodecTypeIds` is provided, compares contract column types against supported codec types and reports missing codecs
+
+**Output Format (TTY):**
+
+Success:
+```
+✔ Database matches contract
+  coreHash: sha256:abc123...
+  profileHash: sha256:def456...
+```
+
+Failure:
+```
+✖ Marker missing (PN-RTM-3001)
+  Why: Contract marker not found in database
+  Fix: Run `prisma-next db sign --db <url>` to create marker
+```
+
+**Output Format (JSON):**
+
+```json
+{
+  "ok": true,
+  "summary": "Database matches contract",
+  "contract": {
+    "coreHash": "sha256:abc123...",
+    "profileHash": "sha256:def456..."
+  },
+  "marker": {
+    "coreHash": "sha256:abc123...",
+    "profileHash": "sha256:def456..."
+  },
+  "target": {
+    "expected": "postgres"
+  },
+  "missingCodecs": [],
+  "meta": {
+    "configPath": "/path/to/prisma-next.config.ts",
+    "contractPath": "/path/to/src/prisma/contract.json"
+  },
+  "timings": {
+    "total": 42
+  }
+}
+```
+
+**Error Codes:**
+
+- `PN-RTM-3001`: Marker missing - Contract marker not found in database
+- `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
+- `PN-RTM-3003`: Target mismatch - Contract target does not match config target
+
+**Family Requirements:**
+
+The family must provide a `verify` helper in the family descriptor:
+
+```typescript
+{
+  verify: {
+    readMarkerSql: () => ({ sql: string, params: readonly unknown[] }),
+    collectSupportedCodecTypeIds?: (descriptors) => readonly string[],
+  },
+}
+```
+
+The SQL family provides this via `@prisma-next/family-sql/cli`.
+
 **Config File (`prisma-next.config.ts`):**
 
 The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.

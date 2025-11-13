@@ -393,6 +393,9 @@ importers:
       c12:
         specifier: ^3.3.2
         version: 3.3.2(magicast@0.3.5)
+      colorette:
+        specifier: ^2.0.20
+        version: 2.0.20
       commander:
         specifier: ^12.0.0
         version: 12.1.0

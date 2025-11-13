@@ -4,25 +4,33 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { ensureSchemaStatement, ensureTableStatement, writeContractMarker } from '@prisma-next/sql-runtime';
+import {
+  ensureSchemaStatement,
+  ensureTableStatement,
+  writeContractMarker,
+} from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
-import { timeouts, withDevDatabase, withClient } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { emitContract } from '../src/api/emit-contract';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
+import { loadConfig } from '../src/config-loader';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../src/pack-assembly';
-import { emitContract } from '../src/api/emit-contract';
-import { loadConfig } from '../src/config-loader';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(__dirname, '../../../../../');
 const fixturesDir = join(__dirname, 'fixtures');
 
-function createConfigFileContent(includeContract = true, outputOverride?: string): string {
+function createConfigFileContent(
+  includeContract = true,
+  outputOverride?: string,
+  queryRunnerFactoryCode?: string,
+): string {
   const adapterPath = resolve(
     workspaceRoot,
     'packages/targets/postgres-adapter/dist/exports/cli.js',
@@ -44,6 +52,12 @@ function createConfigFileContent(includeContract = true, outputOverride?: string
   },`
     : '';
 
+  const dbField = queryRunnerFactoryCode
+    ? `  db: {
+    queryRunnerFactory: ${queryRunnerFactoryCode},
+  },`
+    : '';
+
   return `import { defineConfig } from '${configTypesPath}';
 import postgresAdapter from '${adapterPath}';
 import postgres from '${targetPath}';
@@ -55,14 +69,31 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   extensions: [],
-${contractField}
+${contractField}${dbField}
 });
 `;
 }
 
+function createQueryRunnerFactoryCode(): string {
+  return `(url) => {
+    const { Client } = require('pg');
+    const client = new Client({ connectionString: url });
+    client.connect();
+    return {
+      query: async (sql, params) => {
+        const result = await client.query(sql, params);
+        return { rows: result.rows };
+      },
+      close: async () => {
+        await client.end();
+      },
+    };
+  }`;
+}
+
 describe('db verify command (e2e)', () => {
   let testDir: string;
-  let outputDir: string;
+  let _outputDir: string;
   let configPath: string;
   let contract: SqlContract<SqlStorage>;
   let originalConsoleLog: typeof console.log;
@@ -76,7 +107,7 @@ describe('db verify command (e2e)', () => {
       `prisma-next-db-verify-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     );
     mkdirSync(testDir, { recursive: true });
-    outputDir = join(testDir, 'output');
+    _outputDir = join(testDir, 'output');
     configPath = join(testDir, 'prisma-next.config.ts');
 
     // Create config file
@@ -100,7 +131,9 @@ describe('db verify command (e2e)', () => {
       ? config.family.stripMappings(contractRaw)
       : contractRaw;
 
-    const contractIR = config.family.validateContractIR(contractWithoutMappings) as SqlContract<SqlStorage>;
+    const contractIR = config.family.validateContractIR(
+      contractWithoutMappings,
+    ) as SqlContract<SqlStorage>;
 
     const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
     const operationRegistry = assembleOperationRegistry(descriptors, config.family);
@@ -168,6 +201,14 @@ describe('db verify command (e2e)', () => {
             });
             await executeStatement(client, write.insert);
 
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
+
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
             try {
@@ -207,6 +248,14 @@ describe('db verify command (e2e)', () => {
             // Setup marker schema and table but don't write marker
             await executeStatement(client, ensureSchemaStatement);
             await executeStatement(client, ensureTableStatement);
+
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
 
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
@@ -260,6 +309,14 @@ describe('db verify command (e2e)', () => {
             });
             await executeStatement(client, write.insert);
 
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
+
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
             try {
@@ -295,6 +352,9 @@ describe('db verify command (e2e)', () => {
               target: {
                 expected: expect.any(String),
               },
+              meta: {
+                contractPath: expect.any(String),
+              },
               timings: {
                 total: expect.any(Number),
               },
@@ -316,6 +376,14 @@ describe('db verify command (e2e)', () => {
             // Setup marker schema and table but don't write marker
             await executeStatement(client, ensureSchemaStatement);
             await executeStatement(client, ensureTableStatement);
+
+            // Update config with queryRunnerFactory
+            const configContent = createConfigFileContent(
+              true,
+              undefined,
+              createQueryRunnerFactoryCode(),
+            );
+            writeFileSync(configPath, configContent, 'utf-8');
 
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
@@ -356,4 +424,3 @@ describe('db verify command (e2e)', () => {
     timeouts.spinUpPpgDev,
   );
 });
-
