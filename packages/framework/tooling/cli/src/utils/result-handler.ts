@@ -1,4 +1,3 @@
-import { mapErrorToCliEnvelope } from './errors';
 import type { GlobalFlags } from './global-flags';
 import { formatErrorJson, formatErrorOutput } from './output';
 import type { Result } from './result';
@@ -26,8 +25,8 @@ export function handleResult<T>(
     return 0;
   }
 
-  // Error case - map to CLI envelope
-  const envelope = mapErrorToCliEnvelope(result.error);
+  // Error case - convert to CLI envelope
+  const envelope = result.error.toEnvelope();
 
   // Output error based on flags
   if (flags.json === 'object') {
@@ -38,6 +37,7 @@ export function handleResult<T>(
     console.error(formatErrorOutput(envelope, flags));
   }
 
-  // Return exit code for commands to use with process.exit()
-  return envelope.exitCode ?? 1;
+  // Infer exit code from error domain: CLI errors = 2, RTM errors = 1
+  const exitCode = result.error.domain === 'CLI' ? 2 : 1;
+  return exitCode;
 }

@@ -1,7 +1,7 @@
 import { blue, bold, dim, green, red } from 'colorette';
 import type { EmitContractResult } from '../api/emit-contract';
 import type { VerifyDatabaseResult } from '../api/verify-database';
-import type { CliErrorEnvelope } from './errors';
+import type { CliErrorEnvelope } from './cli-errors';
 import type { GlobalFlags } from './global-flags';
 
 // ============================================================================

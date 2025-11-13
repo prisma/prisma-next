@@ -9,9 +9,11 @@ export interface Ok<T> {
   readonly value: T;
 }
 
+import { CliStructuredError } from './cli-errors';
+
 export interface Err {
   readonly ok: false;
-  readonly error: Error;
+  readonly error: CliStructuredError;
 }
 
 /**
@@ -24,11 +26,9 @@ export function ok<T>(value: T): Ok<T> {
 /**
  * Creates an error result.
  */
-export function err(error: Error): Err {
+export function err(error: CliStructuredError): Err {
   return { ok: false, error };
 }
-
-import { CliStructuredError } from './cli-errors';
 
 /**
  * Performs an async action and catches structured errors, returning a Result.
