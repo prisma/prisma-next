@@ -10,6 +10,8 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../pack-assembly';
+import { parseGlobalFlags } from '../utils/global-flags';
+import { formatStyledHeader, formatSuccessMessage } from '../utils/output';
 
 export function createEmitCommand(): Command {
   const command = new Command('emit');
@@ -21,6 +23,7 @@ export function createEmitCommand(): Command {
       'Path to prisma-next.config.ts (defaults to ./prisma-next.config.ts if present)',
     )
     .action(async (options: { config?: string }) => {
+      const flags = parseGlobalFlags({});
       try {
         // Load config (explicit via --config or default)
         const config = await loadConfig(options.config);
@@ -35,14 +38,6 @@ export function createEmitCommand(): Command {
         // Contract config is already normalized by defineConfig() with defaults applied
         const contractConfig = config.contract;
 
-        // Resolve contract source
-        let contractRaw: unknown;
-        if (typeof contractConfig.source === 'function') {
-          contractRaw = await contractConfig.source();
-        } else {
-          contractRaw = contractConfig.source;
-        }
-
         // Resolve artifact paths (already normalized by defineConfig() with defaults, but resolve relative paths)
         // defineConfig() ensures output and types are always present (defaults applied)
         if (!contractConfig.output || !contractConfig.types) {
@@ -52,6 +47,32 @@ export function createEmitCommand(): Command {
         }
         const contractJsonPath = resolve(contractConfig.output);
         const contractDtsPath = resolve(contractConfig.types);
+
+        // Output header
+        if (!flags.quiet) {
+          const configPath = options.config || './prisma-next.config.ts';
+          const header = formatStyledHeader({
+            command: 'emit',
+            description: 'Write contract artifacts',
+            url: 'https://pris.ly/contract-emit',
+            details: [
+              { label: 'config', value: configPath },
+              { label: 'contract', value: contractJsonPath },
+              { label: 'types', value: contractDtsPath },
+            ],
+            flags,
+          });
+          // eslint-disable-next-line no-console
+          console.log(header);
+        }
+
+        // Resolve contract source
+        let contractRaw: unknown;
+        if (typeof contractConfig.source === 'function') {
+          contractRaw = await contractConfig.source();
+        } else {
+          contractRaw = contractConfig.source;
+        }
 
         // Strip mappings if family provides stripMappings function
         const contractWithoutMappings = config.family.stripMappings
@@ -107,17 +128,22 @@ export function createEmitCommand(): Command {
         writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
         writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
 
-        // eslint-disable-next-line no-undef
+        // eslint-disable-next-line no-console
         console.log(`✓ Emitted contract.json to ${contractJsonPath}`);
-        // eslint-disable-next-line no-undef
+        // eslint-disable-next-line no-console
         console.log(`✓ Emitted contract.d.ts to ${contractDtsPath}`);
-        // eslint-disable-next-line no-undef
+        // eslint-disable-next-line no-console
         console.log(`  coreHash: ${result.coreHash}`);
-        // eslint-disable-next-line no-undef
+        // eslint-disable-next-line no-console
         console.log(`  profileHash: ${result.profileHash}`);
+        // Output success message
+        if (!flags.quiet) {
+          // eslint-disable-next-line no-console
+          console.log(formatSuccessMessage(flags));
+        }
       } catch (error) {
         if (error instanceof Error) {
-          // eslint-disable-next-line no-undef
+          // eslint-disable-next-line no-console
           console.error(`Error: ${error.message}`);
         }
         // Let commander.js handle the error (it will exit with code 1)

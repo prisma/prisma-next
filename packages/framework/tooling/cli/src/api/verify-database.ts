@@ -99,10 +99,10 @@ export async function verifyDatabase(
     const configPath = options.configPath;
 
     // Resolve database URL
-    const dbUrl = options.dbUrl ?? config.db?.url ?? process.env.DATABASE_URL;
+    const dbUrl = options.dbUrl ?? config.db?.url;
     if (!dbUrl) {
       throw new Error(
-        'Database URL is required. Provide --db flag, config.db.url, or DATABASE_URL environment variable.',
+        'Database URL is required. Provide --db flag or config.db.url in prisma-next.config.ts',
       );
     }
 
@@ -194,15 +194,15 @@ export async function verifyDatabase(
           summary: 'Marker missing',
           contract: {
             coreHash: contractCoreHash,
-            profileHash: contractProfileHash,
+            ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
           },
           target: {
             expected: config.target.id,
           },
-          missingCodecs,
-          codecCoverageSkipped,
+          ...(missingCodecs ? { missingCodecs } : {}),
+          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
           meta: {
-            configPath,
+            ...(configPath ? { configPath } : {}),
             contractPath: contractJsonPath,
           },
           timings: {
@@ -228,7 +228,7 @@ export async function verifyDatabase(
           summary: 'Target mismatch',
           contract: {
             coreHash: contractCoreHash,
-            profileHash: contractProfileHash,
+            ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
           },
           marker: {
             coreHash: marker.coreHash,
@@ -238,10 +238,10 @@ export async function verifyDatabase(
             expected: expectedTarget,
             actual: contractTarget,
           },
-          missingCodecs,
-          codecCoverageSkipped,
+          ...(missingCodecs ? { missingCodecs } : {}),
+          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
           meta: {
-            configPath,
+            ...(configPath ? { configPath } : {}),
             contractPath: contractJsonPath,
           },
           timings: {
@@ -259,7 +259,7 @@ export async function verifyDatabase(
           summary: 'Hash mismatch',
           contract: {
             coreHash: contractCoreHash,
-            profileHash: contractProfileHash,
+            ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
           },
           marker: {
             coreHash: marker.coreHash,
@@ -268,10 +268,10 @@ export async function verifyDatabase(
           target: {
             expected: expectedTarget,
           },
-          missingCodecs,
-          codecCoverageSkipped,
+          ...(missingCodecs ? { missingCodecs } : {}),
+          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
           meta: {
-            configPath,
+            ...(configPath ? { configPath } : {}),
             contractPath: contractJsonPath,
           },
           timings: {
@@ -289,7 +289,7 @@ export async function verifyDatabase(
           summary: 'Hash mismatch',
           contract: {
             coreHash: contractCoreHash,
-            profileHash: contractProfileHash,
+            ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
           },
           marker: {
             coreHash: marker.coreHash,
@@ -298,10 +298,10 @@ export async function verifyDatabase(
           target: {
             expected: expectedTarget,
           },
-          missingCodecs,
-          codecCoverageSkipped,
+          ...(missingCodecs ? { missingCodecs } : {}),
+          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
           meta: {
-            configPath,
+            ...(configPath ? { configPath } : {}),
             contractPath: contractJsonPath,
           },
           timings: {
@@ -317,7 +317,7 @@ export async function verifyDatabase(
         summary: 'Database matches contract',
         contract: {
           coreHash: contractCoreHash,
-          profileHash: contractProfileHash,
+          ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
         },
         marker: {
           coreHash: marker.coreHash,
@@ -326,9 +326,10 @@ export async function verifyDatabase(
         target: {
           expected: expectedTarget,
         },
-        missingCodecs,
+        ...(missingCodecs ? { missingCodecs } : {}),
+        ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
         meta: {
-          configPath,
+          ...(configPath ? { configPath } : {}),
           contractPath: contractJsonPath,
         },
         timings: {

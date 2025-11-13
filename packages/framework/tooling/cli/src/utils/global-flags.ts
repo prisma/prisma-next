@@ -24,7 +24,13 @@ export interface CliOptions {
  * Handles verbosity flags (-v, -vv, --trace), JSON output, quiet mode, timestamps, and color.
  */
 export function parseGlobalFlags(options: CliOptions): GlobalFlags {
-  const flags: GlobalFlags = {};
+  const flags: {
+    json?: 'object' | 'ndjson';
+    quiet?: boolean;
+    verbose?: number;
+    timestamps?: boolean;
+    color?: boolean;
+  } = {};
 
   // JSON output
   if (options.json === true || options.json === 'object') {
@@ -53,7 +59,7 @@ export function parseGlobalFlags(options: CliOptions): GlobalFlags {
   }
 
   // Color: respect NO_COLOR env var, --color/--no-color flags
-  if (process.env.NO_COLOR) {
+  if (process.env['NO_COLOR']) {
     flags.color = false;
   } else if (options['no-color']) {
     flags.color = false;
@@ -61,8 +67,8 @@ export function parseGlobalFlags(options: CliOptions): GlobalFlags {
     flags.color = options.color;
   } else {
     // Default: enable color if TTY
-    flags.color = process.stdout.isTTY && !process.env.CI;
+    flags.color = process.stdout.isTTY && !process.env['CI'];
   }
 
-  return flags;
+  return flags as GlobalFlags;
 }

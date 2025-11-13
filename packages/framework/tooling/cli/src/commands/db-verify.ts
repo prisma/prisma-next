@@ -1,11 +1,15 @@
+import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { verifyDatabase } from '../api/verify-database';
+import { loadConfig } from '../config-loader';
 import type { CliErrorEnvelope } from '../utils/errors';
 import { createRtmError, mapErrorToCliEnvelope } from '../utils/errors';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatErrorJson,
   formatErrorOutput,
+  formatStyledHeader,
+  formatSuccessMessage,
   formatVerifyJson,
   formatVerifyOutput,
 } from '../utils/output';
@@ -45,9 +49,35 @@ export function createDbVerifyCommand(): Command {
       const flags = parseGlobalFlags(options);
 
       try {
+        // Load config to get paths for header
+        const config = await loadConfig(options.config);
+        const configPath = options.config || './prisma-next.config.ts';
+        const contractPath = config.contract?.output
+          ? resolve(config.contract.output)
+          : resolve('src/prisma/contract.json');
+
+        // Output header (only for human-readable output)
+        if (flags.json !== 'object' && !flags.quiet) {
+          const details: Array<{ label: string; value: string }> = [
+            { label: 'config', value: configPath },
+            { label: 'contract', value: contractPath },
+          ];
+          if (options.db) {
+            details.push({ label: 'database', value: options.db });
+          }
+          const header = formatStyledHeader({
+            command: 'db verify',
+            description: 'Verify database matches emitted contract',
+            url: 'https://pris.ly/db-verify',
+            details,
+            flags,
+          });
+          console.log(header);
+        }
+
         const result = await verifyDatabase({
-          dbUrl: options.db,
-          configPath: options.config,
+          ...(options.db ? { dbUrl: options.db } : {}),
+          ...(options.config ? { configPath: options.config } : {}),
         });
 
         // Output based on flags
@@ -59,6 +89,10 @@ export function createDbVerifyCommand(): Command {
           const output = formatVerifyOutput(result, flags);
           if (output) {
             console.log(output);
+          }
+          // Output success message if verification passed
+          if (result.ok && !flags.quiet) {
+            console.log(formatSuccessMessage(flags));
           }
         }
 

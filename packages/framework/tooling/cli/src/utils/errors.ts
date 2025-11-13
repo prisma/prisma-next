@@ -37,12 +37,12 @@ export function createCliError(
     domain: 'CLI',
     severity: 'error',
     summary,
-    why: options?.why,
-    fix: options?.fix,
-    where: options?.where,
-    meta: options?.meta,
-    docsUrl: options?.docsUrl,
-    exitCode: options?.exitCode,
+    ...(options?.why ? { why: options.why } : {}),
+    ...(options?.fix ? { fix: options.fix } : {}),
+    ...(options?.where ? { where: options.where } : {}),
+    ...(options?.meta ? { meta: options.meta } : {}),
+    ...(options?.docsUrl ? { docsUrl: options.docsUrl } : {}),
+    ...(options?.exitCode !== undefined ? { exitCode: options.exitCode } : {}),
   };
 }
 
@@ -66,11 +66,11 @@ export function createRtmError(
     domain: 'RTM',
     severity: 'error',
     summary,
-    why: options?.why,
-    fix: options?.fix,
-    where: options?.where,
-    meta: options?.meta,
-    docsUrl: options?.docsUrl,
+    ...(options?.why ? { why: options.why } : {}),
+    ...(options?.fix ? { fix: options.fix } : {}),
+    ...(options?.where ? { where: options.where } : {}),
+    ...(options?.meta ? { meta: options.meta } : {}),
+    ...(options?.docsUrl ? { docsUrl: options.docsUrl } : {}),
     exitCode: options?.exitCode ?? 1,
   };
 }
@@ -130,7 +130,27 @@ export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
     if (message.includes('Database URL is required')) {
       return createCliError('4005', 'Database URL is required', {
         why: message,
-        fix: 'Provide --db flag, config.db.url, or DATABASE_URL environment variable',
+        fix: 'Provide --db flag or config.db.url in prisma-next.config.ts',
+        exitCode: 2,
+      });
+    }
+
+    // Missing queryRunnerFactory (usage/config error - exit code 2)
+    if (message.includes('Config.db.queryRunnerFactory is required')) {
+      return createCliError('4006', 'Query runner factory is required', {
+        why: message,
+        fix: 'Add db.queryRunnerFactory to prisma-next.config.ts',
+        docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
+        exitCode: 2,
+      });
+    }
+
+    // Missing family verify helper (usage/config error - exit code 2)
+    if (message.includes('Family verify.readMarkerSql is required')) {
+      return createCliError('4007', 'Family readMarkerSql() is required', {
+        why: message,
+        fix: 'Ensure family.verify.readMarkerSql() is exported by your family package',
+        docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
         exitCode: 2,
       });
     }

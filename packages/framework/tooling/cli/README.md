@@ -200,6 +200,8 @@ Failure:
 
 **Error Codes:**
 
+- `PN-CLI-4006`: Missing db.queryRunnerFactory in config — provide a query runner factory
+- `PN-CLI-4007`: Missing family.verify.readMarkerSql() — ensure family verify helpers are exported
 - `PN-RTM-3001`: Marker missing - Contract marker not found in database
 - `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
 - `PN-RTM-3003`: Target mismatch - Contract target does not match config target

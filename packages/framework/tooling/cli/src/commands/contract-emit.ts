@@ -16,6 +16,8 @@ import {
   formatEmitOutput,
   formatErrorJson,
   formatErrorOutput,
+  formatStyledHeader,
+  formatSuccessMessage,
 } from '../utils/output';
 
 interface ContractEmitOptions {
@@ -64,6 +66,32 @@ export function createContractEmitCommand(): Command {
         // Contract config is already normalized by defineConfig() with defaults applied
         const contractConfig = config.contract;
 
+        // Resolve artifact paths from config (already normalized by defineConfig() with defaults)
+        if (!contractConfig.output || !contractConfig.types) {
+          throw new Error(
+            'Contract config must have output and types paths. This should not happen if defineConfig() was used.',
+          );
+        }
+        const outputJsonPath = resolve(contractConfig.output);
+        const outputDtsPath = resolve(contractConfig.types);
+
+        // Output header (only for human-readable output)
+        if (flags.json !== 'object' && !flags.quiet) {
+          const configPath = options.config || './prisma-next.config.ts';
+          const header = formatStyledHeader({
+            command: 'contract emit',
+            description: 'Write contract artifacts',
+            url: 'https://pris.ly/contract-emit',
+            details: [
+              { label: 'config', value: configPath },
+              { label: 'contract', value: outputJsonPath },
+              { label: 'types', value: outputDtsPath },
+            ],
+            flags,
+          });
+          console.log(header);
+        }
+
         // Resolve contract source from config (user's config handles loading)
         let contractRaw: unknown;
         if (typeof contractConfig.source === 'function') {
@@ -79,15 +107,6 @@ export function createContractEmitCommand(): Command {
 
         // Validate and normalize the contract using family-specific validation
         const contractIR = config.family.validateContractIR(contractWithoutMappings) as ContractIR;
-
-        // Resolve artifact paths from config (already normalized by defineConfig() with defaults)
-        if (!contractConfig.output || !contractConfig.types) {
-          throw new Error(
-            'Contract config must have output and types paths. This should not happen if defineConfig() was used.',
-          );
-        }
-        const outputJsonPath = resolve(contractConfig.output);
-        const outputDtsPath = resolve(contractConfig.types);
 
         // Build descriptors array for assembly
         const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
@@ -123,6 +142,10 @@ export function createContractEmitCommand(): Command {
           const output = formatEmitOutput(result, flags);
           if (output) {
             console.log(output);
+          }
+          // Output success message
+          if (!flags.quiet) {
+            console.log(formatSuccessMessage(flags));
           }
         }
       } catch (error) {

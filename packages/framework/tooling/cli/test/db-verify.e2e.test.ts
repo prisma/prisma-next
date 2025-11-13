@@ -423,4 +423,164 @@ describe('db verify command (e2e)', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'reports PN-CLI-4006 when db.queryRunnerFactory is missing',
+    async () => {
+      await withDevDatabase(
+        async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            // Setup marker schema and table
+            await executeStatement(client, ensureSchemaStatement);
+            await executeStatement(client, ensureTableStatement);
+
+            // Write marker matching contract
+            const write = writeContractMarker({
+              coreHash: contract.coreHash,
+              profileHash: contract.profileHash ?? contract.coreHash,
+              contractJson: contract,
+              canonicalVersion: 1,
+            });
+            await executeStatement(client, write.insert);
+
+            // Create config WITHOUT queryRunnerFactory
+            const configContent = createConfigFileContent(true, undefined, undefined);
+            writeFileSync(configPath, configContent, 'utf-8');
+
+            const command = createDbVerifyCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await expect(
+                command.parseAsync([
+                  'node',
+                  'cli.js',
+                  'db',
+                  'verify',
+                  '--db',
+                  connectionString,
+                  '--config',
+                  configPath,
+                ]),
+              ).rejects.toThrow();
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            const errorOutput = consoleErrors.join('\n');
+            expect(errorOutput).toContain('PN-CLI-4006');
+            expect(errorOutput).toContain('Query runner factory is required');
+            expect(errorOutput).toContain('Add db.queryRunnerFactory to prisma-next.config.ts');
+          });
+        },
+        { acceleratePort: 54082, databasePort: 54083, shadowDatabasePort: 54084 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'reports PN-CLI-4007 when family.verify.readMarkerSql is missing',
+    async () => {
+      await withDevDatabase(
+        async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            // Setup marker schema and table
+            await executeStatement(client, ensureSchemaStatement);
+            await executeStatement(client, ensureTableStatement);
+
+            // Write marker matching contract
+            const write = writeContractMarker({
+              coreHash: contract.coreHash,
+              profileHash: contract.profileHash ?? contract.coreHash,
+              contractJson: contract,
+              canonicalVersion: 1,
+            });
+            await executeStatement(client, write.insert);
+
+            // Create config with queryRunnerFactory but family without verify.readMarkerSql
+            const adapterPath = resolve(
+              workspaceRoot,
+              'packages/targets/postgres-adapter/dist/exports/cli.js',
+            );
+            const targetPath = resolve(
+              workspaceRoot,
+              'packages/targets/postgres/dist/exports/cli.js',
+            );
+            const configTypesPath = resolve(
+              workspaceRoot,
+              'packages/framework/tooling/cli/dist/config-types.js',
+            );
+            const contractPath = resolve(fixturesDir, 'valid-contract.ts');
+            const emitterPath = resolve(
+              workspaceRoot,
+              'packages/sql/tooling/emitter/dist/exports/emitter.js',
+            );
+            const queryRunnerFactoryCode = createQueryRunnerFactoryCode();
+
+            // Create a family descriptor without verify.readMarkerSql
+            const configContent = `import { defineConfig } from '${configTypesPath}';
+import postgresAdapter from '${adapterPath}';
+import postgres from '${targetPath}';
+import { contract } from '${contractPath}';
+import sqlTargetFamilyHook from '${emitterPath}';
+
+// Create family descriptor without verify.readMarkerSql
+const sqlFamilyWithoutVerify = {
+  kind: 'family' as const,
+  id: 'sql',
+  hook: sqlTargetFamilyHook,
+  // verify property is missing
+};
+
+export default defineConfig({
+  family: sqlFamilyWithoutVerify,
+  target: postgres,
+  adapter: postgresAdapter,
+  extensions: [],
+  contract: {
+    source: contract,
+    output: 'output/contract.json',
+    types: 'output/contract.d.ts',
+  },
+  db: {
+    queryRunnerFactory: ${queryRunnerFactoryCode},
+  },
+});
+`;
+            writeFileSync(configPath, configContent, 'utf-8');
+
+            const command = createDbVerifyCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await expect(
+                command.parseAsync([
+                  'node',
+                  'cli.js',
+                  'db',
+                  'verify',
+                  '--db',
+                  connectionString,
+                  '--config',
+                  configPath,
+                ]),
+              ).rejects.toThrow();
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            const errorOutput = consoleErrors.join('\n');
+            expect(errorOutput).toContain('PN-CLI-4007');
+            expect(errorOutput).toContain('Family readMarkerSql() is required');
+            expect(errorOutput).toContain(
+              'Ensure family.verify.readMarkerSql() is exported by your family package',
+            );
+          });
+        },
+        { acceleratePort: 54085, databasePort: 54086, shadowDatabasePort: 54087 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
