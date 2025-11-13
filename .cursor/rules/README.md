@@ -5,7 +5,8 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 ## Always Apply (curated)
 - `.cursor/rules/use-correct-tools.mdc` — Use configured tools and scripts
 - `.cursor/rules/no-target-branches.mdc` — Don’t branch on target; use adapters
-- `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit “should”
+- `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit "should"
+- `.cursor/rules/cli-command-descriptions.mdc` — CLI command description patterns
 - `.cursor/rules/doc-maintenance.mdc` — Keep docs/READMEs/rules up‑to‑date
 
 ## Testing
