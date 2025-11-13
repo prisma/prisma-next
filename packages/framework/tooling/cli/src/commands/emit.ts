@@ -16,7 +16,7 @@ import {
   errorContractValidationFailed,
 } from '../utils/cli-errors';
 import { parseGlobalFlags } from '../utils/global-flags';
-import { formatStyledHeader, formatSuccessMessage } from '../utils/output';
+import { formatCommandHelp, formatStyledHeader, formatSuccessMessage } from '../utils/output';
 import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
 
@@ -25,10 +25,13 @@ export function createEmitCommand(): Command {
 
   command
     .description('Emit contract.json and contract.d.ts from config.contract')
-    .option(
-      '--config <path>',
-      'Path to prisma-next.config.ts (defaults to ./prisma-next.config.ts if present)',
-    )
+    .configureHelp({
+      formatHelp: (cmd) => {
+        const flags = parseGlobalFlags({});
+        return formatCommandHelp({ command: cmd, flags });
+      },
+    })
+    .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: { config?: string }) => {
       const flags = parseGlobalFlags({});
 

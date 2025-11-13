@@ -122,19 +122,26 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath: configPathWithDb,
-            });
+            // Change to test directory so verifyDatabase can find the contract file
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDirWithDb);
+              const result = await verifyDatabase({
+                dbUrl: connectionString,
+                configPath: 'prisma-next.config.ts',
+              });
 
-            expect(result.ok).toBe(true);
-            expect(result.summary).toBe('Database matches contract');
-            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
-            if (contractWithDb.profileHash) {
-              expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
+              expect(result.ok).toBe(true);
+              expect(result.summary).toBe('Database matches contract');
+              expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+              if (contractWithDb.profileHash) {
+                expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
+              }
+              expect(result.timings.total).toBeGreaterThanOrEqual(0);
+              expect(result.meta?.contractPath).toBeDefined();
+            } finally {
+              process.chdir(originalCwd);
             }
-            expect(result.timings.total).toBeGreaterThanOrEqual(0);
-            expect(result.meta?.contractPath).toBeDefined();
           } finally {
             cleanupWithDb();
           }
@@ -171,16 +178,23 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath: configPathWithDb,
-            });
+            // Change to test directory so verifyDatabase can find the contract file
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDirWithDb);
+              const result = await verifyDatabase({
+                dbUrl: connectionString,
+                configPath: 'prisma-next.config.ts',
+              });
 
-            expect(result.ok).toBe(false);
-            expect(result.code).toBe('PN-RTM-3001');
-            expect(result.summary).toBe('Marker missing');
-            expect(result.marker).toBeUndefined();
-            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+              expect(result.ok).toBe(false);
+              expect(result.code).toBe('PN-RTM-3001');
+              expect(result.summary).toBe('Marker missing');
+              expect(result.marker).toBeUndefined();
+              expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+            } finally {
+              process.chdir(originalCwd);
+            }
           } finally {
             cleanupWithDb();
           }
@@ -226,16 +240,23 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath: configPathWithDb,
-            });
+            // Change to test directory so verifyDatabase can find the contract file
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDirWithDb);
+              const result = await verifyDatabase({
+                dbUrl: connectionString,
+                configPath: 'prisma-next.config.ts',
+              });
 
-            expect(result.ok).toBe(false);
-            expect(result.code).toBe('PN-RTM-3002');
-            expect(result.summary).toBe('Hash mismatch');
-            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
-            expect(result.marker?.coreHash).toBe('sha256:different-hash');
+              expect(result.ok).toBe(false);
+              expect(result.code).toBe('PN-RTM-3002');
+              expect(result.summary).toBe('Hash mismatch');
+              expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+              expect(result.marker?.coreHash).toBe('sha256:different-hash');
+            } finally {
+              process.chdir(originalCwd);
+            }
           } finally {
             cleanupWithDb();
           }
@@ -281,18 +302,25 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath: configPathWithDb,
-            });
+            // Change to test directory so verifyDatabase can find the contract file
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDirWithDb);
+              const result = await verifyDatabase({
+                dbUrl: connectionString,
+                configPath: 'prisma-next.config.ts',
+              });
 
-            expect(result.ok).toBe(false);
-            expect(result.code).toBe('PN-RTM-3002');
-            expect(result.summary).toBe('Hash mismatch');
-            if (contractWithDb.profileHash) {
-              expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
+              expect(result.ok).toBe(false);
+              expect(result.code).toBe('PN-RTM-3002');
+              expect(result.summary).toBe('Hash mismatch');
+              if (contractWithDb.profileHash) {
+                expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
+              }
+              expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
+            } finally {
+              process.chdir(originalCwd);
             }
-            expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
           } finally {
             cleanupWithDb();
           }

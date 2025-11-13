@@ -12,6 +12,7 @@ import {
 import { errorContractConfigMissing } from '../utils/cli-errors';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
+  formatCommandHelp,
   formatEmitJson,
   formatEmitOutput,
   formatStyledHeader,
@@ -37,10 +38,13 @@ interface ContractEmitOptions {
 export function createContractEmitCommand(): Command {
   const command = new Command('emit')
     .description('Emit contract.json and contract.d.ts from config.contract')
-    .option(
-      '--config <path>',
-      'Path to prisma-next.config.ts (defaults to ./prisma-next.config.ts if present)',
-    )
+    .configureHelp({
+      formatHelp: (cmd) => {
+        const flags = parseGlobalFlags({});
+        return formatCommandHelp({ command: cmd, flags });
+      },
+    })
+    .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--json [format]', 'Output as JSON (object or ndjson)', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')

@@ -34,10 +34,13 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - Env toggles: `PRISMA_NEXT_DEBUG=1` ≅ `-v`, `PRISMA_NEXT_TRACE=1` ≅ `-vv`.
 
 ## Help & Usage
-- Default help is concise: Usage → Description → Subcommands → Options → Examples → Environment → Config → See also.
+- **Styled Help Output**: Help output uses the same styled format as normal command output for consistency:
+  - Root help (`prisma-next --help`): Shows "prisma next" title with subcommands listed
+  - Command help (`prisma-next db verify --help`): Shows "next <command> ➜ <description>" with options, subcommands, and docs URLs
+  - Help formatters are in `packages/framework/tooling/cli/src/utils/output.ts` and use `configureHelp()` in `cli.ts`
 - Include 1–2 copy‑pastable examples by default.
 - Show aliases and defaults inline for options.
-- Enable “Did you mean …” command suggestions.
+- Enable "Did you mean …" command suggestions.
 
 ## Errors
 - Codes: `PN-<DOMAIN>-<NNNN>` (e.g., `PN-CLI-4002`, `PN-MIG-2001`, `PN-RTM-3005`, `PN-CON-1001`).

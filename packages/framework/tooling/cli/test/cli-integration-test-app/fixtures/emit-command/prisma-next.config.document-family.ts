@@ -1,8 +1,4 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import { defineConfig } from '@prisma-next/cli/config-types';
-import sql from '@prisma-next/family-sql/cli';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import postgres from '@prisma-next/targets-postgres/cli';
 import { contract } from './invalid-contract-document';
 
 // Create a config with document family (which doesn't exist, but we'll test the error)

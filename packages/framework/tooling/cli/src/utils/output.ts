@@ -1,4 +1,5 @@
-import { blue, bold, dim, green, red } from 'colorette';
+import { blue, bold, cyan, dim, green, magenta, red } from 'colorette';
+import type { Command } from 'commander';
 import type { EmitContractResult } from '../api/emit-contract';
 import type { VerifyDatabaseResult } from '../api/verify-database';
 import type { CliErrorEnvelope } from './cli-errors';
@@ -249,7 +250,7 @@ export function formatStyledHeader(options: {
   }
   lines.push(formatDimText('└'));
 
-  return lines.join('\n');
+  return `${lines.join('\n')}\n`;
 }
 
 /**
@@ -259,4 +260,258 @@ export function formatSuccessMessage(flags: GlobalFlags): string {
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   return `${formatGreen('✓')} Success`;
+}
+
+// ============================================================================
+// Help Output Formatters
+// ============================================================================
+
+/**
+ * Maps command paths to their documentation URLs.
+ */
+function getCommandDocsUrl(commandPath: string): string | undefined {
+  const docsMap: Record<string, string> = {
+    'contract emit': 'https://pris.ly/contract-emit',
+    'db verify': 'https://pris.ly/db-verify',
+  };
+  return docsMap[commandPath];
+}
+
+/**
+ * Builds the full command path from a command and its parents.
+ */
+function buildCommandPath(command: Command): string {
+  const parts: string[] = [];
+  let current: Command | undefined = command;
+  while (current && current.name() !== 'prisma-next') {
+    parts.unshift(current.name());
+    current = current.parent ?? undefined;
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Formats help output for a command using the styled format.
+ */
+export function formatCommandHelp(options: {
+  readonly command: Command;
+  readonly flags: GlobalFlags;
+}): string {
+  const { command, flags } = options;
+  const lines: string[] = [];
+  const useColor = flags.color !== false;
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  // Build full command path (e.g., "db verify")
+  const commandPath = buildCommandPath(command);
+  const description = command.description() || '';
+
+  // Header: "next <full-command-path> ➜ <description>"
+  const brand = createNextBadge(useColor);
+  const operation = useColor ? bold(commandPath) : commandPath;
+  const intent = formatDimText(description);
+  lines.push(`${brand} ${operation} ➜ ${intent}`);
+  lines.push(formatDimText('│')); // Vertical line separator between command and params
+
+  // Extract options and format them
+  const optionsList = command.options.map((opt) => {
+    const flags = opt.flags;
+    const description = opt.description || '';
+    return { flags, description };
+  });
+
+  // Collect all label lengths first (before colorization) to calculate max width
+  const labelLengths: number[] = [];
+
+  if (optionsList.length > 0) {
+    for (const opt of optionsList) {
+      labelLengths.push(opt.flags.length);
+    }
+  }
+
+  // Extract subcommands if any
+  const subcommands = command.commands.filter((cmd) => !cmd.name().startsWith('_'));
+  if (subcommands.length > 0) {
+    for (const subcmd of subcommands) {
+      labelLengths.push(subcmd.name().length);
+    }
+  }
+
+  // Calculate max label width from all labels (before colorization)
+  const maxLabel = labelLengths.length > 0 ? Math.max(...labelLengths) : 0;
+  const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+
+  // Format details using shared logic
+  const details = formatHelpDetails({
+    subcommands,
+    options: optionsList,
+    useColor,
+    pad,
+    maxLabel,
+  });
+
+  // Format all details (subcommands, separator, options)
+  // Labels are already colorized and padded when added to details array
+  if (details.length > 0) {
+    for (const detail of details) {
+      // Check if this is a separator marker (empty label and value)
+      if (detail.label === '' && detail.value === '') {
+        lines.push(formatDimText('│')); // Separator line
+        continue;
+      }
+      const label = detail.label;
+      const value = useColor && detail.color ? detail.color(detail.value) : detail.value;
+      lines.push(`${formatDimText('│')} ${label}  ${value}`);
+    }
+  }
+
+  // Add docs URL if available (with separator line before it)
+  const docsUrl = getCommandDocsUrl(commandPath);
+  if (docsUrl) {
+    lines.push(formatDimText('│')); // Separator line between params and docs
+    // Use the same maxLabel calculated earlier (before colorization) for alignment
+    const label = pad('Read more', maxLabel);
+    const value = useColor ? blue(docsUrl) : docsUrl;
+    lines.push(`${formatDimText('│')} ${label}  ${value}`);
+  }
+
+  lines.push(formatDimText('└'));
+
+  return `${lines.join('\n')}\n`;
+}
+
+/**
+ * Formats subcommands and options into a details array with consistent formatting.
+ * Shared logic used by both root help and command help.
+ */
+function formatHelpDetails(options: {
+  readonly subcommands: readonly Command[];
+  readonly options: ReadonlyArray<{ flags: string; description: string }>;
+  readonly useColor: boolean;
+  readonly pad: (s: string, w: number) => string;
+  readonly maxLabel: number;
+}): Array<{
+  label: string;
+  value: string;
+  color?: (s: string) => string;
+}> {
+  const { subcommands, options: optionsList, useColor, pad, maxLabel } = options;
+  const details: Array<{
+    label: string;
+    value: string;
+    color?: (s: string) => string;
+  }> = [];
+
+  // Format subcommands first (if any) with color coding
+  if (subcommands.length > 0) {
+    for (const subcmd of subcommands) {
+      // Pad the subcommand name first
+      const paddedName = pad(subcmd.name(), maxLabel);
+      // Colorize in cyan
+      const label = useColor ? cyan(paddedName) : paddedName;
+      const desc = subcmd.description() || '';
+      details.push({ label, value: desc });
+    }
+  }
+
+  // Add separator between subcommands and options
+  const hasSubcommands = subcommands.length > 0;
+  const hasOptions = optionsList.length > 0;
+  if (hasSubcommands && hasOptions) {
+    details.push({ label: '', value: '' }); // Marker for separator
+  }
+
+  // Format options with color coding
+  if (optionsList.length > 0) {
+    for (const opt of optionsList) {
+      // Pad the original flags first (based on original length)
+      const paddedFlags = pad(opt.flags, maxLabel);
+      // Then colorize: placeholders in magenta, whole thing in cyan
+      let label = paddedFlags;
+      if (useColor) {
+        // Color placeholders in magenta first, then wrap the whole thing in cyan
+        label = paddedFlags.replace(/(<[^>]+>)/g, (match) => magenta(match));
+        label = cyan(label);
+      }
+      details.push({
+        label,
+        value: opt.description,
+      });
+    }
+  }
+
+  return details;
+}
+
+/**
+ * Formats help output for the root program using the styled format.
+ */
+export function formatRootHelp(options: {
+  readonly program: Command;
+  readonly flags: GlobalFlags;
+}): string {
+  const { program, flags } = options;
+  const lines: string[] = [];
+  const useColor = flags.color !== false;
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  // Header: "prisma next" (stylized title in green)
+  const title = useColor ? green(bold('prisma next')) : 'prisma next';
+  lines.push(title);
+  lines.push(formatDimText('│')); // Vertical line separator between title and params
+
+  // Extract subcommands
+  const subcommands = program.commands.filter((cmd) => !cmd.name().startsWith('_'));
+
+  // Extract global options
+  const globalOptions = program.options.map((opt) => {
+    const flags = opt.flags;
+    const description = opt.description || '';
+    return { flags, description };
+  });
+
+  // Collect all label lengths first (before colorization) to calculate max width
+  const labelLengths: number[] = [];
+  if (subcommands.length > 0) {
+    for (const subcmd of subcommands) {
+      labelLengths.push(subcmd.name().length);
+    }
+  }
+  if (globalOptions.length > 0) {
+    for (const opt of globalOptions) {
+      labelLengths.push(opt.flags.length);
+    }
+  }
+
+  // Calculate max label width from all labels (before colorization)
+  const maxLabel = labelLengths.length > 0 ? Math.max(...labelLengths) : 0;
+  const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+
+  // Format details using shared logic
+  const details = formatHelpDetails({
+    subcommands,
+    options: globalOptions,
+    useColor,
+    pad,
+    maxLabel,
+  });
+
+  // Format all details (subcommands, separator, options)
+  // Labels are already colorized and padded when added to details array
+  if (details.length > 0) {
+    for (const detail of details) {
+      // Check if this is a separator marker (empty label and value)
+      if (detail.label === '' && detail.value === '') {
+        lines.push(formatDimText('│')); // Separator line
+        continue;
+      }
+      const label = detail.label;
+      const value = useColor && detail.color ? detail.color(detail.value) : detail.value;
+      lines.push(`${formatDimText('│')} ${label}  ${value}`);
+    }
+  }
+
+  lines.push(formatDimText('└'));
+
+  return `${lines.join('\n')}\n`;
 }

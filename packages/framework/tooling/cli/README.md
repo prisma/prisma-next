@@ -302,6 +302,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
 - **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
 - **Legacy Commands**: Legacy `emit` command is available as alias alongside canonical `contract emit`
+- **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma next" title with subcommands; command help shows "next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
 
 ### Contract Emit Command (`commands/contract-emit.ts`)
 - Canonical command implementation using commander
@@ -366,6 +367,16 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
   - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
   - Pack-based versions for tests: `assembleOperationRegistryFromPacks`, `extractCodecTypeImportsFromPacks`, etc.
 - These functions handle the generic looping logic; family-specific conversion is delegated to `family.convertOperationManifest()`.
+
+### Output Formatting (`utils/output.ts`)
+- **Command Output Formatters**: Format human-readable output for commands (emit, verify, etc.)
+- **Error Output Formatters**: Format error output for human-readable and JSON display
+- **Styled Headers**: `formatStyledHeader()` creates styled headers for command output with "next <command> ➜ <description>" format
+- **Help Formatters**:
+  - `formatRootHelp()` - Formats root help with "prisma next" title and subcommands
+  - `formatCommandHelp()` - Formats command help with "next <command> ➜ <description>", options, subcommands, and docs URLs
+  - Help formatters use the same styling system as normal command output (colors, dim text, badges)
+  - Help formatting is configured via `configureHelp()` in `cli.ts` to apply to all commands
 
 ### Family Descriptor (provided by family /cli entrypoint)
 - The SQL family (and other families) provide:
