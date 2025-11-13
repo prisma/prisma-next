@@ -2,17 +2,21 @@ import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { verifyDatabase } from '../api/verify-database';
 import { loadConfig } from '../config-loader';
-import type { CliErrorEnvelope } from '../utils/errors';
-import { createRtmError, mapErrorToCliEnvelope } from '../utils/errors';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
-  formatErrorJson,
-  formatErrorOutput,
   formatStyledHeader,
   formatSuccessMessage,
   formatVerifyJson,
   formatVerifyOutput,
 } from '../utils/output';
+import { wrapAsync } from '../utils/result';
+import { handleResultOrThrow } from '../utils/result-handler';
+import {
+  errorMarkerMissing,
+  errorHashMismatch,
+  errorTargetMismatch,
+  errorRuntime,
+} from '../utils/cli-errors';
 
 interface DbVerifyOptions {
   readonly db?: string;
@@ -48,7 +52,7 @@ export function createDbVerifyCommand(): Command {
     .action(async (options: DbVerifyOptions) => {
       const flags = parseGlobalFlags(options);
 
-      try {
+      const result = await wrapAsync(async () => {
         // Load config to get paths for header
         const config = await loadConfig(options.config);
         const configPath = options.config || './prisma-next.config.ts';
@@ -75,84 +79,52 @@ export function createDbVerifyCommand(): Command {
           console.log(header);
         }
 
-        const result = await verifyDatabase({
+        const verifyResult = await verifyDatabase({
           ...(options.db ? { dbUrl: options.db } : {}),
           ...(options.config ? { configPath: options.config } : {}),
         });
 
+        // If verification failed, throw structured error
+        if (!verifyResult.ok && verifyResult.code) {
+          if (verifyResult.code === 'PN-RTM-3001') {
+            throw errorMarkerMissing();
+          }
+          if (verifyResult.code === 'PN-RTM-3002') {
+            throw errorHashMismatch({
+              expected: verifyResult.contract.coreHash,
+              actual: verifyResult.marker?.coreHash,
+            });
+          }
+          if (verifyResult.code === 'PN-RTM-3003') {
+            throw errorTargetMismatch(
+              verifyResult.target.expected,
+              verifyResult.target.actual ?? 'unknown',
+            );
+          }
+          throw errorRuntime(verifyResult.summary);
+        }
+
+        return verifyResult;
+      });
+
+      // Handle result - formats output and throws if error
+      handleResultOrThrow(result, flags, (verifyResult) => {
         // Output based on flags
         if (flags.json === 'object') {
           // JSON output to stdout
-          console.log(formatVerifyJson(result));
+          console.log(formatVerifyJson(verifyResult));
         } else {
           // Human-readable output to stdout
-          const output = formatVerifyOutput(result, flags);
+          const output = formatVerifyOutput(verifyResult, flags);
           if (output) {
             console.log(output);
           }
           // Output success message if verification passed
-          if (result.ok && !flags.quiet) {
+          if (verifyResult.ok && !flags.quiet) {
             console.log(formatSuccessMessage(flags));
           }
         }
-
-        // If verification failed, throw error with appropriate code
-        if (!result.ok && result.code) {
-          let errorEnvelope: CliErrorEnvelope;
-          if (result.code === 'PN-RTM-3001') {
-            errorEnvelope = createRtmError('3001', 'Marker missing', {
-              why: 'Contract marker not found in database',
-              fix: 'Run `prisma-next db sign --db <url>` to create marker',
-            });
-          } else if (result.code === 'PN-RTM-3002') {
-            errorEnvelope = createRtmError('3002', 'Hash mismatch', {
-              why: 'Contract hash does not match database marker',
-              fix: 'Migrate database or re-sign if intentional',
-            });
-          } else if (result.code === 'PN-RTM-3003') {
-            errorEnvelope = createRtmError('3003', 'Target mismatch', {
-              why: 'Contract target does not match config target',
-              fix: 'Align contract target and config target',
-            });
-          } else {
-            errorEnvelope = createRtmError('3000', result.summary, {
-              why: 'Verification failed',
-              fix: 'Check contract and database state',
-            });
-          }
-
-          // Output error based on flags
-          if (flags.json === 'object') {
-            // JSON error to stderr
-            console.error(formatErrorJson(errorEnvelope));
-          } else {
-            // Human-readable error to stderr
-            console.error(formatErrorOutput(errorEnvelope, flags));
-          }
-
-          // Throw error with exit code attached
-          const cliError = new Error(errorEnvelope.summary);
-          (cliError as { exitCode?: number }).exitCode = errorEnvelope.exitCode ?? 1;
-          throw cliError;
-        }
-      } catch (error) {
-        // Map error to CLI envelope
-        const envelope = mapErrorToCliEnvelope(error);
-
-        // Output error based on flags
-        if (flags.json === 'object') {
-          // JSON error to stderr
-          console.error(formatErrorJson(envelope));
-        } else {
-          // Human-readable error to stderr
-          console.error(formatErrorOutput(envelope, flags));
-        }
-
-        // Throw error with exit code attached
-        const cliError = new Error(envelope.summary);
-        (cliError as { exitCode?: number }).exitCode = envelope.exitCode ?? 1;
-        throw cliError;
-      }
+      });
     });
 
   return command;

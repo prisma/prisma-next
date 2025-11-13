@@ -1,3 +1,5 @@
+import { CliStructuredError } from './cli-errors';
+
 export interface CliErrorEnvelope {
   readonly code: string;
   readonly domain: string;
@@ -75,104 +77,41 @@ export function createRtmError(
   };
 }
 
+import { CliStructuredError } from './cli-errors';
+
 /**
- * Maps common errors to CLI error envelopes.
+ * Maps errors to CLI error envelopes.
+ * If the error is a CliStructuredError, extracts fields directly.
+ * Otherwise, falls back to generic error handling.
  */
 export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
+  // Structured errors contain all the information we need
+  if (error instanceof CliStructuredError) {
+    const codePrefix = error.domain === 'CLI' ? 'PN-CLI-' : 'PN-RTM-';
+    return {
+      code: `${codePrefix}${error.code}`,
+      domain: error.domain,
+      severity: error.severity,
+      summary: error.message,
+      ...(error.why ? { why: error.why } : {}),
+      ...(error.fix ? { fix: error.fix } : {}),
+      ...(error.where ? { where: error.where } : {}),
+      ...(error.meta ? { meta: error.meta } : {}),
+      ...(error.docsUrl ? { docsUrl: error.docsUrl } : {}),
+      ...(error.exitCode !== undefined ? { exitCode: error.exitCode } : {}),
+    };
+  }
+
+  // Fallback for generic Error objects (should be rare after migration)
   if (error instanceof Error) {
-    const message = error.message;
-
-    // Config file not found (usage/config error - exit code 2)
-    if (message.includes('Config file not found') || message.includes('not found')) {
-      return createCliError('4001', 'Config file not found', {
-        why: message,
-        fix: "Run 'prisma-next init' to create a config file",
-        docsUrl: 'https://prisma-next.dev/docs/cli/config',
-        exitCode: 2,
-      });
-    }
-
-    // Contract config missing (usage/config error - exit code 2)
-    if (message.includes('Config.contract is required')) {
-      return createCliError('4002', 'Contract configuration missing', {
-        why: 'The contract configuration is required for emit',
-        fix: 'Add contract configuration to your prisma-next.config.ts',
-        docsUrl: 'https://prisma-next.dev/docs/cli/contract-emit',
-        exitCode: 2,
-      });
-    }
-
-    // Contract validation errors
-    if (
-      message.includes('Contract') &&
-      (message.includes('invalid') || message.includes('validation'))
-    ) {
-      return createCliError('4003', 'Contract validation failed', {
-        why: message,
-        fix: 'Check your contract file for errors',
-        docsUrl: 'https://prisma-next.dev/docs/contracts',
-      });
-    }
-
-    // File I/O errors
-    if (
-      message.includes('ENOENT') ||
-      message.includes('Cannot find') ||
-      message.includes('No such file')
-    ) {
-      return createCliError('4004', 'File not found', {
-        why: message,
-        fix: 'Check that the file path is correct',
-      });
-    }
-
-    // Database URL missing (usage/config error - exit code 2)
-    if (message.includes('Database URL is required')) {
-      return createCliError('4005', 'Database URL is required', {
-        why: message,
-        fix: 'Provide --db flag or config.db.url in prisma-next.config.ts',
-        exitCode: 2,
-      });
-    }
-
-    // Missing queryRunnerFactory (usage/config error - exit code 2)
-    if (message.includes('Config.db.queryRunnerFactory is required')) {
-      return createCliError('4006', 'Query runner factory is required', {
-        why: message,
-        fix: 'Add db.queryRunnerFactory to prisma-next.config.ts',
-        docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
-        exitCode: 2,
-      });
-    }
-
-    // Missing family verify helper (usage/config error - exit code 2)
-    if (message.includes('Family verify.readMarkerSql is required')) {
-      return createCliError('4007', 'Family readMarkerSql() is required', {
-        why: message,
-        fix: 'Ensure family.verify.readMarkerSql() is exported by your family package',
-        docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
-        exitCode: 2,
-      });
-    }
-
-    // Config validation errors (missing required fields) - treat as config file issue
-    if (message.includes('Config must have') && message.includes('field')) {
-      return createCliError('4001', 'Config file not found', {
-        why: 'Config file is missing or invalid',
-        fix: "Run 'prisma-next init' to create a config file",
-        docsUrl: 'https://prisma-next.dev/docs/cli/config',
-        exitCode: 2,
-      });
-    }
-
-    // Generic error (runtime error - exit code 1)
     return createCliError('4999', 'Unexpected error', {
-      why: message,
+      why: error.message,
       fix: 'Check the error message and try again',
       exitCode: 1,
     });
   }
 
+  // Fallback for non-Error values
   return createCliError('4999', 'Unexpected error', {
     why: String(error),
     fix: 'Check the error message and try again',

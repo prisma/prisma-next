@@ -12,6 +12,8 @@ import {
 } from '../pack-assembly';
 import { parseGlobalFlags } from '../utils/global-flags';
 import { formatStyledHeader, formatSuccessMessage } from '../utils/output';
+import { wrapAsync } from '../utils/result';
+import { handleResultOrThrow } from '../utils/result-handler';
 
 export function createEmitCommand(): Command {
   const command = new Command('emit');
@@ -24,7 +26,8 @@ export function createEmitCommand(): Command {
     )
     .action(async (options: { config?: string }) => {
       const flags = parseGlobalFlags({});
-      try {
+
+      const result = await wrapAsync(async () => {
         // Load config (explicit via --config or default)
         const config = await loadConfig(options.config);
 
@@ -107,7 +110,7 @@ export function createEmitCommand(): Command {
         // Use family hook from config
         const targetFamily = config.family.hook;
 
-        const result = await emit(
+        const emitResult = await emit(
           contractIR as ContractIR,
           {
             outputDir: dirname(contractJsonPath),
@@ -125,30 +128,33 @@ export function createEmitCommand(): Command {
 
         // The emitter already includes _generated metadata in both contractJson and contractDts
         // Just write the results directly
-        writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
-        writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
+        writeFileSync(contractJsonPath, emitResult.contractJson, 'utf-8');
+        writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
 
+        // Return result with paths for success handler
+        return {
+          emitResult,
+          contractJsonPath,
+          contractDtsPath,
+        };
+      });
+
+      // Handle result - formats output and throws if error
+      handleResultOrThrow(result, flags, ({ emitResult, contractJsonPath, contractDtsPath }) => {
         // eslint-disable-next-line no-console
         console.log(`✓ Emitted contract.json to ${contractJsonPath}`);
         // eslint-disable-next-line no-console
         console.log(`✓ Emitted contract.d.ts to ${contractDtsPath}`);
         // eslint-disable-next-line no-console
-        console.log(`  coreHash: ${result.coreHash}`);
+        console.log(`  coreHash: ${emitResult.coreHash}`);
         // eslint-disable-next-line no-console
-        console.log(`  profileHash: ${result.profileHash}`);
+        console.log(`  profileHash: ${emitResult.profileHash}`);
         // Output success message
         if (!flags.quiet) {
           // eslint-disable-next-line no-console
           console.log(formatSuccessMessage(flags));
         }
-      } catch (error) {
-        if (error instanceof Error) {
-          // eslint-disable-next-line no-console
-          console.error(`Error: ${error.message}`);
-        }
-        // Let commander.js handle the error (it will exit with code 1)
-        throw error;
-      }
+      });
     });
 
   return command;

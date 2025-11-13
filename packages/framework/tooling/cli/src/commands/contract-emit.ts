@@ -9,16 +9,16 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../pack-assembly';
-import { mapErrorToCliEnvelope } from '../utils/errors';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatEmitJson,
   formatEmitOutput,
-  formatErrorJson,
-  formatErrorOutput,
   formatStyledHeader,
   formatSuccessMessage,
 } from '../utils/output';
+import { wrapAsync } from '../utils/result';
+import { handleResultOrThrow } from '../utils/result-handler';
+import { errorContractConfigMissing } from '../utils/cli-errors';
 
 interface ContractEmitOptions {
   readonly config?: string;
@@ -52,15 +52,15 @@ export function createContractEmitCommand(): Command {
     .action(async (options: ContractEmitOptions) => {
       const flags = parseGlobalFlags(options);
 
-      try {
+      const result = await wrapAsync(async () => {
         // Load config
         const config = await loadConfig(options.config);
 
         // Resolve contract from config
         if (!config.contract) {
-          throw new Error(
-            'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
-          );
+          throw errorContractConfigMissing({
+            why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
+          });
         }
 
         // Contract config is already normalized by defineConfig() with defaults applied
@@ -68,9 +68,9 @@ export function createContractEmitCommand(): Command {
 
         // Resolve artifact paths from config (already normalized by defineConfig() with defaults)
         if (!contractConfig.output || !contractConfig.types) {
-          throw new Error(
-            'Contract config must have output and types paths. This should not happen if defineConfig() was used.',
-          );
+          throw errorContractConfigMissing({
+            why: 'Contract config must have output and types paths. This should not happen if defineConfig() was used.',
+          });
         }
         const outputJsonPath = resolve(contractConfig.output);
         const outputDtsPath = resolve(contractConfig.types);
@@ -122,7 +122,7 @@ export function createContractEmitCommand(): Command {
         );
 
         // Call programmatic API with resolved values
-        const result = await emitContract({
+        const emitResult = await emitContract({
           contractIR,
           outputJsonPath,
           outputDtsPath,
@@ -133,13 +133,18 @@ export function createContractEmitCommand(): Command {
           extensionIds,
         });
 
+        return emitResult;
+      });
+
+      // Handle result - formats output and throws if error
+      handleResultOrThrow(result, flags, (emitResult) => {
         // Output based on flags
         if (flags.json === 'object') {
           // JSON output to stdout
-          console.log(formatEmitJson(result));
+          console.log(formatEmitJson(emitResult));
         } else {
           // Human-readable output to stdout
-          const output = formatEmitOutput(result, flags);
+          const output = formatEmitOutput(emitResult, flags);
           if (output) {
             console.log(output);
           }
@@ -148,25 +153,7 @@ export function createContractEmitCommand(): Command {
             console.log(formatSuccessMessage(flags));
           }
         }
-      } catch (error) {
-        // Map error to CLI envelope
-        const envelope = mapErrorToCliEnvelope(error);
-
-        // Output error based on flags
-        if (flags.json === 'object') {
-          // JSON error to stderr
-          console.error(formatErrorJson(envelope));
-        } else {
-          // Human-readable error to stderr
-          console.error(formatErrorOutput(envelope, flags));
-        }
-
-        // Throw error with exit code attached
-        // Commander.js will use exitOverride to handle custom exit codes
-        const cliError = new Error(envelope.summary);
-        (cliError as { exitCode?: number }).exitCode = envelope.exitCode ?? 1;
-        throw cliError;
-      }
+      });
     });
 
   return command;
