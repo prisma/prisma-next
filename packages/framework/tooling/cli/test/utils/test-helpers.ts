@@ -13,27 +13,23 @@ export const integrationFixtureAppDir = join(__dirname, '../cli-integration-test
 
 /**
  * Executes a command and catches process.exit errors (which are expected in tests).
- * For success cases (exit code 0), swallows the error.
- * For error cases (non-zero exit codes), re-throws the error so tests can check console errors.
+ * Returns the exit code that was passed to process.exit(), or 0 if process.exit() wasn't called.
+ * For real errors (not process.exit), re-throws the error.
  */
-export async function executeCommand(command: Command, args: string[]): Promise<void> {
+export async function executeCommand(command: Command, args: string[]): Promise<number> {
   try {
     await command.parseAsync(args);
+    // Command completed successfully without calling process.exit()
+    return 0;
   } catch (error) {
-    // process.exit throws an error in tests - check the exit code
+    // process.exit throws an error in tests - extract the exit code
     if (error instanceof Error && error.message === 'process.exit called') {
       const exitCall = (process.exit as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const exitCode = exitCall?.[0] ?? 0; // process.exit() without argument defaults to 0
-      // For success (exit code 0), swallow the error
-      // For errors (non-zero), re-throw so tests can check console errors
-      if (exitCode !== 0) {
-        throw error;
-      }
-      // Exit code 0 - success, don't throw
-    } else {
-      // Real error (not process.exit), re-throw
-      throw error;
+      return exitCode;
     }
+    // Real error (not process.exit), re-throw
+    throw error;
   }
 }
 

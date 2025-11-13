@@ -134,8 +134,12 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              // Command should succeed (exit code 0) - executeCommand won't throw
-              await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+              const exitCode = await executeCommand(command, [
+                '--config',
+                'prisma-next.config.ts',
+                '--json',
+              ]);
+              expect(exitCode).toBe(0);
             } finally {
               process.chdir(originalCwd);
             }
@@ -209,11 +213,12 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              // Commands don't throw - they call process.exit() with non-zero exit code
-              // executeCommand will catch the process.exit error and re-throw for non-zero codes
-              await expect(
-                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
-              ).rejects.toThrow('process.exit called');
+              const exitCode = await executeCommand(command, [
+                '--config',
+                'prisma-next.config.ts',
+                '--json',
+              ]);
+              expect(exitCode).not.toBe(0);
             } finally {
               process.chdir(originalCwd);
             }
@@ -411,11 +416,12 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              // Commands don't throw - they call process.exit() with non-zero exit code
-              // executeCommand will catch the process.exit error and re-throw for non-zero codes
-              await expect(
-                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
-              ).rejects.toThrow('process.exit called');
+              const exitCode = await executeCommand(command, [
+                '--config',
+                'prisma-next.config.ts',
+                '--json',
+              ]);
+              expect(exitCode).not.toBe(0);
             } finally {
               process.chdir(originalCwd);
             }
@@ -479,11 +485,12 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              // Commands don't throw - they call process.exit() with non-zero exit code
-              // executeCommand will catch the process.exit error and re-throw for non-zero codes
-              await expect(
-                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
-              ).rejects.toThrow('process.exit called');
+              const exitCode = await executeCommand(command, [
+                '--config',
+                'prisma-next.config.ts',
+                '--json',
+              ]);
+              expect(exitCode).not.toBe(0);
             } finally {
               process.chdir(originalCwd);
             }

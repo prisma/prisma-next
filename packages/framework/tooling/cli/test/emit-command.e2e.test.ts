@@ -44,7 +44,12 @@ describe('contract emit command (e2e)', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
         } finally {
           process.chdir(originalCwd);
         }
@@ -65,8 +70,23 @@ describe('contract emit command (e2e)', () => {
         expect(contractDts).toContain('export type Contract');
         expect(contractDts).toContain('CodecTypes');
 
-        expect(consoleOutput.some((msg) => msg.includes('Emitted contract.json'))).toBe(true);
-        expect(consoleOutput.some((msg) => msg.includes('coreHash'))).toBe(true);
+        // Parse JSON output and verify structure
+        const jsonOutput = consoleOutput.join('\n');
+        expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+        const parsed = JSON.parse(jsonOutput);
+        expect(parsed).toMatchObject({
+          ok: true,
+          coreHash: expect.any(String),
+          outDir: expect.any(String),
+          files: {
+            json: expect.any(String),
+            dts: expect.any(String),
+          },
+          timings: {
+            total: expect.any(Number),
+          },
+        });
       } finally {
         cleanupDir();
       }
@@ -88,7 +108,8 @@ describe('contract emit command (e2e)', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+          const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+          expect(exitCode).toBe(0);
         } finally {
           process.chdir(originalCwd);
         }
@@ -118,7 +139,12 @@ describe('contract emit command (e2e)', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
         } finally {
           process.chdir(originalCwd);
         }
@@ -158,22 +184,30 @@ describe('contract emit command (e2e)', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        // Commands don't throw - they call process.exit() with non-zero exit code
-        // executeCommand will catch the process.exit error and re-throw for non-zero codes
-        // Match the pattern from emit-command.test.ts: include command name in args
-        await expect(
-          executeCommand(command, ['node', 'cli.js', 'emit', '--config', 'nonexistent.config.ts']),
-        ).rejects.toThrow('process.exit called');
+        const exitCode = await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'nonexistent.config.ts',
+          '--json',
+        ]);
+        expect(exitCode).not.toBe(0);
       } finally {
         process.chdir(originalCwd);
       }
 
-      // Check that error output contains PN-CLI code
-      // handleResult should have logged the error to console.error before process.exit was called
+      // Parse JSON error output and verify structure
       const errorOutput = consoleErrors.join('\n');
-      expect(errorOutput).toContain('PN-CLI-');
-      // Config errors should have exit code 2 (usage/config error)
-      expect(errorOutput).toContain('PN-CLI-4001');
+      expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+      const parsed = JSON.parse(errorOutput);
+      expect(parsed).toMatchObject({
+        code: 'PN-CLI-4001',
+        summary: expect.any(String),
+        why: expect.any(String),
+        fix: expect.any(String),
+      });
     } finally {
       cleanupDir();
     }
@@ -193,20 +227,30 @@ describe('contract emit command (e2e)', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        // Commands don't throw - they call process.exit() with non-zero exit code
-        // executeCommand will catch the process.exit error and re-throw for non-zero codes
-        // Match the pattern from emit-command.test.ts: include command name in args
-        await expect(
-          executeCommand(command, ['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']),
-        ).rejects.toThrow('process.exit called');
+        const exitCode = await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+          '--json',
+        ]);
+        expect(exitCode).not.toBe(0);
       } finally {
         process.chdir(originalCwd);
       }
 
-      // Check that error output contains PN-CLI code
-      // handleResult should have logged the error to console.error before process.exit was called
+      // Parse JSON error output and verify structure
       const errorOutput = consoleErrors.join('\n');
-      expect(errorOutput).toContain('PN-CLI-');
+      expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+      const parsed = JSON.parse(errorOutput);
+      expect(parsed).toMatchObject({
+        code: expect.stringMatching(/^PN-CLI-/),
+        summary: expect.any(String),
+        why: expect.any(String),
+        fix: expect.any(String),
+      });
     } finally {
       cleanupDir();
     }
@@ -225,7 +269,12 @@ describe('contract emit command (e2e)', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts', '--verbose']);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--verbose',
+          ]);
+          expect(exitCode).toBe(0);
         } finally {
           process.chdir(originalCwd);
         }
@@ -253,7 +302,12 @@ describe('contract emit command (e2e)', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts', '--quiet']);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--quiet',
+          ]);
+          expect(exitCode).toBe(0);
         } finally {
           process.chdir(originalCwd);
         }

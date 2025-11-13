@@ -46,13 +46,15 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(command, [
+        const exitCode = await executeCommand(command, [
           'node',
           'cli.js',
           'emit',
           '--config',
           'prisma-next.config.ts',
+          '--json',
         ]);
+        expect(exitCode).toBe(0);
       } finally {
         process.chdir(originalCwd);
       }
@@ -73,8 +75,23 @@ describe('emit command', () => {
       expect(contractDts).toContain('export type Contract');
       expect(contractDts).toContain('CodecTypes');
 
-      expect(consoleOutput.some((msg) => msg.includes('Emitted contract.json'))).toBe(true);
-      expect(consoleOutput.some((msg) => msg.includes('coreHash'))).toBe(true);
+      // Parse JSON output and verify structure
+      const jsonOutput = consoleOutput.join('\n');
+      expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+      const parsed = JSON.parse(jsonOutput);
+      expect(parsed).toMatchObject({
+        ok: true,
+        coreHash: expect.any(String),
+        outDir: expect.any(String),
+        files: {
+          json: expect.any(String),
+          dts: expect.any(String),
+        },
+        timings: {
+          total: expect.any(Number),
+        },
+      });
     },
     timeouts.typeScriptCompilation,
   );
@@ -132,18 +149,30 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDirNoContract);
-        await expect(
-          command.parseAsync(['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']),
-        ).rejects.toThrow();
+        const exitCode = await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+          '--json',
+        ]);
+        expect(exitCode).not.toBe(0);
       } finally {
         process.chdir(originalCwd);
       }
 
-      expect(
-        consoleErrors.some(
-          (msg) => msg.includes('contract') || msg.includes('Config.contract is required'),
-        ),
-      ).toBe(true);
+      // Parse JSON error output and verify structure
+      const errorOutput = consoleErrors.join('\n');
+      expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+      const parsed = JSON.parse(errorOutput);
+      expect(parsed).toMatchObject({
+        code: expect.stringMatching(/^PN-CLI-/),
+        summary: expect.any(String),
+        why: expect.any(String),
+        fix: expect.any(String),
+      });
     } finally {
       cleanupNoContract();
     }
@@ -162,13 +191,14 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDirDefaults);
-        await executeCommand(command, [
+        const exitCode = await executeCommand(command, [
           'node',
           'cli.js',
           'emit',
           '--config',
           'prisma-next.config.ts',
         ]);
+        expect(exitCode).toBe(0);
       } finally {
         process.chdir(originalCwd);
       }
@@ -250,13 +280,14 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(command, [
+        const exitCode = await executeCommand(command, [
           'node',
           'cli.js',
           'emit',
           '--config',
           'prisma-next.config.ts',
         ]);
+        expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
         expect(existsSync(contractJsonPath)).toBe(true);
@@ -275,13 +306,14 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(command, [
+        const exitCode = await executeCommand(command, [
           'node',
           'cli.js',
           'emit',
           '--config',
           'prisma-next.config.ts',
         ]);
+        expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
         expect(existsSync(contractJsonPath)).toBe(true);
@@ -300,13 +332,14 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(command, [
+        const exitCode = await executeCommand(command, [
           'node',
           'cli.js',
           'emit',
           '--config',
           'prisma-next.config.ts',
         ]);
+        expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
         expect(existsSync(contractJsonPath)).toBe(true);
@@ -324,18 +357,38 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(command, [
+        // Command should succeed (exit code 0) - executeCommand won't throw
+        const exitCode = await executeCommand(command, [
           'node',
           'cli.js',
           'emit',
           '--config',
           'prisma-next.config.ts',
+          '--json',
         ]);
+        expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
         expect(existsSync(contractJsonPath)).toBe(true);
-        const hasProfileHash = consoleOutput.some((msg) => msg.includes('profileHash'));
-        expect(hasProfileHash).toBeDefined();
+
+        // Parse JSON output and verify structure
+        const jsonOutput = consoleOutput.join('\n');
+        expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+        const parsed = JSON.parse(jsonOutput);
+        expect(parsed).toMatchObject({
+          ok: true,
+          coreHash: expect.any(String),
+          profileHash: expect.any(String),
+          outDir: expect.any(String),
+          files: {
+            json: expect.any(String),
+            dts: expect.any(String),
+          },
+          timings: {
+            total: expect.any(Number),
+          },
+        });
       } finally {
         process.chdir(originalCwd);
       }
@@ -356,16 +409,30 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDirNoContract);
-        await expect(
-          command.parseAsync(['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']),
-        ).rejects.toThrow();
+        const exitCode = await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+          '--json',
+        ]);
+        expect(exitCode).not.toBe(0);
       } finally {
         process.chdir(originalCwd);
       }
 
-      // Error should be thrown (either to console or as exception)
-      // Commander.js may handle errors differently, so we just verify it throws
-      expect(true).toBe(true); // Test passes if we reach here (error was thrown)
+      // Parse JSON error output and verify structure
+      const errorOutput = consoleErrors.join('\n');
+      expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+      const parsed = JSON.parse(errorOutput);
+      expect(parsed).toMatchObject({
+        code: expect.stringMatching(/^PN-CLI-/),
+        summary: expect.any(String),
+        why: expect.any(String),
+        fix: expect.any(String),
+      });
     } finally {
       cleanupNoContract();
     }
@@ -458,9 +525,15 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirMissing);
-          await expect(
-            command.parseAsync(['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']),
-          ).rejects.toThrow();
+          const exitCode = await executeCommand(command, [
+            'node',
+            'cli.js',
+            'emit',
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).not.toBe(0);
         } finally {
           process.chdir(originalCwd);
         }
