@@ -1,45 +1,21 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createEmitCommand } from '../src/commands/emit';
-import { executeCommand, setupCommandMocks, setupTestDirectory } from './utils/test-helpers';
+import {
+  executeCommand,
+  setupCommandMocks,
+  setupTestDirectoryFromFixtures,
+} from './utils/test-helpers';
 
-function createConfigFileContent(
-  _testDir: string,
-  includeContract = true,
-  outputOverride?: string,
-): string {
-  const contractImport = includeContract ? `import { contract } from './contract';` : '';
-  const contractField = includeContract
-    ? `  contract: {
-    source: contract,
-    output: '${outputOverride ?? 'output/contract.json'}',
-    types: '${outputOverride ? outputOverride.replace('.json', '.d.ts') : 'output/contract.d.ts'}',
-  },`
-    : '';
-
-  return `import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
-${contractImport}
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-${contractField}
-});
-`;
-}
+// Fixture subdirectory for emit tests
+const fixtureSubdir = 'emit';
 
 describe('contract emit command (e2e)', () => {
   let testDir: string;
   let outputDir: string;
-  let configPath: string;
   let consoleOutput: string[] = [];
   let consoleErrors: string[] = [];
   let cleanupMocks: () => void;
@@ -51,26 +27,22 @@ describe('contract emit command (e2e)', () => {
     consoleOutput = mocks.consoleOutput;
     consoleErrors = mocks.consoleErrors;
     cleanupMocks = mocks.cleanup;
-
-    // Set up test directory with contract file
-    const testSetup = setupTestDirectory();
-    testDir = testSetup.testDir;
-    outputDir = testSetup.outputDir;
-    configPath = testSetup.configPath;
-    cleanupDir = testSetup.cleanup;
-
-    // Create default config file using package names
-    writeFileSync(configPath, createConfigFileContent(testDir), 'utf-8');
   });
 
   afterEach(() => {
-    cleanupDir();
+    cleanupDir?.();
     cleanupMocks();
   });
 
   it(
     'emits contract.json and contract.d.ts with canonical command',
     async () => {
+      // Set up test directory from fixtures
+      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
+      testDir = testSetup.testDir;
+      outputDir = testSetup.outputDir;
+      cleanupDir = testSetup.cleanup;
+
       const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
@@ -105,6 +77,12 @@ describe('contract emit command (e2e)', () => {
   it(
     'emits contract.json and contract.d.ts with legacy emit alias',
     async () => {
+      // Set up test directory from fixtures
+      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
+      testDir = testSetup.testDir;
+      outputDir = testSetup.outputDir;
+      cleanupDir = testSetup.cleanup;
+
       const command = createEmitCommand();
       const originalCwd = process.cwd();
       try {
@@ -126,6 +104,12 @@ describe('contract emit command (e2e)', () => {
   it(
     'outputs JSON when --json flag is provided',
     async () => {
+      // Set up test directory from fixtures
+      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
+      testDir = testSetup.testDir;
+      outputDir = testSetup.outputDir;
+      cleanupDir = testSetup.cleanup;
+
       const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
@@ -157,6 +141,12 @@ describe('contract emit command (e2e)', () => {
   );
 
   it('throws error with PN-CLI code when config file is missing', async () => {
+    // Set up test directory from fixtures (but we'll use a non-existent config)
+    const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
+    testDir = testSetup.testDir;
+    outputDir = testSetup.outputDir;
+    cleanupDir = testSetup.cleanup;
+
     const command = createContractEmitCommand();
     const originalCwd = process.cwd();
     try {
@@ -180,8 +170,14 @@ describe('contract emit command (e2e)', () => {
   });
 
   it('throws error with PN-CLI code when contract config is missing', async () => {
-    const configWithoutContract = join(testDir, 'no-contract-config.ts');
-    writeFileSync(configWithoutContract, createConfigFileContent(testDir, false), 'utf-8');
+    // Set up test directory from fixtures with no-contract config
+    const testSetup = setupTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.no-contract.ts',
+    );
+    testDir = testSetup.testDir;
+    outputDir = testSetup.outputDir;
+    cleanupDir = testSetup.cleanup;
 
     const command = createContractEmitCommand();
     const originalCwd = process.cwd();
@@ -191,7 +187,7 @@ describe('contract emit command (e2e)', () => {
       // executeCommand will catch the process.exit error and re-throw for non-zero codes
       // Match the pattern from emit-command.test.ts: include command name in args
       await expect(
-        executeCommand(command, ['node', 'cli.js', 'emit', '--config', 'no-contract-config.ts']),
+        executeCommand(command, ['node', 'cli.js', 'emit', '--config', 'prisma-next.config.ts']),
       ).rejects.toThrow('process.exit called');
     } finally {
       process.chdir(originalCwd);
@@ -206,6 +202,12 @@ describe('contract emit command (e2e)', () => {
   it(
     'outputs timings in verbose mode',
     async () => {
+      // Set up test directory from fixtures
+      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
+      testDir = testSetup.testDir;
+      outputDir = testSetup.outputDir;
+      cleanupDir = testSetup.cleanup;
+
       const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
@@ -225,6 +227,12 @@ describe('contract emit command (e2e)', () => {
   it(
     'suppresses output in quiet mode',
     async () => {
+      // Set up test directory from fixtures
+      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
+      testDir = testSetup.testDir;
+      outputDir = testSetup.outputDir;
+      cleanupDir = testSetup.cleanup;
+
       const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {

@@ -1,5 +1,5 @@
 {
-  "name": "db-verify-app",
+  "name": "cli-e2e-test-app",
   "private": true,
   "type": "module",
   "dependencies": {

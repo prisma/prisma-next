@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -27,8 +26,8 @@ import {
   setupTestDirectoryFromFixtures,
 } from './utils/test-helpers';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = join(__dirname, 'db-verify-app/fixtures');
+// Fixture subdirectory for db-verify tests
+const fixtureSubdir = 'db-verify';
 
 /**
  * Emits the contract to disk using the config file.
@@ -107,7 +106,7 @@ describe('db verify command (e2e)', () => {
         async ({ connectionString }) => {
           // Set up test directory from fixtures with db config
           const testSetup = setupTestDirectoryFromFixtures(
-            fixturesDir,
+            fixtureSubdir,
             'prisma-next.config.with-db.ts',
             { '{{DB_URL}}': connectionString },
           );
@@ -161,7 +160,7 @@ describe('db verify command (e2e)', () => {
         async ({ connectionString }) => {
           // Set up test directory from fixtures with db config
           const testSetup = setupTestDirectoryFromFixtures(
-            fixturesDir,
+            fixtureSubdir,
             'prisma-next.config.with-db.ts',
             { '{{DB_URL}}': connectionString },
           );
@@ -211,7 +210,7 @@ describe('db verify command (e2e)', () => {
         async ({ connectionString }) => {
           // Set up test directory from fixtures with db config
           const testSetup = setupTestDirectoryFromFixtures(
-            fixturesDir,
+            fixtureSubdir,
             'prisma-next.config.with-db.ts',
             { '{{DB_URL}}': connectionString },
           );
@@ -284,7 +283,7 @@ describe('db verify command (e2e)', () => {
         async ({ connectionString }) => {
           // Set up test directory from fixtures with db config
           const testSetup = setupTestDirectoryFromFixtures(
-            fixturesDir,
+            fixtureSubdir,
             'prisma-next.config.with-db.ts',
             { '{{DB_URL}}': connectionString },
           );
@@ -337,7 +336,7 @@ describe('db verify command (e2e)', () => {
         async ({ connectionString }) => {
           // Set up test directory from fixtures with config that has db.url but no queryRunnerFactory
           const testSetup = setupTestDirectoryFromFixtures(
-            fixturesDir,
+            fixtureSubdir,
             'prisma-next.config.no-query-runner.ts',
             { '{{DB_URL}}': connectionString },
           );
@@ -395,7 +394,7 @@ describe('db verify command (e2e)', () => {
         async ({ connectionString }) => {
           // Set up test directory from fixtures with config that has family without verify
           const testSetup = setupTestDirectoryFromFixtures(
-            fixturesDir,
+            fixtureSubdir,
             'prisma-next.config.no-verify.ts',
             { '{{DB_URL}}': connectionString },
           );
