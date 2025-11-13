@@ -305,13 +305,31 @@ export function formatCommandHelp(options: {
   // Build full command path (e.g., "db verify")
   const commandPath = buildCommandPath(command);
   const description = command.description() || '';
+  const descriptionLines = description.split('\n').filter((line) => line.trim().length > 0);
+  const shortDescription = descriptionLines[0] || '';
+  const longDescription = descriptionLines.slice(1);
 
-  // Header: "next <full-command-path> ➜ <description>"
+  // Header: "next <full-command-path> ➜ <short-description>"
   const brand = createNextBadge(useColor);
   const operation = useColor ? bold(commandPath) : commandPath;
-  const intent = formatDimText(description);
+  const intent = formatDimText(shortDescription);
   lines.push(`${brand} ${operation} ➜ ${intent}`);
-  lines.push(formatDimText('│')); // Vertical line separator between command and params
+
+  // Multi-line description (if present)
+  if (longDescription.length > 0) {
+    // Empty line before description
+    lines.push(formatDimText('│'));
+
+    // Multi-line description (white, not dimmed)
+    const formatGreen = (text: string) => (useColor ? green(text) : text);
+    for (const descLine of longDescription) {
+      // Replace "Prisma Next" with green version if present
+      const formattedLine = descLine.replace(/Prisma Next/g, (match) => formatGreen(match));
+      lines.push(`${formatDimText('│')} ${formattedLine}`);
+    }
+  }
+
+  lines.push(formatDimText('│')); // Vertical line separator between description and params
 
   // Extract options and format them
   const optionsList = command.options.map((opt) => {
@@ -455,61 +473,116 @@ export function formatRootHelp(options: {
   const useColor = flags.color !== false;
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  // Header: "prisma next" (stylized title in green)
+  // Header: "prisma next → Manage your data layer"
   const title = useColor ? green(bold('prisma next')) : 'prisma next';
-  lines.push(title);
-  lines.push(formatDimText('│')); // Vertical line separator between title and params
+  const shortDescription = 'Manage your data layer';
+  const intent = formatDimText(shortDescription);
+  lines.push(`${title} → ${intent}`);
 
-  // Extract subcommands (exclude hidden commands starting with '_' and the 'help' command)
-  const subcommands = program.commands.filter(
+  // Empty line before description
+  lines.push(formatDimText('│'));
+
+  // Multi-line description (white, not dimmed, with "Prisma Next" in green)
+  const formatGreen = (text: string) => (useColor ? green(text) : text);
+  const descriptionLines = [
+    `Use ${formatGreen('Prisma Next')} to define your application's data layer in a declarative contract. Describe your schema as`,
+    "a data contract. Sign your database and application with the same contract to guarantee they're compatible.",
+    'Write migrations to change your contract and database safely.',
+  ];
+  for (const descLine of descriptionLines) {
+    lines.push(`${formatDimText('│')} ${descLine}`);
+  }
+  lines.push(formatDimText('│')); // Vertical line separator between description and params
+
+  // Extract top-level commands (exclude hidden commands starting with '_' and the 'help' command)
+  const topLevelCommands = program.commands.filter(
     (cmd) => !cmd.name().startsWith('_') && cmd.name() !== 'help',
   );
 
-  // Extract global options
+  // Extract global options (needed to determine if last command)
   const globalOptions = program.options.map((opt) => {
     const flags = opt.flags;
     const description = opt.description || '';
     return { flags, description };
   });
 
-  // Collect all label lengths first (before colorization) to calculate max width
-  const labelLengths: number[] = [];
-  if (subcommands.length > 0) {
-    for (const subcmd of subcommands) {
-      labelLengths.push(subcmd.name().length);
-    }
-  }
-  if (globalOptions.length > 0) {
-    for (const opt of globalOptions) {
-      labelLengths.push(opt.flags.length);
-    }
-  }
-
-  // Calculate max label width from all labels (before colorization)
-  const maxLabel = labelLengths.length > 0 ? Math.max(...labelLengths) : 0;
-  const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
-
-  // Format details using shared logic
-  const details = formatHelpDetails({
-    subcommands,
-    options: globalOptions,
-    useColor,
-    pad,
-    maxLabel,
-  });
-
-  // Format all details (subcommands, separator, options)
-  // Labels are already colorized and padded when added to details array
-  if (details.length > 0) {
-    for (const detail of details) {
-      // Check if this is a separator marker (empty label and value)
-      if (detail.label === '' && detail.value === '') {
-        lines.push(formatDimText('│')); // Separator line
-        continue;
+  // Build command tree
+  if (topLevelCommands.length > 0) {
+    // Find max subcommand name length for alignment
+    let maxSubcommandNameLength = 0;
+    for (const cmd of topLevelCommands) {
+      const subcommands = cmd.commands.filter((subcmd) => !subcmd.name().startsWith('_'));
+      for (const subcmd of subcommands) {
+        maxSubcommandNameLength = Math.max(maxSubcommandNameLength, subcmd.name().length);
       }
-      const label = detail.label;
-      const value = useColor && detail.color ? detail.color(detail.value) : detail.value;
-      lines.push(`${formatDimText('│')} ${label}  ${value}`);
+      // Also check the command itself if it has no subcommands
+      if (subcommands.length === 0) {
+        maxSubcommandNameLength = Math.max(maxSubcommandNameLength, cmd.name().length);
+      }
+    }
+
+    const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+
+    // Format each top-level command
+    for (let i = 0; i < topLevelCommands.length; i++) {
+      const cmd = topLevelCommands[i];
+      if (!cmd) continue;
+
+      const subcommands = cmd.commands.filter((subcmd) => !subcmd.name().startsWith('_'));
+      const commandName = useColor ? cyan(cmd.name()) : cmd.name();
+      const isLastCommand = i === topLevelCommands.length - 1;
+
+      if (subcommands.length > 0) {
+        // Command with subcommands - show command name, then tree-structured subcommands
+        const prefix = isLastCommand ? formatDimText('└') : formatDimText('├');
+        lines.push(`${formatDimText('│')} ${prefix}─ ${commandName}`);
+
+        for (let j = 0; j < subcommands.length; j++) {
+          const subcmd = subcommands[j];
+          if (!subcmd) continue;
+
+          const isLastSubcommand = j === subcommands.length - 1;
+          const subcommandName = pad(subcmd.name(), maxSubcommandNameLength);
+          const subcommandNameColored = useColor ? cyan(subcommandName) : subcommandName;
+          const description = subcmd.description() || '';
+
+          // Use tree characters: └─ for last subcommand, ├─ for others
+          const treeChar = isLastSubcommand ? '└' : '├';
+          const continuation = isLastCommand && isLastSubcommand ? ' ' : formatDimText('│');
+          lines.push(
+            `${formatDimText('│')} ${continuation}  ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${description}`,
+          );
+        }
+      } else {
+        // Standalone command - show command name and description on same line
+        const prefix = isLastCommand ? formatDimText('└') : formatDimText('├');
+        const commandNamePadded = pad(cmd.name(), maxSubcommandNameLength);
+        const commandNameColored = useColor ? cyan(commandNamePadded) : commandNamePadded;
+        const description = cmd.description() || '';
+        lines.push(`${formatDimText('│')} ${prefix}─ ${commandNameColored}  ${description}`);
+      }
+    }
+  }
+
+  // Add separator between commands and options if both exist
+  if (topLevelCommands.length > 0 && globalOptions.length > 0) {
+    lines.push(formatDimText('│'));
+  }
+
+  // Format global options
+  if (globalOptions.length > 0) {
+    const maxOptionLength = Math.max(...globalOptions.map((opt) => opt.flags.length));
+    const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
+
+    for (const opt of globalOptions) {
+      const flagsPadded = pad(opt.flags, maxOptionLength);
+      let flagsColored = flagsPadded;
+      if (useColor) {
+        // Color placeholders in magenta, then wrap in cyan
+        flagsColored = flagsPadded.replace(/(<[^>]+>)/g, (match) => magenta(match));
+        flagsColored = cyan(flagsColored);
+      }
+      lines.push(`${formatDimText('│')} ${flagsColored}  ${opt.description}`);
     }
   }
 

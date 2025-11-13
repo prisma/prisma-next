@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { createContractEmitCommand } from './commands/contract-emit';
 import { createDbVerifyCommand } from './commands/db-verify';
-import { createEmitCommand } from './commands/emit';
 import { parseGlobalFlags } from './utils/global-flags';
 import { formatCommandHelp, formatRootHelp } from './utils/output';
 
@@ -87,9 +86,6 @@ dbCommand.addCommand(dbVerifyCommand);
 
 // Register db command
 program.addCommand(dbCommand);
-
-// Keep legacy emit command as alias
-program.addCommand(createEmitCommand());
 
 // Create help command
 const helpCommand = new Command('help')
