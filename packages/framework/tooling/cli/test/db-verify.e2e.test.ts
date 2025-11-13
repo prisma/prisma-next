@@ -132,20 +132,22 @@ describe('db verify command (e2e)', () => {
 
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
+            let exitCode: number;
             try {
               process.chdir(testDir);
-              const exitCode = await executeCommand(command, [
+              exitCode = await executeCommand(command, [
                 '--config',
                 'prisma-next.config.ts',
                 '--json',
               ]);
-              expect(exitCode).toBe(0);
             } finally {
               process.chdir(originalCwd);
             }
 
+            expect(exitCode).toBe(0);
             // Parse JSON output and verify structure
             const jsonOutput = consoleOutput.join('\n');
+            expect(jsonOutput).not.toBe('');
             expect(() => JSON.parse(jsonOutput)).not.toThrow();
 
             const parsed = JSON.parse(jsonOutput);
@@ -229,10 +231,11 @@ describe('db verify command (e2e)', () => {
             const parsed = JSON.parse(errorOutput);
             expect(parsed).toMatchObject({
               code: 'PN-RTM-3001',
-              summary: expect.stringContaining('Marker missing'),
+              summary: expect.any(String),
               why: expect.any(String),
               fix: expect.any(String),
             });
+            expect(parsed.summary).toContain('Marker missing');
           } finally {
             cleanupDir();
           }
@@ -282,12 +285,18 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+              const exitCode = await executeCommand(command, [
+                '--config',
+                'prisma-next.config.ts',
+                '--json',
+              ]);
+              expect(exitCode).toBe(0);
             } finally {
               process.chdir(originalCwd);
             }
 
             const jsonOutput = consoleOutput.join('\n');
+            expect(jsonOutput).not.toBe('');
             expect(() => JSON.parse(jsonOutput)).not.toThrow();
 
             const parsed = JSON.parse(jsonOutput);
@@ -350,9 +359,12 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              await expect(
-                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
-              ).rejects.toThrow('process.exit called');
+              const exitCode = await executeCommand(command, [
+                '--config',
+                'prisma-next.config.ts',
+                '--json',
+              ]);
+              expect(exitCode).not.toBe(0);
             } finally {
               process.chdir(originalCwd);
             }
@@ -363,10 +375,11 @@ describe('db verify command (e2e)', () => {
             const parsed = JSON.parse(errorOutput);
             expect(parsed).toMatchObject({
               code: 'PN-RTM-3001',
-              summary: expect.stringContaining('Marker missing'),
+              summary: expect.any(String),
               why: expect.any(String),
               fix: expect.any(String),
             });
+            expect(parsed.summary).toContain('Marker missing');
           } finally {
             cleanupDir();
           }
@@ -432,10 +445,12 @@ describe('db verify command (e2e)', () => {
             const parsed = JSON.parse(errorOutput);
             expect(parsed).toMatchObject({
               code: 'PN-CLI-4006',
-              summary: expect.stringContaining('db.queryRunnerFactory is required'),
+              summary: expect.any(String),
               why: expect.any(String),
-              fix: expect.stringContaining('Add db.queryRunnerFactory to prisma-next.config.ts'),
+              fix: expect.any(String),
             });
+            expect(parsed.summary).toContain('Query runner factory is required');
+            expect(parsed.fix).toContain('Add db.queryRunnerFactory to prisma-next.config.ts');
           } finally {
             cleanupDir();
           }
@@ -501,12 +516,14 @@ describe('db verify command (e2e)', () => {
             const parsed = JSON.parse(errorOutput);
             expect(parsed).toMatchObject({
               code: 'PN-CLI-4007',
-              summary: expect.stringContaining('Family readMarkerSql() is required'),
+              summary: expect.any(String),
               why: expect.any(String),
-              fix: expect.stringContaining(
-                'Ensure family.verify.readMarkerSql() is exported by your family package',
-              ),
+              fix: expect.any(String),
             });
+            expect(parsed.summary).toContain('Family readMarkerSql() is required');
+            expect(parsed.fix).toContain(
+              'Ensure family.verify.readMarkerSql() is exported by your family package',
+            );
           } finally {
             cleanupDir();
           }
