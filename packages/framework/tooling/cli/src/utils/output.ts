@@ -1,5 +1,9 @@
+import { relative } from 'node:path';
 import { blue, bold, cyan, dim, green, magenta, red } from 'colorette';
 import type { Command } from 'commander';
+import stringWidth from 'string-width';
+import stripAnsi from 'strip-ansi';
+import wrapAnsi from 'wrap-ansi';
 import type { EmitContractResult } from '../api/emit-contract';
 import type { VerifyDatabaseResult } from '../api/verify-database';
 import type { CliErrorEnvelope } from './cli-errors';
@@ -64,8 +68,12 @@ export function formatEmitOutput(result: EmitContractResult, flags: GlobalFlags)
   const lines: string[] = [];
   const prefix = createPrefix(flags);
 
-  lines.push(`${prefix}✔ Emitted contract.json → ${result.files.json}`);
-  lines.push(`${prefix}✔ Emitted contract.d.ts → ${result.files.dts}`);
+  // Convert absolute paths to relative paths from cwd
+  const jsonPath = relative(process.cwd(), result.files.json);
+  const dtsPath = relative(process.cwd(), result.files.dts);
+
+  lines.push(`${prefix}✓ Emitted contract.json → ${jsonPath}`);
+  lines.push(`${prefix}✓ Emitted contract.d.ts → ${dtsPath}`);
   lines.push(`${prefix}  coreHash: ${result.coreHash}`);
   if (result.profileHash) {
     lines.push(`${prefix}  profileHash: ${result.profileHash}`);
@@ -158,7 +166,7 @@ export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFl
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   if (result.ok) {
-    lines.push(`${prefix}${formatGreen('✔')} ${result.summary}`);
+    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
     lines.push(`${prefix}${formatDimText(`  coreHash: ${result.contract.coreHash}`)}`);
     if (result.contract.profileHash) {
       lines.push(`${prefix}${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
@@ -203,6 +211,16 @@ export function formatVerifyJson(result: VerifyDatabaseResult): string {
 // ============================================================================
 
 /**
+ * Fixed width for left column in help output.
+ */
+const LEFT_COLUMN_WIDTH = 20;
+
+/**
+ * Maximum width for right column wrapping in help output.
+ */
+const RIGHT_COLUMN_MAX_WIDTH = 90;
+
+/**
  * Creates a simple arrow marker.
  */
 function createPrismaNextBadge(useColor: boolean): string {
@@ -233,7 +251,7 @@ function formatHeaderLine(options: {
 /**
  * Formats a label/value line with padding and coloring.
  */
-function formatLabelValueLine(options: {
+function _formatLabelValueLine(options: {
   readonly label: string;
   readonly value: string;
   readonly maxLabelWidth: number;
@@ -244,22 +262,6 @@ function formatLabelValueLine(options: {
   const labelPadded = pad(options.label, options.maxLabelWidth);
   const labelColored = options.useColor ? cyan(labelPadded) : labelPadded;
   return `${options.formatDimText('│')} ${labelColored}  ${options.value}`;
-}
-
-/**
- * Formats an option flag with placeholder coloring.
- */
-function formatOptionFlag(flags: string, maxWidth: number, useColor: boolean): string {
-  const pad = createPadFunction();
-  const flagsPadded = pad(flags, maxWidth);
-  if (useColor) {
-    // Color placeholders in magenta, then wrap in cyan
-    const flagsWithPlaceholders = flagsPadded.replace(/(<[^>]+>)/g, (match: string) =>
-      magenta(match),
-    );
-    return cyan(flagsWithPlaceholders);
-  }
-  return flagsPadded;
 }
 
 /**
@@ -280,28 +282,31 @@ function formatReadMoreLine(options: {
 }
 
 /**
- * Wraps text to fit within a specified width, breaking at word boundaries.
+ * Pads text to a fixed width, accounting for ANSI escape codes.
+ * Uses string-width to measure the actual display width.
  */
-function wrapText(text: string, width: number): string[] {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let currentLine = '';
+function padToFixedWidth(text: string, width: number): string {
+  const actualWidth = stringWidth(text);
+  const padding = Math.max(0, width - actualWidth);
+  return text + ' '.repeat(padding);
+}
 
-  for (const word of words) {
-    if (currentLine === '') {
-      currentLine = word;
-    } else if (`${currentLine} ${word}`.length <= width) {
-      currentLine += ` ${word}`;
-    } else {
-      lines.push(currentLine);
-      currentLine = word;
-    }
-  }
-  if (currentLine) {
-    lines.push(currentLine);
-  }
+/**
+ * Wraps text to fit within a specified width using wrap-ansi.
+ * Preserves ANSI escape codes and breaks at word boundaries.
+ */
+function wrapTextAnsi(text: string, width: number): string[] {
+  const wrapped = wrapAnsi(text, width, { hard: false, trim: true });
+  return wrapped.split('\n');
+}
 
-  return lines;
+/**
+ * Formats a default value as "default: <value>" with dimming.
+ */
+function formatDefaultValue(value: unknown, useColor: boolean): string {
+  const valueStr = String(value);
+  const defaultText = `default: ${valueStr}`;
+  return useColor ? dim(defaultText) : defaultText;
 }
 
 /**
@@ -317,23 +322,9 @@ function renderCommandTree(options: {
 }): string[] {
   const { commands, useColor, formatDimText, hasItemsAfter, continuationPrefix } = options;
   const lines: string[] = [];
-  const pad = createPadFunction();
 
   if (commands.length === 0) {
     return lines;
-  }
-
-  // Find max command name length for alignment
-  let maxCommandNameLength = 0;
-  for (const cmd of commands) {
-    const subcommands = cmd.commands.filter((subcmd) => !subcmd.name().startsWith('_'));
-    for (const subcmd of subcommands) {
-      maxCommandNameLength = Math.max(maxCommandNameLength, subcmd.name().length);
-    }
-    // Also check the command itself if it has no subcommands
-    if (subcommands.length === 0) {
-      maxCommandNameLength = Math.max(maxCommandNameLength, cmd.name().length);
-    }
   }
 
   // Format each command
@@ -343,20 +334,23 @@ function renderCommandTree(options: {
 
     const subcommands = cmd.commands.filter((subcmd) => !subcmd.name().startsWith('_'));
     const isLastCommand = i === commands.length - 1;
-    const commandName = useColor ? cyan(cmd.name()) : cmd.name();
 
     if (subcommands.length > 0) {
       // Command with subcommands - show command name, then tree-structured subcommands
       const prefix = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
-      lines.push(`${formatDimText('│')} ${prefix}─ ${commandName}`);
+      // For top-level command, pad name to fixed width (accounting for "│ ├─ " = 5 chars)
+      const treePrefix = `${prefix}─ `;
+      const treePrefixWidth = stringWidth(stripAnsi(treePrefix));
+      const remainingWidth = LEFT_COLUMN_WIDTH - treePrefixWidth;
+      const commandNamePadded = padToFixedWidth(cmd.name(), remainingWidth);
+      const commandNameColored = useColor ? cyan(commandNamePadded) : commandNamePadded;
+      lines.push(`${formatDimText('│')} ${treePrefix}${commandNameColored}`);
 
       for (let j = 0; j < subcommands.length; j++) {
         const subcmd = subcommands[j];
         if (!subcmd) continue;
 
         const isLastSubcommand = j === subcommands.length - 1;
-        const subcommandName = pad(subcmd.name(), maxCommandNameLength);
-        const subcommandNameColored = useColor ? cyan(subcommandName) : subcommandName;
         const shortDescription = subcmd.description() || '';
 
         // Use tree characters: └─ for last subcommand, ├─ for others
@@ -364,17 +358,27 @@ function renderCommandTree(options: {
         const continuation =
           continuationPrefix ??
           (isLastCommand && isLastSubcommand && !hasItemsAfter ? ' ' : formatDimText('│'));
+        // For subcommands, account for "│ │  └─ " = 7 chars (or "│   └─ " = 6 chars if continuation is space)
+        const continuationStr = continuation === ' ' ? ' ' : continuation;
+        const subTreePrefix = `${continuationStr}  ${formatDimText(treeChar)}─ `;
+        const subTreePrefixWidth = stringWidth(stripAnsi(subTreePrefix));
+        const subRemainingWidth = LEFT_COLUMN_WIDTH - subTreePrefixWidth;
+        const subcommandNamePadded = padToFixedWidth(subcmd.name(), subRemainingWidth);
+        const subcommandNameColored = useColor ? cyan(subcommandNamePadded) : subcommandNamePadded;
         lines.push(
-          `${formatDimText('│')} ${continuation}  ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${shortDescription}`,
+          `${formatDimText('│')} ${subTreePrefix}${subcommandNameColored}  ${shortDescription}`,
         );
       }
     } else {
       // Standalone command - show command name and description on same line
       const prefix = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
-      const commandNamePadded = pad(cmd.name(), maxCommandNameLength);
+      const treePrefix = `${prefix}─ `;
+      const treePrefixWidth = stringWidth(stripAnsi(treePrefix));
+      const remainingWidth = LEFT_COLUMN_WIDTH - treePrefixWidth;
+      const commandNamePadded = padToFixedWidth(cmd.name(), remainingWidth);
       const commandNameColored = useColor ? cyan(commandNamePadded) : commandNamePadded;
       const shortDescription = cmd.description() || '';
-      lines.push(`${formatDimText('│')} ${prefix}─ ${commandNameColored}  ${shortDescription}`);
+      lines.push(`${formatDimText('│')} ${treePrefix}${commandNameColored}  ${shortDescription}`);
     }
   }
 
@@ -403,7 +407,7 @@ function formatMultilineDescription(options: {
     const formattedLine = descLine.replace(/Prisma Next/g, (match) => formatGreen(match));
 
     // Wrap the line if it's longer than available width
-    const wrappedLines = wrapText(formattedLine, availableWidth);
+    const wrappedLines = wrapTextAnsi(formattedLine, availableWidth);
     for (const wrappedLine of wrappedLines) {
       lines.push(`${options.formatDimText('│')} ${wrappedLine}`);
     }
@@ -435,30 +439,25 @@ export function formatStyledHeader(options: {
   lines.push(formatHeaderLine({ brand, operation, intent }));
   lines.push(formatDimText('│')); // Vertical line separator between command and params
 
-  // Calculate max label width (including "Read more" if URL is present)
-  const allLabels = options.url
-    ? [...options.details.map((d) => d.label), 'Read more']
-    : options.details.map((d) => d.label);
-  const maxLabel = allLabels.reduce((n, label) => Math.max(n, label.length), 0);
-
-  // Format details (same style as help text options)
+  // Format details using fixed left column width (same style as help text options)
   for (const detail of options.details) {
-    lines.push(
-      formatLabelValueLine({
-        label: detail.label,
-        value: detail.value,
-        maxLabelWidth: maxLabel,
-        useColor,
-        formatDimText,
-      }),
-    );
+    // Add colon to label, then pad to fixed width using padToFixedWidth for ANSI-aware padding
+    const labelWithColon = `${detail.label}:`;
+    const labelPadded = padToFixedWidth(labelWithColon, LEFT_COLUMN_WIDTH);
+    const labelColored = useColor ? cyan(labelPadded) : labelPadded;
+    lines.push(`${formatDimText('│')} ${labelColored}  ${detail.value}`);
   }
 
   // Add "Read more" URL if present (same style as help text)
   if (options.url) {
     lines.push(formatDimText('│')); // Separator line before "Read more"
     lines.push(
-      formatReadMoreLine({ url: options.url, maxLabelWidth: maxLabel, useColor, formatDimText }),
+      formatReadMoreLine({
+        url: options.url,
+        maxLabelWidth: LEFT_COLUMN_WIDTH,
+        useColor,
+        formatDimText,
+      }),
     );
   }
 
@@ -532,17 +531,10 @@ export function formatCommandHelp(options: {
   const optionsList = command.options.map((opt) => {
     const flags = opt.flags;
     const description = opt.description || '';
-    return { flags, description };
+    // Commander.js stores default value in defaultValue property
+    const defaultValue = (opt as { defaultValue?: unknown }).defaultValue;
+    return { flags, description, defaultValue };
   });
-
-  // Collect all label lengths first (before colorization) to calculate max width
-  const labelLengths: number[] = [];
-
-  if (optionsList.length > 0) {
-    for (const opt of optionsList) {
-      labelLengths.push(opt.flags.length);
-    }
-  }
 
   // Extract subcommands if any
   const subcommands = command.commands.filter((cmd) => !cmd.name().startsWith('_'));
@@ -559,20 +551,41 @@ export function formatCommandHelp(options: {
     lines.push(...treeLines);
   }
 
-  // Calculate max label width for options
-  const maxLabel =
-    optionsList.length > 0 ? Math.max(...optionsList.map((opt) => opt.flags.length)) : 0;
-
   // Add separator between subcommands and options if both exist
   if (subcommands.length > 0 && optionsList.length > 0) {
     lines.push(formatDimText('│'));
   }
 
-  // Format options
+  // Format options with fixed width, wrapping, and default values
   if (optionsList.length > 0) {
     for (const opt of optionsList) {
-      const flagsColored = formatOptionFlag(opt.flags, maxLabel, useColor);
-      lines.push(`${formatDimText('│')} ${flagsColored}  ${opt.description}`);
+      // Format flag with fixed 30-char width
+      const flagsPadded = padToFixedWidth(opt.flags, LEFT_COLUMN_WIDTH);
+      let flagsColored = flagsPadded;
+      if (useColor) {
+        // Color placeholders in magenta, then wrap in cyan
+        flagsColored = flagsPadded.replace(/(<[^>]+>)/g, (match: string) => magenta(match));
+        flagsColored = cyan(flagsColored);
+      }
+
+      // Wrap description at 90 characters
+      const wrappedDescription = wrapTextAnsi(opt.description, RIGHT_COLUMN_MAX_WIDTH);
+
+      // First line: flag + first line of description
+      lines.push(`${formatDimText('│')} ${flagsColored}  ${wrappedDescription[0] || ''}`);
+
+      // Continuation lines: empty label (30 spaces) + wrapped lines
+      for (let i = 1; i < wrappedDescription.length; i++) {
+        const emptyLabel = ' '.repeat(LEFT_COLUMN_WIDTH);
+        lines.push(`${formatDimText('│')} ${emptyLabel}  ${wrappedDescription[i] || ''}`);
+      }
+
+      // Default value line (if present)
+      if (opt.defaultValue !== undefined) {
+        const emptyLabel = ' '.repeat(LEFT_COLUMN_WIDTH);
+        const defaultText = formatDefaultValue(opt.defaultValue, useColor);
+        lines.push(`${formatDimText('│')} ${emptyLabel}  ${defaultText}`);
+      }
     }
   }
 
@@ -581,7 +594,12 @@ export function formatCommandHelp(options: {
   if (docsUrl) {
     lines.push(formatDimText('│')); // Separator line between params and docs
     lines.push(
-      formatReadMoreLine({ url: docsUrl, maxLabelWidth: maxLabel, useColor, formatDimText }),
+      formatReadMoreLine({
+        url: docsUrl,
+        maxLabelWidth: LEFT_COLUMN_WIDTH,
+        useColor,
+        formatDimText,
+      }),
     );
   }
 
@@ -624,7 +642,9 @@ export function formatRootHelp(options: {
   const globalOptions = program.options.map((opt) => {
     const flags = opt.flags;
     const description = opt.description || '';
-    return { flags, description };
+    // Commander.js stores default value in defaultValue property
+    const defaultValue = (opt as { defaultValue?: unknown }).defaultValue;
+    return { flags, description, defaultValue };
   });
 
   // Build command tree
@@ -644,20 +664,36 @@ export function formatRootHelp(options: {
     lines.push(formatDimText('│'));
   }
 
-  // Format global options
+  // Format global options with fixed width, wrapping, and default values
   if (globalOptions.length > 0) {
-    const maxOptionLength = Math.max(...globalOptions.map((opt) => opt.flags.length));
-    const pad = createPadFunction();
-
     for (const opt of globalOptions) {
-      const flagsPadded = pad(opt.flags, maxOptionLength);
+      // Format flag with fixed 30-char width
+      const flagsPadded = padToFixedWidth(opt.flags, LEFT_COLUMN_WIDTH);
       let flagsColored = flagsPadded;
       if (useColor) {
         // Color placeholders in magenta, then wrap in cyan
         flagsColored = flagsPadded.replace(/(<[^>]+>)/g, (match: string) => magenta(match));
         flagsColored = cyan(flagsColored);
       }
-      lines.push(`${formatDimText('│')} ${flagsColored}  ${opt.description}`);
+
+      // Wrap description at 90 characters
+      const wrappedDescription = wrapTextAnsi(opt.description, RIGHT_COLUMN_MAX_WIDTH);
+
+      // First line: flag + first line of description
+      lines.push(`${formatDimText('│')} ${flagsColored}  ${wrappedDescription[0] || ''}`);
+
+      // Continuation lines: empty label (30 spaces) + wrapped lines
+      for (let i = 1; i < wrappedDescription.length; i++) {
+        const emptyLabel = ' '.repeat(LEFT_COLUMN_WIDTH);
+        lines.push(`${formatDimText('│')} ${emptyLabel}  ${wrappedDescription[i] || ''}`);
+      }
+
+      // Default value line (if present)
+      if (opt.defaultValue !== undefined) {
+        const emptyLabel = ' '.repeat(LEFT_COLUMN_WIDTH);
+        const defaultText = formatDefaultValue(opt.defaultValue, useColor);
+        lines.push(`${formatDimText('│')} ${emptyLabel}  ${defaultText}`);
+      }
     }
   }
 

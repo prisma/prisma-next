@@ -20,6 +20,16 @@ Provide a command-line interface that:
 - **CLI Command Interface**: Parse arguments and route to command handlers using commander
 - **File I/O**: Read TS contracts, write emitted artifacts (`contract.json`, `contract.d.ts`)
 - **Extension Pack Loading**: Load adapter and extension pack manifests for emission
+- **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
+
+## Command Descriptions
+
+Commands use separate short and long descriptions via `setCommandDescriptions()`:
+
+- **Short description**: One-liner used in command trees and headers (e.g., "Emit signed contract artifacts")
+- **Long description**: Multiline text shown at the bottom of help output with detailed context
+
+See `.cursor/rules/cli-command-descriptions.mdc` for details.
 
 ## Commands
 
@@ -302,7 +312,8 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
 - **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
 - **Legacy Commands**: Legacy `emit` command is available as alias alongside canonical `contract emit`
-- **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma next" title with subcommands; command help shows "next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
+- **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma-next" title with command tree; command help shows "prisma-next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
+- **Command Descriptions**: Commands use `setCommandDescriptions()` to set separate short and long descriptions. See `utils/command-helpers.ts` and `.cursor/rules/cli-command-descriptions.mdc`.
 
 ### Contract Emit Command (`commands/contract-emit.ts`)
 - Canonical command implementation using commander
@@ -371,11 +382,13 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 ### Output Formatting (`utils/output.ts`)
 - **Command Output Formatters**: Format human-readable output for commands (emit, verify, etc.)
 - **Error Output Formatters**: Format error output for human-readable and JSON display
-- **Styled Headers**: `formatStyledHeader()` creates styled headers for command output with "next <command> ➜ <description>" format
+- **Styled Headers**: `formatStyledHeader()` creates styled headers for command output with "prisma-next <command> ➜ <description>" format
 - **Help Formatters**:
-  - `formatRootHelp()` - Formats root help with "prisma next" title and subcommands
-  - `formatCommandHelp()` - Formats command help with "next <command> ➜ <description>", options, subcommands, and docs URLs
+  - `formatRootHelp()` - Formats root help with "prisma-next" title, command tree, and multiline description
+  - `formatCommandHelp()` - Formats command help with "prisma-next <command> ➜ <description>", options, subcommands, docs URLs, and multiline description
+  - `renderCommandTree()` - Shared function to render hierarchical command trees with tree characters (├─, └─, │)
   - Help formatters use the same styling system as normal command output (colors, dim text, badges)
+  - Short descriptions appear in command trees and headers; long descriptions appear at the bottom of help output
   - Help formatting is configured via `configureHelp()` in `cli.ts` to apply to all commands
 
 ### Family Descriptor (provided by family /cli entrypoint)
