@@ -258,6 +258,7 @@ describe('runtime execute integration', () => {
               userId: postTable.columns['userId']!,
               createdAt: postTable.columns['createdAt']!,
             })
+            .limit(1)
             .build({ params: { userId: 1 } });
 
           type PostRow = ResultType<typeof postPlan>;

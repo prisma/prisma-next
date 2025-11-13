@@ -15,6 +15,7 @@ export async function ormGetUsersWithPosts(runtime?: Runtime) {
       email: u.email,
       createdAt: u.createdAt,
     }))
+    .take(100)
     .findMany({
       params: { postId: 1 },
     });
@@ -33,6 +34,7 @@ export async function ormGetUsersWithoutPosts(runtime?: Runtime) {
       email: u.email,
       createdAt: u.createdAt,
     }))
+    .take(100)
     .findMany({
       params: { postId: 1 },
     });
@@ -51,6 +53,7 @@ export async function ormGetUsersWhereAllPostsMatch(runtime?: Runtime) {
       email: u.email,
       createdAt: u.createdAt,
     }))
+    .take(100)
     .findMany({
       params: { userId: 1 },
     });
