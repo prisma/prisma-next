@@ -1,3 +1,4 @@
+import { dirname, resolve } from 'node:path';
 import { loadConfig as loadConfigC12 } from 'c12';
 import type { PrismaNextConfig } from './config-types';
 import {
@@ -18,17 +19,20 @@ import {
 export async function loadConfig(configPath?: string): Promise<PrismaNextConfig> {
   try {
     const cwd = process.cwd();
+    // Resolve config path to absolute path and set cwd to config directory when path is provided
+    const resolvedConfigPath = configPath ? resolve(cwd, configPath) : undefined;
+    const configCwd = resolvedConfigPath ? dirname(resolvedConfigPath) : cwd;
 
     const result = await loadConfigC12<PrismaNextConfig>({
       name: 'prisma-next',
-      ...(configPath ? { configFile: configPath } : {}),
-      cwd,
+      ...(resolvedConfigPath ? { configFile: resolvedConfigPath } : {}),
+      cwd: configCwd,
     });
 
     // Check if config is missing or empty (c12 may return empty object when file doesn't exist)
     if (!result.config || Object.keys(result.config).length === 0) {
       // Use c12's configFile if available, otherwise use explicit configPath, otherwise omit path
-      const displayPath = result.configFile || configPath;
+      const displayPath = result.configFile || resolvedConfigPath || configPath;
       throw errorConfigFileNotFound(displayPath);
     }
 
@@ -53,9 +57,9 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
         error.message.includes('Cannot find') ||
         error.message.includes('ENOENT')
       ) {
-        // Don't assume path - c12 has its own search logic
-        // Only include path if explicitly provided via --config flag
-        throw errorConfigFileNotFound(configPath, {
+        // Use resolved path if available, otherwise use original configPath
+        const displayPath = configPath ? resolve(process.cwd(), configPath) : undefined;
+        throw errorConfigFileNotFound(displayPath, {
           why: error.message,
         });
       }
