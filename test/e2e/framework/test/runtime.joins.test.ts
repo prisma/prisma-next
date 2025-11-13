@@ -88,7 +88,7 @@ describe('end-to-end JOIN queries', () => {
             }
           });
         },
-        { acceleratePort: 54030, databasePort: 54031, shadowDatabasePort: 54032 },
+        { acceleratePort: 54039, databasePort: 54040, shadowDatabasePort: 54041 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -171,7 +171,7 @@ describe('end-to-end JOIN queries', () => {
             }
           });
         },
-        { acceleratePort: 54040, databasePort: 54041, shadowDatabasePort: 54042 },
+        { acceleratePort: 54045, databasePort: 54046, shadowDatabasePort: 54047 },
       );
     },
     timeouts.spinUpPpgDev,

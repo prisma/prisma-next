@@ -1,4 +1,12 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Command } from 'commander';
@@ -14,7 +22,8 @@ export const integrationFixtureAppDir = join(__dirname, '../cli-integration-test
 /**
  * Executes a command and catches process.exit errors (which are expected in tests).
  * Returns the exit code that was passed to process.exit(), or 0 if process.exit() wasn't called.
- * For real errors (not process.exit), re-throws the error.
+ * For real errors (not process.exit), returns 1 to indicate failure.
+ * This handles cases where validation errors are thrown before process.exit() is called.
  */
 export async function executeCommand(command: Command, args: string[]): Promise<number> {
   try {
@@ -28,8 +37,9 @@ export async function executeCommand(command: Command, args: string[]): Promise<
       const exitCode = exitCall?.[0] ?? 0; // process.exit() without argument defaults to 0
       return exitCode;
     }
-    // Real error (not process.exit), re-throw
-    throw error;
+    // Real error (not process.exit) - return non-zero exit code
+    // This handles cases where validation errors are thrown before process.exit() is called
+    return 1;
   }
 }
 
@@ -217,11 +227,15 @@ export function setupIntegrationTestDirectoryFromFixtures(
     throw new Error(`Fixture subdirectory not found: ${fixturesSubdirPath}`);
   }
 
-  // Copy contract.ts if it exists
-  const fixtureContractPath = join(fixturesSubdirPath, 'contract.ts');
-  if (existsSync(fixtureContractPath)) {
-    const contractPath = join(testDir, 'contract.ts');
-    copyFileSync(fixtureContractPath, contractPath);
+  // Copy all .ts files from fixture directory (contract.ts, invalid-contract.ts, etc.)
+  // Exclude the config file as it will be processed separately
+  const fixtureFiles = readdirSync(fixturesSubdirPath);
+  for (const file of fixtureFiles) {
+    if (file.endsWith('.ts') && file !== configFileName) {
+      const fixtureFilePath = join(fixturesSubdirPath, file);
+      const destFilePath = join(testDir, file);
+      copyFileSync(fixtureFilePath, destFilePath);
+    }
   }
 
   // Copy and process config file

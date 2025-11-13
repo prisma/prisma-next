@@ -52,9 +52,9 @@ describe('budgets plugin integration', () => {
 
   beforeAll(async () => {
     database = await createDevDatabase({
-      acceleratePort: 54010,
-      databasePort: 54011,
-      shadowDatabasePort: 54012,
+      acceleratePort: 54013,
+      databasePort: 54014,
+      shadowDatabasePort: 54015,
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
