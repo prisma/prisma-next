@@ -30,7 +30,6 @@ program.exitOverride((err) => {
   if (err) {
     // Help requests are not errors - allow Commander to output help and exit normally
     // Commander throws errors with codes like 'commander.help', 'commander.helpDisplayed', or 'outputHelp'
-    // The error message may be '(outputHelp)' or the code may be 'outputHelp'
     const errorCode = (err as { code?: string }).code;
     const errorMessage = String(err.message ?? '');
     const errorName = err.name ?? '';
@@ -91,5 +90,33 @@ program.addCommand(dbCommand);
 
 // Keep legacy emit command as alias
 program.addCommand(createEmitCommand());
+
+// Create help command
+const helpCommand = new Command('help')
+  .description('Show usage instructions')
+  .configureHelp({
+    formatHelp: (cmd) => {
+      const flags = parseGlobalFlags({});
+      return formatCommandHelp({ command: cmd, flags });
+    },
+  })
+  .action(() => {
+    const flags = parseGlobalFlags({});
+    const helpText = formatRootHelp({ program, flags });
+    // eslint-disable-next-line no-console
+    console.log(helpText);
+    process.exit(0);
+  });
+
+program.addCommand(helpCommand);
+
+// Set help as the default action when no command is provided
+program.action(() => {
+  const flags = parseGlobalFlags({});
+  const helpText = formatRootHelp({ program, flags });
+  // eslint-disable-next-line no-console
+  console.log(helpText);
+  process.exit(0);
+});
 
 program.parse();

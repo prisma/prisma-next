@@ -460,8 +460,10 @@ export function formatRootHelp(options: {
   lines.push(title);
   lines.push(formatDimText('│')); // Vertical line separator between title and params
 
-  // Extract subcommands
-  const subcommands = program.commands.filter((cmd) => !cmd.name().startsWith('_'));
+  // Extract subcommands (exclude hidden commands starting with '_' and the 'help' command)
+  const subcommands = program.commands.filter(
+    (cmd) => !cmd.name().startsWith('_') && cmd.name() !== 'help',
+  );
 
   // Extract global options
   const globalOptions = program.options.map((opt) => {
