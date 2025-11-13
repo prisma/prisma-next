@@ -8,6 +8,7 @@ import {
   errorRuntime,
   errorTargetMismatch,
 } from '../utils/cli-errors';
+import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -35,12 +36,14 @@ interface DbVerifyOptions {
 }
 
 export function createDbVerifyCommand(): Command {
-  const command = new Command('verify')
-    .description(
-      'Check the database satisfies your contract\n' +
-        'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
-        'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
-    )
+  const command = new Command('verify');
+  setCommandDescriptions(
+    command,
+    'Check the database satisfies your contract',
+    'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
+      'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
+  );
+  command
     .configureHelp({
       formatHelp: (cmd) => {
         const flags = parseGlobalFlags({});

@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { createContractEmitCommand } from './commands/contract-emit';
 import { createDbVerifyCommand } from './commands/db-verify';
+import { setCommandDescriptions } from './utils/command-helpers';
 import { parseGlobalFlags } from './utils/global-flags';
 import { formatCommandHelp, formatRootHelp } from './utils/output';
 
@@ -8,13 +9,12 @@ const program = new Command();
 
 program.name('prisma-next').description('Prisma Next CLI').version('0.0.1');
 
-// Suppress Commander.js default error output since commands handle errors themselves
-// We'll handle unknown command errors in exitOverride
-// Note: Commander.js may write errors in chunks, so we suppress all writeErr output
 program.configureOutput({
   writeErr: () => {
     // Suppress all default error output - we handle errors in exitOverride
-    // Unknown command errors are handled in exitOverride with custom formatting
+  },
+  writeOut: () => {
+    // Suppress all default output - our custom formatters handle everything
   },
 });
 
@@ -24,7 +24,10 @@ const rootHelpFormatter = (cmd: Command) => {
   return formatRootHelp({ program: cmd, flags });
 };
 
-program.configureHelp({ formatHelp: rootHelpFormatter });
+program.configureHelp({
+  formatHelp: rootHelpFormatter,
+  subcommandDescription: () => '',
+});
 
 // Override exit to handle unhandled errors (fail fast cases)
 // Commands handle structured errors themselves via process.exit()
@@ -116,18 +119,20 @@ program.exitOverride((err) => {
 });
 
 // Register contract subcommand
-const contractCommand = new Command('contract')
-  .description(
-    'Contract management commands\n' +
-      'Define and emit your application data contract. The contract describes your schema as a\n' +
-      'declarative data structure that can be signed and verified against your database.',
-  )
-  .configureHelp({
-    formatHelp: (cmd) => {
-      const flags = parseGlobalFlags({});
-      return formatCommandHelp({ command: cmd, flags });
-    },
-  });
+const contractCommand = new Command('contract');
+setCommandDescriptions(
+  contractCommand,
+  'Contract management commands',
+  'Define and emit your application data contract. The contract describes your schema as a\n' +
+    'declarative data structure that can be signed and verified against your database.',
+);
+contractCommand.configureHelp({
+  formatHelp: (cmd) => {
+    const flags = parseGlobalFlags({});
+    return formatCommandHelp({ command: cmd, flags });
+  },
+  subcommandDescription: () => '',
+});
 
 // Add emit subcommand to contract
 const contractEmitCommand = createContractEmitCommand();
@@ -137,18 +142,20 @@ contractCommand.addCommand(contractEmitCommand);
 program.addCommand(contractCommand);
 
 // Register db subcommand
-const dbCommand = new Command('db')
-  .description(
-    'Database management commands\n' +
-      'Verify and sign your database with your contract. Ensure your database schema matches\n' +
-      'your contract, and sign it to record the contract hash for future verification.',
-  )
-  .configureHelp({
-    formatHelp: (cmd) => {
-      const flags = parseGlobalFlags({});
-      return formatCommandHelp({ command: cmd, flags });
-    },
-  });
+const dbCommand = new Command('db');
+setCommandDescriptions(
+  dbCommand,
+  'Database management commands',
+  'Verify and sign your database with your contract. Ensure your database schema matches\n' +
+    'your contract, and sign it to record the contract hash for future verification.',
+);
+dbCommand.configureHelp({
+  formatHelp: (cmd) => {
+    const flags = parseGlobalFlags({});
+    return formatCommandHelp({ command: cmd, flags });
+  },
+  subcommandDescription: () => '',
+});
 
 // Add verify subcommand to db
 const dbVerifyCommand = createDbVerifyCommand();

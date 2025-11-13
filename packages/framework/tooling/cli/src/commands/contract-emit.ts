@@ -10,6 +10,7 @@ import {
   extractOperationTypeImports,
 } from '../pack-assembly';
 import { errorContractConfigMissing } from '../utils/cli-errors';
+import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -36,13 +37,15 @@ interface ContractEmitOptions {
 }
 
 export function createContractEmitCommand(): Command {
-  const command = new Command('emit')
-    .description(
-      'Emit signed contract artifacts\n' +
-        'Reads your contract source (TypeScript or Prisma schema) and emits contract.json and\n' +
-        'contract.d.ts. The contract.json contains the canonical contract structure, and\n' +
-        'contract.d.ts provides TypeScript types for type-safe query building.',
-    )
+  const command = new Command('emit');
+  setCommandDescriptions(
+    command,
+    'Emit signed contract artifacts',
+    'Reads your contract source (TypeScript or Prisma schema) and emits contract.json and\n' +
+      'contract.d.ts. The contract.json contains the canonical contract structure, and\n' +
+      'contract.d.ts provides TypeScript types for type-safe query building.',
+  );
+  command
     .configureHelp({
       formatHelp: (cmd) => {
         const flags = parseGlobalFlags({});

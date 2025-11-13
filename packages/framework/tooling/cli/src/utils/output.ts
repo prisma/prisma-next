@@ -3,6 +3,7 @@ import type { Command } from 'commander';
 import type { EmitContractResult } from '../api/emit-contract';
 import type { VerifyDatabaseResult } from '../api/verify-database';
 import type { CliErrorEnvelope } from './cli-errors';
+import { getLongDescription } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
 
 // ============================================================================
@@ -289,8 +290,8 @@ function wrapText(text: string, width: number): string[] {
   for (const word of words) {
     if (currentLine === '') {
       currentLine = word;
-    } else if ((currentLine + ' ' + word).length <= width) {
-      currentLine += ' ' + word;
+    } else if (`${currentLine} ${word}`.length <= width) {
+      currentLine += ` ${word}`;
     } else {
       lines.push(currentLine);
       currentLine = word;
@@ -312,17 +313,9 @@ function renderCommandTree(options: {
   readonly useColor: boolean;
   readonly formatDimText: (text: string) => string;
   readonly hasItemsAfter: boolean;
-  readonly showMultilineDescriptions: boolean;
   readonly continuationPrefix?: string;
 }): string[] {
-  const {
-    commands,
-    useColor,
-    formatDimText,
-    hasItemsAfter,
-    showMultilineDescriptions,
-    continuationPrefix,
-  } = options;
+  const { commands, useColor, formatDimText, hasItemsAfter, continuationPrefix } = options;
   const lines: string[] = [];
   const pad = createPadFunction();
 
@@ -364,12 +357,7 @@ function renderCommandTree(options: {
         const isLastSubcommand = j === subcommands.length - 1;
         const subcommandName = pad(subcmd.name(), maxCommandNameLength);
         const subcommandNameColored = useColor ? cyan(subcommandName) : subcommandName;
-        const fullDescription = subcmd.description() || '';
-        const descriptionLines = fullDescription
-          .split('\n')
-          .filter((line) => line.trim().length > 0);
-        const shortDescription = descriptionLines[0] || '';
-        const longDescription = descriptionLines.slice(1);
+        const shortDescription = subcmd.description() || '';
 
         // Use tree characters: └─ for last subcommand, ├─ for others
         const treeChar = isLastSubcommand ? '└' : '├';
@@ -379,21 +367,14 @@ function renderCommandTree(options: {
         lines.push(
           `${formatDimText('│')} ${continuation}  ${formatDimText(treeChar)}─ ${subcommandNameColored}  ${shortDescription}`,
         );
-
-        // Add multiline description if present and enabled
-        if (showMultilineDescriptions && longDescription.length > 0) {
-          for (const descLine of longDescription) {
-            lines.push(`${formatDimText('│')} ${continuation}     ${descLine}`);
-          }
-        }
       }
     } else {
       // Standalone command - show command name and description on same line
       const prefix = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
       const commandNamePadded = pad(cmd.name(), maxCommandNameLength);
       const commandNameColored = useColor ? cyan(commandNamePadded) : commandNamePadded;
-      const description = cmd.description() || '';
-      lines.push(`${formatDimText('│')} ${prefix}─ ${commandNameColored}  ${description}`);
+      const shortDescription = cmd.description() || '';
+      lines.push(`${formatDimText('│')} ${prefix}─ ${commandNameColored}  ${shortDescription}`);
     }
   }
 
@@ -537,10 +518,8 @@ export function formatCommandHelp(options: {
 
   // Build full command path (e.g., "db verify")
   const commandPath = buildCommandPath(command);
-  const description = command.description() || '';
-  const descriptionLines = description.split('\n').filter((line) => line.trim().length > 0);
-  const shortDescription = descriptionLines[0] || '';
-  const longDescription = descriptionLines.slice(1);
+  const shortDescription = command.description() || '';
+  const longDescription = getLongDescription(command);
 
   // Header: "prisma-next <full-command-path> ➜ <short-description>"
   const brand = createPrismaNextBadge(useColor);
@@ -576,7 +555,6 @@ export function formatCommandHelp(options: {
       useColor,
       formatDimText,
       hasItemsAfter,
-      showMultilineDescriptions: false,
     });
     lines.push(...treeLines);
   }
@@ -608,11 +586,10 @@ export function formatCommandHelp(options: {
   }
 
   // Multi-line description (if present) - shown after all other content
-  if (longDescription.length > 0) {
-    lines.push(formatDimText('│')); // Separator line before description
-    lines.push(
-      ...formatMultilineDescription({ descriptionLines: longDescription, useColor, formatDimText }),
-    );
+  if (longDescription) {
+    lines.push(formatDimText('│'));
+    const descriptionLines = longDescription.split('\n').filter((line) => line.trim().length > 0);
+    lines.push(...formatMultilineDescription({ descriptionLines, useColor, formatDimText }));
   }
 
   lines.push(formatDimText('└'));
@@ -637,7 +614,6 @@ export function formatRootHelp(options: {
   const shortDescription = 'Manage your data layer';
   const intent = formatDimText(shortDescription);
   lines.push(formatHeaderLine({ brand, operation: '', intent }));
-  lines.push(formatDimText('│')); // Vertical line separator between command and params
 
   // Extract top-level commands (exclude hidden commands starting with '_' and the 'help' command)
   const topLevelCommands = program.commands.filter(
@@ -659,7 +635,6 @@ export function formatRootHelp(options: {
       useColor,
       formatDimText,
       hasItemsAfter,
-      showMultilineDescriptions: true,
     });
     lines.push(...treeLines);
   }
