@@ -228,7 +228,7 @@ export function formatStyledHeader(options: {
   const opName = options.command.split(' ').slice(-1)[0] || 'emit';
   const operation = useColor ? bold(opName) : opName;
   const intent = formatDimText(options.description);
-  lines.push(`${brand} ${operation} → ${intent}`);
+  lines.push(`${brand} ${operation} ➜ ${intent}`);
 
   // Parameters box
   const maxLabel = options.details.reduce((n, d) => Math.max(n, d.label.length), 0);

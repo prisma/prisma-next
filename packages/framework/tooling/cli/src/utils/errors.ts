@@ -86,7 +86,7 @@ export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
     if (message.includes('Config file not found') || message.includes('not found')) {
       return createCliError('4001', 'Config file not found', {
         why: message,
-        fix: 'Create prisma-next.config.ts in your project root or specify a path with --config',
+        fix: "Run 'prisma-next init' to create a config file",
         docsUrl: 'https://prisma-next.dev/docs/cli/config',
         exitCode: 2,
       });
@@ -151,6 +151,16 @@ export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
         why: message,
         fix: 'Ensure family.verify.readMarkerSql() is exported by your family package',
         docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
+        exitCode: 2,
+      });
+    }
+
+    // Config validation errors (missing required fields) - treat as config file issue
+    if (message.includes('Config must have') && message.includes('field')) {
+      return createCliError('4001', 'Config file not found', {
+        why: 'Config file is missing or invalid',
+        fix: "Run 'prisma-next init' to create a config file",
+        docsUrl: 'https://prisma-next.dev/docs/cli/config',
         exitCode: 2,
       });
     }

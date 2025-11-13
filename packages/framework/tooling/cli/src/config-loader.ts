@@ -21,11 +21,9 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
       cwd,
     });
 
-    if (!result.config) {
-      const expectedPath = configPath || resolve(cwd, 'prisma-next.config.ts');
-      throw new Error(
-        `Config file not found at ${expectedPath}. Please create prisma-next.config.ts or specify a path with --config.`,
-      );
+    // Check if config is missing or empty (c12 may return empty object when file doesn't exist)
+    if (!result.config || Object.keys(result.config).length === 0) {
+      throw new Error(`Config file not found. Run 'prisma-next init' to create a config file.`);
     }
 
     // Validate config structure
@@ -34,17 +32,16 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
     return result.config;
   } catch (error) {
     if (error instanceof Error) {
-      // Preserve c12's error messages but provide context
-      const cwd = process.cwd();
-      const expectedPath = configPath || resolve(cwd, 'prisma-next.config.ts');
       // Check for file not found errors
       if (
         error.message.includes('not found') ||
         error.message.includes('Cannot find') ||
         error.message.includes('ENOENT')
       ) {
+        const cwd = process.cwd();
+        const expectedPath = configPath || resolve(cwd, 'prisma-next.config.ts');
         throw new Error(
-          `Config file not found at ${expectedPath}. Please create prisma-next.config.ts or specify a path with --config.`,
+          `Config file not found at ${expectedPath}. Run 'prisma-next init' to create a config file.`,
         );
       }
       // For other errors, include the original error message for debugging
