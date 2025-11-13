@@ -36,7 +36,6 @@ interface DbVerifyOptions {
 export function createDbVerifyCommand(): Command {
   const command = new Command('verify')
     .description('Verify database matches emitted contract')
-    .allowExcessArguments(false)
     .option('--db <url>', 'Database connection string')
     .option(
       '--config <path>',

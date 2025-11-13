@@ -161,8 +161,10 @@ export async function verifyDatabase(
         : undefined;
     const contractTarget = contractIR.target;
 
-    // Create query runner from factory
-    const queryRunner = config.db.queryRunnerFactory(dbUrl);
+    // Create query runner from factory (may be async for ESM dynamic imports)
+    const queryRunnerResult = config.db.queryRunnerFactory(dbUrl);
+    const queryRunner =
+      queryRunnerResult instanceof Promise ? await queryRunnerResult : queryRunnerResult;
 
     try {
       // Get marker SQL from family verify helper

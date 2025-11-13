@@ -22,7 +22,7 @@ export async function executeCommand(command: Command, args: string[]): Promise<
     // process.exit throws an error in tests - check the exit code
     if (error instanceof Error && error.message === 'process.exit called') {
       const exitCall = (process.exit as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-      const exitCode = exitCall?.[0];
+      const exitCode = exitCall?.[0] ?? 0; // process.exit() without argument defaults to 0
       // For success (exit code 0), swallow the error
       // For errors (non-zero), re-throw so tests can check console errors
       if (exitCode !== 0) {

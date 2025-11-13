@@ -1,6 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -21,31 +20,15 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../../src/pack-assembly';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// From packages/framework/tooling/cli/test/api to root: ../../../../../../ (7 levels up)
-const workspaceRoot = resolve(__dirname, '../../../../../../');
-const fixturesDir = join(__dirname, '../fixtures');
+import { createContractFile, setupTestDirectory } from '../utils/test-helpers';
 
 function createConfigFileContent(
+  testDir: string,
   includeContract = true,
   outputOverride?: string,
   queryRunnerFactoryCode?: string,
 ): string {
-  // Use absolute paths - c12/jiti resolves modules relative to config file, not workspace root
-  const adapterPath = resolve(
-    workspaceRoot,
-    'packages/targets/postgres-adapter/dist/exports/cli.js',
-  );
-  const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-  const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-  const configTypesPath = resolve(
-    workspaceRoot,
-    'packages/framework/tooling/cli/dist/config-types.js',
-  );
-  const contractPath = resolve(fixturesDir, 'valid-contract.ts');
-
-  const contractImport = includeContract ? `import { contract } from '${contractPath}';` : '';
+  const contractImport = includeContract ? `import { contract } from './contract';` : '';
   const contractField = includeContract
     ? `  contract: {
     source: contract,
@@ -60,10 +43,10 @@ function createConfigFileContent(
   },`
     : '';
 
-  return `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
+  return `import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/cli';
+import sql from '@prisma-next/family-sql/cli';
 ${contractImport}
 
 export default defineConfig({
@@ -81,10 +64,11 @@ ${contractField}${dbField}
  * This wraps a pg Client to provide the queryRunnerFactory interface.
  */
 function createQueryRunnerFactoryCode(): string {
-  return `(url) => {
-    const { Client } = require('pg');
+  return `async (url) => {
+    const pg = await import('pg');
+    const { Client } = pg;
     const client = new Client({ connectionString: url });
-    client.connect();
+    await client.connect();
     return {
       query: async (sql, params) => {
         const result = await client.query(sql, params);
@@ -101,15 +85,20 @@ describe('verifyDatabase API', () => {
   let testDir: string;
   let configPath: string;
   let contract: SqlContract<SqlStorage>;
+  let cleanupDir: () => void;
 
   beforeEach(async () => {
-    // Create temp dir as sibling of test file (within workspace) so package names resolve
-    testDir = join(__dirname, `verify-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(testDir, { recursive: true });
-    configPath = join(testDir, 'prisma-next.config.ts');
+    // Set up test directory with contract file
+    const testSetup = setupTestDirectory();
+    testDir = testSetup.testDir;
+    configPath = testSetup.configPath;
+    cleanupDir = testSetup.cleanup;
+
+    // Create contract file in temp directory
+    createContractFile(testDir);
 
     // Create config file
-    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
+    writeFileSync(configPath, createConfigFileContent(testDir), 'utf-8');
 
     // Load config and emit contract to get contract.json
     const config = await loadConfig(configPath);
@@ -160,9 +149,7 @@ describe('verifyDatabase API', () => {
   });
 
   afterEach(() => {
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
+    cleanupDir();
   });
 
   it(
@@ -183,29 +170,31 @@ describe('verifyDatabase API', () => {
               canonicalVersion: 1,
             });
             await executeStatement(client, write.insert);
-
-            // Update config with queryRunnerFactory
-            const configContent = createConfigFileContent(
-              true,
-              undefined,
-              createQueryRunnerFactoryCode(),
-            );
-            writeFileSync(configPath, configContent, 'utf-8');
-
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath,
-            });
-
-            expect(result.ok).toBe(true);
-            expect(result.summary).toBe('Database matches contract');
-            expect(result.contract.coreHash).toBe(contract.coreHash);
-            if (contract.profileHash) {
-              expect(result.contract.profileHash).toBe(contract.profileHash);
-            }
-            expect(result.timings.total).toBeGreaterThanOrEqual(0);
-            expect(result.meta?.contractPath).toBeDefined();
+            // withClient will close the client after this callback returns
           });
+
+          // Update config with queryRunnerFactory (after client is closed)
+          const configContent = createConfigFileContent(
+            testDir,
+            true,
+            undefined,
+            createQueryRunnerFactoryCode(),
+          );
+          writeFileSync(configPath, configContent, 'utf-8');
+
+          const result = await verifyDatabase({
+            dbUrl: connectionString,
+            configPath,
+          });
+
+          expect(result.ok).toBe(true);
+          expect(result.summary).toBe('Database matches contract');
+          expect(result.contract.coreHash).toBe(contract.coreHash);
+          if (contract.profileHash) {
+            expect(result.contract.profileHash).toBe(contract.profileHash);
+          }
+          expect(result.timings.total).toBeGreaterThanOrEqual(0);
+          expect(result.meta?.contractPath).toBeDefined();
         },
         { acceleratePort: 54050, databasePort: 54051, shadowDatabasePort: 54052 },
       );
@@ -222,26 +211,28 @@ describe('verifyDatabase API', () => {
             // Setup marker schema and table but don't write marker
             await executeStatement(client, ensureSchemaStatement);
             await executeStatement(client, ensureTableStatement);
-
-            // Update config with queryRunnerFactory
-            const configContent = createConfigFileContent(
-              true,
-              undefined,
-              createQueryRunnerFactoryCode(),
-            );
-            writeFileSync(configPath, configContent, 'utf-8');
-
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath,
-            });
-
-            expect(result.ok).toBe(false);
-            expect(result.code).toBe('PN-RTM-3001');
-            expect(result.summary).toBe('Marker missing');
-            expect(result.marker).toBeUndefined();
-            expect(result.contract.coreHash).toBe(contract.coreHash);
+            // withClient will close the client after this callback returns
           });
+
+          // Update config with queryRunnerFactory (after client is closed)
+          const configContent = createConfigFileContent(
+            testDir,
+            true,
+            undefined,
+            createQueryRunnerFactoryCode(),
+          );
+          writeFileSync(configPath, configContent, 'utf-8');
+
+          const result = await verifyDatabase({
+            dbUrl: connectionString,
+            configPath,
+          });
+
+          expect(result.ok).toBe(false);
+          expect(result.code).toBe('PN-RTM-3001');
+          expect(result.summary).toBe('Marker missing');
+          expect(result.marker).toBeUndefined();
+          expect(result.contract.coreHash).toBe(contract.coreHash);
         },
         { acceleratePort: 54053, databasePort: 54054, shadowDatabasePort: 54055 },
       );
@@ -267,26 +258,28 @@ describe('verifyDatabase API', () => {
               canonicalVersion: 1,
             });
             await executeStatement(client, write.insert);
-
-            // Update config with queryRunnerFactory
-            const configContent = createConfigFileContent(
-              true,
-              undefined,
-              createQueryRunnerFactoryCode(),
-            );
-            writeFileSync(configPath, configContent, 'utf-8');
-
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath,
-            });
-
-            expect(result.ok).toBe(false);
-            expect(result.code).toBe('PN-RTM-3002');
-            expect(result.summary).toBe('Hash mismatch');
-            expect(result.contract.coreHash).toBe(contract.coreHash);
-            expect(result.marker?.coreHash).toBe('sha256:different-hash');
+            // withClient will close the client after this callback returns
           });
+
+          // Update config with queryRunnerFactory (after client is closed)
+          const configContent = createConfigFileContent(
+            testDir,
+            true,
+            undefined,
+            createQueryRunnerFactoryCode(),
+          );
+          writeFileSync(configPath, configContent, 'utf-8');
+
+          const result = await verifyDatabase({
+            dbUrl: connectionString,
+            configPath,
+          });
+
+          expect(result.ok).toBe(false);
+          expect(result.code).toBe('PN-RTM-3002');
+          expect(result.summary).toBe('Hash mismatch');
+          expect(result.contract.coreHash).toBe(contract.coreHash);
+          expect(result.marker?.coreHash).toBe('sha256:different-hash');
         },
         { acceleratePort: 54056, databasePort: 54057, shadowDatabasePort: 54058 },
       );
@@ -312,28 +305,30 @@ describe('verifyDatabase API', () => {
               canonicalVersion: 1,
             });
             await executeStatement(client, write.insert);
-
-            // Update config with queryRunnerFactory
-            const configContent = createConfigFileContent(
-              true,
-              undefined,
-              createQueryRunnerFactoryCode(),
-            );
-            writeFileSync(configPath, configContent, 'utf-8');
-
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath,
-            });
-
-            expect(result.ok).toBe(false);
-            expect(result.code).toBe('PN-RTM-3002');
-            expect(result.summary).toBe('Hash mismatch');
-            if (contract.profileHash) {
-              expect(result.contract.profileHash).toBe(contract.profileHash);
-            }
-            expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
+            // withClient will close the client after this callback returns
           });
+
+          // Update config with queryRunnerFactory (after client is closed)
+          const configContent = createConfigFileContent(
+            testDir,
+            true,
+            undefined,
+            createQueryRunnerFactoryCode(),
+          );
+          writeFileSync(configPath, configContent, 'utf-8');
+
+          const result = await verifyDatabase({
+            dbUrl: connectionString,
+            configPath,
+          });
+
+          expect(result.ok).toBe(false);
+          expect(result.code).toBe('PN-RTM-3002');
+          expect(result.summary).toBe('Hash mismatch');
+          if (contract.profileHash) {
+            expect(result.contract.profileHash).toBe(contract.profileHash);
+          }
+          expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
         },
         { acceleratePort: 54059, databasePort: 54060, shadowDatabasePort: 54061 },
       );
@@ -359,23 +354,25 @@ describe('verifyDatabase API', () => {
               canonicalVersion: 1,
             });
             await executeStatement(client, write.insert);
-
-            // Update config with queryRunnerFactory
-            const configContent = createConfigFileContent(
-              true,
-              undefined,
-              createQueryRunnerFactoryCode(),
-            );
-            writeFileSync(configPath, configContent, 'utf-8');
-
-            const result = await verifyDatabase({
-              dbUrl: connectionString,
-              configPath,
-            });
-
-            expect(result.timings).toBeDefined();
-            expect(result.timings.total).toBeGreaterThanOrEqual(0);
+            // withClient will close the client after this callback returns
           });
+
+          // Update config with queryRunnerFactory (after client is closed)
+          const configContent = createConfigFileContent(
+            testDir,
+            true,
+            undefined,
+            createQueryRunnerFactoryCode(),
+          );
+          writeFileSync(configPath, configContent, 'utf-8');
+
+          const result = await verifyDatabase({
+            dbUrl: connectionString,
+            configPath,
+          });
+
+          expect(result.timings).toBeDefined();
+          expect(result.timings.total).toBeGreaterThanOrEqual(0);
         },
         { acceleratePort: 54062, databasePort: 54063, shadowDatabasePort: 54064 },
       );

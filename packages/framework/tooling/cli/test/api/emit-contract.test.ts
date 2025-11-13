@@ -1,7 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -13,26 +11,14 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../../src/pack-assembly';
+import { createContractFile, setupTestDirectory } from '../utils/test-helpers';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(__dirname, '../../../../../');
-const fixturesDir = join(__dirname, '../fixtures');
-
-function createConfigFileContent(includeContract = true, outputOverride?: string): string {
-  // Use absolute paths to dist files to avoid import resolution issues in temp directories
-  const adapterPath = resolve(
-    workspaceRoot,
-    'packages/targets/postgres-adapter/dist/exports/cli.js',
-  );
-  const targetPath = resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js');
-  const familyPath = resolve(workspaceRoot, 'packages/sql/tooling/cli/dist/exports/cli.js');
-  const configTypesPath = resolve(
-    workspaceRoot,
-    'packages/framework/tooling/cli/dist/config-types.js',
-  );
-  const contractPath = resolve(fixturesDir, 'valid-contract.ts');
-
-  const contractImport = includeContract ? `import { contract } from '${contractPath}';` : '';
+function createConfigFileContent(
+  testDir: string,
+  includeContract = true,
+  outputOverride?: string,
+): string {
+  const contractImport = includeContract ? `import { contract } from './contract';` : '';
   const contractField = includeContract
     ? `  contract: {
     source: contract,
@@ -41,10 +27,10 @@ function createConfigFileContent(includeContract = true, outputOverride?: string
   },`
     : '';
 
-  return `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import sql from '${familyPath}';
+  return `import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/cli';
+import sql from '@prisma-next/family-sql/cli';
 ${contractImport}
 
 export default defineConfig({
@@ -60,23 +46,24 @@ ${contractField}
 describe('emitContract API', () => {
   let testDir: string;
   let configPath: string;
+  let cleanupDir: () => void;
 
   beforeEach(() => {
-    testDir = join(
-      tmpdir(),
-      `prisma-next-api-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
-    mkdirSync(testDir, { recursive: true });
-    configPath = join(testDir, 'prisma-next.config.ts');
+    // Set up test directory with contract file
+    const testSetup = setupTestDirectory();
+    testDir = testSetup.testDir;
+    configPath = testSetup.configPath;
+    cleanupDir = testSetup.cleanup;
 
-    // Create default config file with absolute paths
-    writeFileSync(configPath, createConfigFileContent(), 'utf-8');
+    // Create contract file in temp directory
+    createContractFile(testDir);
+
+    // Create default config file using package names
+    writeFileSync(configPath, createConfigFileContent(testDir), 'utf-8');
   });
 
   afterEach(() => {
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
+    cleanupDir();
   });
 
   it(
@@ -215,7 +202,7 @@ describe('emitContract API', () => {
       const customConfigPath = join(testDir, 'custom-config.ts');
       writeFileSync(
         customConfigPath,
-        createConfigFileContent(true, join(newOutputDir, 'contract.json')),
+        createConfigFileContent(testDir, true, join(newOutputDir, 'contract.json')),
         'utf-8',
       );
 

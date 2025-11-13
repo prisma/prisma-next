@@ -116,15 +116,23 @@ export interface PrismaNextConfig {
     /**
      * Family-agnostic minimal query runner factory for DB-connected CLI commands.
      * The CLI will call this to obtain a runner with a single query method.
+     * Can be async to support dynamic imports in ESM contexts.
      */
-    readonly queryRunnerFactory?: (url: string) => {
-      readonly query: <Row = Record<string, unknown>>(
-        sql: string,
-        params?: readonly unknown[],
-      ) => Promise<{ readonly rows: Row[] }>;
-      readonly close?: () => Promise<void>;
-    };
-    readonly [key: string]: unknown;
+    readonly queryRunnerFactory?: (url: string) =>
+      | {
+          readonly query: <Row = Record<string, unknown>>(
+            sql: string,
+            params?: readonly unknown[],
+          ) => Promise<{ readonly rows: Row[] }>;
+          readonly close?: () => Promise<void>;
+        }
+      | Promise<{
+          readonly query: <Row = Record<string, unknown>>(
+            sql: string,
+            params?: readonly unknown[],
+          ) => Promise<{ readonly rows: Row[] }>;
+          readonly close?: () => Promise<void>;
+        }>;
   };
   /**
    * Contract configuration. Specifies source and artifact locations.
