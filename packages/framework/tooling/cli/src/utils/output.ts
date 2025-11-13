@@ -279,7 +279,33 @@ function formatReadMoreLine(options: {
 }
 
 /**
+ * Wraps text to fit within a specified width, breaking at word boundaries.
+ */
+function wrapText(text: string, width: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    if (currentLine === '') {
+      currentLine = word;
+    } else if ((currentLine + ' ' + word).length <= width) {
+      currentLine += ' ' + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
+/**
  * Formats multiline description with "Prisma Next" in green.
+ * If a single long line is provided, it will be wrapped to fit the terminal width.
  */
 function formatMultilineDescription(options: {
   readonly descriptionLines: readonly string[];
@@ -288,10 +314,21 @@ function formatMultilineDescription(options: {
 }): string[] {
   const lines: string[] = [];
   const formatGreen = (text: string) => (options.useColor ? green(text) : text);
+
+  // Terminal width, defaulting to 80 if not available
+  // Account for "│ " prefix (2 characters)
+  const terminalWidth = process.stdout.columns || 80;
+  const availableWidth = terminalWidth - 2; // Subtract "│ " prefix
+
   for (const descLine of options.descriptionLines) {
     // Replace "Prisma Next" with green version if present
     const formattedLine = descLine.replace(/Prisma Next/g, (match) => formatGreen(match));
-    lines.push(`${options.formatDimText('│')} ${formattedLine}`);
+
+    // Wrap the line if it's longer than available width
+    const wrappedLines = wrapText(formattedLine, availableWidth);
+    for (const wrappedLine of wrappedLines) {
+      lines.push(`${options.formatDimText('│')} ${wrappedLine}`);
+    }
   }
   return lines;
 }
@@ -630,15 +667,11 @@ export function formatRootHelp(options: {
   // Multi-line description (white, not dimmed, with "Prisma Next" in green) - shown at bottom
   const formatGreen = (text: string) => (useColor ? green(text) : text);
   const descriptionLines = [
-    `Use ${formatGreen('Prisma Next')} to define your application's data layer in a declarative contract. Describe your schema as`,
-    "a data contract. Sign your database and application with the same contract to guarantee they're compatible.",
-    'Write migrations to change your contract and database safely.',
+    `Use ${formatGreen('Prisma Next')} to define your data layer as a contract. Sign your database and application with the same contract to guarantee compatibility. Plan and apply migrations to safely evolve your schema.`,
   ];
   if (descriptionLines.length > 0) {
     lines.push(formatDimText('│')); // Separator line before description
-    for (const descLine of descriptionLines) {
-      lines.push(`${formatDimText('│')} ${descLine}`);
-    }
+    lines.push(...formatMultilineDescription({ descriptionLines, useColor, formatDimText }));
   }
 
   lines.push(formatDimText('└'));
