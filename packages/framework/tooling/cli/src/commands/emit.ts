@@ -10,6 +10,11 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../pack-assembly';
+import {
+  errorConfigValidation,
+  errorContractConfigMissing,
+  errorContractValidationFailed,
+} from '../utils/cli-errors';
 import { parseGlobalFlags } from '../utils/global-flags';
 import { formatStyledHeader, formatSuccessMessage } from '../utils/output';
 import { performAction } from '../utils/result';
@@ -33,9 +38,9 @@ export function createEmitCommand(): Command {
 
         // Resolve contract from config
         if (!config.contract) {
-          throw new Error(
-            'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
-          );
+          throw errorContractConfigMissing({
+            why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
+          });
         }
 
         // Contract config is already normalized by defineConfig() with defaults applied
@@ -85,13 +90,21 @@ export function createEmitCommand(): Command {
         // Validate and normalize the contract using family-specific validation
         // This ensures consistency between CLI emit and programmatic emit
         // validateContractIR returns ContractIR without mappings (mappings are runtime-only)
-        const contractIR = config.family.validateContractIR(contractWithoutMappings);
+        let contractIR: unknown;
+        try {
+          contractIR = config.family.validateContractIR(contractWithoutMappings);
+        } catch (error) {
+          // Convert validation errors to structured errors so they're handled properly
+          throw errorContractValidationFailed(
+            error instanceof Error ? error.message : String(error),
+          );
+        }
 
         // Validate family is supported (for now, only 'sql' is supported)
         if (config.family.id !== 'sql') {
-          throw new Error(
-            `Unsupported family '${config.family.id}'; expected 'sql'. Please update your config to use a supported family.`,
-          );
+          throw errorConfigValidation('family.id', {
+            why: `Unsupported family '${config.family.id}'; expected 'sql'. Please update your config to use a supported family.`,
+          });
         }
 
         // Build descriptors array for assembly

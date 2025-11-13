@@ -92,7 +92,7 @@ export function createDbVerifyCommand(): Command {
           if (verifyResult.code === 'PN-RTM-3002') {
             throw errorHashMismatch({
               expected: verifyResult.contract.coreHash,
-              actual: verifyResult.marker?.coreHash,
+              ...(verifyResult.marker?.coreHash ? { actual: verifyResult.marker.coreHash } : {}),
             });
           }
           if (verifyResult.code === 'PN-RTM-3003') {
