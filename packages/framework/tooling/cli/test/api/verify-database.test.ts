@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
@@ -24,7 +23,8 @@ import {
 } from '../../src/pack-assembly';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(__dirname, '../../../../../');
+// From packages/framework/tooling/cli/test/api to root: ../../../../../../ (7 levels up)
+const workspaceRoot = resolve(__dirname, '../../../../../../');
 const fixturesDir = join(__dirname, '../fixtures');
 
 function createConfigFileContent(
@@ -32,6 +32,7 @@ function createConfigFileContent(
   outputOverride?: string,
   queryRunnerFactoryCode?: string,
 ): string {
+  // Use absolute paths - c12/jiti resolves modules relative to config file, not workspace root
   const adapterPath = resolve(
     workspaceRoot,
     'packages/targets/postgres-adapter/dist/exports/cli.js',
@@ -102,10 +103,8 @@ describe('verifyDatabase API', () => {
   let contract: SqlContract<SqlStorage>;
 
   beforeEach(async () => {
-    testDir = join(
-      tmpdir(),
-      `prisma-next-verify-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
+    // Create temp dir as sibling of test file (within workspace) so package names resolve
+    testDir = join(__dirname, `verify-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
     configPath = join(testDir, 'prisma-next.config.ts');
 

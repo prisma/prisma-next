@@ -1,18 +1,13 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Command } from 'commander';
 import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createEmitCommand } from '../src/commands/emit';
-import {
-  executeCommand,
-  setupCommandMocks,
-  setupTestDirectory,
-} from './utils/test-helpers';
+import { executeCommand, setupCommandMocks, setupTestDirectory } from './utils/test-helpers';
 
 function createConfigFileContent(
-  testDir: string,
+  _testDir: string,
   includeContract = true,
   outputOverride?: string,
 ): string {
@@ -76,13 +71,11 @@ describe('contract emit command (e2e)', () => {
   it(
     'emits contract.json and contract.d.ts with canonical command',
     async () => {
-      const contractCommand = new Command('contract');
-      const emitCommand = createContractEmitCommand();
-      contractCommand.addCommand(emitCommand);
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(contractCommand, ['emit', '--config', 'prisma-next.config.ts']);
+        await executeCommand(command, ['--config', 'prisma-next.config.ts']);
       } finally {
         process.chdir(originalCwd);
       }
@@ -116,7 +109,7 @@ describe('contract emit command (e2e)', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(command, ['emit', '--config', 'prisma-next.config.ts']);
+        await executeCommand(command, ['--config', 'prisma-next.config.ts']);
       } finally {
         process.chdir(originalCwd);
       }
@@ -133,18 +126,11 @@ describe('contract emit command (e2e)', () => {
   it(
     'outputs JSON when --json flag is provided',
     async () => {
-      const contractCommand = new Command('contract');
-      const emitCommand = createContractEmitCommand();
-      contractCommand.addCommand(emitCommand);
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(contractCommand, [
-          'emit',
-          '--config',
-          'prisma-next.config.ts',
-          '--json',
-        ]);
+        await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
       } finally {
         process.chdir(originalCwd);
       }
@@ -171,18 +157,12 @@ describe('contract emit command (e2e)', () => {
   );
 
   it('throws error with PN-CLI code when config file is missing', async () => {
-    const contractCommand = new Command('contract');
-    const emitCommand = createContractEmitCommand();
-    contractCommand.addCommand(emitCommand);
+    const command = createContractEmitCommand();
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
       await expect(
-        contractCommand.parseAsync([
-          'emit',
-          '--config',
-          'nonexistent.config.ts',
-        ]),
+        command.parseAsync(['node', 'cli.js', 'emit', '--config', 'nonexistent.config.ts']),
       ).rejects.toThrow();
     } finally {
       process.chdir(originalCwd);
@@ -199,18 +179,12 @@ describe('contract emit command (e2e)', () => {
     const configWithoutContract = join(testDir, 'no-contract-config.ts');
     writeFileSync(configWithoutContract, createConfigFileContent(testDir, false), 'utf-8');
 
-    const contractCommand = new Command('contract');
-    const emitCommand = createContractEmitCommand();
-    contractCommand.addCommand(emitCommand);
+    const command = createContractEmitCommand();
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
       await expect(
-        contractCommand.parseAsync([
-          'emit',
-          '--config',
-          configWithoutContract,
-        ]),
+        command.parseAsync(['node', 'cli.js', 'emit', '--config', 'no-contract-config.ts']),
       ).rejects.toThrow();
     } finally {
       process.chdir(originalCwd);
@@ -224,18 +198,11 @@ describe('contract emit command (e2e)', () => {
   it(
     'outputs timings in verbose mode',
     async () => {
-      const contractCommand = new Command('contract');
-      const emitCommand = createContractEmitCommand();
-      contractCommand.addCommand(emitCommand);
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(contractCommand, [
-          'emit',
-          '--config',
-          'prisma-next.config.ts',
-          '--verbose',
-        ]);
+        await executeCommand(command, ['--config', 'prisma-next.config.ts', '--verbose']);
       } finally {
         process.chdir(originalCwd);
       }
@@ -250,18 +217,11 @@ describe('contract emit command (e2e)', () => {
   it(
     'suppresses output in quiet mode',
     async () => {
-      const contractCommand = new Command('contract');
-      const emitCommand = createContractEmitCommand();
-      contractCommand.addCommand(emitCommand);
+      const command = createContractEmitCommand();
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        await executeCommand(contractCommand, [
-          'emit',
-          '--config',
-          'prisma-next.config.ts',
-          '--quiet',
-        ]);
+        await executeCommand(command, ['--config', 'prisma-next.config.ts', '--quiet']);
       } finally {
         process.chdir(originalCwd);
       }

@@ -163,15 +163,14 @@ describe('config loader', () => {
 
   it('throws error when target is missing', async () => {
     const configPath = join(testDir, 'prisma-next.config.ts');
-    const mockHook = {
-      id: 'sql',
-      validateTypes: () => {},
-      validateStructure: () => {},
-      generateContractTypes: () => '',
-    };
     writeFileSync(
       configPath,
-      `const mockHook = ${JSON.stringify(mockHook)};
+      `const mockHook = {
+        id: 'sql',
+        validateTypes: () => {},
+        validateStructure: () => {},
+        generateContractTypes: () => '',
+      };
       export default {
         family: {
           kind: 'family',

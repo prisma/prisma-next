@@ -3,12 +3,7 @@ import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
-import {
-  executeCommand,
-  setupCommandMocks,
-  setupTestDirectory,
-} from './utils/test-helpers';
-
+import { executeCommand, setupCommandMocks, setupTestDirectory } from './utils/test-helpers';
 
 function createConfigFileContent(includeContract = true, outputOverride?: string): string {
   const contractImport = includeContract ? `import { contract } from './contract';` : '';

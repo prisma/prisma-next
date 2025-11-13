@@ -144,4 +144,3 @@ export function setupTestDirectory(): {
 
   return { testDir, contractPath, outputDir, configPath, cleanup };
 }
-

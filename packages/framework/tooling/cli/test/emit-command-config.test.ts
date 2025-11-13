@@ -3,13 +3,9 @@ import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createEmitCommand } from '../src/commands/emit';
-import {
-  executeCommand,
-  setupCommandMocks,
-  setupTestDirectory,
-} from './utils/test-helpers';
+import { executeCommand, setupCommandMocks, setupTestDirectory } from './utils/test-helpers';
 
-function createConfigFileContent(testDir: string): string {
+function createConfigFileContent(_testDir: string): string {
   return `import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
@@ -32,7 +28,6 @@ export default defineConfig({
 
 describe('emit command with config', () => {
   let testDir: string;
-  let contractPath: string;
   let outputDir: string;
   let configPath: string;
   let cleanupMocks: () => void;
@@ -46,7 +41,6 @@ describe('emit command with config', () => {
     // Set up test directory with contract file
     const testSetup = setupTestDirectory();
     testDir = testSetup.testDir;
-    contractPath = testSetup.contractPath;
     outputDir = testSetup.outputDir;
     configPath = testSetup.configPath;
     cleanupDir = testSetup.cleanup;

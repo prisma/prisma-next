@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
@@ -24,7 +23,8 @@ import {
 } from '../src/pack-assembly';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(__dirname, '../../../../../');
+// From packages/framework/tooling/cli/test to root: ../../../../../../ (7 levels up)
+const workspaceRoot = resolve(__dirname, '../../../../../../');
 const fixturesDir = join(__dirname, 'fixtures');
 
 function createConfigFileContent(
@@ -32,6 +32,7 @@ function createConfigFileContent(
   outputOverride?: string,
   queryRunnerFactoryCode?: string,
 ): string {
+  // Use absolute paths - c12/jiti resolves modules relative to config file, not workspace root
   const adapterPath = resolve(
     workspaceRoot,
     'packages/targets/postgres-adapter/dist/exports/cli.js',
@@ -102,10 +103,8 @@ describe('db verify command (e2e)', () => {
   let consoleErrors: string[] = [];
 
   beforeEach(async () => {
-    testDir = join(
-      tmpdir(),
-      `prisma-next-db-verify-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
+    // Create temp dir as sibling of test file (within workspace) so package names resolve
+    testDir = join(__dirname, `db-verify-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
     configPath = join(testDir, 'prisma-next.config.ts');
 
@@ -496,37 +495,33 @@ describe('db verify command (e2e)', () => {
             await executeStatement(client, write.insert);
 
             // Create config with queryRunnerFactory but family without verify.readMarkerSql
-            const adapterPath = resolve(
-              workspaceRoot,
-              'packages/targets/postgres-adapter/dist/exports/cli.js',
-            );
-            const targetPath = resolve(
-              workspaceRoot,
-              'packages/targets/postgres/dist/exports/cli.js',
-            );
-            const configTypesPath = resolve(
-              workspaceRoot,
-              'packages/framework/tooling/cli/dist/config-types.js',
-            );
             const contractPath = resolve(fixturesDir, 'valid-contract.ts');
+            const queryRunnerFactoryCode = createQueryRunnerFactoryCode();
             const emitterPath = resolve(
               workspaceRoot,
               'packages/sql/tooling/emitter/dist/exports/emitter.js',
             );
-            const queryRunnerFactoryCode = createQueryRunnerFactoryCode();
 
             // Create a family descriptor without verify.readMarkerSql
-            const configContent = `import { defineConfig } from '${configTypesPath}';
-import postgresAdapter from '${adapterPath}';
-import postgres from '${targetPath}';
-import { contract } from '${contractPath}';
+            const configContent = `import { defineConfig } from '${resolve(
+              workspaceRoot,
+              'packages/framework/tooling/cli/dist/config-types.js',
+            )}';
+import postgresAdapter from '${resolve(
+              workspaceRoot,
+              'packages/targets/postgres-adapter/dist/exports/cli.js',
+            )}';
+import postgres from '${resolve(workspaceRoot, 'packages/targets/postgres/dist/exports/cli.js')}';
 import sqlTargetFamilyHook from '${emitterPath}';
+import { contract } from '${contractPath}';
 
 // Create family descriptor without verify.readMarkerSql
 const sqlFamilyWithoutVerify = {
   kind: 'family' as const,
   id: 'sql',
   hook: sqlTargetFamilyHook,
+  convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
+  validateContractIR: (contract: unknown) => contract,
   // verify property is missing
 };
 
