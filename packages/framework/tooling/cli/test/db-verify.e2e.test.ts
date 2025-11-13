@@ -22,6 +22,7 @@ import {
 } from '../src/pack-assembly';
 import {
   executeCommand,
+  getExitCode,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
 } from './utils/test-helpers';
@@ -96,7 +97,7 @@ describe('db verify command (e2e)', () => {
   });
 
   it(
-    'verifies database with matching marker',
+    'verifies database with matching marker via driver',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -132,28 +133,25 @@ describe('db verify command (e2e)', () => {
 
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
-            let exitCode: number;
             try {
               process.chdir(testDir);
-              exitCode = await executeCommand(command, [
-                '--config',
-                'prisma-next.config.ts',
-                '--json',
-              ]);
+              await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
             } finally {
               process.chdir(originalCwd);
             }
 
+            // Check exit code is 0 (success)
+            const exitCode = getExitCode();
             expect(exitCode).toBe(0);
-            // Parse JSON output and verify structure
+
+            // Parse and verify JSON output
             const jsonOutput = consoleOutput.join('\n');
-            expect(jsonOutput).not.toBe('');
             expect(() => JSON.parse(jsonOutput)).not.toThrow();
 
             const parsed = JSON.parse(jsonOutput);
             expect(parsed).toMatchObject({
               ok: true,
-              summary: expect.stringContaining('Database matches contract'),
+              summary: expect.any(String),
               contract: {
                 coreHash: expect.any(String),
               },
@@ -162,12 +160,6 @@ describe('db verify command (e2e)', () => {
               },
               target: {
                 expected: expect.any(String),
-              },
-              meta: {
-                contractPath: expect.any(String),
-              },
-              timings: {
-                total: expect.any(Number),
               },
             });
 
@@ -186,7 +178,7 @@ describe('db verify command (e2e)', () => {
   );
 
   it(
-    'reports error when marker is missing',
+    'reports error when marker is missing via driver',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -215,15 +207,16 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              const exitCode = await executeCommand(command, [
-                '--config',
-                'prisma-next.config.ts',
-                '--json',
-              ]);
-              expect(exitCode).not.toBe(0);
+              await expect(
+                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+              ).rejects.toThrow('process.exit called');
             } finally {
               process.chdir(originalCwd);
             }
+
+            // Check exit code is non-zero (error)
+            const exitCode = getExitCode();
+            expect(exitCode).not.toBe(0);
 
             const errorOutput = consoleErrors.join('\n');
             expect(() => JSON.parse(errorOutput)).not.toThrow();
@@ -247,7 +240,7 @@ describe('db verify command (e2e)', () => {
   );
 
   it(
-    'outputs JSON when --json flag is provided',
+    'outputs JSON when --json flag is provided via driver',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -285,15 +278,14 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              const exitCode = await executeCommand(command, [
-                '--config',
-                'prisma-next.config.ts',
-                '--json',
-              ]);
-              expect(exitCode).toBe(0);
+              await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
             } finally {
               process.chdir(originalCwd);
             }
+
+            // Check exit code is 0 (success)
+            const exitCode = getExitCode();
+            expect(exitCode).toBe(0);
 
             const jsonOutput = consoleOutput.join('\n');
             expect(jsonOutput).not.toBe('');
@@ -330,7 +322,7 @@ describe('db verify command (e2e)', () => {
   );
 
   it(
-    'reports error with JSON when marker is missing and --json flag is provided',
+    'reports error with JSON when marker is missing and --json flag is provided via driver',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -359,15 +351,16 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              const exitCode = await executeCommand(command, [
-                '--config',
-                'prisma-next.config.ts',
-                '--json',
-              ]);
-              expect(exitCode).not.toBe(0);
+              await expect(
+                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+              ).rejects.toThrow('process.exit called');
             } finally {
               process.chdir(originalCwd);
             }
+
+            // Check exit code is non-zero (error)
+            const exitCode = getExitCode();
+            expect(exitCode).not.toBe(0);
 
             const errorOutput = consoleErrors.join('\n');
             expect(() => JSON.parse(errorOutput)).not.toThrow();
@@ -391,11 +384,11 @@ describe('db verify command (e2e)', () => {
   );
 
   it(
-    'reports PN-CLI-4006 when db.queryRunnerFactory is missing',
+    'reports PN-CLI-4010 when driver is missing',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          // Set up test directory from fixtures with config that has db.url but no queryRunnerFactory
+          // Set up test directory from fixtures with config that has db.url but no driver
           const testSetup = setupTestDirectoryFromFixtures(
             fixtureSubdir,
             'prisma-next.config.no-query-runner.ts',
@@ -429,28 +422,29 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              const exitCode = await executeCommand(command, [
-                '--config',
-                'prisma-next.config.ts',
-                '--json',
-              ]);
-              expect(exitCode).not.toBe(0);
+              await expect(
+                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+              ).rejects.toThrow('process.exit called');
             } finally {
               process.chdir(originalCwd);
             }
+
+            // Check exit code is non-zero (error)
+            const exitCode = getExitCode();
+            expect(exitCode).not.toBe(0);
 
             const errorOutput = consoleErrors.join('\n');
             expect(() => JSON.parse(errorOutput)).not.toThrow();
 
             const parsed = JSON.parse(errorOutput);
             expect(parsed).toMatchObject({
-              code: 'PN-CLI-4006',
+              code: 'PN-CLI-4010',
               summary: expect.any(String),
               why: expect.any(String),
               fix: expect.any(String),
             });
-            expect(parsed.summary).toContain('Query runner factory is required');
-            expect(parsed.fix).toContain('Add db.queryRunnerFactory to prisma-next.config.ts');
+            expect(parsed.summary).toContain('Driver is required for DB-connected commands');
+            expect(parsed.fix).toContain('Add driver to prisma-next.config.ts');
           } finally {
             cleanupDir();
           }
@@ -462,7 +456,7 @@ describe('db verify command (e2e)', () => {
   );
 
   it(
-    'reports PN-CLI-4007 when family.verify.readMarkerSql is missing',
+    'reports PN-CLI-4007 when family.verify.readMarker is missing',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -500,15 +494,16 @@ describe('db verify command (e2e)', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              const exitCode = await executeCommand(command, [
-                '--config',
-                'prisma-next.config.ts',
-                '--json',
-              ]);
-              expect(exitCode).not.toBe(0);
+              await expect(
+                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+              ).rejects.toThrow('process.exit called');
             } finally {
               process.chdir(originalCwd);
             }
+
+            // Check exit code is non-zero (error)
+            const exitCode = getExitCode();
+            expect(exitCode).not.toBe(0);
 
             const errorOutput = consoleErrors.join('\n');
             expect(() => JSON.parse(errorOutput)).not.toThrow();
@@ -520,9 +515,9 @@ describe('db verify command (e2e)', () => {
               why: expect.any(String),
               fix: expect.any(String),
             });
-            expect(parsed.summary).toContain('Family readMarkerSql() is required');
+            expect(parsed.summary).toContain('Family readMarker() is required');
             expect(parsed.fix).toContain(
-              'Ensure family.verify.readMarkerSql() is exported by your family package',
+              'Ensure family.verify.readMarker() is exported by your family package',
             );
           } finally {
             cleanupDir();

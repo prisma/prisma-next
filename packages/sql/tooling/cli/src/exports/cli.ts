@@ -5,7 +5,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import { collectSupportedCodecTypeIds, readMarkerSql } from './verify';
+import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
 /**
  * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
@@ -59,7 +59,7 @@ const sqlFamilyDescriptor: FamilyDescriptor = {
   id: 'sql',
   hook: sqlTargetFamilyHook,
   verify: {
-    readMarkerSql,
+    readMarker,
     collectSupportedCodecTypeIds,
   },
   convertOperationManifest: (manifest: OperationManifest): OperationSignature => {

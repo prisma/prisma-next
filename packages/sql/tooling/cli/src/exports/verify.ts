@@ -1,12 +1,15 @@
 import type {
   AdapterDescriptor,
+  CliDriver,
   ExtensionDescriptor,
   TargetDescriptor,
 } from '@prisma-next/cli/config-types';
+import { type ContractMarkerRecord, parseContractMarkerRow } from '@prisma-next/cli/marker-parser';
 
 /**
  * Returns the SQL statement to read the contract marker.
  * This is a migration-plane helper (no runtime imports).
+ * @internal - Used internally by readMarker(). Prefer readMarker() for Control Plane usage.
  */
 export function readMarkerSql(): { readonly sql: string; readonly params: readonly unknown[] } {
   return {
@@ -22,6 +25,38 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
     where id = $1`,
     params: [1],
   };
+}
+
+/**
+ * Reads the contract marker from the database using the provided driver.
+ * Returns the parsed marker record or null if no marker is found.
+ * This abstracts SQL-specific details from the Control Plane.
+ *
+ * @param driver - CliDriver instance for executing queries
+ * @returns Promise resolving to ContractMarkerRecord or null if marker not found
+ */
+export async function readMarker(driver: CliDriver): Promise<ContractMarkerRecord | null> {
+  const markerStatement = readMarkerSql();
+  const queryResult = await driver.query<{
+    core_hash: string;
+    profile_hash: string;
+    contract_json: unknown | null;
+    canonical_version: number | null;
+    updated_at: Date | string;
+    app_tag: string | null;
+    meta: unknown | null;
+  }>(markerStatement.sql, markerStatement.params);
+
+  if (queryResult.rows.length === 0) {
+    return null;
+  }
+
+  const markerRow = queryResult.rows[0];
+  if (!markerRow) {
+    return null;
+  }
+
+  return parseContractMarkerRow(markerRow);
 }
 
 /**

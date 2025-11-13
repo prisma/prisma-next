@@ -20,6 +20,23 @@ export const fixtureAppDir = join(__dirname, '../cli-e2e-test-app');
 export const integrationFixtureAppDir = join(__dirname, '../cli-integration-test-app');
 
 /**
+ * Gets the exit code from the process.exit mock.
+ * Returns undefined if process.exit hasn't been called yet.
+ * Note: process.exit() without argument defaults to 0, but we return undefined to distinguish "not called" from "called with 0".
+ * If you need to check for success (exit code 0), check if executeCommand didn't throw instead.
+ */
+export function getExitCode(): number | undefined {
+  const mock = process.exit as unknown as ReturnType<typeof vi.fn>;
+  if (mock.mock.calls.length === 0) {
+    return undefined;
+  }
+  const exitCall = mock.mock.calls[mock.mock.calls.length - 1]; // Get the last call
+  const exitCode = exitCall?.[0];
+  // process.exit() without argument is undefined, but defaults to 0
+  return exitCode === undefined ? 0 : exitCode;
+}
+
+/**
  * Executes a command and catches process.exit errors (which are expected in tests).
  * Returns the exit code that was passed to process.exit(), or 0 if process.exit() wasn't called.
  * For real errors (not process.exit), returns 1 to indicate failure.
@@ -33,13 +50,18 @@ export async function executeCommand(command: Command, args: string[]): Promise<
   } catch (error) {
     // process.exit throws an error in tests - extract the exit code
     if (error instanceof Error && error.message === 'process.exit called') {
-      const exitCall = (process.exit as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-      const exitCode = exitCall?.[0] ?? 0; // process.exit() without argument defaults to 0
-      return exitCode;
+      const exitCode = getExitCode() ?? 0; // Default to 0 if not set
+      // For success (exit code 0), swallow the error
+      // For errors (non-zero), re-throw so tests can check console errors
+      if (exitCode !== 0) {
+        throw error;
+      }
+      // Exit code 0 - success, don't throw
+      return 0;
+    } else {
+      // Real error (not process.exit), re-throw
+      throw error;
     }
-    // Real error (not process.exit) - return non-zero exit code
-    // This handles cases where validation errors are thrown before process.exit() is called
-    return 1;
   }
 }
 

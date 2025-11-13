@@ -383,10 +383,11 @@ function formatMultilineDescription(options: {
   const lines: string[] = [];
   const formatGreen = (text: string) => (options.useColor ? green(text) : text);
 
-  // Calculate wrap width: left column (20) + gap (2) + right column (90) = 112 total
-  // Description line has "│ " prefix (2 chars), so text wraps at 112 - 2 = 110 characters
-  const totalWidth = LEFT_COLUMN_WIDTH + 2 + RIGHT_COLUMN_MAX_WIDTH; // 20 + 2 + 90 = 112
-  const wrapWidth = totalWidth - 2; // Subtract "│ " prefix = 110
+  // Calculate wrap width to align with right edge of right column
+  // Format: "│ " (2) + left column (20) + "  " (2) + right column (90) = 114 total
+  // Description line has "│ " prefix (2 chars), so text wraps at 114 - 2 = 112 characters
+  const totalWidth = 2 + LEFT_COLUMN_WIDTH + 2 + RIGHT_COLUMN_MAX_WIDTH; // 2 + 20 + 2 + 90 = 114
+  const wrapWidth = totalWidth - 2; // Subtract "│ " prefix = 112
 
   for (const descLine of options.descriptionLines) {
     // Replace "Prisma Next" with green version if present

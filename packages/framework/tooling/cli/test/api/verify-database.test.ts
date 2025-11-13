@@ -88,7 +88,7 @@ describe('verifyDatabase API', () => {
   });
 
   it(
-    'verifies database with matching marker',
+    'verifies database with matching marker via driver',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -153,7 +153,7 @@ describe('verifyDatabase API', () => {
   );
 
   it(
-    'returns error when marker is missing',
+    'reports error when marker is missing via driver',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -326,6 +326,68 @@ describe('verifyDatabase API', () => {
           }
         },
         { acceleratePort: 54179, databasePort: 54180, shadowDatabasePort: 54181 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'reports PN-CLI-4010 when driver is missing',
+    async () => {
+      await withDevDatabase(
+        async ({ connectionString }) => {
+          // Use a config that has db.url but no driver
+          // We'll need to create a minimal config for this test
+          const testSetup = setupIntegrationTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDirWithDb = testSetup.testDir;
+          const configPathWithDb = testSetup.configPath;
+          const cleanupWithDb = testSetup.cleanup;
+
+          try {
+            // Emit contract using the original config (needs driver for emit, but we'll use the fixture)
+            // Actually, emit doesn't need driver, so we can use the fixture config
+            await emitContractFromConfig(configPathWithDb, testDirWithDb);
+
+            // Create a modified config without driver for verification
+            const { readFileSync, writeFileSync } = await import('node:fs');
+            const { join } = await import('node:path');
+            const configContent = readFileSync(configPathWithDb, 'utf-8');
+            // Remove driver import and usage
+            const modifiedConfig = configContent
+              .replace(/import postgresDriver from '@prisma-next\/driver-postgres\/cli';\s*/g, '')
+              .replace(/driver: postgresDriver,\s*/g, '');
+            const noDriverConfigPath = join(testDirWithDb, 'prisma-next.config.no-driver.ts');
+            writeFileSync(noDriverConfigPath, modifiedConfig, 'utf-8');
+
+            await withClient(connectionString, async (client) => {
+              // Setup marker schema and table
+              await executeStatement(client, ensureSchemaStatement);
+              await executeStatement(client, ensureTableStatement);
+              // withClient will close the client after this callback returns
+            });
+
+            // Change to test directory and try to verify with config that has no driver
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDirWithDb);
+              await expect(
+                verifyDatabase({
+                  dbUrl: connectionString,
+                  configPath: 'prisma-next.config.no-driver.ts',
+                }),
+              ).rejects.toThrow('PN-CLI-4010');
+            } finally {
+              process.chdir(originalCwd);
+            }
+          } finally {
+            cleanupWithDb();
+          }
+        },
+        { acceleratePort: 54062, databasePort: 54063, shadowDatabasePort: 54064 },
       );
     },
     timeouts.spinUpPpgDev,

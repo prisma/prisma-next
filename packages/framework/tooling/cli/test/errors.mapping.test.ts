@@ -1,30 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import {
-  errorFamilyReadMarkerSqlRequired,
-  errorQueryRunnerFactoryRequired,
-} from '../src/utils/cli-errors';
+import { errorDriverRequired, errorFamilyReadMarkerRequired } from '../src/utils/cli-errors';
 
 describe('CliStructuredError.toEnvelope()', () => {
-  it('converts queryRunnerFactory error to envelope with PN-CLI-4006', () => {
-    const error = errorQueryRunnerFactoryRequired();
+  it('converts driver required error to envelope with PN-CLI-4010', () => {
+    const error = errorDriverRequired();
     const envelope = error.toEnvelope();
 
-    expect(envelope.code).toBe('PN-CLI-4006');
+    expect(envelope.code).toBe('PN-CLI-4010');
     expect(envelope.domain).toBe('CLI');
-    expect(envelope.summary).toBe('Query runner factory is required');
-    expect(envelope.fix).toBe('Add db.queryRunnerFactory to prisma-next.config.ts');
+    expect(envelope.summary).toBe('Driver is required for DB-connected commands');
+    expect(envelope.fix).toBe('Add driver to prisma-next.config.ts');
     expect(envelope.docsUrl).toBe('https://prisma-next.dev/docs/cli/db-verify');
   });
 
-  it('converts readMarkerSql error to envelope with PN-CLI-4007', () => {
-    const error = errorFamilyReadMarkerSqlRequired();
+  it('converts readMarker error to envelope with PN-CLI-4007', () => {
+    const error = errorFamilyReadMarkerRequired();
     const envelope = error.toEnvelope();
 
     expect(envelope.code).toBe('PN-CLI-4007');
     expect(envelope.domain).toBe('CLI');
-    expect(envelope.summary).toBe('Family readMarkerSql() is required');
+    expect(envelope.summary).toBe('Family readMarker() is required');
     expect(envelope.fix).toBe(
-      'Ensure family.verify.readMarkerSql() is exported by your family package',
+      'Ensure family.verify.readMarker() is exported by your family package',
     );
     expect(envelope.docsUrl).toBe('https://prisma-next.dev/docs/cli/db-verify');
   });

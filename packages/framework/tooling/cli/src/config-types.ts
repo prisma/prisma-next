@@ -3,6 +3,42 @@ import type { TargetFamilyHook } from '@prisma-next/emitter';
 import type { OperationSignature } from '@prisma-next/operations';
 import { type } from 'arktype';
 import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
+import type { ContractMarkerRecord } from './utils/marker-parser';
+
+/**
+ * Minimal driver interface for Control Plane database operations.
+ * Provides query execution and connection management.
+ */
+export interface CliDriver {
+  /**
+   * Executes a SQL query with optional parameters.
+   * @returns Promise resolving to query results with rows array
+   */
+  query<Row = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[],
+  ): Promise<{ readonly rows: Row[] }>;
+  /**
+   * Closes the database connection.
+   */
+  close(): Promise<void>;
+}
+
+/**
+ * Descriptor for a driver pack (e.g., Postgres driver).
+ */
+export interface DriverDescriptor {
+  readonly kind: 'driver';
+  readonly id: string;
+  readonly family: string;
+  readonly manifest: ExtensionPackManifest;
+  /**
+   * Creates a CliDriver instance from a connection URL.
+   * @param url - Database connection URL
+   * @returns Promise resolving to a CliDriver instance
+   */
+  create(url: string): Promise<CliDriver>;
+}
 
 /**
  * Descriptor for a target family (e.g., SQL).
@@ -18,10 +54,11 @@ export interface FamilyDescriptor {
    */
   readonly verify?: {
     /**
-     * Returns the SQL statement to read the contract marker.
-     * Family implementations should return a parameterized statement.
+     * Reads the contract marker from the database using the provided driver.
+     * Returns the parsed marker record or null if no marker is found.
+     * This abstracts SQL-specific details from the Control Plane.
      */
-    readMarkerSql: () => { readonly sql: string; readonly params: readonly unknown[] };
+    readMarker: (driver: CliDriver) => Promise<ContractMarkerRecord | null>;
     /**
      * Optionally collects supported codec typeIds from adapter/extension manifests
      * to enable coverage checks.
@@ -111,28 +148,13 @@ export interface PrismaNextConfig {
   readonly target: TargetDescriptor;
   readonly adapter: AdapterDescriptor;
   readonly extensions?: ReadonlyArray<ExtensionDescriptor>;
+  /**
+   * Driver descriptor for DB-connected CLI commands.
+   * Required for DB-connected commands (e.g., db verify).
+   */
+  readonly driver: DriverDescriptor;
   readonly db?: {
     readonly url?: string;
-    /**
-     * Family-agnostic minimal query runner factory for DB-connected CLI commands.
-     * The CLI will call this to obtain a runner with a single query method.
-     * Can be async to support dynamic imports in ESM contexts.
-     */
-    readonly queryRunnerFactory?: (url: string) =>
-      | {
-          readonly query: <Row = Record<string, unknown>>(
-            sql: string,
-            params?: readonly unknown[],
-          ) => Promise<{ readonly rows: Row[] }>;
-          readonly close?: () => Promise<void>;
-        }
-      | Promise<{
-          readonly query: <Row = Record<string, unknown>>(
-            sql: string,
-            params?: readonly unknown[],
-          ) => Promise<{ readonly rows: Row[] }>;
-          readonly close?: () => Promise<void>;
-        }>;
   };
   /**
    * Contract configuration. Specifies source and artifact locations.
@@ -160,6 +182,7 @@ const PrismaNextConfigSchema = type({
   target: 'unknown', // TargetDescriptor - validated separately
   adapter: 'unknown', // AdapterDescriptor - validated separately
   'extensions?': 'unknown[]',
+  'driver?': 'unknown', // DriverDescriptor - validated separately
   'db?': 'unknown',
   'contract?': ContractConfigSchema,
 });
