@@ -16,7 +16,8 @@ describe('help text snapshots', () => {
     program.addCommand(contractEmit);
     program.addCommand(db);
 
-    const flags = parseGlobalFlags({});
+    // Explicitly disable colors for consistent snapshots
+    const flags = parseGlobalFlags({ 'no-color': true });
     const helpText = formatRootHelp({ program, flags });
 
     expect(helpText).toMatchSnapshot();
@@ -24,7 +25,8 @@ describe('help text snapshots', () => {
 
   it('formats contract emit help', () => {
     const command = createContractEmitCommand();
-    const flags = parseGlobalFlags({});
+    // Explicitly disable colors for consistent snapshots
+    const flags = parseGlobalFlags({ 'no-color': true });
     const helpText = formatCommandHelp({ command, flags });
 
     expect(helpText).toMatchSnapshot();
@@ -32,7 +34,8 @@ describe('help text snapshots', () => {
 
   it('formats db verify help', () => {
     const command = createDbVerifyCommand();
-    const flags = parseGlobalFlags({});
+    // Explicitly disable colors for consistent snapshots
+    const flags = parseGlobalFlags({ 'no-color': true });
     const helpText = formatCommandHelp({ command, flags });
 
     expect(helpText).toMatchSnapshot();
