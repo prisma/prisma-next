@@ -1,10 +1,10 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { ResultType } from '@prisma-next/contract/types';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../prisma/contract.d';

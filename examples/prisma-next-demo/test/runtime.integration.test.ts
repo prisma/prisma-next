@@ -8,7 +8,6 @@ import {
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
 } from '@prisma-next/cli/pack-assembly';
-import type { ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
@@ -19,6 +18,7 @@ import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
@@ -133,7 +133,7 @@ describe('runtime execute integration', () => {
           type PlanRow = ResultType<typeof plan>;
           const rows: PlanRow[] = [];
           for await (const row of runtime.execute(plan)) {
-            rows.push(row);
+            rows.push(row as PlanRow);
           }
 
           expect(rows).toHaveLength(1);
@@ -265,14 +265,14 @@ describe('runtime execute integration', () => {
 
           const userRows: UserRow[] = [];
           for await (const row of runtime.execute(userPlan)) {
-            userRows.push(row);
+            userRows.push(row as UserRow);
           }
           expect(userRows).toHaveLength(1);
           expect(userRows[0]).toMatchObject({ email: 'alice@example.com' });
 
           const postRows: PostRow[] = [];
           for await (const row of runtime.execute(postPlan)) {
-            postRows.push(row);
+            postRows.push(row as PostRow);
           }
           expect(postRows).toHaveLength(1);
           expect(postRows[0]).toMatchObject({ title: 'First Post', userId: 1 });

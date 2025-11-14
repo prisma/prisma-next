@@ -1,5 +1,4 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { Plan } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -271,7 +270,7 @@ describe('Codecs Integration Tests', () => {
           },
         },
       },
-    } as Plan<unknown>;
+    } as unknown as import('@prisma-next/contract/types').Plan<unknown>;
 
     const rows = await executePlanAndCollect(runtime, planWithOverride);
     expect(rows.length).toBe(1);

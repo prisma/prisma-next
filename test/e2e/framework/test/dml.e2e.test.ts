@@ -5,6 +5,7 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import {
   createTestRuntimeFromClient,
@@ -54,13 +55,18 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
               });
 
             const insertRows = await executePlanAndCollect(runtime, insertPlan);
+            type InsertRow = ResultType<typeof insertPlan>;
             expect(insertRows.length).toBe(1);
             expect(insertRows[0]).toMatchObject({
               id: expect.any(Number),
               email: 'e2e@example.com',
             });
 
-            const userId = (insertRows[0] as { id: number }).id;
+            const firstRow = insertRows[0] as InsertRow | undefined;
+            const userId = firstRow?.id;
+            if (userId === undefined) {
+              throw new Error('Expected insert to return id');
+            }
 
             // Update
             const updatePlan = builder

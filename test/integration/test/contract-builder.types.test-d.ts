@@ -1,10 +1,11 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { dataTypes } from '@prisma-next/adapter-postgres/codec-types';
-import type { Plan, ResultType } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { sql } from '@prisma-next/sql-lane/sql';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
@@ -100,7 +101,7 @@ test('ResultType inference works identically to fixture contract', () => {
   expectTypeOf<FixtureRow>().toHaveProperty('id');
   expectTypeOf<FixtureRow>().toHaveProperty('email');
   expectTypeOf<FixtureRow>().toHaveProperty('createdAt');
-  expectTypeOf(_plan).toExtend<Plan<BuilderRow>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<BuilderRow>>();
 });
 
 test('codec type inference via type option', () => {

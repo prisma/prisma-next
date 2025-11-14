@@ -4,6 +4,7 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import {
   createTestRuntimeFromClient,
@@ -140,11 +141,12 @@ describe('end-to-end JOIN queries', () => {
                 .build();
 
               const rows = await executePlanAndCollect(runtime, plan);
+              type Row = ResultType<typeof plan>;
 
               expect(rows.length).toBe(3);
-              const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
-              const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
-              const mikeRow = rows.find((r: (typeof rows)[0]) => r.email === 'mike@example.com');
+              const adaRow = rows.find((r: Row) => r.email === 'ada@example.com');
+              const tessRow = rows.find((r: Row) => r.email === 'tess@example.com');
+              const mikeRow = rows.find((r: Row) => r.email === 'mike@example.com');
 
               expect(adaRow).toMatchObject({
                 email: 'ada@example.com',
@@ -221,10 +223,11 @@ describe('end-to-end JOIN queries', () => {
                 .build();
 
               const rows = await executePlanAndCollect(runtime, plan);
+              type Row = ResultType<typeof plan>;
 
               expect(rows.length).toBe(2);
-              const firstPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'First Post');
-              const orphanPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
+              const firstPostRow = rows.find((r: Row) => r.title === 'First Post');
+              const orphanPostRow = rows.find((r: Row) => r.title === 'Orphan Post');
 
               expect(firstPostRow).toMatchObject({
                 title: 'First Post',
@@ -298,11 +301,12 @@ describe('end-to-end JOIN queries', () => {
                 .build();
 
               const rows = await executePlanAndCollect(runtime, plan);
+              type Row = ResultType<typeof plan>;
 
               expect(rows.length).toBe(3);
-              const adaRow = rows.find((r: (typeof rows)[0]) => r.email === 'ada@example.com');
-              const tessRow = rows.find((r: (typeof rows)[0]) => r.email === 'tess@example.com');
-              const orphanRow = rows.find((r: (typeof rows)[0]) => r.title === 'Orphan Post');
+              const adaRow = rows.find((r: Row) => r.email === 'ada@example.com');
+              const tessRow = rows.find((r: Row) => r.email === 'tess@example.com');
+              const orphanRow = rows.find((r: Row) => r.title === 'Orphan Post');
 
               expect(adaRow).toMatchObject({
                 email: 'ada@example.com',
@@ -405,12 +409,13 @@ describe('end-to-end JOIN queries', () => {
               ]);
 
               const rows = await executePlanAndCollect(runtime, plan);
+              type Row = ResultType<typeof plan>;
 
               expect(rows.length).toBe(3);
               const firstPostRow = rows.find(
-                (r: (typeof rows)[0]) => r.title === 'First Post' && r.commentId !== null,
+                (r: Row) => r.title === 'First Post' && r.commentId !== null,
               );
-              const secondPostRow = rows.find((r: (typeof rows)[0]) => r.title === 'Second Post');
+              const secondPostRow = rows.find((r: Row) => r.title === 'Second Post');
 
               expect(firstPostRow).toMatchObject({
                 title: 'First Post',

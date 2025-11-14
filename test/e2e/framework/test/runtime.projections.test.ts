@@ -1,9 +1,9 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { ResultType } from '@prisma-next/contract/types';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import {
   createTestRuntimeFromClient,
@@ -72,7 +72,7 @@ describe('end-to-end nested projection queries', () => {
               expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
               expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
 
-              const flatRow0 = rows[0] as Record<string, unknown>;
+              const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
               expect(flatRow0['name']).toBe('ada@example.com');
               expect(flatRow0['post_title']).toBe(1);
               expect({
@@ -153,13 +153,13 @@ describe('end-to-end nested projection queries', () => {
               expectTypeOf<Row['a']['b']>().toEqualTypeOf<{ c: number }>();
               expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
 
-              const flatRow0 = rows[0] as Record<string, unknown>;
+              const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
               expect(flatRow0['a_b_c']).toBe(1);
               expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
                 a: { b: { c: 1 } },
               });
 
-              const flatRow1 = rows[1] as Record<string, unknown>;
+              const flatRow1 = (rows[1] ?? {}) as Record<string, unknown>;
               expect(flatRow1['a_b_c']).toBe(2);
               expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
                 a: { b: { c: 2 } },
@@ -247,7 +247,7 @@ describe('end-to-end nested projection queries', () => {
               expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
               expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
 
-              const flatRow0 = rows[0] as Record<string, unknown>;
+              const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
               expect(flatRow0['name']).toBe('ada@example.com');
               expect(flatRow0['post_title']).toBe('First Post');
               expect(flatRow0['post_id']).toBe(1);
@@ -344,7 +344,7 @@ describe('end-to-end nested projection queries', () => {
               expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
               expectTypeOf<Row['email']>().toEqualTypeOf<string>();
 
-              const flatRow0 = rows[0] as Record<string, unknown>;
+              const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
               expect(flatRow0['id']).toBe(1);
               expect(flatRow0['post_title']).toBe('ada@example.com');
               expect(flatRow0['post_author_name']).toBe(1);
