@@ -2,7 +2,7 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import type { PrismaNextConfig } from '../config-types';
 import { errorDriverRequired, errorFamilyReadMarkerSqlRequired, errorUnexpected } from '../errors';
 import type { VerifyDatabaseResult } from '../executor';
-import { ControlExecutor } from '../executor';
+import { ControlPlaneExecutor } from '../executor';
 
 export interface VerifyDatabaseOptions {
   readonly config: PrismaNextConfig;
@@ -18,7 +18,7 @@ export type { VerifyDatabaseResult } from '../executor';
 /**
  * Programmatic API for verifying database contract markers.
  * Accepts config object, ContractIR, and dbUrl (no file I/O).
- * Uses driver to create ControlExecutor, and compares contract against database marker.
+ * Uses driver to create ControlPlaneExecutor, and compares contract against database marker.
  *
  * @param options - Options for database verification
  * @returns Result with verification status, hashes, target info, codec coverage, meta, and timings
@@ -43,8 +43,8 @@ export async function verifyDatabase(
     }
     const driver = await config.driver.create(dbUrl);
 
-    // Create ControlExecutor
-    const executor = new ControlExecutor({
+    // Create ControlPlaneExecutor
+    const executor = new ControlPlaneExecutor({
       driver,
       familyVerify: config.family.verify,
       adapter: config.adapter,
@@ -62,7 +62,7 @@ export async function verifyDatabase(
         contractPath ?? 'src/prisma/contract.json',
       );
     } catch (error) {
-      // Wrap errors from ControlExecutor in structured errors
+      // Wrap errors from ControlPlaneExecutor in structured errors
       if (error instanceof Error) {
         // Check if it's the contract validation error
         if (error.message.includes('Contract is missing required fields: coreHash or target')) {

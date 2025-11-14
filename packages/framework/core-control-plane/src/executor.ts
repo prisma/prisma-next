@@ -9,7 +9,7 @@ import type {
 
 /**
  * Result type for database verification operations.
- * Returned by ControlExecutor.verifyAgainst().
+ * Returned by ControlPlaneExecutor.verifyAgainst().
  */
 export interface VerifyDatabaseResult {
   readonly ok: boolean;
@@ -164,7 +164,7 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
  * Mirrors runtime assembly pattern: adapter + driver + family helpers → executor.
  * Provides thin control-only operations (no encode/decode, no runtime plugins).
  */
-export class ControlExecutor {
+export class ControlPlaneExecutor {
   private readonly driver: ControlPlaneDriver;
   private readonly familyVerify: FamilyDescriptor['verify'];
   private readonly adapter: AdapterDescriptor;

@@ -1,2 +1,2 @@
 export type { VerifyDatabaseResult } from '../executor';
-export { ControlExecutor } from '../executor';
+export { ControlPlaneExecutor } from '../executor';
