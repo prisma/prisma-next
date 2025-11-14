@@ -203,27 +203,37 @@ program.action(() => {
 const args = process.argv.slice(2);
 if (args.length > 0) {
   const commandName = args[0];
-  // Check if this is a recognized command
-  const command = program.commands.find((cmd) => cmd.name() === commandName);
-
-  if (!command) {
-    // Unrecognized command - show error message and usage
-    const flags = parseGlobalFlags({});
+  // Handle version option explicitly since we suppress default output
+  if (commandName === '--version' || commandName === '-V') {
     // eslint-disable-next-line no-console
-    console.error(`Unknown command: ${commandName}`);
-    // eslint-disable-next-line no-console
-    console.error('');
-    const helpText = formatRootHelp({ program, flags });
-    // eslint-disable-next-line no-console
-    console.log(helpText);
-    process.exit(1);
-  } else if (command.commands.length > 0 && args.length === 1) {
-    // Parent command called with no subcommand - show help and exit with 0
-    const flags = parseGlobalFlags({});
-    const helpText = formatCommandHelp({ command, flags });
-    // eslint-disable-next-line no-console
-    console.log(helpText);
+    console.log(program.version());
     process.exit(0);
+  }
+  // Skip command check for global options like --help, -h
+  const isGlobalOption = commandName === '--help' || commandName === '-h';
+  if (!isGlobalOption) {
+    // Check if this is a recognized command
+    const command = program.commands.find((cmd) => cmd.name() === commandName);
+
+    if (!command) {
+      // Unrecognized command - show error message and usage
+      const flags = parseGlobalFlags({});
+      // eslint-disable-next-line no-console
+      console.error(`Unknown command: ${commandName}`);
+      // eslint-disable-next-line no-console
+      console.error('');
+      const helpText = formatRootHelp({ program, flags });
+      // eslint-disable-next-line no-console
+      console.log(helpText);
+      process.exit(1);
+    } else if (command.commands.length > 0 && args.length === 1) {
+      // Parent command called with no subcommand - show help and exit with 0
+      const flags = parseGlobalFlags({});
+      const helpText = formatCommandHelp({ command, flags });
+      // eslint-disable-next-line no-console
+      console.log(helpText);
+      process.exit(0);
+    }
   }
 }
 
