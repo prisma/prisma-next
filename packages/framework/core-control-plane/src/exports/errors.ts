@@ -8,6 +8,7 @@ export {
   errorDatabaseUrlRequired,
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
+  errorFamilySchemaVerifierRequired,
   errorFileNotFound,
   errorHashMismatch,
   errorMarkerMissing,

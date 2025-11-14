@@ -1,10 +1,10 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { verifyDatabaseSchema } from '../../src/api/verify-database-schema';
 import { loadConfig } from '../../src/config-loader';
@@ -18,7 +18,7 @@ import { CliStructuredError } from '../../src/utils/cli-errors';
 import { setupIntegrationTestDirectoryFromFixtures } from '../utils/test-helpers';
 
 // Fixture subdirectory for verify-database-schema tests
-const fixtureSubdir = 'verify-database-schema';
+const fixtureSubdir = 'verify-database';
 
 /**
  * Emits the contract to disk using the config file.
@@ -84,7 +84,9 @@ describe('verifyDatabaseSchema API', () => {
   });
 
   afterEach(() => {
-    cleanupDir();
+    if (cleanupDir) {
+      cleanupDir();
+    }
   });
 
   it(
@@ -109,10 +111,12 @@ describe('verifyDatabaseSchema API', () => {
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = {
-                ...config.family.verify,
-                verifySchema: undefined,
-              };
+              const mockedVerify = config.family.verify
+                ? {
+                    ...config.family.verify,
+                    verifySchema: undefined,
+                  }
+                : undefined;
               const mockedFamily = {
                 ...config.family,
                 verify: mockedVerify,
@@ -120,7 +124,7 @@ describe('verifyDatabaseSchema API', () => {
               return {
                 ...config,
                 family: mockedFamily,
-              };
+              } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
             });
 
             const originalCwd = process.cwd();
@@ -129,9 +133,11 @@ describe('verifyDatabaseSchema API', () => {
               await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toThrow(
                 CliStructuredError,
               );
-              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject({
-                code: '4008',
-              });
+              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject(
+                {
+                  code: '4008',
+                },
+              );
             } finally {
               process.chdir(originalCwd);
               vi.restoreAllMocks();
@@ -146,34 +152,31 @@ describe('verifyDatabaseSchema API', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it(
-    'throws error when DB URL is missing',
-    async () => {
-      const testSetup = setupIntegrationTestDirectoryFromFixtures(
-        fixtureSubdir,
-        'prisma-next.config.ts',
-      );
-      const testDir = testSetup.testDir;
-      const cleanup = testSetup.cleanup;
+  it('throws error when DB URL is missing', async () => {
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.ts',
+    );
+    const testDir = testSetup.testDir;
+    const cleanup = testSetup.cleanup;
 
+    try {
+      await emitContractFromConfig(join(testDir, 'prisma-next.config.ts'), testDir);
+
+      const originalCwd = process.cwd();
       try {
-        await emitContractFromConfig(join(testDir, 'prisma-next.config.ts'), testDir);
-
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await expect(verifyDatabaseSchema({})).rejects.toThrow(CliStructuredError);
-          await expect(verifyDatabaseSchema({})).rejects.toMatchObject({
-            code: '4005',
-          });
-        } finally {
-          process.chdir(originalCwd);
-        }
+        process.chdir(testDir);
+        await expect(verifyDatabaseSchema({})).rejects.toThrow(CliStructuredError);
+        await expect(verifyDatabaseSchema({})).rejects.toMatchObject({
+          code: '4005',
+        });
       } finally {
-        cleanup();
+        process.chdir(originalCwd);
       }
-    },
-  );
+    } finally {
+      cleanup();
+    }
+  });
 
   it(
     'throws error when queryRunnerFactory is missing',
@@ -197,9 +200,11 @@ describe('verifyDatabaseSchema API', () => {
               await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toThrow(
                 CliStructuredError,
               );
-              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject({
-                code: '4006',
-              });
+              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject(
+                {
+                  code: '4006',
+                },
+              );
             } finally {
               process.chdir(originalCwd);
             }
@@ -234,9 +239,11 @@ describe('verifyDatabaseSchema API', () => {
               await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toThrow(
                 CliStructuredError,
               );
-              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject({
-                code: '4004',
-              });
+              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject(
+                {
+                  code: '4004',
+                },
+              );
             } finally {
               process.chdir(originalCwd);
             }
@@ -291,10 +298,14 @@ describe('verifyDatabaseSchema API', () => {
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = {
-                ...config.family.verify,
-                verifySchema: verifySchemaMock,
-              };
+              const mockedVerify = config.family.verify
+                ? {
+                    ...config.family.verify,
+                    verifySchema: verifySchemaMock,
+                  }
+                : {
+                    verifySchema: verifySchemaMock,
+                  };
               const mockedFamily = {
                 ...config.family,
                 verify: mockedVerify,
@@ -302,7 +313,7 @@ describe('verifyDatabaseSchema API', () => {
               return {
                 ...config,
                 family: mockedFamily,
-              };
+              } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
             });
 
             const originalCwd = process.cwd();
@@ -313,7 +324,8 @@ describe('verifyDatabaseSchema API', () => {
               expect(result.ok).toBe(true);
               expect(result.summary).toBe('Database schema satisfies contract');
               expect(verifySchemaMock).toHaveBeenCalledOnce();
-              const callArgs = verifySchemaMock.mock.calls[0][0];
+              const callArgs = verifySchemaMock.mock.calls[0]?.[0];
+              expect(callArgs).toBeDefined();
               expect(callArgs).toMatchObject({
                 contractIR: expect.anything(),
                 target: expect.objectContaining({ id: 'postgres' }),
@@ -376,10 +388,14 @@ describe('verifyDatabaseSchema API', () => {
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = {
-                ...config.family.verify,
-                verifySchema: verifySchemaMock,
-              };
+              const mockedVerify = config.family.verify
+                ? {
+                    ...config.family.verify,
+                    verifySchema: verifySchemaMock,
+                  }
+                : {
+                    verifySchema: verifySchemaMock,
+                  };
               const mockedFamily = {
                 ...config.family,
                 verify: mockedVerify,
@@ -387,7 +403,7 @@ describe('verifyDatabaseSchema API', () => {
               return {
                 ...config,
                 family: mockedFamily,
-              };
+              } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
             });
 
             const originalCwd = process.cwd();
@@ -396,7 +412,8 @@ describe('verifyDatabaseSchema API', () => {
               await verifyDatabaseSchema({ dbUrl: connectionString, strict: true });
 
               expect(verifySchemaMock).toHaveBeenCalledOnce();
-              const callArgs = verifySchemaMock.mock.calls[0][0];
+              const callArgs = verifySchemaMock.mock.calls[0]?.[0];
+              expect(callArgs).toBeDefined();
               expect(callArgs.strict).toBe(true);
             } finally {
               process.chdir(originalCwd);
@@ -456,7 +473,8 @@ describe('verifyDatabaseSchema API', () => {
                     column: 'name',
                     expected: 'text',
                     actual: 'integer',
-                    message: 'Column users.name has incompatible type; expected text, found integer.',
+                    message:
+                      'Column users.name has incompatible type; expected text, found integer.',
                   },
                 ],
               },
@@ -467,10 +485,14 @@ describe('verifyDatabaseSchema API', () => {
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = {
-                ...config.family.verify,
-                verifySchema: verifySchemaMock,
-              };
+              const mockedVerify = config.family.verify
+                ? {
+                    ...config.family.verify,
+                    verifySchema: verifySchemaMock,
+                  }
+                : {
+                    verifySchema: verifySchemaMock,
+                  };
               const mockedFamily = {
                 ...config.family,
                 verify: mockedVerify,
@@ -478,7 +500,7 @@ describe('verifyDatabaseSchema API', () => {
               return {
                 ...config,
                 family: mockedFamily,
-              };
+              } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
             });
 
             const originalCwd = process.cwd();
@@ -555,21 +577,29 @@ describe('verifyDatabaseSchema API', () => {
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              if (!config.db?.queryRunnerFactory) {
+              const dbConfig = config.db as
+                | { url?: string; queryRunnerFactory?: (url: string) => unknown }
+                | undefined;
+              if (!dbConfig?.queryRunnerFactory) {
                 throw new Error('queryRunnerFactory is required');
               }
-              const originalFactory = config.db.queryRunnerFactory;
-              const mockedFactory = (url: string) => {
-                const runner = originalFactory(url);
-                return Promise.resolve({
+              const originalFactory = dbConfig.queryRunnerFactory;
+              const mockedFactory = async (url: string) => {
+                const runnerResult = originalFactory(url);
+                const runner = runnerResult instanceof Promise ? await runnerResult : runnerResult;
+                return {
                   ...runner,
                   close: closeMock,
-                });
+                };
               };
-              const mockedVerify = {
-                ...config.family.verify,
-                verifySchema: verifySchemaMock,
-              };
+              const mockedVerify = config.family.verify
+                ? {
+                    ...config.family.verify,
+                    verifySchema: verifySchemaMock,
+                  }
+                : {
+                    verifySchema: verifySchemaMock,
+                  };
               const mockedFamily = {
                 ...config.family,
                 verify: mockedVerify,
@@ -581,7 +611,7 @@ describe('verifyDatabaseSchema API', () => {
                   ...config.db,
                   queryRunnerFactory: mockedFactory,
                 },
-              };
+              } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
             });
 
             const originalCwd = process.cwd();
@@ -604,4 +634,3 @@ describe('verifyDatabaseSchema API', () => {
     timeouts.spinUpPpgDev,
   );
 });
-

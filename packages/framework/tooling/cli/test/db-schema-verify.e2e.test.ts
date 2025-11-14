@@ -79,14 +79,12 @@ async function emitContractFromConfig(
 }
 
 describe('db schema-verify command (e2e)', () => {
-  let consoleOutput: string[] = [];
   let consoleErrors: string[] = [];
   let cleanupMocks: () => void;
 
   beforeEach(() => {
     // Set up console and process.exit mocks
     const mocks = setupCommandMocks();
-    consoleOutput = mocks.consoleOutput;
     consoleErrors = mocks.consoleErrors;
     cleanupMocks = mocks.cleanup;
   });
@@ -153,50 +151,47 @@ describe('db schema-verify command (e2e)', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it(
-    'reports PN-CLI-4005 when DB URL is missing',
-    async () => {
-      // Set up test directory from fixtures without db config
-      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.ts');
-      const testDir = testSetup.testDir;
-      const configPath = testSetup.configPath;
-      const cleanupDir = testSetup.cleanup;
+  it('reports PN-CLI-4005 when DB URL is missing', async () => {
+    // Set up test directory from fixtures without db config
+    const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.ts');
+    const testDir = testSetup.testDir;
+    const configPath = testSetup.configPath;
+    const cleanupDir = testSetup.cleanup;
 
+    try {
+      // Emit contract using the config
+      await emitContractFromConfig(configPath, testDir);
+
+      const command = createDbSchemaVerifyCommand();
+      const originalCwd = process.cwd();
       try {
-        // Emit contract using the config
-        await emitContractFromConfig(configPath, testDir);
-
-        const command = createDbSchemaVerifyCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await expect(
-            executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
-          ).rejects.toThrow('process.exit called');
-        } finally {
-          process.chdir(originalCwd);
-        }
-
-        // Check exit code is non-zero (error)
-        const exitCode = getExitCode();
-        expect(exitCode).not.toBe(0);
-
-        const errorOutput = consoleErrors.join('\n');
-        expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-        const parsed = JSON.parse(errorOutput);
-        expect(parsed).toMatchObject({
-          code: 'PN-CLI-4005',
-          summary: expect.any(String),
-          why: expect.any(String),
-          fix: expect.any(String),
-        });
-        expect(parsed.summary).toContain('Database URL is required');
+        process.chdir(testDir);
+        await expect(
+          executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+        ).rejects.toThrow('process.exit called');
       } finally {
-        cleanupDir();
+        process.chdir(originalCwd);
       }
-    },
-  );
+
+      // Check exit code is non-zero (error)
+      const exitCode = getExitCode();
+      expect(exitCode).not.toBe(0);
+
+      const errorOutput = consoleErrors.join('\n');
+      expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+      const parsed = JSON.parse(errorOutput);
+      expect(parsed).toMatchObject({
+        code: 'PN-CLI-4005',
+        summary: expect.any(String),
+        why: expect.any(String),
+        fix: expect.any(String),
+      });
+      expect(parsed.summary).toContain('Database URL is required');
+    } finally {
+      cleanupDir();
+    }
+  });
 
   it(
     'reports PN-CLI-4006 when queryRunnerFactory is missing',
@@ -414,4 +409,3 @@ describe('db schema-verify command (e2e)', () => {
     timeouts.spinUpPpgDev,
   );
 });
-

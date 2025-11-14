@@ -2,7 +2,7 @@ import { dirname, join } from 'node:path';
 import type { TargetFamilyHook } from '@prisma-next/emitter';
 import type { OperationSignature } from '@prisma-next/operations';
 import { type } from 'arktype';
-import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
+import type { ExtensionPackManifest, OperationManifest } from './exports/pack-manifest-types';
 
 /**
  * Descriptor for a target family (e.g., SQL).
@@ -35,12 +35,12 @@ export interface FamilyDescriptor {
      * This is used by `db schema-verify` command.
      */
     verifySchema?: (options: {
-      readonly queryRunner: {
+      readonly driver: {
         readonly query: <Row = Record<string, unknown>>(
           sql: string,
           params?: readonly unknown[],
         ) => Promise<{ readonly rows: Row[] }>;
-        readonly close?: () => Promise<void>;
+        readonly close: () => Promise<void>;
       };
       readonly contractIR: unknown;
       readonly target: TargetDescriptor;
