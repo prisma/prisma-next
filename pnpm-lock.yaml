@@ -546,9 +546,6 @@ importers:
         specifier: ^9.6.0
         version: 9.6.0
     devDependencies:
-      '@prisma-next/sql-runtime':
-        specifier: workspace:*
-        version: link:../../sql-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -654,9 +651,6 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../authoring/sql-contract-ts
-      '@prisma-next/sql-runtime':
-        specifier: workspace:*
-        version: link:../../sql-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
