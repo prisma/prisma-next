@@ -633,24 +633,22 @@ describe('verifyDatabase API', () => {
               await executeStatement(client, ensureTableStatement);
             });
 
-            // Mock the query runner to return rows with undefined first element
+            // Mock the driver to return rows with undefined first element
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              if (!config.db?.queryRunnerFactory) {
-                throw new Error('config.db.queryRunnerFactory is required');
+              if (!config.driver) {
+                throw new Error('config.driver is required');
               }
-              const originalFactory = config.db.queryRunnerFactory;
-              const mockedDb = {
-                ...config.db,
-                queryRunnerFactory: async (dbUrl: string) => {
-                  const runnerResult = originalFactory(dbUrl);
-                  const runner =
-                    runnerResult instanceof Promise ? await runnerResult : runnerResult;
-                  const originalQuery = runner.query;
+              const originalCreate = config.driver.create;
+              const mockedDriver = {
+                ...config.driver,
+                create: async (url: string) => {
+                  const driver = await originalCreate(url);
+                  const originalQuery = driver.query;
                   return {
-                    ...runner,
+                    ...driver,
                     query: async <Row = Record<string, unknown>>(
                       sql: string,
                       params?: readonly unknown[],
@@ -668,7 +666,7 @@ describe('verifyDatabase API', () => {
               };
               return {
                 ...config,
-                db: mockedDb,
+                driver: mockedDriver,
               };
             });
 
@@ -807,23 +805,23 @@ describe('verifyDatabase API', () => {
           try {
             await emitContractFromConfig(configPathWithDb, testDirWithDb);
 
-            // Mock queryRunnerFactory to throw a non-Error
+            // Mock driver.create to throw a non-Error
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              if (!config.db) {
-                throw new Error('config.db is required');
+              if (!config.driver) {
+                throw new Error('config.driver is required');
               }
-              const mockedDb = {
-                ...config.db,
-                queryRunnerFactory: () => {
+              const mockedDriver = {
+                ...config.driver,
+                create: async () => {
                   throw 'String error instead of Error object';
                 },
               };
               return {
                 ...config,
-                db: mockedDb,
+                driver: mockedDriver,
               };
             });
 
