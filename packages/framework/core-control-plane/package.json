@@ -15,9 +15,9 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/emitter": "workspace:*",
     "@prisma-next/operations": "workspace:*",
-    "arktype": "^2.1.26"
+    "arktype": "^2.1.26",
+    "prettier": "^3.3.3"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -60,6 +60,10 @@
     "./types": {
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
+    },
+    "./emission": {
+      "types": "./dist/exports/emission.d.ts",
+      "import": "./dist/exports/emission.js"
     }
   }
 }

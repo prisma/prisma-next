@@ -1,7 +1,7 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TargetFamilyHook, TypesImportSpec } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/emitter';
 import type { OperationRegistry } from '@prisma-next/operations';
+import { emit } from '../emission/emit';
 
 export interface EmitContractOptions {
   readonly contractIR: ContractIR;

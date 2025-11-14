@@ -24,7 +24,7 @@ The framework domain contains target-agnostic packages that work across all targ
 |   |-- @prisma-next/contract
 |   |-- @prisma-next/plan
 |   |-- @prisma-next/operations
-||-- core (migration plane)
+|-- core (migration plane)
 |   |-- @prisma-next/core-control-plane
 |-- authoring (migration plane)
 |   |-- @prisma-next/contract-authoring

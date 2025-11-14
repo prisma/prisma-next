@@ -1,5 +1,5 @@
+import { computeCoreHash, computeProfileHash } from '@prisma-next/core-control-plane/emission';
 import { describe, expect, it } from 'vitest';
-import { computeCoreHash, computeProfileHash } from '../src/hashing';
 
 describe('hashing', () => {
   it('computes core hash', () => {

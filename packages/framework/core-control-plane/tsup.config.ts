@@ -10,6 +10,7 @@ export default defineConfig({
     'exports/pack-manifest-types': 'src/exports/pack-manifest-types.ts',
     'exports/marker-parser': 'src/exports/marker-parser.ts',
     'exports/types': 'src/exports/types.ts',
+    'exports/emission': 'src/exports/emission.ts',
   },
   outDir: 'dist',
   format: ['esm'],

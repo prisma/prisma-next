@@ -3,12 +3,12 @@ import type {
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/contract/types';
+import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
+import { emit } from '@prisma-next/core-control-plane/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { ContractIR } from '../../../core-contract/src/ir';
-import { emit } from '../src/emitter';
-import type { EmitOptions } from '../src/types';
 import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {

@@ -314,15 +314,15 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../core-contract
-      '@prisma-next/emitter':
-        specifier: workspace:*
-        version: link:../tooling/emitter
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../core-operations
       arktype:
         specifier: ^2.1.26
         version: 2.1.26
+      prettier:
+        specifier: ^3.3.3
+        version: 3.6.2
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -540,12 +540,12 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../core-contract
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../core-control-plane
       arktype:
         specifier: ^2.0.0
         version: 2.1.25
-      prettier:
-        specifier: ^3.3.3
-        version: 3.6.2
     devDependencies:
       '@prisma-next/operations':
         specifier: workspace:*
