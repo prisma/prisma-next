@@ -1,10 +1,10 @@
-# Prisma Next Prototype
+# Prisma Next
 
-A TypeScript-based prototype demonstrating a **contract-first data layer** architecture that decomposes Prisma's ORM into modular, verifiable components.
+Define your data layer as a verifiable contract. Sign your database and application with the contract to guarantee compatibility. Plan and apply migrations to safely evolve your schema.
 
 ## What Is This?
 
-Prisma Next is a prototype of a new data access layer that replaces traditional ORMs with a "contract-first" approach. It follows a similar workflow to Prisma ORM but with key differences:
+Prisma Next is a new production data access layer that replaces traditional ORMs with a "contract-first" approach. It follows a similar workflow to Prisma ORM but with key differences:
 
 - **Defines your database schema as a verifiable contract** (not just a schema)
 - **Generates lightweight types instead of heavy client code**
@@ -71,7 +71,7 @@ What you'll see: Type-safe queries, contract verification, budget enforcement, a
 
 Prisma's current ORM architecture tightly couples three layers — the Prisma Schema Language (PSL), the generated client, and runtime execution. This coupling introduces rigidity, rebuild cost, and conceptual opacity.
 
-The prototype rethinks Prisma's data layer around a **contract-first model**, where the schema is a stable, versioned artifact describing the database structure — not fuel for codegen, but a data contract.
+Prisma Next rethinks Prisma's data layer around a **contract-first model**, where the schema is a stable, versioned artifact describing the database structure — not fuel for codegen, but a data contract.
 
 ## Agent-Accessible Design
 
@@ -83,7 +83,7 @@ Modern developer agents (Cursor, Windsurf, v0.dev) increasingly read, reason abo
 
 The existing Prisma ORM is opaque to agents because schema → client codegen hides SQL semantics and many behaviors are runtime-generated.
 
-This prototype addresses these shortcomings:
+Prisma Next addresses these shortcomings:
 
 1. **PSL as explicit contract**: The IR is a deterministic JSON artifact — machine-readable, diffable, and stable
 2. **Stable query DSL**: Queries are typed, composable ASTs that agents can statically analyze or synthesize
@@ -130,11 +130,11 @@ Agents can read the schema (IR), generate valid queries (DSL), and verify them (
 
 The `docs/` directory contains the complete architectural design for Prisma Next. Use it to understand the long‑term model (data contract, plan model, runtime plugin framework, adapters, packs, migration plane).
 
-This repository implements a proof‑of‑concept; some details differ from the full design:
+This repository implements the initial production version; some details still differ from the full design:
 
-- Hashing: the prototype uses a single `contractHash`. In the design, this corresponds to `coreHash`; `profileHash` (capability pinning) is not implemented here.
+- Hashing: the current implementation uses a single `contractHash`. In the design, this corresponds to `coreHash`; `profileHash` (capability pinning) is not implemented here.
 - CLI: use `pnpm exec prisma-next generate schema.psl -o .prisma`. Some design docs reference different CLI verbs.
-- Scope: migrations and ORM features are minimal in the prototype; the design includes richer planner/runner and extension packs.
+- Scope: migrations and ORM features are intentionally minimal in this release; the design includes richer planner/runner and extension packs.
 
 Start with the [Architecture Overview](./docs/Architecture%20Overview.md) for a description of the design's goals and subsystems involved.
 
@@ -160,7 +160,7 @@ Start with the [Architecture Overview](./docs/Architecture%20Overview.md) for a 
 **Prisma Next Workflow:**
 1. Write `schema.psl`
 2. Run `prisma-next emit` → generates lightweight types + contract
-  - Not prototyped here but this will be replaced by a Vite plugin or equivalent
+  - In the future this will likely be replaced by a Vite plugin or equivalent
 3. Write application code using composable DSL: `sql().from(t.user).select(...)`
 
 Key difference: Prisma Next emits types and a contract rather than generating an executable client.
@@ -334,10 +334,10 @@ model User {
 ### 2. Generate Contract and Types
 
 ```bash
-# Using CLI (prototype)
+# Using CLI
 pnpm exec prisma-next generate schema.psl -o .prisma
 
-# Or programmatically (prototype)
+# Or programmatically
 import { parse } from '@prisma/psl';
 import { emitContractAndTypes } from '@prisma/schema-emitter';
 
