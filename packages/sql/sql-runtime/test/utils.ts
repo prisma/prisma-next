@@ -26,10 +26,9 @@ import type { Extension, RuntimeContext } from '../src/sql-context';
  * This helper DRYs up the common pattern of executing plans in tests.
  * The return type is inferred from the plan's type parameter.
  */
-export async function executePlanAndCollect<P extends Plan | SqlQueryPlan<unknown>>(
-  runtime: ReturnType<typeof createRuntime>,
-  plan: P,
-): Promise<ResultType<P>[]> {
+export async function executePlanAndCollect<
+  P extends Plan<ResultType<P>> | SqlQueryPlan<ResultType<P>>,
+>(runtime: ReturnType<typeof createRuntime>, plan: P): Promise<ResultType<P>[]> {
   type Row = ResultType<P>;
   return collectAsync<Row>(runtime.execute<Row>(plan));
 }

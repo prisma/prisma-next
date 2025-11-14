@@ -119,9 +119,18 @@ export interface Plan<_Row = unknown> {
  * Utility type to extract the Row type from a Plan.
  * Example: `type Row = ResultType<typeof plan>`
  *
- * Note: For SqlQueryPlan, use the SQL-specific ResultType from @prisma-next/sql-relational-core/types
+ * Works with both Plan and SqlQueryPlan (SQL query plans before lowering).
+ * SqlQueryPlan includes a phantom `_Row` property to preserve the generic parameter
+ * for type extraction, allowing ResultType to extract it even when SqlQueryPlan
+ * extends Omit<Plan<_Row>, 'sql' | 'ast'>.
  */
-export type ResultType<P> = P extends Plan<infer R> ? R : never;
+export type ResultType<P> = P extends Plan<infer R>
+  ? R
+  : P extends { readonly _Row?: infer R }
+    ? R extends unknown
+      ? R
+      : never
+    : never;
 
 /**
  * Type guard to check if a contract is a Document contract

@@ -1,5 +1,5 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { Plan } from '@prisma-next/contract/types';
+import type { ResultType as CoreResultType, Plan } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -127,6 +127,87 @@ test('ResultType utility extracts Row type from SqlQueryPlan', () => {
 
   // Also verify the overall structure
   expectTypeOf<ExtractedRow>().toExtend<{ id: number; email: string }>();
+});
+
+test('Core ResultType from @prisma-next/contract works with SqlQueryPlan', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const tables = schema(context).tables;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = getTableColumns(userTable);
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  if (!idColumn || !emailColumn) throw new Error('columns not found');
+
+  const _plan = sql({ context })
+    .from(userTable)
+    .select({
+      id: idColumn,
+      email: emailColumn,
+    })
+    .build();
+
+  // Use core ResultType from @prisma-next/contract (not SQL-specific one)
+  // This verifies that SqlQueryPlan is compatible with the core ResultType
+  type ExtractedRow = CoreResultType<typeof _plan>;
+  // Contract fixture has column types as pg/*@1 IDs, so types come from CodecTypes
+  // id has typeId 'pg/int4@1' → number, email has 'pg/text@1' → string
+
+  // Strict checks: verify fields are NOT never and have correct types
+  // This test would have failed before the fix (would be 'never')
+  expectTypeOf<ExtractedRow['id']>().toEqualTypeOf<number>();
+  expectTypeOf<ExtractedRow['email']>().toEqualTypeOf<string>();
+
+  // Also verify the overall structure
+  expectTypeOf<ExtractedRow>().toExtend<{ id: number; email: string }>();
+});
+
+test('sql() query builder result works with core ResultType from @prisma-next/contract', () => {
+  const contract = validateContract<Contract>(contractJson);
+  const adapter = createPostgresAdapter();
+  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const tables = schema(context).tables;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
+  const userColumns = userTable.columns;
+  const idColumn = userColumns.id;
+  const emailColumn = userColumns.email;
+  const createdAtColumn = userColumns.createdAt;
+  if (!idColumn || !emailColumn || !createdAtColumn) throw new Error('columns not found');
+
+  // Build a query using sql() builder with where, select, and limit (real-world pattern)
+  const plan = sql({ context })
+    .from(userTable)
+    .where(idColumn.eq({ kind: 'param-placeholder', name: 'userId' }))
+    .select({
+      id: idColumn,
+      email: emailColumn,
+      createdAt: createdAtColumn,
+    })
+    .limit(1)
+    .build({ params: { userId: 1 } });
+
+  // Use core ResultType from @prisma-next/contract to extract Row type
+  // This is the pattern users will use in their code
+  type Row = CoreResultType<typeof plan>;
+
+  // Verify that ResultType correctly extracts all field types (not 'never')
+  // This test would have failed before the fix - Row['email'] would be 'never'
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
+
+  // Verify the complete row structure
+  expectTypeOf<Row>().toExtend<{
+    id: number;
+    email: string;
+    createdAt: string;
+  }>();
+
+  // Verify plan is a SqlQueryPlan (not Plan - no sql field)
+  expectTypeOf(plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('execute() preserves Row type through execution', () => {

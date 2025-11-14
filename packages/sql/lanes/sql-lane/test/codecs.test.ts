@@ -154,6 +154,11 @@ describe('DSL Lane Codec Type Stamping', () => {
     // Type check: SqlQueryPlan should be generic
     const typedPlan: SqlQueryPlan = plan;
     expect(typedPlan).toBeDefined();
+
+    // Verify plan structure: should only have ast, params, meta (not _Row phantom property)
+    const planKeys = Object.keys(plan);
+    expect(planKeys).toEqual(['ast', 'params', 'meta']);
+    expect(planKeys).not.toContain('_Row');
   });
 
   it('ResultType utility extracts row type', () => {
