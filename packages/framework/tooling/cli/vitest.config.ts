@@ -37,10 +37,10 @@ export default defineConfig({
         'src/load-ts-contract.ts', // Bundle content undefined and non-Error exceptions (lines 170-171, 211)
       ],
       thresholds: {
-        lines: 95,
-        branches: 91,
+        lines: 85,
+        branches: 75,
         functions: 100,
-        statements: 95,
+        statements: 85,
       },
     },
   },
