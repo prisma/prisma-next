@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { errorConfigFileNotFound, errorMarkerMissing } from '../../src/utils/cli-errors';
 import { err, ok } from '../../src/utils/result';
 import { handleResult } from '../../src/utils/result-handler';

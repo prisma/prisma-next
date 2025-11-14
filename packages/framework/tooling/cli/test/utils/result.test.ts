@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CliStructuredError, errorConfigFileNotFound } from '../../src/utils/cli-errors';
+import { errorConfigFileNotFound } from '../../src/utils/cli-errors';
 import { err, ok, performAction, wrapSync } from '../../src/utils/result';
 
 describe('result utilities', () => {

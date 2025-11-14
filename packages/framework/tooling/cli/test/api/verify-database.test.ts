@@ -592,12 +592,16 @@ describe('verifyDatabase API', () => {
                   const originalQuery = runner.query;
                   return {
                     ...runner,
-                    query: async (sql: string, params?: readonly unknown[]) => {
-                      const result = await originalQuery(sql, params);
+                    query: async <Row = Record<string, unknown>>(
+                      sql: string,
+                      params?: readonly unknown[],
+                    ): Promise<{ readonly rows: Row[] }> => {
+                      const result = await originalQuery<Row>(sql, params);
                       // Return result with rows array that has length > 0 but first element is undefined
+                      // Type assertion needed because we're intentionally testing undefined row case
                       return {
                         ...result,
-                        rows: [undefined, ...result.rows],
+                        rows: [undefined, ...result.rows] as Row[],
                       };
                     },
                   };
