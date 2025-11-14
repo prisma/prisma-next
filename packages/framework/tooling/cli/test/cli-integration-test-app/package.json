@@ -5,6 +5,7 @@
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/control-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",

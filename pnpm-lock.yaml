@@ -498,6 +498,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../..
+      '@prisma-next/control-plane':
+        specifier: workspace:*
+        version: link:../../../../core-control-plane
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../../../targets/postgres-driver
