@@ -19,10 +19,6 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*",
-    "@prisma-next/sql-contract-emitter": "workspace:*",
-    "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/sql-operations": "workspace:*",
     "arktype": "^2.0.0",
     "c12": "^3.3.2",
     "colorette": "^2.0.20",
@@ -33,6 +29,10 @@
     "wrap-ansi": "^9.0.2"
   },
   "devDependencies": {
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-emitter": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/node": "^20.0.0",

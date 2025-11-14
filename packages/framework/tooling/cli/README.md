@@ -21,6 +21,9 @@ Provide a command-line interface that:
 - **File I/O**: Read TS contracts, write emitted artifacts (`contract.json`, `contract.d.ts`)
 - **Extension Pack Loading**: Load adapter and extension pack manifests for emission
 - **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
+- **Config Management**: Load and validate `prisma-next.config.ts` files using Arktype validation
+
+**Note**: Control plane domain actions (database verification, contract emission) are implemented in `@prisma-next/core-control-plane`. The CLI uses the control plane domain actions programmatically but does not define control plane types itself.
 
 ## Command Descriptions
 
@@ -106,20 +109,21 @@ prisma-next db verify -v --timestamps
 
 **Config File Requirements:**
 
-The `db verify` command requires a `queryRunnerFactory` in the config to connect to the database:
+The `db verify` command requires a `driver` in the config to connect to the database:
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgresDriver from '@prisma-next/driver-postgres/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
 import sql from '@prisma-next/family-sql/cli';
 import { contract } from './prisma/contract';
-import { Client } from 'pg';
 
 export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
+  driver: postgresDriver,
   extensions: [],
   contract: {
     source: contract,
@@ -128,35 +132,15 @@ export default defineConfig({
   },
   db: {
     url: process.env.DATABASE_URL, // Optional: can also use --db flag
-    queryRunnerFactory: (url: string) => {
-      const client = new Client({ connectionString: url });
-      client.connect();
-      return {
-        query: async <Row = Record<string, unknown>>(
-          sql: string,
-          params?: readonly unknown[],
-        ): Promise<{ readonly rows: Row[] }> => {
-          const result = await client.query<Row>(sql, params as unknown[]);
-          return { rows: result.rows };
-        },
-        close: async (): Promise<void> => {
-          await client.end();
-        },
-      };
-    },
   },
 });
 ```
 
-The `queryRunnerFactory` must return an object with:
-- `query<Row>(sql: string, params?: readonly unknown[]): Promise<{ readonly rows: Row[] }>` - Execute a SQL query
-- `close?(): Promise<void>` - Optional cleanup method
-
 **Verification Process:**
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
-2. **Connect to Database**: Uses `config.db.queryRunnerFactory(url)` to create a query runner
-3. **Read Marker**: Executes the marker SELECT statement provided by `config.family.verify.readMarkerSql()`
+2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
+3. **Read Marker**: Calls `config.family.verify.readMarker(driver)` to read the contract marker
 4. **Compare**:
    - Marker presence: Returns `PN-RTM-3001` if marker is missing
    - Target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
@@ -210,8 +194,8 @@ Failure:
 
 **Error Codes:**
 
-- `PN-CLI-4006`: Missing db.queryRunnerFactory in config — provide a query runner factory
-- `PN-CLI-4007`: Missing family.verify.readMarkerSql() — ensure family verify helpers are exported
+- `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
+- `PN-CLI-4007`: Missing family.verify.readMarker() — ensure family verify helpers are exported
 - `PN-RTM-3001`: Marker missing - Contract marker not found in database
 - `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
 - `PN-RTM-3003`: Target mismatch - Contract target does not match config target
@@ -223,7 +207,7 @@ The family must provide a `verify` helper in the family descriptor:
 ```typescript
 {
   verify: {
-    readMarkerSql: () => ({ sql: string, params: readonly unknown[] }),
+    readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>,
     collectSupportedCodecTypeIds?: (descriptors) => readonly string[],
   },
 }
@@ -418,7 +402,9 @@ E2E tests use a shared fixture app pattern to ensure proper module resolution:
 - **Shared fixture app**: `test/cli-e2e-test-app/` contains a static `package.json` with dependencies
 - **Fixture organization**: Fixtures are organized by command in subdirectories (e.g., `fixtures/emit/`, `fixtures/db-verify/`)
 - **Ephemeral test directories**: Each test creates an isolated directory with files copied from fixtures
-- **Helper function**: `setupTestDirectoryFromFixtures()` handles directory setup and cleanup
+- **No package.json in test directories**: Test directories inherit workspace dependencies from the parent `package.json` at the root
+- **Helper function**: `setupTestDirectoryFromFixtures()` handles directory setup and returns a cleanup function
+- **Cleanup responsibility**: Each test must clean up its own directory (use `afterEach` hooks or `finally` blocks)
 
 **Example:**
 ```typescript
@@ -431,7 +417,13 @@ it('test description', async () => {
     fixtureSubdir,
     'prisma-next.config.emit.ts',
   );
-  // ... test code ...
+  const cleanupDir = testSetup.cleanup;
+
+  try {
+    // ... test code ...
+  } finally {
+    cleanupDir(); // Each test cleans up its own directory
+  }
 });
 ```
 

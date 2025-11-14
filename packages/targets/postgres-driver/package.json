@@ -13,8 +13,10 @@
     "clean": "node ../../../scripts/clean.mjs"
   },
   "dependencies": {
+    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
+    "arktype": "^2.0.0",
     "pg": "^8.11.5",
     "pg-cursor": "^2.10.5"
   },

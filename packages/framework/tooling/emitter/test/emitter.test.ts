@@ -1,10 +1,14 @@
+import type {
+  TargetFamilyHook,
+  TypesImportSpec,
+  ValidationContext,
+} from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { ContractIR } from '../../../core-contract/src/ir';
 import { emit } from '../src/emitter';
-import type { TargetFamilyHook, ValidationContext } from '../src/target-family';
-import type { EmitOptions, TypesImportSpec } from '../src/types';
+import type { EmitOptions } from '../src/types';
 import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {

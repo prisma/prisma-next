@@ -1,14 +1,8 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { type } from 'arktype';
 
-export interface ContractMarkerRecord {
-  readonly coreHash: string;
-  readonly profileHash: string;
-  readonly contractJson: unknown | null;
-  readonly canonicalVersion: number | null;
-  readonly updatedAt: Date;
-  readonly appTag: string | null;
-  readonly meta: Record<string, unknown>;
-}
+// Re-export for backward compatibility
+export type { ContractMarkerRecord } from '@prisma-next/contract/types';
 
 export interface ContractMarkerRow {
   core_hash: string;

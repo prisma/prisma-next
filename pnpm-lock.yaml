@@ -288,6 +288,10 @@ importers:
         version: 5.9.3
 
   packages/framework/core-contract:
+    dependencies:
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../core-operations
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -335,9 +339,6 @@ importers:
 
   packages/framework/core-operations:
     dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../core-contract
       '@prisma-next/plan':
         specifier: workspace:*
         version: link:../core-plan
@@ -406,18 +407,6 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../../sql/contract
-      '@prisma-next/sql-contract-emitter':
-        specifier: workspace:*
-        version: link:../../../sql/tooling/emitter
-      '@prisma-next/sql-contract-ts':
-        specifier: workspace:*
-        version: link:../../../sql/authoring/sql-contract-ts
-      '@prisma-next/sql-operations':
-        specifier: workspace:*
-        version: link:../../../sql/operations
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
@@ -443,6 +432,18 @@ importers:
         specifier: ^9.0.2
         version: 9.0.2
     devDependencies:
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../sql/contract
+      '@prisma-next/sql-contract-emitter':
+        specifier: workspace:*
+        version: link:../../../sql/tooling/emitter
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../../sql/authoring/sql-contract-ts
+      '@prisma-next/sql-operations':
+        specifier: workspace:*
+        version: link:../../../sql/operations
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../../sql/sql-runtime
@@ -473,6 +474,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../..
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../../../../targets/postgres-driver
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../../../sql/tooling/cli
@@ -494,6 +498,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../..
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../../../../targets/postgres-driver
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../../../sql/tooling/cli
@@ -814,6 +821,12 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../../framework/tooling/cli
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../framework/core-contract
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../../framework/core-control-plane
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../contract
@@ -826,6 +839,9 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../operations
+      arktype:
+        specifier: ^2.0.0
+        version: 2.1.26
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -926,12 +942,18 @@ importers:
 
   packages/targets/postgres-driver:
     dependencies:
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-control-plane
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../sql/contract
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../sql/operations
+      arktype:
+        specifier: ^2.0.0
+        version: 2.1.26
       pg:
         specifier: ^8.11.5
         version: 8.16.3

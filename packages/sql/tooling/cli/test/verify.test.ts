@@ -1,5 +1,5 @@
-import { parseContractMarkerRow } from '@prisma-next/core-control-plane/utils/marker-parser';
 import { describe, expect, it } from 'vitest';
+import { parseContractMarkerRow } from '../src/exports/verify';
 
 describe('marker parser', () => {
   it('parses valid marker row with all fields', () => {

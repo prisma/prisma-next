@@ -31,6 +31,16 @@
       "@prisma-next/driver-postgres/*": ["packages/targets/postgres-driver/src/exports/*.ts"],
       "@prisma-next/contract": ["packages/framework/core-contract/src/exports/types.ts"],
       "@prisma-next/contract/*": ["packages/framework/core-contract/src/exports/*.ts"],
+      "@prisma-next/control-plane": ["packages/framework/core-control-plane/src/exports/types.ts"],
+      "@prisma-next/control-plane/types": [
+        "packages/framework/core-control-plane/src/exports/types.ts"
+      ],
+      "@prisma-next/control-plane/executor": [
+        "packages/framework/core-control-plane/src/exports/executor.ts"
+      ],
+      "@prisma-next/control-plane/pack-manifest-types": [
+        "packages/framework/core-control-plane/src/pack-manifest-types.ts"
+      ],
       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
       "@prisma-next/cli/*": ["packages/framework/tooling/cli/src/exports/*.ts"],
       "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
@@ -87,6 +97,7 @@
     { "path": "./packages/targets/postgres-driver" },
     { "path": "./packages/targets/postgres-adapter" },
     { "path": "./packages/framework/core-contract" },
+    { "path": "./packages/framework/core-control-plane" },
     { "path": "./packages/extensions/compat-prisma" },
     { "path": "./packages/schema-emitter" },
     { "path": "./packages/framework/tooling/cli" },

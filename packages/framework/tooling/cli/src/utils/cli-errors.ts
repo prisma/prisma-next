@@ -10,6 +10,7 @@ export {
   errorContractConfigMissing,
   errorContractValidationFailed,
   errorDatabaseUrlRequired,
+  errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorHashMismatch,

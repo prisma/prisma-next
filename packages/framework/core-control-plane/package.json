@@ -56,6 +56,10 @@
     "./utils/marker-parser": {
       "types": "./dist/exports/marker-parser.d.ts",
       "import": "./dist/exports/marker-parser.js"
+    },
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
     }
   }
 }

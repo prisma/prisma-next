@@ -198,6 +198,18 @@ export function errorFamilyReadMarkerSqlRequired(options?: {
 }
 
 /**
+ * Driver is required for DB-connected commands but not provided.
+ */
+export function errorDriverRequired(options?: { readonly why?: string }): CliStructuredError {
+  return new CliStructuredError('4010', 'Driver is required for DB-connected commands', {
+    domain: 'CLI',
+    why: options?.why ?? 'Config.driver is required for db verify',
+    fix: 'Add driver to prisma-next.config.ts',
+    docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
+  });
+}
+
+/**
  * Config validation error (missing required fields).
  */
 export function errorConfigValidation(

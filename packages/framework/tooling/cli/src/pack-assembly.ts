@@ -1,3 +1,4 @@
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   AdapterDescriptor,
   ExtensionDescriptor,
@@ -8,7 +9,6 @@ import type {
   ExtensionPackManifest,
   OperationManifest,
 } from '@prisma-next/core-control-plane/pack-manifest-types';
-import type { TypesImportSpec } from '@prisma-next/emitter';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 
