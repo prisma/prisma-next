@@ -1,4 +1,8 @@
-import type { ResultType as CoreResultType, Plan, PlanRefs } from '@prisma-next/contract/types';
+import type {
+  ResultType as CoreResultType,
+  ExecutionPlan,
+  PlanRefs,
+} from '@prisma-next/contract/types';
 import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
@@ -368,9 +372,7 @@ export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>
  * SQL-specific Plan type that refines the ast field to use QueryAst.
  * This is the type used by SQL query builders.
  */
-export type SqlPlan<Row = unknown> = Omit<Plan<Row>, 'ast'> & {
-  readonly ast?: QueryAst;
-};
+export type SqlPlan<Row = unknown> = ExecutionPlan<Row, QueryAst>;
 
 /**
  * Helper types for extracting contract structure.
@@ -448,10 +450,10 @@ export interface RawFunctionOptions extends RawTemplateOptions {
 export type RawTemplateFactory = (
   strings: TemplateStringsArray,
   ...values: readonly unknown[]
-) => Plan;
+) => ExecutionPlan;
 
 export interface RawFactory extends RawTemplateFactory {
-  (text: string, options: RawFunctionOptions): Plan;
+  (text: string, options: RawFunctionOptions): ExecutionPlan;
   with(options: RawTemplateOptions): RawTemplateFactory;
 }
 
@@ -476,8 +478,4 @@ export interface SqlBuilderOptions<
  * This extends the core ResultType to also handle SqlQueryPlan.
  * Example: `type Row = ResultType<typeof plan>`
  */
-export type ResultType<P> = P extends SqlQueryPlan<infer R>
-  ? R
-  : P extends Plan<infer R>
-    ? R
-    : CoreResultType<P>;
+export type ResultType<P> = P extends SqlQueryPlan<infer R> ? R : CoreResultType<P>;

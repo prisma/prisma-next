@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type {
   MarkerReader,
   MarkerStatement,
@@ -25,7 +25,7 @@ export class SqlFamilyAdapter<TContract extends SqlContract<SqlStorage>>
     this.markerReader = new SqlMarkerReader();
   }
 
-  validatePlan(plan: Plan, contract: TContract): void {
+  validatePlan(plan: ExecutionPlan, contract: TContract): void {
     if (plan.meta.target !== contract.target) {
       throw runtimeError('PLAN.TARGET_MISMATCH', 'Plan target does not match runtime target', {
         planTarget: plan.meta.target,

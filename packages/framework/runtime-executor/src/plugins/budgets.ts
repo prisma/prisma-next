@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { AfterExecuteResult, Plugin, PluginContext } from './types';
 
 export interface BudgetsOptions {
@@ -23,7 +23,7 @@ interface DriverWithExplain {
 }
 
 async function computeEstimatedRows(
-  plan: Plan,
+  plan: ExecutionPlan,
   driver: DriverWithExplain,
 ): Promise<number | undefined> {
   if (typeof driver.explain !== 'function') {
@@ -115,7 +115,7 @@ function budgetError(code: string, message: string, details?: Record<string, unk
 }
 
 function estimateRows(
-  plan: Plan,
+  plan: ExecutionPlan,
   tableRows: Record<string, number>,
   defaultTableRows: number,
 ): number | null {
@@ -144,7 +144,7 @@ function estimateRows(
   return tableEstimate;
 }
 
-function hasDetectableLimit(plan: Plan): boolean {
+function hasDetectableLimit(plan: ExecutionPlan): boolean {
   if (
     plan.ast &&
     typeof plan.ast === 'object' &&
@@ -175,7 +175,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
   return Object.freeze({
     name: 'budgets',
 
-    async beforeExecute(plan: Plan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
+    async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
       observedRows = 0;
       void ctx.now();
 
@@ -285,7 +285,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
 
     async onRow(
       _row: Record<string, unknown>,
-      _plan: Plan,
+      _plan: ExecutionPlan,
       _ctx: PluginContext<TContract, TAdapter, TDriver>,
     ) {
       void _row;
@@ -302,7 +302,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     },
 
     async afterExecute(
-      _plan: Plan,
+      _plan: ExecutionPlan,
       result: AfterExecuteResult,
       ctx: PluginContext<TContract, TAdapter, TDriver>,
     ) {

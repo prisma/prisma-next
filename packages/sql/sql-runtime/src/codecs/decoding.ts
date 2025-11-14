@@ -1,7 +1,11 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
-function resolveRowCodec(alias: string, plan: Plan, registry: CodecRegistry): Codec | null {
+function resolveRowCodec(
+  alias: string,
+  plan: ExecutionPlan,
+  registry: CodecRegistry,
+): Codec | null {
   const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;
   if (planCodecId) {
     const codec = registry.get(planCodecId);
@@ -25,7 +29,7 @@ function resolveRowCodec(alias: string, plan: Plan, registry: CodecRegistry): Co
 
 export function decodeRow(
   row: Record<string, unknown>,
-  plan: Plan,
+  plan: ExecutionPlan,
   registry: CodecRegistry,
 ): Record<string, unknown> {
   const decoded: Record<string, unknown> = {};

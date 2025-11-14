@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { describe, expect, it } from 'vitest';
 import type { Plugin } from '../src/plugins/types';
@@ -80,7 +80,7 @@ class MockFamilyAdapter implements RuntimeFamilyAdapter<MockContract> {
     this.markerReader = markerReader;
   }
 
-  validatePlan(plan: Plan, contract: MockContract): void {
+  validatePlan(plan: ExecutionPlan, contract: MockContract): void {
     if (plan.meta.target !== contract.target) {
       throw new Error(
         `Plan target ${plan.meta.target} does not match contract target ${contract.target}`,
@@ -115,7 +115,7 @@ describe('runtime-core with mock family', () => {
       operationRegistry,
     });
 
-    const plan: Plan = {
+    const plan: ExecutionPlan = {
       sql: 'SELECT * FROM mock_table',
       params: [],
       meta: {
@@ -156,7 +156,7 @@ describe('runtime-core with mock family', () => {
       operationRegistry,
     });
 
-    const invalidPlan: Plan = {
+    const invalidPlan: ExecutionPlan = {
       sql: 'SELECT * FROM mock_table',
       params: [],
       meta: {
@@ -221,7 +221,7 @@ describe('runtime-core with mock family', () => {
       plugins: [plugin],
     });
 
-    const plan: Plan = {
+    const plan: ExecutionPlan = {
       sql: 'SELECT * FROM mock_table',
       params: [],
       meta: {

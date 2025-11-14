@@ -105,23 +105,39 @@ export interface PlanMeta {
 }
 
 /**
- * Plan interface - target-family agnostic execution plan.
- * The `ast` field is `unknown` here; SQL-specific implementations will refine it to `QueryAst`.
+ * Canonical execution plan shape used by runtimes.
+ *
+ * - Row is the inferred result row type (TypeScript-only).
+ * - Ast is the optional, family-specific AST type (e.g. SQL QueryAst).
+ *
+ * The payload executed by the runtime is represented by the sql + params pair
+ * for now; future families can specialize this via Ast or additional metadata.
  */
-export interface Plan<_Row = unknown> {
+export interface ExecutionPlan<Row = unknown, Ast = unknown> {
   readonly sql: string;
   readonly params: readonly unknown[];
-  readonly ast?: unknown; // SQL-specific AST will be refined in sql-query package
+  readonly ast?: Ast;
   readonly meta: PlanMeta;
+  /**
+   * Phantom property to carry the Row generic for type-level utilities.
+   * Not set at runtime; used only for ResultType extraction.
+   */
+  readonly _row?: Row;
 }
 
 /**
- * Utility type to extract the Row type from a Plan.
+ * Utility type to extract the Row type from an ExecutionPlan.
  * Example: `type Row = ResultType<typeof plan>`
  *
- * Note: For SqlQueryPlan, use the SQL-specific ResultType from @prisma-next/sql-relational-core/types
+ * Works with both ExecutionPlan and SqlQueryPlan (SQL query plans before lowering).
+ * SqlQueryPlan includes a phantom `_Row` property to preserve the generic parameter
+ * for type extraction.
  */
-export type ResultType<P> = P extends Plan<infer R> ? R : never;
+export type ResultType<P> = P extends ExecutionPlan<infer R, unknown>
+  ? R
+  : P extends { readonly _Row?: infer R }
+    ? R
+    : never;
 
 /**
  * Type guard to check if a contract is a Document contract

@@ -1,4 +1,4 @@
-import type { ParamDescriptor, Plan, PlanMeta } from '@prisma-next/contract/types';
+import type { ExecutionPlan, ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
@@ -257,7 +257,7 @@ export function createPlan<Row>(
   lowered: { body: LoweredStatement },
   paramValues: unknown[],
   planMeta: PlanMeta,
-): Plan<Row> {
+): ExecutionPlan<Row> {
   return Object.freeze({
     ast,
     sql: lowered.body.sql,
@@ -275,7 +275,7 @@ export function createPlanWithExists<Row>(
   lowered: { body: LoweredStatement },
   paramValues: unknown[],
   planMeta: PlanMeta,
-): Plan<Row> {
+): ExecutionPlan<Row> {
   const modifiedAst: SelectAst = {
     ...ast,
     ...(combinedWhere !== undefined ? { where: combinedWhere } : {}),

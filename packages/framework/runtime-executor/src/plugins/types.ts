@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 
 export type Severity = 'error' | 'warn' | 'info';
 
@@ -25,14 +25,17 @@ export interface AfterExecuteResult {
 
 export interface Plugin<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
   readonly name: string;
-  beforeExecute?(plan: Plan, ctx: PluginContext<TContract, TAdapter, TDriver>): Promise<void>;
+  beforeExecute?(
+    plan: ExecutionPlan,
+    ctx: PluginContext<TContract, TAdapter, TDriver>,
+  ): Promise<void>;
   onRow?(
     row: Record<string, unknown>,
-    plan: Plan,
+    plan: ExecutionPlan,
     ctx: PluginContext<TContract, TAdapter, TDriver>,
   ): Promise<void>;
   afterExecute?(
-    plan: Plan,
+    plan: ExecutionPlan,
     result: AfterExecuteResult,
     ctx: PluginContext<TContract, TAdapter, TDriver>,
   ): Promise<void>;

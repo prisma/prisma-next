@@ -1,4 +1,4 @@
-import type { Plan, PlanMeta, PlanRefs } from '@prisma-next/contract/types';
+import type { ExecutionPlan, PlanMeta, PlanRefs } from '@prisma-next/contract/types';
 
 export type LintSeverity = 'error' | 'warn';
 export type BudgetSeverity = 'error' | 'warn';
@@ -36,7 +36,10 @@ const MUTATION_PREFIX_REGEX = /^(insert|update|delete|create|alter|drop|truncate
 
 const READ_ONLY_INTENTS = new Set(['read', 'report', 'readonly']);
 
-export function evaluateRawGuardrails(plan: Plan, config?: RawGuardrailConfig): RawGuardrailResult {
+export function evaluateRawGuardrails(
+  plan: ExecutionPlan,
+  config?: RawGuardrailConfig,
+): RawGuardrailResult {
   const lints: LintFinding[] = [];
   const budgets: BudgetFinding[] = [];
 

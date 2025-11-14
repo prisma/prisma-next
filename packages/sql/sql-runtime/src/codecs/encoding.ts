@@ -1,9 +1,9 @@
-import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
 function resolveParamCodec(
   paramDescriptor: ParamDescriptor,
-  plan: Plan,
+  plan: ExecutionPlan,
   registry: CodecRegistry,
 ): Codec | null {
   const paramName = paramDescriptor.name ?? `param_${paramDescriptor.index ?? 0}`;
@@ -29,7 +29,7 @@ function resolveParamCodec(
 export function encodeParam(
   value: unknown,
   paramDescriptor: ParamDescriptor,
-  plan: Plan,
+  plan: ExecutionPlan,
   registry: CodecRegistry,
 ): unknown {
   if (value === null || value === undefined) {
@@ -54,7 +54,7 @@ export function encodeParam(
   return value;
 }
 
-export function encodeParams(plan: Plan, registry: CodecRegistry): readonly unknown[] {
+export function encodeParams(plan: ExecutionPlan, registry: CodecRegistry): readonly unknown[] {
   if (plan.params.length === 0) {
     return plan.params;
   }

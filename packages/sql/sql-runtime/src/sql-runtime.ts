@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type {
   Log,
@@ -43,7 +43,9 @@ export interface RuntimeOptions<
 }
 
 export interface Runtime {
-  execute<Row = Record<string, unknown>>(plan: Plan<Row> | SqlQueryPlan<Row>): AsyncIterable<Row>;
+  execute<Row = Record<string, unknown>>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): AsyncIterable<Row>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
@@ -106,16 +108,18 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     }
   }
 
-  execute<Row = Record<string, unknown>>(plan: Plan<Row> | SqlQueryPlan<Row>): AsyncIterable<Row> {
+  execute<Row = Record<string, unknown>>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): AsyncIterable<Row> {
     this.ensureCodecRegistryValidated(this.contract);
 
     // Check if plan is SqlQueryPlan (has ast but no sql)
-    const isSqlQueryPlan = (p: Plan<Row> | SqlQueryPlan<Row>): p is SqlQueryPlan<Row> => {
+    const isSqlQueryPlan = (p: ExecutionPlan<Row> | SqlQueryPlan<Row>): p is SqlQueryPlan<Row> => {
       return 'ast' in p && !('sql' in p);
     };
 
     // Lower SqlQueryPlan to Plan if needed
-    const executablePlan: Plan<Row> = isSqlQueryPlan(plan)
+    const executablePlan: ExecutionPlan<Row> = isSqlQueryPlan(plan)
       ? lowerSqlPlan(this.context, plan)
       : plan;
 
@@ -123,7 +127,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
       const encodedParams = encodeParams(executablePlan, self.codecRegistry);
-      const planWithEncodedParams: Plan<Row> = {
+      const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,
       };

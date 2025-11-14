@@ -1,4 +1,9 @@
-import type { ParamDescriptor, Plan, PlanMeta, PlanRefs } from '@prisma-next/contract/types';
+import type {
+  ExecutionPlan,
+  ParamDescriptor,
+  PlanMeta,
+  PlanRefs,
+} from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
@@ -115,7 +120,7 @@ function compileTemplateToPositional(
   };
 }
 
-function buildRawPlan(args: RawPlanBuildArgs): Plan {
+function buildRawPlan(args: RawPlanBuildArgs): ExecutionPlan {
   const params = Array.from(args.params);
   const descriptors = args.paramDescriptors.map((descriptor) =>
     Object.freeze({ ...descriptor, source: 'raw' as const }),

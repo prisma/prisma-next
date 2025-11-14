@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { evaluateRawGuardrails } from '../guardrails/raw';
 import type { Plugin, PluginContext } from './types';
 
@@ -36,7 +36,7 @@ export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown
   return Object.freeze({
     name: 'lints',
 
-    async beforeExecute(plan: Plan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
+    async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
       if (plan.ast) {
         return;
       }

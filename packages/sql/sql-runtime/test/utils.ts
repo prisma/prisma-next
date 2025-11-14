@@ -1,4 +1,4 @@
-import type { Plan, ResultType } from '@prisma-next/contract/types';
+import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
@@ -26,10 +26,9 @@ import type { Extension, RuntimeContext } from '../src/sql-context';
  * This helper DRYs up the common pattern of executing plans in tests.
  * The return type is inferred from the plan's type parameter.
  */
-export async function executePlanAndCollect<P extends Plan | SqlQueryPlan<unknown>>(
-  runtime: ReturnType<typeof createRuntime>,
-  plan: P,
-): Promise<ResultType<P>[]> {
+export async function executePlanAndCollect<
+  P extends ExecutionPlan<ResultType<P>> | SqlQueryPlan<ResultType<P>>,
+>(runtime: ReturnType<typeof createRuntime>, plan: P): Promise<ResultType<P>[]> {
   type Row = ResultType<P>;
   return collectAsync<Row>(runtime.execute<Row>(plan));
 }
@@ -40,7 +39,7 @@ export async function executePlanAndCollect<P extends Plan | SqlQueryPlan<unknow
  */
 export async function drainPlanExecution(
   runtime: ReturnType<typeof createRuntime>,
-  plan: Plan | SqlQueryPlan<unknown>,
+  plan: ExecutionPlan | SqlQueryPlan<unknown>,
 ): Promise<void> {
   return drainAsyncIterable(runtime.execute(plan));
 }
