@@ -16,7 +16,7 @@
       "glob": "packages/framework/core-control-plane/**",
       "domain": "framework",
       "layer": "core",
-      "plane": "shared"
+      "plane": "migration"
     },
     {
       "glob": "packages/framework/authoring/contract-authoring/**",

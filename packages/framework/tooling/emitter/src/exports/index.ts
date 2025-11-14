@@ -4,5 +4,6 @@ export type {
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/contract/types';
-export { emit } from '../emitter';
-export type { EmitOptions, EmitResult } from '../types';
+export type { EmitOptions, EmitResult } from '@prisma-next/core-control-plane/emission';
+// Re-export emit function and types from core-control-plane
+export { emit } from '@prisma-next/core-control-plane/emission';

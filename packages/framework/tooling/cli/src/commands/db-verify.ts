@@ -1,13 +1,18 @@
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { Command } from 'commander';
-import { verifyDatabase } from '../api/verify-database';
-import { loadConfig } from '../config-loader';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import {
+  errorDatabaseUrlRequired,
+  errorFileNotFound,
   errorHashMismatch,
   errorMarkerMissing,
   errorRuntime,
   errorTargetMismatch,
-} from '../utils/cli-errors';
+  errorUnexpected,
+} from '@prisma-next/core-control-plane/errors';
+import { verifyDatabase } from '@prisma-next/core-control-plane/verify-database';
+import { Command } from 'commander';
+import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -63,7 +68,7 @@ export function createDbVerifyCommand(): Command {
       const flags = parseGlobalFlags(options);
 
       const result = await performAction(async () => {
-        // Load config to get paths for header
+        // Load config (file I/O)
         const config = await loadConfig(options.config);
         const configPath = options.config || './prisma-next.config.ts';
         const contractPath = config.contract?.output
@@ -89,9 +94,38 @@ export function createDbVerifyCommand(): Command {
           console.log(header);
         }
 
+        // Load contract file (file I/O)
+        let contractJsonContent: string;
+        try {
+          contractJsonContent = await readFile(contractPath, 'utf-8');
+        } catch (error) {
+          if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+            throw errorFileNotFound(contractPath, {
+              why: `Contract file not found at ${contractPath}`,
+            });
+          }
+          throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+            why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
+        const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+
+        // Validate contract using family validator
+        const contractIR = config.family.validateContractIR(contractJson) as ContractIR;
+
+        // Resolve database URL
+        const dbUrl = options.db ?? config.db?.url;
+        if (!dbUrl) {
+          throw errorDatabaseUrlRequired();
+        }
+
+        // Call domain action with loaded config and ContractIR
         const verifyResult = await verifyDatabase({
-          ...(options.db ? { dbUrl: options.db } : {}),
-          ...(options.config ? { configPath: options.config } : {}),
+          config,
+          contractIR,
+          dbUrl,
+          contractPath,
+          configPath,
         });
 
         // If verification failed, throw structured error

@@ -1,10 +1,10 @@
 {
-  "name": "@prisma-next/control-plane",
+  "name": "@prisma-next/core-control-plane",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "description": "Control plane types and executor for Prisma Next database operations",
+  "description": "Control plane domain actions, config types, validation, and error factories for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
@@ -15,8 +15,9 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/emitter": "workspace:*",
-    "@prisma-next/operations": "workspace:*"
+    "@prisma-next/operations": "workspace:*",
+    "arktype": "^2.1.26",
+    "prettier": "^3.3.3"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -28,17 +29,41 @@
     "dist"
   ],
   "exports": {
+    "./config-types": {
+      "types": "./dist/exports/config-types.d.ts",
+      "import": "./dist/exports/config-types.js"
+    },
+    "./config-validation": {
+      "types": "./dist/exports/config-validation.d.ts",
+      "import": "./dist/exports/config-validation.js"
+    },
+    "./emit-contract": {
+      "types": "./dist/exports/emit-contract.d.ts",
+      "import": "./dist/exports/emit-contract.js"
+    },
+    "./verify-database": {
+      "types": "./dist/exports/verify-database.d.ts",
+      "import": "./dist/exports/verify-database.js"
+    },
+    "./errors": {
+      "types": "./dist/exports/errors.d.ts",
+      "import": "./dist/exports/errors.js"
+    },
+    "./pack-manifest-types": {
+      "types": "./dist/exports/pack-manifest-types.d.ts",
+      "import": "./dist/exports/pack-manifest-types.js"
+    },
+    "./utils/marker-parser": {
+      "types": "./dist/exports/marker-parser.d.ts",
+      "import": "./dist/exports/marker-parser.js"
+    },
     "./types": {
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
     },
-    "./executor": {
-      "types": "./dist/exports/executor.d.ts",
-      "import": "./dist/exports/executor.js"
-    },
-    "./pack-manifest-types": {
-      "types": "./dist/pack-manifest-types.d.ts",
-      "import": "./dist/pack-manifest-types.js"
+    "./emission": {
+      "types": "./dist/exports/emission.d.ts",
+      "import": "./dist/exports/emission.js"
     }
   }
 }

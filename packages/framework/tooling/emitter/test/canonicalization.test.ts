@@ -1,5 +1,5 @@
+import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
 import { describe, expect, it } from 'vitest';
-import { canonicalizeContract } from '../src/canonicalization';
 import { createContractIR } from './utils';
 
 describe('canonicalization', () => {

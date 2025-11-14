@@ -2,11 +2,17 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    types: 'src/exports/types.ts',
-    executor: 'src/exports/executor.ts',
-    'pack-manifest-types': 'src/pack-manifest-types.ts',
+    'exports/config-types': 'src/exports/config-types.ts',
+    'exports/config-validation': 'src/exports/config-validation.ts',
+    'exports/emit-contract': 'src/exports/emit-contract.ts',
+    'exports/verify-database': 'src/exports/verify-database.ts',
+    'exports/errors': 'src/exports/errors.ts',
+    'exports/pack-manifest-types': 'src/exports/pack-manifest-types.ts',
+    'exports/marker-parser': 'src/exports/marker-parser.ts',
+    'exports/types': 'src/exports/types.ts',
+    'exports/emission': 'src/exports/emission.ts',
   },
-  outDir: 'dist/exports',
+  outDir: 'dist',
   format: ['esm'],
   sourcemap: true,
   dts: true,

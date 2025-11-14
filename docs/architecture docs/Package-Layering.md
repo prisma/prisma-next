@@ -24,6 +24,8 @@ The framework domain contains target-agnostic packages that work across all targ
 |   |-- @prisma-next/contract
 |   |-- @prisma-next/plan
 |   |-- @prisma-next/operations
+|-- core (migration plane)
+|   |-- @prisma-next/core-control-plane
 |-- authoring (migration plane)
 |   |-- @prisma-next/contract-authoring
 |   |-- @prisma-next/contract-ts (future)
@@ -139,13 +141,17 @@ graph LR
 
 Plane import constraints are enforced declaratively via `planeRules` in `architecture.config.json`. Each plane specifies which planes it can import from (`allow`) and which are forbidden (`forbid`), with optional exceptions for temporary refactoring needs.
 
-### Core Layer (Framework Domain, Shared Plane)
+### Core Layer (Framework Domain)
 
 The innermost layer containing target-family agnostic types and utilities.
 
+**Shared Plane:**
 - `packages/framework/core-plan/` → `@prisma-next/plan` - Plan helpers, diagnostics, shared errors
 - `packages/framework/core-operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
 - `packages/contract/` → `@prisma-next/contract` - Core contract types + plan metadata (legacy, will be migrated)
+
+**Migration Plane:**
+- `packages/framework/core-control-plane/` → `@prisma-next/core-control-plane` - Control plane domain actions (contract emission, database verification), config types, validation, error factories (no file I/O or CLI awareness)
 
 **Dependency Rules:** Cannot import from any other layer.
 

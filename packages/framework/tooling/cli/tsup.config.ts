@@ -22,7 +22,6 @@ export default defineConfig([
       'pack-manifest-types': 'src/exports/pack-manifest-types.ts',
       'pack-assembly': 'src/exports/pack-assembly.ts',
       'pack-loading': 'src/pack-loading.ts',
-      'utils/marker-parser': 'src/utils/marker-parser.ts',
     },
     outDir: 'dist',
     format: ['esm'],

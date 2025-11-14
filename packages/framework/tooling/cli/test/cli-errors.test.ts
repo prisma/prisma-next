@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { errorDriverRequired, errorFamilyReadMarkerRequired } from '../src/utils/cli-errors';
+import { errorDriverRequired, errorFamilyReadMarkerSqlRequired } from '../src/utils/cli-errors';
 
 describe('CliStructuredError.toEnvelope()', () => {
   it('converts driver required error to envelope with PN-CLI-4010', () => {
@@ -14,7 +14,7 @@ describe('CliStructuredError.toEnvelope()', () => {
   });
 
   it('converts readMarker error to envelope with PN-CLI-4007', () => {
-    const error = errorFamilyReadMarkerRequired();
+    const error = errorFamilyReadMarkerSqlRequired();
     const envelope = error.toEnvelope();
 
     expect(envelope.code).toBe('PN-CLI-4007');

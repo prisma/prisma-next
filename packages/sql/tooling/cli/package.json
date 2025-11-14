@@ -16,7 +16,7 @@
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/control-plane": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",

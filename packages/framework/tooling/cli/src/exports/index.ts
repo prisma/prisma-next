@@ -1,9 +1,9 @@
-export type { EmitContractOptions, EmitContractResult, LoggerLike } from '../api/emit-contract';
-export { emitContract } from '../api/emit-contract';
-export { createContractEmitCommand } from '../commands/contract-emit';
-export type { LoadTsContractOptions } from '../load-ts-contract';
-export { loadContractFromTs } from '../load-ts-contract';
-export { loadExtensionPackManifest, loadExtensionPacks } from '../pack-loading';
+// Re-export core-control-plane types for convenience
+export type {
+  EmitContractOptions,
+  EmitContractResult,
+} from '@prisma-next/core-control-plane/emit-contract';
+export { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 export type {
   ArgSpecManifest,
   ExtensionPack,
@@ -11,4 +11,10 @@ export type {
   LoweringSpecManifest,
   OperationManifest,
   ReturnSpecManifest,
-} from '../pack-manifest-types';
+} from '@prisma-next/core-control-plane/pack-manifest-types';
+
+// CLI-specific exports
+export { createContractEmitCommand } from '../commands/contract-emit';
+export type { LoadTsContractOptions } from '../load-ts-contract';
+export { loadContractFromTs } from '../load-ts-contract';
+export { loadExtensionPackManifest, loadExtensionPacks } from '../pack-loading';

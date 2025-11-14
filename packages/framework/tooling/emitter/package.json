@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "arktype": "^2.0.0",
-    "prettier": "^3.3.3"
+    "@prisma-next/core-control-plane": "workspace:*",
+    "arktype": "^2.0.0"
   },
   "devDependencies": {
     "@prisma-next/operations": "workspace:*",

@@ -1,7 +1,9 @@
-import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
+import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import { Command } from 'commander';
-import { emitContract } from '../api/emit-contract';
 import { loadConfig } from '../config-loader';
 import {
   assembleOperationRegistry,
@@ -9,7 +11,6 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../pack-assembly';
-import { errorContractConfigMissing } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -132,11 +133,9 @@ export function createContractEmitCommand(): Command {
           config.extensions ?? [],
         );
 
-        // Call programmatic API with resolved values
+        // Call programmatic API with resolved values (returns strings, no file I/O)
         const emitResult = await emitContract({
           contractIR,
-          outputJsonPath,
-          outputDtsPath,
           targetFamily: config.family.hook,
           operationRegistry,
           codecTypeImports,
@@ -144,7 +143,27 @@ export function createContractEmitCommand(): Command {
           extensionIds,
         });
 
-        return emitResult;
+        // Create directories if needed
+        mkdirSync(dirname(outputJsonPath), { recursive: true });
+        mkdirSync(dirname(outputDtsPath), { recursive: true });
+
+        // Write the results to files
+        writeFileSync(outputJsonPath, emitResult.contractJson, 'utf-8');
+        writeFileSync(outputDtsPath, emitResult.contractDts, 'utf-8');
+
+        // Return result with file paths for output formatting
+        return {
+          coreHash: emitResult.coreHash,
+          profileHash: emitResult.profileHash,
+          outDir: dirname(outputJsonPath),
+          files: {
+            json: outputJsonPath,
+            dts: outputDtsPath,
+          },
+          timings: {
+            total: 0, // Timing is handled by emitContract internally if needed
+          },
+        };
       });
 
       // Handle result - formats output and returns exit code

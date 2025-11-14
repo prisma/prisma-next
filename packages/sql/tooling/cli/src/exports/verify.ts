@@ -4,7 +4,7 @@ import type {
   ControlPlaneDriver,
   ExtensionDescriptor,
   TargetDescriptor,
-} from '@prisma-next/control-plane/types';
+} from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 
 const MetaSchema = type({ '[string]': 'unknown' });

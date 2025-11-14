@@ -1,3 +1,4 @@
+// Re-export core-control-plane config types for convenience
 export type {
   AdapterDescriptor,
   ContractConfig,
@@ -5,5 +6,5 @@ export type {
   FamilyDescriptor,
   PrismaNextConfig,
   TargetDescriptor,
-} from '../config-types';
-export { defineConfig } from '../config-types';
+} from '@prisma-next/core-control-plane/config-types';
+export { defineConfig } from '@prisma-next/core-control-plane/config-types';

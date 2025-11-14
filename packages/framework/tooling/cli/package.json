@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/control-plane": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "arktype": "^2.0.0",
     "c12": "^3.3.2",
@@ -61,10 +61,6 @@
     "./pack-loading": {
       "types": "./dist/pack-loading.d.ts",
       "import": "./dist/pack-loading.js"
-    },
-    "./marker-parser": {
-      "types": "./dist/utils/marker-parser.d.ts",
-      "import": "./dist/utils/marker-parser.js"
     }
   }
 }

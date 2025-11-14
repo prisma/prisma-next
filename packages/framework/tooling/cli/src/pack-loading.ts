@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type {
   ExtensionPack,
   ExtensionPackManifest,
-} from '@prisma-next/control-plane/pack-manifest-types';
+} from '@prisma-next/core-control-plane/pack-manifest-types';
 import { type } from 'arktype';
 
 function readJsonFile<T = unknown>(filePath: string): T {

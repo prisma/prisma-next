@@ -23,7 +23,7 @@ Provide a command-line interface that:
 - **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
 - **Config Management**: Load and validate `prisma-next.config.ts` files using Arktype validation
 
-**Note**: Control plane operations (database verification, contract marker reading) are implemented in `@prisma-next/control-plane`. The CLI uses the control plane executor programmatically but does not define control plane types itself.
+**Note**: Control plane domain actions (database verification, contract emission) are implemented in `@prisma-next/core-control-plane`. The CLI uses the control plane domain actions programmatically but does not define control plane types itself.
 
 ## Command Descriptions
 

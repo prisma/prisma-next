@@ -1,7 +1,7 @@
 import type {
   ExtensionPackManifest,
   OperationManifest,
-} from '@prisma-next/control-plane/pack-manifest-types';
+} from '@prisma-next/core-control-plane/pack-manifest-types';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
 import { describe, expect, it } from 'vitest';
 import type {
