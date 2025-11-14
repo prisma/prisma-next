@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ResultType } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
@@ -13,6 +12,7 @@ import { sql } from '@prisma-next/sql-lane/sql';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
@@ -123,8 +123,9 @@ describe('emit integration', () => {
         .select({ id: idColumn, email: emailColumn })
         .build();
 
+      // SqlQueryPlan doesn't have sql property - lowering happens in runtime
       expect(plan).toMatchObject({
-        sql: expect.anything(),
+        ast: expect.anything(),
         params: expect.anything(),
         meta: expect.objectContaining({
           coreHash: result.coreHash,
