@@ -1,5 +1,5 @@
 import { relative } from 'node:path';
-import { blue, bold, cyan, dim, green, magenta, red } from 'colorette';
+import { bgGreen, blue, bold, cyan, dim, green, magenta, red } from 'colorette';
 import type { Command } from 'commander';
 import stringWidth from 'string-width';
 import stripAnsi from 'strip-ansi';
@@ -249,10 +249,23 @@ function calculateRightColumnWidth(): number {
 }
 
 /**
- * Creates a simple arrow marker.
+ * Creates an arrow segment badge with green background and white text.
+ * Body: green background with white "prisma-next" text
+ * Tip: dark grey arrow pointing right (Powerline separator)
  */
 function createPrismaNextBadge(useColor: boolean): string {
-  return useColor ? bold(green('prisma-next')) : 'prisma-next';
+  if (!useColor) {
+    return 'prisma-next';
+  }
+  // Body: green background with white text
+  const text = ' prisma-next ';
+  const body = bgGreen(bold(text));
+
+  // Use Powerline separator (U+E0B0) which creates the arrow transition effect
+  const separator = '\u{E0B0}';
+  const tip = green(separator); // Dark grey arrow tip
+
+  return `${body}${tip}`;
 }
 
 /**
@@ -271,9 +284,9 @@ function formatHeaderLine(options: {
   readonly intent: string;
 }): string {
   if (options.operation) {
-    return `${options.brand} ${options.operation} ➜ ${options.intent}`;
+    return `${options.brand} ${options.operation} ${options.intent}`;
   }
-  return `${options.brand} ➜ ${options.intent}`;
+  return `${options.brand} ${options.intent}`;
 }
 
 /**
@@ -449,8 +462,8 @@ export function formatStyledHeader(options: {
 
   // Header: arrow + operation badge + intent
   const brand = createPrismaNextBadge(useColor);
-  const opName = options.command.split(' ').slice(-1)[0] || 'emit';
-  const operation = useColor ? bold(opName) : opName;
+  // Use full command path (e.g., "contract emit" not just "emit")
+  const operation = useColor ? bold(options.command) : options.command;
   const intent = formatDimText(options.description);
   lines.push(formatHeaderLine({ brand, operation, intent }));
   lines.push(formatDimText('│')); // Vertical line separator between command and params
@@ -536,7 +549,7 @@ export function formatCommandHelp(options: {
   const shortDescription = command.description() || '';
   const longDescription = getLongDescription(command);
 
-  // Header: "prisma-next <full-command-path> ➜ <short-description>"
+  // Header: "prisma-next <full-command-path> <short-description>"
   const brand = createPrismaNextBadge(useColor);
   const operation = useColor ? bold(commandPath) : commandPath;
   const intent = formatDimText(shortDescription);
@@ -649,6 +662,7 @@ export function formatRootHelp(options: {
   const shortDescription = 'Manage your data layer';
   const intent = formatDimText(shortDescription);
   lines.push(formatHeaderLine({ brand, operation: '', intent }));
+  lines.push(formatDimText('│')); // Vertical line separator after header
 
   // Extract top-level commands (exclude hidden commands starting with '_' and the 'help' command)
   const topLevelCommands = program.commands.filter(
