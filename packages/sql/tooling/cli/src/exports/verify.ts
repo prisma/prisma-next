@@ -128,7 +128,8 @@ export async function readMarker(driver: ControlPlaneDriver): Promise<ContractMa
 
   const markerRow = queryResult.rows[0];
   if (!markerRow) {
-    return null;
+    // If rows array has length > 0 but first element is undefined, this is an unexpected result structure
+    throw new Error('Database query returned unexpected result structure');
   }
 
   return parseContractMarkerRow(markerRow);

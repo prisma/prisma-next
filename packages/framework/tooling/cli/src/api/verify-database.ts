@@ -94,6 +94,26 @@ export async function verifyDatabase(
         configPath,
         contractJsonPath,
       );
+    } catch (error) {
+      // Wrap errors from ControlExecutor in structured errors
+      if (error instanceof Error) {
+        // Check if it's the contract validation error
+        if (error.message.includes('Contract is missing required fields: coreHash or target')) {
+          throw errorUnexpected(error.message, {
+            why: error.message,
+          });
+        }
+        // Check if it's the database query result structure error
+        if (error.message.includes('Database query returned unexpected result structure')) {
+          throw errorUnexpected(error.message, {
+            why: error.message,
+          });
+        }
+        throw error;
+      }
+      throw errorUnexpected(String(error), {
+        why: String(error),
+      });
     } finally {
       // Ensure driver connection is closed
       await executor.close();

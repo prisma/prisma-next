@@ -588,10 +588,9 @@ describe('verifyDatabase API', () => {
                 expect(error).toBeInstanceOf(Error);
                 // errorUnexpected returns a CliStructuredError with message "Unexpected error"
                 // and the why field contains "Contract is missing required fields: coreHash or target"
-                if (error && typeof error === 'object' && 'why' in error) {
-                  expect((error as { why?: string }).why).toContain(
-                    'Contract is missing required fields',
-                  );
+                if (error instanceof CliStructuredError) {
+                  expect(error.message).toBe('Unexpected error');
+                  expect(error.why).toContain('Contract is missing required fields');
                 } else {
                   const errorMessage = error instanceof Error ? error.message : String(error);
                   expect(errorMessage).toBe('Unexpected error');
@@ -626,11 +625,20 @@ describe('verifyDatabase API', () => {
           const cleanupWithDb = testSetup.cleanup;
 
           try {
-            await emitContractFromConfig(configPathWithDb, testDirWithDb);
+            const contractWithDb = await emitContractFromConfig(configPathWithDb, testDirWithDb);
 
             await withClient(connectionString, async (client) => {
               await executeStatement(client, ensureSchemaStatement);
               await executeStatement(client, ensureTableStatement);
+
+              // Write a marker so the query returns rows (needed to trigger the undefined row check)
+              const write = writeContractMarker({
+                coreHash: contractWithDb.coreHash,
+                profileHash: contractWithDb.profileHash ?? contractWithDb.coreHash,
+                contractJson: contractWithDb,
+                canonicalVersion: 1,
+              });
+              await executeStatement(client, write.insert);
             });
 
             // Mock the driver to return rows with undefined first element
@@ -683,8 +691,9 @@ describe('verifyDatabase API', () => {
                 expect(error).toBeInstanceOf(Error);
                 // errorUnexpected returns a CliStructuredError with message "Unexpected error"
                 // and the why field contains "Database query returned unexpected result structure"
-                if (error && typeof error === 'object' && 'why' in error) {
-                  expect((error as { why?: string }).why).toContain(
+                if (error instanceof CliStructuredError) {
+                  expect(error.message).toBe('Unexpected error');
+                  expect(error.why).toContain(
                     'Database query returned unexpected result structure',
                   );
                 } else {
