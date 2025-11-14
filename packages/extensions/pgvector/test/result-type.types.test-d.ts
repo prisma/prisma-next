@@ -1,9 +1,10 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { Plan, ResultType } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { expectTypeOf, test } from 'vitest';
 import pgvector from '../src/exports/runtime';
@@ -128,7 +129,7 @@ test('ResultType correctly infers number[] for vector column', () => {
     embedding: number[] | null;
   }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('ResultType correctly infers number[] for non-nullable vector column', () => {
@@ -189,7 +190,7 @@ test('ResultType correctly infers number[] for non-nullable vector column', () =
     embedding: number[];
   }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('ResultType correctly infers vector column type from CodecTypes', () => {

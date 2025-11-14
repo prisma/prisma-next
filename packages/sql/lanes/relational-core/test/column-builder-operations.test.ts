@@ -1,10 +1,10 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
+import { createStubAdapter, createTestContext } from './utils';
 
 describe('ColumnBuilder operations', () => {
   const contract = validateContract<SqlContract<SqlStorage>>({

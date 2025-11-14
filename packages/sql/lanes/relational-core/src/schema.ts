@@ -1,5 +1,3 @@
-// TODO: Slice 6 will clean up RuntimeContext dependency
-
 import type { OperationRegistry } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
 import type {
@@ -9,9 +7,9 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { TableRef } from './ast/types';
 import { attachOperationsToColumnBuilder } from './operations-registry';
+import type { QueryLaneContext } from './query-lane-context';
 import type {
   BinaryBuilder,
   CodecTypes as CodecTypesType,
@@ -283,7 +281,7 @@ type ToOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationType
 /**
  * Creates a schema handle for building SQL queries.
  *
- * @param context - Runtime context containing contract, codec and operation registries
+ * @param context - Query lane context containing contract, codec and operation registries
  * @returns A schema handle with typed table builders
  *
  * @example
@@ -293,7 +291,7 @@ type ToOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationType
  * ```
  */
 export function schema<Contract extends SqlContract<SqlStorage>>(
-  context: RuntimeContext<Contract>,
+  context: QueryLaneContext<Contract>,
 ): SchemaReturnType<Contract> {
   const contract = context.contract;
   const storage = contract.storage;

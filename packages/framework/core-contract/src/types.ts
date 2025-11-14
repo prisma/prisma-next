@@ -118,6 +118,8 @@ export interface Plan<_Row = unknown> {
 /**
  * Utility type to extract the Row type from a Plan.
  * Example: `type Row = ResultType<typeof plan>`
+ *
+ * Note: For SqlQueryPlan, use the SQL-specific ResultType from @prisma-next/sql-relational-core/types
  */
 export type ResultType<P> = P extends Plan<infer R> ? R : never;
 

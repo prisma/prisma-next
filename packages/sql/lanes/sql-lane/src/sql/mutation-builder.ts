@@ -1,13 +1,6 @@
-import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  Adapter,
-  ColumnRef,
-  LoweredStatement,
-  ParamRef,
-  QueryAst,
-  TableRef,
-} from '@prisma-next/sql-relational-core/ast';
+import type { ColumnRef, ParamRef, TableRef } from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
   createDeleteAst,
@@ -16,6 +9,8 @@ import {
   createTableRef,
   createUpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
   AnyColumnBuilder,
   BinaryBuilder,
@@ -24,7 +19,6 @@ import type {
   ParamPlaceholder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { checkReturningCapability } from '../utils/capabilities';
 import {
   errorFailedToBuildWhereClause,
@@ -46,7 +40,7 @@ export interface InsertBuilder<
   returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): InsertBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
-  build(options?: BuildOptions): Plan<Row>;
+  build(options?: BuildOptions): SqlQueryPlan<Row>;
 }
 
 export interface UpdateBuilder<
@@ -58,7 +52,7 @@ export interface UpdateBuilder<
   returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
-  build(options?: BuildOptions): Plan<Row>;
+  build(options?: BuildOptions): SqlQueryPlan<Row>;
 }
 
 export interface DeleteBuilder<
@@ -70,7 +64,7 @@ export interface DeleteBuilder<
   returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
-  build(options?: BuildOptions): Plan<Row>;
+  build(options?: BuildOptions): SqlQueryPlan<Row>;
 }
 
 export class InsertBuilderImpl<
@@ -80,8 +74,7 @@ export class InsertBuilderImpl<
 > implements InsertBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
-  private readonly context: RuntimeContext<TContract>;
+  private readonly context: QueryLaneContext<TContract>;
   private readonly table: TableRef;
   private readonly values: Record<string, ParamPlaceholder>;
   private returningColumns: AnyColumnBuilder[] = [];
@@ -93,7 +86,6 @@ export class InsertBuilderImpl<
   ) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.adapter = options.context.adapter;
     this.table = table;
     this.values = values;
   }
@@ -114,7 +106,7 @@ export class InsertBuilderImpl<
     return builder;
   }
 
-  build(options?: BuildOptions): Plan<Row> {
+  build(options?: BuildOptions): SqlQueryPlan<Row> {
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
     const paramDescriptors: ParamDescriptor[] = [];
     const paramValues: unknown[] = [];
@@ -168,12 +160,6 @@ export class InsertBuilderImpl<
       returning,
     });
 
-    const lowered = this.adapter.lower(ast, {
-      contract: this.contract,
-      params: paramValues,
-    });
-    const loweredBody = lowered.body as LoweredStatement;
-
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
         // TypeScript can't narrow ColumnBuilder properly
@@ -191,10 +177,9 @@ export class InsertBuilderImpl<
       ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
     });
 
-    const plan: Plan<Row> = Object.freeze({
+    const queryPlan: SqlQueryPlan<Row> = Object.freeze({
       ast,
-      sql: loweredBody.sql,
-      params: loweredBody.params ?? paramValues,
+      params: paramValues,
       meta: {
         ...planMeta,
         lane: 'dsl',
@@ -206,7 +191,7 @@ export class InsertBuilderImpl<
       },
     });
 
-    return plan;
+    return queryPlan;
   }
 }
 
@@ -217,8 +202,7 @@ export class UpdateBuilderImpl<
 > implements UpdateBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
-  private readonly context: RuntimeContext<TContract>;
+  private readonly context: QueryLaneContext<TContract>;
   private readonly table: TableRef;
   private readonly set: Record<string, ParamPlaceholder>;
   private wherePredicate?: BinaryBuilder;
@@ -231,7 +215,6 @@ export class UpdateBuilderImpl<
   ) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.adapter = options.context.adapter;
     this.table = table;
     this.set = set;
   }
@@ -268,7 +251,7 @@ export class UpdateBuilderImpl<
     return builder;
   }
 
-  build(options?: BuildOptions): Plan<Row> {
+  build(options?: BuildOptions): SqlQueryPlan<Row> {
     if (!this.wherePredicate) {
       errorWhereMustBeCalledForUpdate();
     }
@@ -343,12 +326,6 @@ export class UpdateBuilderImpl<
       returning,
     });
 
-    const lowered = this.adapter.lower(ast, {
-      contract: this.contract,
-      params: paramValues,
-    });
-    const loweredBody = lowered.body as LoweredStatement;
-
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
         // TypeScript can't narrow ColumnBuilder properly
@@ -367,10 +344,9 @@ export class UpdateBuilderImpl<
       where: this.wherePredicate,
     });
 
-    const plan: Plan<Row> = Object.freeze({
+    const queryPlan: SqlQueryPlan<Row> = Object.freeze({
       ast,
-      sql: loweredBody.sql,
-      params: loweredBody.params ?? paramValues,
+      params: paramValues,
       meta: {
         ...planMeta,
         lane: 'dsl',
@@ -383,7 +359,7 @@ export class UpdateBuilderImpl<
       },
     });
 
-    return plan;
+    return queryPlan;
   }
 }
 
@@ -394,8 +370,7 @@ export class DeleteBuilderImpl<
 > implements DeleteBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
-  private readonly context: RuntimeContext<TContract>;
+  private readonly context: QueryLaneContext<TContract>;
   private readonly table: TableRef;
   private wherePredicate?: BinaryBuilder;
   private returningColumns: AnyColumnBuilder[] = [];
@@ -403,7 +378,6 @@ export class DeleteBuilderImpl<
   constructor(options: SqlBuilderOptions<TContract>, table: TableRef) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.adapter = options.context.adapter;
     this.table = table;
   }
 
@@ -437,7 +411,7 @@ export class DeleteBuilderImpl<
     return builder;
   }
 
-  build(options?: BuildOptions): Plan<Row> {
+  build(options?: BuildOptions): SqlQueryPlan<Row> {
     if (!this.wherePredicate) {
       errorWhereMustBeCalledForDelete();
     }
@@ -480,12 +454,6 @@ export class DeleteBuilderImpl<
       returning,
     });
 
-    const lowered = this.adapter.lower(ast, {
-      contract: this.contract,
-      params: paramValues,
-    });
-    const loweredBody = lowered.body as LoweredStatement;
-
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
         // TypeScript can't narrow ColumnBuilder properly
@@ -504,10 +472,9 @@ export class DeleteBuilderImpl<
       where: this.wherePredicate,
     });
 
-    const plan: Plan<Row> = Object.freeze({
+    const queryPlan: SqlQueryPlan<Row> = Object.freeze({
       ast,
-      sql: loweredBody.sql,
-      params: loweredBody.params ?? paramValues,
+      params: paramValues,
       meta: {
         ...planMeta,
         lane: 'dsl',
@@ -520,6 +487,6 @@ export class DeleteBuilderImpl<
       },
     });
 
-    return plan;
+    return queryPlan;
   }
 }

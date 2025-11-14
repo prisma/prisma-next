@@ -10,6 +10,7 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
@@ -18,7 +19,6 @@ import type {
   BuildOptions,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { checkIncludeCapabilities } from '../orm/capabilities';
 import type { OrmIncludeState, RelationFilter } from '../orm/state';
 import { buildJoinOnExpr } from '../selection/join';
@@ -59,7 +59,7 @@ export interface IncludeState {
 export function buildIncludeAsts(
   includes: OrmIncludeState[],
   contract: SqlContract<SqlStorage>,
-  context: RuntimeContext<SqlContract<SqlStorage>>,
+  context: QueryLaneContext<SqlContract<SqlStorage>>,
   modelName: string,
   paramsMap: Record<string, unknown>,
   paramDescriptors: ParamDescriptor[],

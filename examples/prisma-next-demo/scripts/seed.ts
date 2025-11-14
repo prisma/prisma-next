@@ -1,11 +1,15 @@
 import 'dotenv/config';
-import type { Plan, ResultType } from '@prisma-next/contract/types';
+import type { Plan } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { Client } from 'pg';
 import { schema, sql } from '../src/prisma/query';
 import { closeRuntime, getRuntime } from '../src/prisma/runtime';
 
-async function collectRows<P extends Plan>(plan: P): Promise<ResultType<P>[]> {
+async function collectRows<P extends Plan | SqlQueryPlan<unknown>>(
+  plan: P,
+): Promise<ResultType<P>[]> {
   const runtime = getRuntime();
   const rows: ResultType<P>[] = [];
   for await (const row of runtime.execute(plan)) {
@@ -96,8 +100,12 @@ async function main() {
     throw new Error('Failed to create users');
   }
 
-  console.log(`Created user: ${alice.email} (id: ${alice.id})`);
-  console.log(`Created user: ${bob.email} (id: ${bob.id})`);
+  type UserRow = ResultType<typeof alicePlan>;
+  const aliceUser = alice as UserRow;
+  const bobUser = bob as UserRow;
+
+  console.log(`Created user: ${aliceUser.email} (id: ${aliceUser.id})`);
+  console.log(`Created user: ${bobUser.email} (id: ${bobUser.id})`);
 
   // Generate sample embedding vectors (1536 dimensions, matching common embedding models)
   const generateEmbedding = (seed: number): number[] => {

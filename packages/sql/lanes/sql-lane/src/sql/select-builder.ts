@@ -1,16 +1,13 @@
-import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  Adapter,
   BinaryExpr,
   ColumnRef,
   Direction,
   IncludeAst,
   IncludeRef,
   JoinAst,
-  LoweredStatement,
   OperationExpr,
-  QueryAst,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -20,6 +17,8 @@ import {
   createSelectAst,
   createTableRef,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
   AnyBinaryBuilder,
   AnyOrderBuilder,
@@ -32,7 +31,6 @@ import type {
   OrderBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { ProjectionInput } from '../types/internal';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {
@@ -66,15 +64,13 @@ export class SelectBuilderImpl<
   Includes extends Record<string, unknown> = Record<string, never>,
 > {
   private readonly contract: TContract;
-  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   private readonly codecTypes: CodecTypes;
-  private readonly context: RuntimeContext<TContract>;
+  private readonly context: QueryLaneContext<TContract>;
   private state: BuilderState = {};
 
   constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.adapter = options.context.adapter;
     this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
     if (state) {
       this.state = state;
@@ -297,7 +293,7 @@ export class SelectBuilderImpl<
     );
   }
 
-  build(options?: BuildOptions): Plan<Row> {
+  build(options?: BuildOptions): SqlQueryPlan<Row> {
     const table = this.ensureFrom();
     const projection = this.ensureProjection();
 
@@ -405,12 +401,6 @@ export class SelectBuilderImpl<
       limit?: number;
     });
 
-    const lowered = this.adapter.lower(ast, {
-      contract: this.contract,
-      params: paramValues,
-    });
-    const loweredBody = lowered.body as LoweredStatement;
-
     const planMeta = buildMeta({
       contract: this.contract,
       table,
@@ -433,14 +423,13 @@ export class SelectBuilderImpl<
       paramCodecs?: Record<string, string>;
     });
 
-    const plan: Plan<Row> = Object.freeze({
+    const queryPlan: SqlQueryPlan<Row> = Object.freeze({
       ast,
-      sql: loweredBody.sql,
-      params: loweredBody.params ?? paramValues,
+      params: paramValues,
       meta: planMeta,
     });
 
-    return plan;
+    return queryPlan;
   }
 
   private ensureFrom() {

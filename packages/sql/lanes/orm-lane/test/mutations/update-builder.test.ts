@@ -1,9 +1,9 @@
+import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { UpdateAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { describe, expect, it } from 'vitest';
 import { buildUpdatePlan } from '../../src/mutations/update-builder';
 import type { OrmContext } from '../../src/orm/context';
@@ -52,30 +52,10 @@ describe('update builder', () => {
     sources: {},
   };
 
-  const adapter = {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(_ast: unknown, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      return {
-        profileId: 'stub-profile',
-        body: Object.freeze({
-          sql: 'UPDATE user SET email = $1 WHERE id = $2',
-          params: ctx.params ? [...ctx.params] : [],
-        }),
-      };
-    },
-  };
-
   const context: OrmContext<SqlContract<SqlStorage>> = {
     contract,
-    adapter: adapter as unknown as OrmContext<SqlContract<SqlStorage>>['adapter'],
-    context: {} as unknown as RuntimeContext<SqlContract<SqlStorage>>,
+    operations: createOperationRegistry(),
+    codecs: createCodecRegistry(),
   };
 
   const getModelAccessor: () => ModelColumnAccessor<
@@ -113,13 +93,13 @@ describe('update builder', () => {
       lane: plan.meta.lane,
       tables: plan.meta.refs?.tables,
       astKind: (plan.ast as UpdateAst).kind,
-      sql: plan.sql,
+      hasParams: plan.params.length > 0,
     }).toMatchObject({
       defined: true,
       lane: 'orm',
       tables: ['user'],
       astKind: 'update',
-      sql: 'UPDATE user SET email = $1 WHERE id = $2',
+      hasParams: true,
     });
   });
 

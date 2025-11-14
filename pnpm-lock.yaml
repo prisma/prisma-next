@@ -584,9 +584,6 @@ importers:
         specifier: ^9.6.0
         version: 9.6.0
     devDependencies:
-      '@prisma-next/sql-runtime':
-        specifier: workspace:*
-        version: link:../../sql-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -645,13 +642,13 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../relational-core
-      '@prisma-next/sql-runtime':
-        specifier: workspace:*
-        version: link:../../sql-runtime
     devDependencies:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../authoring/sql-contract-ts
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../sql-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -685,9 +682,6 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../operations
-      '@prisma-next/sql-runtime':
-        specifier: workspace:*
-        version: link:../../sql-runtime
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0
@@ -790,6 +784,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../contract
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../lanes/relational-core
     devDependencies:
       '@prisma-next/driver-postgres':
         specifier: workspace:*

@@ -9,6 +9,8 @@ export default defineConfig({
     'exports/operations-registry': 'src/exports/operations-registry.ts',
     'exports/errors': 'src/exports/errors.ts',
     'exports/ast': 'src/exports/ast.ts',
+    'exports/plan': 'src/exports/plan.ts',
+    'exports/query-lane-context': 'src/exports/query-lane-context.ts',
   },
   outDir: 'dist',
   format: ['esm'],

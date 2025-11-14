@@ -1,18 +1,10 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 
-export interface SqlContext<TContract extends SqlContract<SqlStorage>> {
-  readonly context: RuntimeContext<TContract>;
-  readonly contract: TContract;
-  readonly adapter: RuntimeContext<TContract>['adapter'];
-}
+export type SqlContext<TContract extends SqlContract<SqlStorage>> = QueryLaneContext<TContract>;
 
 export function createSqlContext<TContract extends SqlContract<SqlStorage>>(
-  context: RuntimeContext<TContract>,
+  context: QueryLaneContext<TContract>,
 ): SqlContext<TContract> {
-  return {
-    context,
-    contract: context.contract,
-    adapter: context.adapter,
-  };
+  return context;
 }

@@ -1,5 +1,6 @@
 import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
@@ -8,7 +9,6 @@ import type {
   InferNestedProjectionRow,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { ModelColumnAccessor, OrmBuilderOptions } from './orm-types';
 
 export interface OrmIncludeChildBuilder<
@@ -41,7 +41,7 @@ export class OrmIncludeChildBuilderImpl<
   ChildRow = unknown,
 > implements OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>
 {
-  private readonly context: RuntimeContext<TContract>;
+  private readonly context: QueryLaneContext<TContract>;
   private readonly contract: TContract;
   private readonly childModelName: ChildModelName;
   private childWhere: AnyBinaryBuilder | undefined;

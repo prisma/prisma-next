@@ -1,17 +1,23 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { Plan, ResultType } from '@prisma-next/contract/types';
+import type { Plan } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { JoinOnBuilder, TableKey, TablesOf } from '@prisma-next/sql-relational-core/types';
+import type {
+  JoinOnBuilder,
+  ResultType,
+  TableKey,
+  TablesOf,
+} from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
-// Helper to simulate execute signature
-function execute<Row>(_plan: Plan<Row>): AsyncIterable<Row> {
+// Helper to simulate execute signature (runtime accepts both Plan and SqlQueryPlan)
+function execute<Row>(_plan: Plan<Row> | SqlQueryPlan<Row>): AsyncIterable<Row> {
   return (async function* () {})();
 }
 
@@ -58,11 +64,11 @@ test('select() with object projection infers Row type', () => {
 
   // Should have id and email properties
   // Note: exact types depend on columnMeta, but structure should be correct
-  // Verify plan structure
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  // Verify plan structure (SqlQueryPlan, not Plan - no sql field)
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
-test('build() returns Plan<Row> with inferred Row type', () => {
+test('build() returns SqlQueryPlan<Row> with inferred Row type', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
@@ -88,10 +94,10 @@ test('build() returns Plan<Row> with inferred Row type', () => {
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
-test('ResultType utility extracts Row type from Plan', () => {
+test('ResultType utility extracts Row type from SqlQueryPlan', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createPostgresAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
@@ -207,10 +213,10 @@ test('wrong Row type assignments fail type check', () => {
     })
     .build();
 
-  // This should compile - correct type
+  // This should compile - correct type (SqlQueryPlan, not Plan)
   type Row = ResultType<typeof _plan>;
-  const correct: Plan<Row> = _plan;
-  expectTypeOf(correct).toExtend<Plan<Row>>();
+  const correct: SqlQueryPlan<Row> = _plan;
+  expectTypeOf(correct).toExtend<SqlQueryPlan<Row>>();
 
   // Type system should preserve Row type through the chain
   // If Row is inferred correctly, it should not be assignable to a completely different type
@@ -218,7 +224,7 @@ test('wrong Row type assignments fail type check', () => {
   // but the important thing is that Row is correctly inferred from the projection
   // This assignment would fail if Row was a specific type (not unknown)
   // For now, we verify that Row is inferred (even if as unknown) by checking the plan structure
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('nullable columns are handled correctly', () => {
@@ -243,7 +249,7 @@ test('nullable columns are handled correctly', () => {
 
   type Row = ResultType<typeof _plan>;
   // Row should have the projection properties
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('different column types map correctly', () => {
@@ -269,7 +275,7 @@ test('different column types map correctly', () => {
     .build();
 
   type Row = ResultType<typeof _plan>;
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('generic contract types are preserved', () => {
@@ -549,7 +555,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
   }>();
 
   // Verify plan structure
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('nested projection infers nested Row type', () => {
@@ -583,7 +589,7 @@ test('nested projection infers nested Row type', () => {
     post: { title: number };
   }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('multi-level nested projection infers deeply nested Row type', () => {
@@ -618,7 +624,7 @@ test('multi-level nested projection infers deeply nested Row type', () => {
     a: { b: { c: number } };
   }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('mixed leaves and nested objects in projection', () => {
@@ -661,7 +667,7 @@ test('mixed leaves and nested objects in projection', () => {
     email: string;
   }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('nested projection with joins infers nested Row type', () => {
@@ -776,7 +782,7 @@ test('nested projection with joins infers nested Row type', () => {
     post: { title: string; id: number };
   }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('insert without returning() has unknown Row type', () => {
@@ -825,7 +831,7 @@ test('insert with returning() infers Row type', () => {
   // Verify the overall structure
   expectTypeOf<Row>().toExtend<{ id: number; email: string }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('update with returning() infers Row type', () => {
@@ -857,7 +863,7 @@ test('update with returning() infers Row type', () => {
   // Verify the overall structure
   expectTypeOf<Row>().toExtend<{ id: number; email: string }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('delete with returning() infers Row type', () => {
@@ -887,5 +893,5 @@ test('delete with returning() infers Row type', () => {
   // Verify the overall structure
   expectTypeOf<Row>().toExtend<{ id: number; email: string }>();
 
-  expectTypeOf(_plan).toExtend<Plan<Row>>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });

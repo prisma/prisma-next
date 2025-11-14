@@ -6,6 +6,7 @@ import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/ru
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import {
   createTestRuntime,
@@ -104,10 +105,12 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
       email: 'e2e@example.com',
     });
 
-    const userId = insertRows[0]?.id;
-    if (userId === undefined) {
-      throw new Error('Expected insert to return id');
+    type InsertRow = ResultType<typeof insertPlan>;
+    const firstRow = insertRows[0] as InsertRow | undefined;
+    if (!firstRow) {
+      throw new Error('Expected insert to return at least one row');
     }
+    const userId = firstRow.id;
 
     // Update
     const updatePlan = builder
