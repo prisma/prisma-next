@@ -1,4 +1,4 @@
-import { unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
@@ -111,6 +111,10 @@ export async function loadContractFromTs(
   options?: LoadTsContractOptions,
 ): Promise<ContractIR> {
   const allowlist = options?.allowlist ?? DEFAULT_ALLOWLIST;
+
+  if (!existsSync(entryPath)) {
+    throw new Error(`Contract file not found: ${entryPath}`);
+  }
 
   const tempFile = join(
     tmpdir(),
