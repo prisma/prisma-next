@@ -179,7 +179,7 @@ describe('db verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54070, databasePort: 54071, shadowDatabasePort: 54072 },
+        { acceleratePort: 54190, databasePort: 54191, shadowDatabasePort: 54192 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -240,7 +240,7 @@ describe('db verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54073, databasePort: 54074, shadowDatabasePort: 54075 },
+        { acceleratePort: 54193, databasePort: 54194, shadowDatabasePort: 54195 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -323,7 +323,7 @@ describe('db verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54076, databasePort: 54077, shadowDatabasePort: 54078 },
+        { acceleratePort: 54196, databasePort: 54197, shadowDatabasePort: 54198 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -384,7 +384,7 @@ describe('db verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54079, databasePort: 54080, shadowDatabasePort: 54081 },
+        { acceleratePort: 54199, databasePort: 54200, shadowDatabasePort: 54201 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -455,7 +455,7 @@ describe('db verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54082, databasePort: 54083, shadowDatabasePort: 54084 },
+        { acceleratePort: 54202, databasePort: 54203, shadowDatabasePort: 54204 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -528,7 +528,7 @@ describe('db verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54085, databasePort: 54086, shadowDatabasePort: 54087 },
+        { acceleratePort: 54205, databasePort: 54206, shadowDatabasePort: 54207 },
       );
     },
     timeouts.spinUpPpgDev,

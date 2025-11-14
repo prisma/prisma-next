@@ -1,0 +1,85 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`help text snapshots > formats contract emit help 1`] = `
+"prisma-next emit ➜ Emit signed contract artifacts
+│
+│ --config <path>       Path to prisma-next.config.ts
+│ --json [format]       Output as JSON (object or ndjson)
+│                       default: false
+│ -q, --quiet           Quiet mode: errors only
+│ -v, --verbose         Verbose output: debug info, timings
+│ -vv, --trace          Trace output: deep internals, stack traces
+│ --timestamps          Add timestamps to output
+│ --color               Force color output
+│ --no-color            Disable color output
+│
+│ Reads your contract source (TypeScript or Prisma schema) and emits contract.json and
+│ contract.d.ts. The contract.json contains the canonical contract structure, and
+│ contract.d.ts provides TypeScript types for type-safe query building.
+└
+"
+`;
+
+exports[`help text snapshots > formats contract emit help with no color 1`] = `
+"prisma-next emit ➜ Emit signed contract artifacts
+│
+│ --config <path>       Path to prisma-next.config.ts
+│ --json [format]       Output as JSON (object or ndjson)
+│                       default: false
+│ -q, --quiet           Quiet mode: errors only
+│ -v, --verbose         Verbose output: debug info, timings
+│ -vv, --trace          Trace output: deep internals, stack traces
+│ --timestamps          Add timestamps to output
+│ --color               Force color output
+│ --no-color            Disable color output
+│
+│ Reads your contract source (TypeScript or Prisma schema) and emits contract.json and
+│ contract.d.ts. The contract.json contains the canonical contract structure, and
+│ contract.d.ts provides TypeScript types for type-safe query building.
+└
+"
+`;
+
+exports[`help text snapshots > formats db verify help 1`] = `
+"prisma-next verify ➜ Check the database satisfies your contract
+│
+│ --db <url>            Database connection string
+│ --config <path>       Path to prisma-next.config.ts
+│ --json [format]       Output as JSON (object or ndjson)
+│                       default: false
+│ -q, --quiet           Quiet mode: errors only
+│ -v, --verbose         Verbose output: debug info, timings
+│ -vv, --trace          Trace output: deep internals, stack traces
+│ --timestamps          Add timestamps to output
+│ --color               Force color output
+│ --no-color            Disable color output
+│
+│ Verifies that your database schema matches the emitted contract. Checks table structures,
+│ column types, constraints, and codec coverage. Reports any mismatches or missing codecs.
+└
+"
+`;
+
+exports[`help text snapshots > formats root help 1`] = `
+"prisma-next ➜ Manage your data layer
+│ ├─ emit               Emit signed contract artifacts
+│ └─ db               
+│    └─ verify          Check the database satisfies your contract
+│
+│ Use Prisma Next to define your data layer as a contract. Sign your database and application with the same
+│ contract to guarantee compatibility. Plan and apply migrations to safely evolve your schema.
+└
+"
+`;
+
+exports[`help text snapshots > formats root help with no color 1`] = `
+"prisma-next ➜ Manage your data layer
+│ ├─ emit               Emit signed contract artifacts
+│ └─ db               
+│    └─ verify          Check the database satisfies your contract
+│
+│ Use Prisma Next to define your data layer as a contract. Sign your database and application with the same
+│ contract to guarantee compatibility. Plan and apply migrations to safely evolve your schema.
+└
+"
+`;
