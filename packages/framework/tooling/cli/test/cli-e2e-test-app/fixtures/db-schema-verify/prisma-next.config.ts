@@ -18,8 +18,5 @@ export default defineConfig({
   },
   db: {
     url: '{{DB_URL}}',
-    queryRunnerFactory: async (url: string) => {
-      return await postgresDriver.create(url);
-    },
   },
 });

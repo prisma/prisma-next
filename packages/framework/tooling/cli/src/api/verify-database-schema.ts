@@ -3,9 +3,9 @@ import { resolve } from 'node:path';
 import { loadConfig } from '../config-loader';
 import {
   errorDatabaseUrlRequired,
+  errorDriverRequired,
   errorFamilySchemaVerifierRequired,
   errorFileNotFound,
-  errorQueryRunnerFactoryRequired,
   errorUnexpected,
 } from '../utils/cli-errors';
 
@@ -97,15 +97,11 @@ export async function verifyDatabaseSchema(
       });
     }
 
-    // Check for queryRunnerFactory
-    const dbConfig = config.db as
-      | { url?: string; queryRunnerFactory?: (url: string) => unknown }
-      | undefined;
-    if (!dbConfig?.queryRunnerFactory) {
-      throw errorQueryRunnerFactoryRequired({
-        why: 'Config.db.queryRunnerFactory is required for db schema-verify',
-      });
+    // Obtain driver: driver is required
+    if (!config.driver) {
+      throw errorDriverRequired();
     }
+    const driver = await config.driver.create(dbUrl);
 
     // Load contract from emitted artifacts
     // Resolve contract path relative to current working directory (project root)
@@ -156,17 +152,6 @@ export async function verifyDatabaseSchema(
       throw errorFamilySchemaVerifierRequired();
     }
 
-    // Create query runner from factory (may be async for ESM dynamic imports)
-    const queryRunnerResult = dbConfig.queryRunnerFactory(dbUrl);
-    const queryRunner =
-      queryRunnerResult instanceof Promise ? await queryRunnerResult : queryRunnerResult;
-
-    // Ensure close method exists (required by ControlPlaneDriver interface)
-    const driver = {
-      query: queryRunner.query,
-      close: queryRunner.close ?? (async () => {}),
-    };
-
     try {
       // Delegate schema verification to family hook
       const result = await config.family.verify.verifySchema({
@@ -206,6 +191,7 @@ export async function verifyDatabaseSchema(
         timings: result.timings,
       };
     } finally {
+      // Ensure driver connection is closed
       await driver.close();
     }
   } catch (error) {

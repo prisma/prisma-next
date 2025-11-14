@@ -170,20 +170,6 @@ export function errorDatabaseUrlRequired(options?: { readonly why?: string }): C
 }
 
 /**
- * Query runner factory is required but not provided in config.
- */
-export function errorQueryRunnerFactoryRequired(options?: {
-  readonly why?: string;
-}): CliStructuredError {
-  return new CliStructuredError('4006', 'Query runner factory is required', {
-    domain: 'CLI',
-    why: options?.why ?? 'Config.db.queryRunnerFactory is required for db verify',
-    fix: 'Add db.queryRunnerFactory to prisma-next.config.ts',
-    docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
-  });
-}
-
-/**
  * Family verify.readMarker is required but not provided.
  */
 export function errorFamilyReadMarkerSqlRequired(options?: {

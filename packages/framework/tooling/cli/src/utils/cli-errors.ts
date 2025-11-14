@@ -16,7 +16,6 @@ export {
   errorFileNotFound,
   errorHashMismatch,
   errorMarkerMissing,
-  errorQueryRunnerFactoryRequired,
   errorRuntime,
   errorTargetMismatch,
   errorUnexpected,

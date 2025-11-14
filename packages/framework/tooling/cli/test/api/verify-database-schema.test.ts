@@ -179,13 +179,13 @@ describe('verifyDatabaseSchema API', () => {
   });
 
   it(
-    'throws error when queryRunnerFactory is missing',
+    'throws error when driver is missing',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
           const testSetup = setupIntegrationTestDirectoryFromFixtures(
             fixtureSubdir,
-            'prisma-next.config.no-query-runner.ts',
+            'prisma-next.config.no-driver.ts',
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
@@ -202,7 +202,7 @@ describe('verifyDatabaseSchema API', () => {
               );
               await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject(
                 {
-                  code: '4006',
+                  code: 'PN-CLI-4010',
                 },
               );
             } finally {
@@ -554,7 +554,7 @@ describe('verifyDatabaseSchema API', () => {
           try {
             await emitContractFromConfig(configPath, testDir);
 
-            // Mock verifySchema hook and query runner
+            // Mock verifySchema hook and driver
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             const closeMock = vi.fn().mockResolvedValue(undefined);
@@ -575,22 +575,21 @@ describe('verifyDatabaseSchema API', () => {
               },
             });
 
-            vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
+            vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
               const config = await originalLoadConfig(path);
-              const dbConfig = config.db as
-                | { url?: string; queryRunnerFactory?: (url: string) => unknown }
-                | undefined;
-              if (!dbConfig?.queryRunnerFactory) {
-                throw new Error('queryRunnerFactory is required');
+              if (!config.driver) {
+                throw new Error('driver is required');
               }
-              const originalFactory = dbConfig.queryRunnerFactory;
-              const mockedFactory = async (url: string) => {
-                const runnerResult = originalFactory(url);
-                const runner = runnerResult instanceof Promise ? await runnerResult : runnerResult;
-                return {
-                  ...runner,
-                  close: closeMock,
-                };
+              const originalDriver = config.driver;
+              const mockedDriver = {
+                ...originalDriver,
+                create: vi.fn().mockImplementation(async (url: string) => {
+                  const driver = await originalDriver.create(url);
+                  return {
+                    ...driver,
+                    close: closeMock,
+                  };
+                }),
               };
               const mockedVerify = config.family.verify
                 ? {
@@ -607,10 +606,7 @@ describe('verifyDatabaseSchema API', () => {
               return {
                 ...config,
                 family: mockedFamily,
-                db: {
-                  ...config.db,
-                  queryRunnerFactory: mockedFactory,
-                },
+                driver: mockedDriver,
               } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
             });
 

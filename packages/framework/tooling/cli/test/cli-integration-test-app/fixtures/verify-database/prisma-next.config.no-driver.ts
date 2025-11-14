@@ -4,7 +4,7 @@ import sql from '@prisma-next/family-sql/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
 import { contract } from './contract';
 
-// This config includes db.url and family with readMarker but no driver
+// This config includes db.url but no driver
 export default defineConfig({
   family: sql,
   target: postgres,

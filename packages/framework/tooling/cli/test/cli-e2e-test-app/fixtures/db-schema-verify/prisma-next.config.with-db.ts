@@ -20,8 +20,5 @@ export default defineConfig({
   },
   db: {
     url: '{{DB_URL}}', // Placeholder to be replaced in tests
-    queryRunnerFactory: async (url: string) => {
-      return await postgresDriver.create(url);
-    },
   },
 });

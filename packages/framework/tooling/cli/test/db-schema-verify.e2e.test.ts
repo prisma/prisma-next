@@ -194,14 +194,14 @@ describe('db schema-verify command (e2e)', () => {
   });
 
   it(
-    'reports PN-CLI-4006 when queryRunnerFactory is missing',
+    'reports PN-CLI-4010 when driver is missing',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
-          // Set up test directory from fixtures with config that has db.url but no queryRunnerFactory
+          // Set up test directory from fixtures with config that has db.url but no driver
           const testSetup = setupTestDirectoryFromFixtures(
             fixtureSubdir,
-            'prisma-next.config.no-query-runner.ts',
+            'prisma-next.config.no-driver.ts',
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
@@ -232,12 +232,12 @@ describe('db schema-verify command (e2e)', () => {
 
             const parsed = JSON.parse(errorOutput);
             expect(parsed).toMatchObject({
-              code: 'PN-CLI-4006',
+              code: 'PN-CLI-4010',
               summary: expect.any(String),
               why: expect.any(String),
               fix: expect.any(String),
             });
-            expect(parsed.summary).toContain('Query runner factory is required');
+            expect(parsed.summary).toContain('Driver is required');
           } finally {
             cleanupDir();
           }
