@@ -1,8 +1,9 @@
-import type { Plan, PlanRefs } from '@prisma-next/contract/types';
+import type { ResultType as CoreResultType, Plan, PlanRefs } from '@prisma-next/contract/types';
 import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type { ColumnRef, Direction, OperationExpr, ParamRef, QueryAst } from './ast/types';
+import type { SqlQueryPlan } from './plan';
 import type { QueryLaneContext } from './query-lane-context';
 
 export interface ParamPlaceholder {
@@ -469,3 +470,14 @@ export interface SqlBuilderOptions<
 > {
   readonly context: QueryLaneContext<TContract>;
 }
+
+/**
+ * SQL-specific ResultType that works with both Plan and SqlQueryPlan.
+ * This extends the core ResultType to also handle SqlQueryPlan.
+ * Example: `type Row = ResultType<typeof plan>`
+ */
+export type ResultType<P> = P extends SqlQueryPlan<infer R>
+  ? R
+  : P extends Plan<infer R>
+    ? R
+    : CoreResultType<P>;

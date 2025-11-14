@@ -1,9 +1,9 @@
+import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DeleteAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { describe, expect, it } from 'vitest';
 import { buildDeletePlan } from '../../src/mutations/delete-builder';
 import type { OrmContext } from '../../src/orm/context';
@@ -50,30 +50,10 @@ describe('delete builder', () => {
     sources: {},
   };
 
-  const adapter = {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(_ast: unknown, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      return {
-        profileId: 'stub-profile',
-        body: Object.freeze({
-          sql: 'DELETE FROM user WHERE id = $1',
-          params: ctx.params ? [...ctx.params] : [],
-        }),
-      };
-    },
-  };
-
   const context: OrmContext<SqlContract<SqlStorage>> = {
     contract,
-    adapter: adapter as unknown as OrmContext<SqlContract<SqlStorage>>['adapter'],
-    context: {} as unknown as RuntimeContext<SqlContract<SqlStorage>>,
+    operations: createOperationRegistry(),
+    codecs: createCodecRegistry(),
   };
 
   const getModelAccessor: () => ModelColumnAccessor<
@@ -109,13 +89,13 @@ describe('delete builder', () => {
       lane: plan.meta.lane,
       tables: plan.meta.refs?.tables,
       astKind: (plan.ast as unknown as DeleteAst).kind,
-      sql: plan.sql,
+      hasParams: plan.params.length > 0,
     }).toMatchObject({
       defined: true,
       lane: 'orm',
       tables: ['user'],
       astKind: 'delete',
-      sql: 'DELETE FROM user WHERE id = $1',
+      hasParams: true,
     });
   });
 
@@ -217,25 +197,8 @@ describe('delete builder', () => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
 
-    const adapterWithoutWhere = {
-      ...adapter,
-      lower(
-        _ast: unknown,
-        ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] },
-      ) {
-        return {
-          profileId: 'stub-profile',
-          body: Object.freeze({
-            sql: 'DELETE FROM user',
-            params: ctx.params ? [...ctx.params] : [],
-          }),
-        };
-      },
-    };
-
     const contextWithoutWhere: OrmContext<SqlContract<SqlStorage>> = {
       ...context,
-      adapter: adapterWithoutWhere as unknown as OrmContext<SqlContract<SqlStorage>>['adapter'],
     };
 
     // This should not throw because buildWhereExpr always returns an expr

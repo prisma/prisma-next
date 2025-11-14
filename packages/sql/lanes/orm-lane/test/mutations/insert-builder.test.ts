@@ -1,7 +1,7 @@
+import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { describe, expect, it } from 'vitest';
 import { buildInsertPlan, convertModelFieldsToColumns } from '../../src/mutations/insert-builder';
 import type { OrmContext } from '../../src/orm/context';
@@ -49,30 +49,10 @@ describe('insert builder', () => {
     sources: {},
   };
 
-  const adapter = {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(_ast: unknown, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      return {
-        profileId: 'stub-profile',
-        body: Object.freeze({
-          sql: 'INSERT INTO user (id, email) VALUES ($1, $2)',
-          params: ctx.params ? [...ctx.params] : [],
-        }),
-      };
-    },
-  };
-
   const context: OrmContext<SqlContract<SqlStorage>> = {
     contract,
-    adapter: adapter as unknown as OrmContext<SqlContract<SqlStorage>>['adapter'],
-    context: {} as unknown as RuntimeContext<SqlContract<SqlStorage>>,
+    operations: createOperationRegistry(),
+    codecs: createCodecRegistry(),
   };
 
   describe('convertModelFieldsToColumns', () => {
@@ -208,13 +188,13 @@ describe('insert builder', () => {
         lane: plan.meta.lane,
         tables: plan.meta.refs?.tables,
         astKind: (plan.ast as InsertAst).kind,
-        sql: plan.sql,
+        hasParams: plan.params.length > 0,
       }).toMatchObject({
         defined: true,
         lane: 'orm',
         tables: ['user'],
         astKind: 'insert',
-        sql: 'INSERT INTO user (id, email) VALUES ($1, $2)',
+        hasParams: true,
       });
     });
 

@@ -8,6 +8,7 @@ import type {
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { Log, Plugin, SqlStatement } from '../src/exports';
@@ -25,7 +26,7 @@ import type { Extension, RuntimeContext } from '../src/sql-context';
  * This helper DRYs up the common pattern of executing plans in tests.
  * The return type is inferred from the plan's type parameter.
  */
-export async function executePlanAndCollect<P extends Plan>(
+export async function executePlanAndCollect<P extends Plan | SqlQueryPlan<unknown>>(
   runtime: ReturnType<typeof createRuntime>,
   plan: P,
 ): Promise<ResultType<P>[]> {
@@ -39,7 +40,7 @@ export async function executePlanAndCollect<P extends Plan>(
  */
 export async function drainPlanExecution(
   runtime: ReturnType<typeof createRuntime>,
-  plan: Plan,
+  plan: Plan | SqlQueryPlan<unknown>,
 ): Promise<void> {
   return drainAsyncIterable(runtime.execute(plan));
 }
