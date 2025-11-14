@@ -504,14 +504,16 @@ const deletePlan = o.user().delete(
 
 - **Plans are immutable** - Built once, never mutated
 - **One query = one statement** - No hidden multi-queries
-- **Unified Plan interface** - All plans use the same `Plan<Row>` interface per ADR 011:
+- **Unified Plan interface** - All plans use the same `ExecutionPlan<Row, Ast>` interface per ADR 011 (with `Plan<Row>` as a legacy alias in the current implementation):
   ```typescript
-  interface Plan<Row = unknown> {
+  interface ExecutionPlan<Row = unknown, Ast = unknown> {
     readonly sql: string;
     readonly params: readonly unknown[];
-    readonly ast?: SelectAst;  // Optional - present for DSL plans
+    readonly ast?: Ast;        // Optional - present for lanes that build an AST
     readonly meta: PlanMeta;   // Unified metadata with lane as string
   }
+  // For backwards compatibility, Plan<Row> is a type alias for ExecutionPlan<Row, unknown>
+  type Plan<Row = unknown> = ExecutionPlan<Row, unknown>;
   ```
 - **Core is lane-agnostic** - Never use discriminated unions based on `lane` field. The `lane` field is metadata only, not for type narrowing. Use optional fields (`ast?`) to distinguish capabilities.
 - **Plans include metadata**: `{ ast?, params, meta: { refs?, projection?, projectionTypes?, target, targetFamily?, coreHash, profileHash?, lane, annotations?, paramDescriptors } }`

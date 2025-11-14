@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { RuntimeContext } from './sql-context';
 
@@ -15,7 +15,7 @@ import type { RuntimeContext } from './sql-context';
 export function lowerSqlPlan<Row>(
   context: RuntimeContext,
   queryPlan: SqlQueryPlan<Row>,
-): Plan<Row> {
+): ExecutionPlan<Row> {
   const lowered = context.adapter.lower(queryPlan.ast, {
     contract: context.contract,
     params: queryPlan.params,

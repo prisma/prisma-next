@@ -16,43 +16,48 @@ Define a Unified Plan model used by all lanes and runtimes:
 ## Plan shape
 
 ```typescript
-export interface Plan<Row = unknown> {
+export interface ExecutionPlan<Row = unknown, Ast = unknown> {
   // Optional dialect-agnostic AST when available
-  ast?: QueryAST
+  ast?: Ast;
 
   // Always present
-  sql: string
-  params: unknown[]
+  sql: string;
+  params: unknown[];
 
   meta: {
-    target: 'postgres' | 'mysql' | 'sqlite'
-    coreHash: string
-    profileHash?: string
-    lane: 'dsl' | 'orm' | 'raw-sql' | 'typed-sql'
-    createdAt: string
+    target: 'postgres' | 'mysql' | 'sqlite';
+    coreHash: string;
+    profileHash?: string;
+    lane: 'dsl' | 'orm' | 'raw-sql' | 'typed-sql';
+    createdAt: string;
 
     // Optional structural hints for guardrails and DX
-    refs?: { tables: string[]; columns: Array<{ table: string; column: string }> }
-    projection?: Record<string, string> // alias → table.column
+    refs?: { tables: string[]; columns: Array<{ table: string; column: string }> };
+    projection?: Record<string, string>; // alias → table.column
 
     // Optional annotations for policy when AST is absent or incomplete
     annotations?: {
-      intent?: 'read' | 'write' | 'admin'
-      isMutation?: boolean
-      requiresWhereForMutation?: boolean
-      hasWhere?: boolean
-      hasLimit?: boolean
-      sensitivity?: 'none' | 'pii' | 'phi' | 'secrets'
-      ownerTag?: string
-      budget?: { maxRows?: number; maxLatencyMs?: number }
-      ext?: Record<string, unknown>
-    }
+      intent?: 'read' | 'write' | 'admin';
+      isMutation?: boolean;
+      requiresWhereForMutation?: boolean;
+      hasWhere?: boolean;
+      hasLimit?: boolean;
+      sensitivity?: 'none' | 'pii' | 'phi' | 'secrets';
+      ownerTag?: string;
+      budget?: { maxRows?: number; maxLatencyMs?: number };
+      ext?: Record<string, unknown>;
+    };
 
     // Optional codec info for param/row checks at boundaries
-    codecs?: { params?: unknown; row?: unknown }
-  }
+    codecs?: { params?: unknown; row?: unknown };
+  };
 }
 ```
+
+For compatibility with existing code and documentation, `Plan<Row>` in the
+implementation is a type alias for `ExecutionPlan<Row, unknown>`. New code
+should prefer the more explicit `ExecutionPlan<Row, Ast>` form when referring
+to the generic execution shape.
 
 ### Notes
 - `coreHash` and `profileHash` reference the canonical contract.json per ADR 004 and ADR 010

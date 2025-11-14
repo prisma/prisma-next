@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from './errors';
 import { computeSqlFingerprint } from './fingerprint';
@@ -36,7 +36,7 @@ export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = 
   readonly _typeContract?: TContract;
   readonly _typeAdapter?: TAdapter;
   readonly _typeDriver?: TDriver;
-  execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row>;
+  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterable<Row>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
@@ -110,7 +110,7 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     };
   }
 
-  private async verifyPlanIfNeeded(_plan: Plan): Promise<void> {
+  private async verifyPlanIfNeeded(_plan: ExecutionPlan): Promise<void> {
     void _plan;
     if (this.verify.mode === 'always') {
       this.verified = false;
@@ -159,11 +159,15 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     this.startupVerified = true;
   }
 
-  private validatePlan(plan: Plan): void {
+  private validatePlan(plan: ExecutionPlan): void {
     this.familyAdapter.validatePlan(plan, this.contract);
   }
 
-  private recordTelemetry(plan: Plan, outcome: TelemetryOutcome, durationMs?: number): void {
+  private recordTelemetry(
+    plan: ExecutionPlan,
+    outcome: TelemetryOutcome,
+    durationMs?: number,
+  ): void {
     const contract = this.contract as { target: string };
     this._telemetry = Object.freeze({
       lane: plan.meta.lane,
@@ -174,7 +178,7 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     });
   }
 
-  execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row> {
+  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterable<Row> {
     this.validatePlan(plan);
     this._telemetry = null;
 

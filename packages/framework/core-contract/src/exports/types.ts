@@ -9,6 +9,7 @@ export type {
   DocIndex,
   DocumentContract,
   DocumentStorage,
+  ExecutionPlan,
   Expr,
   FieldType,
   ParamDescriptor,
