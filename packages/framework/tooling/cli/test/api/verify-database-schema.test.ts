@@ -109,7 +109,7 @@ describe('verifyDatabaseSchema API', () => {
             // Mock config to remove verifySchema hook
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
-            vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
+            vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
               const config = await originalLoadConfig(path);
               const mockedVerify = config.family.verify
                 ? {
@@ -155,7 +155,7 @@ describe('verifyDatabaseSchema API', () => {
   it('throws error when DB URL is missing', async () => {
     const testSetup = setupIntegrationTestDirectoryFromFixtures(
       fixtureSubdir,
-      'prisma-next.config.ts',
+      'prisma-next.config.no-db-url.ts',
     );
     const testDir = testSetup.testDir;
     const cleanup = testSetup.cleanup;
