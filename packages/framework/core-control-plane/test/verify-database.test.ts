@@ -4,13 +4,24 @@ import { describe, expect, it, vi } from 'vitest';
 import { verifyDatabase } from '../src/actions/verify-database';
 import type { PrismaNextConfig } from '../src/config-types';
 import {
+  errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
-  errorQueryRunnerFactoryRequired,
   errorUnexpected,
 } from '../src/errors';
 
 // Helper to create a minimal config for testing
 function createTestConfig(overrides?: Partial<PrismaNextConfig>): PrismaNextConfig {
+  // Default readMarker implementation that returns a marker
+  const defaultReadMarker = vi.fn(async () => ({
+    coreHash: 'sha256:test',
+    profileHash: 'sha256:profile',
+    contractJson: null,
+    canonicalVersion: 1,
+    updatedAt: new Date(),
+    appTag: null,
+    meta: null,
+  }));
+
   return {
     family: {
       kind: 'family',
@@ -19,10 +30,7 @@ function createTestConfig(overrides?: Partial<PrismaNextConfig>): PrismaNextConf
       convertOperationManifest: vi.fn(),
       validateContractIR: vi.fn((contract: unknown) => contract),
       verify: {
-        readMarkerSql: () => ({
-          sql: 'SELECT core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta FROM prisma_next.contract_marker LIMIT 1',
-          params: [],
-        }),
+        readMarker: overrides?.family?.verify?.readMarker ?? defaultReadMarker,
       },
       ...overrides?.family,
     },
@@ -45,6 +53,22 @@ function createTestConfig(overrides?: Partial<PrismaNextConfig>): PrismaNextConf
         version: '15.0.0',
       },
       ...overrides?.adapter,
+    },
+    driver: {
+      kind: 'driver',
+      id: 'postgres',
+      family: 'sql',
+      manifest: {
+        id: 'postgres',
+        version: '15.0.0',
+      },
+      create: vi.fn(async () => ({
+        query: vi.fn(async () => ({
+          rows: [],
+        })),
+        close: vi.fn(async () => {}),
+      })),
+      ...overrides?.driver,
     },
     ...overrides,
   };
@@ -85,26 +109,7 @@ function createTestContractIR(
 
 describe('verifyDatabase', () => {
   it('verifies database with matching marker', async () => {
-    const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [
-              {
-                core_hash: 'sha256:test',
-                profile_hash: 'sha256:profile',
-                contract_json: null,
-                canonical_version: 1,
-                updated_at: new Date(),
-                app_tag: null,
-                meta: null,
-              },
-            ],
-          }),
-          close: async () => {},
-        }),
-      },
-    });
+    const config = createTestConfig();
 
     const contractIR = createTestContractIR({ coreHash: 'sha256:test' });
 
@@ -123,13 +128,15 @@ describe('verifyDatabase', () => {
 
   it('returns error when marker is missing', async () => {
     const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [],
-          }),
-          close: async () => {},
-        }),
+      family: {
+        kind: 'family',
+        id: 'sql',
+        hook: {} as unknown,
+        convertOperationManifest: vi.fn(),
+        validateContractIR: vi.fn((contract: unknown) => contract),
+        verify: {
+          readMarker: vi.fn(async () => null), // Returns null when marker is missing
+        },
       },
     });
 
@@ -150,23 +157,23 @@ describe('verifyDatabase', () => {
 
   it('returns error when coreHash mismatch', async () => {
     const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [
-              {
-                core_hash: 'sha256:different',
-                profile_hash: 'sha256:profile',
-                contract_json: null,
-                canonical_version: 1,
-                updated_at: new Date(),
-                app_tag: null,
-                meta: null,
-              },
-            ],
-          }),
-          close: async () => {},
-        }),
+      family: {
+        kind: 'family',
+        id: 'sql',
+        hook: {} as unknown,
+        convertOperationManifest: vi.fn(),
+        validateContractIR: vi.fn((contract: unknown) => contract),
+        verify: {
+          readMarker: vi.fn(async () => ({
+            coreHash: 'sha256:different',
+            profileHash: 'sha256:profile',
+            contractJson: null,
+            canonicalVersion: 1,
+            updatedAt: new Date(),
+            appTag: null,
+            meta: null,
+          })),
+        },
       },
     });
 
@@ -188,23 +195,23 @@ describe('verifyDatabase', () => {
 
   it('returns error when profileHash mismatch', async () => {
     const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [
-              {
-                core_hash: 'sha256:test',
-                profile_hash: 'sha256:different-profile',
-                contract_json: null,
-                canonical_version: 1,
-                updated_at: new Date(),
-                app_tag: null,
-                meta: null,
-              },
-            ],
-          }),
-          close: async () => {},
-        }),
+      family: {
+        kind: 'family',
+        id: 'sql',
+        hook: {} as unknown,
+        convertOperationManifest: vi.fn(),
+        validateContractIR: vi.fn((contract: unknown) => contract),
+        verify: {
+          readMarker: vi.fn(async () => ({
+            coreHash: 'sha256:test',
+            profileHash: 'sha256:different-profile',
+            contractJson: null,
+            canonicalVersion: 1,
+            updatedAt: new Date(),
+            appTag: null,
+            meta: null,
+          })),
+        },
       },
     });
 
@@ -240,24 +247,6 @@ describe('verifyDatabase', () => {
           version: '8.0.0',
         },
       },
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [
-              {
-                core_hash: 'sha256:test',
-                profile_hash: 'sha256:profile',
-                contract_json: null,
-                canonical_version: 1,
-                updated_at: new Date(),
-                app_tag: null,
-                meta: null,
-              },
-            ],
-          }),
-          close: async () => {},
-        }),
-      },
     });
 
     const contractIR = createTestContractIR({ coreHash: 'sha256:test' });
@@ -276,9 +265,9 @@ describe('verifyDatabase', () => {
     expect(result.target.actual).toBe('postgres');
   });
 
-  it('throws error when queryRunnerFactory is missing', async () => {
+  it('throws error when driver is missing', async () => {
     const config = createTestConfig({
-      db: {},
+      driver: undefined,
     });
 
     const contractIR = createTestContractIR();
@@ -290,10 +279,10 @@ describe('verifyDatabase', () => {
         dbUrl: 'postgresql://test',
         contractPath: 'src/prisma/contract.json',
       }),
-    ).rejects.toThrow(errorQueryRunnerFactoryRequired());
+    ).rejects.toThrow(errorDriverRequired());
   });
 
-  it('throws error when family verify.readMarkerSql is missing', async () => {
+  it('throws error when family verify.readMarker is missing', async () => {
     const config = createTestConfig({
       family: {
         kind: 'family',
@@ -302,12 +291,6 @@ describe('verifyDatabase', () => {
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn((contract: unknown) => contract),
         verify: undefined,
-      },
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({ rows: [] }),
-          close: async () => {},
-        }),
       },
     });
 
@@ -324,26 +307,7 @@ describe('verifyDatabase', () => {
   });
 
   it('handles contract without profileHash', async () => {
-    const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [
-              {
-                core_hash: 'sha256:test',
-                profile_hash: 'sha256:profile',
-                contract_json: null,
-                canonical_version: 1,
-                updated_at: new Date(),
-                app_tag: null,
-                meta: null,
-              },
-            ],
-          }),
-          close: async () => {},
-        }),
-      },
-    });
+    const config = createTestConfig();
 
     const contractIR = createTestContractIR({ coreHash: 'sha256:test' });
     // ContractIR doesn't have profileHash, so it should be undefined
@@ -359,25 +323,33 @@ describe('verifyDatabase', () => {
     expect(result.contract.profileHash).toBeUndefined();
   });
 
-  it('handles query runner without close method', async () => {
+  it('handles driver close method being called', async () => {
+    const mockClose = vi.fn(async () => {});
     const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [
-              {
-                core_hash: 'sha256:test',
-                profile_hash: 'sha256:profile',
-                contract_json: null,
-                canonical_version: 1,
-                updated_at: new Date(),
-                app_tag: null,
-                meta: null,
-              },
-            ],
-          }),
-          // No close method
-        }),
+      family: {
+        kind: 'family',
+        id: 'sql',
+        hook: {} as unknown,
+        convertOperationManifest: vi.fn(),
+        validateContractIR: vi.fn((contract: unknown) => contract),
+        verify: {
+          readMarker: vi.fn(async () => null), // Marker missing
+        },
+      },
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        family: 'sql',
+        manifest: {
+          id: 'postgres',
+          version: '15.0.0',
+        },
+        create: vi.fn(async () => ({
+          query: vi.fn(async () => ({
+            rows: [],
+          })),
+          close: mockClose,
+        })),
       },
     });
 
@@ -390,42 +362,51 @@ describe('verifyDatabase', () => {
       contractPath: 'src/prisma/contract.json',
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false); // Marker missing
+    expect(mockClose).toHaveBeenCalled(); // Driver should be closed
   });
 
   it('handles query result with rows but undefined first row', async () => {
+    // This test is no longer applicable since readMarker returns ContractMarkerRecord | null
+    // The executor handles this internally, so we test that readMarker returns null when marker is missing
     const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [undefined, {}],
-          }),
-          close: async () => {},
-        }),
+      family: {
+        kind: 'family',
+        id: 'sql',
+        hook: {} as unknown,
+        convertOperationManifest: vi.fn(),
+        validateContractIR: vi.fn((contract: unknown) => contract),
+        verify: {
+          readMarker: vi.fn(async () => null),
+        },
       },
     });
 
     const contractIR = createTestContractIR();
 
-    await expect(
-      verifyDatabase({
-        config,
-        contractIR,
-        dbUrl: 'postgresql://test',
-        contractPath: 'src/prisma/contract.json',
-      }),
-    ).rejects.toThrow(errorUnexpected('Query returned rows but first row is undefined'));
+    const result = await verifyDatabase({
+      config,
+      contractIR,
+      dbUrl: 'postgresql://test',
+      contractPath: 'src/prisma/contract.json',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('PN-RTM-3001');
+    expect(result.summary).toBe('Marker missing');
   });
 
   it('handles invalid contract structure (missing coreHash or target)', async () => {
     const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => ({
-          query: async () => ({
-            rows: [],
-          }),
-          close: async () => {},
-        }),
+      family: {
+        kind: 'family',
+        id: 'sql',
+        hook: {} as unknown,
+        convertOperationManifest: vi.fn(),
+        validateContractIR: vi.fn((contract: unknown) => contract),
+        verify: {
+          readMarker: vi.fn(async () => null),
+        },
       },
     });
 
@@ -456,10 +437,17 @@ describe('verifyDatabase', () => {
 
   it('handles non-Error exceptions', async () => {
     const config = createTestConfig({
-      db: {
-        queryRunnerFactory: async () => {
-          throw 'String error';
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        family: 'sql',
+        manifest: {
+          id: 'postgres',
+          version: '15.0.0',
         },
+        create: vi.fn(async () => {
+          throw 'String error';
+        }),
       },
     });
 

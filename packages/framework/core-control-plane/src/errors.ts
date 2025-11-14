@@ -184,15 +184,15 @@ export function errorQueryRunnerFactoryRequired(options?: {
 }
 
 /**
- * Family verify.readMarkerSql is required but not provided.
+ * Family verify.readMarker is required but not provided.
  */
 export function errorFamilyReadMarkerSqlRequired(options?: {
   readonly why?: string;
 }): CliStructuredError {
-  return new CliStructuredError('4007', 'Family readMarkerSql() is required', {
+  return new CliStructuredError('4007', 'Family readMarker() is required', {
     domain: 'CLI',
-    why: options?.why ?? 'Family verify.readMarkerSql is required for db verify',
-    fix: 'Ensure family.verify.readMarkerSql() is exported by your family package',
+    why: options?.why ?? 'Family verify.readMarker is required for db verify',
+    fix: 'Ensure family.verify.readMarker() is exported by your family package',
     docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
   });
 }
