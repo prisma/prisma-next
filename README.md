@@ -22,14 +22,14 @@ git clone <repo>
 cd prisma-next
 pnpm install && pnpm build
 
-# 2. Start database (or however you start a local postgres DB)
-docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:15
+# 2. Start database
+pnpx prisma dev
 
 # 3. Set up and run the demo
 cd examples/prisma-next-demo
 
 # Create .env file with your database connection
-echo 'DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?schema=public' > .env
+echo 'DATABASE_URL=<tcp string from prisma dev>' > .env
 
 # Emit the contract (generates contract.json and contract.d.ts)
 pnpm emit
