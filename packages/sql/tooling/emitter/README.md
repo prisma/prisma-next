@@ -18,7 +18,8 @@ This package provides the SQL-specific emitter hook implementation for the Prism
 ## Dependencies
 
 - **Depends on**:
-  - `@prisma-next/emitter` (contract IR, `TargetFamilyHook` SPI, `ValidationContext`, `TypesImportSpec`)
+  - `@prisma-next/contract` (contract IR, `TargetFamilyHook` SPI, `ValidationContext`, `TypesImportSpec` - types moved to shared plane)
+  - `@prisma-next/emitter` (emitter core, `EmitOptions`, `EmitResult`)
   - `@prisma-next/sql-contract` (SQL contract type definitions)
 - **Depended on by**:
   - `@prisma-next/cli` (uses for contract emission)

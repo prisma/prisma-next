@@ -1,95 +1,27 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import type { VerifyDatabaseResult } from '@prisma-next/control-plane/executor';
+import { ControlExecutor } from '@prisma-next/control-plane/executor';
 import { loadConfig } from '../config-loader';
 import {
   errorDatabaseUrlRequired,
-  errorFamilyReadMarkerSqlRequired,
+  errorDriverRequired,
+  errorFamilyReadMarkerRequired,
   errorFileNotFound,
-  errorQueryRunnerFactoryRequired,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { parseContractMarkerRow } from '../utils/marker-parser';
 
 export interface VerifyDatabaseOptions {
   readonly dbUrl?: string;
   readonly configPath?: string;
 }
 
-export interface VerifyDatabaseResult {
-  readonly ok: boolean;
-  readonly code?: string;
-  readonly summary: string;
-  readonly contract: {
-    readonly coreHash: string;
-    readonly profileHash?: string;
-  };
-  readonly marker?: {
-    readonly coreHash?: string;
-    readonly profileHash?: string;
-  };
-  readonly target: {
-    readonly expected: string;
-    readonly actual?: string;
-  };
-  readonly missingCodecs?: readonly string[];
-  readonly codecCoverageSkipped?: boolean;
-  readonly meta?: {
-    readonly configPath?: string;
-    readonly contractPath: string;
-  };
-  readonly timings: {
-    readonly total: number;
-  };
-}
-
-/**
- * Extracts codec type IDs used in contract storage tables.
- * Uses type guards to safely access SQL-specific structure without importing SQL types.
- */
-function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
-  const typeIds = new Set<string>();
-
-  // Type guard for SQL contract structure
-  if (
-    typeof contract === 'object' &&
-    contract !== null &&
-    'storage' in contract &&
-    typeof contract.storage === 'object' &&
-    contract.storage !== null &&
-    'tables' in contract.storage
-  ) {
-    const storage = contract.storage as { tables?: Record<string, unknown> };
-    if (storage.tables && typeof storage.tables === 'object') {
-      for (const table of Object.values(storage.tables)) {
-        if (
-          typeof table === 'object' &&
-          table !== null &&
-          'columns' in table &&
-          typeof table.columns === 'object' &&
-          table.columns !== null
-        ) {
-          const columns = table.columns as Record<string, { type?: string } | undefined>;
-          for (const column of Object.values(columns)) {
-            if (
-              column &&
-              typeof column === 'object' &&
-              'type' in column &&
-              typeof column.type === 'string'
-            ) {
-              typeIds.add(column.type);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return Array.from(typeIds).sort();
-}
+// Re-export for backward compatibility
+export type { VerifyDatabaseResult } from '@prisma-next/control-plane/executor';
 
 /**
  * Programmatic API for verifying database contract markers.
- * Loads config and contract, uses config-provided query runner, reads marker via family helper, and compares hashes/target.
+ * Loads config and contract, uses driver to create ControlExecutor, and compares contract against database marker.
  *
  * @param options - Options for database verification
  * @returns Result with verification status, hashes, target info, codec coverage, meta, and timings
@@ -109,11 +41,6 @@ export async function verifyDatabase(
     const dbUrl = options.dbUrl ?? config.db?.url;
     if (!dbUrl) {
       throw errorDatabaseUrlRequired();
-    }
-
-    // Check for queryRunnerFactory
-    if (!config.db?.queryRunnerFactory) {
-      throw errorQueryRunnerFactoryRequired();
     }
 
     // Load contract from emitted artifacts
@@ -138,228 +65,58 @@ export async function verifyDatabase(
     // Validate contract using family validator
     const contractIR = config.family.validateContractIR(contractJson);
 
-    // Type guard to ensure contract has required properties
-    if (
-      typeof contractIR !== 'object' ||
-      contractIR === null ||
-      !('coreHash' in contractIR) ||
-      !('target' in contractIR) ||
-      typeof contractIR.coreHash !== 'string' ||
-      typeof contractIR.target !== 'string'
-    ) {
-      throw errorUnexpected('Invalid contract structure', {
-        why: 'Contract is missing required fields: coreHash or target',
-        fix: 'Re-emit the contract using `prisma-next contract emit`',
-      });
+    // Check for family verify.readMarker
+    if (!config.family.verify?.readMarker) {
+      throw errorFamilyReadMarkerRequired();
     }
 
-    // Extract contract hashes and target
-    const contractCoreHash = contractIR.coreHash;
-    const contractProfileHash =
-      'profileHash' in contractIR && typeof contractIR.profileHash === 'string'
-        ? contractIR.profileHash
-        : undefined;
-    const contractTarget = contractIR.target;
+    // Obtain driver: driver is required
+    if (!config.driver) {
+      throw errorDriverRequired();
+    }
+    const driver = await config.driver.create(dbUrl);
 
-    // Create query runner from factory (may be async for ESM dynamic imports)
-    const queryRunnerResult = config.db.queryRunnerFactory(dbUrl);
-    const queryRunner =
-      queryRunnerResult instanceof Promise ? await queryRunnerResult : queryRunnerResult;
+    // Create ControlExecutor
+    const executor = new ControlExecutor({
+      driver,
+      familyVerify: config.family.verify,
+      adapter: config.adapter,
+      target: config.target,
+      extensions: config.extensions ?? [],
+      contractIR,
+    });
 
     try {
-      // Get marker SQL from family verify helper
-      if (!config.family.verify?.readMarkerSql) {
-        throw errorFamilyReadMarkerSqlRequired();
-      }
-
-      const markerStatement = config.family.verify.readMarkerSql();
-      const queryResult = await queryRunner.query<{
-        core_hash: string;
-        profile_hash: string;
-        contract_json: unknown | null;
-        canonical_version: number | null;
-        updated_at: Date | string;
-        app_tag: string | null;
-        meta: unknown | null;
-      }>(markerStatement.sql, markerStatement.params);
-
-      // Compute codec coverage (optional)
-      let missingCodecs: readonly string[] | undefined;
-      let codecCoverageSkipped = false;
-      if (config.family.verify?.collectSupportedCodecTypeIds) {
-        const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-        const supportedTypeIds = config.family.verify.collectSupportedCodecTypeIds(descriptors);
-        if (supportedTypeIds.length === 0) {
-          // Helper is present but returns empty (MVP behavior)
-          // Coverage check is skipped - missingCodecs remains undefined
-          codecCoverageSkipped = true;
-        } else {
-          const supportedSet = new Set(supportedTypeIds);
-          const usedTypeIds = extractCodecTypeIdsFromContract(contractIR);
-          const missing = usedTypeIds.filter((id) => !supportedSet.has(id));
-          if (missing.length > 0) {
-            missingCodecs = missing;
-          }
+      // Verify contract against database
+      return await executor.verifyAgainst(
+        config.target.id,
+        startTime,
+        configPath,
+        contractJsonPath,
+      );
+    } catch (error) {
+      // Wrap errors from ControlExecutor in structured errors
+      if (error instanceof Error) {
+        // Check if it's the contract validation error
+        if (error.message.includes('Contract is missing required fields: coreHash or target')) {
+          throw errorUnexpected(error.message, {
+            why: error.message,
+          });
         }
+        // Check if it's the database query result structure error
+        if (error.message.includes('Database query returned unexpected result structure')) {
+          throw errorUnexpected(error.message, {
+            why: error.message,
+          });
+        }
+        throw error;
       }
-
-      // Check marker presence
-      if (queryResult.rows.length === 0) {
-        const totalTime = Date.now() - startTime;
-        return {
-          ok: false,
-          code: 'PN-RTM-3001',
-          summary: 'Marker missing',
-          contract: {
-            coreHash: contractCoreHash,
-            ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
-          },
-          target: {
-            expected: config.target.id,
-          },
-          ...(missingCodecs ? { missingCodecs } : {}),
-          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-          meta: {
-            ...(configPath ? { configPath } : {}),
-            contractPath: contractJsonPath,
-          },
-          timings: {
-            total: totalTime,
-          },
-        };
-      }
-
-      // Parse marker row
-      const markerRow = queryResult.rows[0];
-      if (!markerRow) {
-        throw errorUnexpected('Query returned rows but first row is undefined', {
-          why: 'Database query returned unexpected result structure',
-        });
-      }
-      const marker = parseContractMarkerRow(markerRow);
-
-      // Compare target
-      const expectedTarget = config.target.id;
-      if (contractTarget !== expectedTarget) {
-        const totalTime = Date.now() - startTime;
-        return {
-          ok: false,
-          code: 'PN-RTM-3003',
-          summary: 'Target mismatch',
-          contract: {
-            coreHash: contractCoreHash,
-            ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
-          },
-          marker: {
-            coreHash: marker.coreHash,
-            profileHash: marker.profileHash,
-          },
-          target: {
-            expected: expectedTarget,
-            actual: contractTarget,
-          },
-          ...(missingCodecs ? { missingCodecs } : {}),
-          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-          meta: {
-            ...(configPath ? { configPath } : {}),
-            contractPath: contractJsonPath,
-          },
-          timings: {
-            total: totalTime,
-          },
-        };
-      }
-
-      // Compare hashes
-      if (marker.coreHash !== contractCoreHash) {
-        const totalTime = Date.now() - startTime;
-        return {
-          ok: false,
-          code: 'PN-RTM-3002',
-          summary: 'Hash mismatch',
-          contract: {
-            coreHash: contractCoreHash,
-            ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
-          },
-          marker: {
-            coreHash: marker.coreHash,
-            profileHash: marker.profileHash,
-          },
-          target: {
-            expected: expectedTarget,
-          },
-          ...(missingCodecs ? { missingCodecs } : {}),
-          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-          meta: {
-            ...(configPath ? { configPath } : {}),
-            contractPath: contractJsonPath,
-          },
-          timings: {
-            total: totalTime,
-          },
-        };
-      }
-
-      // Compare profile hash if present
-      if (contractProfileHash && marker.profileHash !== contractProfileHash) {
-        const totalTime = Date.now() - startTime;
-        return {
-          ok: false,
-          code: 'PN-RTM-3002',
-          summary: 'Hash mismatch',
-          contract: {
-            coreHash: contractCoreHash,
-            ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
-          },
-          marker: {
-            coreHash: marker.coreHash,
-            profileHash: marker.profileHash,
-          },
-          target: {
-            expected: expectedTarget,
-          },
-          ...(missingCodecs ? { missingCodecs } : {}),
-          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-          meta: {
-            ...(configPath ? { configPath } : {}),
-            contractPath: contractJsonPath,
-          },
-          timings: {
-            total: totalTime,
-          },
-        };
-      }
-
-      // Success - all checks passed
-      const totalTime = Date.now() - startTime;
-      return {
-        ok: true,
-        summary: 'Database matches contract',
-        contract: {
-          coreHash: contractCoreHash,
-          ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
-        },
-        marker: {
-          coreHash: marker.coreHash,
-          profileHash: marker.profileHash,
-        },
-        target: {
-          expected: expectedTarget,
-        },
-        ...(missingCodecs ? { missingCodecs } : {}),
-        ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
-        meta: {
-          ...(configPath ? { configPath } : {}),
-          contractPath: contractJsonPath,
-        },
-        timings: {
-          total: totalTime,
-        },
-      };
+      throw errorUnexpected(String(error), {
+        why: String(error),
+      });
     } finally {
-      if (queryRunner.close) {
-        await queryRunner.close();
-      }
+      // Ensure driver connection is closed
+      await executor.close();
     }
   } catch (error) {
     if (error instanceof Error) {

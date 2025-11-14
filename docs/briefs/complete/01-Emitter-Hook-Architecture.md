@@ -33,7 +33,9 @@ Refactor the emitter to a hook-based architecture keyed by `targetFamily` (e.g.,
 
 ### SPI: Target Family Hook
 
-File: `packages/emitter/src/target-family.ts`
+File: `packages/framework/core-contract/src/types.ts` (shared plane)
+
+**Note**: `TargetFamilyHook`, `ValidationContext`, and `TypesImportSpec` are defined in `@prisma-next/contract/types` (shared plane) to allow both migration-plane (emitter) and shared-plane (control-plane) packages to import them without violating dependency rules. The emitter re-exports these types for backward compatibility.
 
 ```ts
 export interface ValidationContext {
@@ -62,9 +64,9 @@ export interface TargetFamilyHook {
 }
 ```
 
-**Note**: The emitter is manifest-agnostic. Hooks receive pre-assembled context (`ValidationContext` with `operationRegistry`, `codecTypeImports`, `operationTypeImports`, `extensionIds`), not extension packs. Assembly happens in the family layer and is exposed via the app’s config (`family` export) so the CLI remains family‑agnostic.
+**Note**: The emitter is manifest-agnostic. Hooks receive pre-assembled context (`ValidationContext` with `operationRegistry`, `codecTypeImports`, `operationTypeImports`, `extensionIds`), not extension packs. Assembly happens in the family layer and is exposed via the app's config (`family` export) so the CLI remains family‑agnostic.
 
-Core types (emitter): `ContractIR`, `TypesImportSpec`, `EmitOptions`, `ValidationContext`, `TargetFamilyHook`.
+Core types: `ContractIR` (from `@prisma-next/contract/ir`), `TypesImportSpec`, `ValidationContext`, `TargetFamilyHook` (from `@prisma-next/contract/types`), `EmitOptions`, `EmitResult` (from `@prisma-next/emitter`).
 
 ### Treat Adapters as Extension Packs
 

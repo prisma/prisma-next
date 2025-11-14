@@ -13,8 +13,10 @@ exports[`help text snapshots > formats contract emit help 1`] = `
 │ --color               Force color output
 │ --no-color            Disable color output
 │
-│ Reads your contract source (TypeScript or Prisma schema) and emits contract.json and
-│ contract.d.ts. The contract.json contains the canonical contract structure, and
+│ Reads your contract source (TypeScript or Prisma schema) and emits
+│ contract.json and
+│ contract.d.ts. The contract.json contains the canonical contract structure,
+│ and
 │ contract.d.ts provides TypeScript types for type-safe query building.
 └
 "
@@ -33,8 +35,10 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 │ --color               Force color output
 │ --no-color            Disable color output
 │
-│ Reads your contract source (TypeScript or Prisma schema) and emits contract.json and
-│ contract.d.ts. The contract.json contains the canonical contract structure, and
+│ Reads your contract source (TypeScript or Prisma schema) and emits
+│ contract.json and
+│ contract.d.ts. The contract.json contains the canonical contract structure,
+│ and
 │ contract.d.ts provides TypeScript types for type-safe query building.
 └
 "
@@ -54,8 +58,10 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │ --color               Force color output
 │ --no-color            Disable color output
 │
-│ Verifies that your database schema matches the emitted contract. Checks table structures,
-│ column types, constraints, and codec coverage. Reports any mismatches or missing codecs.
+│ Verifies that your database schema matches the emitted contract. Checks table
+│ structures,
+│ column types, constraints, and codec coverage. Reports any mismatches or
+│ missing codecs.
 └
 "
 `;
@@ -66,8 +72,9 @@ exports[`help text snapshots > formats root help 1`] = `
 │ └─ db               
 │    └─ verify          Check the database satisfies your contract
 │
-│ Use Prisma Next to define your data layer as a contract. Sign your database and application with the same
-│ contract to guarantee compatibility. Plan and apply migrations to safely evolve your schema.
+│ Use Prisma Next to define your data layer as a contract. Sign your database
+│ and application with the same contract to guarantee compatibility. Plan and
+│ apply migrations to safely evolve your schema.
 └
 "
 `;
@@ -78,8 +85,9 @@ exports[`help text snapshots > formats root help with no color 1`] = `
 │ └─ db               
 │    └─ verify          Check the database satisfies your contract
 │
-│ Use Prisma Next to define your data layer as a contract. Sign your database and application with the same
-│ contract to guarantee compatibility. Plan and apply migrations to safely evolve your schema.
+│ Use Prisma Next to define your data layer as a contract. Sign your database
+│ and application with the same contract to guarantee compatibility. Plan and
+│ apply migrations to safely evolve your schema.
 └
 "
 `;

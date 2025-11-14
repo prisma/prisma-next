@@ -1,5 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ValidationContext } from '@prisma-next/emitter';
+import type { ValidationContext } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 

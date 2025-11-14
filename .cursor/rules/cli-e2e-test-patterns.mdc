@@ -26,7 +26,7 @@ packages/framework/tooling/cli/test/cli-e2e-test-app/
 **Test execution:**
 - Each test creates an ephemeral directory (e.g., `test-1234567890-abc123/`)
 - Files are copied from the fixture subdirectory to the ephemeral directory
-- The static `package.json` is copied to provide dependencies
+- Test directories are subdirectories of the fixture app and inherit workspace dependencies from the parent `package.json` at the root
 - Tests run commands from within the ephemeral directory
 
 ## Pattern
@@ -47,17 +47,22 @@ describe('command e2e tests', () => {
       'prisma-next.config.emit.ts',  // Config file name
       { '{{PLACEHOLDER}}': 'value' }, // Optional replacements
     );
-    testDir = testSetup.testDir;
-    configPath = testSetup.configPath;
-    cleanupDir = testSetup.cleanup;
+    const testDir = testSetup.testDir;
+    const configPath = testSetup.configPath;
+    const cleanupDir = testSetup.cleanup;
 
-    // Run command from testDir
-    const originalCwd = process.cwd();
     try {
-      process.chdir(testDir);
-      await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+      // Run command from testDir
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDir);
+        await executeCommand(command, ['--config', 'prisma-next.config.ts']);
+      } finally {
+        process.chdir(originalCwd);
+      }
     } finally {
-      process.chdir(originalCwd);
+      // Each test must clean up its own directory
+      cleanupDir();
     }
   });
 });
@@ -82,13 +87,17 @@ describe('command e2e tests', () => {
 
 1. **Static `package.json`**: The `package.json` at the root of `cli-e2e-test-app` must have dependencies installed via `pnpm install`. This ensures workspace packages can be resolved when loading config files.
 
-2. **Fixture organization**: Organize fixtures by command in subdirectories. This keeps related fixtures together and makes it easy to find command-specific configs.
+2. **No package.json in test directories**: Test directories are subdirectories of the fixture app and inherit workspace dependencies from the parent `package.json` at the root. jiti will resolve workspace packages by walking up to find the parent `package.json`. This avoids pnpm workspace conflicts when multiple test directories exist.
 
-3. **Placeholder replacement**: Use placeholders like `{{DB_URL}}` in fixture configs and replace them at test time. This allows tests to inject dynamic values (e.g., database connection strings).
+3. **Fixture organization**: Organize fixtures by command in subdirectories. This keeps related fixtures together and makes it easy to find command-specific configs.
 
-4. **Ephemeral directories**: Each test gets its own directory, ensuring isolation. Directories are automatically cleaned up after tests.
+4. **Placeholder replacement**: Use placeholders like `{{DB_URL}}` in fixture configs and replace them at test time. This allows tests to inject dynamic values (e.g., database connection strings).
 
-5. **Module resolution**: Tests run from within the ephemeral directory, which is a sibling of `cli-e2e-test-app`. Node's module resolution walks up to find `node_modules`, allowing workspace packages to be resolved correctly.
+5. **Ephemeral directories**: Each test gets its own directory, ensuring isolation. Each test must clean up its own directory.
+
+6. **Cleanup responsibility**: Each test is responsible for cleaning up its own directory. Use `afterEach` hooks for tests that set up directories in `beforeEach`, or call `cleanupDir()` in `finally` blocks for tests that create directories within individual test cases. **Never use `afterAll` hooks for cleanup** - they can interfere with tests that are still running and cause race conditions. **Never use global cleanup functions** that scan and delete directories - this causes race conditions when tests run in parallel.
+
+7. **Module resolution**: Tests run from within the ephemeral directory, which is a subdirectory of the fixture app. Node's module resolution walks up to find the parent `package.json` and `node_modules`, allowing workspace packages to be resolved correctly.
 
 ## When to Use
 
@@ -121,6 +130,33 @@ const testSetup = setupTestDirectoryFromFixtures(
   'prisma-next.config.with-db.ts',
   { '{{DB_URL}}': connectionString },
 );
+const cleanupDir = testSetup.cleanup;
+
+try {
+  // ... test code ...
+} finally {
+  cleanupDir(); // Each test cleans up its own directory
+}
+```
+
+**Using afterEach for cleanup:**
+```typescript
+describe('command tests', () => {
+  let cleanupDir: () => void;
+
+  beforeEach(() => {
+    const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir);
+    cleanupDir = testSetup.cleanup;
+  });
+
+  afterEach(() => {
+    cleanupDir(); // Clean up after each test
+  });
+
+  it('test description', async () => {
+    // ... test code ...
+  });
+});
 ```
 
 ## Related Patterns

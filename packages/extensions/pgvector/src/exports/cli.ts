@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionDescriptor } from '@prisma-next/cli/config-types';
-import type { ExtensionPackManifest } from '@prisma-next/cli/pack-manifest-types';
+import type { ExtensionPackManifest } from '@prisma-next/control-plane/pack-manifest-types';
 import { type } from 'arktype';
 
 const __filename = fileURLToPath(import.meta.url);

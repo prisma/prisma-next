@@ -1,0 +1,44 @@
+{
+  "name": "@prisma-next/control-plane",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Control plane types and executor for Prisma Next database operations",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
+    "clean": "node ../../../scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/operations": "workspace:*"
+  },
+  "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.1"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
+    },
+    "./executor": {
+      "types": "./dist/exports/executor.d.ts",
+      "import": "./dist/exports/executor.js"
+    },
+    "./pack-manifest-types": {
+      "types": "./dist/pack-manifest-types.d.ts",
+      "import": "./dist/pack-manifest-types.js"
+    }
+  }
+}

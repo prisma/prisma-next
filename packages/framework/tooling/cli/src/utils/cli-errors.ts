@@ -170,29 +170,27 @@ export function errorDatabaseUrlRequired(options?: { readonly why?: string }): C
 }
 
 /**
- * Query runner factory is required but not provided in config.
+ * Family verify.readMarker is required but not provided.
  */
-export function errorQueryRunnerFactoryRequired(options?: {
+export function errorFamilyReadMarkerRequired(options?: {
   readonly why?: string;
 }): CliStructuredError {
-  return new CliStructuredError('4006', 'Query runner factory is required', {
+  return new CliStructuredError('4007', 'Family readMarker() is required', {
     domain: 'CLI',
-    why: options?.why ?? 'Config.db.queryRunnerFactory is required for db verify',
-    fix: 'Add db.queryRunnerFactory to prisma-next.config.ts',
+    why: options?.why ?? 'Family verify.readMarker is required for db verify',
+    fix: 'Ensure family.verify.readMarker() is exported by your family package',
     docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
   });
 }
 
 /**
- * Family verify.readMarkerSql is required but not provided.
+ * Driver is required for DB-connected commands but not provided.
  */
-export function errorFamilyReadMarkerSqlRequired(options?: {
-  readonly why?: string;
-}): CliStructuredError {
-  return new CliStructuredError('4007', 'Family readMarkerSql() is required', {
+export function errorDriverRequired(options?: { readonly why?: string }): CliStructuredError {
+  return new CliStructuredError('4010', 'Driver is required for DB-connected commands', {
     domain: 'CLI',
-    why: options?.why ?? 'Family verify.readMarkerSql is required for db verify',
-    fix: 'Ensure family.verify.readMarkerSql() is exported by your family package',
+    why: options?.why ?? 'Config.driver is required for db verify',
+    fix: 'Add driver to prisma-next.config.ts',
     docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
   });
 }

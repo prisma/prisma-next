@@ -1,15 +1,17 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresDriver from '@prisma-next/driver-postgres/cli';
 import sql from '@prisma-next/family-sql/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
 import { contract } from './contract';
 
-// This config includes db.queryRunnerFactory and db.url
+// This config includes driver and db.url
 // The db.url will be replaced at runtime in tests
 export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
+  driver: postgresDriver,
   extensions: [],
   contract: {
     source: contract,
@@ -18,21 +20,5 @@ export default defineConfig({
   },
   db: {
     url: '{{DB_URL}}', // Placeholder to be replaced in tests
-    queryRunnerFactory: async (url) => {
-      // @ts-expect-error - pg types are not available in test fixtures
-      const pg = await import('pg');
-      const { Client } = pg;
-      const client = new Client({ connectionString: url });
-      await client.connect();
-      return {
-        query: async (sql, params) => {
-          const result = await client.query(sql, params);
-          return { rows: result.rows };
-        },
-        close: async () => {
-          await client.end();
-        },
-      };
-    },
   },
 });

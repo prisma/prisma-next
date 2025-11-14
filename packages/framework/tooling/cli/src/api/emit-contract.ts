@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TargetFamilyHook, TypesImportSpec } from '@prisma-next/emitter';
+import type { TargetFamilyHook, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import type { OperationRegistry } from '@prisma-next/operations';
 
