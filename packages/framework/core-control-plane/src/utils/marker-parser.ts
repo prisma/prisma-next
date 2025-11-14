@@ -83,3 +83,4 @@ export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
     meta: parseMeta(validatedRow.meta),
   };
 }
+

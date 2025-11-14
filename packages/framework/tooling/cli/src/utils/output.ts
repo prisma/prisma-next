@@ -4,8 +4,21 @@ import type { Command } from 'commander';
 import stringWidth from 'string-width';
 import stripAnsi from 'strip-ansi';
 import wrapAnsi from 'wrap-ansi';
-import type { EmitContractResult } from '../api/emit-contract';
-import type { VerifyDatabaseResult } from '../api/verify-database';
+// EmitContractResult type for CLI output formatting (includes file paths)
+export interface EmitContractResult {
+  readonly coreHash: string;
+  readonly profileHash: string;
+  readonly outDir: string;
+  readonly files: {
+    readonly json: string;
+    readonly dts: string;
+  };
+  readonly timings: {
+    readonly total: number;
+  };
+}
+
+import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/verify-database';
 import type { CliErrorEnvelope } from './cli-errors';
 import { getLongDescription } from './command-helpers';
 import type { GlobalFlags } from './global-flags';

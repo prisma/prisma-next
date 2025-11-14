@@ -1,8 +1,4 @@
-/**
- * Re-export all domain error factories from core-control-plane for convenience.
- * CLI-specific errors (e.g., Commander.js argument validation) can be added here if needed.
- */
-export type { CliErrorEnvelope } from '@prisma-next/core-control-plane/errors';
+export type { CliErrorEnvelope } from '../errors';
 export {
   CliStructuredError,
   errorConfigFileNotFound,
@@ -18,4 +14,5 @@ export {
   errorTargetMismatch,
   errorRuntime,
   errorUnexpected,
-} from '@prisma-next/core-control-plane/errors';
+} from '../errors';
+

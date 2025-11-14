@@ -13,6 +13,12 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/framework/core-control-plane/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "migration"
+    },
+    {
       "glob": "packages/framework/authoring/contract-authoring/**",
       "domain": "framework",
       "layer": "authoring",

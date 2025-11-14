@@ -1,17 +1,17 @@
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { loadConfig } from '../config-loader';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { PrismaNextConfig } from '../config-types';
 import {
-  errorDatabaseUrlRequired,
   errorFamilyReadMarkerSqlRequired,
-  errorFileNotFound,
   errorQueryRunnerFactoryRequired,
   errorUnexpected,
-} from '../utils/cli-errors';
+} from '../errors';
 import { parseContractMarkerRow } from '../utils/marker-parser';
 
 export interface VerifyDatabaseOptions {
-  readonly dbUrl?: string;
+  readonly config: PrismaNextConfig;
+  readonly contractIR: ContractIR;
+  readonly dbUrl: string;
+  readonly contractPath?: string;
   readonly configPath?: string;
 }
 
@@ -89,54 +89,25 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
 
 /**
  * Programmatic API for verifying database contract markers.
- * Loads config and contract, uses config-provided query runner, reads marker via family helper, and compares hashes/target.
+ * Accepts config object, ContractIR, and dbUrl (no file I/O).
+ * Uses config-provided query runner, reads marker via family helper, and compares hashes/target.
  *
  * @param options - Options for database verification
  * @returns Result with verification status, hashes, target info, codec coverage, meta, and timings
- * @throws Error if config/contract loading or database connection fails
+ * @throws Error if database connection fails or verification fails
  */
 export async function verifyDatabase(
-  options: VerifyDatabaseOptions = {},
+  options: VerifyDatabaseOptions,
 ): Promise<VerifyDatabaseResult> {
   const startTime = Date.now();
 
   try {
-    // Load config
-    const config = await loadConfig(options.configPath);
-    const configPath = options.configPath;
-
-    // Resolve database URL
-    const dbUrl = options.dbUrl ?? config.db?.url;
-    if (!dbUrl) {
-      throw errorDatabaseUrlRequired();
-    }
+    const { config, contractIR, dbUrl, contractPath, configPath } = options;
 
     // Check for queryRunnerFactory
     if (!config.db?.queryRunnerFactory) {
       throw errorQueryRunnerFactoryRequired();
     }
-
-    // Load contract from emitted artifacts
-    // Resolve contract path relative to current working directory (project root)
-    const contractPath = config.contract?.output ?? 'src/prisma/contract.json';
-    const contractJsonPath = resolve(contractPath);
-    let contractJsonContent: string;
-    try {
-      contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    } catch (error) {
-      if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-        throw errorFileNotFound(contractJsonPath, {
-          why: `Contract file not found at ${contractJsonPath}`,
-        });
-      }
-      throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
-      });
-    }
-    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-
-    // Validate contract using family validator
-    const contractIR = config.family.validateContractIR(contractJson);
 
     // Type guard to ensure contract has required properties
     if (
@@ -221,7 +192,7 @@ export async function verifyDatabase(
           ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
           meta: {
             ...(configPath ? { configPath } : {}),
-            contractPath: contractJsonPath,
+            contractPath: contractPath ?? 'unknown',
           },
           timings: {
             total: totalTime,
@@ -262,7 +233,7 @@ export async function verifyDatabase(
           ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
           meta: {
             ...(configPath ? { configPath } : {}),
-            contractPath: contractJsonPath,
+            contractPath: contractPath ?? 'unknown',
           },
           timings: {
             total: totalTime,
@@ -292,7 +263,7 @@ export async function verifyDatabase(
           ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
           meta: {
             ...(configPath ? { configPath } : {}),
-            contractPath: contractJsonPath,
+            contractPath: contractPath ?? 'unknown',
           },
           timings: {
             total: totalTime,
@@ -322,7 +293,7 @@ export async function verifyDatabase(
           ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
           meta: {
             ...(configPath ? { configPath } : {}),
-            contractPath: contractJsonPath,
+            contractPath: contractPath ?? 'unknown',
           },
           timings: {
             total: totalTime,
@@ -350,7 +321,7 @@ export async function verifyDatabase(
         ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
         meta: {
           ...(configPath ? { configPath } : {}),
-          contractPath: contractJsonPath,
+          contractPath: contractPath ?? 'unknown',
         },
         timings: {
           total: totalTime,
@@ -368,3 +339,4 @@ export async function verifyDatabase(
     throw new Error(`Failed to verify database: ${String(error)}`);
   }
 }
+

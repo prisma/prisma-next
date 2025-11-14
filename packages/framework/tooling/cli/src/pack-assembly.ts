@@ -6,8 +6,8 @@ import type {
   ExtensionDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
-} from './config-types';
-import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
+} from '@prisma-next/core-control-plane/config-types';
+import type { ExtensionPackManifest, OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
 
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).

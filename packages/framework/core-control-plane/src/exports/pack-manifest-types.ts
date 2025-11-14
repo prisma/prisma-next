@@ -1,4 +1,3 @@
-// Re-export core-control-plane pack manifest types for convenience
 export type {
   ArgSpecManifest,
   ExtensionPack,
@@ -6,4 +5,5 @@ export type {
   LoweringSpecManifest,
   OperationManifest,
   ReturnSpecManifest,
-} from '@prisma-next/core-control-plane/pack-manifest-types';
+} from '../pack-manifest-types';
+

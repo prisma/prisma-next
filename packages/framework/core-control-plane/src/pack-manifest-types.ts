@@ -44,3 +44,4 @@ export interface ExtensionPack {
   readonly manifest: ExtensionPackManifest;
   readonly path: string;
 }
+
