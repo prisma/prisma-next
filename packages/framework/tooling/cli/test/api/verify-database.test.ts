@@ -20,6 +20,7 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../../src/pack-assembly';
+import { CliStructuredError } from '../../src/utils/cli-errors';
 import { setupIntegrationTestDirectoryFromFixtures } from '../utils/test-helpers';
 
 // Fixture subdirectory for verify-database tests
@@ -88,7 +89,7 @@ describe('verifyDatabase API', () => {
   });
 
   it(
-    'verifies database with matching marker',
+    'verifies database with matching marker via driver',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -153,7 +154,7 @@ describe('verifyDatabase API', () => {
   );
 
   it(
-    'returns error when marker is missing',
+    'reports error when marker is missing via driver',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -326,6 +327,64 @@ describe('verifyDatabase API', () => {
           }
         },
         { acceleratePort: 54179, databasePort: 54180, shadowDatabasePort: 54181 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'reports PN-CLI-4010 when driver is missing',
+    async () => {
+      await withDevDatabase(
+        async ({ connectionString }) => {
+          // Use a fixture config that has family with readMarker but no driver
+          // Emit doesn't need driver, so we can use the no-driver config for everything
+          const testSetup = setupIntegrationTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.no-driver.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
+          const cleanup = testSetup.cleanup;
+
+          try {
+            // Emit contract using the config (emit doesn't need driver)
+            await emitContractFromConfig(configPath, testDir);
+
+            await withClient(connectionString, async (client) => {
+              // Setup marker schema and table
+              await executeStatement(client, ensureSchemaStatement);
+              await executeStatement(client, ensureTableStatement);
+              // withClient will close the client after this callback returns
+            });
+
+            // Try to verify with config that has no driver
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              try {
+                await verifyDatabase({
+                  dbUrl: connectionString,
+                  configPath: 'prisma-next.config.ts',
+                });
+                throw new Error('Expected verifyDatabase to throw');
+              } catch (error) {
+                // Verify it's the correct error code
+                expect(error).toBeInstanceOf(CliStructuredError);
+                if (error instanceof CliStructuredError) {
+                  expect(error.code).toBe('4010');
+                  expect(error.toEnvelope().code).toBe('PN-CLI-4010');
+                }
+              }
+            } finally {
+              process.chdir(originalCwd);
+            }
+          } finally {
+            cleanup();
+          }
+        },
+        { acceleratePort: 54062, databasePort: 54063, shadowDatabasePort: 54064 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -529,10 +588,9 @@ describe('verifyDatabase API', () => {
                 expect(error).toBeInstanceOf(Error);
                 // errorUnexpected returns a CliStructuredError with message "Unexpected error"
                 // and the why field contains "Contract is missing required fields: coreHash or target"
-                if (error && typeof error === 'object' && 'why' in error) {
-                  expect((error as { why?: string }).why).toContain(
-                    'Contract is missing required fields',
-                  );
+                if (error instanceof CliStructuredError) {
+                  expect(error.message).toBe('Unexpected error');
+                  expect(error.why).toContain('Contract is missing required fields');
                 } else {
                   const errorMessage = error instanceof Error ? error.message : String(error);
                   expect(errorMessage).toBe('Unexpected error');
@@ -567,31 +625,38 @@ describe('verifyDatabase API', () => {
           const cleanupWithDb = testSetup.cleanup;
 
           try {
-            await emitContractFromConfig(configPathWithDb, testDirWithDb);
+            const contractWithDb = await emitContractFromConfig(configPathWithDb, testDirWithDb);
 
             await withClient(connectionString, async (client) => {
               await executeStatement(client, ensureSchemaStatement);
               await executeStatement(client, ensureTableStatement);
+
+              // Write a marker so the query returns rows (needed to trigger the undefined row check)
+              const write = writeContractMarker({
+                coreHash: contractWithDb.coreHash,
+                profileHash: contractWithDb.profileHash ?? contractWithDb.coreHash,
+                contractJson: contractWithDb,
+                canonicalVersion: 1,
+              });
+              await executeStatement(client, write.insert);
             });
 
-            // Mock the query runner to return rows with undefined first element
+            // Mock the driver to return rows with undefined first element
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              if (!config.db?.queryRunnerFactory) {
-                throw new Error('config.db.queryRunnerFactory is required');
+              if (!config.driver) {
+                throw new Error('config.driver is required');
               }
-              const originalFactory = config.db.queryRunnerFactory;
-              const mockedDb = {
-                ...config.db,
-                queryRunnerFactory: async (dbUrl: string) => {
-                  const runnerResult = originalFactory(dbUrl);
-                  const runner =
-                    runnerResult instanceof Promise ? await runnerResult : runnerResult;
-                  const originalQuery = runner.query;
+              const originalCreate = config.driver.create;
+              const mockedDriver = {
+                ...config.driver,
+                create: async (url: string) => {
+                  const driver = await originalCreate(url);
+                  const originalQuery = driver.query;
                   return {
-                    ...runner,
+                    ...driver,
                     query: async <Row = Record<string, unknown>>(
                       sql: string,
                       params?: readonly unknown[],
@@ -609,7 +674,7 @@ describe('verifyDatabase API', () => {
               };
               return {
                 ...config,
-                db: mockedDb,
+                driver: mockedDriver,
               };
             });
 
@@ -626,8 +691,9 @@ describe('verifyDatabase API', () => {
                 expect(error).toBeInstanceOf(Error);
                 // errorUnexpected returns a CliStructuredError with message "Unexpected error"
                 // and the why field contains "Database query returned unexpected result structure"
-                if (error && typeof error === 'object' && 'why' in error) {
-                  expect((error as { why?: string }).why).toContain(
+                if (error instanceof CliStructuredError) {
+                  expect(error.message).toBe('Unexpected error');
+                  expect(error.why).toContain(
                     'Database query returned unexpected result structure',
                   );
                 } else {
@@ -748,23 +814,23 @@ describe('verifyDatabase API', () => {
           try {
             await emitContractFromConfig(configPathWithDb, testDirWithDb);
 
-            // Mock queryRunnerFactory to throw a non-Error
+            // Mock driver.create to throw a non-Error
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              if (!config.db) {
-                throw new Error('config.db is required');
+              if (!config.driver) {
+                throw new Error('config.driver is required');
               }
-              const mockedDb = {
-                ...config.db,
-                queryRunnerFactory: () => {
+              const mockedDriver = {
+                ...config.driver,
+                create: async () => {
                   throw 'String error instead of Error object';
                 },
               };
               return {
                 ...config,
-                db: mockedDb,
+                driver: mockedDriver,
               };
             });
 

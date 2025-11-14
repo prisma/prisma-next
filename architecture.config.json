@@ -13,6 +13,12 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/framework/core-control-plane/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/framework/authoring/contract-authoring/**",
       "domain": "framework",
       "layer": "authoring",
@@ -64,12 +70,6 @@
       "glob": "packages/sql/sql-runtime/**",
       "domain": "sql",
       "layer": "runtime",
-      "plane": "runtime"
-    },
-    {
-      "glob": "packages/compat/**",
-      "domain": "sql",
-      "layer": "adapters",
       "plane": "runtime"
     },
     {

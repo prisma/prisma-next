@@ -14,7 +14,6 @@
     "clean": "node ../../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*",
     "@prisma-next/plan": "workspace:*"
   },
   "devDependencies": {

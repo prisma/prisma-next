@@ -146,12 +146,10 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDirNoContract);
-        const exitCode = await executeCommand(command, [
-          '--config',
-          'prisma-next.config.ts',
-          '--json',
-        ]);
-        expect(exitCode).not.toBe(0);
+        // Command should throw for missing contract
+        await expect(
+          executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+        ).rejects.toThrow();
       } finally {
         process.chdir(originalCwd);
       }
@@ -220,8 +218,10 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDirInvalid);
-        const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
-        expect(exitCode).not.toBe(0);
+        // Command should throw for invalid contract
+        await expect(
+          executeCommand(command, ['--config', 'prisma-next.config.ts']),
+        ).rejects.toThrow();
       } finally {
         process.chdir(originalCwd);
       }
@@ -245,9 +245,10 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirDocument);
-          // The command should return non-zero exit code for unsupported family
-          const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
-          expect(exitCode).not.toBe(0);
+          // The command should throw for unsupported family
+          await expect(
+            executeCommand(command, ['--config', 'prisma-next.config.ts']),
+          ).rejects.toThrow();
         } finally {
           process.chdir(originalCwd);
         }
@@ -392,12 +393,10 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDirNoContract);
-        const exitCode = await executeCommand(command, [
-          '--config',
-          'prisma-next.config.ts',
-          '--json',
-        ]);
-        expect(exitCode).not.toBe(0);
+        // Command should throw for missing contract
+        await expect(
+          executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+        ).rejects.toThrow();
       } finally {
         process.chdir(originalCwd);
       }
@@ -505,15 +504,17 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirMissing);
-          const exitCode = await executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
-            '--config',
-            'prisma-next.config.ts',
-            '--json',
-          ]);
-          expect(exitCode).not.toBe(0);
+          // Command should throw for missing output or types
+          await expect(
+            executeCommand(command, [
+              'node',
+              'cli.js',
+              'emit',
+              '--config',
+              'prisma-next.config.ts',
+              '--json',
+            ]),
+          ).rejects.toThrow();
         } finally {
           process.chdir(originalCwd);
         }

@@ -21,6 +21,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/import-validation.mdc` — Layering rules and exceptions
 - `.cursor/rules/shared-plane-packages.mdc` — Pattern for creating shared plane packages
 - `.cursor/rules/multi-plane-packages.mdc` — Packages that span multiple planes (shared, migration, runtime)
+- `.cursor/rules/resolving-cyclic-dependencies.mdc` — How to resolve cyclic dependencies by checking for unused dependencies
 - `.cursor/rules/declarative-config.mdc` — Prefer declarative configuration over hardcoded logic
 - `architecture.config.json` — Domain/Layer/Plane map
 

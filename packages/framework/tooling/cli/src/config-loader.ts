@@ -207,6 +207,36 @@ function validateConfig(config: unknown): asserts config is PrismaNextConfig {
     }
   }
 
+  // Validate driver descriptor if present
+  if (configObj['driver'] !== undefined) {
+    const driver = configObj['driver'] as Record<string, unknown>;
+    if (driver['kind'] !== 'driver') {
+      throw errorConfigValidation('driver.kind', {
+        why: 'Config.driver must have kind: "driver"',
+      });
+    }
+    if (typeof driver['id'] !== 'string') {
+      throw errorConfigValidation('driver.id', {
+        why: 'Config.driver must have id: string',
+      });
+    }
+    if (typeof driver['family'] !== 'string') {
+      throw errorConfigValidation('driver.family', {
+        why: 'Config.driver must have family: string',
+      });
+    }
+    if (!driver['manifest'] || typeof driver['manifest'] !== 'object') {
+      throw errorConfigValidation('driver.manifest', {
+        why: 'Config.driver must have manifest: ExtensionPackManifest',
+      });
+    }
+    if (typeof driver['create'] !== 'function') {
+      throw errorConfigValidation('driver.create', {
+        why: 'Config.driver must have create: function',
+      });
+    }
+  }
+
   // Validate contract config if present (structure validation - defineConfig() handles normalization)
   if (configObj['contract'] !== undefined) {
     const contract = configObj['contract'] as Record<string, unknown>;

@@ -1,10 +1,10 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ExtensionPackManifest } from '@prisma-next/control-plane/pack-manifest-types';
 import { describe, expect, it } from 'vitest';
 import {
   extractCodecTypeImportsFromPacks,
   extractOperationTypeImportsFromPacks,
 } from '../../../../framework/tooling/cli/src/pack-assembly';
-import type { ExtensionPackManifest } from '../../../../framework/tooling/cli/src/pack-manifest-types';
 import { sqlTargetFamilyHook } from '../src/index';
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {

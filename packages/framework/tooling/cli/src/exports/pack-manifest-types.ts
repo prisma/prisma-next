@@ -5,4 +5,4 @@ export type {
   LoweringSpecManifest,
   OperationManifest,
   ReturnSpecManifest,
-} from '../pack-manifest-types';
+} from '@prisma-next/control-plane/pack-manifest-types';

@@ -87,6 +87,7 @@ flowchart TD
 - Authoring surfaces determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly to `emit()`
 - No global registry or auto-registration - dependencies are explicit and passed directly
 - **Manifest-Agnostic**: Hooks receive pre-assembled context (operation registry, type imports, extension IDs), not extension packs. Manifest parsing and assembly happens in the CLI layer.
+- **Note**: `TargetFamilyHook`, `ValidationContext`, and `TypesImportSpec` types are defined in `@prisma-next/contract/types` (shared plane) and re-exported from this package for backward compatibility.
 
 ### Hashing (`hashing.ts`)
 - `computeCoreHash`: SHA-256 of schema structure (models, storage, relations)
@@ -97,7 +98,9 @@ flowchart TD
 - Excludes `_generated` metadata field from canonicalization to ensure determinism
 - Sorts object keys, omits default values, and orders top-level fields consistently
 
-**Note**: Extension pack loading and manifest parsing are CLI-only responsibilities. The emitter does not export pack loading functions. Import `loadExtensionPacks` from `@prisma-next/cli` or use the CLI's `pack-loading.ts` module directly. Manifest types (`ExtensionPack`, `ExtensionPackManifest`, `OperationManifest`) are defined in `packages/framework/tooling/cli/src/pack-manifest-types.ts`.
+**Note**: Extension pack loading and manifest parsing are CLI-only responsibilities. The emitter does not export pack loading functions. Import `loadExtensionPacks` from `@prisma-next/cli` or use the CLI's `pack-loading.ts` module directly. Manifest types (`ExtensionPack`, `ExtensionPackManifest`, `OperationManifest`) are defined in `@prisma-next/control-plane/pack-manifest-types`.
+
+**Note**: `TargetFamilyHook`, `ValidationContext`, and `TypesImportSpec` types are defined in `@prisma-next/contract/types` (shared plane) to allow both migration-plane (emitter) and shared-plane (control-plane) packages to import them without violating dependency rules. These types are re-exported from this package for backward compatibility.
 
 ## Dependencies
 

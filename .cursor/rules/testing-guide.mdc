@@ -48,6 +48,13 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - Use shared `cli-e2e-test-app` directory with static `package.json` at root
 - Organize fixtures by command in subdirectories (e.g., `fixtures/emit/`, `fixtures/db-verify/`)
 - Use `setupTestDirectoryFromFixtures()` helper to create ephemeral test directories
+- **Test Cleanup**: Each test must clean up its own directory. Use `afterEach` for directories created in `beforeEach`, or call `cleanup()` in `finally` blocks. **Never use `afterAll` hooks for cleanup** - they interfere with running tests and cause race conditions.
+
+**CLI Command Testing:**
+- Use `executeCommand()` helper from `test/utils/test-helpers.ts` to execute CLI commands
+- `executeCommand()` returns `0` for success and throws errors for failures (non-zero exit codes)
+- For error cases, use `await expect(executeCommand(...)).rejects.toThrow()` instead of checking exit codes
+- For success cases, `executeCommand()` returns `0` (doesn't throw)
 - See `.cursor/rules/cli-e2e-test-patterns.mdc` for details
 
 ## Common Patterns

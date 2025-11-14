@@ -216,9 +216,37 @@ export function formatVerifyJson(result: VerifyDatabaseResult): string {
 const LEFT_COLUMN_WIDTH = 20;
 
 /**
- * Maximum width for right column wrapping in help output.
+ * Minimum width for right column wrapping in help output.
+ */
+const RIGHT_COLUMN_MIN_WIDTH = 40;
+
+/**
+ * Maximum width for right column wrapping in help output (when terminal is wide enough).
  */
 const RIGHT_COLUMN_MAX_WIDTH = 90;
+
+/**
+ * Gets the terminal width, or returns a default if not available.
+ */
+function getTerminalWidth(): number {
+  // process.stdout.columns may be undefined in non-TTY environments
+  const terminalWidth = process.stdout.columns;
+  // Default to 80 if terminal width is not available, but allow override via env var
+  const defaultWidth = Number.parseInt(process.env['CLI_WIDTH'] || '80', 10);
+  return terminalWidth || defaultWidth;
+}
+
+/**
+ * Calculates the available width for the right column based on terminal width.
+ * Format: "│ " (2) + left column (20) + "  " (2) + right column = total
+ * So: right column = terminal width - 2 - 20 - 2 = terminal width - 24
+ */
+function calculateRightColumnWidth(): number {
+  const terminalWidth = getTerminalWidth();
+  const availableWidth = terminalWidth - 2 - LEFT_COLUMN_WIDTH - 2; // Subtract separators and left column
+  // Ensure minimum width, but don't exceed maximum
+  return Math.max(RIGHT_COLUMN_MIN_WIDTH, Math.min(availableWidth, RIGHT_COLUMN_MAX_WIDTH));
+}
 
 /**
  * Creates a simple arrow marker.
@@ -383,10 +411,12 @@ function formatMultilineDescription(options: {
   const lines: string[] = [];
   const formatGreen = (text: string) => (options.useColor ? green(text) : text);
 
-  // Calculate wrap width: left column (20) + gap (2) + right column (90) = 112 total
-  // Description line has "│ " prefix (2 chars), so text wraps at 112 - 2 = 110 characters
-  const totalWidth = LEFT_COLUMN_WIDTH + 2 + RIGHT_COLUMN_MAX_WIDTH; // 20 + 2 + 90 = 112
-  const wrapWidth = totalWidth - 2; // Subtract "│ " prefix = 110
+  // Calculate wrap width to align with right edge of right column
+  // Format: "│ " (2) + left column (20) + "  " (2) + right column = total
+  // Description line has "│ " prefix (2 chars), so text wraps at total - 2
+  const rightColumnWidth = calculateRightColumnWidth();
+  const totalWidth = 2 + LEFT_COLUMN_WIDTH + 2 + rightColumnWidth;
+  const wrapWidth = totalWidth - 2; // Subtract "│ " prefix
 
   for (const descLine of options.descriptionLines) {
     // Replace "Prisma Next" with green version if present
@@ -554,8 +584,9 @@ export function formatCommandHelp(options: {
         flagsColored = cyan(flagsColored);
       }
 
-      // Wrap description at 90 characters
-      const wrappedDescription = wrapTextAnsi(opt.description, RIGHT_COLUMN_MAX_WIDTH);
+      // Wrap description based on terminal width
+      const rightColumnWidth = calculateRightColumnWidth();
+      const wrappedDescription = wrapTextAnsi(opt.description, rightColumnWidth);
 
       // First line: flag + first line of description
       lines.push(`${formatDimText('│')} ${flagsColored}  ${wrappedDescription[0] || ''}`);
@@ -662,8 +693,9 @@ export function formatRootHelp(options: {
         flagsColored = cyan(flagsColored);
       }
 
-      // Wrap description at 90 characters
-      const wrappedDescription = wrapTextAnsi(opt.description, RIGHT_COLUMN_MAX_WIDTH);
+      // Wrap description based on terminal width
+      const rightColumnWidth = calculateRightColumnWidth();
+      const wrappedDescription = wrapTextAnsi(opt.description, rightColumnWidth);
 
       // First line: flag + first line of description
       lines.push(`${formatDimText('│')} ${flagsColored}  ${wrappedDescription[0] || ''}`);
