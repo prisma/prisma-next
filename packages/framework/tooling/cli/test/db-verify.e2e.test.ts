@@ -171,7 +171,8 @@ describe('db verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54190, databasePort: 54191, shadowDatabasePort: 54192 },
+        // Use random ports to avoid conflicts in CI (no options = random ports)
+        {},
       );
     },
     timeouts.spinUpPpgDev,

@@ -9,6 +9,9 @@ export default defineConfig({
     environment: 'node',
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
+    env: {
+      CI: 'true',
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
