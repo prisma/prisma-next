@@ -1,7 +1,9 @@
-import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SelectAst, TableRef } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
@@ -13,7 +15,6 @@ import type {
   NestedProjection,
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { buildDeletePlan } from '../mutations/delete-builder';
 import { buildInsertPlan } from '../mutations/insert-builder';
 import { buildUpdatePlan } from '../mutations/update-builder';
@@ -28,12 +29,7 @@ import type {
   OrmRelationFilterBuilder,
   OrmWhereProperty,
 } from '../orm-types';
-import {
-  buildMeta,
-  createPlan,
-  createPlanWithExists,
-  type MetaBuildArgs,
-} from '../plan/plan-assembly';
+import { buildMeta, type MetaBuildArgs } from '../plan/plan-assembly';
 import {
   buildExistsSubqueries,
   buildIncludeAsts,
@@ -55,7 +51,7 @@ export class OrmModelBuilderImpl<
   Row = unknown,
 > implements OrmModelBuilder<TContract, CodecTypes, ModelName, Row>
 {
-  private readonly context: RuntimeContext<TContract>;
+  private readonly context: QueryLaneContext<TContract>;
   private readonly contract: TContract;
   private readonly modelName: ModelName;
   private table: TableRef;
@@ -508,7 +504,7 @@ export class OrmModelBuilderImpl<
     >;
   }
 
-  findMany(options?: BuildOptions): Plan<Row> {
+  findMany(options?: BuildOptions): SqlQueryPlan<Row> {
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
     const contractTable = this.contract.storage.tables[this.table.name];
 
@@ -578,12 +574,6 @@ export class OrmModelBuilderImpl<
       this.limitValue,
     );
 
-    // Lower AST via adapter
-    const lowered = this.context.adapter.lower(ast, {
-      contract: this.contract,
-      params: paramValues,
-    });
-
     // Build plan metadata
     const planMeta = buildMeta({
       contract: this.contract,
@@ -596,9 +586,6 @@ export class OrmModelBuilderImpl<
       orderBy: this.orderByExpr,
     } as MetaBuildArgs);
 
-    // Create plan
-    const plan = createPlan<Row>(ast, lowered, paramValues, planMeta);
-
     // Compile relation filters to EXISTS subqueries and combine with main where clause
     if (this.relationFilters.length > 0) {
       const existsExprs = buildExistsSubqueries(
@@ -609,36 +596,44 @@ export class OrmModelBuilderImpl<
       );
       if (existsExprs.length > 0) {
         const combinedWhere = combineWhereClauses(ast.where, existsExprs);
-        const reLowered = this.context.adapter.lower(
-          {
-            ...ast,
-            ...(combinedWhere !== undefined ? { where: combinedWhere } : {}),
-          } as SelectAst,
-          {
-            contract: this.contract,
-            params: paramValues,
+        const modifiedAst: SelectAst = {
+          ...ast,
+          ...(combinedWhere !== undefined ? { where: combinedWhere } : {}),
+        };
+        return Object.freeze({
+          ast: modifiedAst,
+          params: paramValues,
+          meta: {
+            ...planMeta,
+            lane: 'orm',
           },
-        );
-        return createPlanWithExists<Row>(ast, combinedWhere, reLowered, paramValues, planMeta);
+        });
       }
     }
 
-    return plan;
+    return Object.freeze({
+      ast,
+      params: paramValues,
+      meta: {
+        ...planMeta,
+        lane: 'orm',
+      },
+    });
   }
 
-  findFirst(options?: BuildOptions): Plan<Row> {
-    const plan = this.take(1).findMany(options);
-    return plan;
+  findFirst(options?: BuildOptions): SqlQueryPlan<Row> {
+    const queryPlan = this.take(1).findMany(options);
+    return queryPlan;
   }
 
   findUnique(
     where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     options?: BuildOptions,
-  ): Plan<Row> {
+  ): SqlQueryPlan<Row> {
     return this.where(where).take(1).findMany(options);
   }
 
-  create(data: Record<string, unknown>, options?: BuildOptions): Plan<number> {
+  create(data: Record<string, unknown>, options?: BuildOptions): SqlQueryPlan<number> {
     const context = createOrmContext(this.context);
     return buildInsertPlan(context, this.modelName, data, options);
   }
@@ -647,7 +642,7 @@ export class OrmModelBuilderImpl<
     where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     data: Record<string, unknown>,
     options?: BuildOptions,
-  ): Plan<number> {
+  ): SqlQueryPlan<number> {
     const context = createOrmContext(this.context);
     return buildUpdatePlan<TContract, CodecTypes, ModelName>(
       context,
@@ -662,7 +657,7 @@ export class OrmModelBuilderImpl<
   delete(
     where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     options?: BuildOptions,
-  ): Plan<number> {
+  ): SqlQueryPlan<number> {
     const context = createOrmContext(this.context);
     return buildDeletePlan<TContract, CodecTypes, ModelName>(
       context,

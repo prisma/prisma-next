@@ -17,19 +17,18 @@ function loadContract(name: string): Contract {
 }
 
 describe('createSqlContext', () => {
-  it('creates SqlContext from RuntimeContext', () => {
+  it('creates SqlContext from QueryLaneContext', () => {
     const contract = loadContract('contract');
     const adapter = createStubAdapter();
     const runtimeContext = createTestContext(contract, adapter);
 
     const sqlContext = createSqlContext(runtimeContext);
 
-    expect(sqlContext).toHaveProperty('context');
     expect(sqlContext).toHaveProperty('contract');
-    expect(sqlContext).toHaveProperty('adapter');
-    expect(sqlContext.context).toBe(runtimeContext);
+    expect(sqlContext).toHaveProperty('operations');
+    expect(sqlContext).toHaveProperty('codecs');
     expect(sqlContext.contract).toBe(contract);
-    expect(sqlContext.adapter).toBe(adapter);
+    expect(sqlContext).toBe(runtimeContext);
   });
 
   it('preserves contract reference', () => {
@@ -43,13 +42,14 @@ describe('createSqlContext', () => {
     expect(sqlContext.contract.storage.tables).toBe(contract.storage.tables);
   });
 
-  it('preserves adapter reference', () => {
+  it('preserves operations and codecs references', () => {
     const contract = loadContract('contract');
     const adapter = createStubAdapter();
     const runtimeContext = createTestContext(contract, adapter);
 
     const sqlContext = createSqlContext(runtimeContext);
 
-    expect(sqlContext.adapter).toBe(adapter);
+    expect(sqlContext.operations).toBe(runtimeContext.operations);
+    expect(sqlContext.codecs).toBe(runtimeContext.codecs);
   });
 });

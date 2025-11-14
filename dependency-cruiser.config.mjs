@@ -68,13 +68,6 @@ const pushRule = (name, comment, sourceGroup, targetGroup) => {
   });
 };
 
-const isSqlLanesToRuntime = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'sql' &&
-  sourceGroup.layer === 'lanes' &&
-  sourceGroup.plane === 'runtime' &&
-  targetGroup.layer === 'runtime' &&
-  targetGroup.plane === 'runtime';
-
 const isCompatPrismaToSql = (sourceGroup, targetGroup) =>
   sourceGroup.domain === 'extensions' &&
   sourceGroup.layer === 'compat' &&
@@ -92,11 +85,6 @@ const createUpwardRules = () => {
 
       // SQL contract types are now in shared plane (sql/contract), so authoring can import from shared
       // No exception needed - authoring imports from shared, not targets
-
-      // TODO: lanes are currently aligned with runtime contracts; revisit once the runtime plane is further isolated
-      if (isSqlLanesToRuntime(sourceGroup, targetGroup)) {
-        continue;
-      }
 
       pushRule(
         `upward-${sourceGroup.key}-to-${targetGroup.layer}`,

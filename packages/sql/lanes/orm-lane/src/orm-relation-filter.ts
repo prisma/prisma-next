@@ -1,8 +1,8 @@
 import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyBinaryBuilder, AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
 
 export class OrmRelationFilterBuilderImpl<
@@ -11,7 +11,7 @@ export class OrmRelationFilterBuilderImpl<
   ChildModelName extends string,
 > implements OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>
 {
-  private readonly context: RuntimeContext<TContract>;
+  private readonly context: QueryLaneContext<TContract>;
   private readonly contract: TContract;
   private readonly childModelName: ChildModelName;
   private wherePredicate: AnyBinaryBuilder | undefined = undefined;

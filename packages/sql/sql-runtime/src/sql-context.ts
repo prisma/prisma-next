@@ -1,4 +1,3 @@
-import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
@@ -9,16 +8,13 @@ import type {
   QueryAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 
-export interface RuntimeContext<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-> {
-  readonly contract: TContract;
+export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
+  extends QueryLaneContext<TContract> {
   readonly adapter:
     | Adapter<QueryAst, TContract, LoweredStatement>
     | Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
-  readonly operations: OperationRegistry;
-  readonly codecs: CodecRegistry;
 }
 
 export interface Extension {

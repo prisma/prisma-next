@@ -16,12 +16,12 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/plan": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",

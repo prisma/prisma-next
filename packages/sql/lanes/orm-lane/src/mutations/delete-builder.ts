@@ -1,6 +1,6 @@
-import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { AnyBinaryBuilder, BuildOptions } from '@prisma-next/sql-relational-core/types';
 import type { OrmContext } from '../orm/context';
 import type { ModelColumnAccessor } from '../orm-types';
@@ -18,7 +18,7 @@ export function buildDeletePlan<
   where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
   getModelAccessor: () => ModelColumnAccessor<TContract, CodecTypes, ModelName>,
   options?: BuildOptions,
-): Plan<number> {
+): SqlQueryPlan<number> {
   const modelAccessor = getModelAccessor();
   const wherePredicate = where(modelAccessor);
 
@@ -54,16 +54,9 @@ export function buildDeletePlan<
     where: whereExpr,
   });
 
-  const lowered = context.adapter.lower(ast, {
-    contract: context.contract,
-    params: paramValues,
-  });
-  const loweredBody = lowered.body as LoweredStatement;
-
   return Object.freeze({
     ast,
-    sql: loweredBody.sql,
-    params: loweredBody.params ?? paramValues,
+    params: paramValues,
     meta: {
       target: context.contract.target,
       targetFamily: context.contract.targetFamily,
@@ -90,5 +83,5 @@ export function buildDeletePlan<
             },
           }),
     },
-  }) as Plan<number>;
+  });
 }

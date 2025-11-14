@@ -18,9 +18,11 @@ import type {
   SelectAst,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
+import { lowerSqlPlan } from './lower-sql-plan';
 import type { RuntimeContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
@@ -41,7 +43,7 @@ export interface RuntimeOptions<
 }
 
 export interface Runtime {
-  execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row>;
+  execute<Row = Record<string, unknown>>(plan: Plan<Row> | SqlQueryPlan<Row>): AsyncIterable<Row>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
@@ -58,12 +60,14 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     SqlDriver
   >;
   private readonly contract: TContract;
+  private readonly context: RuntimeContext<TContract>;
   private readonly codecRegistry: CodecRegistry;
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
     const { context, driver, verify, plugins, mode, log } = options;
     this.contract = context.contract;
+    this.context = context;
     this.codecRegistry = context.codecs;
     this.codecRegistryValidated = false;
 
@@ -102,22 +106,36 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     }
   }
 
-  execute<Row = Record<string, unknown>>(plan: Plan<Row>): AsyncIterable<Row> {
+  execute<Row = Record<string, unknown>>(plan: Plan<Row> | SqlQueryPlan<Row>): AsyncIterable<Row> {
     this.ensureCodecRegistryValidated(this.contract);
+
+    // Check if plan is SqlQueryPlan (has ast but no sql)
+    const isSqlQueryPlan = (p: Plan<Row> | SqlQueryPlan<Row>): p is SqlQueryPlan<Row> => {
+      return 'ast' in p && !('sql' in p);
+    };
+
+    // Lower SqlQueryPlan to Plan if needed
+    const executablePlan: Plan<Row> = isSqlQueryPlan(plan)
+      ? lowerSqlPlan(this.context, plan)
+      : plan;
 
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
-      const encodedParams = encodeParams(plan, self.codecRegistry);
+      const encodedParams = encodeParams(executablePlan, self.codecRegistry);
       const planWithEncodedParams: Plan<Row> = {
-        ...plan,
+        ...executablePlan,
         params: encodedParams,
       };
 
       const coreIterator = self.core.execute(planWithEncodedParams);
 
       for await (const rawRow of coreIterator) {
-        const decodedRow = decodeRow(rawRow as Record<string, unknown>, plan, self.codecRegistry);
+        const decodedRow = decodeRow(
+          rawRow as Record<string, unknown>,
+          executablePlan,
+          self.codecRegistry,
+        );
         yield decodedRow as Row;
       }
     };

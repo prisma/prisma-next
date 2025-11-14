@@ -1,7 +1,8 @@
-import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ColumnRef, LoweredStatement, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import type { ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { BuildOptions, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
 import type { OrmContext } from '../orm/context';
 import { createInsertAst, createParamRef, createTableRef } from '../utils/ast';
@@ -55,7 +56,7 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
   modelName: string,
   data: Record<string, unknown>,
   options?: BuildOptions,
-): Plan<number> {
+): SqlQueryPlan<number> {
   if (!data || Object.keys(data).length === 0) {
     errorCreateRequiresFields();
   }
@@ -113,16 +114,9 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
     values: insertValues,
   });
 
-  const lowered = context.adapter.lower(ast, {
-    contract: context.contract,
-    params: paramValues,
-  });
-  const loweredBody = lowered.body as LoweredStatement;
-
   return Object.freeze({
     ast,
-    sql: loweredBody.sql,
-    params: loweredBody.params ?? paramValues,
+    params: paramValues,
     meta: {
       target: context.contract.target,
       targetFamily: context.contract.targetFamily,
@@ -149,5 +143,5 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
             },
           }),
     },
-  }) as Plan<number>;
+  });
 }

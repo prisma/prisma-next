@@ -1,7 +1,7 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { Plan } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
@@ -151,8 +151,8 @@ describe('DSL Lane Codec Type Stamping', () => {
       })
       .build();
 
-    // Type check: Plan should be generic
-    const typedPlan: Plan = plan;
+    // Type check: SqlQueryPlan should be generic
+    const typedPlan: SqlQueryPlan = plan;
     expect(typedPlan).toBeDefined();
   });
 

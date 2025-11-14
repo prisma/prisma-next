@@ -17,13 +17,13 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/plan": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
@@ -61,6 +61,14 @@
     "./ast": {
       "types": "./dist/exports/ast.d.ts",
       "import": "./dist/exports/ast.js"
+    },
+    "./plan": {
+      "types": "./dist/exports/plan.d.ts",
+      "import": "./dist/exports/plan.js"
+    },
+    "./query-lane-context": {
+      "types": "./dist/exports/query-lane-context.d.ts",
+      "import": "./dist/exports/query-lane-context.js"
     }
   }
 }

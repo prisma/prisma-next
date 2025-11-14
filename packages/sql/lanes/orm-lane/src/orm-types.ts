@@ -1,5 +1,6 @@
-import type { Plan } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
@@ -9,11 +10,10 @@ import type {
   InferNestedProjectionRow,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import type { OrmIncludeChildBuilder } from './orm-include-child';
 
 export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {
-  readonly context: RuntimeContext<TContract>;
+  readonly context: QueryLaneContext<TContract>;
 }
 
 type ModelName<TContract extends SqlContract<SqlStorage>> = keyof TContract['models'] & string;
@@ -169,22 +169,22 @@ export interface OrmModelBuilder<
     ModelName,
     InferNestedProjectionRow<Projection, CodecTypes>
   >;
-  findMany(options?: BuildOptions): Plan<Row>;
-  findFirst(options?: BuildOptions): Plan<Row>;
+  findMany(options?: BuildOptions): SqlQueryPlan<Row>;
+  findFirst(options?: BuildOptions): SqlQueryPlan<Row>;
   findUnique(
     where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     options?: BuildOptions,
-  ): Plan<Row>;
-  create(data: Record<string, unknown>, options?: BuildOptions): Plan<number>;
+  ): SqlQueryPlan<Row>;
+  create(data: Record<string, unknown>, options?: BuildOptions): SqlQueryPlan<number>;
   update(
     where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     data: Record<string, unknown>,
     options?: BuildOptions,
-  ): Plan<number>;
+  ): SqlQueryPlan<number>;
   delete(
     where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
     options?: BuildOptions,
-  ): Plan<number>;
+  ): SqlQueryPlan<number>;
 }
 
 export type ModelColumnAccessor<
