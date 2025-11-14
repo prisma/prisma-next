@@ -1,10 +1,11 @@
-// Re-export core-control-plane config types for convenience
+// Re-export core-control-plane descriptor types for convenience
 export type {
   AdapterDescriptor,
-  ContractConfig,
   ExtensionDescriptor,
   FamilyDescriptor,
-  PrismaNextConfig,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/config-types';
-export { defineConfig } from '@prisma-next/core-control-plane/config-types';
+export type { DriverDescriptor } from '@prisma-next/core-control-plane/types';
+// Export CLI-specific config types (includes queryRunnerFactory)
+export type { ContractConfig, PrismaNextConfig } from '../config-types';
+export { defineConfig } from '../config-types';

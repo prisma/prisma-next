@@ -5,6 +5,8 @@ import type {
   ExtensionDescriptor,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
+import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { type } from 'arktype';
 
 const MetaSchema = type({ '[string]': 'unknown' });
@@ -155,4 +157,653 @@ export function collectSupportedCodecTypeIds(
   // or require manifests to explicitly list supported type IDs
   void descriptors;
   return [];
+}
+
+/**
+ * Schema issue types for database schema verification.
+ */
+type SchemaIssue = {
+  readonly kind:
+    | 'missing_table'
+    | 'missing_column'
+    | 'type_mismatch'
+    | 'nullability_mismatch'
+    | 'primary_key_mismatch'
+    | 'foreign_key_mismatch'
+    | 'unique_constraint_mismatch'
+    | 'index_mismatch'
+    | 'extension_missing';
+  readonly table: string;
+  readonly column?: string;
+  readonly indexOrConstraint?: string;
+  readonly expected?: string;
+  readonly actual?: string;
+  readonly message: string;
+};
+
+/**
+ * Database schema information from PostgreSQL information schema.
+ */
+interface DatabaseTable {
+  readonly name: string;
+  readonly columns: ReadonlyArray<DatabaseColumn>;
+  readonly primaryKey?: ReadonlyArray<string>;
+  readonly foreignKeys: ReadonlyArray<DatabaseForeignKey>;
+  readonly uniqueConstraints: ReadonlyArray<DatabaseUniqueConstraint>;
+  readonly indexes: ReadonlyArray<DatabaseIndex>;
+}
+
+interface DatabaseColumn {
+  readonly name: string;
+  readonly dataType: string;
+  readonly isNullable: boolean;
+}
+
+interface DatabaseForeignKey {
+  readonly columns: ReadonlyArray<string>;
+  readonly referencedTable: string;
+  readonly referencedColumns: ReadonlyArray<string>;
+  readonly constraintName: string;
+}
+
+interface DatabaseUniqueConstraint {
+  readonly columns: ReadonlyArray<string>;
+  readonly constraintName: string;
+}
+
+interface DatabaseIndex {
+  readonly name: string;
+  readonly columns: ReadonlyArray<string>;
+  readonly isUnique: boolean;
+}
+
+/**
+ * Query runner interface for schema verification.
+ */
+interface QueryRunner {
+  readonly query: <Row = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[],
+  ) => Promise<{ readonly rows: Row[] }>;
+  readonly close?: () => Promise<void>;
+}
+
+/**
+ * PostgreSQL type compatibility mapping.
+ * Maps contract type names to compatible database type names.
+ */
+const TYPE_COMPATIBILITY: Record<string, ReadonlyArray<string>> = {
+  // Integer types
+  integer: ['int4', 'integer', 'int2', 'int8', 'smallint', 'bigint'],
+  int: ['int4', 'integer', 'int2', 'int8', 'smallint', 'bigint'],
+  int4: ['int4', 'integer'],
+  int2: ['int2', 'smallint'],
+  int8: ['int8', 'bigint'],
+  smallint: ['int2', 'smallint'],
+  bigint: ['int8', 'bigint'],
+  // Text types
+  text: ['text', 'varchar', 'character varying', 'char', 'character'],
+  string: ['text', 'varchar', 'character varying', 'char', 'character'],
+  varchar: ['varchar', 'character varying', 'text'],
+  char: ['char', 'character', 'text'],
+  // Boolean types
+  boolean: ['boolean', 'bool'],
+  bool: ['boolean', 'bool'],
+  // Timestamp types
+  timestamp: [
+    'timestamp',
+    'timestamp without time zone',
+    'timestamptz',
+    'timestamp with time zone',
+  ],
+  timestamptz: [
+    'timestamptz',
+    'timestamp with time zone',
+    'timestamp',
+    'timestamp without time zone',
+  ],
+  // Date types
+  date: ['date'],
+  // Numeric types
+  numeric: ['numeric', 'decimal'],
+  decimal: ['numeric', 'decimal'],
+  // JSON types
+  json: ['json', 'jsonb'],
+  jsonb: ['jsonb', 'json'],
+  // UUID types
+  uuid: ['uuid'],
+  // Binary types
+  bytea: ['bytea'],
+};
+
+/**
+ * Checks if a contract type is compatible with a database type.
+ */
+function isTypeCompatible(contractType: string, databaseType: string): boolean {
+  // Normalize types (remove length/precision modifiers)
+  const normalizedContract =
+    contractType.split('(')[0]?.toLowerCase().trim() ?? contractType.toLowerCase().trim();
+  const normalizedDatabase =
+    databaseType.split('(')[0]?.toLowerCase().trim() ?? databaseType.toLowerCase().trim();
+
+  // Exact match
+  if (normalizedContract === normalizedDatabase) {
+    return true;
+  }
+
+  // Check compatibility mapping
+  const compatibleTypes = TYPE_COMPATIBILITY[normalizedContract];
+  if (compatibleTypes) {
+    return compatibleTypes.some((t) => t === normalizedDatabase);
+  }
+
+  // For extension types (e.g., vector), require exact match
+  return false;
+}
+
+/**
+ * Queries all tables in the public schema.
+ */
+async function queryTables(queryRunner: QueryRunner): Promise<ReadonlyArray<string>> {
+  const result = await queryRunner.query<{ table_name: string }>(
+    `SELECT table_name
+     FROM information_schema.tables
+     WHERE table_schema = 'public'
+       AND table_type = 'BASE TABLE'
+     ORDER BY table_name`,
+  );
+  return result.rows.map((row) => row.table_name);
+}
+
+/**
+ * Queries columns for a specific table.
+ */
+async function queryColumns(
+  queryRunner: QueryRunner,
+  tableName: string,
+): Promise<ReadonlyArray<DatabaseColumn>> {
+  const result = await queryRunner.query<{
+    column_name: string;
+    data_type: string;
+    is_nullable: string;
+  }>(
+    `SELECT column_name, data_type, is_nullable
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = $1
+     ORDER BY ordinal_position`,
+    [tableName],
+  );
+  return result.rows.map((row) => ({
+    name: row.column_name,
+    dataType: row.data_type,
+    isNullable: row.is_nullable === 'YES',
+  }));
+}
+
+/**
+ * Queries primary key columns for a specific table.
+ */
+async function queryPrimaryKeys(
+  queryRunner: QueryRunner,
+  tableName: string,
+): Promise<ReadonlyArray<string>> {
+  const result = await queryRunner.query<{ column_name: string }>(
+    `SELECT kcu.column_name
+     FROM information_schema.table_constraints tc
+     JOIN information_schema.key_column_usage kcu
+       ON tc.constraint_name = kcu.constraint_name
+         AND tc.table_schema = kcu.table_schema
+         AND tc.table_name = kcu.table_name
+     WHERE tc.table_schema = 'public'
+       AND tc.table_name = $1
+       AND tc.constraint_type = 'PRIMARY KEY'
+     ORDER BY kcu.ordinal_position`,
+    [tableName],
+  );
+  return result.rows.map((row) => row.column_name);
+}
+
+/**
+ * Queries foreign key constraints for a specific table.
+ */
+async function queryForeignKeys(
+  queryRunner: QueryRunner,
+  tableName: string,
+): Promise<ReadonlyArray<DatabaseForeignKey>> {
+  const result = await queryRunner.query<{
+    column_name: string;
+    foreign_table_name: string;
+    foreign_column_name: string;
+    constraint_name: string;
+    ordinal_position: number;
+  }>(
+    `SELECT
+       kcu.column_name,
+       ccu.table_name AS foreign_table_name,
+       ccu.column_name AS foreign_column_name,
+       tc.constraint_name,
+       kcu.ordinal_position
+     FROM information_schema.table_constraints tc
+     JOIN information_schema.key_column_usage kcu
+       ON tc.constraint_name = kcu.constraint_name
+         AND tc.table_schema = kcu.table_schema
+         AND tc.table_name = kcu.table_name
+     JOIN information_schema.referential_constraints rc
+       ON rc.constraint_name = tc.constraint_name
+         AND rc.constraint_schema = tc.table_schema
+     JOIN information_schema.constraint_column_usage ccu
+       ON ccu.constraint_name = rc.unique_constraint_name
+         AND ccu.constraint_schema = rc.unique_constraint_schema
+     WHERE tc.table_schema = 'public'
+       AND tc.table_name = $1
+       AND tc.constraint_type = 'FOREIGN KEY'
+     ORDER BY tc.constraint_name, kcu.ordinal_position`,
+    [tableName],
+  );
+
+  // Group by constraint name
+  const fkMap = new Map<string, DatabaseForeignKey>();
+  for (const row of result.rows) {
+    const existing = fkMap.get(row.constraint_name);
+    if (existing) {
+      fkMap.set(row.constraint_name, {
+        ...existing,
+        columns: [...existing.columns, row.column_name],
+        referencedColumns: [...existing.referencedColumns, row.foreign_column_name],
+      });
+    } else {
+      fkMap.set(row.constraint_name, {
+        columns: [row.column_name],
+        referencedTable: row.foreign_table_name,
+        referencedColumns: [row.foreign_column_name],
+        constraintName: row.constraint_name,
+      });
+    }
+  }
+
+  return Array.from(fkMap.values());
+}
+
+/**
+ * Queries unique constraints for a specific table.
+ */
+async function queryUniqueConstraints(
+  queryRunner: QueryRunner,
+  tableName: string,
+): Promise<ReadonlyArray<DatabaseUniqueConstraint>> {
+  const result = await queryRunner.query<{
+    column_name: string;
+    constraint_name: string;
+    ordinal_position: number;
+  }>(
+    `SELECT kcu.column_name, tc.constraint_name, kcu.ordinal_position
+     FROM information_schema.table_constraints tc
+     JOIN information_schema.key_column_usage kcu
+       ON tc.constraint_name = kcu.constraint_name
+         AND tc.table_schema = kcu.table_schema
+         AND tc.table_name = kcu.table_name
+     WHERE tc.table_schema = 'public'
+       AND tc.table_name = $1
+       AND tc.constraint_type = 'UNIQUE'
+     ORDER BY tc.constraint_name, kcu.ordinal_position`,
+    [tableName],
+  );
+
+  // Group by constraint name
+  const uniqueMap = new Map<string, DatabaseUniqueConstraint>();
+  for (const row of result.rows) {
+    const existing = uniqueMap.get(row.constraint_name);
+    if (existing) {
+      uniqueMap.set(row.constraint_name, {
+        ...existing,
+        columns: [...existing.columns, row.column_name],
+      });
+    } else {
+      uniqueMap.set(row.constraint_name, {
+        columns: [row.column_name],
+        constraintName: row.constraint_name,
+      });
+    }
+  }
+
+  return Array.from(uniqueMap.values());
+}
+
+/**
+ * Queries indexes for a specific table.
+ */
+async function queryIndexes(
+  queryRunner: QueryRunner,
+  tableName: string,
+): Promise<ReadonlyArray<DatabaseIndex>> {
+  const result = await queryRunner.query<{
+    index_name: string;
+    column_name: string | null;
+    is_unique: boolean;
+  }>(
+    `SELECT
+       i.relname AS index_name,
+       a.attname AS column_name,
+       ix.indisunique AS is_unique
+     FROM pg_index ix
+     JOIN pg_class t ON t.oid = ix.indrelid
+     JOIN pg_class i ON i.oid = ix.indexrelid
+     JOIN pg_namespace n ON n.oid = t.relnamespace
+     LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+     WHERE n.nspname = 'public'
+       AND t.relname = $1
+       AND NOT ix.indisprimary
+     ORDER BY i.relname, array_position(ix.indkey, a.attnum)`,
+    [tableName],
+  );
+
+  // Group by index name
+  const indexMap = new Map<string, DatabaseIndex>();
+  for (const row of result.rows) {
+    if (!row.column_name) {
+      continue;
+    }
+    const existing = indexMap.get(row.index_name);
+    if (existing) {
+      indexMap.set(row.index_name, {
+        ...existing,
+        columns: [...existing.columns, row.column_name],
+      });
+    } else {
+      indexMap.set(row.index_name, {
+        name: row.index_name,
+        columns: [row.column_name],
+        isUnique: row.is_unique,
+      });
+    }
+  }
+
+  return Array.from(indexMap.values());
+}
+
+/**
+ * Queries installed PostgreSQL extensions.
+ */
+async function queryExtensions(queryRunner: QueryRunner): Promise<ReadonlyArray<string>> {
+  const result = await queryRunner.query<{ extname: string }>(
+    'SELECT extname FROM pg_extension ORDER BY extname',
+  );
+  return result.rows.map((row) => row.extname);
+}
+
+/**
+ * Loads complete database schema information for a table.
+ */
+async function loadDatabaseTable(
+  queryRunner: QueryRunner,
+  tableName: string,
+): Promise<DatabaseTable> {
+  const [columns, primaryKey, foreignKeys, uniqueConstraints, indexes] = await Promise.all([
+    queryColumns(queryRunner, tableName),
+    queryPrimaryKeys(queryRunner, tableName),
+    queryForeignKeys(queryRunner, tableName),
+    queryUniqueConstraints(queryRunner, tableName),
+    queryIndexes(queryRunner, tableName),
+  ]);
+
+  return {
+    name: tableName,
+    columns,
+    ...(primaryKey.length > 0 ? { primaryKey } : {}),
+    foreignKeys,
+    uniqueConstraints,
+    indexes,
+  };
+}
+
+/**
+ * Compares contract table against database table and collects schema issues.
+ */
+function compareTable(
+  contractTable: StorageTable,
+  contractTableName: string,
+  dbTable: DatabaseTable | undefined,
+  installedExtensions: ReadonlyArray<string>,
+): ReadonlyArray<SchemaIssue> {
+  const issues: SchemaIssue[] = [];
+
+  // Check if table exists
+  if (!dbTable) {
+    issues.push({
+      kind: 'missing_table',
+      table: contractTableName,
+      message: `Table ${contractTableName} is not present in database`,
+    });
+    return issues;
+  }
+
+  // Compare columns
+  for (const [columnName, contractColumn] of Object.entries(contractTable.columns)) {
+    const dbColumn = dbTable.columns.find((c) => c.name === columnName);
+    if (!dbColumn) {
+      issues.push({
+        kind: 'missing_column',
+        table: contractTableName,
+        column: columnName,
+        message: `Column ${contractTableName}.${columnName} is not present in database`,
+      });
+      continue;
+    }
+
+    // Check type compatibility
+    if (!isTypeCompatible(contractColumn.type, dbColumn.dataType)) {
+      issues.push({
+        kind: 'type_mismatch',
+        table: contractTableName,
+        column: columnName,
+        expected: contractColumn.type,
+        actual: dbColumn.dataType,
+        message: `Column ${contractTableName}.${columnName} type mismatch: expected ${contractColumn.type}, found ${dbColumn.dataType}`,
+      });
+    }
+
+    // Check nullability
+    if (contractColumn.nullable !== dbColumn.isNullable) {
+      issues.push({
+        kind: 'nullability_mismatch',
+        table: contractTableName,
+        column: columnName,
+        expected: contractColumn.nullable ? 'nullable' : 'not null',
+        actual: dbColumn.isNullable ? 'nullable' : 'not null',
+        message: `Column ${contractTableName}.${columnName} nullability mismatch: expected ${contractColumn.nullable ? 'nullable' : 'not null'}, found ${dbColumn.isNullable ? 'nullable' : 'not null'}`,
+      });
+    }
+
+    // Check for extension-backed types
+    if (contractColumn.type.includes('/') && !contractColumn.type.startsWith('pg/')) {
+      // Extension type (e.g., vector from pgvector)
+      const extensionName = contractColumn.type.split('/')[0];
+      if (extensionName && !installedExtensions.includes(extensionName)) {
+        issues.push({
+          kind: 'extension_missing',
+          table: contractTableName,
+          column: columnName,
+          message: `Extension ${extensionName} is required for column ${contractTableName}.${columnName} but is not installed`,
+        });
+      }
+    }
+  }
+
+  // Compare primary key
+  if (contractTable.primaryKey) {
+    const contractPK = [...contractTable.primaryKey.columns].sort().join(',');
+    const dbPK = dbTable.primaryKey ? [...dbTable.primaryKey].sort().join(',') : '';
+    if (contractPK !== dbPK) {
+      issues.push({
+        kind: 'primary_key_mismatch',
+        table: contractTableName,
+        expected: contractPK,
+        actual: dbPK || '(none)',
+        message: `Primary key mismatch for table ${contractTableName}: expected columns [${contractPK}], found [${dbPK || '(none)'}]`,
+      });
+    }
+  } else if (dbTable.primaryKey && dbTable.primaryKey.length > 0) {
+    // Contract doesn't expect PK but database has one - this is OK in permissive mode
+    // In strict mode, this would be an issue (future enhancement)
+  }
+
+  // Compare foreign keys
+  for (const contractFK of contractTable.foreignKeys) {
+    const contractFKKey = `${[...contractFK.columns].sort().join(',')}->${contractFK.references.table}.${[...contractFK.references.columns].sort().join(',')}`;
+    const matchingFK = dbTable.foreignKeys.find((dbFK) => {
+      const dbFKKey = `${[...dbFK.columns].sort().join(',')}->${dbFK.referencedTable}.${[...dbFK.referencedColumns].sort().join(',')}`;
+      return contractFKKey === dbFKKey;
+    });
+    if (!matchingFK) {
+      issues.push({
+        kind: 'foreign_key_mismatch',
+        table: contractTableName,
+        indexOrConstraint: contractFK.name ?? '(unnamed)',
+        expected: `${contractFK.columns.join(',')} -> ${contractFK.references.table}(${contractFK.references.columns.join(',')})`,
+        message: `Foreign key mismatch for table ${contractTableName}: expected ${contractFK.columns.join(',')} -> ${contractFK.references.table}(${contractFK.references.columns.join(',')})`,
+      });
+    }
+  }
+
+  // Compare unique constraints
+  for (const contractUnique of contractTable.uniques) {
+    const contractUniqueKey = [...contractUnique.columns].sort().join(',');
+    const matchingUnique = dbTable.uniqueConstraints.find((dbUnique) => {
+      const dbUniqueKey = [...dbUnique.columns].sort().join(',');
+      return contractUniqueKey === dbUniqueKey;
+    });
+    if (!matchingUnique) {
+      issues.push({
+        kind: 'unique_constraint_mismatch',
+        table: contractTableName,
+        indexOrConstraint: contractUnique.name ?? '(unnamed)',
+        expected: contractUnique.columns.join(','),
+        message: `Unique constraint mismatch for table ${contractTableName}: expected columns [${contractUnique.columns.join(',')}]`,
+      });
+    }
+  }
+
+  // Compare indexes
+  for (const contractIndex of contractTable.indexes) {
+    const contractIndexKey = [...contractIndex.columns].sort().join(',');
+    const matchingIndex = dbTable.indexes.find((dbIndex) => {
+      const dbIndexKey = [...dbIndex.columns].sort().join(',');
+      return contractIndexKey === dbIndexKey;
+    });
+    if (!matchingIndex) {
+      issues.push({
+        kind: 'index_mismatch',
+        table: contractTableName,
+        indexOrConstraint: contractIndex.name ?? '(unnamed)',
+        expected: contractIndex.columns.join(','),
+        message: `Index mismatch for table ${contractTableName}: expected columns [${contractIndex.columns.join(',')}]`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Verifies that the live database schema satisfies the emitted contract.
+ * Performs catalog introspection and comparison, returning schema issues if any.
+ * This is used by `db schema-verify` command.
+ */
+export async function verifySchema(options: {
+  readonly driver: ControlPlaneDriver;
+  readonly contractIR: unknown;
+  readonly target: TargetDescriptor;
+  readonly adapter: AdapterDescriptor;
+  readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+  readonly strict: boolean;
+  readonly startTime: number;
+  readonly contractPath: string;
+  readonly configPath?: string;
+}): Promise<{
+  readonly ok: boolean;
+  readonly code?: string;
+  readonly summary: string;
+  readonly contract: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+  readonly target: {
+    readonly expected: string;
+    readonly actual?: string;
+  };
+  readonly schema: {
+    readonly issues: ReadonlyArray<SchemaIssue>;
+  };
+  readonly meta?: {
+    readonly configPath?: string;
+    readonly contractPath: string;
+    readonly strict: boolean;
+  };
+  readonly timings: {
+    readonly total: number;
+  };
+}> {
+  const { driver, contractIR, target, strict, startTime, contractPath, configPath } = options;
+
+  // Narrow contractIR to SqlContract<SqlStorage>
+  const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
+
+  // Extract contract hashes
+  const coreHash = contract.coreHash;
+  const profileHash = contract.profileHash;
+
+  // Query database schema
+  const dbTables = await queryTables(driver);
+  const installedExtensions = await queryExtensions(driver);
+
+  // Load database schema for each contract table
+  const dbTableMap = new Map<string, DatabaseTable>();
+  for (const tableName of Object.keys(contract.storage.tables)) {
+    if (dbTables.includes(tableName)) {
+      const dbTable = await loadDatabaseTable(driver, tableName);
+      dbTableMap.set(tableName, dbTable);
+    }
+  }
+
+  // Compare contract against database schema
+  const issues: SchemaIssue[] = [];
+  for (const [tableName, contractTable] of Object.entries(contract.storage.tables)) {
+    const dbTable = dbTableMap.get(tableName);
+    const tableIssues = compareTable(contractTable, tableName, dbTable, installedExtensions);
+    issues.push(...tableIssues);
+  }
+
+  // Calculate timings
+  const totalTime = Date.now() - startTime;
+
+  // Determine result
+  const ok = issues.length === 0;
+  const summary = ok
+    ? 'Database schema matches contract'
+    : `Contract requirements not met: ${issues.length} issue${issues.length === 1 ? '' : 's'} found`;
+
+  return {
+    ok,
+    ...(ok ? {} : { code: 'PN-SCHEMA-0001' }),
+    summary,
+    contract: {
+      coreHash,
+      ...(profileHash ? { profileHash } : {}),
+    },
+    target: {
+      expected: target.id,
+    },
+    schema: {
+      issues,
+    },
+    meta: {
+      ...(configPath ? { configPath } : {}),
+      contractPath,
+      strict,
+    },
+    timings: {
+      total: totalTime,
+    },
+  };
 }

@@ -1,138 +1,23 @@
 import { dirname, join } from 'node:path';
-import type { TargetFamilyHook } from '@prisma-next/emitter';
-import type { OperationSignature } from '@prisma-next/operations';
+import type {
+  AdapterDescriptor,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
-import type { ExtensionPackManifest, OperationManifest } from './exports/pack-manifest-types';
 
-/**
- * Descriptor for a target family (e.g., SQL).
- * Provides the family hook and assembly helpers.
- */
-export interface FamilyDescriptor {
-  readonly kind: 'family';
-  readonly id: string;
-  readonly hook: TargetFamilyHook;
-  /**
-   * Family-specific verification helpers for DB-connected commands.
-   * Must remain in the migration/tooling plane (no runtime imports).
-   */
-  readonly verify?: {
-    /**
-     * Returns the SQL statement to read the contract marker.
-     * Family implementations should return a parameterized statement.
-     */
-    readMarkerSql: () => { readonly sql: string; readonly params: readonly unknown[] };
-    /**
-     * Optionally collects supported codec typeIds from adapter/extension manifests
-     * to enable coverage checks.
-     */
-    collectSupportedCodecTypeIds?: (
-      descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-    ) => readonly string[];
-    /**
-     * Verifies that the live database schema satisfies the emitted contract.
-     * Performs catalog introspection and comparison, returning schema issues if any.
-     * This is used by `db schema-verify` command.
-     */
-    verifySchema?: (options: {
-      readonly driver: {
-        readonly query: <Row = Record<string, unknown>>(
-          sql: string,
-          params?: readonly unknown[],
-        ) => Promise<{ readonly rows: Row[] }>;
-        readonly close: () => Promise<void>;
-      };
-      readonly contractIR: unknown;
-      readonly target: TargetDescriptor;
-      readonly adapter: AdapterDescriptor;
-      readonly extensions: ReadonlyArray<ExtensionDescriptor>;
-      readonly strict: boolean;
-      readonly startTime: number;
-      readonly contractPath: string;
-      readonly configPath?: string;
-    }) => Promise<{
-      readonly ok: boolean;
-      readonly code?: string;
-      readonly summary: string;
-      readonly contract: {
-        readonly coreHash: string;
-        readonly profileHash?: string;
-      };
-      readonly target: {
-        readonly expected: string;
-        readonly actual?: string;
-      };
-      readonly schema: {
-        readonly issues: ReadonlyArray<{
-          readonly kind: string;
-          readonly table: string;
-          readonly column?: string;
-          readonly indexOrConstraint?: string;
-          readonly expected?: string;
-          readonly actual?: string;
-          readonly message: string;
-        }>;
-      };
-      readonly meta?: {
-        readonly configPath?: string;
-        readonly contractPath: string;
-        readonly strict: boolean;
-      };
-      readonly timings: {
-        readonly total: number;
-      };
-    }>;
-  };
-  /**
-   * Converts an OperationManifest to an OperationSignature.
-   * Family-specific conversion logic (e.g., SQL adds lowering spec).
-   */
-  readonly convertOperationManifest: (manifest: OperationManifest) => OperationSignature;
-  /**
-   * Validates a contract JSON and returns a validated ContractIR (without mappings).
-   * Mappings are runtime-only and should not be part of ContractIR.
-   */
-  readonly validateContractIR: (contractJson: unknown) => unknown;
-  /**
-   * Optionally strips mappings from a contract.
-   * Default implementation is a no-op (returns contract as-is).
-   * SQL family overrides this to strip mappings before emitting ContractIR.
-   */
-  readonly stripMappings?: (contract: unknown) => unknown;
-}
+// Re-export core-control-plane descriptor types
+export type {
+  AdapterDescriptor,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 
-/**
- * Descriptor for a target pack (e.g., Postgres target).
- */
-export interface TargetDescriptor {
-  readonly kind: 'target';
-  readonly id: string;
-  readonly family: string;
-  readonly manifest: ExtensionPackManifest;
-}
-
-/**
- * Descriptor for an adapter pack (e.g., Postgres adapter).
- * May optionally provide a runtime factory for DB-connected commands.
- */
-export interface AdapterDescriptor {
-  readonly kind: 'adapter';
-  readonly id: string;
-  readonly family: string;
-  readonly manifest: ExtensionPackManifest;
-  readonly create?: (...args: unknown[]) => unknown;
-  readonly adapter?: unknown;
-}
-
-/**
- * Descriptor for an extension pack (e.g., pgvector).
- */
-export interface ExtensionDescriptor {
-  readonly kind: 'extension';
-  readonly id: string;
-  readonly family: string;
-  readonly manifest: ExtensionPackManifest;
-}
+// Descriptor types are re-exported from core-control-plane above
 
 /**
  * Contract configuration specifying source and artifact locations.
@@ -164,6 +49,12 @@ export interface PrismaNextConfig {
   readonly target: TargetDescriptor;
   readonly adapter: AdapterDescriptor;
   readonly extensions?: ReadonlyArray<ExtensionDescriptor>;
+  /**
+   * Driver descriptor for DB-connected CLI commands.
+   * Required for DB-connected commands (e.g., db verify).
+   * Optional for commands that don't need database access (e.g., emit).
+   */
+  readonly driver?: DriverDescriptor;
   readonly db?: {
     readonly url?: string;
     /**
@@ -213,6 +104,7 @@ const PrismaNextConfigSchema = type({
   target: 'unknown', // TargetDescriptor - validated separately
   adapter: 'unknown', // AdapterDescriptor - validated separately
   'extensions?': 'unknown[]',
+  'driver?': 'unknown', // DriverDescriptor - validated separately (optional)
   'db?': 'unknown',
   'contract?': ContractConfigSchema,
 });
