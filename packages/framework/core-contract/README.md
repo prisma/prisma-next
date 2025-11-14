@@ -218,6 +218,7 @@ flowchart TD
 ## Dependencies
 
 - **`@prisma-next/operations`**: For `OperationRegistry` type used in `ValidationContext` and `TargetFamilyHook`
+- **Note**: This package depends on `@prisma-next/operations`, but `@prisma-next/operations` does not depend on this package (no cycle). The `OperationRegistry` type is used in emitter SPI types that are shared between migration-plane and shared-plane packages.
 
 **Dependents:**
 - **`@prisma-next/contract-authoring`**: Uses core contract types for authoring
