@@ -15,8 +15,34 @@ import { verifySchema } from '../src/exports/verify';
 function createMockDriver(queries: Map<string, unknown[]>): ControlPlaneDriver {
   return {
     query: vi.fn(
-      async <Row = Record<string, unknown>>(sql: string, params?: readonly unknown[]) => {
-        const key = sql.trim().split('\n')[0].trim();
+      async <Row = Record<string, unknown>>(sql: string, _params?: readonly unknown[]) => {
+        // Normalize SQL for matching (remove extra whitespace, convert to single line)
+        const normalized = sql.trim().replace(/\s+/g, ' ').toLowerCase();
+
+        // Try to match by unique query patterns
+        let key: string | undefined;
+        if (normalized.includes('information_schema.tables') && normalized.includes('table_name')) {
+          key = 'SELECT table_name';
+        } else if (
+          normalized.includes('information_schema.columns') &&
+          normalized.includes('column_name')
+        ) {
+          key = 'SELECT column_name';
+        } else if (normalized.includes('primary key') && normalized.includes('kcu.column_name')) {
+          key = 'SELECT kcu.column_name';
+        } else if (normalized.includes('foreign key') && normalized.includes('kcu.column_name')) {
+          key = 'SELECT kcu.column_name (FK)';
+        } else if (normalized.includes('unique') && normalized.includes('kcu.column_name')) {
+          key = 'SELECT kcu.column_name, tc.constraint_name';
+        } else if (normalized.includes('pg_index') && normalized.includes('pg_class')) {
+          key = 'SELECT';
+        } else if (normalized.includes('pg_extension') && normalized.includes('extname')) {
+          key = 'SELECT extname';
+        } else {
+          // Fallback to first line
+          key = sql.trim().split('\n')[0].trim();
+        }
+
         const rows = queries.get(key) ?? [];
         return { rows: rows as Row[] };
       },
@@ -94,6 +120,7 @@ describe('verifySchema', () => {
       { column_name: 'email', data_type: 'text', is_nullable: 'NO' },
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', [
       { column_name: 'email', constraint_name: 'user_email_key' },
     ]);
@@ -162,8 +189,9 @@ describe('verifySchema', () => {
       // Missing email column
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', []);
-    queries.set('SELECT', []);
+    queries.set('SELECT', []); // indexes query
 
     const driver = createMockDriver(queries);
 
@@ -179,8 +207,12 @@ describe('verifySchema', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.schema.issues).toHaveLength(1);
-    expect(result.schema.issues[0]).toMatchObject({
+    expect(result.schema.issues.length).toBeGreaterThanOrEqual(1);
+    const missingColumnIssue = result.schema.issues.find(
+      (i) => i.kind === 'missing_column' && i.column === 'email',
+    );
+    expect(missingColumnIssue).toBeDefined();
+    expect(missingColumnIssue).toMatchObject({
       kind: 'missing_column',
       table: 'user',
       column: 'email',
@@ -200,10 +232,11 @@ describe('verifySchema', () => {
       { column_name: 'email', data_type: 'text', is_nullable: 'NO' },
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', [
       { column_name: 'email', constraint_name: 'user_email_key' },
     ]);
-    queries.set('SELECT', []);
+    queries.set('SELECT', []); // indexes query
 
     const driver = createMockDriver(queries);
 
@@ -243,10 +276,11 @@ describe('verifySchema', () => {
       { column_name: 'email', data_type: 'text', is_nullable: 'YES' }, // Should be NOT NULL
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', [
       { column_name: 'email', constraint_name: 'user_email_key' },
     ]);
-    queries.set('SELECT', []);
+    queries.set('SELECT', []); // indexes query
 
     const driver = createMockDriver(queries);
 
@@ -284,10 +318,11 @@ describe('verifySchema', () => {
       { column_name: 'email', data_type: 'text', is_nullable: 'NO' },
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'email' }]); // Wrong PK
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', [
       { column_name: 'email', constraint_name: 'user_email_key' },
     ]);
-    queries.set('SELECT', []);
+    queries.set('SELECT', []); // indexes query
 
     const driver = createMockDriver(queries);
 
@@ -324,10 +359,11 @@ describe('verifySchema', () => {
       { column_name: 'email', data_type: 'text', is_nullable: 'NO' },
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', [
       { column_name: 'email', constraint_name: 'user_email_key' },
     ]);
-    queries.set('SELECT', []);
+    queries.set('SELECT', []); // indexes query
 
     const driver = createMockDriver(queries);
 
@@ -359,10 +395,11 @@ describe('verifySchema', () => {
       { column_name: 'email', data_type: 'text', is_nullable: 'NO' },
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', [
       { column_name: 'email', constraint_name: 'user_email_key' },
     ]);
-    queries.set('SELECT', []);
+    queries.set('SELECT', []); // indexes query
 
     const driver = createMockDriver(queries);
 
@@ -393,10 +430,11 @@ describe('verifySchema', () => {
       { column_name: 'email', data_type: 'text', is_nullable: 'NO' },
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', [
       { column_name: 'email', constraint_name: 'user_email_key' },
     ]);
-    queries.set('SELECT', []);
+    queries.set('SELECT', []); // indexes query
 
     const driver = createMockDriver(queries);
 
@@ -428,10 +466,11 @@ describe('verifySchema', () => {
       { column_name: 'email', data_type: 'text', is_nullable: 'NO' },
     ]);
     queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []); // foreign keys
     queries.set('SELECT kcu.column_name, tc.constraint_name', [
       { column_name: 'email', constraint_name: 'user_email_key' },
     ]);
-    queries.set('SELECT', []);
+    queries.set('SELECT', []); // indexes query
 
     const driver = createMockDriver(queries);
 

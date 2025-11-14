@@ -333,8 +333,8 @@ describe('verifyDatabaseSchema API', () => {
                 strict: false,
                 contractPath: expect.stringContaining('contract.json'),
               });
-              expect(callArgs.queryRunner).toBeDefined();
-              expect(callArgs.queryRunner.query).toBeDefined();
+              expect(callArgs.driver).toBeDefined();
+              expect(callArgs.driver.query).toBeDefined();
             } finally {
               process.chdir(originalCwd);
               vi.restoreAllMocks();
