@@ -1,4 +1,4 @@
-import type { TypesImportSpec } from '@prisma-next/emitter';
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 
 export type ArgSpecManifest =
   | { readonly kind: 'typeId'; readonly type: string }

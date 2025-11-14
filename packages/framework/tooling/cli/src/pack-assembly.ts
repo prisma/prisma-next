@@ -1,8 +1,8 @@
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ExtensionPackManifest,
   OperationManifest,
 } from '@prisma-next/control-plane/pack-manifest-types';
-import type { TypesImportSpec } from '@prisma-next/emitter';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type {

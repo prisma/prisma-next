@@ -1,10 +1,5 @@
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
-
-export interface TypesImportSpec {
-  readonly package: string;
-  readonly named: string;
-  readonly alias: string;
-}
 
 export interface EmitOptions {
   readonly outputDir: string;

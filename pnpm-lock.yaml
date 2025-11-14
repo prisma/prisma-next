@@ -288,6 +288,10 @@ importers:
         version: 5.9.3
 
   packages/framework/core-contract:
+    dependencies:
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../core-operations
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -332,9 +336,6 @@ importers:
 
   packages/framework/core-operations:
     dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../core-contract
       '@prisma-next/plan':
         specifier: workspace:*
         version: link:../core-plan

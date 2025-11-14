@@ -1,3 +1,8 @@
+// Re-export types from @prisma-next/contract for backward compatibility
+export type {
+  TargetFamilyHook,
+  TypesImportSpec,
+  ValidationContext,
+} from '@prisma-next/contract/types';
 export { emit } from '../emitter';
-export type { TargetFamilyHook, ValidationContext } from '../target-family';
-export type { EmitOptions, EmitResult, TypesImportSpec } from '../types';
+export type { EmitOptions, EmitResult } from '../types';

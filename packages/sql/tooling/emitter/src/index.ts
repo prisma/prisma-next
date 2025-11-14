@@ -1,5 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypesImportSpec, ValidationContext } from '@prisma-next/emitter';
+import type { TypesImportSpec, ValidationContext } from '@prisma-next/contract/types';
 import type {
   ModelDefinition,
   ModelField,

@@ -1,5 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
-import type { TargetFamilyHook } from '@prisma-next/emitter';
+import type { ContractMarkerRecord, TargetFamilyHook } from '@prisma-next/contract/types';
 import type { OperationSignature } from '@prisma-next/operations';
 import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
 

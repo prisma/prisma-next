@@ -13,6 +13,9 @@
     "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
     "clean": "node ../../scripts/clean.mjs"
   },
+  "dependencies": {
+    "@prisma-next/operations": "workspace:*"
+  },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@vitest/coverage-v8": "^2.1.1",

@@ -12,6 +12,7 @@ This package provides TypeScript type definitions and JSON Schemas for Prisma Ne
 - **Document Family Types**: Provides TypeScript types for document target family contracts (`DocumentContract`)
 - **JSON Schema Validation**: Provides JSON Schemas for validating contract structure in IDEs and tooling
 - **Type Guards**: Provides runtime type guards for narrowing contract types (`isDocumentContract`)
+- **Emitter Types**: Defines emitter SPI types (`TargetFamilyHook`, `ValidationContext`, `TypesImportSpec`) that are shared between emitter and control plane
 
 The contract supports document target families:
 - **Document**: For document databases (MongoDB, Firestore, etc.)
@@ -19,6 +20,7 @@ The contract supports document target families:
 ## Package Contents
 
 - **TypeScript Types**: Type definitions for `DocumentContract`, `ContractMarkerRecord`, and related types
+- **Emitter Types**: SPI types for emitter hooks (`TargetFamilyHook`, `ValidationContext`, `TypesImportSpec`)
 - **JSON Schemas**: Schema definitions for validating `contract.json` files in IDEs and tooling
   - `data-contract-document-v1.json` (Document family)
 
@@ -29,7 +31,13 @@ The contract supports document target families:
 Import contract types in your TypeScript code:
 
 ```typescript
-import type { ContractMarkerRecord, DocumentContract } from '@prisma-next/contract/types';
+import type {
+  ContractMarkerRecord,
+  DocumentContract,
+  TargetFamilyHook,
+  TypesImportSpec,
+  ValidationContext,
+} from '@prisma-next/contract/types';
 import { isDocumentContract } from '@prisma-next/contract/types';
 
 // Use type guards to narrow the contract type
@@ -44,6 +52,21 @@ function processContract(contract: DocumentContract) {
 function processMarker(marker: ContractMarkerRecord) {
   console.log(marker.coreHash, marker.profileHash);
 }
+
+// Use emitter types for implementing family hooks
+const myFamilyHook: TargetFamilyHook = {
+  id: 'my-family',
+  validateTypes: (ir, ctx: ValidationContext) => {
+    // Validation logic
+  },
+  validateStructure: (ir) => {
+    // Structure validation
+  },
+  generateContractTypes: (ir, codecTypeImports: TypesImportSpec[], operationTypeImports: TypesImportSpec[]) => {
+    // Type generation
+    return '// Generated types...';
+  },
+};
 ```
 
 ### JSON Schema Validation
@@ -194,7 +217,7 @@ flowchart TD
 
 ## Dependencies
 
-This package has no runtime dependencies (pure types and schemas).
+- **`@prisma-next/operations`**: For `OperationRegistry` type used in `ValidationContext` and `TargetFamilyHook`
 
 **Dependents:**
 - **`@prisma-next/contract-authoring`**: Uses core contract types for authoring
