@@ -1,9 +1,11 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { createPostgresDriver } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   BinaryBuilder,
@@ -233,7 +235,9 @@ class ModelDelegate {
 
     // Execute via runtime
     const results: Record<string, unknown>[] = [];
-    for await (const row of this.runtime.execute<Record<string, unknown>>(plan)) {
+    for await (const row of this.runtime.execute<Record<string, unknown>>(
+      plan as ExecutionPlan<Record<string, unknown>> | SqlQueryPlan<Record<string, unknown>>,
+    )) {
       results.push(row);
     }
 
@@ -289,7 +293,9 @@ class ModelDelegate {
 
     // Execute and return the created row
     const results: Record<string, unknown>[] = [];
-    for await (const row of this.runtime.execute<Record<string, unknown>>(insertPlan)) {
+    for await (const row of this.runtime.execute<Record<string, unknown>>(
+      insertPlan as ExecutionPlan<Record<string, unknown>> | SqlQueryPlan<Record<string, unknown>>,
+    )) {
       results.push(row);
     }
 

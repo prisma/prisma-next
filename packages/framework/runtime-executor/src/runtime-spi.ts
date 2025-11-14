@@ -1,4 +1,4 @@
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 
 export interface MarkerStatement {
   readonly sql: string;
@@ -12,5 +12,5 @@ export interface MarkerReader {
 export interface RuntimeFamilyAdapter<TContract = unknown> {
   readonly contract: TContract;
   readonly markerReader: MarkerReader;
-  validatePlan(plan: Plan, contract: TContract): void;
+  validatePlan(plan: ExecutionPlan, contract: TContract): void;
 }

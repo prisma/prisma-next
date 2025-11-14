@@ -126,18 +126,10 @@ export interface ExecutionPlan<Row = unknown, Ast = unknown> {
 }
 
 /**
- * Legacy alias for ExecutionPlan.
- *
- * Plan<Row> is kept for backward compatibility; new code should prefer
- * ExecutionPlan<Row, Ast> when referring to the generic execution shape.
- */
-export type Plan<Row = unknown, Ast = unknown> = ExecutionPlan<Row, Ast>;
-
-/**
- * Utility type to extract the Row type from a Plan.
+ * Utility type to extract the Row type from an ExecutionPlan.
  * Example: `type Row = ResultType<typeof plan>`
  *
- * Works with both ExecutionPlan/Plan and SqlQueryPlan (SQL query plans before lowering).
+ * Works with both ExecutionPlan and SqlQueryPlan (SQL query plans before lowering).
  * SqlQueryPlan includes a phantom `_Row` property to preserve the generic parameter
  * for type extraction.
  */

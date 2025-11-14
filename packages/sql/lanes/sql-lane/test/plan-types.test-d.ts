@@ -1,5 +1,5 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { ResultType as CoreResultType, Plan } from '@prisma-next/contract/types';
+import type { ResultType as CoreResultType, ExecutionPlan } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -16,8 +16,8 @@ import { expectTypeOf, test } from 'vitest';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
-// Helper to simulate execute signature (runtime accepts both Plan and SqlQueryPlan)
-function execute<Row>(_plan: Plan<Row> | SqlQueryPlan<Row>): AsyncIterable<Row> {
+// Helper to simulate execute signature (runtime accepts both ExecutionPlan and SqlQueryPlan)
+function execute<Row>(_plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterable<Row> {
   return (async function* () {})();
 }
 

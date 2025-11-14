@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import type { Plan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
@@ -7,7 +7,7 @@ import { Client } from 'pg';
 import { schema, sql } from '../src/prisma/query';
 import { closeRuntime, getRuntime } from '../src/prisma/runtime';
 
-async function collectRows<P extends Plan | SqlQueryPlan<unknown>>(
+async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
   plan: P,
 ): Promise<ResultType<P>[]> {
   const runtime = getRuntime();

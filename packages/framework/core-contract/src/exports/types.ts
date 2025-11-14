@@ -13,7 +13,6 @@ export type {
   Expr,
   FieldType,
   ParamDescriptor,
-  Plan,
   PlanMeta,
   PlanRefs,
   ResultType,

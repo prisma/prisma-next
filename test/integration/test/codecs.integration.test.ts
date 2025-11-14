@@ -270,7 +270,7 @@ describe('Codecs Integration Tests', () => {
           },
         },
       },
-    } as unknown as import('@prisma-next/contract/types').Plan<unknown>;
+    } as unknown as import('@prisma-next/contract/types').ExecutionPlan<unknown>;
 
     const rows = await executePlanAndCollect(runtime, planWithOverride);
     expect(rows.length).toBe(1);
