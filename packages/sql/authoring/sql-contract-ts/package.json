@@ -21,7 +21,6 @@
     "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {
-    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/pg": "^8.11.10",
     "pg": "^8.11.5",
