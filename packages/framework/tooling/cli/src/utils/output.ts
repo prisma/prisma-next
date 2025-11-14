@@ -19,6 +19,7 @@ export interface EmitContractResult {
 }
 
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/verify-database';
+import type { SchemaIssue, VerifyDatabaseSchemaResult } from '../api/verify-database-schema';
 import type { CliErrorEnvelope } from './cli-errors';
 import { getLongDescription } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
@@ -212,6 +213,121 @@ export function formatVerifyJson(result: VerifyDatabaseResult): string {
     ...(result.marker ? { marker: result.marker } : {}),
     target: result.target,
     ...(result.missingCodecs ? { missingCodecs: result.missingCodecs } : {}),
+    ...(result.meta ? { meta: result.meta } : {}),
+    timings: result.timings,
+  };
+
+  return JSON.stringify(output, null, 2);
+}
+
+// ============================================================================
+// Schema Verify Output Formatters
+// ============================================================================
+
+/**
+ * Formats human-readable output for database schema verify.
+ */
+export function formatSchemaVerifyOutput(
+  result: VerifyDatabaseSchemaResult,
+  flags: GlobalFlags,
+): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatRed = createColorFormatter(useColor, red);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  if (result.ok) {
+    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
+    lines.push(`${prefix}${formatDimText(`  coreHash: ${result.contract.coreHash}`)}`);
+    if (result.contract.profileHash) {
+      lines.push(`${prefix}${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
+    }
+  } else {
+    lines.push(
+      `${prefix}${formatRed('✖')} ${result.summary}${result.code ? ` (${result.code})` : ''}`,
+    );
+    if (result.schema.issues.length > 0) {
+      lines.push(`${prefix}${formatDimText('Contract requirements not met:')}`);
+      // Group issues by table for better formatting
+      const issuesByTable = new Map<string, SchemaIssue[]>();
+      for (const issue of result.schema.issues) {
+        const tableIssues = issuesByTable.get(issue.table) ?? [];
+        tableIssues.push(issue);
+        issuesByTable.set(issue.table, tableIssues);
+      }
+      // Format issues as nested list
+      for (const [table, issues] of issuesByTable.entries()) {
+        const tableIssue = issues.find((i) => i.kind === 'missing_table');
+        if (tableIssue) {
+          lines.push(`${prefix}${formatDimText(`- table ${table}: not present`)}`);
+        } else {
+          lines.push(`${prefix}${formatDimText(`- table ${table}`)}`);
+          // Group column issues
+          const columnIssues = issues.filter((i) => i.column);
+          const columnIssuesByColumn = new Map<string, SchemaIssue[]>();
+          for (const issue of columnIssues) {
+            if (issue.column) {
+              const colIssues = columnIssuesByColumn.get(issue.column) ?? [];
+              colIssues.push(issue);
+              columnIssuesByColumn.set(issue.column, colIssues);
+            }
+          }
+          for (const [column, colIssues] of columnIssuesByColumn.entries()) {
+            lines.push(`${prefix}${formatDimText(`  - column ${column}`)}`);
+            for (const issue of colIssues) {
+              if (issue.kind === 'missing_column') {
+                lines.push(`${prefix}${formatDimText('    - not present')}`);
+              } else if (issue.kind === 'type_mismatch' && issue.expected && issue.actual) {
+                lines.push(
+                  `${prefix}${formatDimText(`    - type mismatch: expected ${issue.expected}, found ${issue.actual}`)}`,
+                );
+              } else if (issue.kind === 'nullability_mismatch') {
+                lines.push(`${prefix}${formatDimText('    - nullability mismatch')}`);
+              } else {
+                lines.push(`${prefix}${formatDimText(`    - ${issue.message}`)}`);
+              }
+            }
+          }
+          // Handle non-column issues (indexes, constraints, etc.)
+          const nonColumnIssues = issues.filter((i) => !i.column);
+          for (const issue of nonColumnIssues) {
+            if (issue.indexOrConstraint) {
+              lines.push(
+                `${prefix}${formatDimText(`  - ${issue.indexOrConstraint}: ${issue.message}`)}`,
+              );
+            } else {
+              lines.push(`${prefix}${formatDimText(`  - ${issue.message}`)}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (isVerbose(flags, 1)) {
+    lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Formats JSON output for database schema verify.
+ */
+export function formatSchemaVerifyJson(result: VerifyDatabaseSchemaResult): string {
+  const output = {
+    ok: result.ok,
+    ...(result.code ? { code: result.code } : {}),
+    summary: result.summary,
+    contract: result.contract,
+    target: result.target,
+    schema: result.schema,
     ...(result.meta ? { meta: result.meta } : {}),
     timings: result.timings,
   };

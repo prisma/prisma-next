@@ -198,6 +198,20 @@ export function errorFamilyReadMarkerSqlRequired(options?: {
 }
 
 /**
+ * Family verify.verifySchema is required but not provided.
+ */
+export function errorFamilySchemaVerifierRequired(options?: {
+  readonly why?: string;
+}): CliStructuredError {
+  return new CliStructuredError('4008', 'Family verifySchema() is required', {
+    domain: 'CLI',
+    why: options?.why ?? 'Family verify.verifySchema is required for db schema-verify',
+    fix: 'Ensure family.verify.verifySchema() is exported by your family package',
+    docsUrl: 'https://prisma-next.dev/docs/cli/db-schema-verify',
+  });
+}
+
+/**
  * Driver is required for DB-connected commands but not provided.
  */
 export function errorDriverRequired(options?: { readonly why?: string }): CliStructuredError {

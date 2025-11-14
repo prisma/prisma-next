@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { createContractEmitCommand } from './commands/contract-emit';
+import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { parseGlobalFlags } from './utils/global-flags';
@@ -166,6 +167,10 @@ dbCommand.configureHelp({
 // Add verify subcommand to db
 const dbVerifyCommand = createDbVerifyCommand();
 dbCommand.addCommand(dbVerifyCommand);
+
+// Add schema-verify subcommand to db
+const dbSchemaVerifyCommand = createDbSchemaVerifyCommand();
+dbCommand.addCommand(dbSchemaVerifyCommand);
 
 // Register db command
 program.addCommand(dbCommand);

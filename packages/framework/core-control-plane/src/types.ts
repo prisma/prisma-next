@@ -63,6 +63,53 @@ export interface FamilyDescriptor {
     collectSupportedCodecTypeIds?: (
       descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
     ) => readonly string[];
+    /**
+     * Verifies that the live database schema satisfies the emitted contract.
+     * Performs catalog introspection and comparison, returning schema issues if any.
+     * This is used by `db schema-verify` command.
+     */
+    verifySchema?: (options: {
+      readonly driver: ControlPlaneDriver;
+      readonly contractIR: unknown;
+      readonly target: TargetDescriptor;
+      readonly adapter: AdapterDescriptor;
+      readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+      readonly strict: boolean;
+      readonly startTime: number;
+      readonly contractPath: string;
+      readonly configPath?: string;
+    }) => Promise<{
+      readonly ok: boolean;
+      readonly code?: string;
+      readonly summary: string;
+      readonly contract: {
+        readonly coreHash: string;
+        readonly profileHash?: string;
+      };
+      readonly target: {
+        readonly expected: string;
+        readonly actual?: string;
+      };
+      readonly schema: {
+        readonly issues: ReadonlyArray<{
+          readonly kind: string;
+          readonly table: string;
+          readonly column?: string;
+          readonly indexOrConstraint?: string;
+          readonly expected?: string;
+          readonly actual?: string;
+          readonly message: string;
+        }>;
+      };
+      readonly meta?: {
+        readonly configPath?: string;
+        readonly contractPath: string;
+        readonly strict: boolean;
+      };
+      readonly timings: {
+        readonly total: number;
+      };
+    }>;
   };
   /**
    * Converts an OperationManifest to an OperationSignature.
