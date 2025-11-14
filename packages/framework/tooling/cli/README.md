@@ -21,6 +21,9 @@ Provide a command-line interface that:
 - **File I/O**: Read TS contracts, write emitted artifacts (`contract.json`, `contract.d.ts`)
 - **Extension Pack Loading**: Load adapter and extension pack manifests for emission
 - **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
+- **Config Management**: Load and validate `prisma-next.config.ts` files using Arktype validation
+
+**Note**: Control plane operations (database verification, contract marker reading) are implemented in `@prisma-next/control-plane`. The CLI uses the control plane executor programmatically but does not define control plane types itself.
 
 ## Command Descriptions
 
@@ -399,7 +402,9 @@ E2E tests use a shared fixture app pattern to ensure proper module resolution:
 - **Shared fixture app**: `test/cli-e2e-test-app/` contains a static `package.json` with dependencies
 - **Fixture organization**: Fixtures are organized by command in subdirectories (e.g., `fixtures/emit/`, `fixtures/db-verify/`)
 - **Ephemeral test directories**: Each test creates an isolated directory with files copied from fixtures
-- **Helper function**: `setupTestDirectoryFromFixtures()` handles directory setup and cleanup
+- **No package.json in test directories**: Test directories inherit workspace dependencies from the parent `package.json` at the root
+- **Helper function**: `setupTestDirectoryFromFixtures()` handles directory setup and returns a cleanup function
+- **Cleanup responsibility**: Each test must clean up its own directory (use `afterEach` hooks or `finally` blocks)
 
 **Example:**
 ```typescript
@@ -412,7 +417,13 @@ it('test description', async () => {
     fixtureSubdir,
     'prisma-next.config.emit.ts',
   );
-  // ... test code ...
+  const cleanupDir = testSetup.cleanup;
+
+  try {
+    // ... test code ...
+  } finally {
+    cleanupDir(); // Each test cleans up its own directory
+  }
 });
 ```
 

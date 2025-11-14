@@ -74,7 +74,8 @@ This package is in the shared plane, allowing both migration-plane (CLI) and run
 - `@prisma-next/contract` - For `ContractMarkerRecord` type
 - `@prisma-next/emitter` - For `TargetFamilyHook` type
 - `@prisma-next/operations` - For `OperationSignature` type
-- `@prisma-next/cli` - For `ExtensionPackManifest` and `OperationManifest` types
+
+**Note**: This package defines `ExtensionPackManifest` and `OperationManifest` types in `pack-manifest-types.ts` to avoid circular dependencies with the CLI package.
 
 ## Related Documentation
 

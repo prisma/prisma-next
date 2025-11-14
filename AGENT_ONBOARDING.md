@@ -53,9 +53,10 @@ We emit `contract.json` and `contract.d.ts` files—**no executable runtime code
 
 ### Core Packages
 
-- **`@prisma-next/contract`** - Core contract types (`ContractBase`, `Source`). **SQL-specific types live in `@prisma-next/sql-contract-types`**
+- **`@prisma-next/contract`** - Core contract types (`ContractBase`, `Source`, `ContractMarkerRecord`). **SQL-specific types live in `@prisma-next/sql-contract-types`**
 - **`@prisma-next/plan`** - Plan helpers, diagnostics, and shared errors (`planInvalid`, `planUnsupported`, `RuntimeError`) in the core ring
 - **`@prisma-next/emitter`** - Contract emission engine that transforms IR into `contract.json` and `contract.d.ts` using a hook-based architecture
+- **`@prisma-next/control-plane`** - Control plane types and executor for database verification operations (framework/core layer, shared plane). Separates control plane operations from CLI executable, allowing programmatic use without CLI tooling.
 - **`@prisma-next/sql-contract-ts`** - SQL-specific TypeScript contract authoring surface (`defineContract`, `validateContract`) in the SQL family namespace
 - **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types for relational SQL queries in the SQL lanes ring
 - **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers for building SQL queries in the SQL lanes ring
@@ -85,7 +86,7 @@ The repository is organized by **Domains → Layers → Planes**:
 - **Planes**: Migration (authoring, tooling, targets), Runtime (lanes, runtime, adapters), and Shared — cross‑plane code and artifacts safe for both
 
 **Framework Domain** (`packages/framework/**`):
-- **Core layer** (shared plane): `@prisma-next/plan`, `@prisma-next/operations` live in `packages/framework/core-*`
+- **Core layer** (shared plane): `@prisma-next/plan`, `@prisma-next/operations`, `@prisma-next/control-plane` live in `packages/framework/core-*`
 - **Authoring layer** (migration plane): `@prisma-next/contract-authoring`, `@prisma-next/contract-ts`, `@prisma-next/contract-psl` live in `packages/framework/authoring/*`
 - **Tooling layer** (migration plane): `@prisma-next/cli`, `@prisma-next/emitter` live in `packages/framework/tooling/*`
 - **Runtime-executor layer** (runtime plane): `@prisma-next/runtime-executor` lives in `packages/framework/runtime-executor`
