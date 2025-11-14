@@ -141,4 +141,3 @@ describe('emitContract', () => {
     ).rejects.toThrow('Failed to emit contract: String error');
   });
 });
-

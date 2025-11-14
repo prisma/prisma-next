@@ -52,7 +52,10 @@
     "./pack-manifest-types": {
       "types": "./dist/exports/pack-manifest-types.d.ts",
       "import": "./dist/exports/pack-manifest-types.js"
+    },
+    "./utils/marker-parser": {
+      "types": "./dist/exports/marker-parser.d.ts",
+      "import": "./dist/exports/marker-parser.js"
     }
   }
 }
-

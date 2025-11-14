@@ -225,4 +225,3 @@ export function defineConfig(config: PrismaNextConfig): PrismaNextConfig {
   // Return config as-is if no contract (preserve literal types)
   return config;
 }
-

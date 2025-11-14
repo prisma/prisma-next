@@ -1,9 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import { Command } from 'commander';
-import { verifyDatabase } from '@prisma-next/core-control-plane/verify-database';
 import {
+  errorDatabaseUrlRequired,
   errorFileNotFound,
   errorHashMismatch,
   errorMarkerMissing,
@@ -11,6 +10,8 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
+import { verifyDatabase } from '@prisma-next/core-control-plane/verify-database';
+import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';

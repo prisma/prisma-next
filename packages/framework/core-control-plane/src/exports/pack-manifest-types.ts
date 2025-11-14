@@ -6,4 +6,3 @@ export type {
   OperationManifest,
   ReturnSpecManifest,
 } from '../pack-manifest-types';
-

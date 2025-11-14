@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
+import { verifyDatabase } from '@prisma-next/core-control-plane/verify-database';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -11,8 +13,6 @@ import {
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { emitContract } from '../../src/api/emit-contract';
-import { verifyDatabase } from '../../src/api/verify-database';
 import { loadConfig } from '../../src/config-loader';
 import {
   assembleOperationRegistry,
@@ -60,8 +60,6 @@ async function emitContractFromConfig(
 
   const emitResult = await emitContract({
     contractIR: contractIR as ContractIR,
-    outputJsonPath: resolve(testDir, contractConfig.output ?? 'output/contract.json'),
-    outputDtsPath: resolve(testDir, contractConfig.types ?? 'output/contract.d.ts'),
     targetFamily: config.family.hook,
     operationRegistry,
     codecTypeImports,
@@ -69,9 +67,33 @@ async function emitContractFromConfig(
     extensionIds,
   });
 
-  const contractJsonContent = readFileSync(emitResult.files.json, 'utf-8');
-  const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  // Write contract files
+  const contractJsonPath = resolve(testDir, contractConfig.output ?? 'output/contract.json');
+  const contractDtsPath = resolve(testDir, contractConfig.types ?? 'output/contract.d.ts');
+  mkdirSync(dirname(contractJsonPath), { recursive: true });
+  mkdirSync(dirname(contractDtsPath), { recursive: true });
+  writeFileSync(contractJsonPath, emitResult.contractJson, 'utf-8');
+  writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
+
+  const contractJson = JSON.parse(emitResult.contractJson) as Record<string, unknown>;
   return validateContract<SqlContract<SqlStorage>>(contractJson);
+}
+
+// Helper to load config and contract for verifyDatabase
+async function loadConfigAndContract(
+  testDir: string,
+  configPath: string,
+): Promise<{
+  config: Awaited<ReturnType<typeof loadConfig>>;
+  contractIR: ContractIR;
+  contractPath: string;
+}> {
+  const config = await loadConfig(join(testDir, configPath));
+  const contractPath = join(testDir, config.contract?.output ?? 'src/prisma/contract.json');
+  const contractJsonContent = readFileSync(contractPath, 'utf-8');
+  const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  const contractIR = config.family.validateContractIR(contractJson) as ContractIR;
+  return { config, contractIR, contractPath };
 }
 
 describe('verifyDatabase API', () => {
@@ -122,26 +144,32 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            // Change to test directory so verifyDatabase can find the contract file
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDirWithDb);
-              const result = await verifyDatabase({
-                dbUrl: connectionString,
-                configPath: 'prisma-next.config.ts',
-              });
+            // Load config and contract for verifyDatabase
+            const config = await loadConfig(join(testDirWithDb, 'prisma-next.config.ts'));
+            const contractPath = join(
+              testDirWithDb,
+              config.contract?.output ?? 'src/prisma/contract.json',
+            );
+            const contractJsonContent = readFileSync(contractPath, 'utf-8');
+            const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+            const contractIR = config.family.validateContractIR(contractJson) as ContractIR;
 
-              expect(result.ok).toBe(true);
-              expect(result.summary).toBe('Database matches contract');
-              expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
-              if (contractWithDb.profileHash) {
-                expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
-              }
-              expect(result.timings.total).toBeGreaterThanOrEqual(0);
-              expect(result.meta?.contractPath).toBeDefined();
-            } finally {
-              process.chdir(originalCwd);
+            const result = await verifyDatabase({
+              config,
+              contractIR,
+              dbUrl: connectionString,
+              contractPath,
+              configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+            });
+
+            expect(result.ok).toBe(true);
+            expect(result.summary).toBe('Database matches contract');
+            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+            if (contractWithDb.profileHash) {
+              expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
             }
+            expect(result.timings.total).toBeGreaterThanOrEqual(0);
+            expect(result.meta?.contractPath).toBeDefined();
           } finally {
             cleanupWithDb();
           }
@@ -178,23 +206,24 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            // Change to test directory so verifyDatabase can find the contract file
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDirWithDb);
-              const result = await verifyDatabase({
-                dbUrl: connectionString,
-                configPath: 'prisma-next.config.ts',
-              });
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
+            const result = await verifyDatabase({
+              config,
+              contractIR,
+              dbUrl: connectionString,
+              contractPath,
+              configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+            });
 
-              expect(result.ok).toBe(false);
-              expect(result.code).toBe('PN-RTM-3001');
-              expect(result.summary).toBe('Marker missing');
-              expect(result.marker).toBeUndefined();
-              expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
-            } finally {
-              process.chdir(originalCwd);
-            }
+            expect(result.ok).toBe(false);
+            expect(result.code).toBe('PN-RTM-3001');
+            expect(result.summary).toBe('Marker missing');
+            expect(result.marker).toBeUndefined();
+            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
           } finally {
             cleanupWithDb();
           }
@@ -240,23 +269,24 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            // Change to test directory so verifyDatabase can find the contract file
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDirWithDb);
-              const result = await verifyDatabase({
-                dbUrl: connectionString,
-                configPath: 'prisma-next.config.ts',
-              });
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
+            const result = await verifyDatabase({
+              config,
+              contractIR,
+              dbUrl: connectionString,
+              contractPath,
+              configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+            });
 
-              expect(result.ok).toBe(false);
-              expect(result.code).toBe('PN-RTM-3002');
-              expect(result.summary).toBe('Hash mismatch');
-              expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
-              expect(result.marker?.coreHash).toBe('sha256:different-hash');
-            } finally {
-              process.chdir(originalCwd);
-            }
+            expect(result.ok).toBe(false);
+            expect(result.code).toBe('PN-RTM-3002');
+            expect(result.summary).toBe('Hash mismatch');
+            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+            expect(result.marker?.coreHash).toBe('sha256:different-hash');
           } finally {
             cleanupWithDb();
           }
@@ -302,25 +332,26 @@ describe('verifyDatabase API', () => {
               // withClient will close the client after this callback returns
             });
 
-            // Change to test directory so verifyDatabase can find the contract file
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDirWithDb);
-              const result = await verifyDatabase({
-                dbUrl: connectionString,
-                configPath: 'prisma-next.config.ts',
-              });
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
+            const result = await verifyDatabase({
+              config,
+              contractIR,
+              dbUrl: connectionString,
+              contractPath,
+              configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+            });
 
-              expect(result.ok).toBe(false);
-              expect(result.code).toBe('PN-RTM-3002');
-              expect(result.summary).toBe('Hash mismatch');
-              if (contractWithDb.profileHash) {
-                expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
-              }
-              expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
-            } finally {
-              process.chdir(originalCwd);
+            expect(result.ok).toBe(false);
+            expect(result.code).toBe('PN-RTM-3002');
+            expect(result.summary).toBe('Hash mismatch');
+            if (contractWithDb.profileHash) {
+              expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
             }
+            expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
           } finally {
             cleanupWithDb();
           }
@@ -359,9 +390,10 @@ describe('verifyDatabase API', () => {
 
             // Modify the contract JSON to remove profileHash to test line 161
             // First, load the config to get the contract output path
-            const config = await loadConfig(configPathWithDb);
-            const contractPath = config.contract?.output ?? 'src/prisma/contract.json';
-            const contractJsonPath = resolve(testDirWithDb, contractPath);
+            const configForPath = await loadConfig(configPathWithDb);
+            const contractPathForEdit =
+              configForPath.contract?.output ?? 'src/prisma/contract.json';
+            const contractJsonPath = resolve(testDirWithDb, contractPathForEdit);
             const { readFile, writeFile } = await import('node:fs/promises');
             const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
             const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
@@ -390,22 +422,23 @@ describe('verifyDatabase API', () => {
               await executeStatement(client, write.insert);
             });
 
-            // Change to test directory so verifyDatabase can find the contract file
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDirWithDb);
-              const result = await verifyDatabase({
-                dbUrl: connectionString,
-                configPath: 'prisma-next.config.ts',
-              });
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
+            const result = await verifyDatabase({
+              config,
+              contractIR,
+              dbUrl: connectionString,
+              contractPath,
+              configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+            });
 
-              // Should succeed and contractProfileHash should be undefined (line 161)
-              expect(result.ok).toBe(true);
-              expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
-              expect(result.contract.profileHash).toBeUndefined();
-            } finally {
-              process.chdir(originalCwd);
-            }
+            // Should succeed and contractProfileHash should be undefined (line 161)
+            expect(result.ok).toBe(true);
+            expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+            expect(result.contract.profileHash).toBeUndefined();
           } finally {
             cleanupWithDb();
           }
@@ -448,18 +481,20 @@ describe('verifyDatabase API', () => {
               await executeStatement(client, write.insert);
             });
 
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDirWithDb);
-              // The query runner from the factory always has close(), but we've verified the code path exists
-              const result = await verifyDatabase({
-                dbUrl: connectionString,
-                configPath: 'prisma-next.config.ts',
-              });
-              expect(result.ok).toBe(true);
-            } finally {
-              process.chdir(originalCwd);
-            }
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
+            // The query runner from the factory always has close(), but we've verified the code path exists
+            const result = await verifyDatabase({
+              config,
+              contractIR,
+              dbUrl: connectionString,
+              contractPath,
+              configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+            });
+            expect(result.ok).toBe(true);
           } finally {
             cleanupWithDb();
           }
@@ -516,30 +551,33 @@ describe('verifyDatabase API', () => {
               };
             });
 
-            const originalCwd = process.cwd();
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
             try {
-              process.chdir(testDirWithDb);
-              try {
-                await verifyDatabase({
-                  dbUrl: connectionString,
-                  configPath: 'prisma-next.config.ts',
-                });
-                expect.fail('Expected verifyDatabase to throw');
-              } catch (error) {
-                expect(error).toBeInstanceOf(Error);
-                // errorUnexpected returns a CliStructuredError with message "Unexpected error"
-                // and the why field contains "Contract is missing required fields: coreHash or target"
-                if (error && typeof error === 'object' && 'why' in error) {
-                  expect((error as { why?: string }).why).toContain(
-                    'Contract is missing required fields',
-                  );
-                } else {
-                  const errorMessage = error instanceof Error ? error.message : String(error);
-                  expect(errorMessage).toBe('Unexpected error');
-                }
+              await verifyDatabase({
+                config,
+                contractIR,
+                dbUrl: connectionString,
+                contractPath,
+                configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+              });
+              expect.fail('Expected verifyDatabase to throw');
+            } catch (error) {
+              expect(error).toBeInstanceOf(Error);
+              // errorUnexpected returns a CliStructuredError with message "Unexpected error"
+              // and the why field contains "Contract is missing required fields: coreHash or target"
+              if (error && typeof error === 'object' && 'why' in error) {
+                expect((error as { why?: string }).why).toContain(
+                  'Contract is missing required fields',
+                );
+              } else {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                expect(errorMessage).toBe('Unexpected error');
               }
             } finally {
-              process.chdir(originalCwd);
               vi.restoreAllMocks();
             }
           } finally {
@@ -613,30 +651,33 @@ describe('verifyDatabase API', () => {
               };
             });
 
-            const originalCwd = process.cwd();
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
             try {
-              process.chdir(testDirWithDb);
-              try {
-                await verifyDatabase({
-                  dbUrl: connectionString,
-                  configPath: 'prisma-next.config.ts',
-                });
-                expect.fail('Expected verifyDatabase to throw');
-              } catch (error) {
-                expect(error).toBeInstanceOf(Error);
-                // errorUnexpected returns a CliStructuredError with message "Unexpected error"
-                // and the why field contains "Database query returned unexpected result structure"
-                if (error && typeof error === 'object' && 'why' in error) {
-                  expect((error as { why?: string }).why).toContain(
-                    'Database query returned unexpected result structure',
-                  );
-                } else {
-                  const errorMessage = error instanceof Error ? error.message : String(error);
-                  expect(errorMessage).toBe('Unexpected error');
-                }
+              await verifyDatabase({
+                config,
+                contractIR,
+                dbUrl: connectionString,
+                contractPath,
+                configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+              });
+              expect.fail('Expected verifyDatabase to throw');
+            } catch (error) {
+              expect(error).toBeInstanceOf(Error);
+              // errorUnexpected returns a CliStructuredError with message "Unexpected error"
+              // and the why field contains "Database query returned unexpected result structure"
+              if (error && typeof error === 'object' && 'why' in error) {
+                expect((error as { why?: string }).why).toContain(
+                  'Database query returned unexpected result structure',
+                );
+              } else {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                expect(errorMessage).toBe('Unexpected error');
               }
             } finally {
-              process.chdir(originalCwd);
               vi.restoreAllMocks();
             }
           } finally {
@@ -704,23 +745,25 @@ describe('verifyDatabase API', () => {
               return config;
             });
 
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDirWithDb);
-              const result = await verifyDatabase({
-                dbUrl: connectionString,
-                configPath: 'prisma-next.config.ts',
-              });
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
+            const result = await verifyDatabase({
+              config,
+              contractIR,
+              dbUrl: connectionString,
+              contractPath,
+              configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+            });
 
-              // Should succeed but report missing codecs if contract uses types not in supported list
-              expect(result.ok).toBe(true);
-              // If contract uses types not in ['pg/int4@1'], missingCodecs should be present
-              // Otherwise, missingCodecs should be undefined
-              // This test verifies the branch is covered, regardless of whether missingCodecs is set
-            } finally {
-              process.chdir(originalCwd);
-              vi.restoreAllMocks();
-            }
+            // Should succeed but report missing codecs if contract uses types not in supported list
+            expect(result.ok).toBe(true);
+            // If contract uses types not in ['pg/int4@1'], missingCodecs should be present
+            // Otherwise, missingCodecs should be undefined
+            // This test verifies the branch is covered, regardless of whether missingCodecs is set
+            vi.restoreAllMocks();
           } finally {
             cleanupWithDb();
           }
@@ -768,19 +811,21 @@ describe('verifyDatabase API', () => {
               };
             });
 
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDirWithDb);
-              await expect(
-                verifyDatabase({
-                  dbUrl: connectionString,
-                  configPath: 'prisma-next.config.ts',
-                }),
-              ).rejects.toThrow('Failed to verify database: String error instead of Error object');
-            } finally {
-              process.chdir(originalCwd);
-              vi.restoreAllMocks();
-            }
+            // Load config and contract for verifyDatabase
+            const { config, contractIR, contractPath } = await loadConfigAndContract(
+              testDirWithDb,
+              'prisma-next.config.ts',
+            );
+            await expect(
+              verifyDatabase({
+                config,
+                contractIR,
+                dbUrl: connectionString,
+                contractPath,
+                configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+              }),
+            ).rejects.toThrow('Failed to verify database: String error instead of Error object');
+            vi.restoreAllMocks();
           } finally {
             cleanupWithDb();
           }

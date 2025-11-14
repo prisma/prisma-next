@@ -1,11 +1,8 @@
 import { dirname, resolve } from 'node:path';
-import { loadConfig as loadConfigC12 } from 'c12';
 import type { PrismaNextConfig } from '@prisma-next/core-control-plane/config-types';
-import {
-  errorConfigFileNotFound,
-  errorUnexpected,
-} from '@prisma-next/core-control-plane/errors';
 import { validateConfig } from '@prisma-next/core-control-plane/config-validation';
+import { errorConfigFileNotFound, errorUnexpected } from '@prisma-next/core-control-plane/errors';
+import { loadConfig as loadConfigC12 } from 'c12';
 
 /**
  * Loads the Prisma Next config from a TypeScript file.

@@ -1,6 +1,6 @@
-import { errorConfigValidation } from '../src/errors';
-import { validateConfig } from '../src/config-validation';
 import { describe, expect, it, vi } from 'vitest';
+import { validateConfig } from '../src/config-validation';
+import { errorConfigValidation } from '../src/errors';
 
 // Helper to create a minimal valid config for testing
 function createValidConfig(overrides?: Record<string, unknown>) {
@@ -421,4 +421,3 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).not.toThrow();
   });
 });
-

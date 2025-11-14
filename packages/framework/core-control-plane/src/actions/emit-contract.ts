@@ -29,9 +29,7 @@ export interface EmitContractResult {
  * @returns Result with contract JSON string, DTS string, and hashes
  * @throws Error if contract emission fails
  */
-export async function emitContract(
-  options: EmitContractOptions,
-): Promise<EmitContractResult> {
+export async function emitContract(options: EmitContractOptions): Promise<EmitContractResult> {
   try {
     const {
       contractIR,
@@ -67,4 +65,3 @@ export async function emitContract(
     throw new Error(`Failed to emit contract: ${String(error)}`);
   }
 }
-

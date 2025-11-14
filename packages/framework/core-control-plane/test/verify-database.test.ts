@@ -1,18 +1,16 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { contractIR, irHeader, irMeta } from '@prisma-next/contract/ir';
+import { describe, expect, it, vi } from 'vitest';
+import { verifyDatabase } from '../src/actions/verify-database';
 import type { PrismaNextConfig } from '../src/config-types';
 import {
   errorFamilyReadMarkerSqlRequired,
   errorQueryRunnerFactoryRequired,
   errorUnexpected,
 } from '../src/errors';
-import { verifyDatabase } from '../src/actions/verify-database';
-import { describe, expect, it, vi } from 'vitest';
 
 // Helper to create a minimal config for testing
-function createTestConfig(
-  overrides?: Partial<PrismaNextConfig>,
-): PrismaNextConfig {
+function createTestConfig(overrides?: Partial<PrismaNextConfig>): PrismaNextConfig {
   return {
     family: {
       kind: 'family',
@@ -53,7 +51,9 @@ function createTestConfig(
 }
 
 // Helper to create a test ContractIR with coreHash (as it would appear after JSON parsing)
-function createTestContractIR(overrides?: Partial<ContractIR & { coreHash?: string; profileHash?: string }>): ContractIR & { coreHash: string; profileHash?: string } {
+function createTestContractIR(
+  overrides?: Partial<ContractIR & { coreHash?: string; profileHash?: string }>,
+): ContractIR & { coreHash: string; profileHash?: string } {
   const ir = contractIR({
     header: irHeader({
       target: overrides?.target ?? 'postgres',
@@ -475,4 +475,3 @@ describe('verifyDatabase', () => {
     ).rejects.toThrow('Failed to verify database: String error');
   });
 });
-

@@ -1,9 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import { Command } from 'commander';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
+import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import {
   assembleOperationRegistry,

@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -11,7 +12,6 @@ import {
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emitContract } from '../src/api/emit-contract';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
 import { loadConfig } from '../src/config-loader';
 import {
@@ -64,8 +64,6 @@ async function emitContractFromConfig(
 
   const emitResult = await emitContract({
     contractIR: contractIR as ContractIR,
-    outputJsonPath: resolve(testDir, contractConfig.output ?? 'src/prisma/contract.json'),
-    outputDtsPath: resolve(testDir, contractConfig.types ?? 'src/prisma/contract.d.ts'),
     targetFamily: config.family.hook,
     operationRegistry,
     codecTypeImports,
@@ -73,8 +71,15 @@ async function emitContractFromConfig(
     extensionIds,
   });
 
-  const contractJsonContent = readFileSync(emitResult.files.json, 'utf-8');
-  const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  // Write contract files
+  const contractJsonPath = resolve(testDir, contractConfig.output ?? 'src/prisma/contract.json');
+  const contractDtsPath = resolve(testDir, contractConfig.types ?? 'src/prisma/contract.d.ts');
+  mkdirSync(dirname(contractJsonPath), { recursive: true });
+  mkdirSync(dirname(contractDtsPath), { recursive: true });
+  writeFileSync(contractJsonPath, emitResult.contractJson, 'utf-8');
+  writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
+
+  const contractJson = JSON.parse(emitResult.contractJson) as Record<string, unknown>;
   return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
 

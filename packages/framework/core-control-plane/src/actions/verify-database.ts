@@ -339,4 +339,3 @@ export async function verifyDatabase(
     throw new Error(`Failed to verify database: ${String(error)}`);
   }
 }
-

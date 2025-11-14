@@ -1,6 +1,6 @@
+import type { PrismaNextConfig } from '@prisma-next/core-control-plane/config-types';
+import { defineConfig } from '@prisma-next/core-control-plane/config-types';
 import { describe, expect, it } from 'vitest';
-import type { PrismaNextConfig } from '../src/config-types';
-import { defineConfig } from '../src/config-types';
 
 describe('defineConfig', () => {
   const mockHook = {

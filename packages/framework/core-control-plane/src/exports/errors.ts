@@ -2,17 +2,16 @@ export type { CliErrorEnvelope } from '../errors';
 export {
   CliStructuredError,
   errorConfigFileNotFound,
+  errorConfigValidation,
   errorContractConfigMissing,
   errorContractValidationFailed,
-  errorFileNotFound,
   errorDatabaseUrlRequired,
-  errorQueryRunnerFactoryRequired,
   errorFamilyReadMarkerSqlRequired,
-  errorConfigValidation,
-  errorMarkerMissing,
+  errorFileNotFound,
   errorHashMismatch,
-  errorTargetMismatch,
+  errorMarkerMissing,
+  errorQueryRunnerFactoryRequired,
   errorRuntime,
+  errorTargetMismatch,
   errorUnexpected,
 } from '../errors';
-

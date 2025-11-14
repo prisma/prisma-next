@@ -9,4 +9,3 @@ export default defineConfig({
     hookTimeout: timeouts.default,
   },
 });
-

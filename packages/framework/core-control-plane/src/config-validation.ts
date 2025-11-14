@@ -165,4 +165,3 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     }
   }
 }
-

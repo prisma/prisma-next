@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emitContract } from '../../src/api/emit-contract';
 import { loadConfig } from '../../src/config-loader';
 import {
   assembleOperationRegistry,
@@ -72,8 +72,6 @@ describe('emitContract API', () => {
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(testDir, contractConfig.output),
-        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
@@ -83,13 +81,17 @@ describe('emitContract API', () => {
 
       expect(result).toBeDefined();
       expect(result.coreHash).toBeDefined();
-      expect(result.outDir).toBeDefined();
-      expect(result.files.json).toBeDefined();
-      expect(result.files.dts).toBeDefined();
-      expect(result.timings.total).toBeGreaterThanOrEqual(0);
+      expect(result.profileHash).toBeDefined();
+      expect(result.contractJson).toBeDefined();
+      expect(result.contractDts).toBeDefined();
 
-      const contractJsonPath = result.files.json;
-      const contractDtsPath = result.files.dts;
+      // Write the returned strings to files
+      const contractJsonPath = resolve(testDir, contractConfig.output);
+      const contractDtsPath = resolve(testDir, contractConfig.types);
+      mkdirSync(dirname(contractJsonPath), { recursive: true });
+      mkdirSync(dirname(contractDtsPath), { recursive: true });
+      writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
+      writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
 
       expect(existsSync(contractJsonPath)).toBe(true);
       expect(existsSync(contractDtsPath)).toBe(true);
@@ -146,8 +148,6 @@ describe('emitContract API', () => {
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(testDir, contractConfig.output),
-        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
@@ -155,9 +155,15 @@ describe('emitContract API', () => {
         extensionIds,
       });
 
-      // Should use paths from config
-      expect(result.files.json).toContain('output/contract.json');
-      expect(result.files.dts).toContain('output/contract.d.ts');
+      // Write files and verify paths
+      const contractJsonPath = resolve(testDir, contractConfig.output);
+      const contractDtsPath = resolve(testDir, contractConfig.types);
+      mkdirSync(dirname(contractJsonPath), { recursive: true });
+      mkdirSync(dirname(contractDtsPath), { recursive: true });
+      writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
+      writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
+      expect(contractJsonPath).toContain('output/contract.json');
+      expect(contractDtsPath).toContain('output/contract.d.ts');
     },
     timeouts.typeScriptCompilation,
   );
@@ -213,8 +219,6 @@ describe('emitContract API', () => {
 
         const result = await emitContract({
           contractIR: contractIR as ContractIR,
-          outputJsonPath: resolve(customTestDir, contractConfig.output),
-          outputDtsPath: resolve(customTestDir, contractConfig.types),
           targetFamily: config.family.hook,
           operationRegistry,
           codecTypeImports,
@@ -222,9 +226,16 @@ describe('emitContract API', () => {
           extensionIds,
         });
 
+        // Write files
+        const contractJsonPath = resolve(customTestDir, contractConfig.output);
+        const contractDtsPath = resolve(customTestDir, contractConfig.types);
+        mkdirSync(dirname(contractJsonPath), { recursive: true });
+        mkdirSync(dirname(contractDtsPath), { recursive: true });
+        writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
+        writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
         expect(existsSync(newOutputDir)).toBe(true);
-        expect(existsSync(result.files.json)).toBe(true);
-        expect(existsSync(result.files.dts)).toBe(true);
+        expect(existsSync(contractJsonPath)).toBe(true);
+        expect(existsSync(contractDtsPath)).toBe(true);
       } finally {
         customCleanup();
       }
@@ -271,8 +282,6 @@ describe('emitContract API', () => {
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(testDir, contractConfig.output),
-        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
@@ -326,8 +335,6 @@ describe('emitContract API', () => {
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(testDir, contractConfig.output),
-        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
@@ -335,8 +342,8 @@ describe('emitContract API', () => {
         extensionIds,
       });
 
-      expect(result.timings).toBeDefined();
-      expect(result.timings.total).toBeGreaterThanOrEqual(0);
+      // Timings are no longer returned in the result
+      expect(result).toBeDefined();
     },
     timeouts.typeScriptCompilation,
   );
@@ -382,8 +389,6 @@ describe('emitContract API', () => {
       // The function should work normally, but we've verified the error handling path exists
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
-        outputJsonPath: resolve(testDir, contractConfig.output),
-        outputDtsPath: resolve(testDir, contractConfig.types),
         targetFamily: config.family.hook,
         operationRegistry,
         codecTypeImports,
