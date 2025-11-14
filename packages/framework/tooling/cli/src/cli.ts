@@ -9,6 +9,12 @@ const program = new Command();
 
 program.name('prisma-next').description('Prisma Next CLI').version('0.0.1');
 
+// Override version option description to match capitalization style
+const versionOption = program.options.find((opt) => opt.flags.includes('--version'));
+if (versionOption) {
+  versionOption.description = 'Output the version number';
+}
+
 program.configureOutput({
   writeErr: () => {
     // Suppress all default error output - we handle errors in exitOverride
