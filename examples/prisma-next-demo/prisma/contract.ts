@@ -45,6 +45,7 @@ export const contract = defineContract<AllCodecTypes>()
       .field('id', 'id')
       .field('title', 'title')
       .field('userId', 'userId')
+      .field('embedding', 'embedding')
       .field('createdAt', 'createdAt')
       .relation('user', {
         toModel: 'User',

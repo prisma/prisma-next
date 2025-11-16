@@ -1,3 +1,4 @@
+import type { ResultType } from '@prisma-next/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';
@@ -13,6 +14,7 @@ export async function ormGetUsersWithPosts(limit: number, runtime: Runtime) {
           id: m.id,
           title: m.title,
           createdAt: m.createdAt,
+          embedding: m.embedding,
         }))
         .orderBy((m) => m.createdAt.desc()),
     )
@@ -26,6 +28,11 @@ export async function ormGetUsersWithPosts(limit: number, runtime: Runtime) {
     .findMany({
       params: { postId: 1 },
     });
+  type Row = ResultType<typeof plan>;
+  // @ts-expect-error - This is to test the type inference
+  type _Test = Row['posts'];
+  // @ts-expect-error - This is to test the type inference
+  type _Post = Row['posts'][0];
 
   return collect(runtime.execute(plan));
 }

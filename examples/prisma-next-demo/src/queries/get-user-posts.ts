@@ -1,3 +1,4 @@
+import type { ResultType } from '@prisma-next/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { sql, tables } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
@@ -18,6 +19,10 @@ export async function getUserPosts(userId: number) {
       embedding: postTable.columns.embedding,
     })
     .build({ params: { userId } });
+
+  type Row = ResultType<typeof plan>;
+  // @ts-expect-error - This is to test the type inference
+  type _Test = Row['embedding'];
 
   return collect(runtime.execute(plan));
 }

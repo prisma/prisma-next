@@ -1,3 +1,4 @@
+import type { ResultType } from '@prisma-next/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { sql, tables } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
@@ -24,6 +25,10 @@ export async function similaritySearch(queryVector: number[], limit = 10) {
     .orderBy(distanceExpr.asc())
     .limit(limit)
     .build({ params: { queryVector } });
+
+  type Row = ResultType<typeof plan>;
+  // @ts-expect-error - This is to test the type inference
+  type _Test = Row['distance']; // This is correctly inferred as number
 
   return collect(runtime.execute(plan));
 }
