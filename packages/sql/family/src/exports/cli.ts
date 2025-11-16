@@ -74,7 +74,9 @@ const sqlFamilyDescriptor: FamilyDescriptor<SqlSchemaIR> = {
     // Use getter to create verifySchema with descriptor captured in closure
     // This allows verifySchema to refer to itself (the family descriptor) without needing it as a parameter
     get verifySchema() {
-      return createVerifySchema(sqlFamilyDescriptor);
+      return createVerifySchema(sqlFamilyDescriptor) as NonNullable<
+        FamilyDescriptor<SqlSchemaIR>['verify']
+      >['verifySchema'];
     },
   },
   convertOperationManifest: (manifest: OperationManifest): OperationSignature => {

@@ -44,9 +44,9 @@ function createMockDriver(queries: Map<string, unknown[]>): ControlPlaneDriver {
         }
 
         const rows = queries.get(key) ?? [];
-        return { rows: rows as Row[] };
+        return { rows: rows as Row[] } as { readonly rows: Row[] };
       },
-    ),
+    ) as ControlPlaneDriver['query'],
     close: vi.fn(async () => {}),
   };
 }
@@ -128,7 +128,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -155,7 +156,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -195,7 +197,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -240,7 +243,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -284,7 +288,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -326,7 +331,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -367,7 +373,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -403,7 +410,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -438,7 +446,8 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
+    const result = await verifySchema({
       driver,
       contractIR: contract,
       target,
@@ -474,7 +483,7 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify.verifySchema!({
+    const result = await sqlFamilyDescriptor.verify!.verifySchema!({
       driver,
       contractIR: contract,
       target,
@@ -518,14 +527,14 @@ describe('verifySchema integration', () => {
               params?: readonly unknown[],
             ) => {
               const result = await client.query(sql, params as unknown[] | undefined);
-              return { rows: result.rows as Row[] };
+              return { rows: result.rows as Row[] } as { readonly rows: Row[] };
             },
             close: async () => {
               // Don't close the shared client
             },
           };
 
-          const result = await sqlFamilyDescriptor.verify.verifySchema!({
+          const result = await sqlFamilyDescriptor.verify!.verifySchema!({
             driver,
             contractIR: contract,
             target,
