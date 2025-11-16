@@ -5,6 +5,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { collectSupportedCodecTypeIds, introspectSchema, readMarker, verifySchema } from './verify';
 
 /**
@@ -54,7 +55,7 @@ function operationManifestToSignature(manifest: OperationManifest): SqlOperation
  * SQL family descriptor for CLI config.
  * Provides the SQL family hook and conversion helpers.
  */
-const sqlFamilyDescriptor: FamilyDescriptor = {
+const sqlFamilyDescriptor: FamilyDescriptor<SqlSchemaIR> = {
   kind: 'family',
   id: 'sql',
   hook: sqlTargetFamilyHook,

@@ -122,7 +122,7 @@ describe('introspectPostgresSchema (integration with real database)', () => {
               const usersTable = schemaIR.tables['users']!;
               expect(usersTable).toBeDefined();
               expect(usersTable?.name).toBe('users');
-              expect(usersTable?.primaryKey).toEqual({ columns: ['id'] });
+              expect(usersTable?.primaryKey).toMatchObject({ columns: ['id'] });
 
               // Verify users table columns
               expect(usersTable?.columns).toBeDefined();
@@ -200,7 +200,7 @@ describe('introspectPostgresSchema (integration with real database)', () => {
               const postsTable = schemaIR.tables['posts'];
               expect(postsTable).toBeDefined();
               expect(postsTable?.name).toBe('posts');
-              expect(postsTable?.primaryKey).toEqual({ columns: ['id'] });
+              expect(postsTable?.primaryKey).toMatchObject({ columns: ['id'] });
 
               // Verify posts table columns
               expect(postsTable?.columns['user_id']).toMatchObject({

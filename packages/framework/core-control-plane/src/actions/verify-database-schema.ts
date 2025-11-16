@@ -8,10 +8,10 @@ import type {
   TargetDescriptor,
 } from '../types';
 
-export interface VerifyDatabaseSchemaOptions {
+export interface VerifyDatabaseSchemaOptions<TSchemaIR = unknown> {
   readonly driver: ControlPlaneDriver;
   readonly contractIR: unknown;
-  readonly family: FamilyDescriptor;
+  readonly family: FamilyDescriptor<TSchemaIR>;
   readonly target: TargetDescriptor;
   readonly adapter: AdapterDescriptor;
   readonly extensions: ReadonlyArray<ExtensionDescriptor>;
@@ -77,8 +77,8 @@ export interface VerifyDatabaseSchemaResult {
  * @returns Result with verification status, schema issues, meta, and timings
  * @throws Error if database connection fails or verification fails
  */
-export async function verifyDatabaseSchema(
-  options: VerifyDatabaseSchemaOptions,
+export async function verifyDatabaseSchema<TSchemaIR = unknown>(
+  options: VerifyDatabaseSchemaOptions<TSchemaIR>,
 ): Promise<VerifyDatabaseSchemaResult> {
   try {
     const {

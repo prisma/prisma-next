@@ -43,7 +43,7 @@ function createMockFamily(
     readonly adapter: AdapterDescriptor;
     readonly extensions: ReadonlyArray<ExtensionDescriptor>;
   }) => Promise<SqlSchemaIR>,
-): FamilyDescriptor {
+): FamilyDescriptor<SqlSchemaIR> {
   return {
     kind: 'family',
     id: 'sql',

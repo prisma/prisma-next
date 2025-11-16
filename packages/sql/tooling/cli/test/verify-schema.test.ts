@@ -7,6 +7,7 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import sqlFamilyDescriptor from '../src/exports/cli';
 import { verifySchema } from '../src/exports/verify';
 
 /**
@@ -131,6 +132,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -158,6 +160,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -198,6 +201,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -243,6 +247,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -287,6 +292,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -329,6 +335,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -370,6 +377,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -406,6 +414,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -441,6 +450,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -477,6 +487,7 @@ describe('verifySchema', () => {
     const result = await verifySchema({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -528,6 +539,7 @@ describe('verifySchema integration', () => {
           const result = await verifySchema({
             driver,
             contractIR: contract,
+            family: sqlFamilyDescriptor,
             target,
             adapter,
             extensions,

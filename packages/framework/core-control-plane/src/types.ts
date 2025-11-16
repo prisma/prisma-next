@@ -41,7 +41,7 @@ export interface DriverDescriptor {
  * Descriptor for a target family (e.g., SQL).
  * Provides the family hook and assembly helpers.
  */
-export interface FamilyDescriptor {
+export interface FamilyDescriptor<TSchemaIR = unknown> {
   readonly kind: 'family';
   readonly id: string;
   readonly hook: TargetFamilyHook;
@@ -74,7 +74,7 @@ export interface FamilyDescriptor {
       readonly target: TargetDescriptor;
       readonly adapter: AdapterDescriptor;
       readonly extensions: ReadonlyArray<ExtensionDescriptor>;
-    }) => Promise<unknown>;
+    }) => Promise<TSchemaIR>;
     /**
      * Verifies that the live database schema satisfies the emitted contract.
      * Performs catalog introspection and comparison, returning schema issues if any.
@@ -83,6 +83,7 @@ export interface FamilyDescriptor {
     verifySchema?: (options: {
       readonly driver: ControlPlaneDriver;
       readonly contractIR: unknown;
+      readonly family: FamilyDescriptor<TSchemaIR>;
       readonly target: TargetDescriptor;
       readonly adapter: AdapterDescriptor;
       readonly extensions: ReadonlyArray<ExtensionDescriptor>;

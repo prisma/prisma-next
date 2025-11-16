@@ -5,12 +5,12 @@ import type {
   AdapterDescriptor,
   ControlPlaneDriver,
   ExtensionDescriptor,
+  FamilyDescriptor,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { type } from 'arktype';
-import sqlFamilyDescriptor from './cli';
 
 const MetaSchema = type({ '[string]': 'unknown' });
 
@@ -218,6 +218,7 @@ type SchemaIssue = {
 export async function verifySchema(options: {
   readonly driver: ControlPlaneDriver;
   readonly contractIR: unknown;
+  readonly family: FamilyDescriptor<SqlSchemaIR>;
   readonly target: TargetDescriptor;
   readonly adapter: AdapterDescriptor;
   readonly extensions: ReadonlyArray<ExtensionDescriptor>;
@@ -250,10 +251,12 @@ export async function verifySchema(options: {
   };
 }> {
   // Delegate to core verifyDatabaseSchema action
+  // The family descriptor is passed in from config, avoiding circular dependency
+  // (we receive it as a parameter rather than importing sqlFamilyDescriptor)
   return verifyDatabaseSchema({
     driver: options.driver,
     contractIR: options.contractIR,
-    family: sqlFamilyDescriptor,
+    family: options.family,
     target: options.target,
     adapter: options.adapter,
     extensions: options.extensions,
