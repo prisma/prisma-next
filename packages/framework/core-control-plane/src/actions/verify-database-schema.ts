@@ -6,18 +6,21 @@ import type {
   FamilyDescriptor,
   SchemaIssue,
   TargetDescriptor,
+  TargetFamilyContext,
 } from '../types';
 import { introspectDatabaseSchema } from './introspect-database-schema';
 import { verifySchemaAgainstContract } from './verify-schema-against-contract';
 
-export interface VerifyDatabaseSchemaOptions<TSchemaIR = unknown> {
+export interface VerifyDatabaseSchemaOptions<
+  TCtx extends TargetFamilyContext = TargetFamilyContext,
+> {
   readonly driver: ControlPlaneDriver;
   readonly contractIR: unknown;
-  readonly family: FamilyDescriptor<TSchemaIR>;
-  readonly target: TargetDescriptor;
-  readonly adapter: AdapterDescriptor;
-  readonly extensions: ReadonlyArray<ExtensionDescriptor>;
-  readonly codecRegistry: unknown; // Family-specific registry type (e.g., CodecRegistry for SQL)
+  readonly family: FamilyDescriptor<TCtx>;
+  readonly target: TargetDescriptor<TCtx>;
+  readonly adapter: AdapterDescriptor<TCtx>;
+  readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+  readonly contextInput: Omit<TCtx, 'schemaIR'>;
   readonly strict: boolean;
   readonly startTime: number;
   readonly contractPath: string;
@@ -62,8 +65,8 @@ export interface VerifyDatabaseSchemaResult {
  * @returns Result with verification status, schema issues, meta, and timings
  * @throws Error if database connection fails or verification fails
  */
-export async function verifyDatabaseSchema<TSchemaIR = unknown>(
-  options: VerifyDatabaseSchemaOptions<TSchemaIR>,
+export async function verifyDatabaseSchema<TCtx extends TargetFamilyContext = TargetFamilyContext>(
+  options: VerifyDatabaseSchemaOptions<TCtx>,
 ): Promise<VerifyDatabaseSchemaResult> {
   try {
     const {
@@ -73,7 +76,7 @@ export async function verifyDatabaseSchema<TSchemaIR = unknown>(
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict,
       startTime,
       contractPath,
@@ -102,17 +105,17 @@ export async function verifyDatabaseSchema<TSchemaIR = unknown>(
         : undefined;
 
     // 1) Introspect database schema
-    const { schemaIR } = await introspectDatabaseSchema<TSchemaIR>({
+    const { schemaIR } = await introspectDatabaseSchema<TCtx>({
       driver,
       family,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
     });
 
     // 2) Verify schema against contract
-    const { issues } = await verifySchemaAgainstContract<TSchemaIR>({
+    const { issues } = await verifySchemaAgainstContract<TCtx>({
       contractIR,
       schemaIR,
       family,

@@ -5,6 +5,7 @@ import type {
   ExtensionDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
+  TargetFamilyContext,
 } from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 
@@ -43,13 +44,13 @@ export interface ContractConfig {
 
 /**
  * Configuration for Prisma Next CLI.
- * @template TSchemaIR - The schema IR type for the family (defaults to unknown for backward compatibility).
+ * @template TCtx - The target family context type (defaults to TargetFamilyContext for backward compatibility).
  */
-export interface PrismaNextConfig<TSchemaIR = unknown> {
-  readonly family: FamilyDescriptor<TSchemaIR>;
-  readonly target: TargetDescriptor;
-  readonly adapter: AdapterDescriptor;
-  readonly extensions?: ReadonlyArray<ExtensionDescriptor>;
+export interface PrismaNextConfig<TCtx extends TargetFamilyContext = TargetFamilyContext> {
+  readonly family: FamilyDescriptor<TCtx>;
+  readonly target: TargetDescriptor<TCtx>;
+  readonly adapter: AdapterDescriptor<TCtx>;
+  readonly extensions?: ReadonlyArray<ExtensionDescriptor<TCtx>>;
   /**
    * Driver descriptor for DB-connected CLI commands.
    * Required for DB-connected commands (e.g., db verify).
@@ -98,13 +99,15 @@ const PrismaNextConfigSchema = type({
  * - contract.output defaults to 'src/prisma/contract.json' if missing
  * - contract.types defaults to output with .d.ts extension if missing
  *
+ * The function infers the context type from the `family` parameter, so callers don't need to specify it explicitly.
+ *
  * @param config - Raw config input from user
  * @returns Normalized config IR with defaults applied
  * @throws Error if config structure is invalid
  */
-export function defineConfig<TSchemaIR = unknown>(
-  config: PrismaNextConfig<TSchemaIR>,
-): PrismaNextConfig<TSchemaIR> {
+export function defineConfig<TCtx extends TargetFamilyContext = TargetFamilyContext>(
+  config: PrismaNextConfig<TCtx>,
+): PrismaNextConfig<TCtx> {
   // Validate structure using Arktype
   const validated = PrismaNextConfigSchema(config);
   if (validated instanceof type.errors) {

@@ -7,9 +7,10 @@ import type {
   SchemaIssue,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlCodecRegistry } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { type } from 'arktype';
+import type { SqlFamilyContext } from './context';
 
 const MetaSchema = type({ '[string]': 'unknown' });
 
@@ -152,7 +153,11 @@ export async function readMarker(driver: ControlPlaneDriver): Promise<ContractMa
  * would require runtime evaluation or static analysis. This can be enhanced later.
  */
 export function collectSupportedCodecTypeIds(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+  descriptors: ReadonlyArray<
+    | TargetDescriptor<SqlFamilyContext>
+    | AdapterDescriptor<SqlFamilyContext>
+    | ExtensionDescriptor<SqlFamilyContext>
+  >,
 ): readonly string[] {
   // For MVP, return empty array
   // Future enhancement: Extract type IDs from codec-types modules via static analysis
@@ -165,19 +170,20 @@ export function collectSupportedCodecTypeIds(
  * Introspects the database schema and returns a target-agnostic SqlSchemaIR.
  * Delegates to Postgres adapter for concrete introspection.
  * This is the SQL family's implementation of the introspectSchema hook.
- * The codecRegistry is pre-assembled by the domain layer.
+ * The contextInput contains the codecRegistry, pre-assembled by the domain layer.
  */
 export async function introspectSchema(options: {
   readonly driver: ControlPlaneDriver;
-  readonly codecRegistry: unknown; // Framework-agnostic type; SQL family narrows to CodecRegistry
+  readonly contextInput: Omit<SqlFamilyContext, 'schemaIR'>;
   readonly contractIR?: unknown;
-  readonly target: TargetDescriptor;
-  readonly adapter: AdapterDescriptor;
-  readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+  readonly target: TargetDescriptor<SqlFamilyContext>;
+  readonly adapter: AdapterDescriptor<SqlFamilyContext>;
+  readonly extensions: ReadonlyArray<ExtensionDescriptor<SqlFamilyContext>>;
 }): Promise<SqlSchemaIR> {
-  const { driver, contractIR } = options;
-  // Narrow to CodecRegistry - safe because CLI assembles it from SQL adapter/extensions
-  const codecRegistry = options.codecRegistry as CodecRegistry;
+  const { driver, contractIR, contextInput } = options;
+  // Extract codecRegistry from contextInput
+  // contextInput is Omit<SqlFamilyContext, 'schemaIR'>, which contains codecRegistry
+  const codecRegistry: SqlCodecRegistry = contextInput['codecRegistry'];
 
   // Delegate to Postgres adapter for concrete introspection
   // For now, we only support Postgres. In the future, this can branch on target.id
@@ -196,9 +202,9 @@ export async function introspectSchema(options: {
 export async function verifySchema(options: {
   readonly contractIR: unknown;
   readonly schemaIR: SqlSchemaIR;
-  readonly target: TargetDescriptor;
-  readonly adapter: AdapterDescriptor;
-  readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+  readonly target: TargetDescriptor<SqlFamilyContext>;
+  readonly adapter: AdapterDescriptor<SqlFamilyContext>;
+  readonly extensions: ReadonlyArray<ExtensionDescriptor<SqlFamilyContext>>;
 }): Promise<{ readonly issues: readonly SchemaIssue[] }> {
   const { contractIR, schemaIR } = options;
   const issues: SchemaIssue[] = [];

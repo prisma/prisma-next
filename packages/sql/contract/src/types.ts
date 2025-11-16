@@ -84,3 +84,56 @@ export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =
 
 export type ExtractOperationTypes<TContract extends SqlContract<SqlStorage>> =
   TContract['mappings']['operationTypes'];
+
+/**
+ * Codec interface for SQL control-plane operations.
+ * This is a minimal interface that defines the structure of codecs
+ * used in control-plane operations (e.g., schema verification).
+ * The concrete implementation lives in sql/lanes/relational-core.
+ */
+export interface Codec<Id extends string = string, TWire = unknown, TJs = unknown> {
+  /**
+   * Namespaced codec identifier in format 'namespace/name@version'
+   * Examples: 'pg/text@1', 'pg/uuid@1', 'pg/timestamptz@1'
+   */
+  readonly id: Id;
+
+  /**
+   * Contract scalar type IDs that this codec can handle.
+   * Examples: ['text'], ['int4', 'float8'], ['timestamp', 'timestamptz']
+   */
+  readonly targetTypes: readonly string[];
+
+  /**
+   * Decode a wire value (from database) to JavaScript type.
+   * Must be synchronous and pure (no side effects).
+   */
+  decode(wire: TWire): TJs;
+
+  /**
+   * Encode a JavaScript value to wire format (for database).
+   * Optional - if not provided, values pass through unchanged.
+   * Must be synchronous and pure (no side effects).
+   */
+  encode?(value: TJs): TWire;
+}
+
+/**
+ * Registry interface for codecs organized by ID and by contract scalar type.
+ * This is a control-plane interface used for schema verification and introspection.
+ * The concrete implementation lives in sql/lanes/relational-core.
+ *
+ * The registry allows looking up codecs by their namespaced ID or by the
+ * contract scalar types they handle. Multiple codecs may handle the same
+ * scalar type; ordering in getByScalar reflects preference (adapter first,
+ * then packs, then app overrides).
+ */
+export interface SqlCodecRegistry {
+  get(id: string): Codec<string> | undefined;
+  has(id: string): boolean;
+  getByScalar(scalar: string): readonly Codec<string>[];
+  getDefaultCodec(scalar: string): Codec<string> | undefined;
+  register(codec: Codec<string>): void;
+  [Symbol.iterator](): Iterator<Codec<string>>;
+  values(): IterableIterator<Codec<string>>;
+}

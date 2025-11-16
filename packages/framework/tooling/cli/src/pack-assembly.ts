@@ -1,27 +1,28 @@
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
+  ExtensionPackManifest,
+  OperationManifest,
+} from '@prisma-next/core-control-plane/pack-manifest-types';
+import type {
   AdapterDescriptor,
   ExtensionDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
-} from '@prisma-next/core-control-plane/config-types';
-import type {
-  ExtensionPackManifest,
-  OperationManifest,
-} from '@prisma-next/core-control-plane/pack-manifest-types';
+  TargetFamilyContext,
+} from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).
  * Loops over descriptors, extracts operations, converts them using family-specific
  * conversion function, and registers them in a new registry.
  */
-export function assembleOperationRegistry<TSchemaIR = unknown>(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-  family: FamilyDescriptor<TSchemaIR>,
+export function assembleOperationRegistry<TCtx extends TargetFamilyContext = TargetFamilyContext>(
+  descriptors: ReadonlyArray<
+    TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
+  >,
+  family: FamilyDescriptor<TCtx>,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
@@ -39,8 +40,10 @@ export function assembleOperationRegistry<TSchemaIR = unknown>(
 /**
  * Extracts codec type imports from descriptors for contract.d.ts generation.
  */
-export function extractCodecTypeImports(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+export function extractCodecTypeImports<TCtx extends TargetFamilyContext = TargetFamilyContext>(
+  descriptors: ReadonlyArray<
+    TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
+  >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -57,8 +60,10 @@ export function extractCodecTypeImports(
 /**
  * Extracts operation type imports from descriptors for contract.d.ts generation.
  */
-export function extractOperationTypeImports(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+export function extractOperationTypeImports<TCtx extends TargetFamilyContext = TargetFamilyContext>(
+  descriptors: ReadonlyArray<
+    TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
+  >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -77,10 +82,10 @@ export function extractOperationTypeImports(
  * [adapter.id, target.id, ...extensions.map(e => e.id)]
  * Deduplicates while preserving stable order.
  */
-export function extractExtensionIds(
-  adapter: AdapterDescriptor,
-  target: TargetDescriptor,
-  extensions: ReadonlyArray<ExtensionDescriptor>,
+export function extractExtensionIds<TCtx extends TargetFamilyContext = TargetFamilyContext>(
+  adapter: AdapterDescriptor<TCtx>,
+  target: TargetDescriptor<TCtx>,
+  extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>,
 ): ReadonlyArray<string> {
   const ids: string[] = [];
   const seen = new Set<string>();
@@ -150,9 +155,11 @@ export function extractOperationTypeImportsFromPacks(
  * Assembles an operation registry from extension packs.
  * Pack-based version for use in tests.
  */
-export function assembleOperationRegistryFromPacks<TSchemaIR = unknown>(
+export function assembleOperationRegistryFromPacks<
+  TCtx extends TargetFamilyContext = TargetFamilyContext,
+>(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-  family: FamilyDescriptor<TSchemaIR>,
+  family: FamilyDescriptor<TCtx>,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
@@ -175,48 +182,4 @@ export function extractExtensionIdsFromPacks(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
 ): ReadonlyArray<string> {
   return packs.map((pack) => pack.manifest.id);
-}
-
-/**
- * Assembles a codec registry from adapter and extensions.
- * Creates adapter instance if needed, then registers adapter and extension codecs.
- * This is a general CLI helper for any command that needs codec registries.
- *
- * Extensions provide codecs via their runtime entrypoints (e.g., pgvector() returns Extension with codecs()).
- * For now, we only register adapter codecs. Extension codecs can be added later if needed for schema verification.
- */
-export async function assembleCodecRegistry(
-  adapter: AdapterDescriptor,
-  _extensions: ReadonlyArray<ExtensionDescriptor>,
-): Promise<CodecRegistry> {
-  const codecRegistry = createCodecRegistry();
-
-  // Get adapter instance (either pre-created or create via factory)
-  let adapterInstance: { profile: { codecs(): CodecRegistry } } | undefined;
-  if (adapter.adapter) {
-    adapterInstance = adapter.adapter as {
-      profile: { codecs(): CodecRegistry };
-    };
-  } else if (adapter.create) {
-    const created = await adapter.create();
-    adapterInstance = created as {
-      profile: { codecs(): CodecRegistry };
-    };
-  }
-
-  // Register adapter codecs
-  if (adapterInstance) {
-    const adapterCodecs = adapterInstance.profile.codecs();
-    for (const codec of adapterCodecs.values()) {
-      codecRegistry.register(codec);
-    }
-  }
-
-  // TODO: Register extension codecs
-  // Extensions provide codecs via their runtime entrypoints (e.g., pgvector() from @prisma-next/extension-pgvector/runtime).
-  // This would require dynamically importing extension runtime modules, which is complex.
-  // For MVP, adapter codecs are sufficient for schema verification.
-  // Extension codecs can be added later if needed.
-
-  return codecRegistry;
 }

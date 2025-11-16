@@ -5,30 +5,35 @@ import type {
   ExtensionDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
+  TargetFamilyContext,
 } from '../types';
 
-export interface IntrospectDatabaseSchemaOptions<TSchemaIR = unknown> {
+export interface IntrospectDatabaseSchemaOptions<
+  TCtx extends TargetFamilyContext = TargetFamilyContext,
+> {
   readonly driver: ControlPlaneDriver;
-  readonly family: FamilyDescriptor<TSchemaIR>;
-  readonly target: TargetDescriptor;
-  readonly adapter: AdapterDescriptor;
-  readonly extensions: ReadonlyArray<ExtensionDescriptor>;
-  readonly codecRegistry: unknown; // Family-specific registry type (e.g., CodecRegistry for SQL)
+  readonly family: FamilyDescriptor<TCtx>;
+  readonly target: TargetDescriptor<TCtx>;
+  readonly adapter: AdapterDescriptor<TCtx>;
+  readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+  readonly contextInput: Omit<TCtx, 'schemaIR'>;
 }
 
-export interface IntrospectDatabaseSchemaResult<TSchemaIR = unknown> {
-  readonly schemaIR: TSchemaIR;
+export interface IntrospectDatabaseSchemaResult<
+  TCtx extends TargetFamilyContext = TargetFamilyContext,
+> {
+  readonly schemaIR: TCtx['schemaIR'];
 }
 
 /**
  * Introspects the database schema and returns a Schema IR.
  * This is a domain action that orchestrates the family's introspectSchema hook.
- * The codecRegistry is pre-assembled by the caller (CLI/domain).
+ * The contextInput contains family-specific control-plane state (e.g., codecRegistry for SQL).
  */
-export async function introspectDatabaseSchema<TSchemaIR = unknown>(
-  options: IntrospectDatabaseSchemaOptions<TSchemaIR>,
-): Promise<IntrospectDatabaseSchemaResult<TSchemaIR>> {
-  const { driver, family, target, adapter, extensions, codecRegistry } = options;
+export async function introspectDatabaseSchema<
+  TCtx extends TargetFamilyContext = TargetFamilyContext,
+>(options: IntrospectDatabaseSchemaOptions<TCtx>): Promise<IntrospectDatabaseSchemaResult<TCtx>> {
+  const { driver, family, target, adapter, extensions, contextInput } = options;
 
   if (!family.verify?.introspectSchema) {
     throw errorUnexpected('Family introspectSchema() is required', {
@@ -38,7 +43,7 @@ export async function introspectDatabaseSchema<TSchemaIR = unknown>(
 
   const schemaIR = await family.verify.introspectSchema({
     driver,
-    codecRegistry,
+    contextInput,
     target,
     adapter,
     extensions,

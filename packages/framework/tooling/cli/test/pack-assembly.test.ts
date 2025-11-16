@@ -2,6 +2,7 @@ import type {
   ExtensionPackManifest,
   OperationManifest,
 } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { describe, expect, it } from 'vitest';
 import type {
@@ -570,7 +571,10 @@ describe('descriptor-based functions', () => {
       },
     };
 
-    const registry = assembleOperationRegistry([target], sqlFamilyDescriptor);
+    const registry = assembleOperationRegistry<SqlFamilyContext>(
+      [target as TargetDescriptor<SqlFamilyContext>],
+      sqlFamilyDescriptor,
+    );
     const operations = registry.byType('pgvector/vector@1');
     expect(operations).toHaveLength(1);
     expect(operations[0]?.method).toBe('cosineDistance');

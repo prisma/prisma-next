@@ -1,11 +1,11 @@
-import type { FamilyDescriptor } from '@prisma-next/cli/config-types';
 import type { OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { FamilyDescriptor } from '@prisma-next/core-control-plane/types';
 import type { OperationSignature } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlFamilyContext } from '../context';
 import {
   collectSupportedCodecTypeIds,
   introspectSchema,
@@ -56,7 +56,7 @@ function operationManifestToSignature(manifest: OperationManifest): SqlOperation
   };
 }
 
-class SqlFamilyDescriptor implements FamilyDescriptor<SqlSchemaIR> {
+class SqlFamilyDescriptor implements FamilyDescriptor<SqlFamilyContext> {
   readonly kind = 'family' as const;
   readonly id = 'sql' as const;
   readonly hook = sqlTargetFamilyHook;

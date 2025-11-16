@@ -1,22 +1,28 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
 import { readFile as readFileAsync } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  AdapterDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
+import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
+import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
+import type { SqlCodecRegistry, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
 import { loadConfig } from '../../src/config-loader';
-import { assembleCodecRegistry } from '../../src/pack-assembly';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../../src/pack-assembly';
-import { CliStructuredError } from '../../src/utils/cli-errors';
 import { setupIntegrationTestDirectoryFromFixtures } from '../utils/test-helpers';
 
 // Fixture subdirectory for verify-database-schema tests
@@ -32,7 +38,6 @@ async function callVerifyDatabaseSchema(options: {
   readonly strict?: boolean;
 }) {
   const config = await loadConfig(options.configPath);
-  const configPath = options.configPath || './prisma-next.config.ts';
   const contractPath = config.contract?.output
     ? resolve(config.contract.output)
     : resolve('src/prisma/contract.json');
@@ -58,22 +63,49 @@ async function callVerifyDatabaseSchema(options: {
   const driver = await config.driver.create(dbUrl);
 
   try {
-    // Assemble codec registry
-    const codecRegistry = await assembleCodecRegistry(config.adapter, config.extensions ?? []);
+    // Assemble codec registry from adapter + extensions
+    // This is SQL-specific, so we inline it here to avoid framework→SQL domain violation
+    const codecRegistry: SqlCodecRegistry = createCodecRegistry();
+
+    // Get adapter instance (either pre-created or create via factory)
+    let adapterInstance: { profile: { codecs(): SqlCodecRegistry } } | undefined;
+    if (config.adapter.adapter) {
+      adapterInstance = config.adapter.adapter as {
+        profile: { codecs(): SqlCodecRegistry };
+      };
+    } else if (config.adapter.create) {
+      const created = await config.adapter.create();
+      adapterInstance = created as {
+        profile: { codecs(): SqlCodecRegistry };
+      };
+    }
+
+    // Register adapter codecs
+    if (adapterInstance) {
+      const adapterCodecs = adapterInstance.profile.codecs();
+      for (const codec of adapterCodecs.values()) {
+        codecRegistry.register(codec);
+      }
+    }
+
+    // Build contextInput (everything except schemaIR)
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = {
+      codecRegistry,
+    };
 
     // Call domain action
-    return await verifyDatabaseSchema({
+    return await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR,
-      family: config.family,
-      target: config.target,
-      adapter: config.adapter,
-      extensions: config.extensions ?? [],
-      codecRegistry,
+      family: config.family as FamilyDescriptor<SqlFamilyContext>,
+      target: config.target as TargetDescriptor<SqlFamilyContext>,
+      adapter: config.adapter as AdapterDescriptor<SqlFamilyContext>,
+      extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<SqlFamilyContext>>,
+      contextInput,
       strict: options.strict ?? false,
       startTime: Date.now(),
       contractPath: contractJsonPath,
-      configPath: options.configPath,
+      ...(options.configPath ? { configPath: options.configPath } : {}),
     });
   } finally {
     await driver.close();

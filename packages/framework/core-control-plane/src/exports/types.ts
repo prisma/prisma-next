@@ -16,4 +16,5 @@ export type {
   FamilyDescriptor,
   SchemaIssue,
   TargetDescriptor,
+  TargetFamilyContext,
 } from '../types';

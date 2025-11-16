@@ -6,15 +6,16 @@ import type {
   FamilyDescriptor,
   SchemaIssue,
   TargetDescriptor,
+  TargetFamilyContext,
 } from '../types';
 
-export interface VerifySchemaOptions<TSchemaIR = unknown> {
+export interface VerifySchemaOptions<TCtx extends TargetFamilyContext = TargetFamilyContext> {
   readonly contractIR: unknown;
-  readonly schemaIR: TSchemaIR;
-  readonly family: FamilyDescriptor<TSchemaIR>;
-  readonly target: TargetDescriptor;
-  readonly adapter: AdapterDescriptor;
-  readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+  readonly schemaIR: TCtx['schemaIR'];
+  readonly family: FamilyDescriptor<TCtx>;
+  readonly target: TargetDescriptor<TCtx>;
+  readonly adapter: AdapterDescriptor<TCtx>;
+  readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
   readonly driver: ControlPlaneDriver;
   readonly strict: boolean;
 }
@@ -271,9 +272,9 @@ function compareContractToSchema(contractIR: unknown, schemaIR: unknown): Schema
  * If family.verify.verifySchema is provided, defers to it; otherwise uses generic comparison.
  * Also calls extension verifySchema hooks and aggregates all issues.
  */
-export async function verifySchemaAgainstContract<TSchemaIR = unknown>(
-  options: VerifySchemaOptions<TSchemaIR>,
-): Promise<VerifySchemaResult> {
+export async function verifySchemaAgainstContract<
+  TCtx extends TargetFamilyContext = TargetFamilyContext,
+>(options: VerifySchemaOptions<TCtx>): Promise<VerifySchemaResult> {
   const { contractIR, schemaIR, family, target, adapter, extensions, driver, strict } = options;
 
   let issues: SchemaIssue[] = [];

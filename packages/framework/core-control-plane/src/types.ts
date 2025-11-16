@@ -3,6 +3,20 @@ import type { OperationSignature } from '@prisma-next/operations';
 import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
 
 /**
+ * Control-plane context that binds together schema IR and family-specific control-plane registries/state.
+ * This abstraction allows domain actions to work with family-specific types (e.g., CodecRegistry for SQL)
+ * without understanding their concrete structure.
+ *
+ * Families define their own context type that extends this base interface:
+ * - SQL: `SqlFamilyContext extends TargetFamilyContext<SqlSchemaIR, SqlCodecRegistry>`
+ * - Other families can define their own context types as needed
+ */
+export interface TargetFamilyContext<TSchemaIR = unknown, TCodecRegistry = unknown> {
+  readonly schemaIR: TSchemaIR;
+  readonly codecRegistry: TCodecRegistry;
+}
+
+/**
  * Minimal driver interface for Control Plane database operations.
  * Provides query execution and connection management.
  */
@@ -41,7 +55,7 @@ export interface DriverDescriptor {
  * Descriptor for a target family (e.g., SQL).
  * Provides the family hook and assembly helpers.
  */
-export interface FamilyDescriptor<TSchemaIR = unknown> {
+export interface FamilyDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> {
   readonly kind: 'family';
   readonly id: string;
   readonly hook: TargetFamilyHook;
@@ -61,22 +75,24 @@ export interface FamilyDescriptor<TSchemaIR = unknown> {
      * to enable coverage checks.
      */
     collectSupportedCodecTypeIds?: (
-      descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+      descriptors: ReadonlyArray<
+        TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
+      >,
     ) => readonly string[];
     /**
      * Introspects the database schema and returns a target-agnostic Schema IR.
      * Delegates to target-specific implementations (e.g., Postgres adapter) for concrete introspection.
      * This is used by schema verification and future migration planning.
-     * The codecRegistry is pre-assembled by the domain layer (CLI/domain actions).
+     * The contextInput contains family-specific control-plane state (e.g., codecRegistry for SQL).
      */
     introspectSchema?: (options: {
       readonly driver: ControlPlaneDriver;
-      readonly codecRegistry: unknown; // Family-specific registry type (e.g., CodecRegistry for SQL)
+      readonly contextInput: Omit<TCtx, 'schemaIR'>;
       readonly contractIR?: unknown;
-      readonly target: TargetDescriptor;
-      readonly adapter: AdapterDescriptor;
-      readonly extensions: ReadonlyArray<ExtensionDescriptor>;
-    }) => Promise<TSchemaIR>;
+      readonly target: TargetDescriptor<TCtx>;
+      readonly adapter: AdapterDescriptor<TCtx>;
+      readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+    }) => Promise<TCtx['schemaIR']>;
     /**
      * Verifies that the schema IR matches the contract IR.
      * Compares contract against schema IR and returns schema issues if any.
@@ -85,10 +101,10 @@ export interface FamilyDescriptor<TSchemaIR = unknown> {
      */
     verifySchema?: (options: {
       readonly contractIR: unknown;
-      readonly schemaIR: TSchemaIR;
-      readonly target: TargetDescriptor;
-      readonly adapter: AdapterDescriptor;
-      readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+      readonly schemaIR: TCtx['schemaIR'];
+      readonly target: TargetDescriptor<TCtx>;
+      readonly adapter: AdapterDescriptor<TCtx>;
+      readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
     }) => Promise<{ readonly issues: readonly SchemaIssue[] }>;
   };
   /**
@@ -111,25 +127,31 @@ export interface FamilyDescriptor<TSchemaIR = unknown> {
 
 /**
  * Descriptor for a target pack (e.g., Postgres target).
+ * @template TCtx - The family context type for type consistency across descriptors.
  */
-export interface TargetDescriptor {
+export interface TargetDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> {
   readonly kind: 'target';
   readonly id: string;
   readonly family: string;
   readonly manifest: ExtensionPackManifest;
+  // TCtx is used for type consistency across descriptors, even if not used in the interface body
+  readonly _contextType?: TCtx;
 }
 
 /**
  * Descriptor for an adapter pack (e.g., Postgres adapter).
  * May optionally provide a runtime factory for DB-connected commands.
+ * @template TCtx - The family context type for type consistency across descriptors.
  */
-export interface AdapterDescriptor {
+export interface AdapterDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> {
   readonly kind: 'adapter';
   readonly id: string;
   readonly family: string;
   readonly manifest: ExtensionPackManifest;
   readonly create?: (...args: unknown[]) => unknown;
   readonly adapter?: unknown;
+  // TCtx is used for type consistency across descriptors, even if not used in the interface body
+  readonly _contextType?: TCtx;
 }
 
 /**
@@ -177,8 +199,9 @@ export interface ExtensionSchemaVerifierOptions {
 
 /**
  * Descriptor for an extension pack (e.g., pgvector).
+ * @template TCtx - The family context type for type consistency across descriptors.
  */
-export interface ExtensionDescriptor {
+export interface ExtensionDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> {
   readonly kind: 'extension';
   readonly id: string;
   readonly family: string;
@@ -191,4 +214,6 @@ export interface ExtensionDescriptor {
   readonly verifySchema?: (
     options: ExtensionSchemaVerifierOptions,
   ) => Promise<readonly ExtensionSchemaIssue[]>;
+  // TCtx is used for type consistency across descriptors, even if not used in the interface body
+  readonly _contextType?: TCtx;
 }

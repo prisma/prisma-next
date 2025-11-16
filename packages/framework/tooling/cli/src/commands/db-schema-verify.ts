@@ -1,9 +1,17 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import type {
+  AdapterDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
+import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
+import type { SqlCodecRegistry } from '@prisma-next/sql-contract/types';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
-import { assembleCodecRegistry } from '../pack-assembly';
 import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
@@ -148,21 +156,57 @@ export function createDbSchemaVerifyCommand(): Command {
 
         try {
           // Assemble codec registry from adapter + extensions
-          const codecRegistry = await assembleCodecRegistry(config.adapter, config.extensions ?? []);
+          // This is SQL-specific, so we inline it here to avoid framework→SQL domain violation
+          const codecRegistry: SqlCodecRegistry = createCodecRegistry();
+
+          // Get adapter instance (either pre-created or create via factory)
+          let adapterInstance: { profile: { codecs(): SqlCodecRegistry } } | undefined;
+          if (config.adapter.adapter) {
+            adapterInstance = config.adapter.adapter as {
+              profile: { codecs(): SqlCodecRegistry };
+            };
+          } else if (config.adapter.create) {
+            const created = await config.adapter.create();
+            adapterInstance = created as {
+              profile: { codecs(): SqlCodecRegistry };
+            };
+          }
+
+          // Register adapter codecs
+          if (adapterInstance) {
+            const adapterCodecs = adapterInstance.profile.codecs();
+            for (const codec of adapterCodecs.values()) {
+              codecRegistry.register(codec);
+            }
+          }
+
+          // TODO: Register extension codecs
+          // Extensions provide codecs via their runtime entrypoints (e.g., pgvector() from @prisma-next/extension-pgvector/runtime).
+          // This would require dynamically importing extension runtime modules, which is complex.
+          // For MVP, adapter codecs are sufficient for schema verification.
+          // Extension codecs can be added later if needed.
+
+          // Build contextInput (everything except schemaIR)
+          const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = {
+            codecRegistry,
+          };
 
           // Call domain action with assembled inputs
-          const verifyResult = await verifyDatabaseSchema({
+          // Cast config descriptors to SqlFamilyContext types since we know this is SQL family
+          const verifyResult = await verifyDatabaseSchema<SqlFamilyContext>({
             driver,
             contractIR,
-            family: config.family,
-            target: config.target,
-            adapter: config.adapter,
-            extensions: config.extensions ?? [],
-            codecRegistry,
+            family: config.family as FamilyDescriptor<SqlFamilyContext>,
+            target: config.target as TargetDescriptor<SqlFamilyContext>,
+            adapter: config.adapter as AdapterDescriptor<SqlFamilyContext>,
+            extensions: (config.extensions ?? []) as ReadonlyArray<
+              ExtensionDescriptor<SqlFamilyContext>
+            >,
+            contextInput,
             strict: options.strict ?? false,
             startTime,
             contractPath: contractJsonPath,
-            configPath: options.config,
+            ...(options.config ? { configPath: options.config } : {}),
           });
 
           // If verification failed, throw structured error for schema mismatches

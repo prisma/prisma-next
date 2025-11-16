@@ -41,6 +41,10 @@
       "types": "./dist/exports/control.d.ts",
       "import": "./dist/exports/control.js"
     },
+    "./context": {
+      "types": "./dist/exports/context.d.ts",
+      "import": "./dist/exports/context.js"
+    },
     "./runtime": {
       "types": "./dist/exports/runtime.d.ts",
       "import": "./dist/exports/runtime.js"

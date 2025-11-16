@@ -1,6 +1,8 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import { defineConfig } from '@prisma-next/cli/config-types';
+import type { AdapterDescriptor, TargetDescriptor } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/cli';
+import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import postgres from '@prisma-next/targets-postgres/cli';
 import { contract } from './contract';
@@ -26,10 +28,10 @@ const sqlFamilyWithoutVerify = {
   // verify property is missing - this is what we're testing
 };
 
-export default defineConfig({
+export default defineConfig<SqlFamilyContext>({
   family: sqlFamilyWithoutVerify,
-  target: postgres,
-  adapter: postgresAdapter,
+  target: postgres as TargetDescriptor<SqlFamilyContext>,
+  adapter: postgresAdapter as AdapterDescriptor<SqlFamilyContext>,
   driver: postgresDriver,
   extensions: [],
   contract: {

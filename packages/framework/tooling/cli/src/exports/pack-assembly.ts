@@ -1,5 +1,4 @@
 export {
-  assembleCodecRegistry,
   assembleOperationRegistry,
   assembleOperationRegistryFromPacks,
   extractCodecTypeImports,
