@@ -5,7 +5,7 @@ import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbSchemaVerifyCommand } from '../src/commands/db-schema-verify';
 import { loadConfig } from '../src/config-loader';
 import {
@@ -80,12 +80,14 @@ async function emitContractFromConfig(
 
 describe('db schema-verify command (e2e)', () => {
   let consoleErrors: string[] = [];
+  let consoleOutput: string[] = [];
   let cleanupMocks: () => void;
 
   beforeEach(() => {
     // Set up console and process.exit mocks
     const mocks = setupCommandMocks();
     consoleErrors = mocks.consoleErrors;
+    consoleOutput = mocks.consoleOutput;
     cleanupMocks = mocks.cleanup;
   });
 
@@ -112,6 +114,27 @@ describe('db schema-verify command (e2e)', () => {
             // Emit contract using the config
             await emitContractFromConfig(configPath, testDir);
 
+            // Mock config to remove verifySchema hook
+            const configLoaderModule = await import('../src/config-loader');
+            const originalLoadConfig = configLoaderModule.loadConfig;
+            vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
+              const config = await originalLoadConfig(path);
+              const mockedVerify = config.family.verify
+                ? {
+                    ...config.family.verify,
+                    verifySchema: undefined,
+                  }
+                : undefined;
+              const mockedFamily = {
+                ...config.family,
+                verify: mockedVerify,
+              };
+              return {
+                ...config,
+                family: mockedFamily,
+              } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
+            });
+
             const command = createDbSchemaVerifyCommand();
             const originalCwd = process.cwd();
             try {
@@ -121,6 +144,7 @@ describe('db schema-verify command (e2e)', () => {
               ).rejects.toThrow('process.exit called');
             } finally {
               process.chdir(originalCwd);
+              vi.restoreAllMocks();
             }
 
             // Check exit code is non-zero (error)
@@ -152,8 +176,11 @@ describe('db schema-verify command (e2e)', () => {
   );
 
   it('reports PN-CLI-4005 when DB URL is missing', async () => {
-    // Set up test directory from fixtures without db config
-    const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.ts');
+    // Set up test directory from fixtures without db.url
+    const testSetup = setupTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.no-db-url.ts',
+    );
     const testDir = testSetup.testDir;
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
@@ -319,31 +346,70 @@ describe('db schema-verify command (e2e)', () => {
             // Emit contract using the config
             await emitContractFromConfig(configPath, testDir);
 
+            // Mock verifySchema to return a failure so we can test JSON error output format
+            const configLoaderModule = await import('../src/config-loader');
+            const originalLoadConfig = configLoaderModule.loadConfig;
+            vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
+              const config = await originalLoadConfig(path);
+              const mockedVerify = config.family.verify
+                ? {
+                    ...config.family.verify,
+                    verifySchema: vi.fn().mockResolvedValue({
+                      ok: false,
+                      code: 'PN-SCHEMA-0001',
+                      summary: 'Database schema does not match contract',
+                      contract: { coreHash: 'sha256:test' },
+                      target: { expected: 'postgres' },
+                      schema: {
+                        issues: [
+                          {
+                            kind: 'missing_table',
+                            table: 'test',
+                            message: 'Table test is missing',
+                          },
+                        ],
+                      },
+                      timings: { total: 10 },
+                    }),
+                  }
+                : undefined;
+              const mockedFamily = {
+                ...config.family,
+                verify: mockedVerify,
+              };
+              return {
+                ...config,
+                family: mockedFamily,
+              } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
+            });
+
             const command = createDbSchemaVerifyCommand();
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              // This will fail because verifySchema hook is not implemented,
-              // but we can verify the JSON output format is attempted
               await expect(
                 executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
               ).rejects.toThrow('process.exit called');
             } finally {
               process.chdir(originalCwd);
+              vi.restoreAllMocks();
             }
 
-            // Check exit code is non-zero (error - verifySchema hook missing)
+            // Check exit code is non-zero (error)
             const exitCode = getExitCode();
             expect(exitCode).not.toBe(0);
 
-            // Verify error output is JSON
-            const errorOutput = consoleErrors.join('\n');
-            expect(() => JSON.parse(errorOutput)).not.toThrow();
+            // Verify output is JSON (schema verification failures output to stdout, not stderr)
+            const output = consoleOutput.join('\n');
+            expect(output).not.toBe('');
+            expect(() => JSON.parse(output)).not.toThrow();
 
-            const parsed = JSON.parse(errorOutput);
+            const parsed = JSON.parse(output);
             expect(parsed).toMatchObject({
+              ok: false,
               code: expect.any(String),
               summary: expect.any(String),
+              schema: expect.any(Object),
             });
           } finally {
             cleanupDir();
@@ -374,12 +440,40 @@ describe('db schema-verify command (e2e)', () => {
             // Emit contract using the config
             await emitContractFromConfig(configPath, testDir);
 
+            // Mock verifySchema to verify --strict flag is passed through
+            const configLoaderModule = await import('../src/config-loader');
+            const originalLoadConfig = configLoaderModule.loadConfig;
+            const verifySchemaMock = vi.fn().mockResolvedValue({
+              ok: false,
+              code: 'PN-SCHEMA-0001',
+              summary: 'Database schema does not match contract',
+              contract: { coreHash: 'sha256:test' },
+              target: { expected: 'postgres' },
+              schema: { issues: [] },
+              timings: { total: 10 },
+            });
+            vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
+              const config = await originalLoadConfig(path);
+              const mockedVerify = config.family.verify
+                ? {
+                    ...config.family.verify,
+                    verifySchema: verifySchemaMock,
+                  }
+                : undefined;
+              const mockedFamily = {
+                ...config.family,
+                verify: mockedVerify,
+              };
+              return {
+                ...config,
+                family: mockedFamily,
+              } as unknown as Awaited<ReturnType<typeof originalLoadConfig>>;
+            });
+
             const command = createDbSchemaVerifyCommand();
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              // This will fail because verifySchema hook is not implemented,
-              // but we can verify the command accepts --strict flag
               await expect(
                 executeCommand(command, [
                   '--config',
@@ -390,9 +484,15 @@ describe('db schema-verify command (e2e)', () => {
               ).rejects.toThrow('process.exit called');
             } finally {
               process.chdir(originalCwd);
+              vi.restoreAllMocks();
             }
 
-            // Check exit code is non-zero (error - verifySchema hook missing)
+            // Verify --strict flag was passed to verifySchema
+            expect(verifySchemaMock).toHaveBeenCalledOnce();
+            const callArgs = verifySchemaMock.mock.calls[0]?.[0];
+            expect(callArgs?.strict).toBe(true);
+
+            // Check exit code is non-zero (error)
             const exitCode = getExitCode();
             expect(exitCode).not.toBe(0);
 

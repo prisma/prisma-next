@@ -124,6 +124,14 @@ export function createDbSchemaVerifyCommand(): Command {
           }
         }
       });
+
+      // If verification failed (ok: false), exit with non-zero code
+      // This handles the case where performAction returns ok(result) but result.ok is false
+      if (result.ok && !result.value.ok) {
+        process.exit(1);
+        return;
+      }
+
       process.exit(exitCode);
     });
 

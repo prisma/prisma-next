@@ -103,56 +103,56 @@ export async function verifyDatabaseSchema(
     }
     const driver = await config.driver.create(dbUrl);
 
-    // Load contract from emitted artifacts
-    // Resolve contract path relative to current working directory (project root)
-    const contractPath = config.contract?.output ?? 'src/prisma/contract.json';
-    const contractJsonPath = resolve(contractPath);
-    let contractJsonContent: string;
     try {
-      contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    } catch (error) {
-      if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-        throw errorFileNotFound(contractJsonPath, {
-          why: `Contract file not found at ${contractJsonPath}`,
+      // Load contract from emitted artifacts
+      // Resolve contract path relative to current working directory (project root)
+      const contractPath = config.contract?.output ?? 'src/prisma/contract.json';
+      const contractJsonPath = resolve(contractPath);
+      let contractJsonContent: string;
+      try {
+        contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+      } catch (error) {
+        if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+          throw errorFileNotFound(contractJsonPath, {
+            why: `Contract file not found at ${contractJsonPath}`,
+          });
+        }
+        throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+          why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
         });
       }
-      throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
-      });
-    }
-    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+      const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-    // Validate contract using family validator
-    const contractIR = config.family.validateContractIR(contractJson);
+      // Validate contract using family validator
+      const contractIR = config.family.validateContractIR(contractJson);
 
-    // Type guard to ensure contract has required properties
-    if (
-      typeof contractIR !== 'object' ||
-      contractIR === null ||
-      !('coreHash' in contractIR) ||
-      !('target' in contractIR) ||
-      typeof contractIR.coreHash !== 'string' ||
-      typeof contractIR.target !== 'string'
-    ) {
-      throw errorUnexpected('Invalid contract structure', {
-        why: 'Contract is missing required fields: coreHash or target',
-        fix: 'Re-emit the contract using `prisma-next contract emit`',
-      });
-    }
+      // Type guard to ensure contract has required properties
+      if (
+        typeof contractIR !== 'object' ||
+        contractIR === null ||
+        !('coreHash' in contractIR) ||
+        !('target' in contractIR) ||
+        typeof contractIR.coreHash !== 'string' ||
+        typeof contractIR.target !== 'string'
+      ) {
+        throw errorUnexpected('Invalid contract structure', {
+          why: 'Contract is missing required fields: coreHash or target',
+          fix: 'Re-emit the contract using `prisma-next contract emit`',
+        });
+      }
 
-    // Extract contract hashes
-    const contractCoreHash = contractIR.coreHash;
-    const contractProfileHash =
-      'profileHash' in contractIR && typeof contractIR.profileHash === 'string'
-        ? contractIR.profileHash
-        : undefined;
+      // Extract contract hashes
+      const contractCoreHash = contractIR.coreHash;
+      const contractProfileHash =
+        'profileHash' in contractIR && typeof contractIR.profileHash === 'string'
+          ? contractIR.profileHash
+          : undefined;
 
-    // Check for family verifySchema hook
-    if (!config.family.verify?.verifySchema) {
-      throw errorFamilySchemaVerifierRequired();
-    }
+      // Check for family verifySchema hook
+      if (!config.family.verify?.verifySchema) {
+        throw errorFamilySchemaVerifierRequired();
+      }
 
-    try {
       // Delegate schema verification to family hook
       const result = await config.family.verify.verifySchema({
         driver,

@@ -230,7 +230,10 @@ interface QueryRunner {
 
 /**
  * PostgreSQL type compatibility mapping.
- * Maps contract type names to compatible database type names.
+ * Maps logical type names to compatible database type names.
+ *
+ * Keys are "short" type identifiers (e.g. int4, text, timestamptz, vector).
+ * Contract codec IDs like "pg/int4@1" are normalized to these keys before lookup.
  */
 const TYPE_COMPATIBILITY: Record<string, ReadonlyArray<string>> = {
   // Integer types
@@ -274,15 +277,26 @@ const TYPE_COMPATIBILITY: Record<string, ReadonlyArray<string>> = {
   uuid: ['uuid'],
   // Binary types
   bytea: ['bytea'],
+  // Vector types (pgvector)
+  vector: ['vector'],
 };
 
 /**
  * Checks if a contract type is compatible with a database type.
  */
 function isTypeCompatible(contractType: string, databaseType: string): boolean {
-  // Normalize types (remove length/precision modifiers)
+  // Normalize contract type:
+  // - Strip codec namespace/version (e.g. "pg/int4@1" -> "int4")
+  // - Remove length/precision modifiers
+  let contractBase = contractType;
+  const codecMatch = /^[^/]+\/([^@]+)@/.exec(contractType);
+  if (codecMatch) {
+    contractBase = codecMatch[1] ?? contractBase;
+  }
   const normalizedContract =
-    contractType.split('(')[0]?.toLowerCase().trim() ?? contractType.toLowerCase().trim();
+    contractBase.split('(')[0]?.toLowerCase().trim() ?? contractBase.toLowerCase().trim();
+
+  // Normalize database type (remove length/precision modifiers)
   const normalizedDatabase =
     databaseType.split('(')[0]?.toLowerCase().trim() ?? databaseType.toLowerCase().trim();
 
@@ -325,20 +339,24 @@ async function queryColumns(
   const result = await queryRunner.query<{
     column_name: string;
     data_type: string;
+    udt_name: string;
     is_nullable: string;
   }>(
-    `SELECT column_name, data_type, is_nullable
+    `SELECT column_name, data_type, udt_name, is_nullable
      FROM information_schema.columns
      WHERE table_schema = 'public'
        AND table_name = $1
      ORDER BY ordinal_position`,
     [tableName],
   );
-  return result.rows.map((row) => ({
-    name: row.column_name,
-    dataType: row.data_type,
-    isNullable: row.is_nullable === 'YES',
-  }));
+  return result.rows.map((row) => {
+    const databaseType = row.data_type === 'USER-DEFINED' ? row.udt_name : row.data_type;
+    return {
+      name: row.column_name,
+      dataType: databaseType,
+      isNullable: row.is_nullable === 'YES',
+    };
+  });
 }
 
 /**

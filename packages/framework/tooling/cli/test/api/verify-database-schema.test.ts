@@ -200,11 +200,12 @@ describe('verifyDatabaseSchema API', () => {
               await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toThrow(
                 CliStructuredError,
               );
-              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject(
-                {
-                  code: 'PN-CLI-4010',
-                },
-              );
+              const error = await verifyDatabaseSchema({ dbUrl: connectionString }).catch((e) => e);
+              expect(error).toBeInstanceOf(CliStructuredError);
+              if (error instanceof CliStructuredError) {
+                expect(error.code).toBe('4010');
+                expect(error.toEnvelope().code).toBe('PN-CLI-4010');
+              }
             } finally {
               process.chdir(originalCwd);
             }
@@ -585,9 +586,13 @@ describe('verifyDatabaseSchema API', () => {
                 ...originalDriver,
                 create: vi.fn().mockImplementation(async (url: string) => {
                   const driver = await originalDriver.create(url);
+                  const originalClose = driver.close;
                   return {
                     ...driver,
-                    close: closeMock,
+                    close: vi.fn().mockImplementation(async () => {
+                      closeMock();
+                      await originalClose();
+                    }),
                   };
                 }),
               };
