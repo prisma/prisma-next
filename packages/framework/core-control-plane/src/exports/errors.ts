@@ -7,6 +7,7 @@ export {
   errorContractValidationFailed,
   errorDatabaseUrlRequired,
   errorDriverRequired,
+  errorFamilyIntrospectSchemaRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFamilySchemaVerifierRequired,
   errorFileNotFound,

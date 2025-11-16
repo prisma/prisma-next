@@ -11,6 +11,8 @@ export type {
   ControlPlaneDriver,
   DriverDescriptor,
   ExtensionDescriptor,
+  ExtensionSchemaIssue,
+  ExtensionSchemaVerifierOptions,
   FamilyDescriptor,
   TargetDescriptor,
 } from '../types';

@@ -169,6 +169,12 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/sql/schema-ir/**",
+      "domain": "sql",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/sql/operations/**",
       "domain": "sql",
       "layer": "core",

@@ -6,6 +6,7 @@ export default defineConfig({
     'exports/config-validation': 'src/exports/config-validation.ts',
     'exports/emit-contract': 'src/exports/emit-contract.ts',
     'exports/verify-database': 'src/exports/verify-database.ts',
+    'exports/verify-database-schema': 'src/exports/verify-database-schema.ts',
     'exports/errors': 'src/exports/errors.ts',
     'exports/pack-manifest-types': 'src/exports/pack-manifest-types.ts',
     'exports/marker-parser': 'src/exports/marker-parser.ts',

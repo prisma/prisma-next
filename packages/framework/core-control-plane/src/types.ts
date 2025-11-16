@@ -64,6 +64,18 @@ export interface FamilyDescriptor {
       descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
     ) => readonly string[];
     /**
+     * Introspects the database schema and returns a target-agnostic Schema IR.
+     * Delegates to target-specific implementations (e.g., Postgres adapter) for concrete introspection.
+     * This is used by schema verification and future migration planning.
+     */
+    introspectSchema?: (options: {
+      readonly driver: ControlPlaneDriver;
+      readonly contractIR?: unknown;
+      readonly target: TargetDescriptor;
+      readonly adapter: AdapterDescriptor;
+      readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+    }) => Promise<unknown>;
+    /**
      * Verifies that the live database schema satisfies the emitted contract.
      * Performs catalog introspection and comparison, returning schema issues if any.
      * This is used by `db schema-verify` command.
@@ -153,6 +165,27 @@ export interface AdapterDescriptor {
 }
 
 /**
+ * Schema issue reported by extension verification hooks.
+ */
+export interface ExtensionSchemaIssue {
+  readonly kind: string;
+  readonly message: string;
+  readonly table?: string;
+  readonly column?: string;
+  readonly detail?: Record<string, unknown>;
+}
+
+/**
+ * Options passed to extension verifySchema hooks.
+ */
+export interface ExtensionSchemaVerifierOptions {
+  readonly driver: ControlPlaneDriver;
+  readonly contractIR: unknown;
+  readonly schemaIR: unknown;
+  readonly strict: boolean;
+}
+
+/**
  * Descriptor for an extension pack (e.g., pgvector).
  */
 export interface ExtensionDescriptor {
@@ -160,4 +193,12 @@ export interface ExtensionDescriptor {
   readonly id: string;
   readonly family: string;
   readonly manifest: ExtensionPackManifest;
+  /**
+   * Optional schema verification hook for extension-specific checks.
+   * Extensions can use this to verify extension-specific invariants
+   * (e.g., pgvector extension presence, vector column compatibility).
+   */
+  readonly verifySchema?: (
+    options: ExtensionSchemaVerifierOptions,
+  ) => Promise<readonly ExtensionSchemaIssue[]>;
 }

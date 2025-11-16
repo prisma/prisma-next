@@ -4,7 +4,7 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbSchemaVerifyCommand } from '../src/commands/db-schema-verify';
 import { loadConfig } from '../src/config-loader';
@@ -504,6 +504,276 @@ describe('db schema-verify command (e2e)', () => {
           }
         },
         { acceleratePort: 54252, databasePort: 54253, shadowDatabasePort: 54254 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'verifies database schema matches contract via IR',
+    async () => {
+      await withDevDatabase(
+        async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
+          const cleanupDir = testSetup.cleanup;
+
+          try {
+            // Emit contract using the config
+            const contract = await emitContractFromConfig(configPath, testDir);
+
+            // Setup database schema matching the contract
+            await withClient(connectionString, async (client) => {
+              // Create the user table matching the contract
+              await client.query(`
+                CREATE TABLE "user" (
+                  "id" INTEGER NOT NULL,
+                  "email" TEXT NOT NULL,
+                  PRIMARY KEY ("id")
+                )
+              `);
+            });
+
+            const command = createDbSchemaVerifyCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              try {
+                await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+              } catch (error) {
+                // If command fails, check error output for debugging
+                const errorOutput = consoleErrors.join('\n');
+                if (errorOutput) {
+                  console.error('Command failed with errors:', errorOutput);
+                }
+                throw error;
+              }
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            // Check exit code is 0 (success)
+            const exitCode = getExitCode();
+            if (exitCode !== 0) {
+              const errorOutput = consoleErrors.join('\n');
+              const output = consoleOutput.join('\n');
+              console.error('Unexpected exit code:', exitCode);
+              if (errorOutput) {
+                console.error('Error output:', errorOutput);
+              }
+              if (output) {
+                console.error('Standard output:', output);
+              }
+            }
+            expect(exitCode).toBe(0);
+
+            // Parse and verify JSON output
+            const jsonOutput = consoleOutput.join('\n');
+            expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+            const parsed = JSON.parse(jsonOutput);
+            expect(parsed).toMatchObject({
+              ok: true,
+              summary: 'Database schema matches contract',
+              contract: {
+                coreHash: expect.any(String),
+              },
+              target: {
+                expected: 'postgres',
+              },
+              schema: {
+                issues: [],
+              },
+              timings: {
+                total: expect.any(Number),
+              },
+            });
+
+            // Verify coreHash matches
+            expect(parsed.contract.coreHash).toBe(contract.coreHash);
+            expect(consoleErrors.length).toBe(0);
+          } finally {
+            cleanupDir();
+          }
+        },
+        { acceleratePort: 54255, databasePort: 54256, shadowDatabasePort: 54257 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'reports schema issues when database schema does not match contract',
+    async () => {
+      await withDevDatabase(
+        async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
+          const cleanupDir = testSetup.cleanup;
+
+          try {
+            // Emit contract using the config
+            const contract = await emitContractFromConfig(configPath, testDir);
+
+            // Setup database schema that doesn't match the contract
+            await withClient(connectionString, async (client) => {
+              // Create a table with wrong column types and missing primary key
+              await client.query(`
+                CREATE TABLE "user" (
+                  "id" TEXT NOT NULL,
+                  "email" INTEGER NOT NULL
+                )
+              `);
+            });
+
+            const command = createDbSchemaVerifyCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await expect(
+                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+              ).rejects.toThrow('process.exit called');
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            // Check exit code is non-zero (error)
+            const exitCode = getExitCode();
+            expect(exitCode).not.toBe(0);
+
+            // Parse and verify JSON output
+            const jsonOutput = consoleOutput.join('\n');
+            expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+            const parsed = JSON.parse(jsonOutput);
+            expect(parsed).toMatchObject({
+              ok: false,
+              code: 'PN-SCHEMA-0001',
+              summary: expect.stringContaining('issue'),
+              contract: {
+                coreHash: expect.any(String),
+              },
+              target: {
+                expected: 'postgres',
+              },
+              schema: {
+                issues: expect.arrayContaining([
+                  expect.objectContaining({
+                    kind: expect.any(String),
+                    table: 'user',
+                    message: expect.any(String),
+                  }),
+                ]),
+              },
+              timings: {
+                total: expect.any(Number),
+              },
+            });
+
+            // Verify we have issues for type mismatches and missing primary key
+            const issues = parsed.schema.issues as Array<{ kind: string; table: string; column?: string; message: string }>;
+            const typeMismatchIssues = issues.filter((issue) => issue.kind === 'type_mismatch');
+            const primaryKeyIssues = issues.filter((issue) => issue.kind === 'primary_key_mismatch');
+
+            expect(typeMismatchIssues.length).toBeGreaterThan(0);
+            expect(primaryKeyIssues.length).toBeGreaterThan(0);
+
+            // Verify coreHash matches
+            expect(parsed.contract.coreHash).toBe(contract.coreHash);
+          } finally {
+            cleanupDir();
+          }
+        },
+        { acceleratePort: 54258, databasePort: 54259, shadowDatabasePort: 54260 },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'reports missing table when table does not exist in database',
+    async () => {
+      await withDevDatabase(
+        async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
+          const cleanupDir = testSetup.cleanup;
+
+          try {
+            // Emit contract using the config
+            const contract = await emitContractFromConfig(configPath, testDir);
+
+            // Don't create any tables - database is empty
+
+            const command = createDbSchemaVerifyCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await expect(
+                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+              ).rejects.toThrow('process.exit called');
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            // Check exit code is non-zero (error)
+            const exitCode = getExitCode();
+            expect(exitCode).not.toBe(0);
+
+            // Parse and verify JSON output
+            const jsonOutput = consoleOutput.join('\n');
+            expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+            const parsed = JSON.parse(jsonOutput);
+            expect(parsed).toMatchObject({
+              ok: false,
+              code: 'PN-SCHEMA-0001',
+              summary: expect.stringContaining('issue'),
+              contract: {
+                coreHash: expect.any(String),
+              },
+              target: {
+                expected: 'postgres',
+              },
+              schema: {
+                issues: expect.arrayContaining([
+                  expect.objectContaining({
+                    kind: 'missing_table',
+                    table: 'user',
+                    message: expect.stringContaining('not present in database'),
+                  }),
+                ]),
+              },
+              timings: {
+                total: expect.any(Number),
+              },
+            });
+
+            // Verify coreHash matches
+            expect(parsed.contract.coreHash).toBe(contract.coreHash);
+          } finally {
+            cleanupDir();
+          }
+        },
+        { acceleratePort: 54261, databasePort: 54262, shadowDatabasePort: 54263 },
       );
     },
     timeouts.spinUpPpgDev,

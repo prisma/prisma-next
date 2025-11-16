@@ -8,6 +8,11 @@ import type {
 import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { type } from 'arktype';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { assembleCodecRegistry } from '@prisma-next/cli/pack-assembly';
+import { introspectPostgresSchema } from '@prisma-next/adapter-postgres/introspect';
+import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
+import sqlFamilyDescriptor from './cli';
 
 const MetaSchema = type({ '[string]': 'unknown' });
 
@@ -157,6 +162,32 @@ export function collectSupportedCodecTypeIds(
   // or require manifests to explicitly list supported type IDs
   void descriptors;
   return [];
+}
+
+/**
+ * Introspects the database schema and returns a target-agnostic SqlSchemaIR.
+ * Delegates to Postgres adapter for concrete introspection.
+ * This is the SQL family's implementation of the introspectSchema hook.
+ */
+export async function introspectSchema(options: {
+  readonly driver: ControlPlaneDriver;
+  readonly contractIR?: unknown;
+  readonly target: TargetDescriptor;
+  readonly adapter: AdapterDescriptor;
+  readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+}): Promise<SqlSchemaIR> {
+  const { driver, contractIR, adapter, extensions } = options;
+
+  // Assemble codec registry from adapter + extensions
+  const codecRegistry = await assembleCodecRegistry(adapter, extensions);
+
+  // Delegate to Postgres adapter for concrete introspection
+  // For now, we only support Postgres. In the future, this can branch on target.id
+  if (options.target.id !== 'postgres') {
+    throw new Error(`Schema introspection for target '${options.target.id}' is not yet supported`);
+  }
+
+  return introspectPostgresSchema(driver, codecRegistry, contractIR);
 }
 
 /**
@@ -725,7 +756,7 @@ function compareTable(
 
 /**
  * Verifies that the live database schema satisfies the emitted contract.
- * Performs catalog introspection and comparison, returning schema issues if any.
+ * Thin wrapper around core verifyDatabaseSchema action.
  * This is used by `db schema-verify` command.
  */
 export async function verifySchema(options: {
@@ -762,66 +793,17 @@ export async function verifySchema(options: {
     readonly total: number;
   };
 }> {
-  const { driver, contractIR, target, strict, startTime, contractPath, configPath } = options;
-
-  // Narrow contractIR to SqlContract<SqlStorage>
-  const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
-
-  // Extract contract hashes
-  const coreHash = contract.coreHash;
-  const profileHash = contract.profileHash;
-
-  // Query database schema
-  const dbTables = await queryTables(driver);
-  const installedExtensions = await queryExtensions(driver);
-
-  // Load database schema for each contract table
-  const dbTableMap = new Map<string, DatabaseTable>();
-  for (const tableName of Object.keys(contract.storage.tables)) {
-    if (dbTables.includes(tableName)) {
-      const dbTable = await loadDatabaseTable(driver, tableName);
-      dbTableMap.set(tableName, dbTable);
-    }
-  }
-
-  // Compare contract against database schema
-  const issues: SchemaIssue[] = [];
-  for (const [tableName, contractTable] of Object.entries(contract.storage.tables)) {
-    const dbTable = dbTableMap.get(tableName);
-    const tableIssues = compareTable(contractTable, tableName, dbTable, installedExtensions);
-    issues.push(...tableIssues);
-  }
-
-  // Calculate timings
-  const totalTime = Date.now() - startTime;
-
-  // Determine result
-  const ok = issues.length === 0;
-  const summary = ok
-    ? 'Database schema matches contract'
-    : `Contract requirements not met: ${issues.length} issue${issues.length === 1 ? '' : 's'} found`;
-
-  return {
-    ok,
-    ...(ok ? {} : { code: 'PN-SCHEMA-0001' }),
-    summary,
-    contract: {
-      coreHash,
-      ...(profileHash ? { profileHash } : {}),
-    },
-    target: {
-      expected: target.id,
-    },
-    schema: {
-      issues,
-    },
-    meta: {
-      ...(configPath ? { configPath } : {}),
-      contractPath,
-      strict,
-    },
-    timings: {
-      total: totalTime,
-    },
-  };
+  // Delegate to core verifyDatabaseSchema action
+  return verifyDatabaseSchema({
+    driver: options.driver,
+    contractIR: options.contractIR,
+    family: sqlFamilyDescriptor,
+    target: options.target,
+    adapter: options.adapter,
+    extensions: options.extensions,
+    strict: options.strict,
+    startTime: options.startTime,
+    contractPath: options.contractPath,
+    ...(options.configPath ? { configPath: options.configPath } : {}),
+  });
 }

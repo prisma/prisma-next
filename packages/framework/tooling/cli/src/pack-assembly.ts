@@ -11,6 +11,8 @@ import type {
 } from '@prisma-next/core-control-plane/pack-manifest-types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
+import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).
@@ -173,4 +175,48 @@ export function extractExtensionIdsFromPacks(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
 ): ReadonlyArray<string> {
   return packs.map((pack) => pack.manifest.id);
+}
+
+/**
+ * Assembles a codec registry from adapter and extensions.
+ * Creates adapter instance if needed, then registers adapter and extension codecs.
+ * This is a general CLI helper for any command that needs codec registries.
+ *
+ * Extensions provide codecs via their runtime entrypoints (e.g., pgvector() returns Extension with codecs()).
+ * For now, we only register adapter codecs. Extension codecs can be added later if needed for schema verification.
+ */
+export async function assembleCodecRegistry(
+  adapter: AdapterDescriptor,
+  extensions: ReadonlyArray<ExtensionDescriptor>,
+): Promise<CodecRegistry> {
+  const codecRegistry = createCodecRegistry();
+
+  // Get adapter instance (either pre-created or create via factory)
+  let adapterInstance: { profile: { codecs(): CodecRegistry } } | undefined;
+  if (adapter.adapter) {
+    adapterInstance = adapter.adapter as {
+      profile: { codecs(): CodecRegistry };
+    };
+  } else if (adapter.create) {
+    const created = await adapter.create();
+    adapterInstance = created as {
+      profile: { codecs(): CodecRegistry };
+    };
+  }
+
+  // Register adapter codecs
+  if (adapterInstance) {
+    const adapterCodecs = adapterInstance.profile.codecs();
+    for (const codec of adapterCodecs.values()) {
+      codecRegistry.register(codec);
+    }
+  }
+
+  // TODO: Register extension codecs
+  // Extensions provide codecs via their runtime entrypoints (e.g., pgvector() from @prisma-next/extension-pgvector/runtime).
+  // This would require dynamically importing extension runtime modules, which is complex.
+  // For MVP, adapter codecs are sufficient for schema verification.
+  // Extension codecs can be added later if needed.
+
+  return codecRegistry;
 }

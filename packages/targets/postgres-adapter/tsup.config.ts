@@ -7,6 +7,7 @@ export default defineConfig({
     'codec-types': 'src/exports/codec-types.ts',
     cli: 'src/exports/cli.ts',
     runtime: 'src/exports/runtime.ts',
+    introspect: 'src/exports/introspect.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],

@@ -184,6 +184,20 @@ export function errorFamilyReadMarkerSqlRequired(options?: {
 }
 
 /**
+ * Family verify.introspectSchema is required but not provided.
+ */
+export function errorFamilyIntrospectSchemaRequired(options?: {
+  readonly why?: string;
+}): CliStructuredError {
+  return new CliStructuredError('4009', 'Family introspectSchema() is required', {
+    domain: 'CLI',
+    why: options?.why ?? 'Family verify.introspectSchema is required for schema verification',
+    fix: 'Ensure family.verify.introspectSchema() is exported by your family package',
+    docsUrl: 'https://prisma-next.dev/docs/cli/db-schema-verify',
+  });
+}
+
+/**
  * Family verify.verifySchema is required but not provided.
  */
 export function errorFamilySchemaVerifierRequired(options?: {

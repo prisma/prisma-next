@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { AdapterDescriptor } from '@prisma-next/cli/config-types';
 import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
 import { type } from 'arktype';
+import { createPostgresAdapter } from './adapter';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -48,15 +49,14 @@ function loadAdapterManifest(): ExtensionPackManifest {
 
 /**
  * Postgres adapter descriptor for CLI config.
- * May optionally provide a runtime factory for DB-connected commands.
+ * Provides a runtime factory for DB-connected commands (e.g., schema verification).
  */
 const postgresAdapterDescriptor: AdapterDescriptor = {
   kind: 'adapter',
   id: 'postgres',
   family: 'sql',
   manifest: loadAdapterManifest(),
-  // Note: create() factory can be added here for DB-connected commands
-  // For now, emit command doesn't need it
+  create: () => createPostgresAdapter(),
 };
 
 export default postgresAdapterDescriptor;

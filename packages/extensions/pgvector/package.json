@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-schema-ir": "workspace:*",
     "arktype": "^2.0.0"
   },
   "devDependencies": {
