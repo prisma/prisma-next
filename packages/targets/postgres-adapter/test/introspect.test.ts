@@ -1,5 +1,6 @@
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { createSqlTypeMetadataRegistry } from '@prisma-next/family-sql/type-metadata';
+import type { SqlTypeMetadataRegistry } from '@prisma-next/family-sql/types';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { introspectPostgresSchema } from '../src/exports/introspect';
@@ -44,11 +45,11 @@ function createMockDriver(responses: Array<{ sql: string; rows: unknown[] }>): C
 }
 
 /**
- * Creates a minimal codec registry with test codecs.
+ * Creates a minimal type metadata registry with test codecs.
  */
-function createTestCodecRegistry(): CodecRegistry {
-  const registry = createCodecRegistry();
-  registry.register(
+function createTestTypeMetadataRegistry(): SqlTypeMetadataRegistry {
+  const codecRegistry = createCodecRegistry();
+  codecRegistry.register(
     codec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
@@ -65,7 +66,7 @@ function createTestCodecRegistry(): CodecRegistry {
       },
     }),
   );
-  registry.register(
+  codecRegistry.register(
     codec({
       typeId: 'pg/text@1',
       targetTypes: ['text'],
@@ -82,7 +83,7 @@ function createTestCodecRegistry(): CodecRegistry {
       },
     }),
   );
-  registry.register(
+  codecRegistry.register(
     codec({
       typeId: 'pg/bool@1',
       targetTypes: ['bool'],
@@ -99,7 +100,7 @@ function createTestCodecRegistry(): CodecRegistry {
       },
     }),
   );
-  return registry;
+  return createSqlTypeMetadataRegistry([{ codecRegistry }]);
 }
 
 describe('introspectPostgresSchema', () => {
@@ -147,8 +148,8 @@ describe('introspectPostgresSchema', () => {
       },
     ]);
 
-    const codecRegistry = createTestCodecRegistry();
-    const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
+    const types = createTestTypeMetadataRegistry();
+    const schemaIR = await introspectPostgresSchema(driver, types);
 
     expect(schemaIR.tables).toHaveProperty('user');
     expect(schemaIR.tables['user']?.columns).toHaveProperty('id');
@@ -201,8 +202,8 @@ describe('introspectPostgresSchema', () => {
       },
     ]);
 
-    const codecRegistry = createTestCodecRegistry();
-    const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
+    const types = createTestTypeMetadataRegistry();
+    const schemaIR = await introspectPostgresSchema(driver, types);
 
     expect(schemaIR.tables['post']?.foreignKeys).toHaveLength(1);
     expect(schemaIR.tables['post']?.foreignKeys[0]?.columns).toEqual(['user_id']);
@@ -222,8 +223,8 @@ describe('introspectPostgresSchema', () => {
       },
     ]);
 
-    const codecRegistry = createTestCodecRegistry();
-    const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
+    const types = createTestTypeMetadataRegistry();
+    const schemaIR = await introspectPostgresSchema(driver, types);
 
     expect(schemaIR.extensions).toContain('vector');
     expect(schemaIR.extensions).toContain('uuid-ossp');
@@ -265,8 +266,8 @@ describe('introspectPostgresSchema', () => {
       },
     ]);
 
-    const codecRegistry = createTestCodecRegistry();
-    const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
+    const types = createTestTypeMetadataRegistry();
+    const schemaIR = await introspectPostgresSchema(driver, types);
 
     expect(schemaIR.tables['test']?.columns['id']?.typeId).toBe('pg/int4@1');
     expect(schemaIR.tables['test']?.columns['id']?.nativeType).toBe('integer');

@@ -1,5 +1,11 @@
+import type { TargetFamilyContext } from '@prisma-next/core-control-plane/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlTypeMetadataRegistry } from './types';
+
 /**
- * Re-export SqlFamilyContext from sql-contract (shared plane) to maintain backward compatibility.
- * The type is defined in sql-contract to avoid cyclic dependencies with CLI.
+ * SQL family context that binds together schema IR and type metadata registry.
+ * This is the SQL family's instantiation of TargetFamilyContext, adding SQL-specific control-plane state.
  */
-export type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
+export type SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & {
+  readonly types: SqlTypeMetadataRegistry;
+};

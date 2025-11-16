@@ -7,9 +7,9 @@ import type {
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
-import type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
-import type { SqlCodecRegistry } from '@prisma-next/sql-contract/types';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
+import { createSqlTypeMetadataRegistry } from '@prisma-next/family-sql/type-metadata';
+import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import {
@@ -155,40 +155,34 @@ export function createDbSchemaVerifyCommand(): Command {
         const startTime = Date.now();
 
         try {
-          // Assemble codec registry from adapter + extensions
-          // This is SQL-specific, so we inline it here to avoid framework→SQL domain violation
-          const codecRegistry: SqlCodecRegistry = createCodecRegistry();
-
+          // Build type metadata registry from adapter + extensions
+          // This is SQL-specific, so we use the SQL family helper
           // Get adapter instance (either pre-created or create via factory)
-          let adapterInstance: { profile: { codecs(): SqlCodecRegistry } } | undefined;
+          let adapterInstance:
+            | {
+                profile: { codecs(): CodecRegistry };
+              }
+            | undefined;
           if (config.adapter.adapter) {
             adapterInstance = config.adapter.adapter as {
-              profile: { codecs(): SqlCodecRegistry };
+              profile: { codecs(): CodecRegistry };
             };
           } else if (config.adapter.create) {
             const created = await config.adapter.create();
             adapterInstance = created as {
-              profile: { codecs(): SqlCodecRegistry };
+              profile: { codecs(): CodecRegistry };
             };
           }
 
-          // Register adapter codecs
-          if (adapterInstance) {
-            const adapterCodecs = adapterInstance.profile.codecs();
-            for (const codec of adapterCodecs.values()) {
-              codecRegistry.register(codec);
-            }
-          }
-
-          // TODO: Register extension codecs
-          // Extensions provide codecs via their runtime entrypoints (e.g., pgvector() from @prisma-next/extension-pgvector/runtime).
-          // This would require dynamically importing extension runtime modules, which is complex.
-          // For MVP, adapter codecs are sufficient for schema verification.
-          // Extension codecs can be added later if needed.
+          // Build type metadata registry from adapter codecs
+          const codecRegistry = adapterInstance?.profile.codecs();
+          const types = createSqlTypeMetadataRegistry([
+            ...(codecRegistry ? [{ codecRegistry }] : []),
+          ]);
 
           // Build contextInput (everything except schemaIR)
           const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = {
-            codecRegistry,
+            types,
           };
 
           // Call domain action with assembled inputs

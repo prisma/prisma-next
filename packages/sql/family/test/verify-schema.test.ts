@@ -7,11 +7,12 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import type { SqlFamilyContext } from '../src/context';
 import sqlFamilyDescriptor from '../src/exports/control';
+import { createSqlTypeMetadataRegistry } from '../src/type-metadata';
 
 /**
  * Creates a mock driver for testing.
@@ -113,16 +114,12 @@ function createTestDescriptors(): {
 }
 
 /**
- * Creates a codec registry with adapter codecs registered.
+ * Creates a type metadata registry with adapter codecs.
  */
-function createTestCodecRegistry(): ReturnType<typeof createCodecRegistry> {
-  const codecRegistry = createCodecRegistry();
+function createTestTypeMetadataRegistry() {
   const adapterInstance = createPostgresAdapter();
-  const adapterCodecs = adapterInstance.profile.codecs();
-  for (const codec of adapterCodecs.values()) {
-    codecRegistry.register(codec);
-  }
-  return codecRegistry;
+  const codecRegistry = adapterInstance.profile.codecs();
+  return createSqlTypeMetadataRegistry([{ codecRegistry }]);
 }
 
 describe('verifySchema', () => {
@@ -147,16 +144,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -178,16 +176,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -222,16 +221,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -271,16 +271,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -319,16 +320,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -365,16 +367,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -410,16 +413,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -450,16 +454,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -489,16 +494,17 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -600,16 +606,17 @@ describe('verifySchema integration', () => {
             },
           };
 
-          const codecRegistry = createTestCodecRegistry();
+          const types = createTestTypeMetadataRegistry();
+          const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
-          const result = await verifyDatabaseSchema<SqlSchemaIR>({
+          const result = await verifyDatabaseSchema<SqlFamilyContext>({
             driver,
             contractIR: contract,
             family: sqlFamilyDescriptor,
             target,
             adapter,
             extensions,
-            codecRegistry,
+            contextInput,
             strict: false,
             startTime,
             contractPath: 'contract.json',
@@ -628,9 +635,10 @@ describe('verifySchema integration', () => {
 });
 
 describe('introspectSchema hook', () => {
-  it('introspects schema with pre-assembled codecRegistry', async () => {
+  it('introspects schema with pre-assembled type metadata registry', async () => {
     const { target, adapter, extensions } = createTestDescriptors();
-    const codecRegistry = createTestCodecRegistry();
+    const types = createTestTypeMetadataRegistry();
+    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
 
     const queries = new Map<string, unknown[]>();
     queries.set('SELECT table_name', [{ table_name: 'user' }]);
@@ -650,7 +658,7 @@ describe('introspectSchema hook', () => {
 
     const schemaIR = await sqlFamilyDescriptor.verify!.introspectSchema!({
       driver,
-      codecRegistry,
+      contextInput,
       target,
       adapter,
       extensions,

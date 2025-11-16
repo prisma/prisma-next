@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/cli';
-import type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
+import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import postgres from '@prisma-next/targets-postgres/cli';
 import { contract } from './contract';

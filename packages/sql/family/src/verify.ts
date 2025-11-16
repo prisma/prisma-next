@@ -7,10 +7,10 @@ import type {
   SchemaIssue,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
-import type { SqlCodecRegistry } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { type } from 'arktype';
 import type { SqlFamilyContext } from './context';
+import type { SqlTypeMetadataRegistry } from './types';
 
 const MetaSchema = type({ '[string]': 'unknown' });
 
@@ -170,7 +170,7 @@ export function collectSupportedCodecTypeIds(
  * Introspects the database schema and returns a target-agnostic SqlSchemaIR.
  * Delegates to Postgres adapter for concrete introspection.
  * This is the SQL family's implementation of the introspectSchema hook.
- * The contextInput contains the codecRegistry, pre-assembled by the domain layer.
+ * The contextInput contains the types registry, pre-assembled by the domain layer.
  */
 export async function introspectSchema(options: {
   readonly driver: ControlPlaneDriver;
@@ -181,9 +181,9 @@ export async function introspectSchema(options: {
   readonly extensions: ReadonlyArray<ExtensionDescriptor<SqlFamilyContext>>;
 }): Promise<SqlSchemaIR> {
   const { driver, contractIR, contextInput } = options;
-  // Extract codecRegistry from contextInput
-  // contextInput is Omit<SqlFamilyContext, 'schemaIR'>, which contains codecRegistry
-  const codecRegistry: SqlCodecRegistry = contextInput['codecRegistry'];
+  // Extract types from contextInput
+  // contextInput is Omit<SqlFamilyContext, 'schemaIR'>, which contains types
+  const types: SqlTypeMetadataRegistry = contextInput.types;
 
   // Delegate to Postgres adapter for concrete introspection
   // For now, we only support Postgres. In the future, this can branch on target.id
@@ -191,7 +191,7 @@ export async function introspectSchema(options: {
     throw new Error(`Schema introspection for target '${options.target.id}' is not yet supported`);
   }
 
-  return introspectPostgresSchema(driver, codecRegistry, contractIR);
+  return introspectPostgresSchema(driver, types, contractIR);
 }
 
 /**

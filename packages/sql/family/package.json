@@ -48,6 +48,14 @@
     "./runtime": {
       "types": "./dist/exports/runtime.d.ts",
       "import": "./dist/exports/runtime.js"
+    },
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
+    },
+    "./type-metadata": {
+      "types": "./dist/exports/type-metadata.d.ts",
+      "import": "./dist/exports/type-metadata.js"
     }
   }
 }

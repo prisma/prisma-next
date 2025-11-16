@@ -1,5 +1,5 @@
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlTypeMetadataRegistry } from '@prisma-next/family-sql/types';
 import type {
   SqlColumnIR,
   SqlForeignKeyIR,
@@ -300,14 +300,14 @@ async function queryExtensions(driver: ControlPlaneDriver): Promise<ReadonlyArra
 }
 
 /**
- * Maps a database type to a codec ID and native type using the codec registry.
- * Returns the first matching codec's ID and the database's actual nativeType.
+ * Maps a database type to a type ID and native type using the type metadata registry.
+ * Returns the first matching metadata entry's typeId and the database's actual nativeType.
  * The nativeType returned is the database's actual type (e.g., 'character varying'),
- * not the codec's canonical type (e.g., 'text').
+ * not the metadata's canonical type (e.g., 'text').
  */
-function mapDatabaseTypeToCodec(
+function mapDatabaseTypeToTypeMetadata(
   databaseType: string | undefined,
-  codecRegistry: CodecRegistry,
+  types: SqlTypeMetadataRegistry,
 ): { typeId: string; nativeType: string } | undefined {
   if (!databaseType) {
     return undefined;
@@ -318,13 +318,12 @@ function mapDatabaseTypeToCodec(
   // Preserve original database type for nativeType (before normalization)
   const originalDbType = databaseType.split('(')[0]?.trim() ?? databaseType.trim();
 
-  // Try to find a codec with matching nativeType
-  for (const codec of codecRegistry.values()) {
-    const codecNativeType = codec.meta?.db?.sql?.postgres?.nativeType;
-    if (codecNativeType && codecNativeType.toLowerCase() === normalizedDbType) {
+  // Try to find a metadata entry with matching nativeType
+  for (const metadata of types.values()) {
+    if (metadata.nativeType && metadata.nativeType.toLowerCase() === normalizedDbType) {
       return {
-        typeId: codec.id,
-        nativeType: originalDbType, // Return database's actual type, not codec's canonical type
+        typeId: metadata.typeId,
+        nativeType: originalDbType, // Return database's actual type, not metadata's canonical type
       };
     }
   }
@@ -344,13 +343,12 @@ function mapDatabaseTypeToCodec(
 
   for (const [canonicalType, aliases] of Object.entries(typeAliases)) {
     if (aliases.some((alias) => alias.toLowerCase() === normalizedDbType)) {
-      // Try to find codec for canonical type
-      for (const codec of codecRegistry.values()) {
-        const codecNativeType = codec.meta?.db?.sql?.postgres?.nativeType;
-        if (codecNativeType && codecNativeType.toLowerCase() === canonicalType) {
+      // Try to find metadata for canonical type
+      for (const metadata of types.values()) {
+        if (metadata.nativeType && metadata.nativeType.toLowerCase() === canonicalType) {
           return {
-            typeId: codec.id,
-            nativeType: originalDbType, // Return database's actual type, not codec's canonical type
+            typeId: metadata.typeId,
+            nativeType: originalDbType, // Return database's actual type, not metadata's canonical type
           };
         }
       }
@@ -365,14 +363,14 @@ function mapDatabaseTypeToCodec(
  * This is the Postgres-specific implementation that queries PostgreSQL catalogs.
  *
  * @param driver - ControlPlaneDriver for executing queries
- * @param codecRegistry - Codec registry for mapping database types to codec IDs
+ * @param types - Type metadata registry for mapping database types to type IDs
  * @param contract - Optional contract to limit introspection to specific tables
  * @param schema - Database schema name (defaults to 'public')
  * @returns Promise resolving to SqlSchemaIR
  */
 export async function introspectPostgresSchema(
   driver: ControlPlaneDriver,
-  codecRegistry: CodecRegistry,
+  types: SqlTypeMetadataRegistry,
   contract?: unknown,
   schema = 'public',
 ): Promise<SqlSchemaIR> {
@@ -417,11 +415,11 @@ export async function introspectPostgresSchema(
     // Map columns to SqlColumnIR
     const columnIRs: Record<string, SqlColumnIR> = {};
     for (const column of columns) {
-      const codecInfo = mapDatabaseTypeToCodec(column.dataType, codecRegistry);
+      const typeInfo = mapDatabaseTypeToTypeMetadata(column.dataType, types);
       columnIRs[column.name] = {
         name: column.name,
-        typeId: codecInfo?.typeId ?? column.dataType, // Fallback to database type if no codec found
-        ...(codecInfo?.nativeType ? { nativeType: codecInfo.nativeType } : {}),
+        typeId: typeInfo?.typeId ?? column.dataType, // Fallback to database type if no metadata found
+        ...(typeInfo?.nativeType ? { nativeType: typeInfo.nativeType } : {}),
         nullable: column.isNullable,
       };
     }

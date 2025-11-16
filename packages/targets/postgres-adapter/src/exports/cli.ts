@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AdapterDescriptor } from '@prisma-next/cli/config-types';
 import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
-import type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
+import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
 import { type } from 'arktype';
 import { createPostgresAdapter } from './adapter';
 

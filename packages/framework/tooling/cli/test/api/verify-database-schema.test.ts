@@ -10,10 +10,10 @@ import type {
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
-import type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
-import type { SqlCodecRegistry, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
+import { createSqlTypeMetadataRegistry } from '@prisma-next/family-sql/type-metadata';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../../src/config-loader';
@@ -63,34 +63,30 @@ async function callVerifyDatabaseSchema(options: {
   const driver = await config.driver.create(dbUrl);
 
   try {
-    // Assemble codec registry from adapter + extensions
-    // This is SQL-specific, so we inline it here to avoid framework→SQL domain violation
-    const codecRegistry: SqlCodecRegistry = createCodecRegistry();
-
+    // Build type metadata registry from adapter + extensions
+    // This is SQL-specific, so we use the SQL family helper
     // Get adapter instance (either pre-created or create via factory)
-    let adapterInstance: { profile: { codecs(): SqlCodecRegistry } } | undefined;
+    let adapterInstance:
+      | { profile: { codecs(): import('@prisma-next/sql-relational-core/ast').CodecRegistry } }
+      | undefined;
     if (config.adapter.adapter) {
       adapterInstance = config.adapter.adapter as {
-        profile: { codecs(): SqlCodecRegistry };
+        profile: { codecs(): import('@prisma-next/sql-relational-core/ast').CodecRegistry };
       };
     } else if (config.adapter.create) {
       const created = await config.adapter.create();
       adapterInstance = created as {
-        profile: { codecs(): SqlCodecRegistry };
+        profile: { codecs(): import('@prisma-next/sql-relational-core/ast').CodecRegistry };
       };
     }
 
-    // Register adapter codecs
-    if (adapterInstance) {
-      const adapterCodecs = adapterInstance.profile.codecs();
-      for (const codec of adapterCodecs.values()) {
-        codecRegistry.register(codec);
-      }
-    }
+    // Build type metadata registry from adapter codecs
+    const codecRegistry = adapterInstance?.profile.codecs();
+    const types = createSqlTypeMetadataRegistry([...(codecRegistry ? [{ codecRegistry }] : [])]);
 
     // Build contextInput (everything except schemaIR)
     const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = {
-      codecRegistry,
+      types,
     };
 
     // Call domain action
@@ -413,7 +409,7 @@ describe('verifyDatabaseSchema API', () => {
               });
               expect(callArgs.driver).toBeDefined();
               expect(callArgs.driver.query).toBeDefined();
-              expect(callArgs.codecRegistry).toBeDefined();
+              expect(callArgs.contextInput.types).toBeDefined();
             } finally {
               process.chdir(originalCwd);
               vi.restoreAllMocks();

@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import { verifyDatabase } from '@prisma-next/core-control-plane/verify-database';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/family-sql/context';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   ensureSchemaStatement,

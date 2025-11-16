@@ -15,6 +15,7 @@
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",

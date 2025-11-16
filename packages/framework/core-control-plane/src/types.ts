@@ -7,8 +7,8 @@ import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-t
  * This abstraction allows domain actions to work with family-specific types without understanding their concrete structure.
  *
  * The base type contains only the schema IR, which is common to all families.
- * Families extend this with their own control-plane state (e.g., SQL adds codecRegistry):
- * - SQL: `SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & { readonly codecRegistry: SqlCodecRegistry }`
+ * Families extend this with their own control-plane state (e.g., SQL adds types registry):
+ * - SQL: `SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & { readonly types: SqlTypeMetadataRegistry }`
  * - Other families can define their own context types as needed
  */
 export interface TargetFamilyContext<TSchemaIR = unknown> {
@@ -82,7 +82,7 @@ export interface FamilyDescriptor<TCtx extends TargetFamilyContext = TargetFamil
      * Introspects the database schema and returns a target-agnostic Schema IR.
      * Delegates to target-specific implementations (e.g., Postgres adapter) for concrete introspection.
      * This is used by schema verification and future migration planning.
-     * The contextInput contains family-specific control-plane state (e.g., codecRegistry for SQL).
+     * The contextInput contains family-specific control-plane state (e.g., types registry for SQL).
      */
     introspectSchema?: (options: {
       readonly driver: ControlPlaneDriver;

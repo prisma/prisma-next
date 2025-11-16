@@ -28,7 +28,7 @@ export interface IntrospectDatabaseSchemaResult<
 /**
  * Introspects the database schema and returns a Schema IR.
  * This is a domain action that orchestrates the family's introspectSchema hook.
- * The contextInput contains family-specific control-plane state (e.g., codecRegistry for SQL).
+ * The contextInput contains family-specific control-plane state (e.g., types registry for SQL).
  */
 export async function introspectDatabaseSchema<
   TCtx extends TargetFamilyContext = TargetFamilyContext,
