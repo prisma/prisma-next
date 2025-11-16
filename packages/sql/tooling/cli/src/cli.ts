@@ -6,7 +6,12 @@ import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { collectSupportedCodecTypeIds, introspectSchema, readMarker, verifySchema } from './verify';
+import {
+  collectSupportedCodecTypeIds,
+  createVerifySchema,
+  introspectSchema,
+  readMarker,
+} from './verify';
 
 /**
  * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
@@ -54,6 +59,9 @@ function operationManifestToSignature(manifest: OperationManifest): SqlOperation
 /**
  * SQL family descriptor for CLI config.
  * Provides the SQL family hook and conversion helpers.
+ *
+ * Note: verifySchema uses a getter that creates the function with the descriptor
+ * captured in its closure, allowing it to refer to itself without needing it as a parameter.
  */
 const sqlFamilyDescriptor: FamilyDescriptor<SqlSchemaIR> = {
   kind: 'family',
@@ -63,7 +71,11 @@ const sqlFamilyDescriptor: FamilyDescriptor<SqlSchemaIR> = {
     readMarker,
     collectSupportedCodecTypeIds,
     introspectSchema,
-    verifySchema,
+    // Use getter to create verifySchema with descriptor captured in closure
+    // This allows verifySchema to refer to itself (the family descriptor) without needing it as a parameter
+    get verifySchema() {
+      return createVerifySchema(sqlFamilyDescriptor);
+    },
   },
   convertOperationManifest: (manifest: OperationManifest): OperationSignature => {
     return operationManifestToSignature(manifest);

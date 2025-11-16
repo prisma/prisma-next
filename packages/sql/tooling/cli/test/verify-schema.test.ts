@@ -8,7 +8,6 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import sqlFamilyDescriptor from '../src/cli';
-import { verifySchema } from '../src/verify';
 
 /**
  * Creates a mock driver for testing.
@@ -129,10 +128,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -157,10 +155,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -198,10 +195,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -244,10 +240,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -289,10 +284,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -332,10 +326,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -374,10 +367,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -411,10 +403,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -447,10 +438,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
@@ -484,10 +474,9 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await verifySchema({
+    const result = await sqlFamilyDescriptor.verify.verifySchema!({
       driver,
       contractIR: contract,
-      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,

@@ -157,7 +157,6 @@ export async function verifyDatabaseSchema(
       const result = await config.family.verify.verifySchema({
         driver,
         contractIR,
-        family: config.family,
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],

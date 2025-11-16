@@ -79,11 +79,11 @@ export interface FamilyDescriptor<TSchemaIR = unknown> {
      * Verifies that the live database schema satisfies the emitted contract.
      * Performs catalog introspection and comparison, returning schema issues if any.
      * This is used by `db schema-verify` command.
+     * The function captures the family descriptor in its closure, so it can refer to itself.
      */
     verifySchema?: (options: {
       readonly driver: ControlPlaneDriver;
       readonly contractIR: unknown;
-      readonly family: FamilyDescriptor<unknown>;
       readonly target: TargetDescriptor;
       readonly adapter: AdapterDescriptor;
       readonly extensions: ReadonlyArray<ExtensionDescriptor>;
