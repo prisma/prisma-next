@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { introspectDatabaseSchema } from '@prisma-next/core-control-plane/introspect-database-schema';
+import { verifySchemaAgainstContract } from '@prisma-next/core-control-plane/verify-schema-against-contract';
 import { loadConfig } from '../config-loader';
+import { assembleCodecRegistry } from '../pack-assembly';
 import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
-  errorFamilySchemaVerifierRequired,
   errorFileNotFound,
   errorUnexpected,
 } from '../utils/cli-errors';
@@ -148,47 +150,60 @@ export async function verifyDatabaseSchema(
           ? contractIR.profileHash
           : undefined;
 
-      // Check for family verifySchema hook
-      if (!config.family.verify?.verifySchema) {
-        throw errorFamilySchemaVerifierRequired();
-      }
+      // Assemble codec registry from adapter + extensions
+      const codecRegistry = await assembleCodecRegistry(config.adapter, config.extensions ?? []);
 
-      // Delegate schema verification to family hook
-      const result = await config.family.verify.verifySchema({
+      // 1) Introspect database schema
+      // Type safety: config.family is FamilyDescriptor<TSchemaIR>, domain actions are generic
+      const { schemaIR } = await introspectDatabaseSchema({
         driver,
-        contractIR,
+        family: config.family,
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-        strict: options.strict ?? false,
-        startTime,
-        contractPath: contractJsonPath,
-        ...(configPath ? { configPath } : {}),
+        codecRegistry,
       });
 
-      // Normalize result to ensure consistent structure
-      // Use contract hashes from validated contractIR for consistency
+      // 2) Verify schema against contract
+      const { issues } = await verifySchemaAgainstContract({
+        contractIR,
+        schemaIR,
+        family: config.family,
+        target: config.target,
+        adapter: config.adapter,
+        extensions: config.extensions ?? [],
+        driver,
+        strict: options.strict ?? false,
+      });
+
+      // Build result
+      const ok = issues.length === 0;
+      const code = ok ? undefined : 'PN-SCHEMA-0001';
+      const summary = ok
+        ? 'Database schema matches contract'
+        : `Contract requirements not met: ${issues.length} issue${issues.length === 1 ? '' : 's'} found`;
+
       return {
-        ok: result.ok,
-        ...(result.code ? { code: result.code } : {}),
-        summary: result.summary,
+        ok,
+        ...(code ? { code } : {}),
+        summary,
         contract: {
           coreHash: contractCoreHash,
           ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
         },
         target: {
           expected: config.target.id,
-          ...(result.target?.actual ? { actual: result.target.actual } : {}),
+          actual: config.target.id,
         },
-        schema: {
-          issues: result.schema.issues as readonly SchemaIssue[],
-        },
+        schema: { issues },
         meta: {
           ...(configPath ? { configPath } : {}),
           contractPath: contractJsonPath,
           strict: options.strict ?? false,
         },
-        timings: result.timings,
+        timings: {
+          total: Date.now() - startTime,
+        },
       };
     } finally {
       // Ensure driver connection is closed

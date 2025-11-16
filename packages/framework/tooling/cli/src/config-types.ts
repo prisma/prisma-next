@@ -43,9 +43,10 @@ export interface ContractConfig {
 
 /**
  * Configuration for Prisma Next CLI.
+ * @template TSchemaIR - The schema IR type for the family (defaults to unknown for backward compatibility).
  */
-export interface PrismaNextConfig {
-  readonly family: FamilyDescriptor;
+export interface PrismaNextConfig<TSchemaIR = unknown> {
+  readonly family: FamilyDescriptor<TSchemaIR>;
   readonly target: TargetDescriptor;
   readonly adapter: AdapterDescriptor;
   readonly extensions?: ReadonlyArray<ExtensionDescriptor>;
@@ -101,7 +102,9 @@ const PrismaNextConfigSchema = type({
  * @returns Normalized config IR with defaults applied
  * @throws Error if config structure is invalid
  */
-export function defineConfig(config: PrismaNextConfig): PrismaNextConfig {
+export function defineConfig<TSchemaIR = unknown>(
+  config: PrismaNextConfig<TSchemaIR>,
+): PrismaNextConfig<TSchemaIR> {
   // Validate structure using Arktype
   const validated = PrismaNextConfigSchema(config);
   if (validated instanceof type.errors) {

@@ -19,9 +19,9 @@ import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
  * Loops over descriptors, extracts operations, converts them using family-specific
  * conversion function, and registers them in a new registry.
  */
-export function assembleOperationRegistry(
+export function assembleOperationRegistry<TSchemaIR = unknown>(
   descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-  family: FamilyDescriptor,
+  family: FamilyDescriptor<TSchemaIR>,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
@@ -150,9 +150,9 @@ export function extractOperationTypeImportsFromPacks(
  * Assembles an operation registry from extension packs.
  * Pack-based version for use in tests.
  */
-export function assembleOperationRegistryFromPacks(
+export function assembleOperationRegistryFromPacks<TSchemaIR = unknown>(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-  family: FamilyDescriptor,
+  family: FamilyDescriptor<TSchemaIR>,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 

@@ -1,10 +1,14 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type {
   AdapterDescriptor,
   ControlPlaneDriver,
   ExtensionDescriptor,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
+import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import sqlFamilyDescriptor from '../src/exports/control';
@@ -66,8 +70,8 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
       tables: {
         user: {
           columns: {
-            id: { type: 'int4', nullable: false },
-            email: { type: 'text', nullable: false },
+            id: { type: 'pg/int4@1', nullable: false },
+            email: { type: 'pg/text@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [{ columns: ['email'] }],
@@ -89,6 +93,7 @@ function createTestDescriptors(): {
   adapter: AdapterDescriptor;
   extensions: ReadonlyArray<ExtensionDescriptor>;
 } {
+  const adapterInstance = createPostgresAdapter();
   return {
     target: {
       kind: 'target',
@@ -101,9 +106,23 @@ function createTestDescriptors(): {
       id: 'postgres',
       family: 'sql',
       manifest: { id: 'postgres', version: '15.0.0' },
+      adapter: adapterInstance,
     },
     extensions: [],
   };
+}
+
+/**
+ * Creates a codec registry with adapter codecs registered.
+ */
+function createTestCodecRegistry(): ReturnType<typeof createCodecRegistry> {
+  const codecRegistry = createCodecRegistry();
+  const adapterInstance = createPostgresAdapter();
+  const adapterCodecs = adapterInstance.profile.codecs();
+  for (const codec of adapterCodecs.values()) {
+    codecRegistry.register(codec);
+  }
+  return codecRegistry;
 }
 
 describe('verifySchema', () => {
@@ -128,13 +147,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -156,13 +178,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -197,13 +222,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -243,13 +271,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -262,8 +293,8 @@ describe('verifySchema', () => {
       kind: 'type_mismatch',
       table: 'user',
       column: 'id',
-      expected: 'int4',
-      actual: 'varchar',
+      expected: 'pg/int4@1',
+      actual: 'pg/text@1', // varchar maps to text in PostgreSQL
     });
   });
 
@@ -288,13 +319,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -331,13 +365,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -373,13 +410,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -410,13 +450,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -446,13 +489,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const verifySchema = sqlFamilyDescriptor.verify!.verifySchema!;
-    const result = await verifySchema({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: false,
       startTime,
       contractPath: 'contract.json',
@@ -483,12 +529,16 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const result = await sqlFamilyDescriptor.verify!.verifySchema!({
+    const codecRegistry = createTestCodecRegistry();
+
+    const result = await verifyDatabaseSchema<SqlSchemaIR>({
       driver,
       contractIR: contract,
+      family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
+      codecRegistry,
       strict: true,
       startTime,
       contractPath: 'contract.json',
@@ -517,7 +567,23 @@ describe('verifySchema integration', () => {
               )
             `);
 
-          const contract = createTestContract();
+          // PostgreSQL automatically creates an index for primary keys
+          const contract = createTestContract({
+            storage: {
+              tables: {
+                user: {
+                  columns: {
+                    id: { type: 'pg/int4@1', nullable: false },
+                    email: { type: 'pg/text@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [{ columns: ['email'] }],
+                  indexes: [{ columns: ['id'] }], // Primary key index
+                  foreignKeys: [],
+                },
+              },
+            },
+          });
           const { target, adapter, extensions } = createTestDescriptors();
           const startTime = Date.now();
 
@@ -534,12 +600,16 @@ describe('verifySchema integration', () => {
             },
           };
 
-          const result = await sqlFamilyDescriptor.verify!.verifySchema!({
+          const codecRegistry = createTestCodecRegistry();
+
+          const result = await verifyDatabaseSchema<SqlSchemaIR>({
             driver,
             contractIR: contract,
+            family: sqlFamilyDescriptor,
             target,
             adapter,
             extensions,
+            codecRegistry,
             strict: false,
             startTime,
             contractPath: 'contract.json',
@@ -555,4 +625,156 @@ describe('verifySchema integration', () => {
       { acceleratePort: 54190, databasePort: 54191, shadowDatabasePort: 54192 },
     );
   }, 30000);
+});
+
+describe('introspectSchema hook', () => {
+  it('introspects schema with pre-assembled codecRegistry', async () => {
+    const { target, adapter, extensions } = createTestDescriptors();
+    const codecRegistry = createTestCodecRegistry();
+
+    const queries = new Map<string, unknown[]>();
+    queries.set('SELECT table_name', [{ table_name: 'user' }]);
+    queries.set('SELECT extname', []);
+    queries.set('SELECT column_name', [
+      { column_name: 'id', data_type: 'integer', is_nullable: 'NO' },
+      { column_name: 'email', data_type: 'text', is_nullable: 'NO' },
+    ]);
+    queries.set('SELECT kcu.column_name', [{ column_name: 'id' }]);
+    queries.set('SELECT kcu.column_name (FK)', []);
+    queries.set('SELECT kcu.column_name, tc.constraint_name', [
+      { column_name: 'email', constraint_name: 'user_email_key' },
+    ]);
+    queries.set('SELECT', []);
+
+    const driver = createMockDriver(queries);
+
+    const schemaIR = await sqlFamilyDescriptor.verify!.introspectSchema!({
+      driver,
+      codecRegistry,
+      target,
+      adapter,
+      extensions,
+    });
+
+    expect(schemaIR).toBeDefined();
+    expect(schemaIR.tables).toBeDefined();
+    expect(schemaIR.tables.user).toBeDefined();
+    expect(schemaIR.tables.user.columns.id).toBeDefined();
+    expect(schemaIR.tables.user.columns.id.typeId).toBe('pg/int4@1');
+  });
+});
+
+describe('verifySchema hook', () => {
+  it('verifies schema IR against contract IR', async () => {
+    const contract = createTestContract();
+    const { target, adapter, extensions } = createTestDescriptors();
+
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        user: {
+          name: 'user',
+          columns: {
+            id: {
+              name: 'id',
+              typeId: 'pg/int4@1',
+              nullable: false,
+            },
+            email: {
+              name: 'email',
+              typeId: 'pg/text@1',
+              nullable: false,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [{ columns: ['email'] }],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+      extensions: [],
+    };
+
+    const result = await sqlFamilyDescriptor.verify!.verifySchema!({
+      contractIR: contract,
+      schemaIR,
+      target,
+      adapter,
+      extensions,
+    });
+
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it('detects missing table in schema IR', async () => {
+    const contract = createTestContract();
+    const { target, adapter, extensions } = createTestDescriptors();
+
+    const schemaIR: SqlSchemaIR = {
+      tables: {},
+      extensions: [],
+    };
+
+    const result = await sqlFamilyDescriptor.verify!.verifySchema!({
+      contractIR: contract,
+      schemaIR,
+      target,
+      adapter,
+      extensions,
+    });
+
+    expect(result.issues.length).toBeGreaterThan(0);
+    expect(result.issues[0]).toMatchObject({
+      kind: 'missing_table',
+      table: 'user',
+    });
+  });
+
+  it('detects type mismatch', async () => {
+    const contract = createTestContract();
+    const { target, adapter, extensions } = createTestDescriptors();
+
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        user: {
+          name: 'user',
+          columns: {
+            id: {
+              name: 'id',
+              typeId: 'pg/text@1', // Wrong type (should be pg/int4@1)
+              nullable: false,
+            },
+            email: {
+              name: 'email',
+              typeId: 'pg/text@1',
+              nullable: false,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+      extensions: [],
+    };
+
+    const result = await sqlFamilyDescriptor.verify!.verifySchema!({
+      contractIR: contract,
+      schemaIR,
+      target,
+      adapter,
+      extensions,
+    });
+
+    expect(result.issues.length).toBeGreaterThan(0);
+    const typeIssue = result.issues.find((i) => i.kind === 'type_mismatch' && i.column === 'id');
+    expect(typeIssue).toBeDefined();
+    expect(typeIssue).toMatchObject({
+      kind: 'type_mismatch',
+      table: 'user',
+      column: 'id',
+      expected: 'pg/int4@1',
+      actual: 'pg/text@1', // Note: schemaIR uses pg/text@1, not pg/varchar@1
+    });
+  });
 });

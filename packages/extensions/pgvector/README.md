@@ -41,7 +41,7 @@ Add the extension to your `prisma-next.config.ts`:
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
+import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/targets-postgres/cli';
 import pgvector from '@prisma-next/extension-pgvector/cli';
 

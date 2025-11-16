@@ -116,7 +116,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import postgresDriver from '@prisma-next/driver-postgres/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
+import sql from '@prisma-next/family-sql/control';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -213,7 +213,7 @@ The family must provide a `verify` helper in the family descriptor:
 }
 ```
 
-The SQL family provides this via `@prisma-next/family-sql/cli`.
+The SQL family provides this via `@prisma-next/family-sql/control`.
 
 **Config File (`prisma-next.config.ts`):**
 
@@ -230,7 +230,7 @@ The CLI uses a config file to specify the target family, target, adapter, extens
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
+import sql from '@prisma-next/family-sql/control';
 import { contract } from './prisma/contract';
 
 export default defineConfig({

@@ -8,9 +8,9 @@ import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import {
   collectSupportedCodecTypeIds,
-  createVerifySchema,
   introspectSchema,
   readMarker,
+  verifySchema,
 } from '../verify';
 
 /**
@@ -56,26 +56,27 @@ function operationManifestToSignature(manifest: OperationManifest): SqlOperation
   };
 }
 
-const sqlFamilyDescriptor = {
-  kind: 'family' as const,
-  id: 'sql' as const,
-  hook: sqlTargetFamilyHook,
-  verify: {
+class SqlFamilyDescriptor implements FamilyDescriptor<SqlSchemaIR> {
+  readonly kind = 'family' as const;
+  readonly id = 'sql' as const;
+  readonly hook = sqlTargetFamilyHook;
+  readonly verify = {
     readMarker,
     collectSupportedCodecTypeIds,
     introspectSchema,
-  },
-  convertOperationManifest: (manifest: OperationManifest): OperationSignature => {
+    verifySchema,
+  };
+  readonly convertOperationManifest = (manifest: OperationManifest): OperationSignature => {
     return operationManifestToSignature(manifest);
-  },
-  validateContractIR: (contractJson: unknown) => {
+  };
+  readonly validateContractIR = (contractJson: unknown) => {
     // Validate the contract (this normalizes and validates structure/logic)
     const validated = validateContract<SqlContract<SqlStorage>>(contractJson);
     // Strip mappings before returning ContractIR (mappings are runtime-only)
     const { mappings: _mappings, ...contractIR } = validated;
     return contractIR;
-  },
-  stripMappings: (contract: unknown) => {
+  };
+  readonly stripMappings = (contract: unknown) => {
     // Type guard to check if contract has mappings
     if (typeof contract === 'object' && contract !== null && 'mappings' in contract) {
       const { mappings: _mappings, ...contractIR } = contract as {
@@ -85,14 +86,9 @@ const sqlFamilyDescriptor = {
       return contractIR;
     }
     return contract;
-  },
-} as Omit<FamilyDescriptor<SqlSchemaIR>, 'verify'> & {
-  verify: Omit<NonNullable<FamilyDescriptor<SqlSchemaIR>['verify']>, 'verifySchema'>;
-};
+  };
+}
 
-// Now assign verifySchema with descriptor captured in closure
-(sqlFamilyDescriptor.verify as NonNullable<FamilyDescriptor<SqlSchemaIR>['verify']>).verifySchema =
-  createVerifySchema(sqlFamilyDescriptor as FamilyDescriptor<SqlSchemaIR>);
+const sqlFamilyDescriptor = new SqlFamilyDescriptor();
 
-// Export as properly typed FamilyDescriptor
-export default sqlFamilyDescriptor as FamilyDescriptor<SqlSchemaIR>;
+export default sqlFamilyDescriptor;

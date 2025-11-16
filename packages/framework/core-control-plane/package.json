@@ -50,6 +50,14 @@
       "types": "./dist/exports/verify-database-schema.d.ts",
       "import": "./dist/exports/verify-database-schema.js"
     },
+    "./introspect-database-schema": {
+      "types": "./dist/exports/introspect-database-schema.d.ts",
+      "import": "./dist/exports/introspect-database-schema.js"
+    },
+    "./verify-schema-against-contract": {
+      "types": "./dist/exports/verify-schema-against-contract.d.ts",
+      "import": "./dist/exports/verify-schema-against-contract.js"
+    },
     "./errors": {
       "types": "./dist/exports/errors.d.ts",
       "import": "./dist/exports/errors.js"

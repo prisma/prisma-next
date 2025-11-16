@@ -14,5 +14,6 @@ export type {
   ExtensionSchemaIssue,
   ExtensionSchemaVerifierOptions,
   FamilyDescriptor,
+  SchemaIssue,
   TargetDescriptor,
 } from '../types';

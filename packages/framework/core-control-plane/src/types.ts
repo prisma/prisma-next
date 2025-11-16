@@ -67,62 +67,29 @@ export interface FamilyDescriptor<TSchemaIR = unknown> {
      * Introspects the database schema and returns a target-agnostic Schema IR.
      * Delegates to target-specific implementations (e.g., Postgres adapter) for concrete introspection.
      * This is used by schema verification and future migration planning.
+     * The codecRegistry is pre-assembled by the domain layer (CLI/domain actions).
      */
     introspectSchema?: (options: {
       readonly driver: ControlPlaneDriver;
+      readonly codecRegistry: unknown; // Family-specific registry type (e.g., CodecRegistry for SQL)
       readonly contractIR?: unknown;
       readonly target: TargetDescriptor;
       readonly adapter: AdapterDescriptor;
       readonly extensions: ReadonlyArray<ExtensionDescriptor>;
     }) => Promise<TSchemaIR>;
     /**
-     * Verifies that the live database schema satisfies the emitted contract.
-     * Performs catalog introspection and comparison, returning schema issues if any.
-     * This is used by `db schema-verify` command.
-     * The function captures the family descriptor in its closure, so it can refer to itself.
+     * Verifies that the schema IR matches the contract IR.
+     * Compares contract against schema IR and returns schema issues if any.
+     * This is a low-level hook that performs comparison only; domain actions handle orchestration.
+     * Extension verifySchema hooks are called by the domain action, not by this hook.
      */
     verifySchema?: (options: {
-      readonly driver: ControlPlaneDriver;
       readonly contractIR: unknown;
+      readonly schemaIR: TSchemaIR;
       readonly target: TargetDescriptor;
       readonly adapter: AdapterDescriptor;
       readonly extensions: ReadonlyArray<ExtensionDescriptor>;
-      readonly strict: boolean;
-      readonly startTime: number;
-      readonly contractPath: string;
-      readonly configPath?: string;
-    }) => Promise<{
-      readonly ok: boolean;
-      readonly code?: string;
-      readonly summary: string;
-      readonly contract: {
-        readonly coreHash: string;
-        readonly profileHash?: string;
-      };
-      readonly target: {
-        readonly expected: string;
-        readonly actual?: string;
-      };
-      readonly schema: {
-        readonly issues: ReadonlyArray<{
-          readonly kind: string;
-          readonly table: string;
-          readonly column?: string;
-          readonly indexOrConstraint?: string;
-          readonly expected?: string;
-          readonly actual?: string;
-          readonly message: string;
-        }>;
-      };
-      readonly meta?: {
-        readonly configPath?: string;
-        readonly contractPath: string;
-        readonly strict: boolean;
-      };
-      readonly timings: {
-        readonly total: number;
-      };
-    }>;
+    }) => Promise<{ readonly issues: readonly SchemaIssue[] }>;
   };
   /**
    * Converts an OperationManifest to an OperationSignature.
@@ -163,6 +130,28 @@ export interface AdapterDescriptor {
   readonly manifest: ExtensionPackManifest;
   readonly create?: (...args: unknown[]) => unknown;
   readonly adapter?: unknown;
+}
+
+/**
+ * Schema issue reported during schema verification.
+ */
+export interface SchemaIssue {
+  readonly kind:
+    | 'missing_table'
+    | 'missing_column'
+    | 'type_mismatch'
+    | 'nullability_mismatch'
+    | 'primary_key_mismatch'
+    | 'foreign_key_mismatch'
+    | 'unique_constraint_mismatch'
+    | 'index_mismatch'
+    | 'extension_missing';
+  readonly table: string;
+  readonly column?: string;
+  readonly indexOrConstraint?: string;
+  readonly expected?: string;
+  readonly actual?: string;
+  readonly message: string;
 }
 
 /**

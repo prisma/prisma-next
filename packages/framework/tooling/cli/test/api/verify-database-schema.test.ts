@@ -90,7 +90,7 @@ describe('verifyDatabaseSchema API', () => {
   });
 
   it(
-    'throws error when verifySchema hook is missing',
+    'throws error when introspectSchema hook is missing',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -106,7 +106,7 @@ describe('verifyDatabaseSchema API', () => {
           try {
             await emitContractFromConfig(configPath, testDir);
 
-            // Mock config to remove verifySchema hook
+            // Mock config to remove introspectSchema hook
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
@@ -114,7 +114,7 @@ describe('verifyDatabaseSchema API', () => {
               const mockedVerify = config.family.verify
                 ? {
                     ...config.family.verify,
-                    verifySchema: undefined,
+                    introspectSchema: undefined,
                   }
                 : undefined;
               const mockedFamily = {
@@ -130,14 +130,8 @@ describe('verifyDatabaseSchema API', () => {
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
-              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toThrow(
-                CliStructuredError,
-              );
-              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toMatchObject(
-                {
-                  code: '4008',
-                },
-              );
+              await expect(verifyDatabaseSchema({ dbUrl: connectionString })).rejects.toThrow();
+              // Domain action throws errorUnexpected, not CliStructuredError
             } finally {
               process.chdir(originalCwd);
               vi.restoreAllMocks();
@@ -259,7 +253,7 @@ describe('verifyDatabaseSchema API', () => {
   );
 
   it(
-    'calls verifySchema hook with correct parameters',
+    'calls domain action with correct parameters',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -273,28 +267,37 @@ describe('verifyDatabaseSchema API', () => {
           const cleanup = testSetup.cleanup;
 
           try {
-            const contract = await emitContractFromConfig(configPath, testDir);
+            await emitContractFromConfig(configPath, testDir);
 
-            // Mock verifySchema hook
+            // Mock introspectSchema hook to verify it's called correctly
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
+            const introspectSchemaMock = vi.fn().mockResolvedValue({
+              tables: {
+                user: {
+                  name: 'user',
+                  columns: {
+                    id: {
+                      name: 'id',
+                      typeId: 'pg/int4@1',
+                      nullable: false,
+                    },
+                    email: {
+                      name: 'email',
+                      typeId: 'pg/text@1',
+                      nullable: false,
+                    },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+              extensions: [],
+            });
             const verifySchemaMock = vi.fn().mockResolvedValue({
-              ok: true,
-              summary: 'Database schema satisfies contract',
-              contract: {
-                coreHash: contract.coreHash,
-                profileHash: contract.profileHash,
-              },
-              target: {
-                expected: 'postgres',
-                actual: 'postgres',
-              },
-              schema: {
-                issues: [],
-              },
-              timings: {
-                total: 10,
-              },
+              issues: [],
             });
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
@@ -302,9 +305,11 @@ describe('verifyDatabaseSchema API', () => {
               const mockedVerify = config.family.verify
                 ? {
                     ...config.family.verify,
+                    introspectSchema: introspectSchemaMock,
                     verifySchema: verifySchemaMock,
                   }
                 : {
+                    introspectSchema: introspectSchemaMock,
                     verifySchema: verifySchemaMock,
                   };
               const mockedFamily = {
@@ -323,19 +328,16 @@ describe('verifyDatabaseSchema API', () => {
               const result = await verifyDatabaseSchema({ dbUrl: connectionString });
 
               expect(result.ok).toBe(true);
-              expect(result.summary).toBe('Database schema satisfies contract');
-              expect(verifySchemaMock).toHaveBeenCalledOnce();
-              const callArgs = verifySchemaMock.mock.calls[0]?.[0];
+              expect(introspectSchemaMock).toHaveBeenCalledOnce();
+              const callArgs = introspectSchemaMock.mock.calls[0]?.[0];
               expect(callArgs).toBeDefined();
               expect(callArgs).toMatchObject({
-                contractIR: expect.anything(),
                 target: expect.objectContaining({ id: 'postgres' }),
                 adapter: expect.objectContaining({ id: 'postgres' }),
-                strict: false,
-                contractPath: expect.stringContaining('contract.json'),
               });
               expect(callArgs.driver).toBeDefined();
               expect(callArgs.driver.query).toBeDefined();
+              expect(callArgs.codecRegistry).toBeDefined();
             } finally {
               process.chdir(originalCwd);
               vi.restoreAllMocks();
@@ -367,24 +369,35 @@ describe('verifyDatabaseSchema API', () => {
           try {
             await emitContractFromConfig(configPath, testDir);
 
-            // Mock verifySchema hook
+            // Mock introspectSchema and verifySchema hooks
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
+            const introspectSchemaMock = vi.fn().mockResolvedValue({
+              tables: {
+                user: {
+                  name: 'user',
+                  columns: {
+                    id: {
+                      name: 'id',
+                      typeId: 'pg/int4@1',
+                      nullable: false,
+                    },
+                    email: {
+                      name: 'email',
+                      typeId: 'pg/text@1',
+                      nullable: false,
+                    },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+              extensions: [],
+            });
             const verifySchemaMock = vi.fn().mockResolvedValue({
-              ok: true,
-              summary: 'Database schema satisfies contract',
-              contract: {
-                coreHash: 'sha256:test',
-              },
-              target: {
-                expected: 'postgres',
-              },
-              schema: {
-                issues: [],
-              },
-              timings: {
-                total: 10,
-              },
+              issues: [],
             });
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
@@ -392,9 +405,11 @@ describe('verifyDatabaseSchema API', () => {
               const mockedVerify = config.family.verify
                 ? {
                     ...config.family.verify,
+                    introspectSchema: introspectSchemaMock,
                     verifySchema: verifySchemaMock,
                   }
                 : {
+                    introspectSchema: introspectSchemaMock,
                     verifySchema: verifySchemaMock,
                   };
               const mockedFamily = {
@@ -412,10 +427,14 @@ describe('verifyDatabaseSchema API', () => {
               process.chdir(testDir);
               await verifyDatabaseSchema({ dbUrl: connectionString, strict: true });
 
+              expect(introspectSchemaMock).toHaveBeenCalledOnce();
               expect(verifySchemaMock).toHaveBeenCalledOnce();
-              const callArgs = verifySchemaMock.mock.calls[0]?.[0];
-              expect(callArgs).toBeDefined();
-              expect(callArgs.strict).toBe(true);
+              const verifyCallArgs = verifySchemaMock.mock.calls[0]?.[0];
+              expect(verifyCallArgs).toBeDefined();
+              expect(verifyCallArgs.contractIR).toBeDefined();
+              expect(verifyCallArgs.schemaIR).toBeDefined();
+              // Note: strict is passed to verifySchemaAgainstContract, not to family hook
+              // The family hook no longer takes strict parameter
             } finally {
               process.chdir(originalCwd);
               vi.restoreAllMocks();
@@ -445,43 +464,51 @@ describe('verifyDatabaseSchema API', () => {
           const cleanup = testSetup.cleanup;
 
           try {
-            const contract = await emitContractFromConfig(configPath, testDir);
+            await emitContractFromConfig(configPath, testDir);
 
-            // Mock verifySchema hook to return schema issues
+            // Mock introspectSchema and verifySchema hooks
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
+            const introspectSchemaMock = vi.fn().mockResolvedValue({
+              tables: {
+                user: {
+                  name: 'user',
+                  columns: {
+                    id: {
+                      name: 'id',
+                      typeId: 'pg/int4@1',
+                      nullable: false,
+                    },
+                    email: {
+                      name: 'email',
+                      typeId: 'pg/text@1',
+                      nullable: false,
+                    },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+              extensions: [],
+            });
             const verifySchemaMock = vi.fn().mockResolvedValue({
-              ok: false,
-              code: 'PN-SCHEMA-0001',
-              summary: 'Contract requirements not met',
-              contract: {
-                coreHash: contract.coreHash,
-              },
-              target: {
-                expected: 'postgres',
-                actual: 'postgres',
-              },
-              schema: {
-                issues: [
-                  {
-                    kind: 'missing_table',
-                    table: 'posts',
-                    message: 'Table posts is required by the contract but not present.',
-                  },
-                  {
-                    kind: 'type_mismatch',
-                    table: 'users',
-                    column: 'name',
-                    expected: 'text',
-                    actual: 'integer',
-                    message:
-                      'Column users.name has incompatible type; expected text, found integer.',
-                  },
-                ],
-              },
-              timings: {
-                total: 15,
-              },
+              issues: [
+                {
+                  kind: 'missing_table',
+                  table: 'posts',
+                  message: 'Table posts is required by the contract but not present.',
+                },
+                {
+                  kind: 'type_mismatch',
+                  table: 'users',
+                  column: 'name',
+                  expected: 'text',
+                  actual: 'integer',
+                  message: 'Column users.name has incompatible type; expected text, found integer.',
+                },
+              ],
             });
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
@@ -489,9 +516,11 @@ describe('verifyDatabaseSchema API', () => {
               const mockedVerify = config.family.verify
                 ? {
                     ...config.family.verify,
+                    introspectSchema: introspectSchemaMock,
                     verifySchema: verifySchemaMock,
                   }
                 : {
+                    introspectSchema: introspectSchemaMock,
                     verifySchema: verifySchemaMock,
                   };
               const mockedFamily = {
@@ -511,7 +540,7 @@ describe('verifyDatabaseSchema API', () => {
 
               expect(result.ok).toBe(false);
               expect(result.code).toBe('PN-SCHEMA-0001');
-              expect(result.summary).toBe('Contract requirements not met');
+              expect(result.summary).toContain('Contract requirements not met');
               expect(result.schema.issues).toHaveLength(2);
               expect(result.schema.issues[0]).toMatchObject({
                 kind: 'missing_table',
@@ -555,25 +584,36 @@ describe('verifyDatabaseSchema API', () => {
           try {
             await emitContractFromConfig(configPath, testDir);
 
-            // Mock verifySchema hook and driver
+            // Mock introspectSchema, verifySchema hooks and driver
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             const closeMock = vi.fn().mockResolvedValue(undefined);
+            const introspectSchemaMock = vi.fn().mockResolvedValue({
+              tables: {
+                user: {
+                  name: 'user',
+                  columns: {
+                    id: {
+                      name: 'id',
+                      typeId: 'pg/int4@1',
+                      nullable: false,
+                    },
+                    email: {
+                      name: 'email',
+                      typeId: 'pg/text@1',
+                      nullable: false,
+                    },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+              extensions: [],
+            });
             const verifySchemaMock = vi.fn().mockResolvedValue({
-              ok: true,
-              summary: 'Database schema satisfies contract',
-              contract: {
-                coreHash: 'sha256:test',
-              },
-              target: {
-                expected: 'postgres',
-              },
-              schema: {
-                issues: [],
-              },
-              timings: {
-                total: 10,
-              },
+              issues: [],
             });
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
@@ -599,9 +639,11 @@ describe('verifyDatabaseSchema API', () => {
               const mockedVerify = config.family.verify
                 ? {
                     ...config.family.verify,
+                    introspectSchema: introspectSchemaMock,
                     verifySchema: verifySchemaMock,
                   }
                 : {
+                    introspectSchema: introspectSchemaMock,
                     verifySchema: verifySchemaMock,
                   };
               const mockedFamily = {

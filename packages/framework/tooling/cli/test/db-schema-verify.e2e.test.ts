@@ -355,21 +355,13 @@ describe('db schema-verify command (e2e)', () => {
                 ? {
                     ...config.family.verify,
                     verifySchema: vi.fn().mockResolvedValue({
-                      ok: false,
-                      code: 'PN-SCHEMA-0001',
-                      summary: 'Database schema does not match contract',
-                      contract: { coreHash: 'sha256:test' },
-                      target: { expected: 'postgres' },
-                      schema: {
-                        issues: [
-                          {
-                            kind: 'missing_table',
-                            table: 'test',
-                            message: 'Table test is missing',
-                          },
-                        ],
-                      },
-                      timings: { total: 10 },
+                      issues: [
+                        {
+                          kind: 'missing_table',
+                          table: 'test',
+                          message: 'Table test is missing',
+                        },
+                      ],
                     }),
                   }
                 : undefined;
@@ -445,13 +437,7 @@ describe('db schema-verify command (e2e)', () => {
             const configLoaderModule = await import('../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             const verifySchemaMock = vi.fn().mockResolvedValue({
-              ok: false,
-              code: 'PN-SCHEMA-0001',
-              summary: 'Database schema does not match contract',
-              contract: { coreHash: 'sha256:test' },
-              target: { expected: 'postgres' },
-              schema: { issues: [] },
-              timings: { total: 10 },
+              issues: [],
             });
             const loadConfigSpy = vi
               .spyOn(configLoaderModule, 'loadConfig')
@@ -491,12 +477,10 @@ describe('db schema-verify command (e2e)', () => {
               process.chdir(originalCwd);
             }
 
-            // Verify --strict flag was passed to verifySchema
-            // Check mock was called (should be called by verifyDatabaseSchema -> loadConfig)
+            // Verify mock was called (should be called by verifyDatabaseSchema -> loadConfig)
             expect(loadConfigSpy).toHaveBeenCalled();
             expect(verifySchemaMock).toHaveBeenCalledOnce();
-            const callArgs = verifySchemaMock.mock.calls[0]?.[0];
-            expect(callArgs?.strict).toBe(true);
+            // Note: --strict flag is passed to verifySchemaAgainstContract, not to the family hook
 
             // Restore mocks after assertions
             vi.restoreAllMocks();
