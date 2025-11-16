@@ -105,7 +105,7 @@ test('where.related.posts.some returns OrmModelBuilder', () => {
 
   expectTypeOf<SomeFn>().toBeFunction();
   expectTypeOf<ReturnType<SomeFn>>().toExtend<
-    OrmModelBuilder<ContractWithRelations, CodecTypesWithRelations, 'User', unknown>
+    OrmModelBuilder<ContractWithRelations, CodecTypesWithRelations, 'User', Record<string, never>>
   >();
 });
 
@@ -144,7 +144,7 @@ test('include.posts returns OrmModelBuilder', () => {
   type PostsIncludeFn = IncludeAccessor['posts'];
 
   expectTypeOf<ReturnType<PostsIncludeFn>>().toExtend<
-    OrmModelBuilder<ContractWithRelations, CodecTypesWithRelations, 'User', unknown>
+    OrmModelBuilder<ContractWithRelations, CodecTypesWithRelations, 'User', Record<string, never>>
   >();
 });
 
@@ -155,7 +155,7 @@ test('select() infers row type from projection', () => {
 
   expectTypeOf<SelectFn>().toBeFunction();
   expectTypeOf<ReturnType<SelectFn>>().toExtend<
-    OrmModelBuilder<Contract, CodecTypes, 'User', unknown>
+    OrmModelBuilder<Contract, CodecTypes, 'User', Record<string, never>>
   >();
 });
 

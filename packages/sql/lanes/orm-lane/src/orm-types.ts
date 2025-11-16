@@ -46,13 +46,6 @@ type ModelRelations<
     : Record<string, never>
   : Record<string, never>;
 
-type ModelFieldKeys<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-> = TContract['models'][ModelName] extends { fields: infer Fields }
-  ? keyof Fields & string
-  : string;
-
 type ModelFieldToColumnMap<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
