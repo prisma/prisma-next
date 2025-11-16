@@ -14,7 +14,6 @@ export async function ormGetUsersWithPosts(limit: number, runtime: Runtime) {
           id: m.id,
           title: m.title,
           createdAt: m.createdAt,
-          embedding: m.embedding,
         }))
         .orderBy((m) => m.createdAt.desc()),
     )
