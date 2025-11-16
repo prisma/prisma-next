@@ -1,7 +1,6 @@
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { introspectPostgresSchema } from '../src/exports/introspect';
 
@@ -14,7 +13,7 @@ function createMockDriver(responses: Array<{ sql: string; rows: unknown[] }>): C
   return {
     async query<Row = Record<string, unknown>>(
       sql: string,
-      params?: readonly unknown[],
+      _params?: readonly unknown[],
     ): Promise<{ readonly rows: Row[] }> {
       // Normalize SQL for matching (remove whitespace)
       const normalizedSql = sql.replace(/\s+/g, ' ').trim();
@@ -152,11 +151,11 @@ describe('introspectPostgresSchema', () => {
     const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
 
     expect(schemaIR.tables).toHaveProperty('user');
-    expect(schemaIR.tables.user?.columns).toHaveProperty('id');
-    expect(schemaIR.tables.user?.columns.id?.typeId).toBe('pg/int4@1');
-    expect(schemaIR.tables.user?.columns.id?.nativeType).toBe('integer');
-    expect(schemaIR.tables.user?.columns.id?.nullable).toBe(false);
-    expect(schemaIR.tables.user?.primaryKey).toEqual({ columns: ['id'], name: 'user_pkey' });
+    expect(schemaIR.tables['user']?.columns).toHaveProperty('id');
+    expect(schemaIR.tables['user']?.columns['id']?.typeId).toBe('pg/int4@1');
+    expect(schemaIR.tables['user']?.columns['id']?.nativeType).toBe('integer');
+    expect(schemaIR.tables['user']?.columns['id']?.nullable).toBe(false);
+    expect(schemaIR.tables['user']?.primaryKey).toEqual({ columns: ['id'], name: 'user_pkey' });
   });
 
   it('introspects table with foreign keys', async () => {
@@ -205,10 +204,10 @@ describe('introspectPostgresSchema', () => {
     const codecRegistry = createTestCodecRegistry();
     const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
 
-    expect(schemaIR.tables.post?.foreignKeys).toHaveLength(1);
-    expect(schemaIR.tables.post?.foreignKeys[0]?.columns).toEqual(['user_id']);
-    expect(schemaIR.tables.post?.foreignKeys[0]?.referencedTable).toBe('user');
-    expect(schemaIR.tables.post?.foreignKeys[0]?.referencedColumns).toEqual(['id']);
+    expect(schemaIR.tables['post']?.foreignKeys).toHaveLength(1);
+    expect(schemaIR.tables['post']?.foreignKeys[0]?.columns).toEqual(['user_id']);
+    expect(schemaIR.tables['post']?.foreignKeys[0]?.referencedTable).toBe('user');
+    expect(schemaIR.tables['post']?.foreignKeys[0]?.referencedColumns).toEqual(['id']);
   });
 
   it('introspects extensions', async () => {
@@ -269,12 +268,12 @@ describe('introspectPostgresSchema', () => {
     const codecRegistry = createTestCodecRegistry();
     const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
 
-    expect(schemaIR.tables.test?.columns.id?.typeId).toBe('pg/int4@1');
-    expect(schemaIR.tables.test?.columns.id?.nativeType).toBe('integer');
-    expect(schemaIR.tables.test?.columns.name?.typeId).toBe('pg/text@1');
-    expect(schemaIR.tables.test?.columns.name?.nativeType).toBe('text');
-    expect(schemaIR.tables.test?.columns.name?.nullable).toBe(true);
-    expect(schemaIR.tables.test?.columns.active?.typeId).toBe('pg/bool@1');
-    expect(schemaIR.tables.test?.columns.active?.nativeType).toBe('boolean');
+    expect(schemaIR.tables['test']?.columns['id']?.typeId).toBe('pg/int4@1');
+    expect(schemaIR.tables['test']?.columns['id']?.nativeType).toBe('integer');
+    expect(schemaIR.tables['test']?.columns['name']?.typeId).toBe('pg/text@1');
+    expect(schemaIR.tables['test']?.columns['name']?.nativeType).toBe('text');
+    expect(schemaIR.tables['test']?.columns['name']?.nullable).toBe(true);
+    expect(schemaIR.tables['test']?.columns['active']?.typeId).toBe('pg/bool@1');
+    expect(schemaIR.tables['test']?.columns['active']?.nativeType).toBe('boolean');
   });
 });

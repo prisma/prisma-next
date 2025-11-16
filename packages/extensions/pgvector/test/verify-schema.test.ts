@@ -1,19 +1,20 @@
-import { describe, expect, it } from 'vitest';
-import type { ControlPlaneDriver, ExtensionSchemaVerifierOptions } from '@prisma-next/core-control-plane/types';
+import type {
+  ControlPlaneDriver,
+  ExtensionSchemaVerifierOptions,
+} from '@prisma-next/core-control-plane/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { describe, expect, it } from 'vitest';
 import pgvectorExtensionDescriptor from '../src/exports/cli';
 
 /**
  * Creates a mock ControlPlaneDriver for testing.
  */
-function createMockDriver(
-  responses: Array<{ sql: string; rows: unknown[] }>,
-): ControlPlaneDriver {
+function createMockDriver(responses: Array<{ sql: string; rows: unknown[] }>): ControlPlaneDriver {
   let callIndex = 0;
   return {
     async query<Row = Record<string, unknown>>(
       sql: string,
-      params?: readonly unknown[],
+      _params?: readonly unknown[],
     ): Promise<{ readonly rows: Row[] }> {
       const response = responses[callIndex];
       if (!response) {
@@ -203,4 +204,3 @@ describe('pgvector verifySchema hook', () => {
     expect(issues.some((issue) => issue.kind === 'type_mismatch')).toBe(true);
   });
 });
-

@@ -1,7 +1,6 @@
 export type {
+  SchemaIssue,
   VerifyDatabaseSchemaOptions,
   VerifyDatabaseSchemaResult,
-  SchemaIssue,
 } from '../actions/verify-database-schema';
 export { verifyDatabaseSchema } from '../actions/verify-database-schema';
-

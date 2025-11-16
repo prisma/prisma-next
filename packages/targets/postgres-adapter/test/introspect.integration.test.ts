@@ -1,6 +1,5 @@
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -12,10 +11,20 @@ import { introspectPostgresSchema } from '../src/exports/introspect';
  * Creates a ControlPlaneDriver from a Postgres client.
  */
 function createDriverFromClient(client: Client): ControlPlaneDriver {
-  return createPostgresDriverFromOptions({
+  const driver = createPostgresDriverFromOptions({
     connect: { client },
     cursor: { disabled: true },
   });
+  return {
+    query: async <Row = Record<string, unknown>>(
+      sql: string,
+      params?: readonly unknown[],
+    ): Promise<{ readonly rows: Row[] }> => {
+      const result = await driver.query<Row>(sql, params);
+      return { rows: [...result.rows] };
+    },
+    close: driver.close?.bind(driver),
+  };
 }
 
 /**
@@ -117,55 +126,55 @@ describe('introspectPostgresSchema (integration with real database)', () => {
 
               // Verify users table columns
               expect(usersTable?.columns).toBeDefined();
-              expect(usersTable?.columns.id).toMatchObject({
+              expect(usersTable?.columns['id']).toMatchObject({
                 name: 'id',
                 typeId: 'pg/int4@1',
                 nativeType: 'integer',
                 nullable: false,
               });
-              expect(usersTable?.columns.email).toMatchObject({
+              expect(usersTable?.columns['email']).toMatchObject({
                 name: 'email',
                 typeId: 'pg/text@1',
                 nativeType: 'text',
                 nullable: false,
               });
-              expect(usersTable?.columns.name).toMatchObject({
+              expect(usersTable?.columns['name']).toMatchObject({
                 name: 'name',
                 typeId: 'pg/text@1',
                 nativeType: 'character varying',
                 nullable: true,
               });
-              expect(usersTable?.columns.age).toMatchObject({
+              expect(usersTable?.columns['age']).toMatchObject({
                 name: 'age',
                 typeId: 'pg/int2@1',
                 nativeType: 'smallint',
                 nullable: true,
               });
-              expect(usersTable?.columns.score).toMatchObject({
+              expect(usersTable?.columns['score']).toMatchObject({
                 name: 'score',
                 typeId: 'pg/float4@1',
                 nativeType: 'real',
                 nullable: true,
               });
-              expect(usersTable?.columns.balance).toMatchObject({
+              expect(usersTable?.columns['balance']).toMatchObject({
                 name: 'balance',
                 typeId: 'pg/float8@1',
                 nativeType: 'double precision',
                 nullable: true,
               });
-              expect(usersTable?.columns.is_active).toMatchObject({
+              expect(usersTable?.columns['is_active']).toMatchObject({
                 name: 'is_active',
                 typeId: 'pg/bool@1',
                 nativeType: 'boolean',
                 nullable: false,
               });
-              expect(usersTable?.columns.created_at).toMatchObject({
+              expect(usersTable?.columns['created_at']).toMatchObject({
                 name: 'created_at',
                 typeId: 'pg/timestamp@1',
                 nativeType: 'timestamp without time zone',
                 nullable: false,
               });
-              expect(usersTable?.columns.updated_at).toMatchObject({
+              expect(usersTable?.columns['updated_at']).toMatchObject({
                 name: 'updated_at',
                 typeId: 'pg/timestamptz@1',
                 nativeType: 'timestamp with time zone',
@@ -188,13 +197,13 @@ describe('introspectPostgresSchema (integration with real database)', () => {
 
               // Verify posts table
               expect(schemaIR.tables).toHaveProperty('posts');
-              const postsTable = schemaIR.tables.posts;
+              const postsTable = schemaIR.tables['posts'];
               expect(postsTable).toBeDefined();
               expect(postsTable?.name).toBe('posts');
               expect(postsTable?.primaryKey).toEqual({ columns: ['id'] });
 
               // Verify posts table columns
-              expect(postsTable?.columns.user_id).toMatchObject({
+              expect(postsTable?.columns['user_id']).toMatchObject({
                 name: 'user_id',
                 typeId: 'pg/int4@1',
                 nativeType: 'integer',
@@ -234,11 +243,12 @@ describe('introspectPostgresSchema (integration with real database)', () => {
               if (schemaIR.extensions.includes('vector')) {
                 // Verify embeddings table exists if vector extension is available
                 expect(schemaIR.tables).toHaveProperty('embeddings');
-                const embeddingsTable = schemaIR.tables.embeddings;
-                expect(embeddingsTable?.columns.embedding).toBeDefined();
+                const embeddingsTable = schemaIR.tables['embeddings'];
+                expect(embeddingsTable?.columns['embeddings']).toBeDefined();
+                expect(embeddingsTable?.columns['embedding']).toBeDefined();
                 // Note: vector type mapping would require pgvector codec to be registered
                 // For now, we just verify the column exists
-                expect(embeddingsTable?.columns.embedding?.name).toBe('embedding');
+                expect(embeddingsTable?.columns['embedding']?.name).toBe('embedding');
               }
 
               // Verify overall schema structure
@@ -282,47 +292,47 @@ describe('introspectPostgresSchema (integration with real database)', () => {
             try {
               const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
 
-              const typeTestTable = schemaIR.tables.type_test;
+              const typeTestTable = schemaIR.tables['type_test'];
               expect(typeTestTable).toBeDefined();
 
               // Verify type mappings
-              expect(typeTestTable?.columns.int_col).toMatchObject({
+              expect(typeTestTable?.columns['int_col']).toMatchObject({
                 typeId: 'pg/int4@1',
                 nativeType: 'integer',
               });
-              expect(typeTestTable?.columns.bigint_col).toMatchObject({
+              expect(typeTestTable?.columns['bigint_col']).toMatchObject({
                 typeId: 'pg/int8@1',
                 nativeType: 'bigint',
               });
-              expect(typeTestTable?.columns.smallint_col).toMatchObject({
+              expect(typeTestTable?.columns['smallint_col']).toMatchObject({
                 typeId: 'pg/int2@1',
                 nativeType: 'smallint',
               });
-              expect(typeTestTable?.columns.text_col).toMatchObject({
+              expect(typeTestTable?.columns['text_col']).toMatchObject({
                 typeId: 'pg/text@1',
                 nativeType: 'text',
               });
-              expect(typeTestTable?.columns.varchar_col).toMatchObject({
+              expect(typeTestTable?.columns['varchar_col']).toMatchObject({
                 typeId: 'pg/text@1',
                 nativeType: 'character varying',
               });
-              expect(typeTestTable?.columns.bool_col).toMatchObject({
+              expect(typeTestTable?.columns['bool_col']).toMatchObject({
                 typeId: 'pg/bool@1',
                 nativeType: 'boolean',
               });
-              expect(typeTestTable?.columns.real_col).toMatchObject({
+              expect(typeTestTable?.columns['real_col']).toMatchObject({
                 typeId: 'pg/float4@1',
                 nativeType: 'real',
               });
-              expect(typeTestTable?.columns.double_col).toMatchObject({
+              expect(typeTestTable?.columns['double_col']).toMatchObject({
                 typeId: 'pg/float8@1',
                 nativeType: 'double precision',
               });
-              expect(typeTestTable?.columns.timestamp_col).toMatchObject({
+              expect(typeTestTable?.columns['timestamp_col']).toMatchObject({
                 typeId: 'pg/timestamp@1',
                 nativeType: 'timestamp without time zone',
               });
-              expect(typeTestTable?.columns.timestamptz_col).toMatchObject({
+              expect(typeTestTable?.columns['timestamptz_col']).toMatchObject({
                 typeId: 'pg/timestamptz@1',
                 nativeType: 'timestamp with time zone',
               });

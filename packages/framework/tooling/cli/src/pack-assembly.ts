@@ -187,7 +187,7 @@ export function extractExtensionIdsFromPacks(
  */
 export async function assembleCodecRegistry(
   adapter: AdapterDescriptor,
-  extensions: ReadonlyArray<ExtensionDescriptor>,
+  _extensions: ReadonlyArray<ExtensionDescriptor>,
 ): Promise<CodecRegistry> {
   const codecRegistry = createCodecRegistry();
 

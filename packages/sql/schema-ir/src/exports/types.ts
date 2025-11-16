@@ -1,10 +1,9 @@
 export type {
-  SqlSchemaIR,
-  SqlTableIR,
+  SqlAnnotations,
   SqlColumnIR,
   SqlForeignKeyIR,
-  SqlUniqueIR,
   SqlIndexIR,
-  SqlAnnotations,
+  SqlSchemaIR,
+  SqlTableIR,
+  SqlUniqueIR,
 } from '../types';
-

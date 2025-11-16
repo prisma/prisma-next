@@ -17,7 +17,7 @@ function createMockDriver(responses: Array<{ sql: string; rows: unknown[] }>): C
   return {
     async query<Row = Record<string, unknown>>(
       sql: string,
-      params?: readonly unknown[],
+      _params?: readonly unknown[],
     ): Promise<{ readonly rows: Row[] }> {
       const response = responses[callIndex];
       if (!response) {

@@ -10,15 +10,19 @@ import type {
 } from '@prisma-next/sql-schema-ir/types';
 
 /**
- * Queries all tables in the public schema.
+ * Queries all tables in the specified schema.
  */
-async function queryTables(driver: ControlPlaneDriver): Promise<ReadonlyArray<string>> {
+async function queryTables(
+  driver: ControlPlaneDriver,
+  schema: string,
+): Promise<ReadonlyArray<string>> {
   const result = await driver.query<{ table_name: string }>(
     `SELECT table_name
      FROM information_schema.tables
-     WHERE table_schema = 'public'
+     WHERE table_schema = $1
        AND table_type = 'BASE TABLE'
      ORDER BY table_name`,
+    [schema],
   );
   return result.rows.map((row: { table_name: string }) => row.table_name);
 }
@@ -28,6 +32,7 @@ async function queryTables(driver: ControlPlaneDriver): Promise<ReadonlyArray<st
  */
 async function queryColumns(
   driver: ControlPlaneDriver,
+  schema: string,
   tableName: string,
 ): Promise<
   ReadonlyArray<{
@@ -44,10 +49,10 @@ async function queryColumns(
   }>(
     `SELECT column_name, data_type, udt_name, is_nullable
      FROM information_schema.columns
-     WHERE table_schema = 'public'
-       AND table_name = $1
+     WHERE table_schema = $1
+       AND table_name = $2
      ORDER BY ordinal_position`,
-    [tableName],
+    [schema, tableName],
   );
   return result.rows.map(
     (row: { column_name: string; data_type: string; udt_name: string; is_nullable: string }) => {
@@ -67,6 +72,7 @@ async function queryColumns(
  */
 async function queryPrimaryKeys(
   driver: ControlPlaneDriver,
+  schema: string,
   tableName: string,
 ): Promise<{ columns: readonly string[]; name?: string } | undefined> {
   const result = await driver.query<{ column_name: string; constraint_name: string }>(
@@ -76,11 +82,11 @@ async function queryPrimaryKeys(
        ON tc.constraint_name = kcu.constraint_name
          AND tc.table_schema = kcu.table_schema
          AND tc.table_name = kcu.table_name
-     WHERE tc.table_schema = 'public'
-       AND tc.table_name = $1
+     WHERE tc.table_schema = $1
+       AND tc.table_name = $2
        AND tc.constraint_type = 'PRIMARY KEY'
      ORDER BY kcu.ordinal_position`,
-    [tableName],
+    [schema, tableName],
   );
   if (result.rows.length === 0) {
     return undefined;
@@ -98,6 +104,7 @@ async function queryPrimaryKeys(
  */
 async function queryForeignKeys(
   driver: ControlPlaneDriver,
+  schema: string,
   tableName: string,
 ): Promise<
   ReadonlyArray<{
@@ -131,11 +138,11 @@ async function queryForeignKeys(
      JOIN information_schema.constraint_column_usage ccu
        ON ccu.constraint_name = rc.unique_constraint_name
          AND ccu.constraint_schema = rc.unique_constraint_schema
-     WHERE tc.table_schema = 'public'
-       AND tc.table_name = $1
+     WHERE tc.table_schema = $1
+       AND tc.table_name = $2
        AND tc.constraint_type = 'FOREIGN KEY'
      ORDER BY tc.constraint_name, kcu.ordinal_position`,
-    [tableName],
+    [schema, tableName],
   );
 
   // Group by constraint name
@@ -176,6 +183,7 @@ async function queryForeignKeys(
  */
 async function queryUniqueConstraints(
   driver: ControlPlaneDriver,
+  schema: string,
   tableName: string,
 ): Promise<
   ReadonlyArray<{
@@ -194,11 +202,11 @@ async function queryUniqueConstraints(
        ON tc.constraint_name = kcu.constraint_name
          AND tc.table_schema = kcu.table_schema
          AND tc.table_name = kcu.table_name
-     WHERE tc.table_schema = 'public'
-       AND tc.table_name = $1
+     WHERE tc.table_schema = $1
+       AND tc.table_name = $2
        AND tc.constraint_type = 'UNIQUE'
      ORDER BY tc.constraint_name, kcu.ordinal_position`,
-    [tableName],
+    [schema, tableName],
   );
 
   // Group by constraint name
@@ -226,6 +234,7 @@ async function queryUniqueConstraints(
  */
 async function queryIndexes(
   driver: ControlPlaneDriver,
+  schema: string,
   tableName: string,
 ): Promise<
   ReadonlyArray<{
@@ -248,11 +257,11 @@ async function queryIndexes(
      JOIN pg_class i ON i.oid = ix.indexrelid
      JOIN pg_namespace n ON n.oid = t.relnamespace
      LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
-     WHERE n.nspname = 'public'
-       AND t.relname = $1
+     WHERE n.nspname = $1
+       AND t.relname = $2
        AND NOT ix.indisprimary
      ORDER BY i.relname, array_position(ix.indkey, a.attnum)`,
-    [tableName],
+    [schema, tableName],
   );
 
   // Group by index name
@@ -358,15 +367,17 @@ function mapDatabaseTypeToCodec(
  * @param driver - ControlPlaneDriver for executing queries
  * @param codecRegistry - Codec registry for mapping database types to codec IDs
  * @param contract - Optional contract to limit introspection to specific tables
+ * @param schema - Database schema name (defaults to 'public')
  * @returns Promise resolving to SqlSchemaIR
  */
 export async function introspectPostgresSchema(
   driver: ControlPlaneDriver,
   codecRegistry: CodecRegistry,
   contract?: unknown,
+  schema = 'public',
 ): Promise<SqlSchemaIR> {
   // Query all tables (or filter by contract if provided)
-  const allTables = await queryTables(driver);
+  const allTables = await queryTables(driver, schema);
   const tablesToIntrospect = contract
     ? // If contract provided, only introspect tables in contract
       (() => {
@@ -396,11 +407,11 @@ export async function introspectPostgresSchema(
   const tables: Record<string, SqlTableIR> = {};
   for (const tableName of tablesToIntrospect) {
     const [columns, primaryKey, foreignKeys, uniqueConstraints, indexes] = await Promise.all([
-      queryColumns(driver, tableName),
-      queryPrimaryKeys(driver, tableName),
-      queryForeignKeys(driver, tableName),
-      queryUniqueConstraints(driver, tableName),
-      queryIndexes(driver, tableName),
+      queryColumns(driver, schema, tableName),
+      queryPrimaryKeys(driver, schema, tableName),
+      queryForeignKeys(driver, schema, tableName),
+      queryUniqueConstraints(driver, schema, tableName),
+      queryIndexes(driver, schema, tableName),
     ]);
 
     // Map columns to SqlColumnIR
