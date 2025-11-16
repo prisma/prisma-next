@@ -1,9 +1,5 @@
-import type { TargetFamilyContext } from '@prisma-next/core-control-plane/types';
-import type { SqlCodecRegistry } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-
 /**
- * SQL family context that binds together schema IR and codec registry.
- * This is the SQL family's instantiation of TargetFamilyContext.
+ * Re-export SqlFamilyContext from sql-contract (shared plane) to maintain backward compatibility.
+ * The type is defined in sql-contract to avoid cyclic dependencies with CLI.
  */
-export type SqlFamilyContext = TargetFamilyContext<SqlSchemaIR, SqlCodecRegistry>;
+export type { SqlFamilyContext } from '@prisma-next/sql-contract/types';

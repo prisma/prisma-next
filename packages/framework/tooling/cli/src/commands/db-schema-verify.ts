@@ -7,7 +7,7 @@ import type {
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
-import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
+import type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
 import type { SqlCodecRegistry } from '@prisma-next/sql-contract/types';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { Command } from 'commander';

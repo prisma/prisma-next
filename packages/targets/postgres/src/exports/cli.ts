@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { TargetDescriptor } from '@prisma-next/cli/config-types';
 import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,7 +50,7 @@ function loadTargetManifest(): ExtensionPackManifest {
 /**
  * Postgres target descriptor for CLI config.
  */
-const postgresTargetDescriptor: TargetDescriptor = {
+const postgresTargetDescriptor: TargetDescriptor<SqlFamilyContext> = {
   kind: 'target',
   id: 'postgres',
   family: 'sql',

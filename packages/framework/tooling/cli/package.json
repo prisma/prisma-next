@@ -19,7 +19,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
-    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "arktype": "^2.0.0",
     "c12": "^3.3.2",

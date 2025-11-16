@@ -1,4 +1,6 @@
 import type { ContractBase } from '@prisma-next/contract/types';
+import type { TargetFamilyContext } from '@prisma-next/core-control-plane/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
 export type StorageColumn = {
   readonly type: string;
@@ -137,3 +139,13 @@ export interface SqlCodecRegistry {
   [Symbol.iterator](): Iterator<Codec<string>>;
   values(): IterableIterator<Codec<string>>;
 }
+
+/**
+ * SQL family context that binds together schema IR and codec registry.
+ * This is the SQL family's instantiation of TargetFamilyContext, adding SQL-specific control-plane state.
+ *
+ * Moved to sql-contract (shared plane) to avoid cyclic dependencies with CLI.
+ */
+export type SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & {
+  readonly codecRegistry: SqlCodecRegistry;
+};

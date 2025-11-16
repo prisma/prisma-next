@@ -10,7 +10,7 @@ import type {
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
-import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
+import type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
 import type { SqlCodecRegistry, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -94,6 +94,8 @@ async function callVerifyDatabaseSchema(options: {
     };
 
     // Call domain action
+    // Note: loadConfig returns PrismaNextConfig with default TargetFamilyContext type,
+    // so we need to cast target and adapter to SqlFamilyContext types
     return await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR,

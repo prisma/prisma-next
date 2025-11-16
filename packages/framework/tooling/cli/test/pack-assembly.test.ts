@@ -2,7 +2,7 @@ import type {
   ExtensionPackManifest,
   OperationManifest,
 } from '@prisma-next/core-control-plane/pack-manifest-types';
-import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
+import type { SqlFamilyContext } from '@prisma-next/sql-contract/types';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { describe, expect, it } from 'vitest';
 import type {

@@ -4,16 +4,15 @@ import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-t
 
 /**
  * Control-plane context that binds together schema IR and family-specific control-plane registries/state.
- * This abstraction allows domain actions to work with family-specific types (e.g., CodecRegistry for SQL)
- * without understanding their concrete structure.
+ * This abstraction allows domain actions to work with family-specific types without understanding their concrete structure.
  *
- * Families define their own context type that extends this base interface:
- * - SQL: `SqlFamilyContext extends TargetFamilyContext<SqlSchemaIR, SqlCodecRegistry>`
+ * The base type contains only the schema IR, which is common to all families.
+ * Families extend this with their own control-plane state (e.g., SQL adds codecRegistry):
+ * - SQL: `SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & { readonly codecRegistry: SqlCodecRegistry }`
  * - Other families can define their own context types as needed
  */
-export interface TargetFamilyContext<TSchemaIR = unknown, TCodecRegistry = unknown> {
+export interface TargetFamilyContext<TSchemaIR = unknown> {
   readonly schemaIR: TSchemaIR;
-  readonly codecRegistry: TCodecRegistry;
 }
 
 /**

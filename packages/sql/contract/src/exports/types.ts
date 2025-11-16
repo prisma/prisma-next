@@ -11,6 +11,7 @@ export type {
   PrimaryKey,
   SqlCodecRegistry,
   SqlContract,
+  SqlFamilyContext,
   SqlMappings,
   SqlStorage,
   StorageColumn,
