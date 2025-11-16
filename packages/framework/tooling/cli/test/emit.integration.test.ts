@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emit } from '@prisma-next/emitter';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';

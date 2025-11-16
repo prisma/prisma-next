@@ -56,28 +56,14 @@ function operationManifestToSignature(manifest: OperationManifest): SqlOperation
   };
 }
 
-/**
- * SQL family descriptor for CLI config.
- * Provides the SQL family hook and conversion helpers.
- *
- * Note: verifySchema uses a getter that creates the function with the descriptor
- * captured in its closure, allowing it to refer to itself without needing it as a parameter.
- */
-const sqlFamilyDescriptor: FamilyDescriptor<SqlSchemaIR> = {
-  kind: 'family',
-  id: 'sql',
+const sqlFamilyDescriptor = {
+  kind: 'family' as const,
+  id: 'sql' as const,
   hook: sqlTargetFamilyHook,
   verify: {
     readMarker,
     collectSupportedCodecTypeIds,
     introspectSchema,
-    // Use getter to create verifySchema with descriptor captured in closure
-    // This allows verifySchema to refer to itself (the family descriptor) without needing it as a parameter
-    get verifySchema() {
-      return createVerifySchema(sqlFamilyDescriptor) as NonNullable<
-        FamilyDescriptor<SqlSchemaIR>['verify']
-      >['verifySchema'];
-    },
   },
   convertOperationManifest: (manifest: OperationManifest): OperationSignature => {
     return operationManifestToSignature(manifest);
@@ -100,6 +86,13 @@ const sqlFamilyDescriptor: FamilyDescriptor<SqlSchemaIR> = {
     }
     return contract;
   },
+} as Omit<FamilyDescriptor<SqlSchemaIR>, 'verify'> & {
+  verify: Omit<NonNullable<FamilyDescriptor<SqlSchemaIR>['verify']>, 'verifySchema'>;
 };
 
-export default sqlFamilyDescriptor;
+// Now assign verifySchema with descriptor captured in closure
+(sqlFamilyDescriptor.verify as NonNullable<FamilyDescriptor<SqlSchemaIR>['verify']>).verifySchema =
+  createVerifySchema(sqlFamilyDescriptor as FamilyDescriptor<SqlSchemaIR>);
+
+// Export as properly typed FamilyDescriptor
+export default sqlFamilyDescriptor as FamilyDescriptor<SqlSchemaIR>;

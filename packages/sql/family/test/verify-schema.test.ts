@@ -7,7 +7,7 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import sqlFamilyDescriptor from '../src/exports/cli';
+import sqlFamilyDescriptor from '../src/exports/control';
 
 /**
  * Creates a mock driver for testing.

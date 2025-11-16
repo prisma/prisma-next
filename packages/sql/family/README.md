@@ -37,7 +37,7 @@ This package uses a multi-plane structure with separate entrypoints:
 ### Control Plane (CLI)
 
 ```typescript
-import sql from '@prisma-next/family-sql/cli';
+import sql from '@prisma-next/family-sql/control';
 
 // sql is a FamilyDescriptor with:
 // - kind: 'family'
@@ -60,7 +60,7 @@ import sqlRuntime from '@prisma-next/family-sql/runtime';
 
 This package is structured as a multi-plane package:
 
-- **`src/exports/cli.ts`**: Control plane entrypoint (migration plane)
+- **`src/exports/control.ts`**: Control plane entrypoint (migration plane)
 - **`src/exports/runtime.ts`**: Execution plane entrypoint (runtime plane, placeholder)
 - **`src/verify.ts`**: Shared verification logic used by control plane
 

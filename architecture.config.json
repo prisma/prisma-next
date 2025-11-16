@@ -187,7 +187,7 @@
       "plane": "migration"
     },
     {
-      "glob": "packages/sql/family/src/exports/cli.ts",
+      "glob": "packages/sql/family/src/exports/control.ts",
       "domain": "sql",
       "layer": "tooling",
       "plane": "migration"

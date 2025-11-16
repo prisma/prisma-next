@@ -11,7 +11,7 @@ import {
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';

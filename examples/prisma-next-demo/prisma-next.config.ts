@@ -3,7 +3,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/cli';
 import pgvector from '@prisma-next/extension-pgvector/cli';
-import sql from '@prisma-next/family-sql/cli';
+import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/targets-postgres/cli';
 import { contract } from './prisma/contract';
 

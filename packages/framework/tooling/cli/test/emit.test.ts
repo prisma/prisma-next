@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emit } from '@prisma-next/emitter';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
