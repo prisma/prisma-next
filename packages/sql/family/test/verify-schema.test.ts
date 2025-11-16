@@ -7,7 +7,7 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import sqlFamilyDescriptor from '../src/cli';
+import sqlFamilyDescriptor from '../src/exports/cli';
 
 /**
  * Creates a mock driver for testing.
@@ -525,10 +525,9 @@ describe('verifySchema integration', () => {
             },
           };
 
-          const result = await verifySchema({
+          const result = await sqlFamilyDescriptor.verify.verifySchema!({
             driver,
             contractIR: contract,
-            family: sqlFamilyDescriptor,
             target,
             adapter,
             extensions,

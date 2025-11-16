@@ -181,10 +181,22 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/sql/tooling/**",
+      "glob": "packages/sql/tooling/emitter/**",
       "domain": "sql",
       "layer": "tooling",
       "plane": "migration"
+    },
+    {
+      "glob": "packages/sql/family/src/exports/cli.ts",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/sql/family/src/exports/runtime.ts",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "runtime"
     }
   ],
   "rules": {

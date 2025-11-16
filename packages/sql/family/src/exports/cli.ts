@@ -11,7 +11,7 @@ import {
   createVerifySchema,
   introspectSchema,
   readMarker,
-} from './verify';
+} from '../verify';
 
 /**
  * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.

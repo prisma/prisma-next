@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     cli: 'src/exports/cli.ts',
+    runtime: 'src/exports/runtime.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],

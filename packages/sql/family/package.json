@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "description": "SQL family CLI entry point",
+  "description": "SQL family descriptor for control plane and runtime",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
@@ -39,6 +39,10 @@
     "./cli": {
       "types": "./dist/exports/cli.d.ts",
       "import": "./dist/exports/cli.js"
+    },
+    "./runtime": {
+      "types": "./dist/exports/runtime.d.ts",
+      "import": "./dist/exports/runtime.js"
     }
   }
 }
