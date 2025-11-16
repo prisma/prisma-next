@@ -218,7 +218,7 @@ type SchemaIssue = {
 export async function verifySchema(options: {
   readonly driver: ControlPlaneDriver;
   readonly contractIR: unknown;
-  readonly family: FamilyDescriptor<SqlSchemaIR>;
+  readonly family: FamilyDescriptor<unknown>;
   readonly target: TargetDescriptor;
   readonly adapter: AdapterDescriptor;
   readonly extensions: ReadonlyArray<ExtensionDescriptor>;
@@ -253,10 +253,11 @@ export async function verifySchema(options: {
   // Delegate to core verifyDatabaseSchema action
   // The family descriptor is passed in from config, avoiding circular dependency
   // (we receive it as a parameter rather than importing sqlFamilyDescriptor)
+  // Cast to SqlSchemaIR since we know this is the SQL family
   return verifyDatabaseSchema({
     driver: options.driver,
     contractIR: options.contractIR,
-    family: options.family,
+    family: options.family as FamilyDescriptor<SqlSchemaIR>,
     target: options.target,
     adapter: options.adapter,
     extensions: options.extensions,

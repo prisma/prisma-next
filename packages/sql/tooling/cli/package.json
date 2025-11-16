@@ -39,10 +39,6 @@
     "./cli": {
       "types": "./dist/exports/cli.d.ts",
       "import": "./dist/exports/cli.js"
-    },
-    "./runtime": {
-      "types": "./dist/exports/runtime.d.ts",
-      "import": "./dist/exports/runtime.js"
     }
   }
 }

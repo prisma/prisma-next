@@ -83,7 +83,7 @@ export interface FamilyDescriptor<TSchemaIR = unknown> {
     verifySchema?: (options: {
       readonly driver: ControlPlaneDriver;
       readonly contractIR: unknown;
-      readonly family: FamilyDescriptor<TSchemaIR>;
+      readonly family: FamilyDescriptor<unknown>;
       readonly target: TargetDescriptor;
       readonly adapter: AdapterDescriptor;
       readonly extensions: ReadonlyArray<ExtensionDescriptor>;
