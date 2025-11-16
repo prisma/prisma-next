@@ -1,4 +1,6 @@
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
+import { verifyDatabaseSchema } from '../src/actions/verify-database-schema';
 import type {
   AdapterDescriptor,
   ControlPlaneDriver,
@@ -6,15 +8,11 @@ import type {
   FamilyDescriptor,
   TargetDescriptor,
 } from '../src/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { verifyDatabaseSchema } from '../src/actions/verify-database-schema';
 
 /**
  * Creates a mock ControlPlaneDriver for testing.
  */
-function createMockDriver(
-  responses: Array<{ sql: string; rows: unknown[] }>,
-): ControlPlaneDriver {
+function createMockDriver(responses: Array<{ sql: string; rows: unknown[] }>): ControlPlaneDriver {
   let callIndex = 0;
   return {
     async query<Row = Record<string, unknown>>(
@@ -37,13 +35,15 @@ function createMockDriver(
 /**
  * Creates a mock family descriptor with introspectSchema hook.
  */
-function createMockFamily(introspectSchemaImpl: (options: {
-  readonly driver: ControlPlaneDriver;
-  readonly contractIR?: unknown;
-  readonly target: TargetDescriptor;
-  readonly adapter: AdapterDescriptor;
-  readonly extensions: ReadonlyArray<ExtensionDescriptor>;
-}) => Promise<SqlSchemaIR>): FamilyDescriptor {
+function createMockFamily(
+  introspectSchemaImpl: (options: {
+    readonly driver: ControlPlaneDriver;
+    readonly contractIR?: unknown;
+    readonly target: TargetDescriptor;
+    readonly adapter: AdapterDescriptor;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+  }) => Promise<SqlSchemaIR>,
+): FamilyDescriptor {
   return {
     kind: 'family',
     id: 'sql',
@@ -88,7 +88,17 @@ function createTestContract() {
 
 describe('verifyDatabaseSchema', () => {
   it('returns ok when schema matches contract', async () => {
-    const contract = createTestContract();
+    const contract = {
+      ...createTestContract(),
+      storage: {
+        tables: {
+          user: {
+            ...createTestContract().storage.tables.user,
+            primaryKey: { columns: ['id'] }, // Contract has primaryKey as object
+          },
+        },
+      },
+    };
     const schemaIR: SqlSchemaIR = {
       tables: {
         user: {
@@ -107,7 +117,7 @@ describe('verifyDatabaseSchema', () => {
               nullable: false,
             },
           },
-          primaryKey: ['id'],
+          primaryKey: { columns: ['id'] }, // SchemaIR now matches ContractIR format
           foreignKeys: [],
           uniques: [],
           indexes: [],
@@ -130,16 +140,17 @@ describe('verifyDatabaseSchema', () => {
       manifest: {} as never,
     };
 
+    const driver = createMockDriver([]);
     const result = await verifyDatabaseSchema({
-      config: {
-        family,
-        target,
-        adapter,
-        extensions: [],
-        contract: { source: contract },
-      } as never,
+      driver,
       contractIR: contract,
-      dbUrl: 'postgresql://test',
+      family,
+      target,
+      adapter,
+      extensions: [],
+      strict: false,
+      startTime: Date.now(),
+      contractPath: 'test/contract.json',
     });
 
     expect(result.ok).toBe(true);
@@ -167,16 +178,17 @@ describe('verifyDatabaseSchema', () => {
       manifest: {} as never,
     };
 
+    const driver = createMockDriver([]);
     const result = await verifyDatabaseSchema({
-      config: {
-        family,
-        target,
-        adapter,
-        extensions: [],
-        contract: { source: contract },
-      } as never,
+      driver,
       contractIR: contract,
-      dbUrl: 'postgresql://test',
+      family,
+      target,
+      adapter,
+      extensions: [],
+      strict: false,
+      startTime: Date.now(),
+      contractPath: 'test/contract.json',
     });
 
     expect(result.ok).toBe(false);
@@ -222,16 +234,17 @@ describe('verifyDatabaseSchema', () => {
       manifest: {} as never,
     };
 
+    const driver = createMockDriver([]);
     const result = await verifyDatabaseSchema({
-      config: {
-        family,
-        target,
-        adapter,
-        extensions: [],
-        contract: { source: contract },
-      } as never,
+      driver,
       contractIR: contract,
-      dbUrl: 'postgresql://test',
+      family,
+      target,
+      adapter,
+      extensions: [],
+      strict: false,
+      startTime: Date.now(),
+      contractPath: 'test/contract.json',
     });
 
     expect(result.ok).toBe(false);
@@ -283,16 +296,17 @@ describe('verifyDatabaseSchema', () => {
       manifest: {} as never,
     };
 
+    const driver = createMockDriver([]);
     const result = await verifyDatabaseSchema({
-      config: {
-        family,
-        target,
-        adapter,
-        extensions: [],
-        contract: { source: contract },
-      } as never,
+      driver,
       contractIR: contract,
-      dbUrl: 'postgresql://test',
+      family,
+      target,
+      adapter,
+      extensions: [],
+      strict: false,
+      startTime: Date.now(),
+      contractPath: 'test/contract.json',
     });
 
     expect(result.ok).toBe(false);
@@ -356,20 +370,20 @@ describe('verifyDatabaseSchema', () => {
       manifest: {} as never,
     };
 
+    const driver = createMockDriver([]);
     const result = await verifyDatabaseSchema({
-      config: {
-        family,
-        target,
-        adapter,
-        extensions: [extension],
-        contract: { source: contract },
-      } as never,
+      driver,
       contractIR: contract,
-      dbUrl: 'postgresql://test',
+      family,
+      target,
+      adapter,
+      extensions: [extension],
+      strict: false,
+      startTime: Date.now(),
+      contractPath: 'test/contract.json',
     });
 
     expect(result.ok).toBe(false);
     expect(result.schema.issues).toContainEqual(extensionIssue);
   });
 });
-

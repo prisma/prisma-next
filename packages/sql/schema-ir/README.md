@@ -58,7 +58,7 @@ const schemaIR: SqlSchemaIR = {
           nullable: false,
         },
       },
-      primaryKey: ['id'],
+      primaryKey: { columns: ['id'] },
       foreignKeys: [],
       uniques: [{ columns: ['email'] }],
       indexes: [],

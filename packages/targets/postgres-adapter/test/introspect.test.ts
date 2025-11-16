@@ -1,26 +1,39 @@
-import { describe, expect, it } from 'vitest';
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import { codec } from '@prisma-next/sql-relational-core/ast';
+import { describe, expect, it } from 'vitest';
 import { introspectPostgresSchema } from '../src/exports/introspect';
 
 /**
  * Creates a mock ControlPlaneDriver for testing.
+ * Matches queries by checking if the SQL contains the pattern (to handle multi-line queries).
  */
-function createMockDriver(
-  responses: Array<{ sql: string; rows: unknown[] }>,
-): ControlPlaneDriver {
+function createMockDriver(responses: Array<{ sql: string; rows: unknown[] }>): ControlPlaneDriver {
   let callIndex = 0;
   return {
     async query<Row = Record<string, unknown>>(
       sql: string,
       params?: readonly unknown[],
     ): Promise<{ readonly rows: Row[] }> {
-      const response = responses[callIndex];
+      // Normalize SQL for matching (remove whitespace)
+      const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+
+      // Find matching response by checking if SQL contains the pattern
+      // Prefer more specific patterns (longer) over shorter ones
+      const matchingResponses = responses
+        .map((r, idx) => ({
+          response: r,
+          index: idx,
+          pattern: r.sql.replace(/\s+/g, ' ').trim(),
+        }))
+        .filter(({ pattern }) => normalizedSql.includes(pattern) || pattern.includes(normalizedSql))
+        .sort((a, b) => b.pattern.length - a.pattern.length); // Prefer longer (more specific) patterns
+
+      const response = matchingResponses[0]?.response;
+
       if (!response) {
-        throw new Error(`Unexpected query call ${callIndex}: ${sql}`);
+        throw new Error(`Unexpected query call ${callIndex}: ${sql.substring(0, 200)}`);
       }
       callIndex++;
       return { rows: response.rows as Row[] };
@@ -98,22 +111,31 @@ describe('introspectPostgresSchema', () => {
         rows: [{ table_name: 'user' }],
       },
       {
-        sql: 'SELECT column_name',
+        sql: 'SELECT column_name, data_type, udt_name, is_nullable',
         rows: [
           { column_name: 'id', data_type: 'integer', udt_name: 'int4', is_nullable: 'NO' },
-          { column_name: 'email', data_type: 'character varying', udt_name: 'varchar', is_nullable: 'NO' },
+          {
+            column_name: 'email',
+            data_type: 'character varying',
+            udt_name: 'varchar',
+            is_nullable: 'NO',
+          },
         ],
       },
       {
-        sql: 'SELECT kcu.column_name',
-        rows: [{ column_name: 'id' }],
+        sql: 'SELECT kcu.column_name, tc.constraint_name',
+        rows: [{ column_name: 'id', constraint_name: 'user_pkey' }],
       },
       {
-        sql: 'SELECT kcu.column_name',
+        sql: 'SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name, tc.constraint_name, kcu.ordinal_position',
         rows: [],
       },
       {
-        sql: 'SELECT kcu.column_name',
+        sql: 'SELECT kcu.column_name, tc.constraint_name, kcu.ordinal_position',
+        rows: [],
+      },
+      {
+        sql: 'SELECT kcu.column_name, tc.constraint_name, kcu.ordinal_position',
         rows: [],
       },
       {
@@ -134,7 +156,7 @@ describe('introspectPostgresSchema', () => {
     expect(schemaIR.tables.user?.columns.id?.typeId).toBe('pg/int4@1');
     expect(schemaIR.tables.user?.columns.id?.nativeType).toBe('integer');
     expect(schemaIR.tables.user?.columns.id?.nullable).toBe(false);
-    expect(schemaIR.tables.user?.primaryKey).toEqual(['id']);
+    expect(schemaIR.tables.user?.primaryKey).toEqual({ columns: ['id'], name: 'user_pkey' });
   });
 
   it('introspects table with foreign keys', async () => {
@@ -144,18 +166,18 @@ describe('introspectPostgresSchema', () => {
         rows: [{ table_name: 'post' }],
       },
       {
-        sql: 'SELECT column_name',
+        sql: 'SELECT column_name, data_type, udt_name, is_nullable',
         rows: [
           { column_name: 'id', data_type: 'integer', udt_name: 'int4', is_nullable: 'NO' },
           { column_name: 'user_id', data_type: 'integer', udt_name: 'int4', is_nullable: 'NO' },
         ],
       },
       {
-        sql: 'SELECT kcu.column_name',
-        rows: [{ column_name: 'id' }],
+        sql: 'SELECT kcu.column_name, tc.constraint_name',
+        rows: [{ column_name: 'id', constraint_name: 'user_pkey' }],
       },
       {
-        sql: 'SELECT kcu.column_name',
+        sql: 'SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name, tc.constraint_name, kcu.ordinal_position',
         rows: [
           {
             column_name: 'user_id',
@@ -167,7 +189,7 @@ describe('introspectPostgresSchema', () => {
         ],
       },
       {
-        sql: 'SELECT kcu.column_name',
+        sql: 'SELECT kcu.column_name, tc.constraint_name, kcu.ordinal_position',
         rows: [],
       },
       {
@@ -215,7 +237,7 @@ describe('introspectPostgresSchema', () => {
         rows: [{ table_name: 'test' }],
       },
       {
-        sql: 'SELECT column_name',
+        sql: 'SELECT column_name, data_type, udt_name, is_nullable',
         rows: [
           { column_name: 'id', data_type: 'integer', udt_name: 'int4', is_nullable: 'NO' },
           { column_name: 'name', data_type: 'text', udt_name: 'text', is_nullable: 'YES' },
@@ -223,15 +245,15 @@ describe('introspectPostgresSchema', () => {
         ],
       },
       {
-        sql: 'SELECT kcu.column_name',
+        sql: 'SELECT kcu.column_name, tc.constraint_name',
         rows: [],
       },
       {
-        sql: 'SELECT kcu.column_name',
+        sql: 'SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name, tc.constraint_name, kcu.ordinal_position',
         rows: [],
       },
       {
-        sql: 'SELECT kcu.column_name',
+        sql: 'SELECT kcu.column_name, tc.constraint_name, kcu.ordinal_position',
         rows: [],
       },
       {
@@ -256,4 +278,3 @@ describe('introspectPostgresSchema', () => {
     expect(schemaIR.tables.test?.columns.active?.nativeType).toBe('boolean');
   });
 });
-

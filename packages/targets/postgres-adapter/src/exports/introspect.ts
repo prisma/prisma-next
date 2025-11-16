@@ -62,14 +62,15 @@ async function queryColumns(
 }
 
 /**
- * Queries primary key columns for a specific table.
+ * Queries primary key constraint for a specific table.
+ * Returns both column names and constraint name to match ContractIR format.
  */
 async function queryPrimaryKeys(
   driver: ControlPlaneDriver,
   tableName: string,
-): Promise<ReadonlyArray<string>> {
-  const result = await driver.query<{ column_name: string }>(
-    `SELECT kcu.column_name
+): Promise<{ columns: readonly string[]; name?: string } | undefined> {
+  const result = await driver.query<{ column_name: string; constraint_name: string }>(
+    `SELECT kcu.column_name, tc.constraint_name
      FROM information_schema.table_constraints tc
      JOIN information_schema.key_column_usage kcu
        ON tc.constraint_name = kcu.constraint_name
@@ -81,7 +82,15 @@ async function queryPrimaryKeys(
      ORDER BY kcu.ordinal_position`,
     [tableName],
   );
-  return result.rows.map((row: { column_name: string }) => row.column_name);
+  if (result.rows.length === 0) {
+    return undefined;
+  }
+  const columns = result.rows.map((row: { column_name: string }) => row.column_name);
+  const constraintName = result.rows[0]?.constraint_name;
+  return {
+    columns,
+    ...(constraintName ? { name: constraintName } : {}),
+  };
 }
 
 /**
@@ -288,9 +297,12 @@ async function queryExtensions(driver: ControlPlaneDriver): Promise<ReadonlyArra
  * not the codec's canonical type (e.g., 'text').
  */
 function mapDatabaseTypeToCodec(
-  databaseType: string,
+  databaseType: string | undefined,
   codecRegistry: CodecRegistry,
 ): { typeId: string; nativeType: string } | undefined {
+  if (!databaseType) {
+    return undefined;
+  }
   // Normalize database type (remove length/precision modifiers) for matching
   const normalizedDbType =
     databaseType.split('(')[0]?.toLowerCase().trim() ?? databaseType.toLowerCase().trim();
@@ -427,9 +439,7 @@ export async function introspectPostgresSchema(
     tables[tableName] = {
       name: tableName,
       columns: columnIRs,
-      ...(primaryKey.length > 0
-        ? { primaryKey: Object.freeze(primaryKey) as readonly string[] }
-        : {}),
+      ...(primaryKey ? { primaryKey: Object.freeze(primaryKey) } : {}),
       foreignKeys: Object.freeze(foreignKeyIRs) as readonly SqlForeignKeyIR[],
       uniques: Object.freeze(uniqueIRs) as readonly SqlUniqueIR[],
       indexes: Object.freeze(indexIRs) as readonly SqlIndexIR[],

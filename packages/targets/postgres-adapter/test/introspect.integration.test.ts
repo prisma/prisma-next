@@ -1,10 +1,10 @@
-import { Client } from 'pg';
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
-import { createPostgresDriverFromOptions } from '../../postgres-driver/src/postgres-driver';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import type { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
+import { createPostgresDriverFromOptions } from '../../postgres-driver/src/postgres-driver';
 import { createPostgresAdapter } from '../src/core/adapter';
 import { introspectPostgresSchema } from '../src/exports/introspect';
 
@@ -113,7 +113,7 @@ describe('introspectPostgresSchema (integration with real database)', () => {
               const usersTable = schemaIR.tables['users']!;
               expect(usersTable).toBeDefined();
               expect(usersTable?.name).toBe('users');
-              expect(usersTable?.primaryKey).toEqual(['id']);
+              expect(usersTable?.primaryKey).toEqual({ columns: ['id'] });
 
               // Verify users table columns
               expect(usersTable?.columns).toBeDefined();
@@ -191,7 +191,7 @@ describe('introspectPostgresSchema (integration with real database)', () => {
               const postsTable = schemaIR.tables.posts;
               expect(postsTable).toBeDefined();
               expect(postsTable?.name).toBe('posts');
-              expect(postsTable?.primaryKey).toEqual(['id']);
+              expect(postsTable?.primaryKey).toEqual({ columns: ['id'] });
 
               // Verify posts table columns
               expect(postsTable?.columns.user_id).toMatchObject({

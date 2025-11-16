@@ -5,6 +5,8 @@
  * for the SQL family, used for verification and future migration planning.
  */
 
+import type { PrimaryKey } from '@prisma-next/sql-contract/types';
+
 /**
  * Namespaced annotations for extensibility.
  * Each namespace (e.g., 'pg', 'pgvector') owns its annotations.
@@ -56,11 +58,12 @@ export type SqlIndexIR = {
 
 /**
  * SQL table IR representing a table in the schema.
+ * Primary key format matches ContractIR for consistency.
  */
 export type SqlTableIR = {
   readonly name: string;
   readonly columns: Record<string, SqlColumnIR>;
-  readonly primaryKey?: readonly string[];
+  readonly primaryKey?: PrimaryKey; // Matches ContractIR format: { columns: string[]; name?: string }
   readonly foreignKeys: readonly SqlForeignKeyIR[];
   readonly uniques: readonly SqlUniqueIR[];
   readonly indexes: readonly SqlIndexIR[];
@@ -76,4 +79,3 @@ export type SqlSchemaIR = {
   readonly extensions: readonly string[]; // logical extension ids or DB extension names
   readonly annotations?: SqlAnnotations; // extensible global metadata
 };
-

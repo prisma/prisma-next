@@ -14,7 +14,8 @@
     "clean": "node ../../../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.1",
@@ -32,4 +33,3 @@
     }
   }
 }
-

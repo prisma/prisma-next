@@ -257,17 +257,24 @@ export async function verifyDatabaseSchema(
               }
 
               // Compare primary key
+              // Both Contract and SchemaIR now use { columns: string[]; name?: string } format
               const contractPrimaryKey =
                 'primaryKey' in contractTable &&
-                Array.isArray(contractTable.primaryKey) &&
-                contractTable.primaryKey.length > 0
-                  ? (contractTable.primaryKey as readonly string[])
+                contractTable.primaryKey !== null &&
+                contractTable.primaryKey !== undefined &&
+                typeof contractTable.primaryKey === 'object' &&
+                'columns' in contractTable.primaryKey &&
+                Array.isArray(contractTable.primaryKey.columns)
+                  ? (contractTable.primaryKey.columns as readonly string[])
                   : undefined;
               const schemaPrimaryKey =
                 'primaryKey' in schemaTable &&
-                Array.isArray(schemaTable.primaryKey) &&
-                schemaTable.primaryKey.length > 0
-                  ? (schemaTable.primaryKey as readonly string[])
+                schemaTable.primaryKey !== null &&
+                schemaTable.primaryKey !== undefined &&
+                typeof schemaTable.primaryKey === 'object' &&
+                'columns' in schemaTable.primaryKey &&
+                Array.isArray(schemaTable.primaryKey.columns)
+                  ? (schemaTable.primaryKey.columns as readonly string[])
                   : undefined;
 
               if (contractPrimaryKey && !schemaPrimaryKey) {
@@ -425,4 +432,3 @@ export async function verifyDatabaseSchema(
     throw new Error(`Failed to verify database schema: ${String(error)}`);
   }
 }
-

@@ -169,7 +169,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54240, databasePort: 54241, shadowDatabasePort: 54242 },
+        { acceleratePort: 54310, databasePort: 54311, shadowDatabasePort: 54312 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -269,7 +269,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54243, databasePort: 54244, shadowDatabasePort: 54245 },
+        { acceleratePort: 54313, databasePort: 54314, shadowDatabasePort: 54315 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -321,7 +321,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54246, databasePort: 54247, shadowDatabasePort: 54248 },
+        { acceleratePort: 54316, databasePort: 54317, shadowDatabasePort: 54318 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -415,7 +415,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54249, databasePort: 54250, shadowDatabasePort: 54251 },
+        { acceleratePort: 54319, databasePort: 54320, shadowDatabasePort: 54321 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -503,7 +503,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54252, databasePort: 54253, shadowDatabasePort: 54254 },
+        { acceleratePort: 54322, databasePort: 54323, shadowDatabasePort: 54324 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -549,8 +549,24 @@ describe('db schema-verify command (e2e)', () => {
               } catch (error) {
                 // If command fails, check error output for debugging
                 const errorOutput = consoleErrors.join('\n');
+                const output = consoleOutput.join('\n');
                 if (errorOutput) {
                   console.error('Command failed with errors:', errorOutput);
+                }
+                if (output) {
+                  console.error('Command output:', output);
+                  // Try to parse JSON output to see what issues were reported
+                  try {
+                    const parsed = JSON.parse(output);
+                    if (parsed.schema?.issues) {
+                      console.error(
+                        'Schema issues:',
+                        JSON.stringify(parsed.schema.issues, null, 2),
+                      );
+                    }
+                  } catch {
+                    // Not JSON, ignore
+                  }
                 }
                 throw error;
               }
@@ -560,17 +576,39 @@ describe('db schema-verify command (e2e)', () => {
 
             // Check exit code is 0 (success)
             const exitCode = getExitCode();
+            const errorOutput = consoleErrors.join('\n');
+            const output = consoleOutput.join('\n');
+
             if (exitCode !== 0) {
-              const errorOutput = consoleErrors.join('\n');
-              const output = consoleOutput.join('\n');
               console.error('Unexpected exit code:', exitCode);
               if (errorOutput) {
                 console.error('Error output:', errorOutput);
               }
               if (output) {
                 console.error('Standard output:', output);
+                // Try to parse JSON output to see what issues were reported
+                try {
+                  const parsed = JSON.parse(output);
+                  console.error('Parsed result:', JSON.stringify(parsed, null, 2));
+                  if (parsed.schema?.issues) {
+                    console.error('Schema issues:', JSON.stringify(parsed.schema.issues, null, 2));
+                  }
+                } catch {
+                  // Not JSON, ignore
+                }
               }
             }
+
+            // Always try to parse output to see what we got
+            if (output) {
+              try {
+                const parsed = JSON.parse(output);
+                console.log('Verification result:', JSON.stringify(parsed, null, 2));
+              } catch {
+                // Not JSON, ignore
+              }
+            }
+
             expect(exitCode).toBe(0);
 
             // Parse and verify JSON output
@@ -602,7 +640,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54255, databasePort: 54256, shadowDatabasePort: 54257 },
+        { acceleratePort: 54325, databasePort: 54326, shadowDatabasePort: 54327 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -683,9 +721,16 @@ describe('db schema-verify command (e2e)', () => {
             });
 
             // Verify we have issues for type mismatches and missing primary key
-            const issues = parsed.schema.issues as Array<{ kind: string; table: string; column?: string; message: string }>;
+            const issues = parsed.schema.issues as Array<{
+              kind: string;
+              table: string;
+              column?: string;
+              message: string;
+            }>;
             const typeMismatchIssues = issues.filter((issue) => issue.kind === 'type_mismatch');
-            const primaryKeyIssues = issues.filter((issue) => issue.kind === 'primary_key_mismatch');
+            const primaryKeyIssues = issues.filter(
+              (issue) => issue.kind === 'primary_key_mismatch',
+            );
 
             expect(typeMismatchIssues.length).toBeGreaterThan(0);
             expect(primaryKeyIssues.length).toBeGreaterThan(0);
@@ -696,7 +741,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54258, databasePort: 54259, shadowDatabasePort: 54260 },
+        { acceleratePort: 54328, databasePort: 54329, shadowDatabasePort: 54330 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -773,7 +818,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54261, databasePort: 54262, shadowDatabasePort: 54263 },
+        { acceleratePort: 54331, databasePort: 54332, shadowDatabasePort: 54333 },
       );
     },
     timeouts.spinUpPpgDev,
