@@ -1,8 +1,16 @@
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
 import { Command } from 'commander';
-import { verifyDatabaseSchema } from '../api/verify-database-schema';
 import { loadConfig } from '../config-loader';
-import { errorRuntime } from '../utils/cli-errors';
+import { assembleCodecRegistry } from '../pack-assembly';
+import {
+  errorDatabaseUrlRequired,
+  errorDriverRequired,
+  errorFileNotFound,
+  errorRuntime,
+  errorUnexpected,
+} from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -87,23 +95,91 @@ export function createDbSchemaVerifyCommand(): Command {
           console.log(header);
         }
 
-        const verifyResult = await verifyDatabaseSchema({
-          ...(options.db ? { dbUrl: options.db } : {}),
-          ...(options.config ? { configPath: options.config } : {}),
-          strict: options.strict ?? false,
-        });
-
-        // If verification failed, throw structured error for schema mismatches
-        if (!verifyResult.ok && verifyResult.code) {
-          if (verifyResult.code === 'PN-SCHEMA-0001') {
-            // Schema mismatch - return result as-is, don't throw
-            // The formatter will handle displaying the issues
-            return verifyResult;
+        // Load contract from file (file I/O)
+        const contractJsonPath = resolve(contractPath);
+        let contractJsonContent: string;
+        try {
+          contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+        } catch (error) {
+          if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+            throw errorFileNotFound(contractJsonPath, {
+              why: `Contract file not found at ${contractJsonPath}`,
+            });
           }
-          throw errorRuntime(verifyResult.summary);
+          throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+            why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
+        const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+
+        // Validate contract using family validator
+        const contractIR = config.family.validateContractIR(contractJson);
+
+        // Type guard to ensure contract has required properties
+        if (
+          typeof contractIR !== 'object' ||
+          contractIR === null ||
+          !('coreHash' in contractIR) ||
+          !('target' in contractIR) ||
+          typeof contractIR.coreHash !== 'string' ||
+          typeof contractIR.target !== 'string'
+        ) {
+          throw errorUnexpected('Invalid contract structure', {
+            why: 'Contract is missing required fields: coreHash or target',
+            fix: 'Re-emit the contract using `prisma-next contract emit`',
+          });
         }
 
-        return verifyResult;
+        // Resolve database URL
+        const dbUrl = options.db ?? config.db?.url;
+        if (!dbUrl) {
+          throw errorDatabaseUrlRequired({
+            why: 'Database URL is required for db schema-verify',
+          });
+        }
+
+        // Obtain driver: driver is required
+        if (!config.driver) {
+          throw errorDriverRequired();
+        }
+        const driver = await config.driver.create(dbUrl);
+
+        const startTime = Date.now();
+
+        try {
+          // Assemble codec registry from adapter + extensions
+          const codecRegistry = await assembleCodecRegistry(config.adapter, config.extensions ?? []);
+
+          // Call domain action with assembled inputs
+          const verifyResult = await verifyDatabaseSchema({
+            driver,
+            contractIR,
+            family: config.family,
+            target: config.target,
+            adapter: config.adapter,
+            extensions: config.extensions ?? [],
+            codecRegistry,
+            strict: options.strict ?? false,
+            startTime,
+            contractPath: contractJsonPath,
+            configPath: options.config,
+          });
+
+          // If verification failed, throw structured error for schema mismatches
+          if (!verifyResult.ok && verifyResult.code) {
+            if (verifyResult.code === 'PN-SCHEMA-0001') {
+              // Schema mismatch - return result as-is, don't throw
+              // The formatter will handle displaying the issues
+              return verifyResult;
+            }
+            throw errorRuntime(verifyResult.summary);
+          }
+
+          return verifyResult;
+        } finally {
+          // Ensure driver connection is closed
+          await driver.close();
+        }
       });
 
       // Handle result - formats output and returns exit code

@@ -19,7 +19,10 @@ export interface EmitContractResult {
 }
 
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/verify-database';
-import type { SchemaIssue, VerifyDatabaseSchemaResult } from '../api/verify-database-schema';
+import type {
+  SchemaIssue,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/verify-database-schema';
 import type { CliErrorEnvelope } from './cli-errors';
 import { getLongDescription } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
