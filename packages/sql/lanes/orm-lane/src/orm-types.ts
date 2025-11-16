@@ -7,6 +7,7 @@ import type {
   AnyOrderBuilder,
   BuildOptions,
   ColumnBuilder,
+  ComputeColumnJsType,
   InferNestedProjectionRow,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
@@ -45,6 +46,47 @@ type ModelRelations<
     : Record<string, never>
   : Record<string, never>;
 
+type ModelFieldToColumnMap<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = TContract['mappings']['fieldToColumn'] extends Record<string, Record<string, string>>
+  ? ModelName extends keyof TContract['mappings']['fieldToColumn']
+    ? TContract['mappings']['fieldToColumn'][ModelName]
+    : never
+  : never;
+
+type FieldColumnName<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = ModelFieldToColumnMap<TContract, ModelName> extends Record<string, string>
+  ? FieldName extends keyof ModelFieldToColumnMap<TContract, ModelName>
+    ? ModelFieldToColumnMap<TContract, ModelName>[FieldName]
+    : FieldName
+  : FieldName;
+
+type ModelColumnMeta<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  ColumnName extends string,
+> = ModelToTableName<TContract, ModelName> extends infer TableName extends string
+  ? TableName extends keyof TContract['storage']['tables']
+    ? ColumnName extends keyof TContract['storage']['tables'][TableName]['columns']
+      ? TContract['storage']['tables'][TableName]['columns'][ColumnName]
+      : never
+    : never
+  : never;
+
+type _IndexKeys = string | number | symbol;
+
+export type IncludeAccumulator<
+  Includes extends Record<string, unknown>,
+  Key extends string,
+  Value,
+> = {
+  readonly [K in Exclude<keyof Includes, _IndexKeys> | Key]: K extends Key ? Value : Includes[K];
+};
+
 export type OrmRegistry<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
@@ -75,23 +117,24 @@ export type OrmRelationAccessor<
   CodecTypes extends Record<string, { output: unknown }>,
   ModelName extends string,
   ChildModelName extends string,
+  Includes extends Record<string, unknown>,
   Row,
 > = {
   some(
     fn: (
       child: OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>,
     ) => OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>,
-  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>;
   none(
     fn: (
       child: OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>,
     ) => OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>,
-  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>;
   every(
     fn: (
       child: OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>,
     ) => OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>,
-  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>;
 };
 
 // Where property - both a function and an object with related
@@ -99,10 +142,11 @@ export type OrmWhereProperty<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }>,
   ModelName extends string,
+  Includes extends Record<string, unknown>,
   Row,
 > = ((
   fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
-) => OrmModelBuilder<TContract, CodecTypes, ModelName, Row>) & {
+) => OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>) & {
   related: ModelRelations<TContract, ModelName> extends Record<string, { to: infer To }>
     ? To extends string
       ? {
@@ -113,7 +157,7 @@ export type OrmWhereProperty<
             to: infer ChildModelName;
           }
             ? ChildModelName extends string
-              ? OrmRelationAccessor<TContract, CodecTypes, ModelName, ChildModelName, Row>
+              ? OrmRelationAccessor<TContract, CodecTypes, ModelName, ChildModelName, Includes, Row>
               : never
             : never;
         }
@@ -126,6 +170,7 @@ export type OrmIncludeAccessor<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }>,
   ModelName extends string,
+  Includes extends Record<string, unknown>,
   Row,
 > = ModelRelations<TContract, ModelName> extends Record<string, { to: infer To }>
   ? To extends string
@@ -137,11 +182,17 @@ export type OrmIncludeAccessor<
           to: infer ChildModelName;
         }
           ? ChildModelName extends string
-            ? (
+            ? <ChildRow>(
                 child: (
                   child: OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName>,
-                ) => OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, unknown>,
-              ) => OrmModelBuilder<TContract, CodecTypes, ModelName, Row>
+                ) => OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>,
+              ) => OrmModelBuilder<
+                TContract,
+                CodecTypes,
+                ModelName,
+                IncludeAccumulator<Includes, K & string, ChildRow>,
+                Row
+              >
             : never
           : never;
       }
@@ -152,22 +203,24 @@ export interface OrmModelBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   ModelName extends string = string,
+  Includes extends Record<string, unknown> = Record<string, never>,
   Row = unknown,
 > {
-  where: OrmWhereProperty<TContract, CodecTypes, ModelName, Row>;
-  include: OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>;
+  where: OrmWhereProperty<TContract, CodecTypes, ModelName, Includes, Row>;
+  include: OrmIncludeAccessor<TContract, CodecTypes, ModelName, Includes, Row>;
   orderBy(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyOrderBuilder,
-  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
-  take(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
-  skip(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row>;
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>;
+  take(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>;
+  skip(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>;
   select<Projection extends Record<string, AnyColumnBuilder | boolean | NestedProjection>>(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => Projection,
   ): OrmModelBuilder<
     TContract,
     CodecTypes,
     ModelName,
-    InferNestedProjectionRow<Projection, CodecTypes>
+    Includes,
+    InferNestedProjectionRow<Projection, CodecTypes, Includes>
   >;
   findMany(options?: BuildOptions): SqlQueryPlan<Row>;
   findFirst(options?: BuildOptions): SqlQueryPlan<Row>;
@@ -189,20 +242,21 @@ export interface OrmModelBuilder<
 
 export type ModelColumnAccessor<
   TContract extends SqlContract<SqlStorage>,
-  _CodecTypes extends Record<string, { output: unknown }>,
+  CodecTypes extends Record<string, { output: unknown }>,
   ModelName extends string,
 > = TContract['models'][ModelName] extends { fields: infer Fields }
   ? Fields extends Record<string, unknown>
     ? {
-        readonly [K in keyof Fields]: ColumnBuilder<
-          K & string,
-          TContract['storage']['tables'][TContract['mappings']['modelToTable'] extends Record<
-            string,
-            string
+        readonly [K in keyof Fields & string]: ColumnBuilder<
+          K,
+          ModelColumnMeta<TContract, ModelName, FieldColumnName<TContract, ModelName, K>>,
+          ComputeColumnJsType<
+            TContract,
+            ModelToTableName<TContract, ModelName>,
+            FieldColumnName<TContract, ModelName, K>,
+            ModelColumnMeta<TContract, ModelName, FieldColumnName<TContract, ModelName, K>>,
+            CodecTypes
           >
-            ? TContract['mappings']['modelToTable'][ModelName]
-            : never]['columns'][K & string],
-          unknown
         >;
       }
     : never

@@ -22,6 +22,7 @@ import type { OrmIncludeChildBuilder } from '../orm-include-child';
 import { OrmIncludeChildBuilderImpl } from '../orm-include-child';
 import { OrmRelationFilterBuilderImpl } from '../orm-relation-filter';
 import type {
+  IncludeAccumulator,
   ModelColumnAccessor,
   OrmBuilderOptions,
   OrmIncludeAccessor,
@@ -48,8 +49,9 @@ export class OrmModelBuilderImpl<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   ModelName extends string = string,
+  Includes extends Record<string, unknown> = Record<string, never>,
   Row = unknown,
-> implements OrmModelBuilder<TContract, CodecTypes, ModelName, Row>
+> implements OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>
 {
   private readonly context: QueryLaneContext<TContract>;
   private readonly contract: TContract;
@@ -82,11 +84,11 @@ export class OrmModelBuilderImpl<
     this.table = table;
   }
 
-  get where(): OrmWhereProperty<TContract, CodecTypes, ModelName, Row> {
+  get where(): OrmWhereProperty<TContract, CodecTypes, ModelName, Includes, Row> {
     const whereFn = (
       fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
-    ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> => {
-      const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
+    ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row> => {
+      const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Includes, Row>(
         { context: this.context },
         this.modelName,
       );
@@ -108,27 +110,34 @@ export class OrmModelBuilderImpl<
       TContract,
       CodecTypes,
       ModelName,
+      Includes,
       Row
     >;
   }
 
-  get include(): OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row> {
+  get include(): OrmIncludeAccessor<TContract, CodecTypes, ModelName, Includes, Row> {
     return this._createIncludeProxy();
   }
 
-  private _createIncludeProxy(): OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row> {
+  private _createIncludeProxy(): OrmIncludeAccessor<
+    TContract,
+    CodecTypes,
+    ModelName,
+    Includes,
+    Row
+  > {
     const self = this;
     // Relations are keyed by table name, not model name
     const tableName = this.contract.mappings.modelToTable?.[this.modelName];
     if (!tableName) {
-      return {} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>;
+      return {} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Includes, Row>;
     }
     const modelRelations = this.contract.relations?.[tableName];
     if (!modelRelations || typeof modelRelations !== 'object') {
-      return {} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>;
+      return {} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Includes, Row>;
     }
 
-    return new Proxy({} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Row>, {
+    return new Proxy({} as OrmIncludeAccessor<TContract, CodecTypes, ModelName, Includes, Row>, {
       get(_target, prop) {
         if (typeof prop !== 'string') {
           return undefined;
@@ -146,29 +155,50 @@ export class OrmModelBuilderImpl<
           on: { parentCols: readonly string[]; childCols: readonly string[] };
         };
 
-        return (
+        const relationName = prop as keyof typeof modelRelations & string;
+
+        const includeFn = (<ChildRow>(
           child: (
             child: OrmIncludeChildBuilder<TContract, CodecTypes, typeof childModelName>,
-          ) => OrmIncludeChildBuilder<TContract, CodecTypes, typeof childModelName, unknown>,
+          ) => OrmIncludeChildBuilder<TContract, CodecTypes, typeof childModelName, ChildRow>,
         ) => {
-          return self._applyInclude(prop, childModelName, child, relationDef);
-        };
+          return self._applyInclude<typeof relationName, ChildRow>(
+            relationName,
+            childModelName,
+            child,
+            relationDef,
+          );
+        }) as OrmIncludeAccessor<
+          TContract,
+          CodecTypes,
+          ModelName,
+          Includes,
+          Row
+        >[typeof relationName];
+
+        return includeFn;
       },
     });
   }
 
-  private _applyInclude(
-    relationName: string,
+  private _applyInclude<RelationName extends string, ChildRow>(
+    relationName: RelationName,
     childModelName: string,
     childBuilderFn: (
       child: OrmIncludeChildBuilder<TContract, CodecTypes, string>,
-    ) => OrmIncludeChildBuilder<TContract, CodecTypes, string, unknown>,
+    ) => OrmIncludeChildBuilder<TContract, CodecTypes, string, ChildRow>,
     relationDef: {
       to: string;
       cardinality: string;
       on: { parentCols: readonly string[]; childCols: readonly string[] };
     },
-  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
+  ): OrmModelBuilder<
+    TContract,
+    CodecTypes,
+    ModelName,
+    IncludeAccumulator<Includes, RelationName, ChildRow>,
+    Row
+  > {
     // Get child table
     const childTableName = this.contract.mappings.modelToTable?.[childModelName];
     if (!childTableName) {
@@ -185,7 +215,7 @@ export class OrmModelBuilderImpl<
       childBuilder as OrmIncludeChildBuilder<TContract, CodecTypes, string>,
     );
     const childState = (
-      builtChild as OrmIncludeChildBuilderImpl<TContract, CodecTypes, string>
+      builtChild as OrmIncludeChildBuilderImpl<TContract, CodecTypes, string, ChildRow>
     ).getState();
 
     // Store the include
@@ -202,10 +232,13 @@ export class OrmModelBuilderImpl<
       relation: relationDef,
     };
 
-    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
-      { context: this.context },
-      this.modelName,
-    );
+    const builder = new OrmModelBuilderImpl<
+      TContract,
+      CodecTypes,
+      ModelName,
+      IncludeAccumulator<Includes, RelationName, ChildRow>,
+      Row
+    >({ context: this.context }, this.modelName);
     builder['table'] = this.table;
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
@@ -221,156 +254,160 @@ export class OrmModelBuilderImpl<
     TContract,
     CodecTypes,
     ModelName,
+    Includes,
     Row
   >['related'] {
     const self = this;
     // Relations are keyed by table name, not model name
     const tableName = this.contract.mappings.modelToTable?.[this.modelName];
     if (!tableName) {
-      return {} as OrmWhereProperty<TContract, CodecTypes, ModelName, Row>['related'];
+      return {} as OrmWhereProperty<TContract, CodecTypes, ModelName, Includes, Row>['related'];
     }
     const modelRelations = this.contract.relations?.[tableName];
     if (!modelRelations || typeof modelRelations !== 'object') {
-      return {} as OrmWhereProperty<TContract, CodecTypes, ModelName, Row>['related'];
+      return {} as OrmWhereProperty<TContract, CodecTypes, ModelName, Includes, Row>['related'];
     }
 
-    return new Proxy({} as OrmWhereProperty<TContract, CodecTypes, ModelName, Row>['related'], {
-      get(_target, prop) {
-        if (typeof prop !== 'string') {
-          return undefined;
-        }
+    return new Proxy(
+      {} as OrmWhereProperty<TContract, CodecTypes, ModelName, Includes, Row>['related'],
+      {
+        get(_target, prop) {
+          if (typeof prop !== 'string') {
+            return undefined;
+          }
 
-        const relation = (modelRelations as Record<string, { to?: string }>)[prop];
-        if (!relation || typeof relation !== 'object' || !('to' in relation)) {
-          throw planInvalid(`Relation ${prop} not found on model ${self.modelName}`);
-        }
+          const relation = (modelRelations as Record<string, { to?: string }>)[prop];
+          if (!relation || typeof relation !== 'object' || !('to' in relation)) {
+            throw planInvalid(`Relation ${prop} not found on model ${self.modelName}`);
+          }
 
-        const childModelName = relation.to as string;
-        const relationDef = relation as {
-          to: string;
-          cardinality: string;
-          on: { parentCols: readonly string[]; childCols: readonly string[] };
-        };
-        const filterBuilder = new OrmRelationFilterBuilderImpl<
-          TContract,
-          CodecTypes,
-          typeof childModelName
-        >({ context: self.context }, childModelName);
-        // Expose model accessor directly on the builder for convenience
-        const modelAccessor = filterBuilder.getModelAccessor();
-        const builderWithAccessor = Object.assign(
-          filterBuilder,
-          modelAccessor,
-        ) as OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName> &
-          ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>;
+          const childModelName = relation.to as string;
+          const relationDef = relation as {
+            to: string;
+            cardinality: string;
+            on: { parentCols: readonly string[]; childCols: readonly string[] };
+          };
+          const filterBuilder = new OrmRelationFilterBuilderImpl<
+            TContract,
+            CodecTypes,
+            typeof childModelName
+          >({ context: self.context }, childModelName);
+          // Expose model accessor directly on the builder for convenience
+          const modelAccessor = filterBuilder.getModelAccessor();
+          const builderWithAccessor = Object.assign(
+            filterBuilder,
+            modelAccessor,
+          ) as OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName> &
+            ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>;
 
-        return {
-          some: (
-            fn: (
-              child:
+          return {
+            some: (
+              fn: (
+                child:
+                  | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
+                  | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
+              ) =>
                 | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-                | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
-            ) =>
-              | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-              | AnyBinaryBuilder,
-          ) => {
-            const result = fn(builderWithAccessor);
-            // If result is a AnyBinaryBuilder, wrap it in a builder
-            if (result && 'kind' in result && result.kind === 'binary') {
-              const wrappedBuilder = new OrmRelationFilterBuilderImpl<
-                TContract,
-                CodecTypes,
-                typeof childModelName
-              >({ context: self.context }, childModelName);
-              wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                | AnyBinaryBuilder,
+            ) => {
+              const result = fn(builderWithAccessor);
+              // If result is a AnyBinaryBuilder, wrap it in a builder
+              if (result && 'kind' in result && result.kind === 'binary') {
+                const wrappedBuilder = new OrmRelationFilterBuilderImpl<
+                  TContract,
+                  CodecTypes,
+                  typeof childModelName
+                >({ context: self.context }, childModelName);
+                wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                return self._applyRelationFilter(
+                  prop,
+                  childModelName,
+                  'some',
+                  () => wrappedBuilder,
+                  relationDef,
+                );
+              }
               return self._applyRelationFilter(
                 prop,
                 childModelName,
                 'some',
-                () => wrappedBuilder,
+                () =>
+                  result as OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>,
                 relationDef,
               );
-            }
-            return self._applyRelationFilter(
-              prop,
-              childModelName,
-              'some',
-              () =>
-                result as OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>,
-              relationDef,
-            );
-          },
-          none: (
-            fn: (
-              child:
+            },
+            none: (
+              fn: (
+                child:
+                  | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
+                  | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
+              ) =>
                 | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-                | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
-            ) =>
-              | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-              | AnyBinaryBuilder,
-          ) => {
-            const result = fn(builderWithAccessor);
-            if (result && 'kind' in result && result.kind === 'binary') {
-              const wrappedBuilder = new OrmRelationFilterBuilderImpl<
-                TContract,
-                CodecTypes,
-                typeof childModelName
-              >({ context: self.context }, childModelName);
-              wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                | AnyBinaryBuilder,
+            ) => {
+              const result = fn(builderWithAccessor);
+              if (result && 'kind' in result && result.kind === 'binary') {
+                const wrappedBuilder = new OrmRelationFilterBuilderImpl<
+                  TContract,
+                  CodecTypes,
+                  typeof childModelName
+                >({ context: self.context }, childModelName);
+                wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                return self._applyRelationFilter(
+                  prop,
+                  childModelName,
+                  'none',
+                  () => wrappedBuilder,
+                  relationDef,
+                );
+              }
               return self._applyRelationFilter(
                 prop,
                 childModelName,
                 'none',
-                () => wrappedBuilder,
+                () =>
+                  result as OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>,
                 relationDef,
               );
-            }
-            return self._applyRelationFilter(
-              prop,
-              childModelName,
-              'none',
-              () =>
-                result as OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>,
-              relationDef,
-            );
-          },
-          every: (
-            fn: (
-              child:
+            },
+            every: (
+              fn: (
+                child:
+                  | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
+                  | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
+              ) =>
                 | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-                | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
-            ) =>
-              | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-              | AnyBinaryBuilder,
-          ) => {
-            const result = fn(builderWithAccessor);
-            if (result && 'kind' in result && result.kind === 'binary') {
-              const wrappedBuilder = new OrmRelationFilterBuilderImpl<
-                TContract,
-                CodecTypes,
-                typeof childModelName
-              >({ context: self.context }, childModelName);
-              wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                | AnyBinaryBuilder,
+            ) => {
+              const result = fn(builderWithAccessor);
+              if (result && 'kind' in result && result.kind === 'binary') {
+                const wrappedBuilder = new OrmRelationFilterBuilderImpl<
+                  TContract,
+                  CodecTypes,
+                  typeof childModelName
+                >({ context: self.context }, childModelName);
+                wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                return self._applyRelationFilter(
+                  prop,
+                  childModelName,
+                  'every',
+                  () => wrappedBuilder,
+                  relationDef,
+                );
+              }
               return self._applyRelationFilter(
                 prop,
                 childModelName,
                 'every',
-                () => wrappedBuilder,
+                () =>
+                  result as OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>,
                 relationDef,
               );
-            }
-            return self._applyRelationFilter(
-              prop,
-              childModelName,
-              'every',
-              () =>
-                result as OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>,
-              relationDef,
-            );
-          },
-        };
+            },
+          };
+        },
       },
-    });
+    );
   }
 
   private _applyRelationFilter(
@@ -385,7 +422,7 @@ export class OrmModelBuilderImpl<
       cardinality: string;
       on: { parentCols: readonly string[]; childCols: readonly string[] };
     },
-  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row> {
     // Create a relation filter builder and apply the callback
     const filterBuilder = new OrmRelationFilterBuilderImpl<TContract, CodecTypes, string>(
       { context: this.context },
@@ -407,7 +444,7 @@ export class OrmModelBuilderImpl<
       relation: relationDef,
     };
 
-    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
+    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Includes, Row>(
       { context: this.context },
       this.modelName,
     );
@@ -424,8 +461,8 @@ export class OrmModelBuilderImpl<
 
   orderBy(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => OrderBuilder,
-  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
-    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row> {
+    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Includes, Row>(
       { context: this.context },
       this.modelName,
     );
@@ -440,8 +477,8 @@ export class OrmModelBuilderImpl<
     return builder;
   }
 
-  take(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
-    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
+  take(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row> {
+    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Includes, Row>(
       { context: this.context },
       this.modelName,
     );
@@ -456,10 +493,10 @@ export class OrmModelBuilderImpl<
     return builder;
   }
 
-  skip(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Row> {
+  skip(n: number): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row> {
     // TODO: SQL lane doesn't support offset yet - this is a placeholder
     // When offset is added to SelectAst, implement it here
-    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Row>(
+    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Includes, Row>(
       { context: this.context },
       this.modelName,
     );
@@ -480,13 +517,15 @@ export class OrmModelBuilderImpl<
     TContract,
     CodecTypes,
     ModelName,
-    InferNestedProjectionRow<Projection, CodecTypes>
+    Includes,
+    InferNestedProjectionRow<Projection, CodecTypes, Includes>
   > {
     const builder = new OrmModelBuilderImpl<
       TContract,
       CodecTypes,
       ModelName,
-      InferNestedProjectionRow<Projection, CodecTypes>
+      Includes,
+      InferNestedProjectionRow<Projection, CodecTypes, Includes>
     >({ context: this.context }, this.modelName);
     builder['table'] = this.table;
     builder.wherePredicate = this.wherePredicate;
@@ -500,7 +539,8 @@ export class OrmModelBuilderImpl<
       TContract,
       CodecTypes,
       ModelName,
-      InferNestedProjectionRow<Projection, CodecTypes>
+      Includes,
+      InferNestedProjectionRow<Projection, CodecTypes, Includes>
     >;
   }
 

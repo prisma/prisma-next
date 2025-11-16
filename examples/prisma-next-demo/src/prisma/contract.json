@@ -2,13 +2,16 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:ce9ed581529d07b9a2b9cdd49112887d8830683f5571248f4cde25eb43915688",
+  "coreHash": "sha256:45bf7bc3b8a59dc0226dfb0f1e579a29b9dc96233797f5f43b92f9ee75de9317",
   "profileHash": "sha256:685b5ca1c6135f0c44f6545694b75a136addc2d74f3a76e22428cd66e293c4a8",
   "models": {
     "Post": {
       "fields": {
         "createdAt": {
           "column": "createdAt"
+        },
+        "embedding": {
+          "column": "embedding"
         },
         "id": {
           "column": "id"

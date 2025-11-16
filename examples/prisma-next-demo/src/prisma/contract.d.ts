@@ -60,6 +60,7 @@ export type Contract = SqlContract<
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly title: CodecTypes['pg/text@1']['output'];
         readonly userId: CodecTypes['pg/int4@1']['output'];
+        readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       };
     };
@@ -99,6 +100,7 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly title: 'title';
         readonly userId: 'userId';
+        readonly embedding: 'embedding';
         readonly createdAt: 'createdAt';
       };
     };
@@ -112,6 +114,7 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly title: 'title';
         readonly userId: 'userId';
+        readonly embedding: 'embedding';
         readonly createdAt: 'createdAt';
       };
     };
