@@ -1,9 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypesImportSpec } from '@prisma-next/contract/types';
-import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
-import type { OperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config-loader';
@@ -61,25 +58,9 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      }) as {
-        readonly operationRegistry: OperationRegistry;
-        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly extensionIds: ReadonlyArray<string>;
-      };
-
-      // Extract assembly data from family instance
-      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-        familyInstance;
-
-      const result = await emitContract({
-        contractIR: contractIR as ContractIR,
-        targetFamily: config.family.hook,
-        operationRegistry,
-        codecTypeImports,
-        operationTypeImports,
-        extensionIds,
       });
+
+      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
       expect(result).toBeDefined();
       expect(result.coreHash).toBeDefined();
@@ -143,25 +124,9 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      }) as {
-        readonly operationRegistry: OperationRegistry;
-        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly extensionIds: ReadonlyArray<string>;
-      };
-
-      // Extract assembly data from family instance
-      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-        familyInstance;
-
-      const result = await emitContract({
-        contractIR: contractIR as ContractIR,
-        targetFamily: config.family.hook,
-        operationRegistry,
-        codecTypeImports,
-        operationTypeImports,
-        extensionIds,
       });
+
+      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
       // Write files and verify paths
       const contractJsonPath = resolve(testDir, contractConfig.output);
@@ -289,25 +254,9 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      }) as {
-        readonly operationRegistry: OperationRegistry;
-        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly extensionIds: ReadonlyArray<string>;
-      };
-
-      // Extract assembly data from family instance
-      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-        familyInstance;
-
-      const result = await emitContract({
-        contractIR: contractIR as ContractIR,
-        targetFamily: config.family.hook,
-        operationRegistry,
-        codecTypeImports,
-        operationTypeImports,
-        extensionIds,
       });
+
+      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
       // profileHash is always present
       expect(typeof result.profileHash).toBe('string');
@@ -348,25 +297,9 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      }) as {
-        readonly operationRegistry: OperationRegistry;
-        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly extensionIds: ReadonlyArray<string>;
-      };
-
-      // Extract assembly data from family instance
-      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-        familyInstance;
-
-      const result = await emitContract({
-        contractIR: contractIR as ContractIR,
-        targetFamily: config.family.hook,
-        operationRegistry,
-        codecTypeImports,
-        operationTypeImports,
-        extensionIds,
       });
+
+      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
       // Timings are no longer returned in the result
       expect(result).toBeDefined();

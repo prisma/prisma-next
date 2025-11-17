@@ -4,7 +4,6 @@ export default defineConfig({
   entry: {
     'exports/config-types': 'src/exports/config-types.ts',
     'exports/config-validation': 'src/exports/config-validation.ts',
-    'exports/emit-contract': 'src/exports/emit-contract.ts',
     'exports/errors': 'src/exports/errors.ts',
     'exports/pack-manifest-types': 'src/exports/pack-manifest-types.ts',
     'exports/types': 'src/exports/types.ts',

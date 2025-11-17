@@ -1,10 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypesImportSpec } from '@prisma-next/contract/types';
-import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
-import type { OperationRegistry } from '@prisma-next/operations';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -116,32 +114,15 @@ export function createContractEmitCommand(): Command {
         // Validate and normalize the contract using family-specific validation
         const contractIR = config.family.validateContractIR(contractWithoutMappings) as ContractIR;
 
-        // TODO: remove the cast after migrating the domain action to the instance
         // Create family instance (assembles operation registry, type imports, extension IDs)
         const familyInstance = config.family.create({
           target: config.target,
           adapter: config.adapter,
           extensions: config.extensions ?? [],
-        }) as {
-          readonly operationRegistry: OperationRegistry;
-          readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-          readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-          readonly extensionIds: ReadonlyArray<string>;
-        };
+        }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-        // Extract assembly data from family instance
-        const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-          familyInstance;
-
-        // Call programmatic API with resolved values (returns strings, no file I/O)
-        const emitResult = await emitContract({
-          contractIR,
-          targetFamily: config.family.hook,
-          operationRegistry,
-          codecTypeImports,
-          operationTypeImports,
-          extensionIds,
-        });
+        // Call emitContract on family instance (returns strings, no file I/O)
+        const emitResult = await familyInstance.emitContract({ contractIR });
 
         // Create directories if needed
         mkdirSync(dirname(outputJsonPath), { recursive: true });

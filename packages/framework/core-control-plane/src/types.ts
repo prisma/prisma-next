@@ -1,3 +1,4 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TargetFamilyHook } from '@prisma-next/contract/types';
 import type { OperationSignature } from '@prisma-next/operations';
 import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
@@ -151,6 +152,12 @@ export interface FamilyInstance<
     readonly driver: ControlPlaneDriver;
     readonly contractIR?: unknown;
   }): Promise<TSchemaIR>;
+
+  /**
+   * Emits contract JSON and DTS as strings.
+   * Uses the instance's preassembled state (operation registry, type imports, extension IDs).
+   */
+  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
 }
 
 /**
@@ -231,4 +238,14 @@ export interface VerifyDatabaseSchemaResult {
   readonly timings: {
     readonly total: number;
   };
+}
+
+/**
+ * Result type for contract emission operations.
+ */
+export interface EmitContractResult {
+  readonly contractJson: string;
+  readonly contractDts: string;
+  readonly coreHash: string;
+  readonly profileHash: string;
 }

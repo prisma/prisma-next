@@ -1,10 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypesImportSpec } from '@prisma-next/contract/types';
-import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import type { FamilyInstance, VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
-import type { OperationRegistry } from '@prisma-next/operations';
 // verifyDatabase domain action removed - tests now use family instance directly
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -55,25 +52,9 @@ async function emitContractFromConfig(
     target: config.target,
     adapter: config.adapter,
     extensions: config.extensions ?? [],
-  }) as {
-    readonly operationRegistry: OperationRegistry;
-    readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-    readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-    readonly extensionIds: ReadonlyArray<string>;
-  };
-
-  // Extract assembly data from family instance
-  const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-    familyInstance;
-
-  const emitResult = await emitContract({
-    contractIR: contractIR as ContractIR,
-    targetFamily: config.family.hook,
-    operationRegistry,
-    codecTypeImports,
-    operationTypeImports,
-    extensionIds,
   });
+
+  const emitResult = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
   // Write contract files
   const contractJsonPath = resolve(testDir, contractConfig.output ?? 'output/contract.json');
