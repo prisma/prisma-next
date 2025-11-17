@@ -11,7 +11,7 @@ The CLI provides commands for emitting canonical `contract.json` and `contract.d
 Provide a command-line interface that:
 - Loads TypeScript-authored contracts using esbuild with import allowlisting
 - Validates contract purity (JSON-serializable, no functions/getters)
-- Invokes the emitter to produce canonical artifacts
+- Invokes the emitter and core control-plane domain actions to produce canonical artifacts and perform verification
 - Handles all file I/O operations (CLI handles I/O; emitter returns strings)
 
 ## Responsibilities
@@ -23,7 +23,7 @@ Provide a command-line interface that:
 - **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
 - **Config Management**: Load and validate `prisma-next.config.ts` files using Arktype validation
 
-**Note**: Control plane domain actions (database verification, contract emission) are implemented in `@prisma-next/core-control-plane`. The CLI uses the control plane domain actions programmatically but does not define control plane types itself.
+**Note**: Control-plane domain actions (contract emission, database marker verification, schema verification) are implemented in `@prisma-next/core-control-plane`. The CLI uses these domain actions programmatically but does not define control-plane types itself. Families (e.g., SQL) expose control-plane descriptors and contexts via their own `/control` entrypoints (e.g., `@prisma-next/family-sql/control`).
 
 ## Command Descriptions
 
@@ -140,13 +140,13 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Read Marker**: Calls `config.family.verify.readMarker(driver)` to read the contract marker
+3. **Read Marker**: Calls `config.family.readMarker(driver)` to read the contract marker
 4. **Compare**:
    - Marker presence: Returns `PN-RTM-3001` if marker is missing
    - Target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
    - Core hash: Returns `PN-RTM-3002` if `coreHash` doesn't match
    - Profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
-5. **Codec Coverage** (optional): If `config.family.verify.collectSupportedCodecTypeIds` is provided, compares contract column types against supported codec types and reports missing codecs
+5. **Type Coverage** (optional): If `config.family.supportedTypeIds` is provided, compares contract column types against supported type IDs and reports missing types
 
 **Output Format (TTY):**
 
@@ -195,21 +195,23 @@ Failure:
 **Error Codes:**
 
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4007`: Missing family.verify.readMarker() — ensure family verify helpers are exported
+- `PN-CLI-4007`: Missing family.readMarker() — ensure family readMarker hook is exported
 - `PN-RTM-3001`: Marker missing - Contract marker not found in database
 - `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
 - `PN-RTM-3003`: Target mismatch - Contract target does not match config target
 
 **Family Requirements:**
 
-The family must provide a `verify` helper in the family descriptor:
+The family must provide control-plane helpers in the family descriptor:
 
 ```typescript
-{
-  verify: {
-    readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>,
-    collectSupportedCodecTypeIds?: (descriptors) => readonly string[],
-  },
+interface FamilyDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> {
+  readMarker?: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>;
+  supportedTypeIds?: (
+    descriptors: ReadonlyArray<
+      TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
+    >,
+  ) => readonly string[];
 }
 ```
 
@@ -449,3 +451,13 @@ This package is part of the **framework domain**, **tooling layer**, **migration
 
 - [`@prisma-next/emitter`](../emitter/README.md) - Contract emission engine
 - Project Brief — CLI Support for Extension Packs: `docs/briefs/complete/20-CLI-Support-for-Extension-Packs.md`
+
+## Control vs Execution Plane
+
+- The CLI operates in the **control plane**:
+  - Loads configs and contracts.
+  - Delegates to core control-plane domain actions (`emitContract`, `verifyDatabase`, `verifyDatabaseSchema`, `introspectDatabaseSchema`).
+  - Uses control-plane family descriptors (e.g., `@prisma-next/family-sql/control`) and control-plane contexts (`TargetFamilyContext` subtypes such as `SqlFamilyContext`).
+- The **execution plane** (runtime) is separate:
+  - Uses runtime adapters/families/extensions (e.g., `./runtime` entrypoints) to build query execution contexts.
+  - The CLI does not depend on runtime types (e.g., codec registries); control-plane families expose any required metadata (such as SQL type metadata registries) via their own SPIs.

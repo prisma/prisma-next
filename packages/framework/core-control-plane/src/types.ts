@@ -3,17 +3,31 @@ import type { OperationSignature } from '@prisma-next/operations';
 import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
 
 /**
- * Control-plane context that binds together schema IR and family-specific control-plane registries/state.
- * This abstraction allows domain actions to work with family-specific types without understanding their concrete structure.
+ * Type carrier for a target family's schema IR type.
+ * This is a pure type-level construct; it does not contain runtime fields.
  *
- * The base type contains only the schema IR, which is common to all families.
  * Families extend this with their own control-plane state (e.g., SQL adds types registry):
  * - SQL: `SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & { readonly types: SqlTypeMetadataRegistry }`
  * - Other families can define their own context types as needed
+ *
+ * The schemaIR itself is not stored in the context; it's produced by introspection
+ * and passed as a separate value to domain actions and family hooks.
  */
+// Pure type carrier; no runtime fields required.
+// Families extend this with their own control-plane state.
+// The phantom brand ties TSchemaIR to this family at the type level.
 export interface TargetFamilyContext<TSchemaIR = unknown> {
-  readonly schemaIR: TSchemaIR;
+  // This field is optional and never actually set at runtime.
+  // It exists only to tie TSchemaIR to this family at the type level.
+  readonly _schemaIrBrand?: TSchemaIR;
 }
+
+/**
+ * Extracts the schema IR type from a TargetFamilyContext.
+ */
+export type SchemaIROf<TCtx> = TCtx extends TargetFamilyContext<infer TSchemaIR>
+  ? TSchemaIR
+  : unknown;
 
 /**
  * Minimal driver interface for Control Plane database operations.
@@ -58,54 +72,67 @@ export interface FamilyDescriptor<TCtx extends TargetFamilyContext = TargetFamil
   readonly kind: 'family';
   readonly id: string;
   readonly hook: TargetFamilyHook;
+
   /**
-   * Family-specific verification helpers for DB-connected commands.
-   * Must remain in the migration/tooling plane (no runtime imports).
+   * Reads the contract marker from the database using the provided driver.
+   * Returns the parsed marker record or null if no marker is found.
+   * This abstracts SQL-specific details from the Control Plane.
    */
-  readonly verify?: {
-    /**
-     * Reads the contract marker from the database using the provided driver.
-     * Returns the parsed marker record or null if no marker is found.
-     * This abstracts SQL-specific details from the Control Plane.
-     */
-    readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>;
-    /**
-     * Optionally collects supported codec typeIds from adapter/extension manifests
-     * to enable coverage checks.
-     */
-    collectSupportedCodecTypeIds?: (
-      descriptors: ReadonlyArray<
-        TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
-      >,
-    ) => readonly string[];
-    /**
-     * Introspects the database schema and returns a target-agnostic Schema IR.
-     * Delegates to target-specific implementations (e.g., Postgres adapter) for concrete introspection.
-     * This is used by schema verification and future migration planning.
-     * The contextInput contains family-specific control-plane state (e.g., types registry for SQL).
-     */
-    introspectSchema?: (options: {
-      readonly driver: ControlPlaneDriver;
-      readonly contextInput: Omit<TCtx, 'schemaIR'>;
-      readonly contractIR?: unknown;
-      readonly target: TargetDescriptor<TCtx>;
-      readonly adapter: AdapterDescriptor<TCtx>;
-      readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
-    }) => Promise<TCtx['schemaIR']>;
-    /**
-     * Verifies that the schema IR matches the contract IR.
-     * Compares contract against schema IR and returns schema issues if any.
-     * This is a low-level hook that performs comparison only; domain actions handle orchestration.
-     * Extension verifySchema hooks are called by the domain action, not by this hook.
-     */
-    verifySchema?: (options: {
-      readonly contractIR: unknown;
-      readonly schemaIR: TCtx['schemaIR'];
-      readonly target: TargetDescriptor<TCtx>;
-      readonly adapter: AdapterDescriptor<TCtx>;
-      readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
-    }) => Promise<{ readonly issues: readonly SchemaIssue[] }>;
-  };
+  readonly readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>;
+
+  /**
+   * Returns supported type IDs from adapter/extension descriptors
+   * to enable coverage checks.
+   */
+  readonly supportedTypeIds: (
+    descriptors: ReadonlyArray<
+      TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
+    >,
+  ) => readonly string[];
+
+  /**
+   * Prepares family-specific control-plane context from descriptors.
+   * For SQL, this constructs a SqlTypeMetadataRegistry from adapter codecs and extension metadata.
+   * The returned context is used as input to introspectSchema and other control-plane operations.
+   * The context does not contain schemaIR; that is produced separately by introspectSchema.
+   */
+  readonly prepareControlContext: (options: {
+    readonly contractIR: unknown;
+    readonly target: TargetDescriptor<TCtx>;
+    readonly adapter: AdapterDescriptor<TCtx>;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+  }) => Promise<TCtx>;
+
+  /**
+   * Introspects the database schema and returns a target-agnostic Schema IR.
+   * Delegates to target-specific implementations (e.g., Postgres adapter) for concrete introspection.
+   * This is used by schema verification and future migration planning.
+   * The contextInput contains family-specific control-plane state (e.g., types registry for SQL).
+   * The schemaIR is returned as a separate value, not stored in the context.
+   */
+  readonly introspectSchema: (options: {
+    readonly driver: ControlPlaneDriver;
+    readonly contextInput: TCtx;
+    readonly contractIR?: unknown;
+    readonly target: TargetDescriptor<TCtx>;
+    readonly adapter: AdapterDescriptor<TCtx>;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+  }) => Promise<SchemaIROf<TCtx>>;
+
+  /**
+   * Verifies that the schema IR matches the contract IR.
+   * Compares contract against schema IR and returns schema issues if any.
+   * This is a low-level hook that performs comparison only; domain actions handle orchestration.
+   * Extension verifySchema hooks are called by the domain action, not by this hook.
+   */
+  readonly verifySchema: (options: {
+    readonly contractIR: unknown;
+    readonly schemaIR: SchemaIROf<TCtx>;
+    readonly target: TargetDescriptor<TCtx>;
+    readonly adapter: AdapterDescriptor<TCtx>;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+  }) => Promise<{ readonly issues: readonly SchemaIssue[] }>;
+
   /**
    * Converts an OperationManifest to an OperationSignature.
    * Family-specific conversion logic (e.g., SQL adds lowering spec).

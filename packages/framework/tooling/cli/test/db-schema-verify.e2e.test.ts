@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/family-sql/context';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -119,15 +119,9 @@ describe('db schema-verify command (e2e)', () => {
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = config.family.verify
-                ? {
-                    ...config.family.verify,
-                    verifySchema: undefined,
-                  }
-                : undefined;
               const mockedFamily = {
                 ...config.family,
-                verify: mockedVerify,
+                verifySchema: undefined,
               };
               return {
                 ...config,
@@ -163,7 +157,7 @@ describe('db schema-verify command (e2e)', () => {
             });
             expect(parsed.summary).toContain('Family verifySchema() is required');
             expect(parsed.fix).toContain(
-              'Ensure family.verify.verifySchema() is exported by your family package',
+              'Ensure family.verifySchema() is exported by your family package',
             );
           } finally {
             cleanupDir();
@@ -351,23 +345,17 @@ describe('db schema-verify command (e2e)', () => {
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = config.family.verify
-                ? {
-                    ...config.family.verify,
-                    verifySchema: vi.fn().mockResolvedValue({
-                      issues: [
-                        {
-                          kind: 'missing_table',
-                          table: 'test',
-                          message: 'Table test is missing',
-                        },
-                      ],
-                    }),
-                  }
-                : undefined;
               const mockedFamily = {
                 ...config.family,
-                verify: mockedVerify,
+                verifySchema: vi.fn().mockResolvedValue({
+                  issues: [
+                    {
+                      kind: 'missing_table',
+                      table: 'test',
+                      message: 'Table test is missing',
+                    },
+                  ],
+                }),
               };
               return {
                 ...config,
@@ -443,17 +431,9 @@ describe('db schema-verify command (e2e)', () => {
               .spyOn(configLoaderModule, 'loadConfig')
               .mockImplementation(async (path) => {
                 const config = await originalLoadConfig(path);
-                const mockedVerify = config.family.verify
-                  ? {
-                      ...config.family.verify,
-                      verifySchema: verifySchemaMock,
-                    }
-                  : {
-                      verifySchema: verifySchemaMock,
-                    };
                 const mockedFamily = {
                   ...config.family,
-                  verify: mockedVerify,
+                  verifySchema: verifySchemaMock,
                 };
                 return {
                   ...config,

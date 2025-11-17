@@ -8,6 +8,11 @@ import type {
 } from './types';
 
 /**
+ * Removes readonly modifiers from all properties of a type.
+ */
+type Writable<T> = { -readonly [P in keyof T]: T[P] };
+
+/**
  * Result type for database verification operations.
  * Returned by ControlPlaneExecutor.verifyAgainst().
  */
@@ -28,7 +33,7 @@ export interface VerifyDatabaseResult {
     readonly actual?: string;
   };
   readonly missingCodecs?: readonly string[];
-  readonly codecCoverageSkipped?: boolean;
+  readonly typeCoverageSkipped?: boolean;
   readonly meta?: {
     readonly configPath?: string;
     readonly contractPath: string;
@@ -38,80 +43,23 @@ export interface VerifyDatabaseResult {
   };
 }
 
-type CreateVerifyResultOptions = {
-  ok: boolean;
-  code?: string;
-  summary: string;
-  contractCoreHash: string;
-  contractProfileHash?: string;
-  marker?: ContractMarkerRecord;
-  expectedTargetId: string;
-  actualTargetId?: string;
-  missingCodecs?: readonly string[];
-  codecCoverageSkipped?: boolean;
-  configPath?: string;
-  contractPath: string;
-  totalTime: number;
-};
-
 /**
- * Creates a VerifyDatabaseResult object with common structure.
- * Centralizes result construction to reduce duplication.
+ * Derives summary message from verification result.
  */
-function createVerifyResult(options: CreateVerifyResultOptions): VerifyDatabaseResult {
-  const contract: { coreHash: string; profileHash?: string } = {
-    coreHash: options.contractCoreHash,
-  };
-  if (options.contractProfileHash) {
-    contract.profileHash = options.contractProfileHash;
+function deriveSummary(ok: boolean, code?: string): string {
+  if (ok) {
+    return 'Database matches contract';
   }
-
-  const target: { expected: string; actual?: string } = {
-    expected: options.expectedTargetId,
-  };
-  if (options.actualTargetId) {
-    target.actual = options.actualTargetId;
+  switch (code) {
+    case 'PN-RTM-3001':
+      return 'Marker missing';
+    case 'PN-RTM-3002':
+      return 'Hash mismatch';
+    case 'PN-RTM-3003':
+      return 'Target mismatch';
+    default:
+      return 'Verification failed';
   }
-
-  const meta: { contractPath: string; configPath?: string } = {
-    contractPath: options.contractPath,
-  };
-  if (options.configPath) {
-    meta.configPath = options.configPath;
-  }
-
-  const result: VerifyDatabaseResult = {
-    ok: options.ok,
-    summary: options.summary,
-    contract,
-    target,
-    meta,
-    timings: {
-      total: options.totalTime,
-    },
-  };
-
-  if (options.code) {
-    (result as { code?: string }).code = options.code;
-  }
-
-  if (options.marker) {
-    (result as { marker?: { coreHash: string; profileHash: string } }).marker = {
-      coreHash: options.marker.coreHash,
-      profileHash: options.marker.profileHash,
-    };
-  }
-
-  if (options.missingCodecs) {
-    (result as { missingCodecs?: readonly string[] }).missingCodecs = options.missingCodecs;
-  }
-
-  if (options.codecCoverageSkipped) {
-    (result as { codecCoverageSkipped?: boolean }).codecCoverageSkipped =
-      options.codecCoverageSkipped;
-  }
-
-  return result;
 }
 
 /**
@@ -166,7 +114,7 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
  */
 export class ControlPlaneExecutor {
   private readonly driver: ControlPlaneDriver;
-  private readonly familyVerify: FamilyDescriptor['verify'];
+  private readonly family: FamilyDescriptor;
   private readonly adapter: AdapterDescriptor;
   private readonly target: TargetDescriptor;
   private readonly extensions: ReadonlyArray<ExtensionDescriptor>;
@@ -174,14 +122,14 @@ export class ControlPlaneExecutor {
 
   constructor(options: {
     readonly driver: ControlPlaneDriver;
-    readonly familyVerify: FamilyDescriptor['verify'];
+    readonly family: FamilyDescriptor;
     readonly adapter: AdapterDescriptor;
     readonly target: TargetDescriptor;
     readonly extensions: ReadonlyArray<ExtensionDescriptor>;
     readonly contractIR: unknown;
   }) {
     this.driver = options.driver;
-    this.familyVerify = options.familyVerify;
+    this.family = options.family;
     this.adapter = options.adapter;
     this.target = options.target;
     this.extensions = options.extensions;
@@ -193,10 +141,10 @@ export class ControlPlaneExecutor {
    * Delegates to family-provided readMarker() to abstract SQL-specific details.
    */
   async readMarker(): Promise<ContractMarkerRecord | null> {
-    if (!this.familyVerify?.readMarker) {
-      throw new Error('Family verify.readMarker() is required');
+    if (!this.family.readMarker) {
+      throw new Error('Family readMarker() is required');
     }
-    return this.familyVerify.readMarker(this.driver);
+    return this.family.readMarker(this.driver);
   }
 
   /**
@@ -233,16 +181,16 @@ export class ControlPlaneExecutor {
     // Read marker from database
     const marker = await this.readMarker();
 
-    // Compute codec coverage (optional)
+    // Compute type coverage (optional)
     let missingCodecs: readonly string[] | undefined;
-    let codecCoverageSkipped = false;
-    if (this.familyVerify?.collectSupportedCodecTypeIds) {
+    let typeCoverageSkipped = false;
+    if (this.family.supportedTypeIds) {
       const descriptors = [this.adapter, this.target, ...this.extensions];
-      const supportedTypeIds = this.familyVerify.collectSupportedCodecTypeIds(descriptors);
+      const supportedTypeIds = this.family.supportedTypeIds(descriptors);
       if (supportedTypeIds.length === 0) {
         // Helper is present but returns empty (MVP behavior)
         // Coverage check is skipped - missingCodecs remains undefined
-        codecCoverageSkipped = true;
+        typeCoverageSkipped = true;
       } else {
         const supportedSet = new Set(supportedTypeIds);
         const usedTypeIds = extractCodecTypeIdsFromContract(this.contractIR);
@@ -256,99 +204,155 @@ export class ControlPlaneExecutor {
     // Check marker presence
     if (!marker) {
       const totalTime = Date.now() - startTime;
-      const options: CreateVerifyResultOptions = {
+      const code = 'PN-RTM-3001';
+      const result: Writable<VerifyDatabaseResult> = {
         ok: false,
-        code: 'PN-RTM-3001',
-        summary: 'Marker missing',
-        contractCoreHash,
-        expectedTargetId,
-        contractPath,
-        totalTime,
+        code,
+        summary: deriveSummary(false, code),
+        contract: {
+          coreHash: contractCoreHash,
+          ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
+        },
+        target: {
+          expected: expectedTargetId,
+        },
+        timings: {
+          total: totalTime,
+        },
+        meta: {
+          contractPath,
+          ...(configPath ? { configPath } : {}),
+        },
       };
-      if (contractProfileHash) options.contractProfileHash = contractProfileHash;
-      if (missingCodecs) options.missingCodecs = missingCodecs;
-      if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
-      if (configPath) options.configPath = configPath;
-      return createVerifyResult(options);
+      if (missingCodecs) result.missingCodecs = missingCodecs;
+      if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
+      return result satisfies VerifyDatabaseResult;
     }
 
     // Compare target
     if (contractTarget !== expectedTargetId) {
       const totalTime = Date.now() - startTime;
-      const options: CreateVerifyResultOptions = {
+      const code = 'PN-RTM-3003';
+      const result: Writable<VerifyDatabaseResult> = {
         ok: false,
-        code: 'PN-RTM-3003',
-        summary: 'Target mismatch',
-        contractCoreHash,
-        marker,
-        expectedTargetId,
-        actualTargetId: contractTarget,
-        contractPath,
-        totalTime,
+        code,
+        summary: deriveSummary(false, code),
+        contract: {
+          coreHash: contractCoreHash,
+          ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
+        },
+        marker: {
+          coreHash: marker.coreHash,
+          ...(marker.profileHash ? { profileHash: marker.profileHash } : {}),
+        },
+        target: {
+          expected: expectedTargetId,
+          actual: contractTarget,
+        },
+        timings: {
+          total: totalTime,
+        },
+        meta: {
+          contractPath,
+          ...(configPath ? { configPath } : {}),
+        },
       };
-      if (contractProfileHash) options.contractProfileHash = contractProfileHash;
-      if (missingCodecs) options.missingCodecs = missingCodecs;
-      if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
-      if (configPath) options.configPath = configPath;
-      return createVerifyResult(options);
+      if (missingCodecs) result.missingCodecs = missingCodecs;
+      if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
+      return result satisfies VerifyDatabaseResult;
     }
 
     // Compare hashes
     if (marker.coreHash !== contractCoreHash) {
       const totalTime = Date.now() - startTime;
-      const options: CreateVerifyResultOptions = {
+      const code = 'PN-RTM-3002';
+      const result: Writable<VerifyDatabaseResult> = {
         ok: false,
-        code: 'PN-RTM-3002',
-        summary: 'Hash mismatch',
-        contractCoreHash,
-        marker,
-        expectedTargetId,
-        contractPath,
-        totalTime,
+        code,
+        summary: deriveSummary(false, code),
+        contract: {
+          coreHash: contractCoreHash,
+          ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
+        },
+        marker: {
+          coreHash: marker.coreHash,
+          ...(marker.profileHash ? { profileHash: marker.profileHash } : {}),
+        },
+        target: {
+          expected: expectedTargetId,
+        },
+        timings: {
+          total: totalTime,
+        },
+        meta: {
+          contractPath,
+          ...(configPath ? { configPath } : {}),
+        },
       };
-      if (contractProfileHash) options.contractProfileHash = contractProfileHash;
-      if (missingCodecs) options.missingCodecs = missingCodecs;
-      if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
-      if (configPath) options.configPath = configPath;
-      return createVerifyResult(options);
+      if (missingCodecs) result.missingCodecs = missingCodecs;
+      if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
+      return result satisfies VerifyDatabaseResult;
     }
 
     // Compare profile hash if present
     if (contractProfileHash && marker.profileHash !== contractProfileHash) {
       const totalTime = Date.now() - startTime;
-      const options: CreateVerifyResultOptions = {
+      const code = 'PN-RTM-3002';
+      const result: Writable<VerifyDatabaseResult> = {
         ok: false,
-        code: 'PN-RTM-3002',
-        summary: 'Hash mismatch',
-        contractCoreHash,
-        contractProfileHash,
-        marker,
-        expectedTargetId,
-        contractPath,
-        totalTime,
+        code,
+        summary: deriveSummary(false, code),
+        contract: {
+          coreHash: contractCoreHash,
+          profileHash: contractProfileHash,
+        },
+        marker: {
+          coreHash: marker.coreHash,
+          ...(marker.profileHash ? { profileHash: marker.profileHash } : {}),
+        },
+        target: {
+          expected: expectedTargetId,
+        },
+        timings: {
+          total: totalTime,
+        },
+        meta: {
+          contractPath,
+          ...(configPath ? { configPath } : {}),
+        },
       };
-      if (missingCodecs) options.missingCodecs = missingCodecs;
-      if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
-      if (configPath) options.configPath = configPath;
-      return createVerifyResult(options);
+      if (missingCodecs) result.missingCodecs = missingCodecs;
+      if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
+      return result satisfies VerifyDatabaseResult;
     }
 
     // Success - all checks passed
     const totalTime = Date.now() - startTime;
-    const options: CreateVerifyResultOptions = {
+    const result: Writable<VerifyDatabaseResult> = {
       ok: true,
-      summary: 'Database matches contract',
-      contractCoreHash,
-      marker,
-      expectedTargetId,
-      contractPath,
-      totalTime,
+      summary: deriveSummary(true),
+      contract: {
+        coreHash: contractCoreHash,
+        ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
+      },
+      marker: {
+        coreHash: marker.coreHash,
+        ...(marker.profileHash ? { profileHash: marker.profileHash } : {}),
+      },
+      target: {
+        expected: expectedTargetId,
+      },
+      timings: {
+        total: totalTime,
+      },
+      meta: {
+        contractPath,
+        ...(configPath ? { configPath } : {}),
+      },
     };
-    if (contractProfileHash) options.contractProfileHash = contractProfileHash;
-    if (missingCodecs) options.missingCodecs = missingCodecs;
-    if (codecCoverageSkipped) options.codecCoverageSkipped = codecCoverageSkipped;
-    if (configPath) options.configPath = configPath;
-    return createVerifyResult(options);
+    if (missingCodecs) result.missingCodecs = missingCodecs;
+    if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
+    return result satisfies VerifyDatabaseResult;
   }
 
   /**

@@ -20,9 +20,7 @@ describe('CliStructuredError.toEnvelope()', () => {
     expect(envelope.code).toBe('PN-CLI-4007');
     expect(envelope.domain).toBe('CLI');
     expect(envelope.summary).toBe('Family readMarker() is required');
-    expect(envelope.fix).toBe(
-      'Ensure family.verify.readMarker() is exported by your family package',
-    );
+    expect(envelope.fix).toBe('Ensure family.readMarker() is exported by your family package');
     expect(envelope.docsUrl).toBe('https://prisma-next.dev/docs/cli/db-verify');
   });
 });

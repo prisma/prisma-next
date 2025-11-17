@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import { verifyDatabase } from '@prisma-next/core-control-plane/verify-database';
-import type { SqlContract, SqlStorage } from '@prisma-next/family-sql/context';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   ensureSchemaStatement,
@@ -768,7 +768,7 @@ describe('verifyDatabase API', () => {
   );
 
   it(
-    'reports missing codecs when collectSupportedCodecTypeIds returns non-empty array',
+    'reports missing codecs when supportedTypeIds returns non-empty array',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -797,29 +797,22 @@ describe('verifyDatabase API', () => {
               await executeStatement(client, write.insert);
             });
 
-            // Mock collectSupportedCodecTypeIds to return a non-empty array that doesn't include all type IDs
+            // Mock supportedTypeIds to return a non-empty array that doesn't include all type IDs
             const configLoaderModule = await import('../../src/config-loader');
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              if (config.family.verify?.collectSupportedCodecTypeIds) {
-                const mockedVerify = {
-                  ...config.family.verify,
-                  collectSupportedCodecTypeIds: () => {
-                    // Return a subset of supported types (not all types used in contract)
-                    return ['pg/int4@1']; // Only int4, but contract might use text too
-                  },
-                };
-                const mockedFamily = {
-                  ...config.family,
-                  verify: mockedVerify,
-                };
-                return {
-                  ...config,
-                  family: mockedFamily,
-                };
-              }
-              return config;
+              const mockedFamily = {
+                ...config.family,
+                supportedTypeIds: () => {
+                  // Return a subset of supported types (not all types used in contract)
+                  return ['pg/int4@1']; // Only int4, but contract might use text too
+                },
+              };
+              return {
+                ...config,
+                family: mockedFamily,
+              };
             });
 
             // Load config and contract for verifyDatabase

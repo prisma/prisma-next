@@ -97,7 +97,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 const result = await verifyDatabaseSchema({
   driver,
   contractIR,
-  schemaIR, // Produced by family.verify.introspectSchema
+  schemaIR, // Produced by family.introspectSchema
   family,
   target,
   adapter,

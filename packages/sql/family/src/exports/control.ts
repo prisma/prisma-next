@@ -7,9 +7,10 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { SqlFamilyContext } from '../context';
 import {
-  collectSupportedCodecTypeIds,
   introspectSchema,
+  prepareControlContext,
   readMarker,
+  supportedTypeIds,
   verifySchema,
 } from '../verify';
 
@@ -60,12 +61,11 @@ class SqlFamilyDescriptor implements FamilyDescriptor<SqlFamilyContext> {
   readonly kind = 'family' as const;
   readonly id = 'sql' as const;
   readonly hook = sqlTargetFamilyHook;
-  readonly verify = {
-    readMarker,
-    collectSupportedCodecTypeIds,
-    introspectSchema,
-    verifySchema,
-  };
+  readonly readMarker = readMarker;
+  readonly supportedTypeIds = supportedTypeIds;
+  readonly prepareControlContext = prepareControlContext;
+  readonly introspectSchema = introspectSchema;
+  readonly verifySchema = verifySchema;
   readonly convertOperationManifest = (manifest: OperationManifest): OperationSignature => {
     return operationManifestToSignature(manifest);
   };

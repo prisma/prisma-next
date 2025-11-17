@@ -38,20 +38,33 @@ function createMockDriver(responses: Array<{ sql: string; rows: unknown[] }>): C
 function createMockFamily(
   introspectSchemaImpl: (options: {
     readonly driver: ControlPlaneDriver;
+    readonly contextInput: unknown;
     readonly contractIR?: unknown;
     readonly target: TargetDescriptor;
     readonly adapter: AdapterDescriptor;
     readonly extensions: ReadonlyArray<ExtensionDescriptor>;
   }) => Promise<SqlSchemaIR>,
-): FamilyDescriptor<SqlSchemaIR> {
+  verifySchemaImpl?: (options: {
+    readonly contractIR: unknown;
+    readonly schemaIR: SqlSchemaIR;
+    readonly target: TargetDescriptor;
+    readonly adapter: AdapterDescriptor;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+  }) => Promise<{ readonly issues: readonly unknown[] }>,
+): FamilyDescriptor<{ schemaIR: SqlSchemaIR }> {
   return {
     kind: 'family',
     id: 'sql',
     hook: {} as never,
-    verify: {
-      readMarker: async () => null,
-      introspectSchema: introspectSchemaImpl,
-    },
+    readMarker: async () => null,
+    supportedTypeIds: () => [],
+    prepareControlContext: async () => ({}),
+    introspectSchema: introspectSchemaImpl,
+    verifySchema:
+      verifySchemaImpl ??
+      (async () => ({
+        issues: [],
+      })),
     convertOperationManifest: () => {
       throw new Error('Not implemented');
     },
@@ -148,6 +161,7 @@ describe('verifyDatabaseSchema', () => {
       target,
       adapter,
       extensions: [],
+      contextInput: {},
       strict: false,
       startTime: Date.now(),
       contractPath: 'test/contract.json',
@@ -164,7 +178,43 @@ describe('verifyDatabaseSchema', () => {
       extensions: [],
     };
 
-    const family = createMockFamily(async () => schemaIR);
+    const family = createMockFamily(
+      async () => schemaIR,
+      async ({ contractIR, schemaIR: schema }) => {
+        const issues: unknown[] = [];
+        if (
+          typeof contractIR === 'object' &&
+          contractIR !== null &&
+          'storage' in contractIR &&
+          typeof contractIR.storage === 'object' &&
+          contractIR.storage !== null &&
+          'tables' in contractIR.storage &&
+          typeof contractIR.storage.tables === 'object' &&
+          contractIR.storage.tables !== null
+        ) {
+          const contractTables = contractIR.storage.tables as Record<string, unknown>;
+          if (
+            typeof schema === 'object' &&
+            schema !== null &&
+            'tables' in schema &&
+            typeof schema.tables === 'object' &&
+            schema.tables !== null
+          ) {
+            const schemaTables = schema.tables as Record<string, unknown>;
+            for (const [tableName] of Object.entries(contractTables)) {
+              if (!schemaTables[tableName]) {
+                issues.push({
+                  kind: 'missing_table',
+                  table: tableName,
+                  message: `Table ${tableName} is not present in database`,
+                });
+              }
+            }
+          }
+        }
+        return { issues };
+      },
+    );
     const target: TargetDescriptor = {
       kind: 'target',
       id: 'postgres',
@@ -186,6 +236,7 @@ describe('verifyDatabaseSchema', () => {
       target,
       adapter,
       extensions: [],
+      contextInput: {},
       strict: false,
       startTime: Date.now(),
       contractPath: 'test/contract.json',
@@ -220,7 +271,62 @@ describe('verifyDatabaseSchema', () => {
       extensions: [],
     };
 
-    const family = createMockFamily(async () => schemaIR);
+    const family = createMockFamily(
+      async () => schemaIR,
+      async ({ contractIR, schemaIR: schema }) => {
+        const issues: unknown[] = [];
+        if (
+          typeof contractIR === 'object' &&
+          contractIR !== null &&
+          'storage' in contractIR &&
+          typeof contractIR.storage === 'object' &&
+          contractIR.storage !== null &&
+          'tables' in contractIR.storage &&
+          typeof contractIR.storage.tables === 'object' &&
+          contractIR.storage.tables !== null
+        ) {
+          const contractTables = contractIR.storage.tables as Record<string, unknown>;
+          if (
+            typeof schema === 'object' &&
+            schema !== null &&
+            'tables' in schema &&
+            typeof schema.tables === 'object' &&
+            schema.tables !== null
+          ) {
+            const schemaTables = schema.tables as Record<string, unknown>;
+            for (const [tableName, contractTable] of Object.entries(contractTables)) {
+              const schemaTable = schemaTables[tableName];
+              if (
+                typeof contractTable === 'object' &&
+                contractTable !== null &&
+                'columns' in contractTable &&
+                typeof contractTable.columns === 'object' &&
+                contractTable.columns !== null &&
+                typeof schemaTable === 'object' &&
+                schemaTable !== null &&
+                'columns' in schemaTable &&
+                typeof schemaTable.columns === 'object' &&
+                schemaTable.columns !== null
+              ) {
+                const contractColumns = contractTable.columns as Record<string, unknown>;
+                const schemaColumns = schemaTable.columns as Record<string, unknown>;
+                for (const [columnName] of Object.entries(contractColumns)) {
+                  if (!schemaColumns[columnName]) {
+                    issues.push({
+                      kind: 'missing_column',
+                      table: tableName,
+                      column: columnName,
+                      message: `Column ${tableName}.${columnName} is not present in database`,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+        return { issues };
+      },
+    );
     const target: TargetDescriptor = {
       kind: 'target',
       id: 'postgres',
@@ -242,6 +348,7 @@ describe('verifyDatabaseSchema', () => {
       target,
       adapter,
       extensions: [],
+      contextInput: {},
       strict: false,
       startTime: Date.now(),
       contractPath: 'test/contract.json',
@@ -282,7 +389,76 @@ describe('verifyDatabaseSchema', () => {
       extensions: [],
     };
 
-    const family = createMockFamily(async () => schemaIR);
+    const family = createMockFamily(
+      async () => schemaIR,
+      async ({ contractIR, schemaIR: schema }) => {
+        const issues: unknown[] = [];
+        if (
+          typeof contractIR === 'object' &&
+          contractIR !== null &&
+          'storage' in contractIR &&
+          typeof contractIR.storage === 'object' &&
+          contractIR.storage !== null &&
+          'tables' in contractIR.storage &&
+          typeof contractIR.storage.tables === 'object' &&
+          contractIR.storage.tables !== null
+        ) {
+          const contractTables = contractIR.storage.tables as Record<string, unknown>;
+          if (
+            typeof schema === 'object' &&
+            schema !== null &&
+            'tables' in schema &&
+            typeof schema.tables === 'object' &&
+            schema.tables !== null
+          ) {
+            const schemaTables = schema.tables as Record<string, unknown>;
+            for (const [tableName, contractTable] of Object.entries(contractTables)) {
+              const schemaTable = schemaTables[tableName];
+              if (
+                typeof contractTable === 'object' &&
+                contractTable !== null &&
+                'columns' in contractTable &&
+                typeof contractTable.columns === 'object' &&
+                contractTable.columns !== null &&
+                typeof schemaTable === 'object' &&
+                schemaTable !== null &&
+                'columns' in schemaTable &&
+                typeof schemaTable.columns === 'object' &&
+                schemaTable.columns !== null
+              ) {
+                const contractColumns = contractTable.columns as Record<string, unknown>;
+                const schemaColumns = schemaTable.columns as Record<string, unknown>;
+                for (const [columnName, contractColumn] of Object.entries(contractColumns)) {
+                  const schemaColumn = schemaColumns[columnName];
+                  if (
+                    typeof contractColumn === 'object' &&
+                    contractColumn !== null &&
+                    'type' in contractColumn &&
+                    typeof contractColumn.type === 'string' &&
+                    typeof schemaColumn === 'object' &&
+                    schemaColumn !== null &&
+                    'typeId' in schemaColumn &&
+                    typeof schemaColumn.typeId === 'string'
+                  ) {
+                    if (contractColumn.type !== schemaColumn.typeId) {
+                      issues.push({
+                        kind: 'type_mismatch',
+                        table: tableName,
+                        column: columnName,
+                        expected: contractColumn.type,
+                        actual: schemaColumn.typeId,
+                        message: `Column ${tableName}.${columnName} type mismatch: expected ${contractColumn.type}, found ${schemaColumn.typeId}`,
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        return { issues };
+      },
+    );
     const target: TargetDescriptor = {
       kind: 'target',
       id: 'postgres',
@@ -304,6 +480,7 @@ describe('verifyDatabaseSchema', () => {
       target,
       adapter,
       extensions: [],
+      contextInput: {},
       strict: false,
       startTime: Date.now(),
       contractPath: 'test/contract.json',

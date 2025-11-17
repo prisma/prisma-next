@@ -332,6 +332,9 @@ importers:
       prettier:
         specifier: ^3.3.3
         version: 3.6.2
+      ts-toolbelt:
+        specifier: ^9.6.0
+        version: 9.6.0
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -416,6 +419,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../sql/contract
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../../sql/lanes/relational-core
@@ -444,9 +450,6 @@ importers:
         specifier: ^9.0.2
         version: 9.0.2
     devDependencies:
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../../sql/contract
       '@prisma-next/sql-contract-emitter':
         specifier: workspace:*
         version: link:../../../sql/tooling/emitter
@@ -623,6 +626,12 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../framework/core-contract
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-control-plane
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:*
+        version: link:../schema-ir
       arktype:
         specifier: ^2.1.25
         version: 2.1.25
@@ -932,6 +941,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../sql/contract
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
@@ -957,6 +969,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../framework/core-control-plane
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../sql/family
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../sql/contract

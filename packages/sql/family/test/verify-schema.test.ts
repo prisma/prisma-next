@@ -145,7 +145,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -177,7 +177,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -222,7 +222,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -272,7 +272,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -321,7 +321,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -368,7 +368,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -414,7 +414,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -455,7 +455,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -495,7 +495,7 @@ describe('verifySchema', () => {
     const driver = createMockDriver(queries);
 
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
@@ -535,16 +535,20 @@ describe('verifySchema', () => {
 
     const driver = createMockDriver(queries);
 
-    const codecRegistry = createTestCodecRegistry();
+    // Create contextInput with types registry (codecRegistry is part of types)
+    const adapterInstance = createPostgresAdapter();
+    const codecRegistry = adapterInstance.profile.codecs();
+    const types = createSqlTypeMetadataRegistry([{ codecRegistry }]);
+    const contextInput: SqlFamilyContext = { types };
 
-    const result = await verifyDatabaseSchema<SqlSchemaIR>({
+    const result = await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR: contract,
       family: sqlFamilyDescriptor,
       target,
       adapter,
       extensions,
-      codecRegistry,
+      contextInput,
       strict: true,
       startTime,
       contractPath: 'contract.json',
@@ -607,7 +611,7 @@ describe('verifySchema integration', () => {
           };
 
           const types = createTestTypeMetadataRegistry();
-          const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+          const contextInput: SqlFamilyContext = { types };
 
           const result = await verifyDatabaseSchema<SqlFamilyContext>({
             driver,
@@ -638,7 +642,7 @@ describe('introspectSchema hook', () => {
   it('introspects schema with pre-assembled type metadata registry', async () => {
     const { target, adapter, extensions } = createTestDescriptors();
     const types = createTestTypeMetadataRegistry();
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = { types };
+    const contextInput: SqlFamilyContext = { types };
 
     const queries = new Map<string, unknown[]>();
     queries.set('SELECT table_name', [{ table_name: 'user' }]);
@@ -656,7 +660,7 @@ describe('introspectSchema hook', () => {
 
     const driver = createMockDriver(queries);
 
-    const schemaIR = await sqlFamilyDescriptor.verify!.introspectSchema!({
+    const schemaIR = await sqlFamilyDescriptor.introspectSchema({
       driver,
       contextInput,
       target,
@@ -702,7 +706,7 @@ describe('verifySchema hook', () => {
       extensions: [],
     };
 
-    const result = await sqlFamilyDescriptor.verify!.verifySchema!({
+    const result = await sqlFamilyDescriptor.verifySchema({
       contractIR: contract,
       schemaIR,
       target,
@@ -722,7 +726,7 @@ describe('verifySchema hook', () => {
       extensions: [],
     };
 
-    const result = await sqlFamilyDescriptor.verify!.verifySchema!({
+    const result = await sqlFamilyDescriptor.verifySchema({
       contractIR: contract,
       schemaIR,
       target,
@@ -766,7 +770,7 @@ describe('verifySchema hook', () => {
       extensions: [],
     };
 
-    const result = await sqlFamilyDescriptor.verify!.verifySchema!({
+    const result = await sqlFamilyDescriptor.verifySchema({
       contractIR: contract,
       schemaIR,
       target,

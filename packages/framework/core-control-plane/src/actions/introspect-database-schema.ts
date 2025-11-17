@@ -4,6 +4,7 @@ import type {
   ControlPlaneDriver,
   ExtensionDescriptor,
   FamilyDescriptor,
+  SchemaIROf,
   TargetDescriptor,
   TargetFamilyContext,
 } from '../types';
@@ -16,13 +17,13 @@ export interface IntrospectDatabaseSchemaOptions<
   readonly target: TargetDescriptor<TCtx>;
   readonly adapter: AdapterDescriptor<TCtx>;
   readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
-  readonly contextInput: Omit<TCtx, 'schemaIR'>;
+  readonly contextInput: TCtx;
 }
 
 export interface IntrospectDatabaseSchemaResult<
   TCtx extends TargetFamilyContext = TargetFamilyContext,
 > {
-  readonly schemaIR: TCtx['schemaIR'];
+  readonly schemaIR: SchemaIROf<TCtx>;
 }
 
 /**
@@ -35,13 +36,13 @@ export async function introspectDatabaseSchema<
 >(options: IntrospectDatabaseSchemaOptions<TCtx>): Promise<IntrospectDatabaseSchemaResult<TCtx>> {
   const { driver, family, target, adapter, extensions, contextInput } = options;
 
-  if (!family.verify?.introspectSchema) {
+  if (!family.introspectSchema) {
     throw errorUnexpected('Family introspectSchema() is required', {
-      why: 'Family verify.introspectSchema is required for schema verification',
+      why: 'Family introspectSchema is required for schema verification',
     });
   }
 
-  const schemaIR = await family.verify.introspectSchema({
+  const schemaIR = await family.introspectSchema({
     driver,
     contextInput,
     target,

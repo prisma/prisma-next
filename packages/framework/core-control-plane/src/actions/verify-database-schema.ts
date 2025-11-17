@@ -20,7 +20,7 @@ export interface VerifyDatabaseSchemaOptions<
   readonly target: TargetDescriptor<TCtx>;
   readonly adapter: AdapterDescriptor<TCtx>;
   readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
-  readonly contextInput: Omit<TCtx, 'schemaIR'>;
+  readonly contextInput: TCtx;
   readonly strict: boolean;
   readonly startTime: number;
   readonly contractPath: string;

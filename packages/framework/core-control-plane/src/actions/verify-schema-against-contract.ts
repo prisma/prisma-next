@@ -4,6 +4,7 @@ import type {
   ExtensionDescriptor,
   ExtensionSchemaVerifierOptions,
   FamilyDescriptor,
+  SchemaIROf,
   SchemaIssue,
   TargetDescriptor,
   TargetFamilyContext,
@@ -11,7 +12,7 @@ import type {
 
 export interface VerifySchemaOptions<TCtx extends TargetFamilyContext = TargetFamilyContext> {
   readonly contractIR: unknown;
-  readonly schemaIR: TCtx['schemaIR'];
+  readonly schemaIR: SchemaIROf<TCtx>;
   readonly family: FamilyDescriptor<TCtx>;
   readonly target: TargetDescriptor<TCtx>;
   readonly adapter: AdapterDescriptor<TCtx>;
@@ -269,7 +270,7 @@ function compareContractToSchema(contractIR: unknown, schemaIR: unknown): Schema
 
 /**
  * Verifies that the schema IR matches the contract IR.
- * If family.verify.verifySchema is provided, defers to it; otherwise uses generic comparison.
+ * If family.verifySchema is provided, defers to it; otherwise uses generic comparison.
  * Also calls extension verifySchema hooks and aggregates all issues.
  */
 export async function verifySchemaAgainstContract<
@@ -280,8 +281,8 @@ export async function verifySchemaAgainstContract<
   let issues: SchemaIssue[] = [];
 
   // If family provides verifySchema hook, use it; otherwise use generic comparison
-  if (family.verify?.verifySchema) {
-    const result = await family.verify.verifySchema({
+  if (family.verifySchema) {
+    const result = await family.verifySchema({
       contractIR,
       schemaIR,
       target,

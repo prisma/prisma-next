@@ -50,11 +50,11 @@ function loadTargetManifest(): ExtensionPackManifest {
 /**
  * Postgres target descriptor for CLI config.
  */
-const postgresTargetDescriptor: TargetDescriptor<SqlFamilyContext> = {
+const postgresTargetDescriptor = {
   kind: 'target',
   id: 'postgres',
   family: 'sql',
   manifest: loadTargetManifest(),
-};
+} as const satisfies TargetDescriptor<SqlFamilyContext>;
 
 export default postgresTargetDescriptor;

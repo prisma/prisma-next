@@ -52,7 +52,7 @@ function loadAdapterManifest(): ExtensionPackManifest {
  * Postgres adapter descriptor for CLI config.
  * Provides a runtime factory for DB-connected commands (e.g., schema verification).
  */
-const postgresAdapterDescriptor: AdapterDescriptor<SqlFamilyContext> = {
+const postgresAdapterDescriptor = {
   kind: 'adapter',
   id: 'postgres',
   family: 'sql',
@@ -60,4 +60,4 @@ const postgresAdapterDescriptor: AdapterDescriptor<SqlFamilyContext> = {
   create: () => createPostgresAdapter(),
 };
 
-export default postgresAdapterDescriptor;
+export default postgresAdapterDescriptor as unknown as AdapterDescriptor<SqlFamilyContext>;

@@ -1,15 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
+import type { TargetFamilyContext } from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
-import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
-import { createSqlTypeMetadataRegistry } from '@prisma-next/family-sql/type-metadata';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import {
@@ -155,47 +147,24 @@ export function createDbSchemaVerifyCommand(): Command {
         const startTime = Date.now();
 
         try {
-          // Build type metadata registry from adapter + extensions
-          // This is SQL-specific, so we use the SQL family helper
-          // Get adapter instance (either pre-created or create via factory)
-          let adapterInstance:
-            | {
-                profile: { codecs(): CodecRegistry };
-              }
-            | undefined;
-          if (config.adapter.adapter) {
-            adapterInstance = config.adapter.adapter as {
-              profile: { codecs(): CodecRegistry };
-            };
-          } else if (config.adapter.create) {
-            const created = await config.adapter.create();
-            adapterInstance = created as {
-              profile: { codecs(): CodecRegistry };
-            };
-          }
-
-          // Build type metadata registry from adapter codecs
-          const codecRegistry = adapterInstance?.profile.codecs();
-          const types = createSqlTypeMetadataRegistry([
-            ...(codecRegistry ? [{ codecRegistry }] : []),
-          ]);
-
-          // Build contextInput (everything except schemaIR)
-          const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = {
-            types,
-          };
+          // Prepare family-specific control-plane context via family hook
+          const contextInput = config.family.prepareControlContext
+            ? await config.family.prepareControlContext({
+                contractIR,
+                target: config.target,
+                adapter: config.adapter,
+                extensions: config.extensions ?? [],
+              })
+            : ({} as TargetFamilyContext);
 
           // Call domain action with assembled inputs
-          // Cast config descriptors to SqlFamilyContext types since we know this is SQL family
-          const verifyResult = await verifyDatabaseSchema<SqlFamilyContext>({
+          const verifyResult = await verifyDatabaseSchema({
             driver,
             contractIR,
-            family: config.family as FamilyDescriptor<SqlFamilyContext>,
-            target: config.target as TargetDescriptor<SqlFamilyContext>,
-            adapter: config.adapter as AdapterDescriptor<SqlFamilyContext>,
-            extensions: (config.extensions ?? []) as ReadonlyArray<
-              ExtensionDescriptor<SqlFamilyContext>
-            >,
+            family: config.family,
+            target: config.target,
+            adapter: config.adapter,
+            extensions: config.extensions ?? [],
             contextInput,
             strict: options.strict ?? false,
             startTime,

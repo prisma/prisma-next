@@ -193,9 +193,9 @@ export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFl
   }
 
   if (isVerbose(flags, 1)) {
-    if (result.codecCoverageSkipped) {
+    if (result.typeCoverageSkipped) {
       lines.push(
-        `${prefix}${formatDimText('  Codec coverage check skipped (helper returned no supported types)')}`,
+        `${prefix}${formatDimText('  Type coverage check skipped (helper returned no supported types)')}`,
       );
     }
     lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);

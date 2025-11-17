@@ -7,10 +7,12 @@ import type {
   SchemaIssue,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
+import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { type } from 'arktype';
 import type { SqlFamilyContext } from './context';
-import type { SqlTypeMetadataRegistry } from './types';
+import { createSqlTypeMetadataRegistry } from './type-metadata';
+import type { SqlTypeMetadata, SqlTypeMetadataRegistry } from './types';
 
 const MetaSchema = type({ '[string]': 'unknown' });
 
@@ -152,7 +154,7 @@ export async function readMarker(driver: ControlPlaneDriver): Promise<ContractMa
  * For MVP, we return an empty array since extracting type IDs from TypeScript modules
  * would require runtime evaluation or static analysis. This can be enhanced later.
  */
-export function collectSupportedCodecTypeIds(
+export function supportedTypeIds(
   descriptors: ReadonlyArray<
     | TargetDescriptor<SqlFamilyContext>
     | AdapterDescriptor<SqlFamilyContext>
@@ -167,14 +169,74 @@ export function collectSupportedCodecTypeIds(
 }
 
 /**
+ * Prepares family-specific control-plane context from descriptors.
+ * For SQL, this constructs a SqlTypeMetadataRegistry from adapter codecs and extension metadata.
+ * The returned context is used as input to introspectSchema and other control-plane operations.
+ * The context does not contain schemaIR; that is produced separately by introspectSchema.
+ */
+export async function prepareControlContext(options: {
+  readonly contractIR: unknown;
+  readonly target: TargetDescriptor<SqlFamilyContext>;
+  readonly adapter: AdapterDescriptor<SqlFamilyContext>;
+  readonly extensions: ReadonlyArray<ExtensionDescriptor<SqlFamilyContext>>;
+}): Promise<SqlFamilyContext> {
+  const { adapter: adapterDescriptor, extensions } = options;
+
+  // Hydrate adapter instance (either pre-created or create via factory)
+  let adapterInstance:
+    | {
+        profile: { codecs(): CodecRegistry };
+      }
+    | undefined;
+  if (adapterDescriptor.adapter) {
+    adapterInstance = adapterDescriptor.adapter as {
+      profile: { codecs(): CodecRegistry };
+    };
+  } else if (adapterDescriptor.create) {
+    const created = await adapterDescriptor.create();
+    adapterInstance = created as {
+      profile: { codecs(): CodecRegistry };
+    };
+  }
+
+  // Get codec registry from adapter
+  const codecRegistry = adapterInstance?.profile.codecs();
+
+  // Collect extension typeMetadata
+  const extensionTypeMetadata: SqlTypeMetadata[] = [];
+  for (const extension of extensions) {
+    // Check if extension has typeMetadata property (from control-plane extension SPI)
+    if (
+      typeof extension === 'object' &&
+      extension !== null &&
+      'typeMetadata' in extension &&
+      Array.isArray(extension.typeMetadata)
+    ) {
+      extensionTypeMetadata.push(...(extension.typeMetadata as SqlTypeMetadata[]));
+    }
+  }
+
+  // Build type metadata registry from adapter codecs and extension metadata
+  const types = createSqlTypeMetadataRegistry([
+    ...(codecRegistry ? [{ codecRegistry }] : []),
+    ...(extensionTypeMetadata.length > 0 ? [{ typeMetadata: extensionTypeMetadata }] : []),
+  ]);
+
+  // Return context with control-plane state (types registry)
+  // TargetFamilyContext is a pure type carrier with no runtime fields, so { types } satisfies SqlFamilyContext
+  return { types } as SqlFamilyContext;
+}
+
+/**
  * Introspects the database schema and returns a target-agnostic SqlSchemaIR.
  * Delegates to Postgres adapter for concrete introspection.
  * This is the SQL family's implementation of the introspectSchema hook.
  * The contextInput contains the types registry, pre-assembled by the domain layer.
+ * The schemaIR is returned as a separate value, not stored in the context.
  */
 export async function introspectSchema(options: {
   readonly driver: ControlPlaneDriver;
-  readonly contextInput: Omit<SqlFamilyContext, 'schemaIR'>;
+  readonly contextInput: SqlFamilyContext;
   readonly contractIR?: unknown;
   readonly target: TargetDescriptor<SqlFamilyContext>;
   readonly adapter: AdapterDescriptor<SqlFamilyContext>;
@@ -182,7 +244,6 @@ export async function introspectSchema(options: {
 }): Promise<SqlSchemaIR> {
   const { driver, contractIR, contextInput } = options;
   // Extract types from contextInput
-  // contextInput is Omit<SqlFamilyContext, 'schemaIR'>, which contains types
   const types: SqlTypeMetadataRegistry = contextInput.types;
 
   // Delegate to Postgres adapter for concrete introspection

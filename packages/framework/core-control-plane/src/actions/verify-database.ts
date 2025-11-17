@@ -32,8 +32,8 @@ export async function verifyDatabase(
   try {
     const { config, contractIR, dbUrl, contractPath, configPath } = options;
 
-    // Check for family verify.readMarker
-    if (!config.family.verify?.readMarker) {
+    // Check for family readMarker
+    if (!config.family.readMarker) {
       throw errorFamilyReadMarkerSqlRequired();
     }
 
@@ -46,7 +46,7 @@ export async function verifyDatabase(
     // Create ControlPlaneExecutor
     const executor = new ControlPlaneExecutor({
       driver,
-      familyVerify: config.family.verify,
+      family: config.family,
       adapter: config.adapter,
       target: config.target,
       extensions: config.extensions ?? [],

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/family-sql/context';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   ensureSchemaStatement,
@@ -462,7 +462,7 @@ describe('db verify command (e2e)', () => {
   );
 
   it(
-    'reports PN-CLI-4007 when family.verify.readMarker is missing',
+    'reports PN-CLI-4007 when family.readMarker is missing',
     async () => {
       await withDevDatabase(
         async ({ connectionString }) => {
@@ -523,7 +523,7 @@ describe('db verify command (e2e)', () => {
             });
             expect(parsed.summary).toContain('Family readMarker() is required');
             expect(parsed.fix).toContain(
-              'Ensure family.verify.readMarker() is exported by your family package',
+              'Ensure family.readMarker() is exported by your family package',
             );
           } finally {
             cleanupDir();

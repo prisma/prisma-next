@@ -85,7 +85,7 @@ async function callVerifyDatabaseSchema(options: {
     const types = createSqlTypeMetadataRegistry([...(codecRegistry ? [{ codecRegistry }] : [])]);
 
     // Build contextInput (everything except schemaIR)
-    const contextInput: Omit<SqlFamilyContext, 'schemaIR'> = {
+    const contextInput: SqlFamilyContext = {
       types,
     };
 
@@ -95,7 +95,7 @@ async function callVerifyDatabaseSchema(options: {
     return await verifyDatabaseSchema<SqlFamilyContext>({
       driver,
       contractIR,
-      family: config.family as FamilyDescriptor<SqlFamilyContext>,
+      family: config.family as unknown as FamilyDescriptor<SqlFamilyContext>,
       target: config.target as TargetDescriptor<SqlFamilyContext>,
       adapter: config.adapter as AdapterDescriptor<SqlFamilyContext>,
       extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<SqlFamilyContext>>,
@@ -201,15 +201,9 @@ describe('verifyDatabaseSchema API', () => {
             const originalLoadConfig = configLoaderModule.loadConfig;
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementation(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = config.family.verify
-                ? {
-                    ...config.family.verify,
-                    introspectSchema: undefined,
-                  }
-                : undefined;
               const mockedFamily = {
                 ...config.family,
-                verify: mockedVerify,
+                introspectSchema: undefined,
               };
               return {
                 ...config,
@@ -374,19 +368,10 @@ describe('verifyDatabaseSchema API', () => {
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = config.family.verify
-                ? {
-                    ...config.family.verify,
-                    introspectSchema: introspectSchemaMock,
-                    verifySchema: verifySchemaMock,
-                  }
-                : {
-                    introspectSchema: introspectSchemaMock,
-                    verifySchema: verifySchemaMock,
-                  };
               const mockedFamily = {
                 ...config.family,
-                verify: mockedVerify,
+                introspectSchema: introspectSchemaMock,
+                verifySchema: verifySchemaMock,
               };
               return {
                 ...config,
@@ -474,19 +459,10 @@ describe('verifyDatabaseSchema API', () => {
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = config.family.verify
-                ? {
-                    ...config.family.verify,
-                    introspectSchema: introspectSchemaMock,
-                    verifySchema: verifySchemaMock,
-                  }
-                : {
-                    introspectSchema: introspectSchemaMock,
-                    verifySchema: verifySchemaMock,
-                  };
               const mockedFamily = {
                 ...config.family,
-                verify: mockedVerify,
+                introspectSchema: introspectSchemaMock,
+                verifySchema: verifySchemaMock,
               };
               return {
                 ...config,
@@ -585,19 +561,10 @@ describe('verifyDatabaseSchema API', () => {
 
             vi.spyOn(configLoaderModule, 'loadConfig').mockImplementationOnce(async (path) => {
               const config = await originalLoadConfig(path);
-              const mockedVerify = config.family.verify
-                ? {
-                    ...config.family.verify,
-                    introspectSchema: introspectSchemaMock,
-                    verifySchema: verifySchemaMock,
-                  }
-                : {
-                    introspectSchema: introspectSchemaMock,
-                    verifySchema: verifySchemaMock,
-                  };
               const mockedFamily = {
                 ...config.family,
-                verify: mockedVerify,
+                introspectSchema: introspectSchemaMock,
+                verifySchema: verifySchemaMock,
               };
               return {
                 ...config,
@@ -708,19 +675,10 @@ describe('verifyDatabaseSchema API', () => {
                   };
                 }),
               };
-              const mockedVerify = config.family.verify
-                ? {
-                    ...config.family.verify,
-                    introspectSchema: introspectSchemaMock,
-                    verifySchema: verifySchemaMock,
-                  }
-                : {
-                    introspectSchema: introspectSchemaMock,
-                    verifySchema: verifySchemaMock,
-                  };
               const mockedFamily = {
                 ...config.family,
-                verify: mockedVerify,
+                introspectSchema: introspectSchemaMock,
+                verifySchema: verifySchemaMock,
               };
               return {
                 ...config,

@@ -29,9 +29,11 @@ function createTestConfig(overrides?: Partial<PrismaNextConfig>): PrismaNextConf
       hook: {} as unknown,
       convertOperationManifest: vi.fn(),
       validateContractIR: vi.fn((contract: unknown) => contract),
-      verify: {
-        readMarker: overrides?.family?.verify?.readMarker ?? defaultReadMarker,
-      },
+      readMarker: overrides?.family?.readMarker ?? defaultReadMarker,
+      supportedTypeIds: vi.fn(() => []),
+      prepareControlContext: vi.fn(async () => ({})),
+      introspectSchema: vi.fn(async () => ({})),
+      verifySchema: vi.fn(async () => ({ issues: [] })),
       ...overrides?.family,
     },
     target: {
@@ -134,9 +136,11 @@ describe('verifyDatabase', () => {
         hook: {} as unknown,
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn((contract: unknown) => contract),
-        verify: {
-          readMarker: vi.fn(async () => null), // Returns null when marker is missing
-        },
+        readMarker: vi.fn(async () => null), // Returns null when marker is missing
+        supportedTypeIds: vi.fn(() => []),
+        prepareControlContext: vi.fn(async () => ({})),
+        introspectSchema: vi.fn(async () => ({})),
+        verifySchema: vi.fn(async () => ({ issues: [] })),
       },
     });
 
@@ -163,17 +167,19 @@ describe('verifyDatabase', () => {
         hook: {} as unknown,
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn((contract: unknown) => contract),
-        verify: {
-          readMarker: vi.fn(async () => ({
-            coreHash: 'sha256:different',
-            profileHash: 'sha256:profile',
-            contractJson: null,
-            canonicalVersion: 1,
-            updatedAt: new Date(),
-            appTag: null,
-            meta: null,
-          })),
-        },
+        readMarker: vi.fn(async () => ({
+          coreHash: 'sha256:different',
+          profileHash: 'sha256:profile',
+          contractJson: null,
+          canonicalVersion: 1,
+          updatedAt: new Date(),
+          appTag: null,
+          meta: null,
+        })),
+        supportedTypeIds: vi.fn(() => []),
+        prepareControlContext: vi.fn(async () => ({})),
+        introspectSchema: vi.fn(async () => ({})),
+        verifySchema: vi.fn(async () => ({ issues: [] })),
       },
     });
 
@@ -201,17 +207,19 @@ describe('verifyDatabase', () => {
         hook: {} as unknown,
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn((contract: unknown) => contract),
-        verify: {
-          readMarker: vi.fn(async () => ({
-            coreHash: 'sha256:test',
-            profileHash: 'sha256:different-profile',
-            contractJson: null,
-            canonicalVersion: 1,
-            updatedAt: new Date(),
-            appTag: null,
-            meta: null,
-          })),
-        },
+        readMarker: vi.fn(async () => ({
+          coreHash: 'sha256:test',
+          profileHash: 'sha256:different-profile',
+          contractJson: null,
+          canonicalVersion: 1,
+          updatedAt: new Date(),
+          appTag: null,
+          meta: null,
+        })),
+        supportedTypeIds: vi.fn(() => []),
+        prepareControlContext: vi.fn(async () => ({})),
+        introspectSchema: vi.fn(async () => ({})),
+        verifySchema: vi.fn(async () => ({ issues: [] })),
       },
     });
 
@@ -282,7 +290,7 @@ describe('verifyDatabase', () => {
     ).rejects.toThrow(errorDriverRequired());
   });
 
-  it('throws error when family verify.readMarker is missing', async () => {
+  it('throws error when family readMarker is missing', async () => {
     const config = createTestConfig({
       family: {
         kind: 'family',
@@ -290,7 +298,11 @@ describe('verifyDatabase', () => {
         hook: {} as unknown,
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn((contract: unknown) => contract),
-        verify: undefined,
+        readMarker: undefined,
+        supportedTypeIds: vi.fn(() => []),
+        prepareControlContext: vi.fn(async () => ({})),
+        introspectSchema: vi.fn(async () => ({})),
+        verifySchema: vi.fn(async () => ({ issues: [] })),
       },
     });
 
@@ -332,9 +344,11 @@ describe('verifyDatabase', () => {
         hook: {} as unknown,
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn((contract: unknown) => contract),
-        verify: {
-          readMarker: vi.fn(async () => null), // Marker missing
-        },
+        readMarker: vi.fn(async () => null), // Marker missing
+        supportedTypeIds: vi.fn(() => []),
+        prepareControlContext: vi.fn(async () => ({})),
+        introspectSchema: vi.fn(async () => ({})),
+        verifySchema: vi.fn(async () => ({ issues: [] })),
       },
       driver: {
         kind: 'driver',
@@ -376,9 +390,11 @@ describe('verifyDatabase', () => {
         hook: {} as unknown,
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn((contract: unknown) => contract),
-        verify: {
-          readMarker: vi.fn(async () => null),
-        },
+        readMarker: vi.fn(async () => null),
+        supportedTypeIds: vi.fn(() => []),
+        prepareControlContext: vi.fn(async () => ({})),
+        introspectSchema: vi.fn(async () => ({})),
+        verifySchema: vi.fn(async () => ({ issues: [] })),
       },
     });
 
@@ -404,9 +420,11 @@ describe('verifyDatabase', () => {
         hook: {} as unknown,
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn((contract: unknown) => contract),
-        verify: {
-          readMarker: vi.fn(async () => null),
-        },
+        readMarker: vi.fn(async () => null),
+        supportedTypeIds: vi.fn(() => []),
+        prepareControlContext: vi.fn(async () => ({})),
+        introspectSchema: vi.fn(async () => ({})),
+        verifySchema: vi.fn(async () => ({ issues: [] })),
       },
     });
 

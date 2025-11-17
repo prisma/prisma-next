@@ -177,36 +177,36 @@ export function errorFamilyReadMarkerSqlRequired(options?: {
 }): CliStructuredError {
   return new CliStructuredError('4007', 'Family readMarker() is required', {
     domain: 'CLI',
-    why: options?.why ?? 'Family verify.readMarker is required for db verify',
-    fix: 'Ensure family.verify.readMarker() is exported by your family package',
+    why: options?.why ?? 'Family readMarker is required for db verify',
+    fix: 'Ensure family.readMarker() is exported by your family package',
     docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
   });
 }
 
 /**
- * Family verify.introspectSchema is required but not provided.
+ * Family introspectSchema is required but not provided.
  */
 export function errorFamilyIntrospectSchemaRequired(options?: {
   readonly why?: string;
 }): CliStructuredError {
   return new CliStructuredError('4009', 'Family introspectSchema() is required', {
     domain: 'CLI',
-    why: options?.why ?? 'Family verify.introspectSchema is required for schema verification',
-    fix: 'Ensure family.verify.introspectSchema() is exported by your family package',
+    why: options?.why ?? 'Family introspectSchema is required for schema verification',
+    fix: 'Ensure family.introspectSchema() is exported by your family package',
     docsUrl: 'https://prisma-next.dev/docs/cli/db-schema-verify',
   });
 }
 
 /**
- * Family verify.verifySchema is required but not provided.
+ * Family verifySchema is required but not provided.
  */
 export function errorFamilySchemaVerifierRequired(options?: {
   readonly why?: string;
 }): CliStructuredError {
   return new CliStructuredError('4008', 'Family verifySchema() is required', {
     domain: 'CLI',
-    why: options?.why ?? 'Family verify.verifySchema is required for db schema-verify',
-    fix: 'Ensure family.verify.verifySchema() is exported by your family package',
+    why: options?.why ?? 'Family verifySchema is required for db schema-verify',
+    fix: 'Ensure family.verifySchema() is exported by your family package',
     docsUrl: 'https://prisma-next.dev/docs/cli/db-schema-verify',
   });
 }
