@@ -111,9 +111,6 @@ export function createDbVerifyCommand(): Command {
         }
         const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-        // Validate contract using family validator
-        const contractIR = config.family.validateContractIR(contractJson) as ContractIR;
-
         // Resolve database URL
         const dbUrl = options.db ?? config.db?.url;
         if (!dbUrl) {
@@ -129,12 +126,15 @@ export function createDbVerifyCommand(): Command {
         const driver = await config.driver.create(dbUrl);
 
         try {
-          // Create family instance
+          // Create family instance first
           const familyInstance = config.family.create({
             target: config.target,
             adapter: config.adapter,
             extensions: config.extensions ?? [],
           }) as FamilyInstance<string>;
+
+          // Validate contract using instance validator
+          const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
 
           // Call family instance verify method
           let verifyResult: VerifyDatabaseResult;

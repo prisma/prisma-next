@@ -12,8 +12,11 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
+import type { OperationRegistry } from '@prisma-next/operations';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import {
   assembleOperationRegistry,
@@ -22,6 +25,50 @@ import {
   extractOperationTypeImports,
 } from './assembly';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
+
+/**
+ * Private: Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
+ * This is SQL-family-specific conversion logic.
+ */
+function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
+  return {
+    forTypeId: manifest.for,
+    method: manifest.method,
+    args: manifest.args.map((arg: OperationManifest['args'][number]) => {
+      if (arg.kind === 'typeId') {
+        if (!arg.type) {
+          throw new Error('typeId arg must have type property');
+        }
+        return { kind: 'typeId' as const, type: arg.type };
+      }
+      if (arg.kind === 'param') {
+        return { kind: 'param' as const };
+      }
+      if (arg.kind === 'literal') {
+        return { kind: 'literal' as const };
+      }
+      throw new Error(`Invalid arg kind: ${(arg as { kind: unknown }).kind}`);
+    }),
+    returns: (() => {
+      if (manifest.returns.kind === 'typeId') {
+        return { kind: 'typeId' as const, type: manifest.returns.type };
+      }
+      if (manifest.returns.kind === 'builtin') {
+        return {
+          kind: 'builtin' as const,
+          type: manifest.returns.type as 'number' | 'boolean' | 'string',
+        };
+      }
+      throw new Error(`Invalid return kind: ${(manifest.returns as { kind: unknown }).kind}`);
+    })(),
+    lowering: {
+      targetFamily: 'sql',
+      strategy: manifest.lowering.strategy,
+      template: manifest.lowering.template,
+    },
+    ...(manifest.capabilities ? { capabilities: manifest.capabilities } : {}),
+  };
+}
 
 /**
  * Extracts codec type IDs used in contract storage tables.
@@ -163,7 +210,6 @@ interface CreateSqlFamilyInstanceOptions {
   readonly target: TargetDescriptor<'sql'>;
   readonly adapter: AdapterDescriptor<'sql'>;
   readonly extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>;
-  readonly convertOperationManifest: (manifest: OperationManifest) => OperationSignature;
 }
 
 /**
@@ -172,7 +218,7 @@ interface CreateSqlFamilyInstanceOptions {
 export function createSqlFamilyInstance(
   options: CreateSqlFamilyInstanceOptions,
 ): SqlFamilyInstance {
-  const { target, adapter, extensions, convertOperationManifest } = options;
+  const { target, adapter, extensions } = options;
 
   // Build descriptors array for assembly
   const descriptors = [target, adapter, ...extensions];
@@ -183,12 +229,35 @@ export function createSqlFamilyInstance(
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
 
+  /**
+   * Strips mappings from a contract (mappings are runtime-only).
+   */
+  function stripMappings(contract: unknown): unknown {
+    // Type guard to check if contract has mappings
+    if (typeof contract === 'object' && contract !== null && 'mappings' in contract) {
+      const { mappings: _mappings, ...contractIR } = contract as {
+        mappings?: unknown;
+        [key: string]: unknown;
+      };
+      return contractIR;
+    }
+    return contract;
+  }
+
   return {
     familyId: 'sql',
     operationRegistry,
     codecTypeImports,
     operationTypeImports,
     extensionIds,
+
+    validateContractIR(contractJson: unknown): unknown {
+      // Validate the contract (this normalizes and validates structure/logic)
+      const validated = validateContract<SqlContract<SqlStorage>>(contractJson);
+      // Strip mappings before returning ContractIR (mappings are runtime-only)
+      const { mappings: _mappings, ...contractIR } = validated;
+      return contractIR;
+    },
 
     async verify(verifyOptions: {
       readonly driver: ControlPlaneDriver;
@@ -346,10 +415,14 @@ export function createSqlFamilyInstance(
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {
-      const ir = contractIR as ContractIR;
+      // Strip mappings if present (mappings are runtime-only)
+      const contractWithoutMappings = stripMappings(contractIR);
+
+      // Validate and normalize the contract
+      const validatedIR = this.validateContractIR(contractWithoutMappings) as ContractIR;
 
       const result = await emit(
-        ir,
+        validatedIR,
         {
           outputDir: '',
           operationRegistry,

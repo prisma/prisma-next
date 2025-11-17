@@ -51,16 +51,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       why: 'Config.family must have hook: TargetFamilyHook',
     });
   }
-  if (typeof family['convertOperationManifest'] !== 'function') {
-    throw errorConfigValidation('family.convertOperationManifest', {
-      why: 'Config.family must have convertOperationManifest: function',
-    });
-  }
-  if (typeof family['validateContractIR'] !== 'function') {
-    throw errorConfigValidation('family.validateContractIR', {
-      why: 'Config.family must have validateContractIR: function',
-    });
-  }
   if (typeof family['create'] !== 'function') {
     throw errorConfigValidation('family.create', {
       why: 'Config.family must have create: function',

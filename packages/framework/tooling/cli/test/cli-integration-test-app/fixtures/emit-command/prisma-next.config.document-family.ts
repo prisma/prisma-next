@@ -16,18 +16,6 @@ export default defineConfig({
     familyId: 'document',
     manifest: { id: 'document', version: '0.0.1' },
     hook: mockHook,
-    convertOperationManifest: () => ({
-      forTypeId: '',
-      method: '',
-      args: [],
-      returns: { kind: 'builtin' as const, type: 'string' as const },
-      lowering: {
-        targetFamily: 'sql' as const,
-        strategy: 'function' as const,
-        template: '',
-      },
-    }),
-    validateContractIR: (contract: unknown) => contract,
     // Test fixture - mock family instance for testing
     create: () => ({}) as unknown as FamilyInstance<string>,
   },

@@ -45,6 +45,10 @@
     "./runtime": {
       "types": "./dist/exports/runtime.d.ts",
       "import": "./dist/exports/runtime.js"
+    },
+    "./instance": {
+      "types": "./dist/exports/instance.d.ts",
+      "import": "./dist/exports/instance.js"
     }
   }
 }

@@ -58,26 +58,26 @@ const matchesGlobPattern = (group, pattern) => {
     if (glob === pattern) {
       return true;
     }
-    
+
     // Check if the group's glob matches the exception pattern by normalizing both and testing
     // Normalize both patterns to regex and check if they would match the same files
     const normalizedExceptionPattern = normalizeGlob(pattern);
     const normalizedGroupPattern = normalizeGlob(glob);
-    
+
     // If the normalized patterns are identical, they match
     if (normalizedExceptionPattern === normalizedGroupPattern) {
       return true;
     }
-    
+
     // Check if one pattern is a prefix of the other (handles cases like packages/extensions/** vs packages/extensions/compat-prisma/**)
     const exceptionBase = pattern.replace(/\/\*\*$/, '').replace(/\*$/, '');
     const groupBase = glob.replace(/\/\*\*$/, '').replace(/\*$/, '');
-    
+
     // Group matches exception if group's base path starts with exception's base path, or vice versa
     if (groupBase.startsWith(exceptionBase) || exceptionBase.startsWith(groupBase)) {
       return true;
     }
-    
+
     return false;
   });
 };

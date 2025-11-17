@@ -1,7 +1,6 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TargetFamilyHook } from '@prisma-next/contract/types';
-import type { OperationSignature } from '@prisma-next/operations';
-import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
+import type { ExtensionPackManifest } from './pack-manifest-types';
 import type { CoreSchemaView } from './schema-view';
 
 /**
@@ -41,29 +40,13 @@ export interface DriverDescriptor {
 
 /**
  * Descriptor for a target family (e.g., SQL).
- * Provides the family hook and assembly helpers.
+ * Provides the family hook and factory method.
  */
 export interface FamilyDescriptor<TFamilyId extends string, TFamilyInstance = unknown> {
   readonly kind: 'family';
   readonly familyId: TFamilyId;
   readonly manifest: ExtensionPackManifest;
   readonly hook: TargetFamilyHook;
-  /**
-   * Converts an OperationManifest to an OperationSignature.
-   * Family-specific conversion logic (e.g., SQL adds lowering spec).
-   */
-  readonly convertOperationManifest: (manifest: OperationManifest) => OperationSignature;
-  /**
-   * Validates a contract JSON and returns a validated ContractIR (without mappings).
-   * Mappings are runtime-only and should not be part of ContractIR.
-   */
-  readonly validateContractIR: (contractJson: unknown) => unknown;
-  /**
-   * Optionally strips mappings from a contract.
-   * Default implementation is a no-op (returns contract as-is).
-   * SQL family overrides this to strip mappings before emitting ContractIR.
-   */
-  readonly stripMappings?: (contract: unknown) => unknown;
   /**
    * Creates a family instance for control-plane operations.
    * @param options - Target, adapter, and extensions for the instance
@@ -123,6 +106,12 @@ export interface FamilyInstance<
   readonly familyId: TFamilyId;
 
   /**
+   * Validates a contract JSON and returns a validated ContractIR (without mappings).
+   * Mappings are runtime-only and should not be part of ContractIR.
+   */
+  validateContractIR(contractJson: unknown): unknown;
+
+  /**
    * Verifies the database marker against the contract.
    * Compares target, coreHash, and profileHash.
    */
@@ -164,6 +153,7 @@ export interface FamilyInstance<
   /**
    * Emits contract JSON and DTS as strings.
    * Uses the instance's preassembled state (operation registry, type imports, extension IDs).
+   * Handles stripping mappings and validation internally.
    */
   emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
 }

@@ -1,6 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -45,20 +44,15 @@ async function emitContractFromConfig(
     contractRaw = contractConfig.source;
   }
 
-  const contractWithoutMappings = config.family.stripMappings
-    ? config.family.stripMappings(contractRaw)
-    : contractRaw;
-
-  const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
-  // Create family instance (assembles operation registry, type imports, extension IDs)
+  // Create family instance first (assembles operation registry, type imports, extension IDs)
   const familyInstance = config.family.create({
     target: config.target,
     adapter: config.adapter,
     extensions: config.extensions ?? [],
   }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-  const emitResult = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
+  // emitContract handles stripping mappings and validation internally
+  const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
 
   // Write contract files
   const contractJsonPath = resolve(testDir, contractConfig.output ?? 'src/prisma/contract.json');

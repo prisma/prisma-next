@@ -73,18 +73,15 @@ async function emitContract(
   contract: SqlContract<SqlStorage>,
   testDir: string,
 ): Promise<SqlContract<SqlStorage>> {
-  // Strip mappings and validate contract IR
-  const { mappings: _mappings, ...contractWithoutMappings } = contract;
-  const contractIR = sql.validateContractIR(contractWithoutMappings) as ContractIR;
-
-  // Create family instance
+  // Create family instance first
   const familyInstance = sql.create({
     target: postgres,
     adapter: postgresAdapter,
     extensions: [],
   });
 
-  const emitResult = await familyInstance.emitContract({ contractIR });
+  // emitContract handles stripping mappings and validation internally
+  const emitResult = await familyInstance.emitContract({ contractIR: contract });
 
   // Write contract files
   const contractJsonPath = resolve(testDir, 'output/contract.json');
@@ -105,7 +102,14 @@ function loadContract(testDir: string): { contractIR: ContractIR; contractPath: 
   const contractPath = join(testDir, 'output/contract.json');
   const contractJsonContent = readFileSync(contractPath, 'utf-8');
   const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-  const contractIR = sql.validateContractIR(contractJson) as ContractIR;
+
+  // Create family instance to validate contract
+  const familyInstance = sql.create({
+    target: postgres,
+    adapter: postgresAdapter,
+    extensions: [],
+  });
+  const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
   return { contractIR, contractPath };
 }
 

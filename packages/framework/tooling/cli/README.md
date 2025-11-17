@@ -320,10 +320,8 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
   - User's config is responsible for loading the contract (can use `loadContractFromTs` or any other method)
   - Throws error if `config.contract` is missing
 - Uses artifact paths from `config.contract.output/types` (already normalized by `defineConfig()` with defaults applied)
-- Strips mappings if family provides `stripMappings()` function
-- Uses framework CLI assembly functions to loop over descriptors
-- Calls `config.family.validateContractIR()` to validate and normalize contract
-- Passes resolved contract IR, paths, and assembly data to programmatic API (`emitContract()`)
+- Creates family instance via `config.family.create()` (assembles operation registry, type imports, extension IDs)
+- Calls `familyInstance.emitContract()` with raw contract (instance handles stripping mappings and validation internally)
 - Outputs human-readable or JSON format based on flags
 
 ### Programmatic API (`api/emit-contract.ts`)
@@ -372,10 +370,14 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 
 ### Family Descriptor (provided by family /cli entrypoint)
 - The SQL family (and other families) provide:
-  - `convertOperationManifest(manifest)` - Converts `OperationManifest` to `OperationSignature` (family-specific, e.g., SQL adds lowering spec)
+  - `create(options)` - Creates a family instance that implements domain actions
+  - `hook` - Target family hook for contract emission
+- Family instances provide:
   - `validateContractIR(contractJson)` - Validates and normalizes contract, returns ContractIR without mappings
-  - `stripMappings?(contract)` - Optionally strips runtime-only mappings from contract
-- The framework CLI handles generic looping; families provide conversion logic.
+  - `emitContract(options)` - Emits contract (handles stripping mappings and validation internally)
+  - `verify(options)` - Verifies database marker against contract
+  - `schemaVerify(options)` - Verifies database schema against contract
+  - `introspect(options)` - Introspects database schema
 
 ### Pack Manifest Types (IR)
 - Families define their manifest IR and related types under their own tooling packages. CLI treats manifests as opaque data.

@@ -13,18 +13,6 @@ const sqlFamilyWithoutCreate = {
   familyId: 'sql' as const,
   manifest: { id: 'sql', version: '0.0.1' },
   hook: sqlTargetFamilyHook,
-  convertOperationManifest: () => ({
-    forTypeId: '',
-    method: '',
-    args: [],
-    returns: { kind: 'builtin' as const, type: 'string' as const },
-    lowering: {
-      targetFamily: 'sql' as const,
-      strategy: 'function' as const,
-      template: '',
-    },
-  }),
-  validateContractIR: (contract: unknown) => contract,
   // create method is missing - this is what we're testing
 };
 

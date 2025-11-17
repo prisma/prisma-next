@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -44,24 +43,19 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      const contractWithoutMappings = config.family.stripMappings
-        ? config.family.stripMappings(contractRaw)
-        : contractRaw;
-
-      const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
       if (!contractConfig.output || !contractConfig.types) {
         throw new Error('Contract config must have output and types paths');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
+      // Create family instance first (assembles operation registry, type imports, extension IDs)
       const familyInstance = config.family.create({
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
+      // emitContract handles stripping mappings and validation internally
+      const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
       expect(result).toBeDefined();
       expect(result.coreHash).toBeDefined();
@@ -110,24 +104,19 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      const contractWithoutMappings = config.family.stripMappings
-        ? config.family.stripMappings(contractRaw)
-        : contractRaw;
-
-      const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
       if (!contractConfig.output || !contractConfig.types) {
         throw new Error('Contract config must have output and types paths');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
+      // Create family instance first (assembles operation registry, type imports, extension IDs)
       const familyInstance = config.family.create({
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
+      // emitContract handles stripping mappings and validation internally
+      const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
       // Write files and verify paths
       const contractJsonPath = resolve(testDir, contractConfig.output);
@@ -171,24 +160,19 @@ describe('emitContract API', () => {
           contractRaw = contractConfig.source;
         }
 
-        const contractWithoutMappings = config.family.stripMappings
-          ? config.family.stripMappings(contractRaw)
-          : contractRaw;
-
-        const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
         if (!contractConfig.output || !contractConfig.types) {
           throw new Error('Contract config must have output and types paths');
         }
 
-        // Create family instance (assembles operation registry, type imports, extension IDs)
+        // Create family instance first (assembles operation registry, type imports, extension IDs)
         const familyInstance = config.family.create({
           target: config.target,
           adapter: config.adapter,
           extensions: config.extensions ?? [],
         }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-        const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
+        // emitContract handles stripping mappings and validation internally
+        const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
         // Write files
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
@@ -224,24 +208,19 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      const contractWithoutMappings = config.family.stripMappings
-        ? config.family.stripMappings(contractRaw)
-        : contractRaw;
-
-      const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
       if (!contractConfig.output || !contractConfig.types) {
         throw new Error('Contract config must have output and types paths');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
+      // Create family instance first (assembles operation registry, type imports, extension IDs)
       const familyInstance = config.family.create({
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
+      // emitContract handles stripping mappings and validation internally
+      const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
       // profileHash is always present
       expect(typeof result.profileHash).toBe('string');
@@ -267,24 +246,19 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      const contractWithoutMappings = config.family.stripMappings
-        ? config.family.stripMappings(contractRaw)
-        : contractRaw;
-
-      const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
       if (!contractConfig.output || !contractConfig.types) {
         throw new Error('Contract config must have output and types paths');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
+      // Create family instance first (assembles operation registry, type imports, extension IDs)
       const familyInstance = config.family.create({
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
+      // emitContract handles stripping mappings and validation internally
+      const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
       // Timings are no longer returned in the result
       expect(result).toBeDefined();
@@ -310,25 +284,19 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      const contractWithoutMappings = config.family.stripMappings
-        ? config.family.stripMappings(contractRaw)
-        : contractRaw;
-
-      const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
       if (!contractConfig.output || !contractConfig.types) {
         throw new Error('Contract config must have output and types paths');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
+      // Create family instance first (assembles operation registry, type imports, extension IDs)
       const familyInstance = config.family.create({
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-      // The function should work normally
-      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
+      // emitContract handles stripping mappings and validation internally
+      const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
       expect(result).toBeDefined();
     },

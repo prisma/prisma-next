@@ -10,10 +10,9 @@ function createValidConfig(overrides?: Record<string, unknown>) {
       familyId: 'sql',
       manifest: { id: 'sql', version: '0.0.1' },
       hook: {},
-      convertOperationManifest: vi.fn(),
-      validateContractIR: vi.fn(),
       create: vi.fn(() => ({
         familyId: 'sql',
+        validateContractIR: vi.fn(),
         verify: vi.fn(),
         schemaVerify: vi.fn(),
         introspect: vi.fn(),
@@ -78,8 +77,7 @@ describe('validateConfig', () => {
         kind: 'invalid',
         id: 'sql',
         hook: {},
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn(),
+        create: vi.fn(),
       },
     });
     expect(() => validateConfig(config)).toThrow(errorConfigValidation('family.kind'));
@@ -92,8 +90,6 @@ describe('validateConfig', () => {
         familyId: 123,
         manifest: { id: 'sql', version: '0.0.1' },
         hook: {},
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn(),
         create: vi.fn(),
       },
     });
@@ -105,8 +101,7 @@ describe('validateConfig', () => {
       family: {
         kind: 'family',
         id: 'sql',
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn(),
+        create: vi.fn(),
       },
     });
     expect(() => validateConfig(config1)).toThrow(errorConfigValidation('family.hook'));
@@ -116,41 +111,10 @@ describe('validateConfig', () => {
         kind: 'family',
         id: 'sql',
         hook: 'not-an-object',
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn(),
+        create: vi.fn(),
       },
     });
     expect(() => validateConfig(config2)).toThrow(errorConfigValidation('family.hook'));
-  });
-
-  it('throws error when family.convertOperationManifest is not a function', () => {
-    const config = createValidConfig({
-      family: {
-        kind: 'family',
-        id: 'sql',
-        hook: {},
-        convertOperationManifest: 'not-a-function',
-        validateContractIR: vi.fn(),
-      },
-    });
-    expect(() => validateConfig(config)).toThrow(
-      errorConfigValidation('family.convertOperationManifest'),
-    );
-  });
-
-  it('throws error when family.validateContractIR is not a function', () => {
-    const config = createValidConfig({
-      family: {
-        kind: 'family',
-        id: 'sql',
-        hook: {},
-        convertOperationManifest: vi.fn(),
-        validateContractIR: 'not-a-function',
-      },
-    });
-    expect(() => validateConfig(config)).toThrow(
-      errorConfigValidation('family.validateContractIR'),
-    );
   });
 
   it('throws error when target.kind is not "target"', () => {
