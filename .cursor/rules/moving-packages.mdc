@@ -12,7 +12,10 @@ When moving packages to new locations, you must update all relative paths that r
 
 **Key Principle**: Count the directory depth from the package to the root, then use that many `../` segments.
 
-**Formula**: From `packages/domain/layer/package/` to root = 4 levels up (`../../../../`)
+**Formula**: Count the directory depth from package to root:
+- From `packages/domain/layer/package/` to root = 4 levels up (`../../../../`)
+- From `packages/domain/package/` to root = 3 levels up (`../../../`)
+- From `packages/sql/family/` to root = 3 levels up (`../../../`)
 
 ### Common Paths to Update
 
