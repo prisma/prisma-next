@@ -664,6 +664,15 @@ importers:
         specifier: ^2.0.0
         version: 2.1.26
     devDependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../targets/postgres-adapter
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../targets/postgres-driver
+      '@prisma-next/targets-postgres':
+        specifier: workspace:*
+        version: link:../../targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
