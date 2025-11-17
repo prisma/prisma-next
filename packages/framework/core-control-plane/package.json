@@ -52,6 +52,10 @@
     "./emission": {
       "types": "./dist/exports/emission.d.ts",
       "import": "./dist/exports/emission.js"
+    },
+    "./schema-view": {
+      "types": "./dist/exports/schema-view.d.ts",
+      "import": "./dist/exports/schema-view.js"
     }
   }
 }

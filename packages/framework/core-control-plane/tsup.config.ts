@@ -8,6 +8,7 @@ export default defineConfig({
     'exports/pack-manifest-types': 'src/exports/pack-manifest-types.ts',
     'exports/types': 'src/exports/types.ts',
     'exports/emission': 'src/exports/emission.ts',
+    'exports/schema-view': 'src/exports/schema-view.ts',
   },
   outDir: 'dist',
   format: ['esm'],

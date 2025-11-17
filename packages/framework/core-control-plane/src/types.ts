@@ -2,6 +2,7 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TargetFamilyHook } from '@prisma-next/contract/types';
 import type { OperationSignature } from '@prisma-next/operations';
 import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
+import type { CoreSchemaView } from './schema-view';
 
 /**
  * Minimal driver interface for Control Plane database operations.
@@ -152,6 +153,13 @@ export interface FamilyInstance<
     readonly driver: ControlPlaneDriver;
     readonly contractIR?: unknown;
   }): Promise<TSchemaIR>;
+
+  /**
+   * Optionally projects a family-specific Schema IR into a core schema view.
+   * Families that provide this method enable rich tree output for CLI visualization.
+   * Families that do not provide it still support introspection via raw Schema IR.
+   */
+  toSchemaView?(schema: TSchemaIR): CoreSchemaView;
 
   /**
    * Emits contract JSON and DTS as strings.
