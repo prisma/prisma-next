@@ -4,13 +4,13 @@
  * Dependency Cruiser configuration for Prisma Next.
  *
  * It derives module groups from architecture.config.json and encodes the same-layer/
- * downward-only semantics. Plane import constraints are defined declaratively in
- * architecture.config.json under `planeRules` rather than hardcoded here.
+ * downward-only semantics. Plane import constraints and cross-domain exceptions are
+ * defined declaratively in architecture.config.json rather than hardcoded here.
  */
 
 import config from './architecture.config.json' with { type: 'json' };
 
-const { packages: packageConfigs, layerOrder, planeRules } = config;
+const { packages: packageConfigs, layerOrder, planeRules, crossDomainExceptions } = config;
 
 const normalizeGlob = (glob) => {
   let pattern = glob.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
@@ -68,12 +68,6 @@ const pushRule = (name, comment, sourceGroup, targetGroup) => {
   });
 };
 
-const isCompatPrismaToSql = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'extensions' &&
-  sourceGroup.layer === 'compat' &&
-  sourceGroup.globs.some((glob) => glob.includes('compat-prisma')) &&
-  targetGroup.domain === 'sql';
-
 const createUpwardRules = () => {
   for (const sourceGroup of moduleGroups) {
     for (const targetGroup of moduleGroups) {
@@ -102,10 +96,14 @@ const createCrossDomainRules = () => {
       if (sourceGroup.domain === targetGroup.domain) continue;
       if (targetGroup.domain === 'framework') continue;
 
-      // TODO: compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API
-      if (isCompatPrismaToSql(sourceGroup, targetGroup)) {
-        continue;
-      }
+      // Check if this import is allowed by an exception
+      const isException = crossDomainExceptions?.some((exception) => {
+        const sourceMatches = matchesGlobPattern(sourceGroup, exception.from);
+        const targetMatches = matchesGlobPattern(targetGroup, exception.to);
+        return sourceMatches && targetMatches;
+      });
+
+      if (isException) continue;
 
       pushRule(
         `cross-domain-${sourceGroup.domain}-to-${targetGroup.domain}`,

@@ -230,6 +230,13 @@
       ]
     }
   },
+  "crossDomainExceptions": [
+    {
+      "from": "packages/extensions/compat-prisma/**",
+      "to": "packages/sql/**",
+      "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
+    }
+  ],
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
     "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"]
