@@ -51,6 +51,13 @@ export default defineConfig({
   adapter: postgresAdapter,
   extensions: [pgvector],
 });
+
+In the control plane, the pgvector extension:
+
+- Contributes a control-plane extension descriptor with:
+  - `verifySchema`: extension-specific schema verification hook (ensures the `vector` extension is installed and `pg/vector@1` columns map to native `vector` types).
+  - Optionally, type metadata (future) to describe additional SQL types in the control plane.
+- Is consumed by the SQL family control descriptor (via `@prisma-next/family-sql/control`) as part of schema verification.
 ```
 
 ## Usage
@@ -168,4 +175,3 @@ The extension declares the following capabilities:
 - [pgvector documentation](https://github.com/pgvector/pgvector)
 - [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md)
 - [Extension Packs Guide](../../../docs/reference/Extension-Packs-Naming-and-Layout.md)
-

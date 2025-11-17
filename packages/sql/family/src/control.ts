@@ -5,14 +5,14 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type { SqlFamilyContext } from '../context';
+import type { SqlFamilyContext } from './context';
 import {
   introspectSchema,
   prepareControlContext,
-  readMarker,
   supportedTypeIds,
   verifySchema,
-} from '../verify';
+} from './control-hooks';
+import { readMarker } from './marker';
 
 /**
  * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.

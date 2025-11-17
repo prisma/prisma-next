@@ -2,7 +2,7 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    control: 'src/exports/control.ts',
+    control: 'src/control.ts',
     context: 'src/exports/context.ts',
     runtime: 'src/exports/runtime.ts',
     types: 'src/exports/types.ts',

@@ -11,7 +11,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlFamilyContext } from '../src/context';
-import sqlFamilyDescriptor from '../src/exports/control';
+import sqlFamilyDescriptor from '../src/control';
 import { createSqlTypeMetadataRegistry } from '../src/type-metadata';
 
 /**
