@@ -626,9 +626,6 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../framework/core-control-plane
-      '@prisma-next/sql-schema-ir':
-        specifier: workspace:*
-        version: link:../schema-ir
       arktype:
         specifier: ^2.1.25
         version: 2.1.25
@@ -682,6 +679,9 @@ importers:
         specifier: ^2.0.0
         version: 2.1.26
     devDependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../targets/postgres-adapter
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils

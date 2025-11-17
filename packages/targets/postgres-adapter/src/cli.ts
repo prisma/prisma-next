@@ -5,6 +5,7 @@ import type { AdapterDescriptor } from '@prisma-next/cli/config-types';
 import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
 import { type } from 'arktype';
 import { createPostgresAdapter } from './core/adapter';
+import { introspectPostgresSchema } from './exports/introspect';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -57,6 +58,7 @@ const postgresAdapterDescriptor = {
   family: 'sql',
   manifest: loadAdapterManifest(),
   create: () => createPostgresAdapter(),
+  introspect: introspectPostgresSchema,
 };
 
 // Type assertion to avoid importing SqlFamilyContext (breaks cycle)

@@ -176,6 +176,15 @@ export interface AdapterDescriptor<TCtx extends TargetFamilyContext = TargetFami
   readonly manifest: ExtensionPackManifest;
   readonly create?: (...args: unknown[]) => unknown;
   readonly adapter?: unknown;
+  /**
+   * Introspects the database schema and returns a target-agnostic Schema IR.
+   * This allows adapters to provide introspection without the family needing to import adapter-specific code.
+   */
+  readonly introspect?: (
+    driver: ControlPlaneDriver,
+    types: unknown,
+    contract?: unknown,
+  ) => Promise<unknown>;
   // TCtx is used for type consistency across descriptors, even if not used in the interface body
   readonly _contextType?: TCtx;
 }

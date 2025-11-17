@@ -1,4 +1,5 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { introspectPostgresSchema } from '@prisma-next/adapter-postgres/introspect';
 import type {
   AdapterDescriptor,
   ControlPlaneDriver,
@@ -7,7 +8,7 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlTypeMetadataRegistry } from '@prisma-next/sql-schema-ir/types';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlFamilyContext } from '../src/context';
@@ -108,6 +109,7 @@ function createTestDescriptors(): {
       family: 'sql',
       manifest: { id: 'postgres', version: '15.0.0' },
       adapter: adapterInstance,
+      introspect: introspectPostgresSchema,
     },
     extensions: [],
   };

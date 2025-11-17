@@ -101,7 +101,7 @@ export async function prepareControlContext(options: {
 
 /**
  * Introspects the database schema and returns a target-agnostic SqlSchemaIR.
- * Delegates to Postgres adapter for concrete introspection.
+ * Uses the adapter's introspection function (target-agnostic).
  * This is the SQL family's implementation of the introspectSchema hook.
  * The contextInput contains the types registry, pre-assembled by the domain layer.
  * The schemaIR is returned as a separate value, not stored in the context.
@@ -118,16 +118,13 @@ export async function introspectSchema(options: {
   // Extract types from contextInput
   const types: SqlTypeMetadataRegistry = contextInput.types;
 
-  // Delegate to Postgres adapter for concrete introspection
-  // For now, we only support Postgres. In the future, this can branch on target.id
-  if (options.target.id !== 'postgres') {
-    throw new Error(`Schema introspection for target '${options.target.id}' is not yet supported`);
+  // Use adapter's introspection function (target-agnostic)
+  if (!options.adapter.introspect) {
+    throw new Error(`Adapter '${options.adapter.id}' does not provide introspection`);
   }
 
-  // Dynamic import to break cycle: family-sql -> adapter-postgres
-  // The adapter provides introspection, but we don't want a build-time dependency
-  const { introspectPostgresSchema } = await import('@prisma-next/adapter-postgres/introspect');
-  return introspectPostgresSchema(driver, types, contractIR);
+  const schemaIR = await options.adapter.introspect(driver, types, contractIR);
+  return schemaIR as SqlSchemaIR;
 }
 
 /**
