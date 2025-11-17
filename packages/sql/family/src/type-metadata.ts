@@ -1,5 +1,5 @@
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { SqlTypeMetadata, SqlTypeMetadataRegistry } from './types';
+import type { SqlTypeMetadata, SqlTypeMetadataRegistry } from '@prisma-next/sql-schema-ir/types';
 import { createSqlTypeMetadataRegistryFromEntries } from './types';
 
 /**

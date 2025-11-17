@@ -3,7 +3,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { TargetDescriptor } from '@prisma-next/cli/config-types';
 import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
-import type { SqlFamilyContext } from '@prisma-next/family-sql/context';
 import { type } from 'arktype';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,11 +49,13 @@ function loadTargetManifest(): ExtensionPackManifest {
 /**
  * Postgres target descriptor for CLI config.
  */
+// Type assertion to avoid importing SqlFamilyContext (breaks cycle)
+// The descriptor is compatible with TargetDescriptor<SqlFamilyContext> at runtime
 const postgresTargetDescriptor = {
   kind: 'target',
   id: 'postgres',
   family: 'sql',
   manifest: loadTargetManifest(),
-} as const satisfies TargetDescriptor<SqlFamilyContext>;
+} as const satisfies TargetDescriptor;
 
 export default postgresTargetDescriptor;

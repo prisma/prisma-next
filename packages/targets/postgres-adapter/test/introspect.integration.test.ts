@@ -1,5 +1,5 @@
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { createSqlTypeMetadataRegistry } from '@prisma-next/family-sql/type-metadata';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -28,12 +28,13 @@ function createDriverFromClient(client: Client): ControlPlaneDriver {
 }
 
 /**
- * Gets the codec registry from the Postgres adapter.
+ * Gets the type metadata registry from the Postgres adapter.
  * The adapter's codec registry contains all Postgres codecs with their nativeType metadata.
  */
-function getAdapterCodecRegistry(): CodecRegistry {
+function getAdapterTypeMetadataRegistry() {
   const adapter = createPostgresAdapter();
-  return adapter.profile.codecs();
+  const codecRegistry = adapter.profile.codecs();
+  return createSqlTypeMetadataRegistry([{ codecRegistry }]);
 }
 
 describe('introspectPostgresSchema (integration with real database)', () => {
@@ -105,13 +106,13 @@ describe('introspectPostgresSchema (integration with real database)', () => {
               // pgvector extension not available - skip embeddings table
             }
 
-            // Create driver and codec registry
+            // Create driver and type metadata registry
             const driver = createDriverFromClient(client);
-            const codecRegistry = getAdapterCodecRegistry();
+            const types = getAdapterTypeMetadataRegistry();
 
             try {
               // Introspect the schema
-              const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
+              const schemaIR = await introspectPostgresSchema(driver, types);
 
               // Verify schema structure
               expect(schemaIR.tables).toBeDefined();
@@ -287,10 +288,10 @@ describe('introspectPostgresSchema (integration with real database)', () => {
             `);
 
             const driver = createDriverFromClient(client);
-            const codecRegistry = getAdapterCodecRegistry();
+            const types = getAdapterTypeMetadataRegistry();
 
             try {
-              const schemaIR = await introspectPostgresSchema(driver, codecRegistry);
+              const schemaIR = await introspectPostgresSchema(driver, types);
 
               const typeTestTable = schemaIR.tables['type_test'];
               expect(typeTestTable).toBeDefined();
@@ -370,7 +371,7 @@ describe('introspectPostgresSchema (integration with real database)', () => {
             `);
 
             const driver = createDriverFromClient(client);
-            const codecRegistry = getAdapterCodecRegistry();
+            const types = getAdapterTypeMetadataRegistry();
 
             // Create a contract that only references users and posts
             const contract = {
@@ -384,7 +385,7 @@ describe('introspectPostgresSchema (integration with real database)', () => {
 
             try {
               // Introspect with contract filter
-              const schemaIR = await introspectPostgresSchema(driver, codecRegistry, contract);
+              const schemaIR = await introspectPostgresSchema(driver, types, contract);
 
               // Should only include tables from contract
               expect(schemaIR.tables).toHaveProperty('users');

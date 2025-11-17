@@ -1,6 +1,5 @@
 import type { TargetFamilyContext } from '@prisma-next/core-control-plane/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { SqlTypeMetadataRegistry } from './types';
+import type { SqlSchemaIR, SqlTypeMetadataRegistry } from '@prisma-next/sql-schema-ir/types';
 
 /**
  * SQL family context that carries the schema IR type and SQL-specific control-plane state.

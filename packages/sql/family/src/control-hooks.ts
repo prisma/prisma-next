@@ -1,4 +1,3 @@
-import { introspectPostgresSchema } from '@prisma-next/adapter-postgres/introspect';
 import type {
   AdapterDescriptor,
   ControlPlaneDriver,
@@ -7,10 +6,13 @@ import type {
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlSchemaIR,
+  SqlTypeMetadata,
+  SqlTypeMetadataRegistry,
+} from '@prisma-next/sql-schema-ir/types';
 import type { SqlFamilyContext } from './context';
 import { createSqlTypeMetadataRegistry } from './type-metadata';
-import type { SqlTypeMetadata, SqlTypeMetadataRegistry } from './types';
 
 /**
  * Collects supported codec type IDs from adapter and extension manifests.
@@ -122,6 +124,9 @@ export async function introspectSchema(options: {
     throw new Error(`Schema introspection for target '${options.target.id}' is not yet supported`);
   }
 
+  // Dynamic import to break cycle: family-sql -> adapter-postgres
+  // The adapter provides introspection, but we don't want a build-time dependency
+  const { introspectPostgresSchema } = await import('@prisma-next/adapter-postgres/introspect');
   return introspectPostgresSchema(driver, types, contractIR);
 }
 

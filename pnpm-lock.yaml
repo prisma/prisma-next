@@ -332,9 +332,6 @@ importers:
       prettier:
         specifier: ^3.3.3
         version: 3.6.2
-      ts-toolbelt:
-        specifier: ^9.6.0
-        version: 9.6.0
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -654,9 +651,6 @@ importers:
 
   packages/sql/family:
     dependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../targets/postgres-adapter
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli
@@ -851,9 +845,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../framework/core-contract
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../contract
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^2.1.1
@@ -969,9 +960,6 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../framework/core-control-plane
-      '@prisma-next/family-sql':
-        specifier: workspace:*
-        version: link:../../sql/family
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../sql/contract

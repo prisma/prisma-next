@@ -1,11 +1,11 @@
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
-import type { SqlTypeMetadataRegistry } from '@prisma-next/family-sql/types';
 import type {
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
   SqlSchemaIR,
   SqlTableIR,
+  SqlTypeMetadataRegistry,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 

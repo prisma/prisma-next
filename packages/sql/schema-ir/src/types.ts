@@ -5,7 +5,14 @@
  * for the SQL family, used for verification and future migration planning.
  */
 
-import type { PrimaryKey } from '@prisma-next/sql-contract/types';
+/**
+ * Primary key definition matching ContractIR format.
+ * Defined here to avoid circular dependency with sql-contract.
+ */
+export type PrimaryKey = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+};
 
 /**
  * Namespaced annotations for extensibility.
@@ -79,3 +86,39 @@ export type SqlSchemaIR = {
   readonly extensions: readonly string[]; // logical extension ids or DB extension names
   readonly annotations?: SqlAnnotations; // extensible global metadata
 };
+
+/**
+ * SQL type metadata for control-plane and execution-plane type availability and mapping.
+ * This abstraction provides a read-only view of type information without encode/decode behavior.
+ */
+export interface SqlTypeMetadata {
+  /**
+   * Namespaced type identifier in format 'namespace/name@version'
+   * Examples: 'pg/int4@1', 'pg/text@1', 'pg/timestamptz@1'
+   */
+  readonly typeId: string;
+
+  /**
+   * Contract scalar type IDs that this type can handle.
+   * Examples: ['text'], ['int4', 'float8'], ['timestamp', 'timestamptz']
+   */
+  readonly targetTypes: readonly string[];
+
+  /**
+   * Native database type name (target-specific).
+   * Examples: 'integer', 'text', 'character varying', 'timestamp with time zone'
+   * This is optional because not all types have a native database representation.
+   */
+  readonly nativeType?: string;
+}
+
+/**
+ * Registry interface for SQL type metadata.
+ * Provides read-only iteration over type metadata entries.
+ */
+export interface SqlTypeMetadataRegistry {
+  /**
+   * Returns an iterator over all type metadata entries.
+   */
+  values(): IterableIterator<SqlTypeMetadata>;
+}

@@ -1,7 +1,7 @@
 import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
 import { createSqlTypeMetadataRegistry } from '@prisma-next/family-sql/type-metadata';
-import type { SqlTypeMetadataRegistry } from '@prisma-next/family-sql/types';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlTypeMetadataRegistry } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { introspectPostgresSchema } from '../src/exports/introspect';
 
