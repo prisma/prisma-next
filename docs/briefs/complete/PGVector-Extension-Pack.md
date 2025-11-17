@@ -24,7 +24,7 @@
   - `operations[]`: entries for methods (e.g., `cosineDistance`) on `for: 'pg/vector@1'` with lowering templates.
   - Optional `capabilities`: e.g., `{ 'pgvector/ivfflat': true, 'pgvector/cosine': true }`.
 - Assembly:
-  - Family CLI (`@prisma-next/family-sql/cli`) consumes the pack via config and assembles operation registry + type imports (no framework/cli↔SQL coupling).
+  - Family CLI (`@prisma-next/family-sql/control`) consumes the pack via config and assembles operation registry + type imports (no framework/cli↔SQL coupling).
 - Types:
   - Codec type: `CodecTypes['pg/vector@1']#output` → `number[]`.
   - Operation types: augment `OperationTypes` for `pg/vector@1` with methods like `cosineDistance(rhs: vector | number[]): number`.

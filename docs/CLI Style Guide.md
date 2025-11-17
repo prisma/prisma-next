@@ -96,7 +96,6 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - `db verify` (canonical):
   - Loads config + contract, connects via `--db` or `config.db.url`.
   - Checks marker presence, `coreHash`/`profileHash` equality, target match.
-  - Optional MVP+ check: codec coverage (adapter + extensions cover all `typeId`s).
   - Non‑interactive; single JSON with `--json`.
 - `db schema-verify` (canonical):
   - Loads config + contract, connects via `config.db.url` (or `--db` when supported).

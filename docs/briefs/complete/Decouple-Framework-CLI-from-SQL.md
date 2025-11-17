@@ -47,7 +47,7 @@ Introduce a single indirection layer via the existing FamilyDescriptor and move 
 - `@prisma-next/sql-tooling-assembly` package removed.
 
 4) Update examples/tests to consume family exports
-- Replace imports of framework `pack-assembly` with `@prisma-next/family-sql/cli` or use the config path.
+- Replace imports of framework `pack-assembly` with `@prisma-next/family-sql/control` or use the config path.
 
 5) Remove dep‑cruiser exceptions
 - After code changes land, delete CLI→SQL exceptions:
@@ -70,7 +70,7 @@ Introduce a single indirection layer via the existing FamilyDescriptor and move 
 ## Migration Plan
 1. Add new methods to FamilyDescriptor and implement them in SQL family package.
 2. Refactor CLI `emit.ts` to use new family methods; remove SQL imports.
-3. Delete `framework/tooling/cli/src/pack-assembly.ts`; update examples/tests to import from `@prisma-next/family-sql/cli` or use config.
+3. Delete `framework/tooling/cli/src/pack-assembly.ts`; update examples/tests to import from `@prisma-next/family-sql/control` or use config.
 4. Run `pnpm build && pnpm test:packages` and fix type fallout.
 5. Remove exceptions from `dependency-cruiser.config.mjs`; run `pnpm lint:deps`.
 6. Update docs and briefs; confirm examples still function.

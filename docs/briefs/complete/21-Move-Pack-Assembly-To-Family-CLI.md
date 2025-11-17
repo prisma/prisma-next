@@ -50,7 +50,7 @@ Out of scope:
 
 ```ts
 import { defineConfig } from '@prisma-next/cli';
-import sql from '@prisma-next/family-sql/cli';
+import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/targets-postgres/cli';
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 

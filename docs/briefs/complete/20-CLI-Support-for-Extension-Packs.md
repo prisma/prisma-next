@@ -27,7 +27,7 @@ import { defineConfig } from '@prisma-next/cli'
 import postgresAdapter from '@prisma-next/adapter-postgres/cli'
 import postgres from '@prisma-next/targets-postgres/cli'
 // future: import pgvector from '@prisma-next/ext-pgvector/cli'
-import sql from '@prisma-next/family-sql/cli'
+import sql from '@prisma-next/family-sql/control'
 
 export default defineConfig({
   family: sql,
@@ -47,14 +47,14 @@ Notes
 - Use explicit entrypoints to avoid cross‑plane imports:
   - `…/cli` entrypoints default‑export IR‑only descriptors for tooling (safe for emit).
   - `…/runtime` entrypoints export runtime factories/types for DB‑connected execution.
-- `@prisma-next/family-sql/cli` default‑exports a FamilyDescriptor (IR‑only) used to select the family hook.
+- `@prisma-next/family-sql/control` default‑exports a FamilyDescriptor (IR‑only) used to select the family hook.
 - `@prisma-next/targets-postgres/cli` default‑exports a TargetDescriptor (IR manifest for emission).
 - `@prisma-next/adapter-postgres/cli` default‑exports an AdapterDescriptor (IR manifest) for emission; a matching `@prisma-next/adapter-postgres/runtime` module exports the runtime factory for DB‑connected commands.
 - The CLI validates descriptor manifests read from the config.
 
 ## Package Entry Points and Contracts
 
-- FamilyDescriptor (default from `@prisma-next/family-sql/cli`)
+- FamilyDescriptor (default from `@prisma-next/family-sql/control`)
   - `{ kind: 'family', id: 'sql', hook: TargetFamilyHook, assembleOperationRegistry, extractCodecTypeImports, extractOperationTypeImports }`
 - TargetDescriptor (default from `@prisma-next/targets-postgres/cli`)
   - `{ kind: 'target', id: 'postgres', family: 'sql', manifest: ExtensionPackManifest }`
@@ -152,7 +152,7 @@ Diagnostics and error handling
 
 2) Family‑provided helpers (no bridge layer)
 - The family’s `/cli` default export must include: `hook`, `assembleOperationRegistry`, `extractCodecTypeImports`, `extractOperationTypeImports`.
-- Move SQL‑specific `pack-assembly.ts` and `pack-manifest-types.ts` under the SQL family (e.g., `packages/sql/tooling/assembly`) and re‑export the helpers from `@prisma-next/family-sql/cli`.
+- Move SQL‑specific `pack-assembly.ts` and `pack-manifest-types.ts` under the SQL family (e.g., `packages/sql/tooling/assembly`) and re‑export the helpers from `@prisma-next/family-sql/control`.
 
 3) Emit command
 - Update `packages/framework/tooling/cli/src/commands/emit.ts` to:
@@ -211,7 +211,7 @@ import { defineConfig } from '@prisma-next/cli'
 import postgresAdapter from '@prisma-next/adapter-postgres/cli'
 import postgres from '@prisma-next/targets-postgres/cli'
 // future: import pgvector from '@prisma-next/ext-pgvector/cli'
-import sql from '@prisma-next/family-sql/cli'
+import sql from '@prisma-next/family-sql/control'
 
 export default defineConfig({
   family: sql,
@@ -237,7 +237,7 @@ Key properties:
 
 To support the simple config above, packages expose default exports designed for CLI config usage:
 
-- `@prisma-next/family-sql/cli` → FamilyDescriptor: `{ kind: 'family', id: 'sql', hook: TargetFamilyHook, assembleOperationRegistry, extractCodecTypeImports, extractOperationTypeImports }`
+- `@prisma-next/family-sql/control` → FamilyDescriptor: `{ kind: 'family', id: 'sql', hook: TargetFamilyHook, assembleOperationRegistry, extractCodecTypeImports, extractOperationTypeImports }`
 - `@prisma-next/targets-postgres/cli` → TargetDescriptor: `{ kind: 'target', id: 'postgres', family: 'sql', manifest: ExtensionPackManifest }`
 - `@prisma-next/adapter-postgres/cli` → AdapterDescriptor: `{ kind: 'adapter', id: 'postgres', family: 'sql', manifest: ExtensionPackManifest, create?: (opts) => Adapter, adapter?: Adapter }`
 - `@prisma-next/ext-…/cli` (optional) → ExtensionDescriptor (same shape as TargetDescriptor, or a narrowed `kind: 'extension'` if we add it)

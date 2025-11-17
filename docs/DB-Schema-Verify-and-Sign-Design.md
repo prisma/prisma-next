@@ -10,7 +10,7 @@ This document specifies the production-ready design for:
 This replaces the earlier “Option A” brief under `docs/briefs/07-CLI-DB-Schema-Verify-Option-A.md` (now removed) and aligns with the current architecture:
 
 - Contract-first, with `contract.json` as the canonical source of schema requirements.
-- Control-plane executor living in `@prisma-next/control-plane`, with the framework CLI target-agnostic.
+- Control-plane domain actions living in `@prisma-next/core-control-plane`, with the framework CLI target-agnostic.
 - Family/target/extension-specific logic implemented behind family hooks (no target-branches in the framework CLI).
 
 ### Goals
@@ -303,13 +303,6 @@ export interface FamilyDescriptor<TCtx extends TargetFamilyContext = TargetFamil
 
   // Marker read (used by db verify / db sign)
   readonly readMarker?: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>;
-
-  // Optional: codec coverage checks (unchanged)
-  readonly collectSupportedCodecTypeIds?: (
-    descriptors: ReadonlyArray<
-      TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
-    >,
-  ) => readonly string[];
 
   /**
    * Prepares family-specific control-plane context from descriptors.
