@@ -422,7 +422,7 @@ function formatHeaderLine(options: {
   readonly intent: string;
 }): string {
   if (options.operation) {
-    return `${options.brand} ${options.operation} ${options.intent}`;
+    return `${options.brand} ${options.operation} → ${options.intent}`;
   }
   return `${options.brand} ${options.intent}`;
 }
