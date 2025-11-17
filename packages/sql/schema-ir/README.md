@@ -13,6 +13,26 @@ This package defines the core types for the SQL Schema IR, a target-agnostic rep
 - **Enable extensible metadata** via annotations for targets and extension packs
 - **Support future migration planning** by providing a structured representation of schema differences
 
+## Responsibilities
+
+- **Type Definitions**: Provides core types for SQL Schema IR (`SqlSchemaIR`, `SqlTableIR`, `SqlColumnIR`, etc.)
+- **Shared Plane Package**: Located in the shared plane, making it accessible to both migration-plane and runtime-plane packages
+- **Extensibility**: Supports annotations for targets and extension packs to attach metadata without modifying core IR structure
+- **Type Safety**: Provides TypeScript types for schema representation with proper nullability and constraint modeling
+
+## Dependencies
+
+- **`@prisma-next/contract`**: For `ContractIR` type (used in `SqlContractIR`)
+
+**Dependents:**
+- **Migration Plane**:
+  - `@prisma-next/core-control-plane` - Core verification logic
+  - `@prisma-next/adapter-postgres` - Postgres introspection
+  - `@prisma-next/extension-pgvector` - Extension verification hooks
+- **Runtime Plane** (future):
+  - Migration planning logic
+  - Schema diff utilities
+
 ## Types
 
 ### Core Types
@@ -116,20 +136,6 @@ const result = await verifyDatabaseSchema({
 
 This package sits at the core layer in the shared plane, making it accessible to both migration-plane (authoring, tooling, targets) and runtime-plane (lanes, runtime, adapters) packages.
 
-### Dependencies
-
-- `@prisma-next/contract` - For `ContractIR` type (used in `SqlContractIR`)
-
-### Consumers
-
-- **Migration Plane**:
-  - `@prisma-next/core-control-plane` - Core verification logic
-  - `@prisma-next/adapter-postgres` - Postgres introspection
-  - `@prisma-next/extension-pgvector` - Extension verification hooks
-
-- **Runtime Plane** (future):
-  - Migration planning logic
-  - Schema diff utilities
 
 ## Related Documentation
 
