@@ -126,6 +126,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../packages/sql/sql-runtime
+      '@prisma-next/targets-postgres':
+        specifier: workspace:*
+        version: link:../../packages/targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../test/utils

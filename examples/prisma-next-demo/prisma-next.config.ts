@@ -1,8 +1,8 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
-import pgvector from '@prisma-next/extension-pgvector/cli';
+import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/control';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
