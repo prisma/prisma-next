@@ -810,10 +810,11 @@ describe('verifyDatabase API', () => {
                     return ['pg/int4@1']; // Only int4, but contract might use text too
                   },
                 };
-                const mockedFamily = {
-                  ...config.family,
+                // Preserve all methods from the original family descriptor (class instance)
+                const mockedFamily = Object.create(Object.getPrototypeOf(config.family));
+                Object.assign(mockedFamily, config.family, {
                   verify: mockedVerify,
-                };
+                });
                 return {
                   ...config,
                   family: mockedFamily,
