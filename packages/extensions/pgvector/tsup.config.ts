@@ -2,7 +2,7 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    cli: 'src/exports/cli.ts',
+    control: 'src/exports/control.ts',
     runtime: 'src/exports/runtime.ts',
     'codec-types': 'src/exports/codec-types.ts',
     'operation-types': 'src/exports/operation-types.ts',

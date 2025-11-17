@@ -115,7 +115,7 @@ The `db verify` command requires a `driver` in the config to connect to the data
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/control';
 import sql from '@prisma-next/family-sql/cli';
 import { contract } from './prisma/contract';
 
@@ -229,7 +229,7 @@ The CLI uses a config file to specify the target family, target, adapter, extens
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import postgres from '@prisma-next/targets-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/control';
 import sql from '@prisma-next/family-sql/cli';
 import { contract } from './prisma/contract';
 

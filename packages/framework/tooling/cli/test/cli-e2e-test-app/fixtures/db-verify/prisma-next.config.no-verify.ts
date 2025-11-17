@@ -2,7 +2,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/cli';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import postgres from '@prisma-next/targets-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/control';
 import { contract } from './contract';
 
 // Create family descriptor without verify.readMarker
