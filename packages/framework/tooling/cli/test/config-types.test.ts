@@ -13,7 +13,8 @@ describe('defineConfig', () => {
   const baseConfig: PrismaNextConfig = {
     family: {
       kind: 'family',
-      id: 'sql',
+      familyId: 'sql',
+      manifest: { id: 'sql', version: '0.0.1' },
       hook: mockHook,
       convertOperationManifest: () => ({
         forTypeId: '',
@@ -22,17 +23,36 @@ describe('defineConfig', () => {
         returns: { kind: 'builtin', type: 'string' },
       }),
       validateContractIR: (contract: unknown) => contract,
+      create: () => ({
+        familyId: 'sql',
+        verify: async () => ({
+          ok: true,
+          summary: 'test',
+          contract: { coreHash: 'test' },
+          target: { expected: 'postgres' },
+          timings: { total: 0 },
+        }),
+        schemaVerify: async () => ({
+          ok: true,
+          summary: 'test',
+          contract: { coreHash: 'test' },
+          target: { expected: 'postgres' },
+          schema: { issues: [] },
+          timings: { total: 0 },
+        }),
+        introspect: async () => ({ tables: {}, extensions: [] }),
+      }),
     },
     target: {
       kind: 'target',
+      familyId: 'sql',
       id: 'postgres',
-      family: 'sql',
       manifest: { id: 'postgres', version: '1.0.0' },
     },
     adapter: {
       kind: 'adapter',
+      familyId: 'sql',
       id: 'postgres',
-      family: 'sql',
       manifest: { id: 'postgres', version: '1.0.0' },
     },
     extensions: [],
@@ -41,7 +61,7 @@ describe('defineConfig', () => {
   it('returns the config object unchanged when no contract', () => {
     const result = defineConfig(baseConfig);
     expect(result).toBe(baseConfig);
-    expect(result.family.id).toBe('sql');
+    expect(result.family.familyId).toBe('sql');
     expect(result.target.id).toBe('postgres');
     expect(result.adapter.id).toBe('postgres');
   });

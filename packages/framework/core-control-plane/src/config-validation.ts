@@ -36,9 +36,14 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       why: 'Config.family must have kind: "family"',
     });
   }
-  if (typeof family['id'] !== 'string') {
-    throw errorConfigValidation('family.id', {
-      why: 'Config.family must have id: string',
+  if (typeof family['familyId'] !== 'string') {
+    throw errorConfigValidation('family.familyId', {
+      why: 'Config.family must have familyId: string',
+    });
+  }
+  if (!family['manifest'] || typeof family['manifest'] !== 'object') {
+    throw errorConfigValidation('family.manifest', {
+      why: 'Config.family must have manifest: ExtensionPackManifest',
     });
   }
   if (!family['hook'] || typeof family['hook'] !== 'object') {
@@ -56,6 +61,13 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       why: 'Config.family must have validateContractIR: function',
     });
   }
+  if (typeof family['create'] !== 'function') {
+    throw errorConfigValidation('family.create', {
+      why: 'Config.family must have create: function',
+    });
+  }
+
+  const familyId = family['familyId'] as string;
 
   // Validate target descriptor
   const target = configObj['target'] as Record<string, unknown>;
@@ -69,14 +81,19 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       why: 'Config.target must have id: string',
     });
   }
-  if (typeof target['family'] !== 'string') {
-    throw errorConfigValidation('target.family', {
-      why: 'Config.target must have family: string',
+  if (typeof target['familyId'] !== 'string') {
+    throw errorConfigValidation('target.familyId', {
+      why: 'Config.target must have familyId: string',
     });
   }
   if (!target['manifest'] || typeof target['manifest'] !== 'object') {
     throw errorConfigValidation('target.manifest', {
       why: 'Config.target must have manifest: ExtensionPackManifest',
+    });
+  }
+  if (target['familyId'] !== familyId) {
+    throw errorConfigValidation('target.familyId', {
+      why: `Config.target.familyId must match Config.family.familyId (expected: ${familyId}, got: ${target['familyId']})`,
     });
   }
 
@@ -92,14 +109,19 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       why: 'Config.adapter must have id: string',
     });
   }
-  if (typeof adapter['family'] !== 'string') {
-    throw errorConfigValidation('adapter.family', {
-      why: 'Config.adapter must have family: string',
+  if (typeof adapter['familyId'] !== 'string') {
+    throw errorConfigValidation('adapter.familyId', {
+      why: 'Config.adapter must have familyId: string',
     });
   }
   if (!adapter['manifest'] || typeof adapter['manifest'] !== 'object') {
     throw errorConfigValidation('adapter.manifest', {
       why: 'Config.adapter must have manifest: ExtensionPackManifest',
+    });
+  }
+  if (adapter['familyId'] !== familyId) {
+    throw errorConfigValidation('adapter.familyId', {
+      why: `Config.adapter.familyId must match Config.family.familyId (expected: ${familyId}, got: ${adapter['familyId']})`,
     });
   }
 
@@ -127,14 +149,19 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
           why: 'Config.extensions items must have id: string',
         });
       }
-      if (typeof extObj['family'] !== 'string') {
-        throw errorConfigValidation('extensions[].family', {
-          why: 'Config.extensions items must have family: string',
+      if (typeof extObj['familyId'] !== 'string') {
+        throw errorConfigValidation('extensions[].familyId', {
+          why: 'Config.extensions items must have familyId: string',
         });
       }
       if (!extObj['manifest'] || typeof extObj['manifest'] !== 'object') {
         throw errorConfigValidation('extensions[].manifest', {
           why: 'Config.extensions items must have manifest: ExtensionPackManifest',
+        });
+      }
+      if (extObj['familyId'] !== familyId) {
+        throw errorConfigValidation('extensions[].familyId', {
+          why: `Config.extensions[].familyId must match Config.family.familyId (expected: ${familyId}, got: ${extObj['familyId']})`,
         });
       }
     }

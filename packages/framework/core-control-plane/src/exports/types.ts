@@ -12,5 +12,10 @@ export type {
   DriverDescriptor,
   ExtensionDescriptor,
   FamilyDescriptor,
+  FamilyId,
+  FamilyInstance,
+  SchemaIssue,
   TargetDescriptor,
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
 } from '../types';

@@ -1,11 +1,19 @@
-import type { FamilyDescriptor } from '@prisma-next/cli/config-types';
-import type { OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type {
+  ExtensionPackManifest,
+  OperationManifest,
+} from '@prisma-next/core-control-plane/pack-manifest-types';
+import type {
+  AdapterDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import type { OperationSignature } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import { collectSupportedCodecTypeIds, readMarker } from './verify';
+import { createSqlFamilyInstance, type SqlFamilyInstance } from './instance';
 
 /**
  * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
@@ -51,17 +59,22 @@ function operationManifestToSignature(manifest: OperationManifest): SqlOperation
 }
 
 /**
+ * SQL family manifest.
+ */
+const sqlFamilyManifest: ExtensionPackManifest = {
+  id: 'sql',
+  version: '0.0.1',
+};
+
+/**
  * SQL family descriptor implementation.
  * Provides the SQL family hook and conversion helpers.
  */
-export class SqlFamilyDescriptor implements FamilyDescriptor {
+export class SqlFamilyDescriptor implements FamilyDescriptor<'sql', SqlFamilyInstance> {
   readonly kind = 'family' as const;
-  readonly id = 'sql';
+  readonly familyId = 'sql' as const;
+  readonly manifest = sqlFamilyManifest;
   readonly hook = sqlTargetFamilyHook;
-  readonly verify = {
-    readMarker,
-    collectSupportedCodecTypeIds,
-  };
 
   convertOperationManifest(manifest: OperationManifest): OperationSignature {
     return operationManifestToSignature(manifest);
@@ -85,5 +98,13 @@ export class SqlFamilyDescriptor implements FamilyDescriptor {
       return contractIR;
     }
     return contract;
+  }
+
+  create(options: {
+    readonly target: TargetDescriptor<'sql'>;
+    readonly adapter: AdapterDescriptor<'sql'>;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>;
+  }): SqlFamilyInstance {
+    return createSqlFamilyInstance(options);
   }
 }

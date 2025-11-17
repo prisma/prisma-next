@@ -460,14 +460,14 @@ describe('descriptor-based functions', () => {
     const adapter: AdapterDescriptor = {
       kind: 'adapter',
       id: 'adapter-1',
-      family: 'sql',
+      familyId: 'sql',
       manifest: { id: 'adapter-1', version: '1.0.0' },
     };
 
     const target: TargetDescriptor = {
       kind: 'target',
       id: 'target-1',
-      family: 'sql',
+      familyId: 'sql',
       manifest: { id: 'target-1', version: '1.0.0' },
     };
 
@@ -475,13 +475,13 @@ describe('descriptor-based functions', () => {
       {
         kind: 'extension',
         id: 'ext-1',
-        family: 'sql',
+        familyId: 'sql',
         manifest: { id: 'ext-1', version: '1.0.0' },
       },
       {
         kind: 'extension',
         id: 'ext-2',
-        family: 'sql',
+        familyId: 'sql',
         manifest: { id: 'ext-2', version: '1.0.0' },
       },
     ];
@@ -494,14 +494,14 @@ describe('descriptor-based functions', () => {
     const adapter: AdapterDescriptor = {
       kind: 'adapter',
       id: 'duplicate',
-      family: 'sql',
+      familyId: 'sql',
       manifest: { id: 'duplicate', version: '1.0.0' },
     };
 
     const target: TargetDescriptor = {
       kind: 'target',
       id: 'duplicate',
-      family: 'sql',
+      familyId: 'sql',
       manifest: { id: 'duplicate', version: '1.0.0' },
     };
 
@@ -515,14 +515,14 @@ describe('descriptor-based functions', () => {
     const adapter: AdapterDescriptor = {
       kind: 'adapter',
       id: 'adapter-1',
-      family: 'sql',
+      familyId: 'sql',
       manifest: { id: 'adapter-1', version: '1.0.0' },
     };
 
     const target: TargetDescriptor = {
       kind: 'target',
       id: 'target-1',
-      family: 'sql',
+      familyId: 'sql',
       manifest: { id: 'target-1', version: '1.0.0' },
     };
 
@@ -530,13 +530,13 @@ describe('descriptor-based functions', () => {
       {
         kind: 'extension',
         id: 'ext-1',
-        family: 'sql',
+        familyId: 'sql',
         manifest: { id: 'ext-1', version: '1.0.0' },
       },
       {
         kind: 'extension',
         id: 'ext-1',
-        family: 'sql',
+        familyId: 'sql',
         manifest: { id: 'ext-1', version: '1.0.0' },
       },
     ];
@@ -549,7 +549,7 @@ describe('descriptor-based functions', () => {
     const target: TargetDescriptor = {
       kind: 'target',
       id: 'target-1',
-      family: 'sql',
+      familyId: 'sql',
       manifest: {
         id: 'target-1',
         version: '1.0.0',
@@ -580,7 +580,7 @@ describe('descriptor-based functions', () => {
     const adapter: AdapterDescriptor = {
       kind: 'adapter',
       id: 'adapter-1',
-      family: 'sql',
+      familyId: 'sql',
       manifest: {
         id: 'adapter-1',
         version: '1.0.0',
@@ -609,7 +609,7 @@ describe('descriptor-based functions', () => {
     const extension: ExtensionDescriptor = {
       kind: 'extension',
       id: 'ext-1',
-      family: 'sql',
+      familyId: 'sql',
       manifest: {
         id: 'ext-1',
         version: '1.0.0',
@@ -638,7 +638,7 @@ describe('descriptor-based functions', () => {
     const adapter: AdapterDescriptor = {
       kind: 'adapter',
       id: 'adapter-1',
-      family: 'sql',
+      familyId: 'sql',
       manifest: {
         id: 'adapter-1',
         version: '1.0.0',

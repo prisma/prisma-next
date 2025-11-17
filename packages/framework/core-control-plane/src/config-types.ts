@@ -1,4 +1,5 @@
 import { dirname, join } from 'node:path';
+import { type } from 'arktype';
 import type {
   AdapterDescriptor,
   ControlPlaneDriver,
@@ -6,21 +7,10 @@ import type {
   ExtensionDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
-} from '@prisma-next/control-plane/types';
-import { type } from 'arktype';
-
-// Re-export control plane types for backward compatibility
-export type {
-  AdapterDescriptor,
-  ControlPlaneDriver,
-  DriverDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
-} from '@prisma-next/control-plane/types';
+} from './types';
 
 /**
- * @deprecated Use ControlPlaneDriver from @prisma-next/control-plane/types instead
+ * @deprecated Use ControlPlaneDriver from @prisma-next/core-control-plane/types instead
  */
 export type CliDriver = ControlPlaneDriver;
 

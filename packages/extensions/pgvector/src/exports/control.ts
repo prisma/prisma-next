@@ -49,10 +49,10 @@ function loadExtensionManifest(): ExtensionPackManifest {
 /**
  * pgvector extension descriptor for CLI config.
  */
-const pgvectorExtensionDescriptor: ExtensionDescriptor = {
+const pgvectorExtensionDescriptor: ExtensionDescriptor<'sql'> = {
   kind: 'extension',
+  familyId: 'sql',
   id: 'pgvector',
-  family: 'sql',
   manifest: loadExtensionManifest(),
 };
 

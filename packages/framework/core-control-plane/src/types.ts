@@ -1,6 +1,11 @@
-import type { ContractMarkerRecord, TargetFamilyHook } from '@prisma-next/contract/types';
+import type { TargetFamilyHook } from '@prisma-next/contract/types';
 import type { OperationSignature } from '@prisma-next/operations';
 import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
+
+/**
+ * Family identifier type. Each family, target, adapter, and extension is tied to a FamilyId.
+ */
+export type FamilyId = 'sql' | string;
 
 /**
  * Minimal driver interface for Control Plane database operations.
@@ -41,29 +46,14 @@ export interface DriverDescriptor {
  * Descriptor for a target family (e.g., SQL).
  * Provides the family hook and assembly helpers.
  */
-export interface FamilyDescriptor {
+export interface FamilyDescriptor<
+  TFamilyId extends FamilyId = FamilyId,
+  TFamilyInstance = unknown,
+> {
   readonly kind: 'family';
-  readonly id: string;
+  readonly familyId: TFamilyId;
+  readonly manifest: ExtensionPackManifest;
   readonly hook: TargetFamilyHook;
-  /**
-   * Family-specific verification helpers for DB-connected commands.
-   * Must remain in the migration/tooling plane (no runtime imports).
-   */
-  readonly verify?: {
-    /**
-     * Reads the contract marker from the database using the provided driver.
-     * Returns the parsed marker record or null if no marker is found.
-     * This abstracts SQL-specific details from the Control Plane.
-     */
-    readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>;
-    /**
-     * Optionally collects supported codec typeIds from adapter/extension manifests
-     * to enable coverage checks.
-     */
-    collectSupportedCodecTypeIds?: (
-      descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-    ) => readonly string[];
-  };
   /**
    * Converts an OperationManifest to an OperationSignature.
    * Family-specific conversion logic (e.g., SQL adds lowering spec).
@@ -80,15 +70,25 @@ export interface FamilyDescriptor {
    * SQL family overrides this to strip mappings before emitting ContractIR.
    */
   readonly stripMappings?: (contract: unknown) => unknown;
+  /**
+   * Creates a family instance for control-plane operations.
+   * @param options - Target, adapter, and extensions for the instance
+   * @returns Family instance that implements domain actions
+   */
+  create(options: {
+    readonly target: TargetDescriptor<TFamilyId>;
+    readonly adapter: AdapterDescriptor<TFamilyId>;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor<TFamilyId>>;
+  }): TFamilyInstance;
 }
 
 /**
  * Descriptor for a target pack (e.g., Postgres target).
  */
-export interface TargetDescriptor {
+export interface TargetDescriptor<TFamilyId extends FamilyId = FamilyId> {
   readonly kind: 'target';
+  readonly familyId: TFamilyId;
   readonly id: string;
-  readonly family: string;
   readonly manifest: ExtensionPackManifest;
 }
 
@@ -96,21 +96,147 @@ export interface TargetDescriptor {
  * Descriptor for an adapter pack (e.g., Postgres adapter).
  * May optionally provide a runtime factory for DB-connected commands.
  */
-export interface AdapterDescriptor {
+export interface AdapterDescriptor<TFamilyId extends FamilyId = FamilyId> {
   readonly kind: 'adapter';
+  readonly familyId: TFamilyId;
   readonly id: string;
-  readonly family: string;
   readonly manifest: ExtensionPackManifest;
   readonly create?: (...args: unknown[]) => unknown;
   readonly adapter?: unknown;
+  readonly createControlInstance?: () => unknown;
 }
 
 /**
  * Descriptor for an extension pack (e.g., pgvector).
  */
-export interface ExtensionDescriptor {
+export interface ExtensionDescriptor<TFamilyId extends FamilyId = FamilyId> {
   readonly kind: 'extension';
+  readonly familyId: TFamilyId;
   readonly id: string;
-  readonly family: string;
   readonly manifest: ExtensionPackManifest;
+}
+
+/**
+ * Family instance interface for control-plane domain actions.
+ * Each family implements this interface with family-specific types.
+ */
+export interface FamilyInstance<
+  TFamilyId extends FamilyId = FamilyId,
+  TSchemaIR = unknown,
+  TVerifyResult = unknown,
+  TSchemaVerifyResult = unknown,
+> {
+  readonly familyId: TFamilyId;
+
+  /**
+   * Verifies the database marker against the contract.
+   * Compares target, coreHash, and profileHash.
+   */
+  verify(options: {
+    readonly driver: ControlPlaneDriver;
+    readonly contractIR: unknown;
+    readonly expectedTargetId: string;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<TVerifyResult>;
+
+  /**
+   * Verifies the database schema against the contract.
+   * Compares contract requirements against live database schema.
+   */
+  schemaVerify(options: {
+    readonly driver: ControlPlaneDriver;
+    readonly contractIR: unknown;
+    readonly strict: boolean;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<TSchemaVerifyResult>;
+
+  /**
+   * Introspects the database schema and returns a family-specific schema IR.
+   */
+  introspect(options: {
+    readonly driver: ControlPlaneDriver;
+    readonly contractIR?: unknown;
+  }): Promise<TSchemaIR>;
+}
+
+/**
+ * Result type for database marker verification operations.
+ */
+export interface VerifyDatabaseResult {
+  readonly ok: boolean;
+  readonly code?: string;
+  readonly summary: string;
+  readonly contract: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+  readonly marker?: {
+    readonly coreHash?: string;
+    readonly profileHash?: string;
+  };
+  readonly target: {
+    readonly expected: string;
+    readonly actual?: string;
+  };
+  readonly missingCodecs?: readonly string[];
+  readonly codecCoverageSkipped?: boolean;
+  readonly meta?: {
+    readonly configPath?: string;
+    readonly contractPath: string;
+  };
+  readonly timings: {
+    readonly total: number;
+  };
+}
+
+/**
+ * Schema issue type for schema verification results.
+ */
+export interface SchemaIssue {
+  readonly kind:
+    | 'missing_table'
+    | 'missing_column'
+    | 'type_mismatch'
+    | 'nullability_mismatch'
+    | 'primary_key_mismatch'
+    | 'foreign_key_mismatch'
+    | 'unique_constraint_mismatch'
+    | 'index_mismatch'
+    | 'extension_missing';
+  readonly table: string;
+  readonly column?: string;
+  readonly indexOrConstraint?: string;
+  readonly expected?: string;
+  readonly actual?: string;
+  readonly message: string;
+}
+
+/**
+ * Result type for database schema verification operations.
+ */
+export interface VerifyDatabaseSchemaResult {
+  readonly ok: boolean;
+  readonly code?: string;
+  readonly summary: string;
+  readonly contract: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+  readonly target: {
+    readonly expected: string;
+    readonly actual?: string;
+  };
+  readonly schema: {
+    readonly issues: readonly SchemaIssue[];
+  };
+  readonly meta?: {
+    readonly configPath?: string;
+    readonly contractPath: string;
+    readonly strict: boolean;
+  };
+  readonly timings: {
+    readonly total: number;
+  };
 }

@@ -28,13 +28,20 @@ describe('config loader', () => {
     export default {
       family: {
         kind: 'family',
-        id: 'sql',
+        familyId: 'sql',
+        manifest: { id: 'sql', version: '0.0.1' },
         hook: mockHook,
         convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
         validateContractIR: (contract: unknown) => contract,
+        create: () => ({
+          familyId: 'sql',
+          verify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
+          schemaVerify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, schema: { issues: [] }, timings: { total: 0 } }),
+          introspect: async () => ({ tables: {}, extensions: [] }),
+        }),
       },
-      target: { kind: 'target', id: 'postgres', family: 'sql', manifest: { id: 'postgres', version: '1.0.0' } },
-      adapter: { kind: 'adapter', id: 'postgres', family: 'sql', manifest: { id: 'postgres', version: '1.0.0' } },
+      target: { kind: 'target', familyId: 'sql', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' } },
+      adapter: { kind: 'adapter', familyId: 'sql', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' } },
       extensions: [],
     };`;
   };
@@ -46,7 +53,7 @@ describe('config loader', () => {
     const config = await loadConfig(configPath);
     expect(config).toBeDefined();
     expect(config.family).toBeDefined();
-    expect(config.family.id).toBe('sql');
+    expect(config.family.familyId).toBe('sql');
   });
 
   it('loads config with named export', async () => {
@@ -62,13 +69,20 @@ describe('config loader', () => {
       export const config = {
         family: {
           kind: 'family',
-          id: 'sql',
+          familyId: 'sql',
+          manifest: { id: 'sql', version: '0.0.1' },
           hook: mockHook,
           convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
           validateContractIR: (contract: unknown) => contract,
+          create: () => ({
+            familyId: 'sql',
+            verify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
+            schemaVerify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, schema: { issues: [] }, timings: { total: 0 } }),
+            introspect: async () => ({ tables: {}, extensions: [] }),
+          }),
         },
-        target: { kind: 'target', id: 'postgres', family: 'sql', manifest: { id: 'postgres', version: '1.0.0' } },
-        adapter: { kind: 'adapter', id: 'postgres', family: 'sql', manifest: { id: 'postgres', version: '1.0.0' } },
+        target: { kind: 'target', familyId: 'sql', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' } },
+        adapter: { kind: 'adapter', familyId: 'sql', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' } },
         extensions: [],
       };
       export default config;`,
@@ -78,7 +92,7 @@ describe('config loader', () => {
     const config = await loadConfig(configPath);
     expect(config).toBeDefined();
     expect(config.family).toBeDefined();
-    expect(config.family.id).toBe('sql');
+    expect(config.family.familyId).toBe('sql');
   });
 
   it('loads config with default path when path not provided', async () => {
@@ -91,7 +105,7 @@ describe('config loader', () => {
       process.chdir(testDir);
       const config = await loadConfig();
       expect(config).toBeDefined();
-      expect(config.family.id).toBe('sql');
+      expect(config.family.familyId).toBe('sql');
     } finally {
       process.chdir(originalCwd);
     }

@@ -50,10 +50,10 @@ function loadAdapterManifest(): ExtensionPackManifest {
  * Postgres adapter descriptor for CLI config.
  * May optionally provide a runtime factory for DB-connected commands.
  */
-const postgresAdapterDescriptor: AdapterDescriptor = {
+const postgresAdapterDescriptor: AdapterDescriptor<'sql'> = {
   kind: 'adapter',
+  familyId: 'sql',
   id: 'postgres',
-  family: 'sql',
   manifest: loadAdapterManifest(),
   // Note: create() factory can be added here for DB-connected commands
   // For now, emit command doesn't need it

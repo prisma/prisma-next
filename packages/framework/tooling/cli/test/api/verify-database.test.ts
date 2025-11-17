@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
-import { verifyDatabase } from '@prisma-next/core-control-plane/verify-database';
+// verifyDatabase domain action removed - tests now use family instance directly
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -80,7 +80,7 @@ async function emitContractFromConfig(
   return validateContract<SqlContract<SqlStorage>>(contractJson);
 }
 
-// Helper to load config and contract for verifyDatabase
+// Helper to load config and contract
 async function loadConfigAndContract(
   testDir: string,
   configPath: string,
@@ -95,6 +95,37 @@ async function loadConfigAndContract(
   const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
   const contractIR = config.family.validateContractIR(contractJson) as ContractIR;
   return { config, contractIR, contractPath };
+}
+
+// Helper to verify database using family instance
+async function verifyDatabaseViaFamilyInstance(options: {
+  config: Awaited<ReturnType<typeof loadConfig>>;
+  contractIR: ContractIR;
+  dbUrl: string;
+  contractPath: string;
+  configPath?: string;
+}): Promise<import('@prisma-next/core-control-plane/types').VerifyDatabaseResult> {
+  const { config, contractIR, dbUrl, contractPath, configPath } = options;
+  if (!config.driver) {
+    throw new Error('Driver is required');
+  }
+  const driver = await config.driver.create(dbUrl);
+  try {
+    const familyInstance = config.family.create({
+      target: config.target,
+      adapter: config.adapter,
+      extensions: config.extensions ?? [],
+    });
+    return await familyInstance.verify({
+      driver,
+      contractIR,
+      expectedTargetId: config.target.id,
+      contractPath,
+      configPath,
+    });
+  } finally {
+    await driver.close();
+  }
 }
 
 describe('verifyDatabase API', () => {
@@ -155,7 +186,7 @@ describe('verifyDatabase API', () => {
             const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
             const contractIR = config.family.validateContractIR(contractJson) as ContractIR;
 
-            const result = await verifyDatabase({
+            const result = await verifyDatabaseViaFamilyInstance({
               config,
               contractIR,
               dbUrl: connectionString,
@@ -212,7 +243,7 @@ describe('verifyDatabase API', () => {
               testDirWithDb,
               'prisma-next.config.ts',
             );
-            const result = await verifyDatabase({
+            const result = await verifyDatabaseViaFamilyInstance({
               config,
               contractIR,
               dbUrl: connectionString,
@@ -275,7 +306,7 @@ describe('verifyDatabase API', () => {
               testDirWithDb,
               'prisma-next.config.ts',
             );
-            const result = await verifyDatabase({
+            const result = await verifyDatabaseViaFamilyInstance({
               config,
               contractIR,
               dbUrl: connectionString,
@@ -338,7 +369,7 @@ describe('verifyDatabase API', () => {
               testDirWithDb,
               'prisma-next.config.ts',
             );
-            const result = await verifyDatabase({
+            const result = await verifyDatabaseViaFamilyInstance({
               config,
               contractIR,
               dbUrl: connectionString,
@@ -403,7 +434,7 @@ describe('verifyDatabase API', () => {
               const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
               const contractIR = config.family.validateContractIR(contractJson) as ContractIR;
               try {
-                await verifyDatabase({
+                await verifyDatabaseViaFamilyInstance({
                   config,
                   contractIR,
                   dbUrl: connectionString,
@@ -497,7 +528,7 @@ describe('verifyDatabase API', () => {
               testDirWithDb,
               'prisma-next.config.ts',
             );
-            const result = await verifyDatabase({
+            const result = await verifyDatabaseViaFamilyInstance({
               config,
               contractIR,
               dbUrl: connectionString,
@@ -557,7 +588,7 @@ describe('verifyDatabase API', () => {
               'prisma-next.config.ts',
             );
             // The query runner from the factory always has close(), but we've verified the code path exists
-            const result = await verifyDatabase({
+            const result = await verifyDatabaseViaFamilyInstance({
               config,
               contractIR,
               dbUrl: connectionString,
@@ -627,7 +658,7 @@ describe('verifyDatabase API', () => {
               'prisma-next.config.ts',
             );
             try {
-              await verifyDatabase({
+              await verifyDatabaseViaFamilyInstance({
                 config,
                 contractIR,
                 dbUrl: connectionString,
@@ -734,7 +765,7 @@ describe('verifyDatabase API', () => {
               'prisma-next.config.ts',
             );
             try {
-              await verifyDatabase({
+              await verifyDatabaseViaFamilyInstance({
                 config,
                 contractIR,
                 dbUrl: connectionString,
@@ -828,7 +859,7 @@ describe('verifyDatabase API', () => {
               testDirWithDb,
               'prisma-next.config.ts',
             );
-            const result = await verifyDatabase({
+            const result = await verifyDatabaseViaFamilyInstance({
               config,
               contractIR,
               dbUrl: connectionString,
