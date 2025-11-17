@@ -1,6 +1,20 @@
 import type { O } from 'ts-toolbelt';
 
 /**
+ * Codec metadata for database-specific type information.
+ * Used for schema introspection and verification.
+ */
+export interface CodecMeta {
+  readonly db?: {
+    readonly sql?: {
+      readonly postgres?: {
+        readonly nativeType: string; // e.g. 'integer', 'text', 'vector', 'timestamp with time zone'
+      };
+    };
+  };
+}
+
+/**
  * Codec interface for encoding/decoding values between wire format and JavaScript types.
  *
  * Codecs are pure, synchronous functions with no side effects or IO.
@@ -18,6 +32,12 @@ export interface Codec<Id extends string = string, TWire = unknown, TJs = unknow
    * Examples: ['text'], ['int4', 'float8'], ['timestamp', 'timestamptz']
    */
   readonly targetTypes: readonly string[];
+
+  /**
+   * Optional metadata for database-specific type information.
+   * Used for schema introspection and verification.
+   */
+  readonly meta?: CodecMeta;
 
   /**
    * Decode a wire value (from database) to JavaScript type.
@@ -142,10 +162,12 @@ export function codec<Id extends string, TWire, TJs>(config: {
   targetTypes: readonly string[];
   encode: (value: TJs) => TWire;
   decode: (wire: TWire) => TJs;
+  meta?: CodecMeta;
 }): Codec<Id, TWire, TJs> {
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
+    ...(config.meta ? { meta: config.meta } : {}),
     encode: config.encode,
     decode: config.decode,
   };
