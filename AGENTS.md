@@ -36,6 +36,10 @@ cd examples/todo-app && pnpm demo  # End-to-end demo
 ## Quick Context
 - Contract‑first: we emit `contract.json` and `contract.d.ts` only; queries compile at runtime.
 - Modular packages with domain/layer/plane guardrails: `architecture.config.json`.
+- Control vs execution plane:
+  - Control plane: config loading, contract emission, schema verification, and marker reading. Uses control‑plane family descriptors and contexts (e.g., `@prisma-next/family-sql/control` with `SqlFamilyContext`).
+  - Execution plane: query lowering, codecs, and runtime execution. Uses runtime family/adapter/extension entrypoints (e.g., `./runtime`).
+  - Keep control‑plane code (core‑control‑plane, CLI) free of runtime types (e.g., `CodecRegistry`); rely on family‑specific metadata views instead (e.g., SQL type metadata registries).
 - Use Arktype for validation; extract types via `.infer` where needed: `.cursor/rules/arktype-usage.mdc`.
 - Directory layout: the entire SQL family (all layers and planes) lives under `packages/sql/**`. The top-level `packages/targets/**` is reserved for concrete target extension packs (e.g., `packages/targets/postgres` for target, `packages/targets/postgres-adapter` for adapter, `packages/targets/postgres-driver` for driver), not for family internals.
 - Targets domain separation: keep dialect, adapter, and driver as separate packages under `packages/targets/**` so consumers can mix and match.

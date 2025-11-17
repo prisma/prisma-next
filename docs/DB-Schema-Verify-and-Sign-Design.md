@@ -29,6 +29,27 @@ This replaces the earlier “Option A” brief under `docs/briefs/07-CLI-DB-Sche
 - No multi-environment switching or shadow database support; we always use the primary DB from config (or `--db` override when we add it).
 - No fully implemented strict mode; strictness is wired through but the strict strategy itself is allowed to be a stub.
 
+## Control vs Execution Plane Families
+
+Schema verification and signing live in the **control plane**. The SQL runtime and other execution-plane concerns are separate:
+
+- Execution plane:
+  - Runtime family descriptor and context live in runtime packages (e.g. SQL runtime).
+  - Concerned with lowering, codecs, operations, and query execution.
+- Control plane:
+  - Control family descriptor and context live in the control-plane side (e.g. `@prisma-next/family-sql/control`).
+  - Concerned with schema IR, schema verification, marker reading, and type metadata.
+
+For SQL:
+
+- Control-plane context:
+  - `SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & { readonly types: SqlTypeMetadataRegistry }`.
+  - `TargetFamilyContext<TSchemaIR>` is a pure type carrier; it does not contain `schemaIR` as a runtime field. The schema IR is produced by introspection and passed as a separate value.
+- Execution-plane context:
+  - `RuntimeSqlContext` (owned by the SQL runtime) remains separate and is not used by schema verification.
+
+Execution-plane objects (e.g. runtime codec registries) are internal to the family’s control-plane implementation; they are not part of the control-plane SPI or CLI contracts.
+
 ## User-facing CLI
 
 ### Command shape
@@ -247,61 +268,178 @@ export interface VerifyDatabaseSchemaResult {
 
 ### Responsibilities
 
-- `verifyDatabaseSchema` (framework CLI):
-  - Load config (via `loadConfig`).
-  - Resolve DB URL (for now: `config.db.url` only).
-  - Resolve and read `contract.json` (fail fast if missing).
-  - Validate contract via `config.family.validateContractIR`.
-  - Construct or obtain a `ControlPlaneDriver` from the configured driver (same pattern as `verifyDatabase`).
-  - Delegate schema comparison to family/target/extension via a single `verifySchema` hook.
-  - Normalize the family’s result into `VerifyDatabaseSchemaResult`.
+- `verifyDatabaseSchema` (core control-plane / domain action):
+  - Accepts:
+    - `family`, `target`, `adapter`, `extensions` descriptors.
+    - A family-specific `contextInput` (e.g. `{ types }` for SQL) produced by the family.
+    - A `ControlPlaneDriver`, `contractIR`, and control metadata (paths, strictness, timings).
+  - Orchestrates control-plane steps generically:
+    1. Call `introspectDatabaseSchema` (domain action) → uses `family.introspectSchema` to build `schemaIR`.
+    2. Call `verifySchemaAgainstContract` (domain action) → uses `family.verifySchema` and extension `verifySchema` hooks to produce `schema.issues`.
+  - Decorates the result with contract hashes, target info, meta, and timings, and assigns `PN-SCHEMA-0001` when `issues.length > 0`.
+- Framework CLI:
+  - Loads config (via `loadConfig`).
+  - Resolves DB URL (for now: `config.db.url` only).
+  - Resolves and reads `contract.json` (fail fast if missing).
+  - Validates contract via `config.family.validateContractIR`.
+  - Constructs a `ControlPlaneDriver` from the configured driver (same pattern as `db verify`).
+  - Delegates context assembly to the family:
+    - Calls `config.family.prepareControlContext?.({ contractIR, target, adapter, extensions })` to obtain a family-specific `contextInput`.
+  - Calls `verifyDatabaseSchema` with descriptors, driver, `contractIR`, and the family-provided `contextInput`.
+  - Renders TTY/JSON output and exit codes based on `VerifyDatabaseSchemaResult`.
+
+## Family SPI and Control-Plane Context
+
+The control-plane **family descriptor** encodes the family’s strategy for schema verification and context assembly. For DB-connected commands, we use:
+
+- A family-specific context type `TCtx extends TargetFamilyContext` (e.g. `SqlFamilyContext`).
+- A set of top-level hooks on the family descriptor (flattened; no nested `verify` namespace):
+
+```ts
+export interface FamilyDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> {
+  readonly kind: 'family';
+  readonly id: string;
+  readonly hook: TargetFamilyHook;
+
+  // Marker read (used by db verify / db sign)
+  readonly readMarker?: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>;
+
+  // Optional: codec coverage checks (unchanged)
+  readonly collectSupportedCodecTypeIds?: (
+    descriptors: ReadonlyArray<
+      TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
+    >,
+  ) => readonly string[];
+
+  /**
+   * Prepares family-specific control-plane context from descriptors.
+   * For SQL, this constructs a SqlTypeMetadataRegistry from adapter codecs and extension metadata.
+   * The context does not contain schemaIR; that is produced separately by introspectSchema.
+   */
+  readonly prepareControlContext?: (options: {
+    readonly contractIR: unknown;
+    readonly target: TargetDescriptor<TCtx>;
+    readonly adapter: AdapterDescriptor<TCtx>;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+  }) => Promise<TCtx>;
+
+  /**
+   * Introspects the database schema and returns a target-agnostic Schema IR.
+   * Delegates to target-specific implementations (e.g., Postgres adapter).
+   * The contextInput contains family-specific control-plane state (e.g., type metadata for SQL).
+   * The schemaIR is returned as a separate value, not stored in the context.
+   */
+  readonly introspectSchema?: (options: {
+    readonly driver: ControlPlaneDriver;
+    readonly contextInput: TCtx;
+    readonly contractIR?: unknown;
+    readonly target: TargetDescriptor<TCtx>;
+    readonly adapter: AdapterDescriptor<TCtx>;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+  }) => Promise<SchemaIROf<TCtx>>;
+
+  /**
+   * Verifies that the schema IR matches the contract IR.
+   * Compares contract against schema IR and returns schema issues.
+   * Extension verifySchema hooks are invoked by the domain action, not by this hook.
+   */
+  readonly verifySchema?: (options: {
+    readonly contractIR: unknown;
+    readonly schemaIR: SchemaIROf<TCtx>;
+    readonly target: TargetDescriptor<TCtx>;
+    readonly adapter: AdapterDescriptor<TCtx>;
+    readonly extensions: ReadonlyArray<ExtensionDescriptor<TCtx>>;
+  }) => Promise<{ readonly issues: readonly SchemaIssue[] }>;
+}
+```
+
+For SQL:
+
+- `TCtx` is `SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & { types: SqlTypeMetadataRegistry }`.
+- `TargetFamilyContext<SqlSchemaIR>` is a pure type carrier; it does not contain `schemaIR` as a runtime field.
+- `prepareControlContext`:
+  - Hydrates the adapter instance (from `AdapterDescriptor`).
+  - Obtains a runtime `CodecRegistry` from `adapter.profile.codecs()`.
+  - Reads `typeMetadata` from control-plane extensions.
+  - Returns `{ types }` as `SqlFamilyContext` (the context does not contain `schemaIR`).
+  - Builds a `SqlTypeMetadataRegistry` from both (using `createSqlTypeMetadataRegistry`).
+  - Returns `{ types }` as the context input.
+- `introspectSchema`:
+  - Delegates to `adapter.introspect(driver, types, contractIR)` to produce `SqlSchemaIR`.
+  - The adapter's `introspect` function is provided through the `AdapterDescriptor` (e.g., `introspectPostgresSchema` for Postgres).
+  - This keeps the SQL family target-agnostic while allowing adapters to provide target-specific introspection logic.
+- `verifySchema`:
+  - Compares `contractIR` and `SqlSchemaIR` and returns `SchemaIssue[]`.
+
+This keeps:
+
+- The CLI and domain actions **generic and family-agnostic**.
+- All SQL-specific strategy (including how to derive types from codecs) inside the SQL family’s control-plane descriptor and context.
   - Ensure the driver is closed.
-  - Throw CLI-typed errors (`errorDatabaseUrlRequired`, `errorFileNotFound`, `errorFamilySchemaVerifierRequired`, etc.) as needed.
+  - Throw CLI-typed errors (`errorDatabaseUrlRequired`, `errorFileNotFound`, etc.) as needed.
+
+- Domain actions (`introspectDatabaseSchema`, `verifySchemaAgainstContract`):
+  - `introspectDatabaseSchema`: Calls `family.verify.introspectSchema` hook with pre-assembled `codecRegistry`.
+  - `verifySchemaAgainstContract`: Calls `family.verify.verifySchema` hook (if provided) or uses generic comparison, then calls extension `verifySchema` hooks.
 
 - Family/target/extension (via control-plane/family SPI):
-  - Perform catalog introspection and comparison.
+  - `introspectSchema` hook: Performs catalog introspection and builds Schema IR.
+  - `verifySchema` hook: Compares contract IR vs schema IR and returns issues.
   - Own type compatibility rules, nullability semantics, index naming, etc.
   - Only read schema elements that the contract depends on (tables, columns, and relationships referenced by the contract).
 
 ## Family SPI for Schema Verification
 
-We extend the control-plane family descriptor with a schema verification hook:
+The control-plane family descriptor provides low-level hooks for schema introspection and verification:
 
-- In `@prisma-next/control-plane/types` (or equivalent), we enrich `FamilyDescriptor.verify`:
+- In `@prisma-next/core-control-plane/types`, `FamilyDescriptor.verify` includes:
 
 ```ts
-export interface FamilyDescriptor {
+export interface FamilyDescriptor<TSchemaIR = unknown> {
   // existing fields …
   readonly verify?: {
     readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>;
     collectSupportedCodecTypeIds?: (
       descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
     ) => readonly string[];
-    verifySchema?: (options: {
+    /**
+     * Introspects the database schema and returns a Schema IR.
+     * The codecRegistry is pre-assembled by the domain layer (CLI/domain actions).
+     */
+    introspectSchema?: (options: {
       readonly driver: ControlPlaneDriver;
-      readonly contractIR: unknown;
+      readonly codecRegistry: CodecRegistry;
+      readonly contractIR?: unknown;
       readonly target: TargetDescriptor;
       readonly adapter: AdapterDescriptor;
       readonly extensions: ReadonlyArray<ExtensionDescriptor>;
-      readonly strict: boolean;
-      readonly startTime: number;
-      readonly contractPath: string;
-      readonly configPath?: string;
-    }) => Promise<VerifyDatabaseSchemaResult>;
+    }) => Promise<TSchemaIR>;
+    /**
+     * Verifies that the schema IR matches the contract IR.
+     * Compares contract against schema IR and returns schema issues.
+     * This is a low-level hook that performs comparison only; extension hooks are handled by domain actions.
+     */
+    verifySchema?: (options: {
+      readonly contractIR: unknown;
+      readonly schemaIR: TSchemaIR;
+      readonly target: TargetDescriptor;
+      readonly adapter: AdapterDescriptor;
+      readonly extensions: ReadonlyArray<ExtensionDescriptor>;
+    }) => Promise<{ readonly issues: readonly SchemaIssue[] }>;
   };
 }
 ```
 
 Key points:
 
-- Single monolithic `verifySchema` hook to keep the framework CLI simple.
-- The framework CLI passes:
-  - `driver`: already created from the configured driver descriptor.
-  - `contractIR`: validated contract IR from the family.
-  - `target`, `adapter`, `extensions`: same descriptors passed to `ControlExecutor`.
-  - `strict`: strictness flag from the CLI; strict mode is stubbed in v1 but wired through.
-  - `startTime`, `configPath`, `contractPath`: allow the family to set timings and meta.
-- The hook returns a fully populated `VerifyDatabaseSchemaResult` (or a family-internal equivalent that the CLI can adapt 1:1).
+- **Two separate hooks**: `introspectSchema` (builds Schema IR from DB) and `verifySchema` (compares contract IR vs schema IR).
+- **Registry assembly in CLI**: The `codecRegistry` is pre-assembled by the CLI/domain layer and passed to `introspectSchema`; families never assemble registries.
+- **Low-level operations**: Family hooks are pure operations; domain actions (`introspectDatabaseSchema`, `verifySchemaAgainstContract`) orchestrate them.
+- **CLI orchestration**: The CLI API (`verifyDatabaseSchema`) orchestrates:
+  1. Assembles codec registry via `assembleCodecRegistry`.
+  2. Calls `introspectDatabaseSchema` domain action.
+  3. Calls `verifySchemaAgainstContract` domain action.
+  4. Builds `VerifyDatabaseSchemaResult` from results.
 
 ### Strict vs permissive
 

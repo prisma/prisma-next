@@ -31,7 +31,7 @@ This package uses a multi-plane structure with separate entrypoints:
   - Implements control-plane hooks for DB-connected commands:
     - `readMarker` – read contract marker rows.
     - `prepareControlContext` – build SQL control-plane context from descriptors.
-    - `introspectSchema` – introspect database schema and produce `SqlSchemaIR`.
+    - `introspectSchema` – introspect database schema and produce `SqlSchemaIR` (delegates to adapter's `introspect` function).
     - `verifySchema` – compare contract IR against schema IR and return `SchemaIssue[]`.
 
 ## Usage
@@ -71,9 +71,18 @@ This package is structured as a multi-plane package:
 - **`src/exports/runtime.ts`**: Execution plane entrypoint (placeholder for future runtime family hooks).
 - **`src/context.ts`**: Defines `SqlFamilyContext` (control-plane context).
 - **`src/type-metadata.ts`** & `src/types.ts`: Define SQL type metadata (`SqlTypeMetadata`, `SqlTypeMetadataRegistry`) and helpers (e.g., `createSqlTypeMetadataRegistry`).
-- **`src/verify.ts`**: Shared verification logic used by the control-plane family descriptor (`readMarker`, `introspectSchema`, `verifySchema`).
+- **`src/marker.ts`**: Contract marker reading logic (`readMarker`).
+- **`src/control-hooks.ts`**: Control-plane hooks (`prepareControlContext`, `introspectSchema`, `verifySchema`, `supportedTypeIds`).
 
 The package follows the multi-plane entrypoint pattern established by adapter packages like `@prisma-next/adapter-postgres`, allowing it to serve both control and runtime planes while maintaining strict plane boundaries.
+
+## Target-Agnostic Design
+
+The SQL family is **target-agnostic** and does not import from specific adapters. Instead, adapters provide their introspection logic through the `AdapterDescriptor.introspect` method:
+
+- The family's `introspectSchema` hook delegates to `adapter.introspect()` to perform target-specific introspection
+- This allows the family to work with any SQL target (Postgres, MySQL, etc.) without hardcoding target-specific logic
+- Adapters are responsible for implementing their own introspection functions that produce `SqlSchemaIR`
 
 ## Dependencies
 

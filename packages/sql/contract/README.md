@@ -132,7 +132,10 @@ flowchart TD
 ## Dependencies
 
 - **`@prisma-next/contract`**: Framework-level contract types (`ContractBase`)
+- **`@prisma-next/core-control-plane`**: Control plane types
 - **`arktype`**: Runtime validation library
+
+**Note**: This package does not depend on `@prisma-next/sql-schema-ir`. The `PrimaryKey` type is defined in this package (`sql-contract`) and is also available from `@prisma-next/sql-schema-ir/types` for convenience.
 
 **Dependents:**
 - **`@prisma-next/sql-contract-ts`**: Uses SQL contract types and validators for authoring

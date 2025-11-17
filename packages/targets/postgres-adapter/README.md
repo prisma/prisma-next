@@ -108,6 +108,7 @@ flowchart TD
 **CLI Entry Point (`cli.ts`)**
 - Exports `AdapterDescriptor` for CLI config
 - Loads adapter manifest from `packs/manifest.json`
+- Provides `introspect` function for schema introspection (used by SQL family)
 - Used by `prisma-next.config.ts` to declare the adapter
 
 **Runtime Entry Point (`runtime.ts`)**
@@ -174,10 +175,26 @@ import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 export default defineConfig({
   family: sql,
   target: postgres,
-  adapter: postgresAdapter,
+  adapter: postgresAdapter, // Includes introspect function for schema verification
   extensions: [],
 });
 ```
+
+### Schema Introspection
+
+The adapter provides an `introspect` function through its `AdapterDescriptor` that the SQL family uses for schema verification:
+
+```typescript
+import { introspectPostgresSchema } from '@prisma-next/adapter-postgres/introspect';
+
+// The adapter descriptor includes this function
+const adapterDescriptor = {
+  // ...
+  introspect: introspectPostgresSchema, // Used by SQL family for schema verification
+};
+```
+
+This allows the SQL family to remain target-agnostic while still supporting PostgreSQL-specific introspection logic.
 
 ## Capabilities
 

@@ -94,9 +94,28 @@ Adapter, target, and extension descriptors are also parameterized by `TCtx` to k
 
 ```typescript
 export interface TargetDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> { /* … */ }
-export interface AdapterDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> { /* … */ }
+export interface AdapterDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> {
+  readonly kind: 'adapter';
+  readonly id: string;
+  readonly family: string;
+  readonly manifest: ExtensionPackManifest;
+  readonly create?: (...args: unknown[]) => unknown;
+  readonly adapter?: unknown;
+  /**
+   * Introspects the database schema and returns a target-agnostic Schema IR.
+   * This allows adapters to provide introspection without the family needing to import adapter-specific code.
+   */
+  readonly introspect?: (
+    driver: ControlPlaneDriver,
+    types: unknown,
+    contract?: unknown,
+  ) => Promise<unknown>;
+  readonly _contextType?: TCtx;
+}
 export interface ExtensionDescriptor<TCtx extends TargetFamilyContext = TargetFamilyContext> { /* … */ }
 ```
+
+**Adapter Introspection Pattern**: Adapters provide their introspection logic through the `introspect` method on `AdapterDescriptor`. This allows families to remain target-agnostic while still supporting target-specific introspection. The SQL family's `introspectSchema` hook delegates to `adapter.introspect()` to perform schema introspection.
 
 ### Emit Contract
 

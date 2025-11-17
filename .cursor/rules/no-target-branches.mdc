@@ -74,6 +74,35 @@ class PostgresAdapter implements Adapter {
 }
 ```
 
+**✅ CORRECT: Use adapter introspection pattern for schema introspection**
+
+```typescript
+// ✅ CORRECT: Adapter provides introspection through AdapterDescriptor
+// packages/targets/postgres-adapter/src/cli.ts
+const postgresAdapterDescriptor = {
+  kind: 'adapter',
+  id: 'postgres',
+  family: 'sql',
+  manifest: loadAdapterManifest(),
+  create: () => createPostgresAdapter(),
+  introspect: introspectPostgresSchema, // Adapter provides introspection
+};
+
+// ✅ CORRECT: Family delegates to adapter.introspect() (target-agnostic)
+// packages/sql/family/src/control-hooks.ts
+export async function introspectSchema(options: {
+  readonly adapter: AdapterDescriptor<SqlFamilyContext>;
+  // ...
+}): Promise<SqlSchemaIR> {
+  if (!options.adapter.introspect) {
+    throw new Error(`Adapter '${options.adapter.id}' does not provide introspection`);
+  }
+  return await options.adapter.introspect(driver, types, contractIR) as SqlSchemaIR;
+}
+```
+
+This pattern keeps families target-agnostic while allowing adapters to provide target-specific introspection logic.
+
 ## When Is Target Branching Acceptable?
 
 Target-specific branching is **only acceptable** in:
@@ -123,11 +152,13 @@ If you find target-specific branching in core packages:
 - Adapters register codecs: `adapter.profile.codecs().register(codec)`
 - Extension packs define type mappings in manifests
 - Capabilities drive conditional behavior: `if (adapter.profile.capabilities.jsonAgg)`
+- Adapters provide introspection through `AdapterDescriptor.introspect`: `adapter.introspect(driver, types, contract)`
 
 **Bad patterns (to avoid):**
 - `if (target === 'postgres')` in core packages
 - `switch (target)` in validation logic
 - Hardcoded target-specific type mappings in core
+- Dynamic imports of adapter-specific functions in families: `await import('@prisma-next/adapter-postgres/introspect')` (use `adapter.introspect` instead)
 
 ## Testing
 
