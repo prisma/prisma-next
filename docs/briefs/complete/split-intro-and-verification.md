@@ -240,7 +240,6 @@ export interface IntrospectDatabaseSchemaOptions<TSchemaIR = unknown> {
 
 export interface IntrospectDatabaseSchemaResult<TSchemaIR = unknown> {
   readonly schemaIR: TSchemaIR;
-  readonly timings: { readonly total: number };
 }
 
 export async function introspectDatabaseSchema<TSchemaIR = unknown>(
@@ -254,7 +253,6 @@ export async function introspectDatabaseSchema<TSchemaIR = unknown>(
     });
   }
 
-  const start = Date.now();
   const schemaIR = await family.verify.introspectSchema({
     driver,
     target,
@@ -263,10 +261,7 @@ export async function introspectDatabaseSchema<TSchemaIR = unknown>(
     codecRegistry,
   });
 
-  return {
-    schemaIR,
-    timings: { total: Date.now() - start },
-  };
+  return { schemaIR };
 }
 ```
 
@@ -343,7 +338,7 @@ export async function verifyDatabaseSchema(
   const codecRegistry = await assembleCodecRegistry(config.adapter, config.extensions ?? []);
 
   // 1) Introspect
-  const { schemaIR, timings: introspectTimings } = await introspectDatabaseSchema<SqlSchemaIR>({
+  const { schemaIR } = await introspectDatabaseSchema<SqlSchemaIR>({
     driver,
     family: config.family as FamilyDescriptor<SqlSchemaIR>,
     target: config.target,
@@ -388,7 +383,6 @@ export async function verifyDatabaseSchema(
     },
     timings: {
       total: Date.now() - startTime,
-      // optionally introspectTimings.total if we want to expose
     },
   };
 }
