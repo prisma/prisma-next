@@ -4,7 +4,7 @@ import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
-import postgresDriver from '@prisma-next/driver-postgres/cli';
+import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';

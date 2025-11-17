@@ -24,7 +24,9 @@
         "packages/targets/postgres-adapter/src/exports/runtime.ts"
       ],
       "@prisma-next/adapter-postgres/*": ["packages/targets/postgres-adapter/src/exports/*.ts"],
-      "@prisma-next/driver-postgres/cli": ["packages/targets/postgres-driver/src/exports/cli.ts"],
+      "@prisma-next/driver-postgres/control": [
+        "packages/targets/postgres-driver/src/exports/control.ts"
+      ],
       "@prisma-next/driver-postgres/runtime": [
         "packages/targets/postgres-driver/src/exports/runtime.ts"
       ],

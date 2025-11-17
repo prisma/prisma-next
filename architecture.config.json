@@ -121,7 +121,7 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/targets/postgres-driver/src/exports/cli.ts",
+      "glob": "packages/targets/postgres-driver/src/exports/control.ts",
       "domain": "targets",
       "layer": "drivers",
       "plane": "migration"
