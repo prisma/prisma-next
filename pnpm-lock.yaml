@@ -657,6 +657,9 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../operations
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:*
+        version: link:../schema-ir
       arktype:
         specifier: ^2.0.0
         version: 2.1.26

@@ -1,7 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
+import type { FamilyInstance, VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
+import type { OperationRegistry } from '@prisma-next/operations';
 // verifyDatabase domain action removed - tests now use family instance directly
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -13,17 +16,7 @@ import {
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  FamilyInstance,
-  VerifyDatabaseResult,
-} from '@prisma-next/core-control-plane/types';
 import { loadConfig } from '../../src/config-loader';
-import {
-  assembleOperationRegistry,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '../../src/pack-assembly';
 import { CliStructuredError } from '../../src/utils/cli-errors';
 import { setupIntegrationTestDirectoryFromFixtures } from '../utils/test-helpers';
 
@@ -57,11 +50,21 @@ async function emitContractFromConfig(
 
   const contractIR = config.family.validateContractIR(contractWithoutMappings);
 
-  const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-  const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-  const codecTypeImports = extractCodecTypeImports(descriptors);
-  const operationTypeImports = extractOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds(config.adapter, config.target, config.extensions ?? []);
+  // Create family instance (assembles operation registry, type imports, extension IDs)
+  const familyInstance = config.family.create({
+    target: config.target,
+    adapter: config.adapter,
+    extensions: config.extensions ?? [],
+  }) as {
+    readonly operationRegistry: OperationRegistry;
+    readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+    readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+    readonly extensionIds: ReadonlyArray<string>;
+  };
+
+  // Extract assembly data from family instance
+  const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+    familyInstance;
 
   const emitResult = await emitContract({
     contractIR: contractIR as ContractIR,
@@ -111,23 +114,43 @@ async function verifyDatabaseViaFamilyInstance(options: {
 }): Promise<import('@prisma-next/core-control-plane/types').VerifyDatabaseResult> {
   const { config, contractIR, dbUrl, contractPath, configPath } = options;
   if (!config.driver) {
-    throw new Error('Driver is required');
+    // Match command handler behavior - use structured error
+    const { errorDriverRequired } = await import('@prisma-next/core-control-plane/errors');
+    throw errorDriverRequired();
   }
-  const driver = await config.driver.create(dbUrl);
+  let driver: Awaited<ReturnType<typeof config.driver.create>>;
+  try {
+    driver = await config.driver.create(dbUrl);
+  } catch (error) {
+    // Wrap errors from driver.create() in structured error (matching command handler behavior)
+    const { errorUnexpected } = await import('@prisma-next/core-control-plane/errors');
+    throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+      why: `Failed to verify database: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
   try {
     const familyInstance = config.family.create({
       target: config.target,
       adapter: config.adapter,
       extensions: config.extensions ?? [],
     }) as FamilyInstance<string>;
-    const result = await familyInstance.verify({
-      driver,
-      contractIR,
-      expectedTargetId: config.target.id,
-      contractPath,
-      ...(configPath ? { configPath } : {}),
-    });
-    return result as VerifyDatabaseResult;
+    let result: VerifyDatabaseResult;
+    try {
+      result = (await familyInstance.verify({
+        driver,
+        contractIR,
+        expectedTargetId: config.target.id,
+        contractPath,
+        ...(configPath ? { configPath } : {}),
+      })) as VerifyDatabaseResult;
+    } catch (error) {
+      // Wrap errors from verify() in structured error (matching command handler behavior)
+      const { errorUnexpected } = await import('@prisma-next/core-control-plane/errors');
+      throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to verify database: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+    return result;
   } finally {
     await driver.close();
   }
@@ -674,10 +697,10 @@ describe('verifyDatabase API', () => {
             } catch (error) {
               expect(error).toBeInstanceOf(Error);
               // errorUnexpected returns a CliStructuredError with message "Unexpected error"
-              // and the why field contains "Contract is missing required fields: coreHash or target"
+              // and the why field contains "Failed to verify database: Contract is missing required fields: coreHash or target"
               if (error && typeof error === 'object' && 'why' in error) {
                 expect((error as { why?: string }).why).toContain(
-                  'Contract is missing required fields',
+                  'Failed to verify database: Contract is missing required fields',
                 );
               } else {
                 const errorMessage = error instanceof Error ? error.message : String(error);
@@ -781,10 +804,10 @@ describe('verifyDatabase API', () => {
             } catch (error) {
               expect(error).toBeInstanceOf(Error);
               // errorUnexpected returns a CliStructuredError with message "Unexpected error"
-              // and the why field contains "Database query returned unexpected result structure"
+              // and the why field contains "Failed to verify database: Database query returned unexpected result structure"
               if (error && typeof error === 'object' && 'why' in error) {
                 expect((error as { why?: string }).why).toContain(
-                  'Database query returned unexpected result structure',
+                  'Failed to verify database: Database query returned unexpected result structure',
                 );
               } else {
                 const errorMessage = error instanceof Error ? error.message : String(error);
@@ -916,7 +939,31 @@ describe('verifyDatabase API', () => {
                 contractPath,
                 configPath: join(testDirWithDb, 'prisma-next.config.ts'),
               }),
-            ).rejects.toThrow('Failed to verify database: String error instead of Error object');
+            ).rejects.toThrow();
+            // Verify the error has the correct why field
+            try {
+              await verifyDatabaseViaFamilyInstance({
+                config,
+                contractIR,
+                dbUrl: connectionString,
+                contractPath,
+                configPath: join(testDirWithDb, 'prisma-next.config.ts'),
+              });
+              expect.fail('Expected verifyDatabase to throw');
+            } catch (error) {
+              // errorUnexpected wraps the error, so it should be a CliStructuredError
+              expect(error).toBeInstanceOf(Error);
+              // errorUnexpected returns a CliStructuredError with message "Unexpected error"
+              // and the why field contains "Failed to verify database: String error instead of Error object"
+              if (error && typeof error === 'object' && 'why' in error) {
+                expect((error as { why?: string }).why).toBe(
+                  'Failed to verify database: String error instead of Error object',
+                );
+              } else {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                expect(errorMessage).toBe('Unexpected error');
+              }
+            }
             vi.restoreAllMocks();
           } finally {
             cleanupWithDb();

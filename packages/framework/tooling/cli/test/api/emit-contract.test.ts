@@ -1,16 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
+import type { OperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config-loader';
-import {
-  assembleOperationRegistry,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '../../src/pack-assembly';
 import { setupIntegrationTestDirectoryFromFixtures } from '../utils/test-helpers';
 
 // Fixture subdirectory for emit-contract tests
@@ -60,15 +56,21 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output and types paths');
       }
 
-      const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-      const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-      const codecTypeImports = extractCodecTypeImports(descriptors);
-      const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(
-        config.adapter,
-        config.target,
-        config.extensions ?? [],
-      );
+      // Create family instance (assembles operation registry, type imports, extension IDs)
+      const familyInstance = config.family.create({
+        target: config.target,
+        adapter: config.adapter,
+        extensions: config.extensions ?? [],
+      }) as {
+        readonly operationRegistry: OperationRegistry;
+        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly extensionIds: ReadonlyArray<string>;
+      };
+
+      // Extract assembly data from family instance
+      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+        familyInstance;
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
@@ -136,15 +138,21 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output and types paths');
       }
 
-      const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-      const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-      const codecTypeImports = extractCodecTypeImports(descriptors);
-      const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(
-        config.adapter,
-        config.target,
-        config.extensions ?? [],
-      );
+      // Create family instance (assembles operation registry, type imports, extension IDs)
+      const familyInstance = config.family.create({
+        target: config.target,
+        adapter: config.adapter,
+        extensions: config.extensions ?? [],
+      }) as {
+        readonly operationRegistry: OperationRegistry;
+        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly extensionIds: ReadonlyArray<string>;
+      };
+
+      // Extract assembly data from family instance
+      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+        familyInstance;
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
@@ -207,15 +215,21 @@ describe('emitContract API', () => {
           throw new Error('Contract config must have output and types paths');
         }
 
-        const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-        const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-        const codecTypeImports = extractCodecTypeImports(descriptors);
-        const operationTypeImports = extractOperationTypeImports(descriptors);
-        const extensionIds = extractExtensionIds(
-          config.adapter,
-          config.target,
-          config.extensions ?? [],
-        );
+        // Create family instance (assembles operation registry, type imports, extension IDs)
+        const familyInstance = config.family.create({
+          target: config.target,
+          adapter: config.adapter,
+          extensions: config.extensions ?? [],
+        }) as {
+          readonly operationRegistry: OperationRegistry;
+          readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+          readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+          readonly extensionIds: ReadonlyArray<string>;
+        };
+
+        // Extract assembly data from family instance
+        const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+          familyInstance;
 
         const result = await emitContract({
           contractIR: contractIR as ContractIR,
@@ -270,15 +284,21 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output and types paths');
       }
 
-      const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-      const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-      const codecTypeImports = extractCodecTypeImports(descriptors);
-      const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(
-        config.adapter,
-        config.target,
-        config.extensions ?? [],
-      );
+      // Create family instance (assembles operation registry, type imports, extension IDs)
+      const familyInstance = config.family.create({
+        target: config.target,
+        adapter: config.adapter,
+        extensions: config.extensions ?? [],
+      }) as {
+        readonly operationRegistry: OperationRegistry;
+        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly extensionIds: ReadonlyArray<string>;
+      };
+
+      // Extract assembly data from family instance
+      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+        familyInstance;
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
@@ -323,15 +343,21 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output and types paths');
       }
 
-      const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-      const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-      const codecTypeImports = extractCodecTypeImports(descriptors);
-      const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(
-        config.adapter,
-        config.target,
-        config.extensions ?? [],
-      );
+      // Create family instance (assembles operation registry, type imports, extension IDs)
+      const familyInstance = config.family.create({
+        target: config.target,
+        adapter: config.adapter,
+        extensions: config.extensions ?? [],
+      }) as {
+        readonly operationRegistry: OperationRegistry;
+        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly extensionIds: ReadonlyArray<string>;
+      };
+
+      // Extract assembly data from family instance
+      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+        familyInstance;
 
       const result = await emitContract({
         contractIR: contractIR as ContractIR,
@@ -376,15 +402,21 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output and types paths');
       }
 
-      const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-      const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-      const codecTypeImports = extractCodecTypeImports(descriptors);
-      const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(
-        config.adapter,
-        config.target,
-        config.extensions ?? [],
-      );
+      // Create family instance (assembles operation registry, type imports, extension IDs)
+      const familyInstance = config.family.create({
+        target: config.target,
+        adapter: config.adapter,
+        extensions: config.extensions ?? [],
+      }) as {
+        readonly operationRegistry: OperationRegistry;
+        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+        readonly extensionIds: ReadonlyArray<string>;
+      };
+
+      // Extract assembly data from family instance
+      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+        familyInstance;
 
       // The function should work normally, but we've verified the error handling path exists
       const result = await emitContract({

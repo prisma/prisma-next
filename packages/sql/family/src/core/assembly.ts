@@ -6,29 +6,28 @@ import type {
 import type {
   AdapterDescriptor,
   ExtensionDescriptor,
-  FamilyDescriptor,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
-import type { OperationRegistry } from '@prisma-next/operations';
+import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).
- * Loops over descriptors, extracts operations, converts them using family-specific
+ * Loops over descriptors, extracts operations, converts them using the provided
  * conversion function, and registers them in a new registry.
  */
-export function assembleOperationRegistry<TFamilyId extends string>(
+export function assembleOperationRegistry(
   descriptors: ReadonlyArray<
-    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
   >,
-  family: FamilyDescriptor<TFamilyId>,
+  convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
   for (const descriptor of descriptors) {
     const operations = descriptor.manifest.operations ?? [];
     for (const operationManifest of operations as ReadonlyArray<OperationManifest>) {
-      const signature = family.convertOperationManifest(operationManifest);
+      const signature = convertOperationManifest(operationManifest);
       registry.register(signature);
     }
   }
@@ -39,9 +38,9 @@ export function assembleOperationRegistry<TFamilyId extends string>(
 /**
  * Extracts codec type imports from descriptors for contract.d.ts generation.
  */
-export function extractCodecTypeImports<TFamilyId extends string>(
+export function extractCodecTypeImports(
   descriptors: ReadonlyArray<
-    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
   >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
@@ -59,9 +58,9 @@ export function extractCodecTypeImports<TFamilyId extends string>(
 /**
  * Extracts operation type imports from descriptors for contract.d.ts generation.
  */
-export function extractOperationTypeImports<TFamilyId extends string>(
+export function extractOperationTypeImports(
   descriptors: ReadonlyArray<
-    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
   >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
@@ -81,10 +80,10 @@ export function extractOperationTypeImports<TFamilyId extends string>(
  * [adapter.id, target.id, ...extensions.map(e => e.id)]
  * Deduplicates while preserving stable order.
  */
-export function extractExtensionIds<TFamilyId extends string>(
-  adapter: AdapterDescriptor<TFamilyId>,
-  target: TargetDescriptor<TFamilyId>,
-  extensions: ReadonlyArray<ExtensionDescriptor<TFamilyId>>,
+export function extractExtensionIds(
+  adapter: AdapterDescriptor<'sql'>,
+  target: TargetDescriptor<'sql'>,
+  extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>,
 ): ReadonlyArray<string> {
   const ids: string[] = [];
   const seen = new Set<string>();
@@ -154,16 +153,16 @@ export function extractOperationTypeImportsFromPacks(
  * Assembles an operation registry from extension packs.
  * Pack-based version for use in tests.
  */
-export function assembleOperationRegistryFromPacks<TFamilyId extends string>(
+export function assembleOperationRegistryFromPacks(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-  family: FamilyDescriptor<TFamilyId>,
+  convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
   for (const pack of packs) {
     const operations = pack.manifest.operations ?? [];
     for (const operationManifest of operations as ReadonlyArray<OperationManifest>) {
-      const signature = family.convertOperationManifest(operationManifest);
+      const signature = convertOperationManifest(operationManifest);
       registry.register(signature);
     }
   }

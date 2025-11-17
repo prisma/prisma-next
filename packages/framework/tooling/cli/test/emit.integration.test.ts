@@ -22,7 +22,7 @@ import {
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../src/exports/pack-assembly';
+} from '../../../../sql/family/src/core/assembly';
 import { loadContractFromTs } from '../src/load-ts-contract';
 import { loadExtensionPacks } from '../src/pack-loading';
 
@@ -75,7 +75,10 @@ describe('emit integration', () => {
       const packs = loadExtensionPacks(adapterPath, []);
 
       // Assemble operation registry and extract type imports from packs
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const operationRegistry = assembleOperationRegistryFromPacks(
+        packs,
+        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+      );
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -147,7 +150,10 @@ describe('emit integration', () => {
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const operationRegistry = assembleOperationRegistryFromPacks(
+        packs,
+        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+      );
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);

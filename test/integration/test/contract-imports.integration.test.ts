@@ -4,12 +4,6 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
-} from '@prisma-next/cli/pack-assembly';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
@@ -18,6 +12,12 @@ import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '../../../packages/sql/family/src/core/assembly';
 
 const execFileAsync = promisify(execFile);
 
@@ -101,7 +101,10 @@ describe('contract.d.ts imports resolution', () => {
         join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const operationRegistry = assembleOperationRegistryFromPacks(
+        packs,
+        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+      );
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -275,7 +278,10 @@ type UserIdColumn = UserColumns['id'];
         join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const operationRegistry = assembleOperationRegistryFromPacks(
+        packs,
+        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+      );
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);

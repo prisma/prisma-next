@@ -273,7 +273,7 @@ describe('validateConfig', () => {
         {
           kind: 'extension',
           id: 'pg-vector',
-          family: 'sql',
+          familyId: 'sql',
           manifest: {
             id: 'pg-vector',
             version: '1.0.0',

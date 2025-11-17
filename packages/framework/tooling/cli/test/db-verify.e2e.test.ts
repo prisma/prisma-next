@@ -1,7 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
+import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -14,12 +16,6 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
 import { loadConfig } from '../src/config-loader';
-import {
-  assembleOperationRegistry,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '../src/pack-assembly';
 import {
   executeCommand,
   getExitCode,
@@ -57,11 +53,21 @@ async function emitContractFromConfig(
 
   const contractIR = config.family.validateContractIR(contractWithoutMappings);
 
-  const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-  const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-  const codecTypeImports = extractCodecTypeImports(descriptors);
-  const operationTypeImports = extractOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds(config.adapter, config.target, config.extensions ?? []);
+  // Create family instance (assembles operation registry, type imports, extension IDs)
+  const familyInstance = config.family.create({
+    target: config.target,
+    adapter: config.adapter,
+    extensions: config.extensions ?? [],
+  }) as {
+    readonly operationRegistry: OperationRegistry;
+    readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+    readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+    readonly extensionIds: ReadonlyArray<string>;
+  };
+
+  // Extract assembly data from family instance
+  const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+    familyInstance;
 
   const emitResult = await emitContract({
     contractIR: contractIR as ContractIR,

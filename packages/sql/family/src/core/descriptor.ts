@@ -105,6 +105,9 @@ export class SqlFamilyDescriptor implements FamilyDescriptor<'sql', SqlFamilyIns
     readonly adapter: AdapterDescriptor<'sql'>;
     readonly extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>;
   }): SqlFamilyInstance {
-    return createSqlFamilyInstance(options);
+    return createSqlFamilyInstance({
+      ...options,
+      convertOperationManifest: this.convertOperationManifest.bind(this),
+    });
   }
 }

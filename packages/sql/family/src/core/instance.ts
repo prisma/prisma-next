@@ -1,4 +1,5 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
+import type { OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
 import type {
   AdapterDescriptor,
   ControlPlaneDriver,
@@ -8,7 +9,14 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import {
+  assembleOperationRegistry,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
+} from './assembly';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
 /**
@@ -129,17 +137,29 @@ function createVerifyResult(options: {
   return result;
 }
 
+/**
+ * State fields for SQL family instance that hold assembly data.
+ */
+interface SqlFamilyInstanceState {
+  readonly operationRegistry: OperationRegistry;
+  readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+  readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+  readonly extensionIds: ReadonlyArray<string>;
+}
+
 export type SqlFamilyInstance = FamilyInstance<
   'sql',
   SqlSchemaIR,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult
->;
+> &
+  SqlFamilyInstanceState;
 
 interface CreateSqlFamilyInstanceOptions {
   readonly target: TargetDescriptor<'sql'>;
   readonly adapter: AdapterDescriptor<'sql'>;
   readonly extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>;
+  readonly convertOperationManifest: (manifest: OperationManifest) => OperationSignature;
 }
 
 /**
@@ -148,10 +168,23 @@ interface CreateSqlFamilyInstanceOptions {
 export function createSqlFamilyInstance(
   options: CreateSqlFamilyInstanceOptions,
 ): SqlFamilyInstance {
-  const { target, adapter, extensions } = options;
+  const { target, adapter, extensions, convertOperationManifest } = options;
+
+  // Build descriptors array for assembly
+  const descriptors = [target, adapter, ...extensions];
+
+  // Assemble operation registry, type imports, and extension IDs
+  const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+  const codecTypeImports = extractCodecTypeImports(descriptors);
+  const operationTypeImports = extractOperationTypeImports(descriptors);
+  const extensionIds = extractExtensionIds(adapter, target, extensions);
 
   return {
     familyId: 'sql',
+    operationRegistry,
+    codecTypeImports,
+    operationTypeImports,
+    extensionIds,
 
     async verify(verifyOptions: {
       readonly driver: ControlPlaneDriver;

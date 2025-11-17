@@ -334,14 +334,10 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Fail Fast**: Non-structured errors propagate and are caught by Commander.js's `exitOverride()` with stack traces
 - See `.cursor/rules/cli-error-handling.mdc` for detailed patterns
 
-### Pack Assembly (`pack-assembly.ts`)
-- Generic assembly functions that loop over descriptors/packs:
-  - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, delegates to `family.convertOperationManifest()` for conversion
-  - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
-  - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
-  - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
-  - Pack-based versions for tests: `assembleOperationRegistryFromPacks`, `extractCodecTypeImportsFromPacks`, etc.
-- These functions handle the generic looping logic; family-specific conversion is delegated to `family.convertOperationManifest()`.
+### Pack Assembly
+- **Family instances** now handle pack assembly internally. The CLI creates a family instance via `config.family.create()` and reads assembly data (operation registry, type imports, extension IDs) from the instance.
+- **Removed**: `pack-assembly.ts` has been removed. Pack assembly is now handled by family instances. For SQL family, tests can import pack-based helpers directly from `packages/sql/family/src/core/assembly.ts` using relative paths.
+- Assembly logic is family-specific and owned by each family's instance implementation (e.g., `createSqlFamilyInstance` in `@prisma-next/family-sql`).
 
 ### Output Formatting (`utils/output.ts`)
 - **Command Output Formatters**: Format human-readable output for commands (emit, verify, etc.)

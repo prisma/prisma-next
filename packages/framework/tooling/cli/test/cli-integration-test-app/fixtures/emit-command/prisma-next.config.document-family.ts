@@ -1,4 +1,5 @@
 import { defineConfig } from '@prisma-next/cli/config-types';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { contract } from './invalid-contract-document';
 
 // Create a config with document family (which doesn't exist, but we'll test the error)
@@ -27,7 +28,8 @@ export default defineConfig({
       },
     }),
     validateContractIR: (contract: unknown) => contract,
-    create: () => ({} as any), // Mock create method
+    // Test fixture - mock family instance for testing
+    create: () => ({}) as unknown as FamilyInstance<string>,
   },
   target: {
     kind: 'target',

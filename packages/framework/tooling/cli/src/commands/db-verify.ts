@@ -11,10 +11,7 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
-import type {
-  FamilyInstance,
-  VerifyDatabaseResult,
-} from '@prisma-next/core-control-plane/types';
+import type { FamilyInstance, VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -140,13 +137,21 @@ export function createDbVerifyCommand(): Command {
           }) as FamilyInstance<string>;
 
           // Call family instance verify method
-          const verifyResult = (await familyInstance.verify({
-            driver,
-            contractIR,
-            expectedTargetId: config.target.id,
-            contractPath,
-            configPath,
-          })) as VerifyDatabaseResult;
+          let verifyResult: VerifyDatabaseResult;
+          try {
+            verifyResult = (await familyInstance.verify({
+              driver,
+              contractIR,
+              expectedTargetId: config.target.id,
+              contractPath,
+              configPath,
+            })) as VerifyDatabaseResult;
+          } catch (error) {
+            // Wrap errors from verify() in structured error
+            throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+              why: `Failed to verify database: ${error instanceof Error ? error.message : String(error)}`,
+            });
+          }
 
           // If verification failed, throw structured error
           if (!verifyResult.ok && verifyResult.code) {

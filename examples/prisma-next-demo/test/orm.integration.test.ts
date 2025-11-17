@@ -2,12 +2,6 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
-import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
-} from '@prisma-next/cli/pack-assembly';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
@@ -19,6 +13,12 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '../../../packages/sql/family/src/core/assembly';
 import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
 
@@ -32,7 +32,10 @@ beforeAll(async () => {
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, [pgvectorPath]);
-  const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+  const operationRegistry = assembleOperationRegistryFromPacks(
+    packs,
+    sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+  );
   const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
   const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
   const extensionIds = extractExtensionIdsFromPacks(packs);

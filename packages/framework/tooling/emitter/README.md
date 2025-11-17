@@ -21,7 +21,7 @@ Provide a deterministic, verifiable representation of the application's data con
 - **Validate**: Core structure validation plus family-specific type and structure validation via hooks
 - **Canonicalize**: Compute `coreHash` (schema meaning) and `profileHash` (capabilities/pins) from canonical JSON
 - **Emit**: Generate `contract.json` and `contract.d.ts` with family-specific type generation
-- **Manifest-Agnostic**: The emitter is completely manifest-agnostic. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI, not extension packs. Manifest parsing and assembly happens in the CLI layer (`packages/framework/tooling/cli/src/pack-assembly.ts`).
+- **Manifest-Agnostic**: The emitter is completely manifest-agnostic. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI, not extension packs. Manifest parsing and assembly happens in family instances (e.g., `createSqlFamilyInstance` in `@prisma-next/family-sql`).
 
 **Note**: The emitter does NOT normalize contracts. Normalization must happen in the contract builder when the contract is created. The emitter assumes contracts are already normalized (all required fields present, including `schemaVersion`, `models`, `relations`, `storage`, `extensions`, `capabilities`, `meta`, and `sources`). All fields can be empty objects/arrays, but they must be present.
 
