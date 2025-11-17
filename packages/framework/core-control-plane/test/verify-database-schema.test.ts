@@ -57,7 +57,6 @@ function createMockFamily(
     id: 'sql',
     hook: {} as never,
     readMarker: async () => null,
-    supportedTypeIds: () => [],
     prepareControlContext: async () => ({}),
     introspectSchema: introspectSchemaImpl,
     verifySchema:

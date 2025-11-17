@@ -16,7 +16,6 @@ describe('defineConfig', () => {
       id: 'sql',
       hook: mockHook,
       readMarker: async () => null,
-      supportedTypeIds: () => [],
       prepareControlContext: async () => ({}),
       introspectSchema: async () => ({}),
       verifySchema: async () => ({ issues: [] }),

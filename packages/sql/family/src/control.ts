@@ -6,12 +6,7 @@ import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { SqlFamilyContext } from './context';
-import {
-  introspectSchema,
-  prepareControlContext,
-  supportedTypeIds,
-  verifySchema,
-} from './control-hooks';
+import { introspectSchema, prepareControlContext, verifySchema } from './control-hooks';
 import { readMarker } from './marker';
 
 /**
@@ -62,7 +57,6 @@ class SqlFamilyDescriptor implements FamilyDescriptor<SqlFamilyContext> {
   readonly id = 'sql' as const;
   readonly hook = sqlTargetFamilyHook;
   readonly readMarker = readMarker;
-  readonly supportedTypeIds = supportedTypeIds;
   readonly prepareControlContext = prepareControlContext;
   readonly introspectSchema = introspectSchema;
   readonly verifySchema = verifySchema;

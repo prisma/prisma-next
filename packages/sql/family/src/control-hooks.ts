@@ -15,32 +15,6 @@ import type { SqlFamilyContext } from './context';
 import { createSqlTypeMetadataRegistry } from './type-metadata';
 
 /**
- * Collects supported codec type IDs from adapter and extension manifests.
- * Returns a sorted, unique array of type IDs that are declared in the manifests.
- * This enables coverage checks by comparing contract column types against supported types.
- *
- * Note: This extracts type IDs from manifest type imports, not from runtime codec registries.
- * The manifests declare which codec types are available, but the actual type IDs
- * are defined in the codec-types TypeScript modules that are imported.
- *
- * For MVP, we return an empty array since extracting type IDs from TypeScript modules
- * would require runtime evaluation or static analysis. This can be enhanced later.
- */
-export function supportedTypeIds(
-  descriptors: ReadonlyArray<
-    | TargetDescriptor<SqlFamilyContext>
-    | AdapterDescriptor<SqlFamilyContext>
-    | ExtensionDescriptor<SqlFamilyContext>
-  >,
-): readonly string[] {
-  // For MVP, return empty array
-  // Future enhancement: Extract type IDs from codec-types modules via static analysis
-  // or require manifests to explicitly list supported type IDs
-  void descriptors;
-  return [];
-}
-
-/**
  * Prepares family-specific control-plane context from descriptors.
  * For SQL, this constructs a SqlTypeMetadataRegistry from adapter codecs and extension metadata.
  * The returned context is used as input to introspectSchema and other control-plane operations.

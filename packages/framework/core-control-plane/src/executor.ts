@@ -32,7 +32,6 @@ export interface VerifyDatabaseResult {
     readonly expected: string;
     readonly actual?: string;
   };
-  readonly missingCodecs?: readonly string[];
   readonly meta?: {
     readonly configPath?: string;
     readonly contractPath: string;
@@ -59,51 +58,6 @@ function deriveSummary(ok: boolean, code?: string): string {
     default:
       return 'Verification failed';
   }
-}
-
-/**
- * Extracts codec type IDs used in contract storage tables.
- * Uses type guards to safely access SQL-specific structure without importing SQL types.
- */
-function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
-  const typeIds = new Set<string>();
-
-  // Type guard for SQL contract structure
-  if (
-    typeof contract === 'object' &&
-    contract !== null &&
-    'storage' in contract &&
-    typeof contract.storage === 'object' &&
-    contract.storage !== null &&
-    'tables' in contract.storage
-  ) {
-    const storage = contract.storage as { tables?: Record<string, unknown> };
-    if (storage.tables && typeof storage.tables === 'object') {
-      for (const table of Object.values(storage.tables)) {
-        if (
-          typeof table === 'object' &&
-          table !== null &&
-          'columns' in table &&
-          typeof table.columns === 'object' &&
-          table.columns !== null
-        ) {
-          const columns = table.columns as Record<string, { type?: string } | undefined>;
-          for (const column of Object.values(columns)) {
-            if (
-              column &&
-              typeof column === 'object' &&
-              'type' in column &&
-              typeof column.type === 'string'
-            ) {
-              typeIds.add(column.type);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return Array.from(typeIds).sort();
 }
 
 /**
@@ -146,7 +100,6 @@ export class ControlPlaneExecutor {
   /**
    * Verifies the contract against the database marker.
    * Compares target, coreHash, and profileHash.
-   * Optionally performs codec coverage checks.
    */
   async verifyAgainst(
     expectedTargetId: string,
@@ -177,19 +130,6 @@ export class ControlPlaneExecutor {
     // Read marker from database
     const marker = await this.readMarker();
 
-    // Compute type coverage
-    let missingCodecs: readonly string[] | undefined;
-    const descriptors = [this.adapter, this.target, ...this.extensions];
-    const supportedTypeIds = this.family.supportedTypeIds(descriptors);
-    if (supportedTypeIds.length > 0) {
-      const supportedSet = new Set(supportedTypeIds);
-      const usedTypeIds = extractCodecTypeIdsFromContract(this.contractIR);
-      const missing = usedTypeIds.filter((id) => !supportedSet.has(id));
-      if (missing.length > 0) {
-        missingCodecs = missing;
-      }
-    }
-
     // Check marker presence
     if (!marker) {
       const totalTime = Date.now() - startTime;
@@ -213,7 +153,6 @@ export class ControlPlaneExecutor {
           ...(configPath ? { configPath } : {}),
         },
       };
-      if (missingCodecs) result.missingCodecs = missingCodecs;
       return result satisfies VerifyDatabaseResult;
     }
 
@@ -245,7 +184,6 @@ export class ControlPlaneExecutor {
           ...(configPath ? { configPath } : {}),
         },
       };
-      if (missingCodecs) result.missingCodecs = missingCodecs;
       return result satisfies VerifyDatabaseResult;
     }
 
@@ -276,7 +214,6 @@ export class ControlPlaneExecutor {
           ...(configPath ? { configPath } : {}),
         },
       };
-      if (missingCodecs) result.missingCodecs = missingCodecs;
       return result satisfies VerifyDatabaseResult;
     }
 
@@ -307,7 +244,6 @@ export class ControlPlaneExecutor {
           ...(configPath ? { configPath } : {}),
         },
       };
-      if (missingCodecs) result.missingCodecs = missingCodecs;
       return result satisfies VerifyDatabaseResult;
     }
 
@@ -335,7 +271,6 @@ export class ControlPlaneExecutor {
         ...(configPath ? { configPath } : {}),
       },
     };
-    if (missingCodecs) result.missingCodecs = missingCodecs;
     return result satisfies VerifyDatabaseResult;
   }
 

@@ -27,7 +27,6 @@ const sqlFamilyWithoutVerify = {
   readMarker: async () => {
     throw new Error('readMarker not implemented');
   },
-  supportedTypeIds: () => [],
   prepareControlContext: async () => {
     throw new Error('prepareControlContext not implemented');
   },

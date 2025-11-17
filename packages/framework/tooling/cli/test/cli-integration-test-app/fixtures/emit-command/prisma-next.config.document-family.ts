@@ -27,7 +27,6 @@ export default defineConfig({
     }),
     validateContractIR: (contract: unknown) => contract,
     readMarker: async () => null,
-    supportedTypeIds: () => [],
     prepareControlContext: async () => ({}),
     introspectSchema: async () => ({}),
     verifySchema: async () => ({ issues: [] }),

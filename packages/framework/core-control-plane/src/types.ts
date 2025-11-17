@@ -81,16 +81,6 @@ export interface FamilyDescriptor<TCtx extends TargetFamilyContext = TargetFamil
   readonly readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>;
 
   /**
-   * Returns supported type IDs from adapter/extension descriptors
-   * to enable coverage checks.
-   */
-  readonly supportedTypeIds: (
-    descriptors: ReadonlyArray<
-      TargetDescriptor<TCtx> | AdapterDescriptor<TCtx> | ExtensionDescriptor<TCtx>
-    >,
-  ) => readonly string[];
-
-  /**
    * Prepares family-specific control-plane context from descriptors.
    * For SQL, this constructs a SqlTypeMetadataRegistry from adapter codecs and extension metadata.
    * The returned context is used as input to introspectSchema and other control-plane operations.

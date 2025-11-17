@@ -210,7 +210,6 @@ export function formatVerifyJson(result: VerifyDatabaseResult): string {
     contract: result.contract,
     ...(result.marker ? { marker: result.marker } : {}),
     target: result.target,
-    ...(result.missingCodecs ? { missingCodecs: result.missingCodecs } : {}),
     ...(result.meta ? { meta: result.meta } : {}),
     timings: result.timings,
   };

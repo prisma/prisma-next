@@ -72,7 +72,7 @@ This package is structured as a multi-plane package:
 - **`src/context.ts`**: Defines `SqlFamilyContext` (control-plane context).
 - **`src/type-metadata.ts`** & `src/types.ts`: Define SQL type metadata (`SqlTypeMetadata`, `SqlTypeMetadataRegistry`) and helpers (e.g., `createSqlTypeMetadataRegistry`).
 - **`src/marker.ts`**: Contract marker reading logic (`readMarker`).
-- **`src/control-hooks.ts`**: Control-plane hooks (`prepareControlContext`, `introspectSchema`, `verifySchema`, `supportedTypeIds`).
+- **`src/control-hooks.ts`**: Control-plane hooks (`prepareControlContext`, `introspectSchema`, `verifySchema`).
 
 The package follows the multi-plane entrypoint pattern established by adapter packages like `@prisma-next/adapter-postgres`, allowing it to serve both control and runtime planes while maintaining strict plane boundaries.
 

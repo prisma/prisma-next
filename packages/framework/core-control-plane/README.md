@@ -85,7 +85,6 @@ export type SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & {
   - `hook`, `convertOperationManifest`, `validateContractIR`, `stripMappings?`
   - Control-plane hooks for DB-connected commands (all required except `stripMappings`):
     - `readMarker`: Read contract markers from the database
-    - `supportedTypeIds`: Returns supported type IDs for coverage checks
     - `prepareControlContext`: Build family-specific control-plane context from descriptors (e.g., SQL type metadata)
     - `introspectSchema`: Introspect database schema and return `SchemaIROf<TCtx>`
     - `verifySchema`: Compare contract IR against Schema IR and return `SchemaIssue[]`
