@@ -22,7 +22,7 @@ packages/{domain}/{package-name}/
 │   │   ├── codecs.ts      # Codec definitions
 │   │   └── types.ts       # Type definitions
 │   └── exports/           # Entry points
-│       ├── cli.ts         # Migration plane (CLI descriptors)
+│       ├── control.ts     # Migration plane (control plane descriptors)
 │       ├── runtime.ts     # Runtime plane (runtime factories)
 │       ├── adapter.ts     # Re-export from core
 │       ├── codec-types.ts # Re-export from core
@@ -41,7 +41,7 @@ Multi-plane packages require **multiple globs** in `architecture.config.json`, o
   "plane": "shared"
 },
 {
-  "glob": "packages/targets/postgres-adapter/src/exports/cli.ts",
+  "glob": "packages/targets/postgres-adapter/src/exports/control.ts",
   "domain": "targets",
   "layer": "adapters",
   "plane": "migration"
@@ -61,10 +61,11 @@ Multi-plane packages require **multiple globs** in `architecture.config.json`, o
   - No CLI-specific or runtime-specific dependencies
   - Can import from shared plane packages only
 
-- **`src/exports/cli.ts`**: Migration plane entry point
-  - Exports CLI descriptors (`AdapterDescriptor`, `TargetDescriptor`, etc.)
-  - Can import from migration plane packages (e.g., `@prisma-next/cli`, `@prisma-next/sql-tooling-assembly`)
+- **`src/exports/control.ts`**: Migration plane entry point (control plane)
+  - Exports control plane descriptors (`AdapterDescriptor`, `TargetDescriptor`, `DriverDescriptor`, etc.)
+  - Can import from migration plane packages (e.g., `@prisma-next/cli`, `@prisma-next/core-control-plane`)
   - Can import from core (`../core/...`)
+  - **Naming convention**: Use `control.ts` (not `cli.ts`) and export as `./control` (not `./cli`)
 
 - **`src/exports/runtime.ts`**: Runtime plane entry point
   - Exports runtime factories (e.g., `createPostgresAdapter`)
@@ -81,7 +82,7 @@ export default defineConfig({
     adapter: 'src/exports/adapter.ts',
     types: 'src/exports/types.ts',
     'codec-types': 'src/exports/codec-types.ts',
-    cli: 'src/exports/cli.ts',
+    control: 'src/exports/control.ts',
     runtime: 'src/exports/runtime.ts',
   },
   outDir: 'dist/exports',

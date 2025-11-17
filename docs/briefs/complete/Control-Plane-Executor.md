@@ -35,7 +35,7 @@ Golden rules this design adheres to:
 - Config uses `db.queryRunnerFactory` (custom runner) (`packages/framework/tooling/cli/src/config-types.ts:114`).
 - `verify-database.ts` loads the contract, retrieves SQL from `family.verify.readMarkerSql()`, and executes SQL via the ad‑hoc runner; then compares hashes and target (`packages/framework/tooling/cli/src/api/verify-database.ts`).
 - SQL family exports `verify.readMarkerSql` and `collectSupportedCodecTypeIds` (`packages/sql/tooling/cli/src/exports/cli.ts`). The Control Plane parses rows via `parseContractMarkerRow`.
-- `@prisma-next/driver-postgres/cli` is currently a stub; drivers aren’t wired for CLI control usage.
+- `@prisma-next/driver-postgres/control` is currently a stub; drivers aren't wired for CLI control usage.
 
 Limitations:
 - Diverges from runtime assembly (no driver in config, app supplies runner).
@@ -53,7 +53,7 @@ This replaces previous “migration vs runtime vs shared” wording with simpler
 ## Config Shape (Control Plane)
 
 - Keep: `family`, `target`, `adapter`, `extensions`, `db: { url }`, `contract`.
-- Add: `driver` (DriverDescriptor) via `@prisma-next/driver-<id>/cli`.
+- Add: `driver` (DriverDescriptor) via `@prisma-next/driver-<id>/control`.
 - Remove (deprecate): `db.queryRunnerFactory`.
 
 Example:
@@ -93,7 +93,7 @@ Notes
 
 ## Driver CLI Entry Point
 
-- Implement `@prisma-next/driver-postgres/cli` to export a `DriverDescriptor` with `create(url)` returning a `CliDriver` using `pg` under the hood.
+- Implement `@prisma-next/driver-postgres/control` to export a `DriverDescriptor` with `create(url)` returning a `CliDriver` using `pg` under the hood.
 - Maintain separation: adapter handles lowering/capabilities, driver handles transport, target exposes dialect manifest.
 
 Example (sketch):

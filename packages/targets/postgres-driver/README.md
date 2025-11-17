@@ -15,7 +15,7 @@ The PostgreSQL driver provides transport and connection management for PostgreSQ
 Drivers are transport-agnostic: they own pooling, connection management, and transport protocol (TCP, HTTP, etc.), but contain no dialect-specific logic. All dialect behavior lives in adapters.
 
 This package spans multiple planes:
-- **Migration plane** (`src/exports/cli.ts`): CLI entry point for driver descriptors (future)
+- **Migration plane** (`src/exports/control.ts`): Control plane entry point for driver descriptors
 - **Runtime plane** (`src/exports/runtime.ts`): Runtime entry point for driver implementation
 
 ## Purpose
@@ -108,5 +108,6 @@ const runtime = createRuntime({
   - `createPostgresDriver(connectionString, options?)`: Create driver from connection string
   - `createPostgresDriverFromOptions(options)`: Create driver from options object
   - Types: `PostgresDriverOptions`, `QueryResult`
-- `./cli`: Migration entry point for driver descriptors (future)
+- `./control`: Control plane entry point for driver descriptors
+  - Default export: `DriverDescriptor` for use in `prisma-next.config.ts`
 
