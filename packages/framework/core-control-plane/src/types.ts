@@ -3,11 +3,6 @@ import type { OperationSignature } from '@prisma-next/operations';
 import type { ExtensionPackManifest, OperationManifest } from './pack-manifest-types';
 
 /**
- * Family identifier type. Each family, target, adapter, and extension is tied to a FamilyId.
- */
-export type FamilyId = 'sql' | string;
-
-/**
  * Minimal driver interface for Control Plane database operations.
  * Provides query execution and connection management.
  */
@@ -46,10 +41,7 @@ export interface DriverDescriptor {
  * Descriptor for a target family (e.g., SQL).
  * Provides the family hook and assembly helpers.
  */
-export interface FamilyDescriptor<
-  TFamilyId extends FamilyId = FamilyId,
-  TFamilyInstance = unknown,
-> {
+export interface FamilyDescriptor<TFamilyId extends string, TFamilyInstance = unknown> {
   readonly kind: 'family';
   readonly familyId: TFamilyId;
   readonly manifest: ExtensionPackManifest;
@@ -85,7 +77,7 @@ export interface FamilyDescriptor<
 /**
  * Descriptor for a target pack (e.g., Postgres target).
  */
-export interface TargetDescriptor<TFamilyId extends FamilyId = FamilyId> {
+export interface TargetDescriptor<TFamilyId extends string> {
   readonly kind: 'target';
   readonly familyId: TFamilyId;
   readonly id: string;
@@ -96,7 +88,7 @@ export interface TargetDescriptor<TFamilyId extends FamilyId = FamilyId> {
  * Descriptor for an adapter pack (e.g., Postgres adapter).
  * May optionally provide a runtime factory for DB-connected commands.
  */
-export interface AdapterDescriptor<TFamilyId extends FamilyId = FamilyId> {
+export interface AdapterDescriptor<TFamilyId extends string> {
   readonly kind: 'adapter';
   readonly familyId: TFamilyId;
   readonly id: string;
@@ -109,7 +101,7 @@ export interface AdapterDescriptor<TFamilyId extends FamilyId = FamilyId> {
 /**
  * Descriptor for an extension pack (e.g., pgvector).
  */
-export interface ExtensionDescriptor<TFamilyId extends FamilyId = FamilyId> {
+export interface ExtensionDescriptor<TFamilyId extends string> {
   readonly kind: 'extension';
   readonly familyId: TFamilyId;
   readonly id: string;
@@ -121,7 +113,7 @@ export interface ExtensionDescriptor<TFamilyId extends FamilyId = FamilyId> {
  * Each family implements this interface with family-specific types.
  */
 export interface FamilyInstance<
-  TFamilyId extends FamilyId = FamilyId,
+  TFamilyId extends string,
   TSchemaIR = unknown,
   TVerifyResult = unknown,
   TSchemaVerifyResult = unknown,

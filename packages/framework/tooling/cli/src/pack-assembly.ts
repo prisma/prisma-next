@@ -1,14 +1,14 @@
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
+  ExtensionPackManifest,
+  OperationManifest,
+} from '@prisma-next/core-control-plane/pack-manifest-types';
+import type {
   AdapterDescriptor,
   ExtensionDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
-} from '@prisma-next/core-control-plane/config-types';
-import type {
-  ExtensionPackManifest,
-  OperationManifest,
-} from '@prisma-next/core-control-plane/pack-manifest-types';
+} from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 
@@ -17,9 +17,11 @@ import { createOperationRegistry } from '@prisma-next/operations';
  * Loops over descriptors, extracts operations, converts them using family-specific
  * conversion function, and registers them in a new registry.
  */
-export function assembleOperationRegistry(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-  family: FamilyDescriptor,
+export function assembleOperationRegistry<TFamilyId extends string>(
+  descriptors: ReadonlyArray<
+    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+  >,
+  family: FamilyDescriptor<TFamilyId>,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
@@ -37,8 +39,10 @@ export function assembleOperationRegistry(
 /**
  * Extracts codec type imports from descriptors for contract.d.ts generation.
  */
-export function extractCodecTypeImports(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+export function extractCodecTypeImports<TFamilyId extends string>(
+  descriptors: ReadonlyArray<
+    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+  >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -55,8 +59,10 @@ export function extractCodecTypeImports(
 /**
  * Extracts operation type imports from descriptors for contract.d.ts generation.
  */
-export function extractOperationTypeImports(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+export function extractOperationTypeImports<TFamilyId extends string>(
+  descriptors: ReadonlyArray<
+    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+  >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -75,10 +81,10 @@ export function extractOperationTypeImports(
  * [adapter.id, target.id, ...extensions.map(e => e.id)]
  * Deduplicates while preserving stable order.
  */
-export function extractExtensionIds(
-  adapter: AdapterDescriptor,
-  target: TargetDescriptor,
-  extensions: ReadonlyArray<ExtensionDescriptor>,
+export function extractExtensionIds<TFamilyId extends string>(
+  adapter: AdapterDescriptor<TFamilyId>,
+  target: TargetDescriptor<TFamilyId>,
+  extensions: ReadonlyArray<ExtensionDescriptor<TFamilyId>>,
 ): ReadonlyArray<string> {
   const ids: string[] = [];
   const seen = new Set<string>();
@@ -148,9 +154,9 @@ export function extractOperationTypeImportsFromPacks(
  * Assembles an operation registry from extension packs.
  * Pack-based version for use in tests.
  */
-export function assembleOperationRegistryFromPacks(
+export function assembleOperationRegistryFromPacks<TFamilyId extends string>(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-  family: FamilyDescriptor,
+  family: FamilyDescriptor<TFamilyId>,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 

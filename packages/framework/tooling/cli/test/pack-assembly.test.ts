@@ -457,21 +457,21 @@ describe('extractExtensionIdsFromPacks', () => {
 
 describe('descriptor-based functions', () => {
   it('extractExtensionIds deduplicates while preserving order', () => {
-    const adapter: AdapterDescriptor = {
+    const adapter: AdapterDescriptor<'sql'> = {
       kind: 'adapter',
       id: 'adapter-1',
       familyId: 'sql',
       manifest: { id: 'adapter-1', version: '1.0.0' },
     };
 
-    const target: TargetDescriptor = {
+    const target: TargetDescriptor<'sql'> = {
       kind: 'target',
       id: 'target-1',
       familyId: 'sql',
       manifest: { id: 'target-1', version: '1.0.0' },
     };
 
-    const extensions: ReadonlyArray<ExtensionDescriptor> = [
+    const extensions: ReadonlyArray<ExtensionDescriptor<'sql'>> = [
       {
         kind: 'extension',
         id: 'ext-1',
@@ -491,42 +491,42 @@ describe('descriptor-based functions', () => {
   });
 
   it('extractExtensionIds handles duplicate adapter id', () => {
-    const adapter: AdapterDescriptor = {
+    const adapter: AdapterDescriptor<'sql'> = {
       kind: 'adapter',
       id: 'duplicate',
       familyId: 'sql',
       manifest: { id: 'duplicate', version: '1.0.0' },
     };
 
-    const target: TargetDescriptor = {
+    const target: TargetDescriptor<'sql'> = {
       kind: 'target',
       id: 'duplicate',
       familyId: 'sql',
       manifest: { id: 'duplicate', version: '1.0.0' },
     };
 
-    const extensions: ReadonlyArray<ExtensionDescriptor> = [];
+    const extensions: ReadonlyArray<ExtensionDescriptor<'sql'>> = [];
 
     const ids = extractExtensionIds(adapter, target, extensions);
     expect(ids).toEqual(['duplicate']);
   });
 
   it('extractExtensionIds handles duplicate extension ids', () => {
-    const adapter: AdapterDescriptor = {
+    const adapter: AdapterDescriptor<'sql'> = {
       kind: 'adapter',
       id: 'adapter-1',
       familyId: 'sql',
       manifest: { id: 'adapter-1', version: '1.0.0' },
     };
 
-    const target: TargetDescriptor = {
+    const target: TargetDescriptor<'sql'> = {
       kind: 'target',
       id: 'target-1',
       familyId: 'sql',
       manifest: { id: 'target-1', version: '1.0.0' },
     };
 
-    const extensions: ReadonlyArray<ExtensionDescriptor> = [
+    const extensions: ReadonlyArray<ExtensionDescriptor<'sql'>> = [
       {
         kind: 'extension',
         id: 'ext-1',
@@ -546,7 +546,7 @@ describe('descriptor-based functions', () => {
   });
 
   it('assembleOperationRegistry from descriptors', () => {
-    const target: TargetDescriptor = {
+    const target: TargetDescriptor<'sql'> = {
       kind: 'target',
       id: 'target-1',
       familyId: 'sql',
@@ -577,7 +577,7 @@ describe('descriptor-based functions', () => {
   });
 
   it('extractCodecTypeImports from descriptors', () => {
-    const adapter: AdapterDescriptor = {
+    const adapter: AdapterDescriptor<'sql'> = {
       kind: 'adapter',
       id: 'adapter-1',
       familyId: 'sql',
@@ -606,7 +606,7 @@ describe('descriptor-based functions', () => {
   });
 
   it('extractOperationTypeImports from descriptors', () => {
-    const extension: ExtensionDescriptor = {
+    const extension: ExtensionDescriptor<'sql'> = {
       kind: 'extension',
       id: 'ext-1',
       familyId: 'sql',
@@ -635,7 +635,7 @@ describe('descriptor-based functions', () => {
   });
 
   it('handles descriptors without type imports', () => {
-    const adapter: AdapterDescriptor = {
+    const adapter: AdapterDescriptor<'sql'> = {
       kind: 'adapter',
       id: 'adapter-1',
       familyId: 'sql',

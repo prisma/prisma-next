@@ -12,7 +12,8 @@ const mockHook = {
 export default defineConfig({
   family: {
     kind: 'family',
-    id: 'document',
+    familyId: 'document',
+    manifest: { id: 'document', version: '0.0.1' },
     hook: mockHook,
     convertOperationManifest: () => ({
       forTypeId: '',
@@ -26,17 +27,18 @@ export default defineConfig({
       },
     }),
     validateContractIR: (contract: unknown) => contract,
+    create: () => ({} as any), // Mock create method
   },
   target: {
     kind: 'target',
     id: 'mongodb',
-    family: 'document',
+    familyId: 'document',
     manifest: { id: 'mongodb', version: '1.0.0' },
   },
   adapter: {
     kind: 'adapter',
     id: 'mongodb',
-    family: 'document',
+    familyId: 'document',
     manifest: { id: 'mongodb', version: '1.0.0' },
   },
   extensions: [],

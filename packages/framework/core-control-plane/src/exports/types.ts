@@ -12,7 +12,6 @@ export type {
   DriverDescriptor,
   ExtensionDescriptor,
   FamilyDescriptor,
-  FamilyId,
   FamilyInstance,
   SchemaIssue,
   TargetDescriptor,

@@ -153,7 +153,13 @@ export function createSqlFamilyInstance(
   return {
     familyId: 'sql',
 
-    async verify(verifyOptions): Promise<VerifyDatabaseResult> {
+    async verify(verifyOptions: {
+      readonly driver: ControlPlaneDriver;
+      readonly contractIR: unknown;
+      readonly expectedTargetId: string;
+      readonly contractPath: string;
+      readonly configPath?: string;
+    }): Promise<VerifyDatabaseResult> {
       const { driver, contractIR, expectedTargetId, contractPath, configPath } = verifyOptions;
       const startTime = Date.now();
 
@@ -208,10 +214,10 @@ export function createSqlFamilyInstance(
           expectedTargetId,
           contractPath,
           totalTime,
-          contractProfileHash,
-          missingCodecs,
-          codecCoverageSkipped,
-          configPath,
+          ...(contractProfileHash ? { contractProfileHash } : {}),
+          ...(missingCodecs ? { missingCodecs } : {}),
+          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
+          ...(configPath ? { configPath } : {}),
         });
       }
 
@@ -228,10 +234,10 @@ export function createSqlFamilyInstance(
           actualTargetId: contractTarget,
           contractPath,
           totalTime,
-          contractProfileHash,
-          missingCodecs,
-          codecCoverageSkipped,
-          configPath,
+          ...(contractProfileHash ? { contractProfileHash } : {}),
+          ...(missingCodecs ? { missingCodecs } : {}),
+          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
+          ...(configPath ? { configPath } : {}),
         });
       }
 
@@ -247,10 +253,10 @@ export function createSqlFamilyInstance(
           expectedTargetId,
           contractPath,
           totalTime,
-          contractProfileHash,
-          missingCodecs,
-          codecCoverageSkipped,
-          configPath,
+          ...(contractProfileHash ? { contractProfileHash } : {}),
+          ...(missingCodecs ? { missingCodecs } : {}),
+          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
+          ...(configPath ? { configPath } : {}),
         });
       }
 
@@ -267,9 +273,9 @@ export function createSqlFamilyInstance(
           expectedTargetId,
           contractPath,
           totalTime,
-          missingCodecs,
-          codecCoverageSkipped,
-          configPath,
+          ...(missingCodecs ? { missingCodecs } : {}),
+          ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
+          ...(configPath ? { configPath } : {}),
         });
       }
 
@@ -283,10 +289,10 @@ export function createSqlFamilyInstance(
         expectedTargetId,
         contractPath,
         totalTime,
-        contractProfileHash,
-        missingCodecs,
-        codecCoverageSkipped,
-        configPath,
+        ...(contractProfileHash ? { contractProfileHash } : {}),
+        ...(missingCodecs ? { missingCodecs } : {}),
+        ...(codecCoverageSkipped ? { codecCoverageSkipped } : {}),
+        ...(configPath ? { configPath } : {}),
       });
     },
 
@@ -296,7 +302,6 @@ export function createSqlFamilyInstance(
       // compare contract vs SqlSchemaIR, and return VerifyDatabaseSchemaResult
       throw new Error('schemaVerify not yet implemented');
     },
-
     async introspect(): Promise<SqlSchemaIR> {
       // TODO: Implement introspection
       // This will build SqlTypeMetadataRegistry and call adapter introspection

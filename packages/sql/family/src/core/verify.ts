@@ -147,8 +147,10 @@ export async function readMarker(driver: ControlPlaneDriver): Promise<ContractMa
  * For MVP, we return an empty array since extracting type IDs from TypeScript modules
  * would require runtime evaluation or static analysis. This can be enhanced later.
  */
-export function collectSupportedCodecTypeIds(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+export function collectSupportedCodecTypeIds<TFamilyId extends string>(
+  descriptors: ReadonlyArray<
+    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+  >,
 ): readonly string[] {
   // For MVP, return empty array
   // Future enhancement: Extract type IDs from codec-types modules via static analysis

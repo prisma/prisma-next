@@ -11,6 +11,10 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
+import type {
+  FamilyInstance,
+  VerifyDatabaseResult,
+} from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -133,16 +137,16 @@ export function createDbVerifyCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             extensions: config.extensions ?? [],
-          });
+          }) as FamilyInstance<string>;
 
           // Call family instance verify method
-          const verifyResult = await familyInstance.verify({
+          const verifyResult = (await familyInstance.verify({
             driver,
             contractIR,
             expectedTargetId: config.target.id,
             contractPath,
             configPath,
-          });
+          })) as VerifyDatabaseResult;
 
           // If verification failed, throw structured error
           if (!verifyResult.ok && verifyResult.code) {
