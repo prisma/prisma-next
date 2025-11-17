@@ -27,10 +27,11 @@ import {
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
 /**
- * Private: Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
+ * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
  * This is SQL-family-specific conversion logic.
+ * Used internally by instance creation and test utilities in the same package.
  */
-function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
+export function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
   return {
     forTypeId: manifest.for,
     method: manifest.method,

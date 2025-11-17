@@ -31,8 +31,6 @@ describe('config loader', () => {
         familyId: 'sql',
         manifest: { id: 'sql', version: '0.0.1' },
         hook: mockHook,
-        convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
-        validateContractIR: (contract: unknown) => contract,
         create: () => ({
           familyId: 'sql',
           verify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
@@ -72,7 +70,6 @@ describe('config loader', () => {
           familyId: 'sql',
           manifest: { id: 'sql', version: '0.0.1' },
           hook: mockHook,
-          convertOperationManifest: () => ({ forTypeId: '', method: '', args: [], returns: { kind: 'builtin', type: 'string' } }),
           validateContractIR: (contract: unknown) => contract,
           create: () => ({
             familyId: 'sql',

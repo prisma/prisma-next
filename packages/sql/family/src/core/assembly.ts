@@ -10,6 +10,8 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
+// Import private function from same package (test utility needs it)
+import { convertOperationManifest } from './instance';
 
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).
@@ -155,7 +157,6 @@ export function extractOperationTypeImportsFromPacks(
  */
 export function assembleOperationRegistryFromPacks(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-  convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 

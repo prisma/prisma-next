@@ -61,18 +61,16 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 ## Package Structure
 
 - **`src/core/descriptor.ts`**: `SqlFamilyDescriptor` class implementing `FamilyDescriptor` interface (pure data + factory)
-- **`src/core/instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `emitContract`). Contains private `convertOperationManifest` function for operation manifest conversion.
-- **`src/core/assembly.ts`**: Assembly helpers for building operation registries and extracting type imports from descriptors
+- **`src/core/instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
+- **`src/core/assembly.ts`**: Assembly helpers for building operation registries and extracting type imports from descriptors. Test utilities import `convertOperationManifest` from the same package via relative path.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/exports/control.ts`**: Control plane entry point (exports `SqlFamilyDescriptor` instance)
 - **`src/exports/runtime.ts`**: Runtime entry point (placeholder for future functionality)
-- **`src/exports/instance.ts`**: Exports `convertOperationManifest` for test use
 
 ## Entrypoints
 
 - **`./control`**: Control plane entry point for CLI/config usage (exports `SqlFamilyDescriptor`)
 - **`./runtime`**: Runtime entry point (placeholder for future functionality)
-- **`./instance`**: Exports `convertOperationManifest` for test use only
 
 ## Dependencies
 

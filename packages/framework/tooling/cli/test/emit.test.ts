@@ -12,7 +12,6 @@ import {
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
 } from '../../../../sql/family/src/core/assembly';
-import { convertOperationManifest } from '../../../../sql/family/src/core/instance';
 import { loadContractFromTs } from '../src/load-ts-contract';
 import { loadExtensionPacks } from '../src/pack-loading';
 
@@ -44,7 +43,7 @@ describe('emit command functionality', () => {
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -96,7 +95,7 @@ describe('emit command functionality', () => {
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -127,7 +126,7 @@ describe('emit command functionality', () => {
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);
