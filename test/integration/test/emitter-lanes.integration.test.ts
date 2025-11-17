@@ -11,7 +11,7 @@ import {
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';

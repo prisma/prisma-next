@@ -1,0 +1,46 @@
+{
+  "name": "@prisma-next/family-sql",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "SQL family descriptor for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "clean": "node ../../../../scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/sql-contract-emitter": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*",
+    "arktype": "^2.0.0"
+  },
+  "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^2.1.1"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./control": {
+      "types": "./dist/exports/control.d.ts",
+      "import": "./dist/exports/control.js"
+    },
+    "./runtime": {
+      "types": "./dist/exports/runtime.d.ts",
+      "import": "./dist/exports/runtime.js"
+    }
+  }
+}

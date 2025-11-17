@@ -7,7 +7,7 @@ import {
 } from '@prisma-next/cli/pack-assembly';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
