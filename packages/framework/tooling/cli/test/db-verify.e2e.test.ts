@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -55,7 +56,7 @@ async function emitContractFromConfig(
     target: config.target,
     adapter: config.adapter,
     extensions: config.extensions ?? [],
-  });
+  }) as FamilyInstance<string, unknown, unknown, unknown>;
 
   const emitResult = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 

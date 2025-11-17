@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config-loader';
@@ -58,7 +59,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      });
+      }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
@@ -124,7 +125,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      });
+      }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
@@ -185,25 +186,9 @@ describe('emitContract API', () => {
           target: config.target,
           adapter: config.adapter,
           extensions: config.extensions ?? [],
-        }) as {
-          readonly operationRegistry: OperationRegistry;
-          readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-          readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-          readonly extensionIds: ReadonlyArray<string>;
-        };
+        }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-        // Extract assembly data from family instance
-        const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-          familyInstance;
-
-        const result = await emitContract({
-          contractIR: contractIR as ContractIR,
-          targetFamily: config.family.hook,
-          operationRegistry,
-          codecTypeImports,
-          operationTypeImports,
-          extensionIds,
-        });
+        const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
         // Write files
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
@@ -254,7 +239,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      });
+      }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
@@ -297,7 +282,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      });
+      }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
@@ -340,26 +325,10 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         extensions: config.extensions ?? [],
-      }) as {
-        readonly operationRegistry: OperationRegistry;
-        readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-        readonly extensionIds: ReadonlyArray<string>;
-      };
+      }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-      // Extract assembly data from family instance
-      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-        familyInstance;
-
-      // The function should work normally, but we've verified the error handling path exists
-      const result = await emitContract({
-        contractIR: contractIR as ContractIR,
-        targetFamily: config.family.hook,
-        operationRegistry,
-        codecTypeImports,
-        operationTypeImports,
-        extensionIds,
-      });
+      // The function should work normally
+      const result = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
       expect(result).toBeDefined();
     },

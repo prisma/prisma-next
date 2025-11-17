@@ -52,7 +52,7 @@ async function emitContractFromConfig(
     target: config.target,
     adapter: config.adapter,
     extensions: config.extensions ?? [],
-  });
+  }) as FamilyInstance<string, unknown, unknown, unknown>;
 
   const emitResult = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
