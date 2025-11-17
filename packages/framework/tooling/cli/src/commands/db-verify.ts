@@ -45,8 +45,7 @@ export function createDbVerifyCommand(): Command {
   setCommandDescriptions(
     command,
     'Check the database satisfies your contract',
-    'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
-      'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
+    'Verifies that your database schema matches the emitted contract. Checks marker presence, target, and hash matches.',
   );
   command
     .configureHelp({
