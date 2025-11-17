@@ -498,7 +498,7 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../..
-      '@prisma-next/control-plane':
+      '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../../../core-control-plane
       '@prisma-next/driver-postgres':
@@ -763,6 +763,25 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@20.19.24)
+
+  packages/sql/schema-ir:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../framework/core-contract
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.1
+        version: 2.1.9(vitest@2.1.9(@types/node@20.19.24))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
