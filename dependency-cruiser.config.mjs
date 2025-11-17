@@ -4,13 +4,13 @@
  * Dependency Cruiser configuration for Prisma Next.
  *
  * It derives module groups from architecture.config.json and encodes the same-layer/
- * downward-only semantics. Plane import constraints are defined declaratively in
- * architecture.config.json under `planeRules` rather than hardcoded here.
+ * downward-only semantics. Plane import constraints and cross-domain exceptions are
+ * defined declaratively in architecture.config.json rather than hardcoded here.
  */
 
 import config from './architecture.config.json' with { type: 'json' };
 
-const { packages: packageConfigs, layerOrder, planeRules } = config;
+const { packages: packageConfigs, layerOrder, planeRules, crossDomainExceptions } = config;
 
 const normalizeGlob = (glob) => {
   let pattern = glob.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
@@ -51,9 +51,35 @@ const describeGroup = (group) => `${group.domain}/${group.layer}/${group.plane}`
 const groupPattern = (group) => group.patterns.join('|');
 
 const matchesGlobPattern = (group, pattern) => {
-  const normalizedPattern = normalizeGlob(pattern);
-  const regex = new RegExp(normalizedPattern);
-  return group.globs.some((glob) => regex.test(glob));
+  // Check if any of the group's globs match the exception pattern
+  // We check if the globs are identical or if one is a prefix of the other (with proper glob semantics)
+  return group.globs.some((glob) => {
+    // Exact match
+    if (glob === pattern) {
+      return true;
+    }
+    
+    // Check if the group's glob matches the exception pattern by normalizing both and testing
+    // Normalize both patterns to regex and check if they would match the same files
+    const normalizedExceptionPattern = normalizeGlob(pattern);
+    const normalizedGroupPattern = normalizeGlob(glob);
+    
+    // If the normalized patterns are identical, they match
+    if (normalizedExceptionPattern === normalizedGroupPattern) {
+      return true;
+    }
+    
+    // Check if one pattern is a prefix of the other (handles cases like packages/extensions/** vs packages/extensions/compat-prisma/**)
+    const exceptionBase = pattern.replace(/\/\*\*$/, '').replace(/\*$/, '');
+    const groupBase = glob.replace(/\/\*\*$/, '').replace(/\*$/, '');
+    
+    // Group matches exception if group's base path starts with exception's base path, or vice versa
+    if (groupBase.startsWith(exceptionBase) || exceptionBase.startsWith(groupBase)) {
+      return true;
+    }
+    
+    return false;
+  });
 };
 
 const forbidden = [];
@@ -67,12 +93,6 @@ const pushRule = (name, comment, sourceGroup, targetGroup) => {
     to: { path: groupPattern(targetGroup) },
   });
 };
-
-const isCompatPrismaToSql = (sourceGroup, targetGroup) =>
-  sourceGroup.domain === 'extensions' &&
-  sourceGroup.layer === 'compat' &&
-  sourceGroup.globs.some((glob) => glob.includes('compat-prisma')) &&
-  targetGroup.domain === 'sql';
 
 const createUpwardRules = () => {
   for (const sourceGroup of moduleGroups) {
@@ -102,10 +122,14 @@ const createCrossDomainRules = () => {
       if (sourceGroup.domain === targetGroup.domain) continue;
       if (targetGroup.domain === 'framework') continue;
 
-      // TODO: compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API
-      if (isCompatPrismaToSql(sourceGroup, targetGroup)) {
-        continue;
-      }
+      // Check if this import is allowed by an exception
+      const isException = crossDomainExceptions?.some((exception) => {
+        const sourceMatches = matchesGlobPattern(sourceGroup, exception.from);
+        const targetMatches = matchesGlobPattern(targetGroup, exception.to);
+        return sourceMatches && targetMatches;
+      });
+
+      if (isException) continue;
 
       pushRule(
         `cross-domain-${sourceGroup.domain}-to-${targetGroup.domain}`,

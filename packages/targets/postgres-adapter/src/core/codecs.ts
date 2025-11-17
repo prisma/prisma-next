@@ -19,6 +19,15 @@ const pgTextCodec = codec({
   targetTypes: ['text'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'text',
+        },
+      },
+    },
+  },
 });
 
 const pgInt4Codec = codec<'pg/int4@1', number, number>({
@@ -26,6 +35,15 @@ const pgInt4Codec = codec<'pg/int4@1', number, number>({
   targetTypes: ['int4'],
   encode: (value) => value,
   decode: (wire) => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'integer',
+        },
+      },
+    },
+  },
 });
 
 const pgInt2Codec = codec<'pg/int2@1', number, number>({
@@ -33,6 +51,15 @@ const pgInt2Codec = codec<'pg/int2@1', number, number>({
   targetTypes: ['int2'],
   encode: (value) => value,
   decode: (wire) => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'smallint',
+        },
+      },
+    },
+  },
 });
 
 const pgInt8Codec = codec<'pg/int8@1', number, number>({
@@ -40,6 +67,15 @@ const pgInt8Codec = codec<'pg/int8@1', number, number>({
   targetTypes: ['int8'],
   encode: (value) => value,
   decode: (wire) => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'bigint',
+        },
+      },
+    },
+  },
 });
 
 const pgFloat4Codec = codec<'pg/float4@1', number, number>({
@@ -47,6 +83,15 @@ const pgFloat4Codec = codec<'pg/float4@1', number, number>({
   targetTypes: ['float4'],
   encode: (value) => value,
   decode: (wire) => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'real',
+        },
+      },
+    },
+  },
 });
 
 const pgFloat8Codec = codec<'pg/float8@1', number, number>({
@@ -54,6 +99,15 @@ const pgFloat8Codec = codec<'pg/float8@1', number, number>({
   targetTypes: ['float8'],
   encode: (value) => value,
   decode: (wire) => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'double precision',
+        },
+      },
+    },
+  },
 });
 
 const pgTimestampCodec = codec<'pg/timestamp@1', string | Date, string>({
@@ -68,6 +122,15 @@ const pgTimestampCodec = codec<'pg/timestamp@1', string | Date, string>({
     if (typeof wire === 'string') return wire;
     if (wire instanceof Date) return wire.toISOString();
     return String(wire);
+  },
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'timestamp without time zone',
+        },
+      },
+    },
   },
 });
 
@@ -84,6 +147,15 @@ const pgTimestamptzCodec = codec<'pg/timestamptz@1', string | Date, string>({
     if (wire instanceof Date) return wire.toISOString();
     return String(wire);
   },
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'timestamp with time zone',
+        },
+      },
+    },
+  },
 });
 
 const pgBoolCodec = codec<'pg/bool@1', boolean, boolean>({
@@ -91,6 +163,15 @@ const pgBoolCodec = codec<'pg/bool@1', boolean, boolean>({
   targetTypes: ['bool'],
   encode: (value) => value,
   decode: (wire) => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'boolean',
+        },
+      },
+    },
+  },
 });
 
 // Build codec definitions using the builder DSL

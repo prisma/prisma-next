@@ -7,16 +7,23 @@ function createValidConfig(overrides?: Record<string, unknown>) {
   return {
     family: {
       kind: 'family',
-      id: 'sql',
+      familyId: 'sql',
+      manifest: { id: 'sql', version: '0.0.1' },
       hook: {},
       convertOperationManifest: vi.fn(),
       validateContractIR: vi.fn(),
+      create: vi.fn(() => ({
+        familyId: 'sql',
+        verify: vi.fn(),
+        schemaVerify: vi.fn(),
+        introspect: vi.fn(),
+      })),
       ...overrides?.family,
     },
     target: {
       kind: 'target',
+      familyId: 'sql',
       id: 'postgres',
-      family: 'sql',
       manifest: {
         id: 'postgres',
         version: '15.0.0',
@@ -25,8 +32,8 @@ function createValidConfig(overrides?: Record<string, unknown>) {
     },
     adapter: {
       kind: 'adapter',
+      familyId: 'sql',
       id: 'postgres',
-      family: 'sql',
       manifest: {
         id: 'postgres',
         version: '15.0.0',
@@ -78,17 +85,19 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).toThrow(errorConfigValidation('family.kind'));
   });
 
-  it('throws error when family.id is not a string', () => {
+  it('throws error when family.familyId is not a string', () => {
     const config = createValidConfig({
       family: {
         kind: 'family',
-        id: 123,
+        familyId: 123,
+        manifest: { id: 'sql', version: '0.0.1' },
         hook: {},
         convertOperationManifest: vi.fn(),
         validateContractIR: vi.fn(),
+        create: vi.fn(),
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('family.id'));
+    expect(() => validateConfig(config)).toThrow(errorConfigValidation('family.familyId'));
   });
 
   it('throws error when family.hook is missing or not an object', () => {
@@ -168,7 +177,7 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).toThrow(errorConfigValidation('target.id'));
   });
 
-  it('throws error when target.family is not a string', () => {
+  it('throws error when target.familyId is not a string', () => {
     const config = createValidConfig({
       target: {
         kind: 'target',
@@ -177,7 +186,7 @@ describe('validateConfig', () => {
         manifest: {},
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('target.family'));
+    expect(() => validateConfig(config)).toThrow(errorConfigValidation('target.familyId'));
   });
 
   it('throws error when target.manifest is missing or not an object', () => {
@@ -225,7 +234,7 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).toThrow(errorConfigValidation('adapter.id'));
   });
 
-  it('throws error when adapter.family is not a string', () => {
+  it('throws error when adapter.familyId is not a string', () => {
     const config = createValidConfig({
       adapter: {
         kind: 'adapter',
@@ -234,7 +243,7 @@ describe('validateConfig', () => {
         manifest: {},
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('adapter.family'));
+    expect(() => validateConfig(config)).toThrow(errorConfigValidation('adapter.familyId'));
   });
 
   it('throws error when adapter.manifest is missing or not an object', () => {
@@ -264,7 +273,7 @@ describe('validateConfig', () => {
         {
           kind: 'extension',
           id: 'pg-vector',
-          family: 'sql',
+          familyId: 'sql',
           manifest: {
             id: 'pg-vector',
             version: '1.0.0',
@@ -328,7 +337,7 @@ describe('validateConfig', () => {
         },
       ],
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('extensions[].family'));
+    expect(() => validateConfig(config)).toThrow(errorConfigValidation('extensions[].familyId'));
   });
 
   it('throws error when extension.manifest is missing or not an object', () => {

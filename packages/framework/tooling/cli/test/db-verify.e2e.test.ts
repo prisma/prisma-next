@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -14,12 +14,6 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
 import { loadConfig } from '../src/config-loader';
-import {
-  assembleOperationRegistry,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '../src/pack-assembly';
 import {
   executeCommand,
   getExitCode,
@@ -57,20 +51,14 @@ async function emitContractFromConfig(
 
   const contractIR = config.family.validateContractIR(contractWithoutMappings);
 
-  const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
-  const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-  const codecTypeImports = extractCodecTypeImports(descriptors);
-  const operationTypeImports = extractOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds(config.adapter, config.target, config.extensions ?? []);
+  // Create family instance (assembles operation registry, type imports, extension IDs)
+  const familyInstance = config.family.create({
+    target: config.target,
+    adapter: config.adapter,
+    extensions: config.extensions ?? [],
+  }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-  const emitResult = await emitContract({
-    contractIR: contractIR as ContractIR,
-    targetFamily: config.family.hook,
-    operationRegistry,
-    codecTypeImports,
-    operationTypeImports,
-    extensionIds,
-  });
+  const emitResult = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
 
   // Write contract files
   const contractJsonPath = resolve(testDir, contractConfig.output ?? 'src/prisma/contract.json');
@@ -456,80 +444,6 @@ describe('db verify command (e2e)', () => {
           }
         },
         { acceleratePort: 54202, databasePort: 54203, shadowDatabasePort: 54204 },
-      );
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'reports PN-CLI-4007 when family.verify.readMarker is missing',
-    async () => {
-      await withDevDatabase(
-        async ({ connectionString }) => {
-          // Set up test directory from fixtures with config that has family without verify
-          const testSetup = setupTestDirectoryFromFixtures(
-            fixtureSubdir,
-            'prisma-next.config.no-verify.ts',
-            { '{{DB_URL}}': connectionString },
-          );
-          const testDir = testSetup.testDir;
-          const configPath = testSetup.configPath;
-          const cleanupDir = testSetup.cleanup;
-
-          try {
-            // Emit contract using the config
-            const contract = await emitContractFromConfig(configPath, testDir);
-
-            await withClient(connectionString, async (client) => {
-              // Setup marker schema and table
-              await executeStatement(client, ensureSchemaStatement);
-              await executeStatement(client, ensureTableStatement);
-
-              // Write marker matching contract
-              const write = writeContractMarker({
-                coreHash: contract.coreHash,
-                profileHash: contract.profileHash ?? contract.coreHash,
-                contractJson: contract,
-                canonicalVersion: 1,
-              });
-              await executeStatement(client, write.insert);
-              // withClient will close the client after this callback returns
-            });
-
-            const command = createDbVerifyCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDir);
-              await expect(
-                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
-              ).rejects.toThrow('process.exit called');
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            // Check exit code is non-zero (error)
-            const exitCode = getExitCode();
-            expect(exitCode).not.toBe(0);
-
-            const errorOutput = consoleErrors.join('\n');
-            expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-            const parsed = JSON.parse(errorOutput);
-            expect(parsed).toMatchObject({
-              code: 'PN-CLI-4007',
-              summary: expect.any(String),
-              why: expect.any(String),
-              fix: expect.any(String),
-            });
-            expect(parsed.summary).toContain('Family readMarker() is required');
-            expect(parsed.fix).toContain(
-              'Ensure family.verify.readMarker() is exported by your family package',
-            );
-          } finally {
-            cleanupDir();
-          }
-        },
-        { acceleratePort: 54205, databasePort: 54206, shadowDatabasePort: 54207 },
       );
     },
     timeouts.spinUpPpgDev,

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AdapterDescriptor } from '@prisma-next/cli/config-types';
+import type { TargetDescriptor } from '@prisma-next/cli/config-types';
 import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
 import { type } from 'arktype';
 
@@ -31,32 +31,29 @@ const ExtensionPackManifestSchema = type({
 });
 
 /**
- * Loads the adapter manifest from packs/manifest.json.
+ * Loads the target manifest from packs/manifest.json.
  */
-function loadAdapterManifest(): ExtensionPackManifest {
+function loadTargetManifest(): ExtensionPackManifest {
   const manifestPath = join(__dirname, '../../packs/manifest.json');
   const manifestJson = JSON.parse(readFileSync(manifestPath, 'utf-8'));
 
   const result = ExtensionPackManifestSchema(manifestJson);
   if (result instanceof type.errors) {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
-    throw new Error(`Invalid adapter manifest structure at ${manifestPath}: ${messages}`);
+    throw new Error(`Invalid target manifest structure at ${manifestPath}: ${messages}`);
   }
 
   return result as ExtensionPackManifest;
 }
 
 /**
- * Postgres adapter descriptor for CLI config.
- * May optionally provide a runtime factory for DB-connected commands.
+ * Postgres target descriptor for CLI config.
  */
-const postgresAdapterDescriptor: AdapterDescriptor = {
-  kind: 'adapter',
+const postgresTargetDescriptor: TargetDescriptor<'sql'> = {
+  kind: 'target',
+  familyId: 'sql',
   id: 'postgres',
-  family: 'sql',
-  manifest: loadAdapterManifest(),
-  // Note: create() factory can be added here for DB-connected commands
-  // For now, emit command doesn't need it
+  manifest: loadTargetManifest(),
 };
 
-export default postgresAdapterDescriptor;
+export default postgresTargetDescriptor;

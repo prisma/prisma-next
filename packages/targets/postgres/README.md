@@ -27,7 +27,7 @@ This package spans multiple planes:
 ### Migration Plane (CLI)
 
 ```typescript
-import postgres from '@prisma-next/targets-postgres/cli';
+import postgres from '@prisma-next/targets-postgres/control';
 
 // postgres is a TargetDescriptor with:
 // - kind: 'target'

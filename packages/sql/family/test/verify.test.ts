@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseContractMarkerRow } from '../src/exports/verify';
+import { parseContractMarkerRow } from '../src/core/verify';
 
 describe('marker parser', () => {
   it('parses valid marker row with all fields', () => {

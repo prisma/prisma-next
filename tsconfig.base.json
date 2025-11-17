@@ -55,8 +55,8 @@
       "@prisma-next/core-control-plane/config-validation": [
         "packages/framework/core-control-plane/src/exports/config-validation.ts"
       ],
-      "@prisma-next/core-control-plane/emit-contract": [
-        "packages/framework/core-control-plane/src/exports/emit-contract.ts"
+      "@prisma-next/core-control-plane/emission": [
+        "packages/framework/core-control-plane/src/exports/emission.ts"
       ],
       "@prisma-next/core-control-plane/verify-database": [
         "packages/framework/core-control-plane/src/exports/verify-database.ts"
@@ -67,6 +67,9 @@
       "@prisma-next/core-control-plane/pack-manifest-types": [
         "packages/framework/core-control-plane/src/exports/pack-manifest-types.ts"
       ],
+      "@prisma-next/core-control-plane/types": [
+        "packages/framework/core-control-plane/src/exports/types.ts"
+      ],
       "@prisma-next/contract-authoring": [
         "packages/framework/authoring/contract-authoring/src/index.ts"
       ],
@@ -76,8 +79,9 @@
       "@prisma-next/sql-contract/*": ["packages/sql/contract/src/exports/*.ts"],
       "@prisma-next/sql-operations": ["packages/sql/operations/src/index.ts"],
       "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
-      "@prisma-next/family-sql/cli": ["packages/sql/tooling/cli/src/exports/cli.ts"],
-      "@prisma-next/family-sql/runtime": ["packages/sql/tooling/cli/src/exports/runtime.ts"],
+      "@prisma-next/family-sql/control": ["packages/sql/family/src/exports/control.ts"],
+      "@prisma-next/family-sql/runtime": ["packages/sql/family/src/exports/runtime.ts"],
+      "@prisma-next/targets-postgres/control": ["packages/targets/postgres/src/exports/control.ts"],
       "@prisma-next/targets-postgres/cli": ["packages/targets/postgres/src/exports/cli.ts"],
       "@prisma-next/targets-postgres/runtime": ["packages/targets/postgres/src/exports/runtime.ts"],
       "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],

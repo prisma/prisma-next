@@ -73,13 +73,31 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/sql/family/src/core/**",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/sql/family/src/exports/control.ts",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/sql/family/src/exports/runtime.ts",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/targets/postgres-adapter/src/core/**",
       "domain": "targets",
       "layer": "adapters",
       "plane": "shared"
     },
     {
-      "glob": "packages/targets/postgres-adapter/src/exports/cli.ts",
+      "glob": "packages/targets/postgres-adapter/src/exports/control.ts",
       "domain": "targets",
       "layer": "adapters",
       "plane": "migration"
@@ -91,7 +109,7 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/targets/postgres/src/exports/cli.ts",
+      "glob": "packages/targets/postgres/src/exports/control.ts",
       "domain": "extensions",
       "layer": "targets",
       "plane": "migration"
@@ -133,7 +151,7 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/extensions/pgvector/src/exports/cli.ts",
+      "glob": "packages/extensions/pgvector/src/exports/control.ts",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "migration"
@@ -164,6 +182,12 @@
     },
     {
       "glob": "packages/sql/contract/**",
+      "domain": "sql",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/sql/schema-ir/**",
       "domain": "sql",
       "layer": "core",
       "plane": "shared"
@@ -212,6 +236,13 @@
       ]
     }
   },
+  "crossDomainExceptions": [
+    {
+      "from": "packages/extensions/compat-prisma/**",
+      "to": "packages/sql/**",
+      "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
+    }
+  ],
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
     "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"]

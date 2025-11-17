@@ -2,14 +2,14 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    cli: 'src/exports/cli.ts',
+    control: 'src/exports/control.ts',
     runtime: 'src/exports/runtime.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],
   sourcemap: true,
   dts: true,
-  clean: false,
+  clean: true,
   target: 'es2022',
   minify: false,
 });

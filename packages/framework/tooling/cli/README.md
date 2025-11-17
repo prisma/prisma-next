@@ -113,10 +113,10 @@ The `db verify` command requires a `driver` in the config to connect to the data
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
+import postgres from '@prisma-next/targets-postgres/control';
+import sql from '@prisma-next/family-sql/control';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -140,13 +140,14 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Read Marker**: Calls `config.family.verify.readMarker(driver)` to read the contract marker
-4. **Compare**:
-   - Marker presence: Returns `PN-RTM-3001` if marker is missing
-   - Target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
-   - Core hash: Returns `PN-RTM-3002` if `coreHash` doesn't match
-   - Profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
-5. **Codec Coverage** (optional): If `config.family.verify.collectSupportedCodecTypeIds` is provided, compares contract column types against supported codec types and reports missing codecs
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, and extensions to create a family instance
+4. **Verify**: Calls `familyInstance.verify()` which:
+   - Reads the contract marker from the database
+   - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
+   - Compares target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
+   - Compares core hash: Returns `PN-RTM-3002` if `coreHash` doesn't match
+   - Compares profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
+   - Checks codec coverage (optional): Compares contract column types against supported codec types and reports missing codecs
 
 **Output Format (TTY):**
 
@@ -195,25 +196,35 @@ Failure:
 **Error Codes:**
 
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4007`: Missing family.verify.readMarker() — ensure family verify helpers are exported
 - `PN-RTM-3001`: Marker missing - Contract marker not found in database
 - `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
 - `PN-RTM-3003`: Target mismatch - Contract target does not match config target
 
 **Family Requirements:**
 
-The family must provide a `verify` helper in the family descriptor:
+The family must provide a `create()` method in the family descriptor that returns a `FamilyInstance` with a `verify()` method:
 
 ```typescript
-{
-  verify: {
-    readMarker: (driver: ControlPlaneDriver) => Promise<ContractMarkerRecord | null>,
-    collectSupportedCodecTypeIds?: (descriptors) => readonly string[],
-  },
+interface FamilyDescriptor {
+  create(options: {
+    target: TargetDescriptor;
+    adapter: AdapterDescriptor;
+    extensions: ExtensionDescriptor[];
+  }): FamilyInstance;
+}
+
+interface FamilyInstance {
+  verify(options: {
+    driver: ControlPlaneDriver;
+    contractIR: ContractIR;
+    expectedTargetId: string;
+    contractPath: string;
+    configPath?: string;
+  }): Promise<VerifyDatabaseResult>;
 }
 ```
 
-The SQL family provides this via `@prisma-next/family-sql/cli`.
+The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles reading the marker, comparing hashes, and checking codec coverage internally.
 
 **Config File (`prisma-next.config.ts`):**
 
@@ -228,9 +239,9 @@ The CLI uses a config file to specify the target family, target, adapter, extens
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgres from '@prisma-next/targets-postgres/control';
+import sql from '@prisma-next/family-sql/control';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -334,14 +345,10 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Fail Fast**: Non-structured errors propagate and are caught by Commander.js's `exitOverride()` with stack traces
 - See `.cursor/rules/cli-error-handling.mdc` for detailed patterns
 
-### Pack Assembly (`pack-assembly.ts`)
-- Generic assembly functions that loop over descriptors/packs:
-  - `assembleOperationRegistry(descriptors, family)` - Loops over descriptors, extracts operations, delegates to `family.convertOperationManifest()` for conversion
-  - `extractCodecTypeImports(descriptors)` - Extracts codec type imports from descriptors
-  - `extractOperationTypeImports(descriptors)` - Extracts operation type imports from descriptors
-  - `extractExtensionIds(adapter, target, extensions)` - Extracts extension IDs in deterministic order
-  - Pack-based versions for tests: `assembleOperationRegistryFromPacks`, `extractCodecTypeImportsFromPacks`, etc.
-- These functions handle the generic looping logic; family-specific conversion is delegated to `family.convertOperationManifest()`.
+### Pack Assembly
+- **Family instances** now handle pack assembly internally. The CLI creates a family instance via `config.family.create()` and reads assembly data (operation registry, type imports, extension IDs) from the instance.
+- **Removed**: `pack-assembly.ts` has been removed. Pack assembly is now handled by family instances. For SQL family, tests can import pack-based helpers directly from `packages/sql/family/src/core/assembly.ts` using relative paths.
+- Assembly logic is family-specific and owned by each family's instance implementation (e.g., `createSqlFamilyInstance` in `@prisma-next/family-sql`).
 
 ### Output Formatting (`utils/output.ts`)
 - **Command Output Formatters**: Format human-readable output for commands (emit, verify, etc.)

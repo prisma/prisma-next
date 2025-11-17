@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emit } from '@prisma-next/emitter';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -16,13 +17,12 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
-import sqlFamilyDescriptor from '../../../../sql/tooling/cli/src/exports/cli';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../src/exports/pack-assembly';
+} from '../../../../sql/family/src/core/assembly';
 import { loadContractFromTs } from '../src/load-ts-contract';
 import { loadExtensionPacks } from '../src/pack-loading';
 
@@ -75,7 +75,10 @@ describe('emit integration', () => {
       const packs = loadExtensionPacks(adapterPath, []);
 
       // Assemble operation registry and extract type imports from packs
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const operationRegistry = assembleOperationRegistryFromPacks(
+        packs,
+        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+      );
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -147,7 +150,10 @@ describe('emit integration', () => {
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const operationRegistry = assembleOperationRegistryFromPacks(
+        packs,
+        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+      );
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);

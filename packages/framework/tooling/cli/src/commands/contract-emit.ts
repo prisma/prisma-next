@@ -1,16 +1,10 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
-import {
-  assembleOperationRegistry,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '../pack-assembly';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -120,28 +114,15 @@ export function createContractEmitCommand(): Command {
         // Validate and normalize the contract using family-specific validation
         const contractIR = config.family.validateContractIR(contractWithoutMappings) as ContractIR;
 
-        // Build descriptors array for assembly
-        const descriptors = [config.adapter, config.target, ...(config.extensions ?? [])];
+        // Create family instance (assembles operation registry, type imports, extension IDs)
+        const familyInstance = config.family.create({
+          target: config.target,
+          adapter: config.adapter,
+          extensions: config.extensions ?? [],
+        }) as FamilyInstance<string, unknown, unknown, unknown>;
 
-        // Use framework CLI assembly functions (loops over descriptors, delegates to family for conversion)
-        const operationRegistry = assembleOperationRegistry(descriptors, config.family);
-        const codecTypeImports = extractCodecTypeImports(descriptors);
-        const operationTypeImports = extractOperationTypeImports(descriptors);
-        const extensionIds = extractExtensionIds(
-          config.adapter,
-          config.target,
-          config.extensions ?? [],
-        );
-
-        // Call programmatic API with resolved values (returns strings, no file I/O)
-        const emitResult = await emitContract({
-          contractIR,
-          targetFamily: config.family.hook,
-          operationRegistry,
-          codecTypeImports,
-          operationTypeImports,
-          extensionIds,
-        });
+        // Call emitContract on family instance (returns strings, no file I/O)
+        const emitResult = await familyInstance.emitContract({ contractIR });
 
         // Create directories if needed
         mkdirSync(dirname(outputJsonPath), { recursive: true });

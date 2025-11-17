@@ -37,14 +37,6 @@
       "types": "./dist/exports/config-validation.d.ts",
       "import": "./dist/exports/config-validation.js"
     },
-    "./emit-contract": {
-      "types": "./dist/exports/emit-contract.d.ts",
-      "import": "./dist/exports/emit-contract.js"
-    },
-    "./verify-database": {
-      "types": "./dist/exports/verify-database.d.ts",
-      "import": "./dist/exports/verify-database.js"
-    },
     "./errors": {
       "types": "./dist/exports/errors.d.ts",
       "import": "./dist/exports/errors.js"
@@ -52,10 +44,6 @@
     "./pack-manifest-types": {
       "types": "./dist/exports/pack-manifest-types.d.ts",
       "import": "./dist/exports/pack-manifest-types.js"
-    },
-    "./utils/marker-parser": {
-      "types": "./dist/exports/marker-parser.d.ts",
-      "import": "./dist/exports/marker-parser.js"
     },
     "./types": {
       "types": "./dist/exports/types.d.ts",

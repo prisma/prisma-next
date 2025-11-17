@@ -1,32 +1,33 @@
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
-} from '@prisma-next/core-control-plane/config-types';
-import type {
   ExtensionPackManifest,
   OperationManifest,
 } from '@prisma-next/core-control-plane/pack-manifest-types';
-import type { OperationRegistry } from '@prisma-next/operations';
+import type {
+  AdapterDescriptor,
+  ExtensionDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
+import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).
- * Loops over descriptors, extracts operations, converts them using family-specific
+ * Loops over descriptors, extracts operations, converts them using the provided
  * conversion function, and registers them in a new registry.
  */
 export function assembleOperationRegistry(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
-  family: FamilyDescriptor,
+  descriptors: ReadonlyArray<
+    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+  >,
+  convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
   for (const descriptor of descriptors) {
     const operations = descriptor.manifest.operations ?? [];
     for (const operationManifest of operations as ReadonlyArray<OperationManifest>) {
-      const signature = family.convertOperationManifest(operationManifest);
+      const signature = convertOperationManifest(operationManifest);
       registry.register(signature);
     }
   }
@@ -38,7 +39,9 @@ export function assembleOperationRegistry(
  * Extracts codec type imports from descriptors for contract.d.ts generation.
  */
 export function extractCodecTypeImports(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+  descriptors: ReadonlyArray<
+    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+  >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -56,7 +59,9 @@ export function extractCodecTypeImports(
  * Extracts operation type imports from descriptors for contract.d.ts generation.
  */
 export function extractOperationTypeImports(
-  descriptors: ReadonlyArray<TargetDescriptor | AdapterDescriptor | ExtensionDescriptor>,
+  descriptors: ReadonlyArray<
+    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+  >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -76,9 +81,9 @@ export function extractOperationTypeImports(
  * Deduplicates while preserving stable order.
  */
 export function extractExtensionIds(
-  adapter: AdapterDescriptor,
-  target: TargetDescriptor,
-  extensions: ReadonlyArray<ExtensionDescriptor>,
+  adapter: AdapterDescriptor<'sql'>,
+  target: TargetDescriptor<'sql'>,
+  extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>,
 ): ReadonlyArray<string> {
   const ids: string[] = [];
   const seen = new Set<string>();
@@ -150,14 +155,14 @@ export function extractOperationTypeImportsFromPacks(
  */
 export function assembleOperationRegistryFromPacks(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-  family: FamilyDescriptor,
+  convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
   for (const pack of packs) {
     const operations = pack.manifest.operations ?? [];
     for (const operationManifest of operations as ReadonlyArray<OperationManifest>) {
-      const signature = family.convertOperationManifest(operationManifest);
+      const signature = convertOperationManifest(operationManifest);
       registry.register(signature);
     }
   }

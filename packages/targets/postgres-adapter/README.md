@@ -169,7 +169,7 @@ const runtime = createRuntime({
 ### CLI Config
 
 ```typescript
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 
 export default defineConfig({
   family: sql,

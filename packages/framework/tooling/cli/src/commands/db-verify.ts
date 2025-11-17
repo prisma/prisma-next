@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import {
   errorDatabaseUrlRequired,
+  errorDriverRequired,
   errorFileNotFound,
   errorHashMismatch,
   errorMarkerMissing,
@@ -10,7 +11,7 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
-import { verifyDatabase } from '@prisma-next/core-control-plane/verify-database';
+import type { FamilyInstance, VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -119,36 +120,64 @@ export function createDbVerifyCommand(): Command {
           throw errorDatabaseUrlRequired();
         }
 
-        // Call domain action with loaded config and ContractIR
-        const verifyResult = await verifyDatabase({
-          config,
-          contractIR,
-          dbUrl,
-          contractPath,
-          configPath,
-        });
-
-        // If verification failed, throw structured error
-        if (!verifyResult.ok && verifyResult.code) {
-          if (verifyResult.code === 'PN-RTM-3001') {
-            throw errorMarkerMissing();
-          }
-          if (verifyResult.code === 'PN-RTM-3002') {
-            throw errorHashMismatch({
-              expected: verifyResult.contract.coreHash,
-              ...(verifyResult.marker?.coreHash ? { actual: verifyResult.marker.coreHash } : {}),
-            });
-          }
-          if (verifyResult.code === 'PN-RTM-3003') {
-            throw errorTargetMismatch(
-              verifyResult.target.expected,
-              verifyResult.target.actual ?? 'unknown',
-            );
-          }
-          throw errorRuntime(verifyResult.summary);
+        // Check for driver
+        if (!config.driver) {
+          throw errorDriverRequired();
         }
 
-        return verifyResult;
+        // Create driver
+        const driver = await config.driver.create(dbUrl);
+
+        try {
+          // Create family instance
+          const familyInstance = config.family.create({
+            target: config.target,
+            adapter: config.adapter,
+            extensions: config.extensions ?? [],
+          }) as FamilyInstance<string>;
+
+          // Call family instance verify method
+          let verifyResult: VerifyDatabaseResult;
+          try {
+            verifyResult = (await familyInstance.verify({
+              driver,
+              contractIR,
+              expectedTargetId: config.target.id,
+              contractPath,
+              configPath,
+            })) as VerifyDatabaseResult;
+          } catch (error) {
+            // Wrap errors from verify() in structured error
+            throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+              why: `Failed to verify database: ${error instanceof Error ? error.message : String(error)}`,
+            });
+          }
+
+          // If verification failed, throw structured error
+          if (!verifyResult.ok && verifyResult.code) {
+            if (verifyResult.code === 'PN-RTM-3001') {
+              throw errorMarkerMissing();
+            }
+            if (verifyResult.code === 'PN-RTM-3002') {
+              throw errorHashMismatch({
+                expected: verifyResult.contract.coreHash,
+                ...(verifyResult.marker?.coreHash ? { actual: verifyResult.marker.coreHash } : {}),
+              });
+            }
+            if (verifyResult.code === 'PN-RTM-3003') {
+              throw errorTargetMismatch(
+                verifyResult.target.expected,
+                verifyResult.target.actual ?? 'unknown',
+              );
+            }
+            throw errorRuntime(verifyResult.summary);
+          }
+
+          return verifyResult;
+        } finally {
+          // Ensure driver connection is closed
+          await driver.close();
+        }
       });
 
       // Handle result - formats output and returns exit code

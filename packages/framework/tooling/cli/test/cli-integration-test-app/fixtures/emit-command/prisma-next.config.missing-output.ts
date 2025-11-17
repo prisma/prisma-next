@@ -1,6 +1,6 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import postgres from '@prisma-next/targets-postgres/control';
 import { contract } from './contract';
 
 // Manually create config without using defineConfig to test error path

@@ -1,4 +1,5 @@
 import { defineConfig } from '@prisma-next/cli/config-types';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { contract } from './invalid-contract-document';
 
 // Create a config with document family (which doesn't exist, but we'll test the error)
@@ -12,7 +13,8 @@ const mockHook = {
 export default defineConfig({
   family: {
     kind: 'family',
-    id: 'document',
+    familyId: 'document',
+    manifest: { id: 'document', version: '0.0.1' },
     hook: mockHook,
     convertOperationManifest: () => ({
       forTypeId: '',
@@ -26,17 +28,19 @@ export default defineConfig({
       },
     }),
     validateContractIR: (contract: unknown) => contract,
+    // Test fixture - mock family instance for testing
+    create: () => ({}) as unknown as FamilyInstance<string>,
   },
   target: {
     kind: 'target',
     id: 'mongodb',
-    family: 'document',
+    familyId: 'document',
     manifest: { id: 'mongodb', version: '1.0.0' },
   },
   adapter: {
     kind: 'adapter',
     id: 'mongodb',
-    family: 'document',
+    familyId: 'document',
     manifest: { id: 'mongodb', version: '1.0.0' },
   },
   extensions: [],

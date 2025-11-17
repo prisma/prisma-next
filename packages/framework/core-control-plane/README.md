@@ -12,8 +12,9 @@ This package provides the core domain logic for control plane operations (contra
 - **Config Validation**: Pure validation logic for config structure (no file I/O)
 - **Config Normalization**: `defineConfig()` function for normalizing config with defaults
 - **Domain Actions**:
-  - `emitContract()`: Emits contract JSON and DTS as strings (no file I/O)
   - `verifyDatabase()`: Verifies database contract markers (accepts config object and ContractIR)
+
+Note: Contract emission is implemented on family instances (e.g., `familyInstance.emitContract()`), not as a core domain action.
 - **Error Factories**: Domain error factories (`CliStructuredError`, config errors, runtime errors)
 - **Pack Manifest Types**: Type definitions for extension pack manifests
 
@@ -64,26 +65,6 @@ const config = defineConfig({
 
 // Validate config structure (pure validation, no file I/O)
 validateConfig(config);
-```
-
-### Emit Contract
-
-```typescript
-import { emitContract } from '@prisma-next/core-control-plane/emit-contract';
-
-// Emit contract - returns strings (no file I/O)
-const result = await emitContract({
-  contractIR,
-  targetFamily,
-  operationRegistry,
-  codecTypeImports,
-  operationTypeImports,
-  extensionIds,
-});
-
-// CLI layer writes strings to files
-await writeFile('contract.json', result.contractJson);
-await writeFile('contract.d.ts', result.contractDts);
 ```
 
 ### Verify Database

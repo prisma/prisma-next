@@ -1,4 +1,5 @@
 import { dirname, join } from 'node:path';
+import { type } from 'arktype';
 import type {
   AdapterDescriptor,
   ControlPlaneDriver,
@@ -6,21 +7,10 @@ import type {
   ExtensionDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
-} from '@prisma-next/control-plane/types';
-import { type } from 'arktype';
-
-// Re-export control plane types for backward compatibility
-export type {
-  AdapterDescriptor,
-  ControlPlaneDriver,
-  DriverDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
-} from '@prisma-next/control-plane/types';
+} from './types';
 
 /**
- * @deprecated Use ControlPlaneDriver from @prisma-next/control-plane/types instead
+ * @deprecated Use ControlPlaneDriver from @prisma-next/core-control-plane/types instead
  */
 export type CliDriver = ControlPlaneDriver;
 
@@ -49,11 +39,11 @@ export interface ContractConfig {
 /**
  * Configuration for Prisma Next CLI.
  */
-export interface PrismaNextConfig {
-  readonly family: FamilyDescriptor;
-  readonly target: TargetDescriptor;
-  readonly adapter: AdapterDescriptor;
-  readonly extensions?: ReadonlyArray<ExtensionDescriptor>;
+export interface PrismaNextConfig<TFamilyId extends string = string> {
+  readonly family: FamilyDescriptor<TFamilyId>;
+  readonly target: TargetDescriptor<TFamilyId>;
+  readonly adapter: AdapterDescriptor<TFamilyId>;
+  readonly extensions?: ReadonlyArray<ExtensionDescriptor<TFamilyId>>;
   /**
    * Driver descriptor for DB-connected CLI commands.
    * Required for DB-connected commands (e.g., db verify).
@@ -106,7 +96,9 @@ const PrismaNextConfigSchema = type({
  * @returns Normalized config IR with defaults applied
  * @throws Error if config structure is invalid
  */
-export function defineConfig(config: PrismaNextConfig): PrismaNextConfig {
+export function defineConfig<TFamilyId extends string = string>(
+  config: PrismaNextConfig<TFamilyId>,
+): PrismaNextConfig<TFamilyId> {
   // Validate structure using Arktype
   const validated = PrismaNextConfigSchema(config);
   if (validated instanceof type.errors) {

@@ -19,6 +19,7 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/targets-postgres": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "pg": "^8.11.5"

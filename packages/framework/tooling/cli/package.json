@@ -54,10 +54,6 @@
       "types": "./dist/pack-manifest-types.d.ts",
       "import": "./dist/pack-manifest-types.js"
     },
-    "./pack-assembly": {
-      "types": "./dist/pack-assembly.d.ts",
-      "import": "./dist/pack-assembly.js"
-    },
     "./pack-loading": {
       "types": "./dist/pack-loading.d.ts",
       "import": "./dist/pack-loading.js"

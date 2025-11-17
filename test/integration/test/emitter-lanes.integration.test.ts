@@ -2,16 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
-} from '@prisma-next/cli/pack-assembly';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/cli';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -24,6 +18,12 @@ import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '../../../packages/sql/family/src/core/assembly';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
@@ -102,7 +102,10 @@ describe('emitter → lanes integration', () => {
         join(__dirname, '../../../packages/targets/postgres-adapter'),
         [],
       );
-      const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+      const operationRegistry = assembleOperationRegistryFromPacks(
+        packs,
+        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+      );
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -206,7 +209,10 @@ describe('emitter → lanes integration', () => {
       join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
-    const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+    const operationRegistry = assembleOperationRegistryFromPacks(
+      packs,
+      sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+    );
     const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
     const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
     const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -289,7 +295,10 @@ describe('emitter → lanes integration', () => {
       join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
-    const operationRegistry = assembleOperationRegistryFromPacks(packs, sqlFamilyDescriptor);
+    const operationRegistry = assembleOperationRegistryFromPacks(
+      packs,
+      sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+    );
     const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
     const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
     const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -312,7 +321,10 @@ describe('emitter → lanes integration', () => {
       join(__dirname, '../../../packages/targets/postgres-adapter'),
       [],
     );
-    const operationRegistry2 = assembleOperationRegistryFromPacks(packs2, sqlFamilyDescriptor);
+    const operationRegistry2 = assembleOperationRegistryFromPacks(
+      packs2,
+      sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
+    );
     const codecTypeImports2 = extractCodecTypeImportsFromPacks(packs2);
     const operationTypeImports2 = extractOperationTypeImportsFromPacks(packs2);
     const extensionIds2 = extractExtensionIdsFromPacks(packs2);

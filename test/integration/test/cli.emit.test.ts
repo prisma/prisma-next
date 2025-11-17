@@ -72,7 +72,7 @@ export const contract = defineContract<CodecTypes>()
     const configContent = `import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/cli';
+import sql from '@prisma-next/family-sql/control';
 import { contract } from './contract';
 
 export default defineConfig({

@@ -49,7 +49,7 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - Enable "Did you mean …" command suggestions.
 
 ## Errors
-- Codes: `PN-<DOMAIN>-<NNNN>` (e.g., `PN-CLI-4002`, `PN-MIG-2001`, `PN-RTM-3005`, `PN-CON-1001`).
+- Codes: `PN-<DOMAIN>-<NNNN>` (e.g., `PN-CLI-4002`, `PN-MIG-2001`, `PN-RTM-3005`, `PN-CON-1001`, `PN-SCHEMA-0001`).
 - Human layout (TTY):
   - First line: `✖` concise summary + code
   - Why: one line cause
@@ -96,8 +96,11 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - `db verify` (canonical):
   - Loads config + contract, connects via `--db` or `config.db.url`.
   - Checks marker presence, `coreHash`/`profileHash` equality, target match.
-  - Optional MVP+ check: codec coverage (adapter + extensions cover all `typeId`s).
   - Non‑interactive; single JSON with `--json`.
+- `db schema-verify` (canonical):
+  - Loads config + contract, connects via `config.db.url` (or `--db` when supported).
+  - Verifies that the live database schema satisfies the contract (catalog-based checks).
+  - Non‑interactive; single JSON object with `--json`.
 - `db sign` (canonical):
   - Runs the same verify phase first, then writes/updates the marker row.
   - Missing marker → insert; same hash → no‑op; different hash → never overwrite unless `--force`.
@@ -153,4 +156,3 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 ---
 
 This guide is the single source of truth for CLI behavior. When in doubt, prefer the defaults here and keep the UX friendly, informative, and consistent with our contract‑first architecture.
-

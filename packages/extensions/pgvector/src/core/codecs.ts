@@ -44,6 +44,15 @@ const pgVectorCodec = codec<'pg/vector@1', string, number[]>({
     });
     return values;
   },
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'vector',
+        },
+      },
+    },
+  },
 });
 
 // Build codec definitions using the builder DSL

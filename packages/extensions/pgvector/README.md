@@ -40,10 +40,10 @@ Add the extension to your `prisma-next.config.ts`:
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import sql from '@prisma-next/family-sql/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import pgvector from '@prisma-next/extension-pgvector/cli';
+import postgres from '@prisma-next/targets-postgres/control';
+import pgvector from '@prisma-next/extension-pgvector/control';
 
 export default defineConfig({
   family: sql,
