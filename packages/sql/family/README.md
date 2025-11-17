@@ -13,6 +13,7 @@ Provides the SQL family descriptor (`FamilyDescriptor`) that includes:
 ## Responsibilities
 
 - **Family Descriptor Export**: Exports the SQL `FamilyDescriptor` for use in CLI configuration files
+- **Family Instance Creation**: Creates `SqlFamilyInstance` objects that implement control-plane domain actions (`verify`, `schemaVerify`, `introspect`, `emitContract`)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Operation Manifest Conversion**: Provides `convertOperationManifest` to convert `OperationManifest` to `SqlOperationSignature` (adds lowering spec)
 - **Contract Validation**: Provides `validateContractIR` to validate and normalize contracts, returning ContractIR without mappings
@@ -31,7 +32,18 @@ import sql from '@prisma-next/family-sql/control';
 // - convertOperationManifest: (manifest) => OperationSignature
 // - validateContractIR: (contractJson) => ContractIR (without mappings)
 // - stripMappings?: (contract) => contract (removes mappings)
-// - verify: { readMarker, collectSupportedCodecTypeIds }
+// - create: (options) => SqlFamilyInstance
+
+// Create a family instance for control-plane operations
+const familyInstance = sql.create({
+  target: postgresTargetDescriptor,
+  adapter: postgresAdapterDescriptor,
+  extensions: [pgVectorExtensionDescriptor],
+});
+
+// Use instance methods for domain actions
+const verifyResult = await familyInstance.verify({ driver, contractIR, ... });
+const emitResult = await familyInstance.emitContract({ contractIR });
 ```
 
 ## Architecture
@@ -42,20 +54,27 @@ This package is the control plane entry point for the SQL family. It composes:
 - `@prisma-next/sql-contract-ts` - Contract validation
 
 The framework CLI uses this descriptor to:
-1. Select the family hook for emit
+1. Create family instances for control-plane operations (via `create()`)
 2. Convert operation manifests to signatures (via `convertOperationManifest`)
 3. Validate and normalize contracts before emission (via `validateContractIR`)
 4. Strip runtime-only mappings from contracts (via `stripMappings`)
-5. Read contract markers from database (via `verify.readMarker`)
+
+Family instances implement domain actions:
+- **`verify()`**: Verifies database marker against contract (compares target, coreHash, profileHash)
+- **`schemaVerify()`**: Verifies database schema against contract (compares contract requirements vs live schema)
+- **`introspect()`**: Introspects database schema and returns `SqlSchemaIR`
+- **`emitContract()`**: Emits contract JSON and DTS as strings using preassembled state (operation registry, type imports, extension IDs)
 
 The framework CLI handles the generic looping over descriptors and delegates family-specific conversion to `convertOperationManifest`.
 
 ## Package Structure
 
 - **`src/core/descriptor.ts`**: `SqlFamilyDescriptor` class implementing `FamilyDescriptor` interface
+- **`src/core/instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`verify`, `schemaVerify`, `introspect`, `emitContract`)
+- **`src/core/assembly.ts`**: Assembly helpers for building operation registries and extracting type imports from descriptors
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/exports/control.ts`**: Control plane entry point (exports `SqlFamilyDescriptor` instance)
-- **`src/exports/runtime.ts`**: Runtime entry point (placeholder for future DB-connected commands)
+- **`src/exports/runtime.ts`**: Runtime entry point (placeholder for future functionality)
 
 ## Entrypoints
 
