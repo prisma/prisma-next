@@ -137,6 +137,19 @@ export interface FamilyInstance<
 
   /**
    * Introspects the database schema and returns a family-specific schema IR.
+   *
+   * This is a read-only operation that returns a snapshot of the live database schema.
+   * The method is family-owned and delegates to target/adapter-specific introspectors
+   * to perform the actual schema introspection.
+   *
+   * @param options - Introspection options
+   * @param options.driver - Control plane driver for database connection
+   * @param options.contractIR - Optional contract IR for contract-guided introspection.
+   *   When provided, families may use it for filtering, optimization, or validation
+   *   during introspection. The contract IR does not change the meaning of "what exists"
+   *   in the database - it only guides how introspection is performed.
+   * @returns Promise resolving to the family-specific Schema IR (e.g., `SqlSchemaIR` for SQL).
+   *   The IR represents the complete schema snapshot at the time of introspection.
    */
   introspect(options: {
     readonly driver: ControlPlaneDriver;
@@ -246,4 +259,27 @@ export interface EmitContractResult {
   readonly contractDts: string;
   readonly coreHash: string;
   readonly profileHash: string;
+}
+
+/**
+ * Result envelope for schema introspection operations.
+ * Used by CLI for JSON output when introspecting database schemas.
+ *
+ * @template TSchemaIR - The family-specific Schema IR type (e.g., `SqlSchemaIR` for SQL)
+ */
+export interface IntrospectSchemaResult<TSchemaIR = unknown> {
+  readonly ok: true;
+  readonly summary: string;
+  readonly target: {
+    readonly familyId: string;
+    readonly id: string;
+  };
+  readonly schema: TSchemaIR;
+  readonly meta?: {
+    readonly configPath?: string;
+    readonly dbUrl?: string;
+  };
+  readonly timings: {
+    readonly total: number;
+  };
 }

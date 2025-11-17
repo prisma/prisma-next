@@ -409,9 +409,25 @@ export function createSqlFamilyInstance(
       // compare contract vs SqlSchemaIR, and return VerifyDatabaseSchemaResult
       throw new Error('schemaVerify not yet implemented');
     },
-    async introspect(): Promise<SqlSchemaIR> {
-      // TODO: Implement introspection
-      // This will build SqlTypeMetadataRegistry and call adapter introspection
+    async introspect(_options: {
+      readonly driver: ControlPlaneDriver;
+      readonly contractIR?: unknown;
+    }): Promise<SqlSchemaIR> {
+      // Implementation plan:
+      // 1. Construct SqlTypeMetadataRegistry from:
+      //    - Adapter codecs (via adapter.profile.codecs())
+      //    - Control-plane extension metadata (if extensions provide type metadata)
+      //    See docs/Sql-Type-Metadata-Design.md for type metadata construction details.
+      //
+      // 2. Delegate to target-specific introspector:
+      //    - For Postgres: call introspectPostgresSchema(driver, typeMetadataRegistry, contractIR?)
+      //    - The introspector queries the database catalog and returns SqlSchemaIR
+      //
+      // 3. Return the complete SqlSchemaIR representing the live database schema
+      //
+      // Note: This is a read-only operation. The contractIR parameter is optional and
+      // may be used for contract-guided introspection (filtering, optimization) but
+      // does not change what exists in the database.
       throw new Error('introspect not yet implemented');
     },
 

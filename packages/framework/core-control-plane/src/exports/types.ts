@@ -14,6 +14,7 @@ export type {
   ExtensionDescriptor,
   FamilyDescriptor,
   FamilyInstance,
+  IntrospectSchemaResult,
   SchemaIssue,
   TargetDescriptor,
   VerifyDatabaseResult,

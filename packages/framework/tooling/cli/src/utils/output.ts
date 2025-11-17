@@ -18,7 +18,11 @@ export interface EmitContractResult {
   };
 }
 
-import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
+import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
+import type {
+  IntrospectSchemaResult,
+  VerifyDatabaseResult,
+} from '@prisma-next/core-control-plane/types';
 import type { CliErrorEnvelope } from './cli-errors';
 import { getLongDescription } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
@@ -217,6 +221,127 @@ export function formatVerifyJson(result: VerifyDatabaseResult): string {
   };
 
   return JSON.stringify(output, null, 2);
+}
+
+/**
+ * Formats JSON output for database introspection.
+ */
+export function formatIntrospectJson(result: IntrospectSchemaResult<unknown>): string {
+  return JSON.stringify(result, null, 2);
+}
+
+/**
+ * Renders a schema tree structure from CoreSchemaView.
+ * Similar to renderCommandTree but for SchemaTreeNode structure.
+ */
+function renderSchemaTree(
+  node: SchemaTreeNode,
+  flags: GlobalFlags,
+  options: {
+    readonly isLast: boolean;
+    readonly prefix: string;
+    readonly useColor: boolean;
+    readonly formatDimText: (text: string) => string;
+  },
+): string[] {
+  const { isLast, prefix, useColor, formatDimText } = options;
+  const lines: string[] = [];
+
+  // Determine tree character for this node
+  const treeChar = isLast ? '└' : '├';
+  const treePrefix = `${prefix}${formatDimText(treeChar)}─ `;
+
+  // Format node label with color based on kind
+  let labelColor: (text: string) => string = (text) => text;
+  if (useColor) {
+    switch (node.kind) {
+      case 'root':
+        labelColor = bold;
+        break;
+      case 'entity':
+      case 'collection':
+        labelColor = cyan;
+        break;
+      case 'field':
+        labelColor = (text) => text; // Default color
+        break;
+      case 'index':
+        labelColor = dim;
+        break;
+      case 'extension':
+        labelColor = magenta;
+        break;
+      default:
+        break;
+    }
+  }
+
+  const labelColored = labelColor(node.label);
+  lines.push(`${formatDimText('│')} ${treePrefix}${labelColored}`);
+
+  // Render children if present
+  if (node.children && node.children.length > 0) {
+    const childPrefix = isLast ? `${prefix}   ` : `${prefix}${formatDimText('│')}  `;
+    for (let i = 0; i < node.children.length; i++) {
+      const child = node.children[i];
+      if (!child) continue;
+      const isLastChild = i === node.children.length - 1;
+      const childLines = renderSchemaTree(child, flags, {
+        isLast: isLastChild,
+        prefix: childPrefix,
+        useColor,
+        formatDimText,
+      });
+      lines.push(...childLines);
+    }
+  }
+
+  return lines;
+}
+
+/**
+ * Formats human-readable output for database introspection.
+ */
+export function formatIntrospectOutput(
+  result: IntrospectSchemaResult<unknown>,
+  schemaView: CoreSchemaView | undefined,
+  flags: GlobalFlags,
+): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  if (schemaView) {
+    // Render tree structure
+    const treeLines = renderSchemaTree(schemaView.root, flags, {
+      isLast: true,
+      prefix: '',
+      useColor,
+      formatDimText,
+    });
+    lines.push(...treeLines);
+  } else {
+    // Fallback: print summary when toSchemaView is not available
+    lines.push(`${prefix}✓ ${result.summary}`);
+    if (isVerbose(flags, 1)) {
+      lines.push(`${prefix}  Target: ${result.target.familyId}/${result.target.id}`);
+      if (result.meta?.dbUrl) {
+        lines.push(`${prefix}  Database: ${result.meta.dbUrl}`);
+      }
+    }
+  }
+
+  // Add timings in verbose mode
+  if (isVerbose(flags, 1)) {
+    lines.push(`${prefix}  Total time: ${result.timings.total}ms`);
+  }
+
+  return lines.join('\n');
 }
 
 // ============================================================================
