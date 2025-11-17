@@ -81,6 +81,7 @@
       "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
       "@prisma-next/family-sql/control": ["packages/sql/family/src/exports/control.ts"],
       "@prisma-next/family-sql/runtime": ["packages/sql/family/src/exports/runtime.ts"],
+      "@prisma-next/targets-postgres/control": ["packages/targets/postgres/src/exports/control.ts"],
       "@prisma-next/targets-postgres/cli": ["packages/targets/postgres/src/exports/cli.ts"],
       "@prisma-next/targets-postgres/runtime": ["packages/targets/postgres/src/exports/runtime.ts"],
       "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
