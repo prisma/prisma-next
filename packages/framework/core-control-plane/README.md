@@ -83,12 +83,12 @@ export type SqlFamilyContext = TargetFamilyContext<SqlSchemaIR> & {
 
 - `FamilyDescriptor<TCtx extends TargetFamilyContext>` exposes:
   - `hook`, `convertOperationManifest`, `validateContractIR`, `stripMappings?`
-  - Control-plane hooks for DB-connected commands:
-    - `readMarker?`: Read contract markers from the database
-    - `supportedTypeIds?`: Optional type coverage helper
-    - `prepareControlContext?`: Build family-specific control-plane context from descriptors (e.g., SQL type metadata)
-    - `introspectSchema?`: Introspect database schema and return `SchemaIROf<TCtx>`
-    - `verifySchema?`: Compare contract IR against Schema IR and return `SchemaIssue[]`
+  - Control-plane hooks for DB-connected commands (all required except `stripMappings`):
+    - `readMarker`: Read contract markers from the database
+    - `supportedTypeIds`: Returns supported type IDs for coverage checks
+    - `prepareControlContext`: Build family-specific control-plane context from descriptors (e.g., SQL type metadata)
+    - `introspectSchema`: Introspect database schema and return `SchemaIROf<TCtx>`
+    - `verifySchema`: Compare contract IR against Schema IR and return `SchemaIssue[]`
 
 Adapter, target, and extension descriptors are also parameterized by `TCtx` to keep family types consistent:
 

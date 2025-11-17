@@ -146,7 +146,7 @@ export default defineConfig({
    - Target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
    - Core hash: Returns `PN-RTM-3002` if `coreHash` doesn't match
    - Profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
-5. **Type Coverage** (optional): If `config.family.supportedTypeIds` is provided, compares contract column types against supported type IDs and reports missing types
+5. **Type Coverage**: Calls `config.family.supportedTypeIds()` to get supported type IDs, then compares contract column types against them and reports missing types. If `supportedTypeIds()` returns an empty array, no coverage check is performed.
 
 **Output Format (TTY):**
 

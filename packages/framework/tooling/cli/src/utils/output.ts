@@ -193,11 +193,6 @@ export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFl
   }
 
   if (isVerbose(flags, 1)) {
-    if (result.typeCoverageSkipped) {
-      lines.push(
-        `${prefix}${formatDimText('  Type coverage check skipped (helper returned no supported types)')}`,
-      );
-    }
     lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
   }
 

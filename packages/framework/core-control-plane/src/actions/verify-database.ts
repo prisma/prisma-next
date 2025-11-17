@@ -1,6 +1,6 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { PrismaNextConfig } from '../config-types';
-import { errorDriverRequired, errorFamilyReadMarkerSqlRequired, errorUnexpected } from '../errors';
+import { errorDriverRequired, errorUnexpected } from '../errors';
 import type { VerifyDatabaseResult } from '../executor';
 import { ControlPlaneExecutor } from '../executor';
 
@@ -31,11 +31,6 @@ export async function verifyDatabase(
 
   try {
     const { config, contractIR, dbUrl, contractPath, configPath } = options;
-
-    // Check for family readMarker
-    if (!config.family.readMarker) {
-      throw errorFamilyReadMarkerSqlRequired();
-    }
 
     // Obtain driver: driver is required
     if (!config.driver) {

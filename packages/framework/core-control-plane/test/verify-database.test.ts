@@ -3,11 +3,7 @@ import { contractIR, irHeader, irMeta } from '@prisma-next/contract/ir';
 import { describe, expect, it, vi } from 'vitest';
 import { verifyDatabase } from '../src/actions/verify-database';
 import type { PrismaNextConfig } from '../src/config-types';
-import {
-  errorDriverRequired,
-  errorFamilyReadMarkerSqlRequired,
-  errorUnexpected,
-} from '../src/errors';
+import { errorDriverRequired, errorUnexpected } from '../src/errors';
 
 // Helper to create a minimal config for testing
 function createTestConfig(overrides?: Partial<PrismaNextConfig>): PrismaNextConfig {
@@ -288,34 +284,6 @@ describe('verifyDatabase', () => {
         contractPath: 'src/prisma/contract.json',
       }),
     ).rejects.toThrow(errorDriverRequired());
-  });
-
-  it('throws error when family readMarker is missing', async () => {
-    const config = createTestConfig({
-      family: {
-        kind: 'family',
-        id: 'sql',
-        hook: {} as unknown,
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn((contract: unknown) => contract),
-        readMarker: undefined,
-        supportedTypeIds: vi.fn(() => []),
-        prepareControlContext: vi.fn(async () => ({})),
-        introspectSchema: vi.fn(async () => ({})),
-        verifySchema: vi.fn(async () => ({ issues: [] })),
-      },
-    });
-
-    const contractIR = createTestContractIR();
-
-    await expect(
-      verifyDatabase({
-        config,
-        contractIR,
-        dbUrl: 'postgresql://test',
-        contractPath: 'src/prisma/contract.json',
-      }),
-    ).rejects.toThrow(errorFamilyReadMarkerSqlRequired());
   });
 
   it('handles contract without profileHash', async () => {

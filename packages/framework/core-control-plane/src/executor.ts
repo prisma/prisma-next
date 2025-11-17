@@ -33,7 +33,6 @@ export interface VerifyDatabaseResult {
     readonly actual?: string;
   };
   readonly missingCodecs?: readonly string[];
-  readonly typeCoverageSkipped?: boolean;
   readonly meta?: {
     readonly configPath?: string;
     readonly contractPath: string;
@@ -141,9 +140,6 @@ export class ControlPlaneExecutor {
    * Delegates to family-provided readMarker() to abstract SQL-specific details.
    */
   async readMarker(): Promise<ContractMarkerRecord | null> {
-    if (!this.family.readMarker) {
-      throw new Error('Family readMarker() is required');
-    }
     return this.family.readMarker(this.driver);
   }
 
@@ -181,23 +177,16 @@ export class ControlPlaneExecutor {
     // Read marker from database
     const marker = await this.readMarker();
 
-    // Compute type coverage (optional)
+    // Compute type coverage
     let missingCodecs: readonly string[] | undefined;
-    let typeCoverageSkipped = false;
-    if (this.family.supportedTypeIds) {
-      const descriptors = [this.adapter, this.target, ...this.extensions];
-      const supportedTypeIds = this.family.supportedTypeIds(descriptors);
-      if (supportedTypeIds.length === 0) {
-        // Helper is present but returns empty (MVP behavior)
-        // Coverage check is skipped - missingCodecs remains undefined
-        typeCoverageSkipped = true;
-      } else {
-        const supportedSet = new Set(supportedTypeIds);
-        const usedTypeIds = extractCodecTypeIdsFromContract(this.contractIR);
-        const missing = usedTypeIds.filter((id) => !supportedSet.has(id));
-        if (missing.length > 0) {
-          missingCodecs = missing;
-        }
+    const descriptors = [this.adapter, this.target, ...this.extensions];
+    const supportedTypeIds = this.family.supportedTypeIds(descriptors);
+    if (supportedTypeIds.length > 0) {
+      const supportedSet = new Set(supportedTypeIds);
+      const usedTypeIds = extractCodecTypeIdsFromContract(this.contractIR);
+      const missing = usedTypeIds.filter((id) => !supportedSet.has(id));
+      if (missing.length > 0) {
+        missingCodecs = missing;
       }
     }
 
@@ -225,7 +214,6 @@ export class ControlPlaneExecutor {
         },
       };
       if (missingCodecs) result.missingCodecs = missingCodecs;
-      if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
       return result satisfies VerifyDatabaseResult;
     }
 
@@ -258,7 +246,6 @@ export class ControlPlaneExecutor {
         },
       };
       if (missingCodecs) result.missingCodecs = missingCodecs;
-      if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
       return result satisfies VerifyDatabaseResult;
     }
 
@@ -290,7 +277,6 @@ export class ControlPlaneExecutor {
         },
       };
       if (missingCodecs) result.missingCodecs = missingCodecs;
-      if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
       return result satisfies VerifyDatabaseResult;
     }
 
@@ -322,7 +308,6 @@ export class ControlPlaneExecutor {
         },
       };
       if (missingCodecs) result.missingCodecs = missingCodecs;
-      if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
       return result satisfies VerifyDatabaseResult;
     }
 
@@ -351,7 +336,6 @@ export class ControlPlaneExecutor {
       },
     };
     if (missingCodecs) result.missingCodecs = missingCodecs;
-    if (typeCoverageSkipped) result.typeCoverageSkipped = typeCoverageSkipped;
     return result satisfies VerifyDatabaseResult;
   }
 

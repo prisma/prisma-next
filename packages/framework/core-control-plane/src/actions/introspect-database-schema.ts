@@ -1,4 +1,3 @@
-import { errorUnexpected } from '../errors';
 import type {
   AdapterDescriptor,
   ControlPlaneDriver,
@@ -35,12 +34,6 @@ export async function introspectDatabaseSchema<
   TCtx extends TargetFamilyContext = TargetFamilyContext,
 >(options: IntrospectDatabaseSchemaOptions<TCtx>): Promise<IntrospectDatabaseSchemaResult<TCtx>> {
   const { driver, family, target, adapter, extensions, contextInput } = options;
-
-  if (!family.introspectSchema) {
-    throw errorUnexpected('Family introspectSchema() is required', {
-      why: 'Family introspectSchema is required for schema verification',
-    });
-  }
 
   const schemaIR = await family.introspectSchema({
     driver,

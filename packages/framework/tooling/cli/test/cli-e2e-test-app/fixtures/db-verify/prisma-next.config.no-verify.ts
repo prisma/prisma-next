@@ -6,8 +6,8 @@ import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import postgres from '@prisma-next/targets-postgres/cli';
 import { contract } from './contract';
 
-// Create family descriptor without verify.readMarker
-// The hook property must be the actual TargetFamilyHook with validateTypes/validateStructure
+// Create family descriptor with stub verify hooks that throw errors
+// This tests the error case where verify hooks are not properly implemented
 const sqlFamilyWithoutVerify = {
   kind: 'family' as const,
   id: 'sql',
@@ -24,7 +24,19 @@ const sqlFamilyWithoutVerify = {
     },
   }),
   validateContractIR: (contract: unknown) => contract,
-  // verify property is missing - this is what we're testing
+  readMarker: async () => {
+    throw new Error('readMarker not implemented');
+  },
+  supportedTypeIds: () => [],
+  prepareControlContext: async () => {
+    throw new Error('prepareControlContext not implemented');
+  },
+  introspectSchema: async () => {
+    throw new Error('introspectSchema not implemented');
+  },
+  verifySchema: async () => {
+    throw new Error('verifySchema not implemented');
+  },
 };
 
 export default defineConfig<SqlFamilyContext>({
