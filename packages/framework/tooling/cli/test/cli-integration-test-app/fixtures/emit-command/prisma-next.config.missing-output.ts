@@ -1,4 +1,4 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import sql from '@prisma-next/family-sql/cli';
 import postgres from '@prisma-next/targets-postgres/cli';
 import { contract } from './contract';

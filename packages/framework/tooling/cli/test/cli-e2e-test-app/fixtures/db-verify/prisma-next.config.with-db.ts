@@ -1,4 +1,4 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/cli';
 import sql from '@prisma-next/family-sql/cli';

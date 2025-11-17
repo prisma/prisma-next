@@ -5,7 +5,7 @@ export default defineConfig({
     adapter: 'src/exports/adapter.ts',
     types: 'src/exports/types.ts',
     'codec-types': 'src/exports/codec-types.ts',
-    cli: 'src/exports/cli.ts',
+    control: 'src/exports/control.ts',
     runtime: 'src/exports/runtime.ts',
   },
   outDir: 'dist/exports',

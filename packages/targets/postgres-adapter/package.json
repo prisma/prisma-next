@@ -39,9 +39,9 @@
       "types": "./dist/exports/codec-types.d.ts",
       "import": "./dist/exports/codec-types.js"
     },
-    "./cli": {
-      "types": "./dist/exports/cli.d.ts",
-      "import": "./dist/exports/cli.js"
+    "./control": {
+      "types": "./dist/exports/control.d.ts",
+      "import": "./dist/exports/control.js"
     },
     "./runtime": {
       "types": "./dist/exports/runtime.d.ts",
