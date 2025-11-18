@@ -99,10 +99,11 @@ Adapters produce `SqlSchemaIR` by querying database catalogs:
 
 ```typescript
 // In Postgres adapter
-import { introspectPostgresSchema } from '@prisma-next/adapter-postgres/introspect';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
-const schemaIR: SqlSchemaIR = await introspectPostgresSchema(driver, codecRegistry, contract);
+const controlAdapter = postgresAdapter.createControlInstance();
+const schemaIR: SqlSchemaIR = await controlAdapter.introspect(driver, contract);
 ```
 
 ### Schema Verification

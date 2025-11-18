@@ -55,10 +55,11 @@ const postgresDriverDescriptor: DriverDescriptor = {
   id: 'postgres',
   family: 'sql',
   manifest: loadDriverManifest(),
-  async create(url: string): Promise<ControlPlaneDriver> {
+  async create(url: string): Promise<ControlPlaneDriver<'postgres'>> {
     const client = new Client({ connectionString: url });
     await client.connect();
     return {
+      target: 'postgres' as const,
       async query<Row = Record<string, unknown>>(
         sql: string,
         params?: readonly unknown[],

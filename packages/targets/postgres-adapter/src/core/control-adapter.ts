@@ -24,13 +24,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
-   * @param driver - ControlPlaneDriver instance for executing queries
+   * @param driver - ControlPlaneDriver<'postgres'> instance for executing queries
    * @param contractIR - Optional contract IR for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   async introspect(
-    driver: ControlPlaneDriver,
+    driver: ControlPlaneDriver<'postgres'>,
     _contractIR?: unknown,
     schema = 'public',
   ): Promise<SqlSchemaIR> {

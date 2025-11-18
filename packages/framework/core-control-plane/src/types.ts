@@ -6,8 +6,16 @@ import type { CoreSchemaView } from './schema-view';
 /**
  * Minimal driver interface for Control Plane database operations.
  * Provides query execution and connection management.
+ *
+ * @template TTarget - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface ControlPlaneDriver {
+export interface ControlPlaneDriver<TTarget extends string = string> {
+  /**
+   * The target ID this driver implements.
+   * Used for type tracking and runtime validation.
+   */
+  readonly target?: TTarget;
+
   /**
    * Executes a SQL query with optional parameters.
    * @returns Promise resolving to query results with rows array
@@ -81,6 +89,7 @@ export interface AdapterDescriptor<TFamilyId extends string> {
   readonly create?: (...args: unknown[]) => unknown;
   readonly adapter?: unknown;
   readonly createControlInstance?: () => unknown;
+  readonly control?: unknown; // Family-specific control descriptor (e.g., SqlControlAdapterDescriptor)
 }
 
 /**

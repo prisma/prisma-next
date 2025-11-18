@@ -636,6 +636,9 @@ importers:
 
   packages/sql/family:
     dependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../targets/postgres-adapter
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli
@@ -664,9 +667,6 @@ importers:
         specifier: ^2.0.0
         version: 2.1.26
     devDependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../targets/postgres-adapter
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../targets/postgres-driver
@@ -945,6 +945,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../sql/family
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../sql/contract
@@ -957,6 +960,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../sql/lanes/relational-core
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:*
+        version: link:../../sql/schema-ir
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
