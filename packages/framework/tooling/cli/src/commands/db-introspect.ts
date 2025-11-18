@@ -20,6 +20,7 @@ import {
 } from '../utils/output';
 import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
+import { withSpinner } from '../utils/spinner';
 
 interface DbIntrospectOptions {
   readonly db?: string;
@@ -130,7 +131,10 @@ export function createDbIntrospectCommand(): Command {
         const driverDescriptor = config.driver;
 
         // Create driver
-        const driver = await driverDescriptor.create(dbUrl);
+        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+          message: 'Connecting to database...',
+          flags,
+        });
 
         try {
           // Create family instance
@@ -150,10 +154,17 @@ export function createDbIntrospectCommand(): Command {
           // Call family instance introspect method
           let schemaIR: unknown;
           try {
-            schemaIR = await typedFamilyInstance.introspect({
-              driver,
-              contractIR,
-            });
+            schemaIR = await withSpinner(
+              () =>
+                typedFamilyInstance.introspect({
+                  driver,
+                  contractIR,
+                }),
+              {
+                message: 'Introspecting database schema...',
+                flags,
+              },
+            );
           } catch (error) {
             // Wrap errors from introspect() in structured error
             throw errorRuntime(error instanceof Error ? error.message : String(error), {
@@ -177,6 +188,11 @@ export function createDbIntrospectCommand(): Command {
           }
 
           const totalTime = Date.now() - startTime;
+
+          // Add blank line after all async operations if spinners were shown
+          if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
+            console.log('');
+          }
 
           // Build result envelope
           const introspectResult: IntrospectSchemaResult<unknown> = {

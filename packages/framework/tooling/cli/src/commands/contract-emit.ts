@@ -15,6 +15,7 @@ import {
 } from '../utils/output';
 import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
+import { withSpinner } from '../utils/spinner';
 
 interface ContractEmitOptions {
   readonly config?: string;
@@ -122,7 +123,13 @@ export function createContractEmitCommand(): Command {
         }
 
         // Call emitContract on family instance (handles stripping mappings and validation internally)
-        const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
+        const emitResult = await withSpinner(
+          () => familyInstance.emitContract({ contractIR: contractRaw }),
+          {
+            message: 'Emitting contract...',
+            flags,
+          },
+        );
 
         // Create directories if needed
         mkdirSync(dirname(outputJsonPath), { recursive: true });
@@ -131,6 +138,11 @@ export function createContractEmitCommand(): Command {
         // Write the results to files
         writeFileSync(outputJsonPath, emitResult.contractJson, 'utf-8');
         writeFileSync(outputDtsPath, emitResult.contractDts, 'utf-8');
+
+        // Add blank line after all async operations if spinners were shown
+        if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
+          console.log('');
+        }
 
         // Return result with file paths for output formatting
         return {
