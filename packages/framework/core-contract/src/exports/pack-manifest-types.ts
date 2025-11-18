@@ -1,4 +1,3 @@
-// Re-export pack manifest types from shared location for convenience
 export type {
   ArgSpecManifest,
   ExtensionPack,
@@ -6,4 +5,4 @@ export type {
   LoweringSpecManifest,
   OperationManifest,
   ReturnSpecManifest,
-} from '@prisma-next/contract/pack-manifest-types';
+} from '../types';
