@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`help text snapshots > formats contract emit help 1`] = `
-"prisma-next emit Emit signed contract artifacts
+"prisma-next emit → Emit signed contract artifacts
 │
 │ --config <path>       Path to prisma-next.config.ts
 │ --json [format]       Output as JSON (object or ndjson)
@@ -23,7 +23,7 @@ exports[`help text snapshots > formats contract emit help 1`] = `
 `;
 
 exports[`help text snapshots > formats contract emit help with no color 1`] = `
-"prisma-next emit Emit signed contract artifacts
+"prisma-next emit → Emit signed contract artifacts
 │
 │ --config <path>       Path to prisma-next.config.ts
 │ --json [format]       Output as JSON (object or ndjson)
@@ -45,7 +45,7 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 `;
 
 exports[`help text snapshots > formats db verify help 1`] = `
-"prisma-next verify Check the database satisfies your contract
+"prisma-next verify → Check the database satisfies your contract
 │
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
