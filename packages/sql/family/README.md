@@ -56,6 +56,7 @@ Family instances implement domain actions:
 - **`verify()`**: Verifies database marker against contract (compares target, coreHash, profileHash)
 - **`schemaVerify()`**: Verifies database schema against contract (compares contract requirements vs live schema)
 - **`introspect()`**: Introspects database schema and returns `SqlSchemaIR`
+- **`toSchemaView(schema)`**: Projects `SqlSchemaIR` into `CoreSchemaView` for human-readable display. Always displays native database types (e.g., `int4`, `text`) rather than mapped codec IDs (e.g., `pg/int4@1`) to reflect actual database state.
 - **`emitContract({ contractIR })`**: Emits contract JSON and DTS as strings. Handles stripping mappings and validation internally. Uses preassembled state (operation registry, type imports, extension IDs).
 
 The descriptor is "pure data + factory" - it only provides the hook and factory method. All family-specific logic lives on the instance.
@@ -63,15 +64,17 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 ## Package Structure
 
 - **`src/core/descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
-- **`src/core/instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
+- **`src/core/instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
 - **`src/core/assembly.ts`**: Assembly helpers for building operation registries and extracting type imports from descriptors. Test utilities import `convertOperationManifest` from the same package via relative path.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
+- **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
 - **`src/exports/control.ts`**: Control plane entry point (exports `SqlFamilyDescriptor` instance)
 - **`src/exports/runtime.ts`**: Runtime entry point (placeholder for future functionality)
 
 ## Entrypoints
 
 - **`./control`**: Control plane entry point for CLI/config usage (exports `SqlFamilyDescriptor`)
+- **`./control-adapter`**: SQL control adapter interface (`SqlControlAdapter`, `SqlControlAdapterDescriptor`) for target-specific adapters
 - **`./runtime`**: Runtime entry point (placeholder for future functionality)
 
 ## Dependencies

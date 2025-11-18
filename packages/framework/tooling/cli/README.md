@@ -245,6 +245,158 @@ interface FamilyInstance {
 
 The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles reading the marker, comparing hashes, and checking codec coverage internally.
 
+### `prisma-next db introspect`
+
+Inspect the live database schema and display it as a human-readable tree or machine-consumable JSON.
+
+**Command:**
+```bash
+prisma-next db introspect [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+Options:
+- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--timestamps`: Add timestamps to output
+- `--color/--no-color`: Force/disable color output
+
+Examples:
+```bash
+# Use config defaults
+prisma-next db introspect
+
+# Specify database URL
+prisma-next db introspect --db postgresql://user:pass@localhost/db
+
+# JSON output
+prisma-next db introspect --json
+
+# Verbose output with timestamps
+prisma-next db introspect -v --timestamps
+```
+
+**Config File Requirements:**
+
+The `db introspect` command requires a `driver` in the config to connect to the database:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import postgres from '@prisma-next/targets-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensions: [],
+  db: {
+    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+  },
+});
+```
+
+**Introspection Process:**
+
+1. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
+2. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+3. **Introspect**: Calls `familyInstance.introspect()` which:
+   - Queries the database catalog to discover schema structure
+   - Returns a family-specific schema IR (e.g., `SqlSchemaIR` for SQL family)
+4. **Transform to Schema View**: Calls `familyInstance.toSchemaView()` to project the schema IR into a `CoreSchemaView` for display
+5. **Format Output**: Formats the schema view as a human-readable tree or JSON envelope
+
+**Output Format (TTY):**
+
+Human-readable schema tree:
+```
+sql schema (tables: 2)
+├─ table user
+│  ├─ id: int4 (not null)
+│  ├─ email: text (not null)
+│  └─ unique user_email_key
+├─ table post
+│  ├─ id: int4 (not null)
+│  ├─ title: text (not null)
+│  └─ userId: int4 (not null)
+├─ extension plpgsql
+└─ extension vector
+```
+
+**Output Format (JSON):**
+
+```json
+{
+  "ok": true,
+  "summary": "Schema introspected successfully",
+  "schema": {
+    "root": {
+      "kind": "root",
+      "id": "sql-schema",
+      "label": "sql schema (tables: 2)",
+      "children": [
+        {
+          "kind": "entity",
+          "id": "table-user",
+          "label": "table user",
+          "children": [
+            {
+              "kind": "field",
+              "id": "column-user-id",
+              "label": "id: int4 (not null)",
+              "meta": {
+                "typeId": "pg/int4@1",
+                "nullable": false,
+                "nativeType": "int4"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "meta": {
+    "configPath": "/path/to/prisma-next.config.ts",
+    "dbUrl": "postgresql://user:pass@localhost/db"
+  },
+  "timings": {
+    "total": 42
+  }
+}
+```
+
+**Error Codes:**
+- `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
+- `PN-CLI-4011`: Missing database URL — provide `--db` flag or `config.db.url` or `DATABASE_URL` environment variable
+
+**Family Requirements:**
+
+The family must provide:
+1. A `create()` method in the family descriptor that returns a `FamilyInstance` with an `introspect()` method
+2. An optional `toSchemaView()` method on the `FamilyInstance` to project family-specific schema IR into `CoreSchemaView`
+
+```typescript
+interface FamilyInstance {
+  introspect(options: {
+    driver: ControlDriverInstance;
+    contractIR?: ContractIR;
+    schema?: string;
+  }): Promise<FamilySchemaIR>;
+
+  toSchemaView?(schema: FamilySchemaIR): CoreSchemaView;
+}
+```
+
+The SQL family provides this via `@prisma-next/family-sql/control`. The `introspect()` method queries the database catalog and returns `SqlSchemaIR`, and `toSchemaView()` projects it into a `CoreSchemaView` for display.
+
+**Note:** The introspection output displays native database types (e.g., `int4`, `text`, `timestamptz`) rather than mapped codec IDs (e.g., `pg/int4@1`). This reflects the actual database state, which may be enriched with type mappings later.
+
 **Config File (`prisma-next.config.ts`):**
 
 The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.
