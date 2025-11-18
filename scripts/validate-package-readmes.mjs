@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 
 function listSrcParents() {
   const out = execSync("find packages -type d -name src | sed 's|/src$||'", { encoding: 'utf8' });
@@ -11,8 +11,8 @@ function listSrcParents() {
 }
 
 const dirs = listSrcParents();
-let errors = [];
-let warnings = [];
+const errors = [];
+const warnings = [];
 
 for (const dir of dirs) {
   const readme = `${dir}/README.md`;
@@ -29,12 +29,12 @@ for (const dir of dirs) {
 }
 
 if (errors.length) {
-  console.error('README validation failed:\n' + errors.map((e) => ` - ${e}`).join('\n'));
+  console.error(`README validation failed:\n${errors.map((e) => ` - ${e}`).join('\n')}`);
   if (warnings.length)
-    console.warn('README warnings:\n' + warnings.map((w) => ` - ${w}`).join('\n'));
+    console.warn(`README warnings:\n${warnings.map((w) => ` - ${w}`).join('\n')}`);
   process.exit(1);
 } else if (warnings.length) {
-  console.warn('README warnings:\n' + warnings.map((w) => ` - ${w}`).join('\n'));
+  console.warn(`README warnings:\n${warnings.map((w) => ` - ${w}`).join('\n')}`);
   console.log('Package README presence validated.');
   process.exit(0);
 } else {
