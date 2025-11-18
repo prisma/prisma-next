@@ -92,8 +92,6 @@ prisma-next contract emit --json
 prisma-next contract emit -v --timestamps
 ```
 
-**Note:** The `contract emit` command is the canonical form. The `emit` command is kept as a legacy alias for backward compatibility.
-
 ### `prisma-next db verify`
 
 Verify that a database instance matches the emitted contract by checking marker presence, hash equality, and target compatibility.
@@ -327,7 +325,6 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - Exit codes: 0 (success), 1 (runtime error), 2 (usage/config error)
 - **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
 - **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
-- **Legacy Commands**: Legacy `emit` command is available as alias alongside canonical `contract emit`
 - **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma-next" title with command tree; command help shows "prisma-next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
 - **Command Descriptions**: Commands use `setCommandDescriptions()` to set separate short and long descriptions. See `utils/command-helpers.ts` and `.cursor/rules/cli-command-descriptions.mdc`.
 

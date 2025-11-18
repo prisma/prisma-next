@@ -103,41 +103,6 @@ describe('contract emit command (e2e)', () => {
   );
 
   it(
-    'emits contract.json and contract.d.ts with legacy emit alias',
-    async () => {
-      // Set up test directory from fixtures
-      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
-      const testDir = testSetup.testDir;
-      const outputDir = testSetup.outputDir;
-      const cleanupDir = testSetup.cleanup;
-
-      try {
-        const command = createContractEmitCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts']);
-        } finally {
-          process.chdir(originalCwd);
-        }
-
-        // Check exit code is 0 (success)
-        const exitCode = getExitCode();
-        expect(exitCode).toBe(0);
-
-        const contractJsonPath = join(outputDir, 'contract.json');
-        const contractDtsPath = join(outputDir, 'contract.d.ts');
-
-        expect(existsSync(contractJsonPath)).toBe(true);
-        expect(existsSync(contractDtsPath)).toBe(true);
-      } finally {
-        cleanupDir();
-      }
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
     'outputs JSON when --json flag is provided',
     async () => {
       // Set up test directory from fixtures
