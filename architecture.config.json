@@ -19,6 +19,12 @@
       "plane": "migration"
     },
     {
+      "glob": "packages/framework/core-execution-plane/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/framework/authoring/contract-authoring/**",
       "domain": "framework",
       "layer": "authoring",

@@ -1,12 +1,13 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import sqlFamily from '@prisma-next/family-sql/runtime';
 import {
   budgets,
-  createRuntime,
   createRuntimeContext,
   type Runtime,
   type RuntimeContext,
 } from '@prisma-next/sql-runtime';
+import postgresTarget from '@prisma-next/targets-postgres/runtime';
 import { Pool } from 'pg';
 import { contract } from '../../prisma/contract';
 
@@ -14,7 +15,7 @@ let runtime: Runtime | undefined;
 let context: RuntimeContext<typeof contract> | undefined;
 let pool: Pool | undefined;
 
-export function getRuntime() {
+export function getRuntime(): Runtime {
   if (!runtime) {
     const connectionString = process.env['DATABASE_URL'];
     if (!connectionString) {
@@ -26,29 +27,26 @@ export function getRuntime() {
 
     pool = new Pool({ connectionString });
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool },
-      cursor: { disabled: true },
-    });
-
-    const adapter = createPostgresAdapter();
-
-    // Create context with contract and adapter (adapter provides codecs via profile.codecs())
-    // Extensions can be added programmatically when available
-    context = createRuntimeContext({
-      contract,
-      adapter,
+    // Create runtime family instance from descriptors
+    const familyInstance = sqlFamily.create({
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
       extensions: [],
     });
 
-    runtime = createRuntime({
-      adapter,
-      driver,
+    // Create runtime using family instance
+    runtime = familyInstance.createRuntime({
+      contract,
+      driverOptions: {
+        connect: { pool },
+        cursor: { disabled: true },
+      },
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,
       },
-      context,
+      extensions: [],
       plugins: [
         budgets({
           maxRows: 10_000,
@@ -58,11 +56,19 @@ export function getRuntime() {
         }),
       ],
     });
+
+    // Create context for schema/query builders (adapter from descriptor)
+    const adapterInstance = postgresAdapter.create();
+    context = createRuntimeContext({
+      contract,
+      adapter: adapterInstance,
+      extensions: [],
+    });
   }
   return runtime;
 }
 
-export function getContext() {
+export function getContext(): RuntimeContext<typeof contract> {
   if (!context) {
     getRuntime();
   }

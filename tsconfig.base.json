@@ -72,6 +72,9 @@
       "@prisma-next/core-control-plane/types": [
         "packages/framework/core-control-plane/src/exports/types.ts"
       ],
+      "@prisma-next/core-execution-plane/types": [
+        "packages/framework/core-execution-plane/src/exports/types.ts"
+      ],
       "@prisma-next/contract-authoring": [
         "packages/framework/authoring/contract-authoring/src/index.ts"
       ],
@@ -110,6 +113,7 @@
     { "path": "./packages/framework/core-plan" },
     { "path": "./packages/framework/core-operations" },
     { "path": "./packages/framework/core-control-plane" },
+    { "path": "./packages/framework/core-execution-plane" },
     { "path": "./packages/framework/authoring/contract-authoring" },
     { "path": "./packages/framework/authoring/contract-ts" },
     { "path": "./packages/framework/authoring/contract-psl" },

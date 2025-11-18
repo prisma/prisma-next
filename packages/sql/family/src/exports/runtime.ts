@@ -1,4 +1,7 @@
-// Runtime entry point for SQL family
-// This will be implemented in the future for DB-connected commands
+import { SqlRuntimeFamilyDescriptor } from '../core/runtime-descriptor';
 
-export {};
+/**
+ * SQL runtime family descriptor for execution/runtime plane.
+ * Provides factory method to create SQL runtime family instance.
+ */
+export default new SqlRuntimeFamilyDescriptor();

@@ -1,10 +1,10 @@
 {
-  "name": "@prisma-next/targets-postgres",
+  "name": "@prisma-next/core-execution-plane",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "description": "Postgres target pack for Prisma Next",
+  "description": "Execution/runtime plane descriptor and instance types for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
@@ -14,9 +14,8 @@
     "clean": "node ../../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/cli": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
-    "arktype": "^2.0.0"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -25,17 +24,12 @@
     "vitest": "^2.1.1"
   },
   "files": [
-    "dist",
-    "packs"
+    "dist"
   ],
   "exports": {
-    "./control": {
-      "types": "./dist/exports/control.d.ts",
-      "import": "./dist/exports/control.js"
-    },
-    "./runtime": {
-      "types": "./dist/exports/runtime.d.ts",
-      "import": "./dist/exports/runtime.js"
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
     }
   }
 }

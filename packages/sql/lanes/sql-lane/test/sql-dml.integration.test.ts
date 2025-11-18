@@ -1,6 +1,5 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { ResultType } from '@prisma-next/contract/types';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -56,7 +55,6 @@ const fixtureContract = validateContract(fixtureContractRaw);
 
 describe('DML Integration Tests', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
   const adapter = createPostgresAdapter();
 
@@ -68,10 +66,6 @@ describe('DML Integration Tests', () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    sharedDriver = createPostgresDriverFromOptions({
-      connect: { client },
-      cursor: { disabled: true },
-    });
   }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
@@ -102,9 +96,16 @@ describe('DML Integration Tests', () => {
 
   describe('insert', () => {
     it('inserts a row and returns it with returning clause', async () => {
-      const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-      });
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        },
+      );
 
       const context = createTestContext(fixtureContract, adapter);
       const tables = schema(context).tables;
@@ -150,9 +151,16 @@ describe('DML Integration Tests', () => {
     });
 
     it('inserts a row without returning clause', async () => {
-      const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-      });
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        },
+      );
 
       const context = createTestContext(fixtureContract, adapter);
       const tables = schema(context).tables;
@@ -195,9 +203,16 @@ describe('DML Integration Tests', () => {
     }, timeouts.spinUpPpgDev);
 
     it('updates a row and returns it with returning clause', async () => {
-      const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-      });
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        },
+      );
 
       const context = createTestContext(fixtureContract, adapter);
       const tables = schema(context).tables;
@@ -243,9 +258,16 @@ describe('DML Integration Tests', () => {
     });
 
     it('updates a row without returning clause', async () => {
-      const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-      });
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        },
+      );
 
       const context = createTestContext(fixtureContract, adapter);
       const tables = schema(context).tables;
@@ -292,9 +314,16 @@ describe('DML Integration Tests', () => {
     }, timeouts.spinUpPpgDev);
 
     it('deletes a row and returns it with returning clause', async () => {
-      const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-      });
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        },
+      );
 
       const context = createTestContext(fixtureContract, adapter);
       const tables = schema(context).tables;
@@ -338,9 +367,16 @@ describe('DML Integration Tests', () => {
     });
 
     it('deletes a row without returning clause', async () => {
-      const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-      });
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        },
+      );
 
       const context = createTestContext(fixtureContract, adapter);
       const tables = schema(context).tables;

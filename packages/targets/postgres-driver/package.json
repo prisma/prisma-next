@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "arktype": "^2.0.0",

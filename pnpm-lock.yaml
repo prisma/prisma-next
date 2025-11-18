@@ -340,6 +340,28 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@24.7.2)
 
+  packages/framework/core-execution-plane:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../core-contract
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../core-control-plane
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@24.7.2)
+
   packages/framework/core-operations:
     dependencies:
       '@prisma-next/plan':
@@ -645,6 +667,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../framework/core-control-plane
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-execution-plane
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../contract
@@ -657,6 +682,9 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../operations
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../sql-runtime
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../schema-ir
@@ -920,6 +948,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-execution-plane
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
@@ -942,6 +973,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-execution-plane
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../sql/family
@@ -982,6 +1016,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../framework/core-control-plane
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-execution-plane
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../sql/contract

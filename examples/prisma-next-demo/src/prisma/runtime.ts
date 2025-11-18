@@ -1,14 +1,15 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
+import sqlFamily from '@prisma-next/family-sql/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   budgets,
-  createRuntime,
   createRuntimeContext,
   type Runtime,
   type RuntimeContext,
 } from '@prisma-next/sql-runtime';
+import postgresTarget from '@prisma-next/targets-postgres/runtime';
 import { Pool } from 'pg';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
@@ -17,7 +18,7 @@ let runtime: Runtime | undefined;
 let context: RuntimeContext<Contract> | undefined;
 let pool: Pool | undefined;
 
-export function getRuntime() {
+export function getRuntime(): Runtime {
   if (!runtime) {
     const connectionString = process.env['DATABASE_URL'];
     if (!connectionString) {
@@ -28,30 +29,26 @@ export function getRuntime() {
 
     pool = new Pool({ connectionString });
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool },
-      cursor: { disabled: true },
+    // Create runtime family instance from descriptors
+    const familyInstance = sqlFamily.create({
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
+      extensions: [],
     });
 
-    const adapter = createPostgresAdapter();
-
-    // Create context with contract, adapter, and extensions
-    // Adapter provides codecs via profile.codecs()
-    // pgvector extension provides vector codec and operations
-    context = createRuntimeContext({
+    // Create runtime using family instance
+    runtime = familyInstance.createRuntime({
       contract,
-      adapter,
-      extensions: [pgvector()],
-    });
-
-    runtime = createRuntime({
-      adapter,
-      driver,
+      driverOptions: {
+        connect: { pool },
+        cursor: { disabled: true },
+      },
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,
       },
-      context,
+      extensions: [pgvector()],
       plugins: [
         budgets({
           maxRows: 10_000,
@@ -61,11 +58,19 @@ export function getRuntime() {
         }),
       ],
     });
+
+    // Create context for schema/query builders (adapter and extensions from family instance)
+    const adapterInstance = postgresAdapter.create();
+    context = createRuntimeContext({
+      contract,
+      adapter: adapterInstance,
+      extensions: [pgvector()],
+    });
   }
   return runtime;
 }
 
-export function getContext() {
+export function getContext(): RuntimeContext<Contract> {
   if (!context) {
     getRuntime();
   }

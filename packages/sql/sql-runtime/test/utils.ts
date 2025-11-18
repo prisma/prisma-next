@@ -1,19 +1,18 @@
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import type { PostgresDriverOptions } from '@prisma-next/driver-postgres/runtime';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import sqlFamily from '@prisma-next/family-sql/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  Adapter,
-  LoweredStatement,
-  SelectAst,
-  SqlDriver,
-} from '@prisma-next/sql-relational-core/ast';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import postgresTarget from '@prisma-next/targets-postgres/runtime';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
-import type { Log, Plugin, SqlStatement } from '../src/exports';
+import type { Log, Plugin, Runtime, SqlStatement } from '../src/exports';
 import {
-  createRuntime,
+  type createRuntime,
   createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
@@ -103,6 +102,7 @@ export interface CreateTestRuntimeOptions {
     mode: 'onFirstUse' | 'startup' | 'always';
     requireMarker?: boolean;
   };
+  readonly extensions?: readonly Extension[];
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -127,15 +127,14 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
 }
 
 /**
- * Creates a runtime with standard test configuration.
+ * Creates a runtime with standard test configuration using runtime descriptors.
  * This helper DRYs up the common pattern of runtime creation in tests.
  */
 export function createTestRuntime(
   contract: SqlContract<SqlStorage>,
-  adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-  driver: SqlDriver,
+  driverOptions: PostgresDriverOptions,
   options?: CreateTestRuntimeOptions,
-): ReturnType<typeof createRuntime> {
+): Runtime {
   const verify: {
     mode: 'onFirstUse' | 'startup' | 'always';
     requireMarker: boolean;
@@ -145,54 +144,47 @@ export function createTestRuntime(
         requireMarker: options.verify.requireMarker ?? false,
       }
     : { mode: 'onFirstUse', requireMarker: false };
-  const context = createTestContext(contract, adapter);
-  const runtimeOptions: {
-    adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
-    driver: SqlDriver;
-    verify: {
-      mode: 'onFirstUse' | 'startup' | 'always';
-      requireMarker: boolean;
-    };
-    context: RuntimeContext<SqlContract<SqlStorage>>;
-    plugins?: readonly Plugin[];
-    mode?: 'strict' | 'permissive';
-    log?: Log;
-  } = {
-    adapter,
-    driver,
+
+  // Create runtime family instance from descriptors
+  const familyInstance = sqlFamily.create({
+    target: postgresTarget,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensions: [],
+  });
+
+  // Create runtime using family instance
+  return familyInstance.createRuntime({
+    contract,
+    driverOptions,
     verify,
-    context,
-  };
-  if (options?.plugins) {
-    runtimeOptions.plugins = options.plugins;
-  }
-  if (options?.mode) {
-    runtimeOptions.mode = options.mode;
-  }
-  if (options?.log) {
-    runtimeOptions.log = options.log;
-  }
-  return createRuntime(runtimeOptions);
+    ...(options?.extensions ? { extensions: options.extensions } : {}),
+    ...(options?.plugins ? { plugins: options.plugins } : {}),
+    ...(options?.mode ? { mode: options.mode } : {}),
+    ...(options?.log ? { log: options.log } : {}),
+  });
 }
 
 /**
- * Creates a runtime with the given contract and database client.
+ * Creates a runtime with the given contract and database client using runtime descriptors.
  * This helper DRYs up the common pattern of runtime creation in e2e tests.
  */
 export function createTestRuntimeFromClient(
   contract: SqlContract<SqlStorage>,
   client: Client,
-  adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
   options?: CreateTestRuntimeOptions,
-): ReturnType<typeof createRuntime> {
-  const driver = createPostgresDriverFromOptions({
-    connect: { client },
-    cursor: { disabled: true },
-  });
-  return createTestRuntime(contract, adapter, driver, {
-    ...options,
-    verify: options?.verify ?? ({ mode: 'onFirstUse', requireMarker: true } as const),
-  });
+): Runtime {
+  return createTestRuntime(
+    contract,
+    {
+      connect: { client },
+      cursor: { disabled: true },
+    },
+    {
+      ...options,
+      verify: options?.verify ?? ({ mode: 'onFirstUse', requireMarker: true } as const),
+    },
+  );
 }
 
 /**
