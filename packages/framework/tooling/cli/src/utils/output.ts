@@ -494,10 +494,29 @@ function renderSchemaVerificationTree(
         labelColor = dim;
         formattedLabel = labelColor(node.name);
         break;
-      case 'extension':
-        labelColor = magenta;
-        formattedLabel = labelColor(node.name);
+      case 'extension': {
+        // Parse specific extension message formats
+        // "database is postgres" -> dim "database is", cyan "postgres"
+        const dbMatch = node.name.match(/^database is\s+(.+)$/);
+        if (dbMatch?.[1]) {
+          const dbName = dbMatch[1];
+          formattedLabel = `${dim('database is')} ${cyan(dbName)}`;
+        } else {
+          // "vector extension is enabled" -> dim everything except extension name
+          // Match pattern: "extensionName extension is enabled"
+          const extMatch = node.name.match(/^([^\s]+)\s+(extension is enabled)$/);
+          if (extMatch?.[1] && extMatch[2]) {
+            const extName = extMatch[1];
+            const rest = extMatch[2];
+            formattedLabel = `${cyan(extName)} ${dim(rest)}`;
+          } else {
+            // Fallback: color entire name with magenta
+            labelColor = magenta;
+            formattedLabel = labelColor(node.name);
+          }
+        }
         break;
+      }
       default:
         formattedLabel = node.name;
         break;
