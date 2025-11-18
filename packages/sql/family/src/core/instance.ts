@@ -10,15 +10,30 @@ import type {
   ControlFamilyInstance,
   ControlTargetDescriptor,
   EmitContractResult,
+  SchemaIssue,
+  SchemaVerificationNode,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry } from '@prisma-next/operations';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ForeignKey,
+  Index,
+  PrimaryKey,
+  SqlContract,
+  SqlStorage,
+  UniqueConstraint,
+} from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlSchemaIR,
+  SqlTableIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
@@ -119,6 +134,536 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
 }
 
 /**
+ * Compares two arrays of strings for equality (order-sensitive).
+ */
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Compares primary keys and adds issues if mismatch.
+ * Returns 'pass' or 'fail'.
+ */
+function comparePrimaryKey(
+  contractPK: PrimaryKey,
+  schemaPK: PrimaryKey | undefined,
+  tableName: string,
+  issues: SchemaIssue[],
+): 'pass' | 'fail' {
+  if (!schemaPK) {
+    issues.push({
+      kind: 'primary_key_mismatch',
+      table: tableName,
+      expected: contractPK.columns.join(', '),
+      message: `Table "${tableName}" is missing primary key`,
+    });
+    return 'fail';
+  }
+
+  if (!arraysEqual(contractPK.columns, schemaPK.columns)) {
+    issues.push({
+      kind: 'primary_key_mismatch',
+      table: tableName,
+      expected: contractPK.columns.join(', '),
+      actual: schemaPK.columns.join(', '),
+      message: `Table "${tableName}" has primary key mismatch: expected columns [${contractPK.columns.join(', ')}], got [${schemaPK.columns.join(', ')}]`,
+    });
+    return 'fail';
+  }
+
+  // Compare name if both are modeled
+  if (contractPK.name && schemaPK.name && contractPK.name !== schemaPK.name) {
+    issues.push({
+      kind: 'primary_key_mismatch',
+      table: tableName,
+      indexOrConstraint: contractPK.name,
+      expected: contractPK.name,
+      actual: schemaPK.name,
+      message: `Table "${tableName}" has primary key name mismatch: expected "${contractPK.name}", got "${schemaPK.name}"`,
+    });
+    return 'fail';
+  }
+
+  return 'pass';
+}
+
+/**
+ * Compares foreign keys and returns verification nodes.
+ */
+function compareForeignKeys(
+  contractFKs: readonly ForeignKey[],
+  schemaFKs: readonly SqlForeignKeyIR[],
+  tableName: string,
+  tablePath: string,
+  issues: SchemaIssue[],
+  strict: boolean,
+): SchemaVerificationNode[] {
+  const nodes: SchemaVerificationNode[] = [];
+
+  // Check each contract FK exists in schema
+  for (const contractFK of contractFKs) {
+    const fkPath = `${tablePath}.foreignKeys[${contractFK.columns.join(',')}]`;
+    const matchingFK = schemaFKs.find((fk) => {
+      return (
+        arraysEqual(fk.columns, contractFK.columns) &&
+        fk.referencedTable === contractFK.references.table &&
+        arraysEqual(fk.referencedColumns, contractFK.references.columns)
+      );
+    });
+
+    if (!matchingFK) {
+      issues.push({
+        kind: 'foreign_key_mismatch',
+        table: tableName,
+        expected: `${contractFK.columns.join(', ')} -> ${contractFK.references.table}(${contractFK.references.columns.join(', ')})`,
+        message: `Table "${tableName}" is missing foreign key: ${contractFK.columns.join(', ')} -> ${contractFK.references.table}(${contractFK.references.columns.join(', ')})`,
+      });
+      nodes.push({
+        status: 'fail',
+        kind: 'foreignKey',
+        name: `foreignKey(${contractFK.columns.join(', ')})`,
+        contractPath: fkPath,
+        code: 'foreign_key_mismatch',
+        message: 'Foreign key missing',
+        expected: contractFK,
+        actual: undefined,
+        children: [],
+      });
+    } else {
+      // Compare name if both are modeled
+      if (contractFK.name && matchingFK.name && contractFK.name !== matchingFK.name) {
+        issues.push({
+          kind: 'foreign_key_mismatch',
+          table: tableName,
+          indexOrConstraint: contractFK.name,
+          expected: contractFK.name,
+          actual: matchingFK.name,
+          message: `Table "${tableName}" has foreign key name mismatch: expected "${contractFK.name}", got "${matchingFK.name}"`,
+        });
+        nodes.push({
+          status: 'fail',
+          kind: 'foreignKey',
+          name: `foreignKey(${contractFK.columns.join(', ')})`,
+          contractPath: fkPath,
+          code: 'foreign_key_mismatch',
+          message: 'Foreign key name mismatch',
+          expected: contractFK.name,
+          actual: matchingFK.name,
+          children: [],
+        });
+      } else {
+        nodes.push({
+          status: 'pass',
+          kind: 'foreignKey',
+          name: `foreignKey(${contractFK.columns.join(', ')})`,
+          contractPath: fkPath,
+          code: '',
+          message: '',
+          expected: undefined,
+          actual: undefined,
+          children: [],
+        });
+      }
+    }
+  }
+
+  // Check for extra FKs in strict mode
+  if (strict) {
+    for (const schemaFK of schemaFKs) {
+      const matchingFK = contractFKs.find((fk) => {
+        return (
+          arraysEqual(fk.columns, schemaFK.columns) &&
+          fk.references.table === schemaFK.referencedTable &&
+          arraysEqual(fk.references.columns, schemaFK.referencedColumns)
+        );
+      });
+
+      if (!matchingFK) {
+        issues.push({
+          kind: 'foreign_key_mismatch',
+          table: tableName,
+          message: `Extra foreign key found in database (not in contract): ${schemaFK.columns.join(', ')} -> ${schemaFK.referencedTable}(${schemaFK.referencedColumns.join(', ')})`,
+        });
+        nodes.push({
+          status: 'fail',
+          kind: 'foreignKey',
+          name: `foreignKey(${schemaFK.columns.join(', ')})`,
+          contractPath: `${tablePath}.foreignKeys[${schemaFK.columns.join(',')}]`,
+          code: 'extra_foreign_key',
+          message: 'Extra foreign key found',
+          expected: undefined,
+          actual: schemaFK,
+          children: [],
+        });
+      }
+    }
+  }
+
+  return nodes;
+}
+
+/**
+ * Compares unique constraints and returns verification nodes.
+ */
+function compareUniqueConstraints(
+  contractUniques: readonly UniqueConstraint[],
+  schemaUniques: readonly SqlUniqueIR[],
+  tableName: string,
+  tablePath: string,
+  issues: SchemaIssue[],
+  strict: boolean,
+): SchemaVerificationNode[] {
+  const nodes: SchemaVerificationNode[] = [];
+
+  // Check each contract unique exists in schema
+  for (const contractUnique of contractUniques) {
+    const uniquePath = `${tablePath}.uniques[${contractUnique.columns.join(',')}]`;
+    const matchingUnique = schemaUniques.find((u) =>
+      arraysEqual(u.columns, contractUnique.columns),
+    );
+
+    if (!matchingUnique) {
+      issues.push({
+        kind: 'unique_constraint_mismatch',
+        table: tableName,
+        expected: contractUnique.columns.join(', '),
+        message: `Table "${tableName}" is missing unique constraint: ${contractUnique.columns.join(', ')}`,
+      });
+      nodes.push({
+        status: 'fail',
+        kind: 'unique',
+        name: `unique(${contractUnique.columns.join(', ')})`,
+        contractPath: uniquePath,
+        code: 'unique_constraint_mismatch',
+        message: 'Unique constraint missing',
+        expected: contractUnique,
+        actual: undefined,
+        children: [],
+      });
+    } else {
+      // Compare name if both are modeled
+      if (
+        contractUnique.name &&
+        matchingUnique.name &&
+        contractUnique.name !== matchingUnique.name
+      ) {
+        issues.push({
+          kind: 'unique_constraint_mismatch',
+          table: tableName,
+          indexOrConstraint: contractUnique.name,
+          expected: contractUnique.name,
+          actual: matchingUnique.name,
+          message: `Table "${tableName}" has unique constraint name mismatch: expected "${contractUnique.name}", got "${matchingUnique.name}"`,
+        });
+        nodes.push({
+          status: 'fail',
+          kind: 'unique',
+          name: `unique(${contractUnique.columns.join(', ')})`,
+          contractPath: uniquePath,
+          code: 'unique_constraint_mismatch',
+          message: 'Unique constraint name mismatch',
+          expected: contractUnique.name,
+          actual: matchingUnique.name,
+          children: [],
+        });
+      } else {
+        nodes.push({
+          status: 'pass',
+          kind: 'unique',
+          name: `unique(${contractUnique.columns.join(', ')})`,
+          contractPath: uniquePath,
+          code: '',
+          message: '',
+          expected: undefined,
+          actual: undefined,
+          children: [],
+        });
+      }
+    }
+  }
+
+  // Check for extra uniques in strict mode
+  if (strict) {
+    for (const schemaUnique of schemaUniques) {
+      const matchingUnique = contractUniques.find((u) =>
+        arraysEqual(u.columns, schemaUnique.columns),
+      );
+
+      if (!matchingUnique) {
+        issues.push({
+          kind: 'unique_constraint_mismatch',
+          table: tableName,
+          message: `Extra unique constraint found in database (not in contract): ${schemaUnique.columns.join(', ')}`,
+        });
+        nodes.push({
+          status: 'fail',
+          kind: 'unique',
+          name: `unique(${schemaUnique.columns.join(', ')})`,
+          contractPath: `${tablePath}.uniques[${schemaUnique.columns.join(',')}]`,
+          code: 'extra_unique_constraint',
+          message: 'Extra unique constraint found',
+          expected: undefined,
+          actual: schemaUnique,
+          children: [],
+        });
+      }
+    }
+  }
+
+  return nodes;
+}
+
+/**
+ * Compares indexes and returns verification nodes.
+ */
+function compareIndexes(
+  contractIndexes: readonly Index[],
+  schemaIndexes: readonly SqlIndexIR[],
+  tableName: string,
+  tablePath: string,
+  issues: SchemaIssue[],
+  strict: boolean,
+): SchemaVerificationNode[] {
+  const nodes: SchemaVerificationNode[] = [];
+
+  // Check each contract index exists in schema
+  for (const contractIndex of contractIndexes) {
+    const indexPath = `${tablePath}.indexes[${contractIndex.columns.join(',')}]`;
+    const matchingIndex = schemaIndexes.find(
+      (idx) => arraysEqual(idx.columns, contractIndex.columns) && idx.unique === false,
+    );
+
+    if (!matchingIndex) {
+      issues.push({
+        kind: 'index_mismatch',
+        table: tableName,
+        expected: contractIndex.columns.join(', '),
+        message: `Table "${tableName}" is missing index: ${contractIndex.columns.join(', ')}`,
+      });
+      nodes.push({
+        status: 'fail',
+        kind: 'index',
+        name: `index(${contractIndex.columns.join(', ')})`,
+        contractPath: indexPath,
+        code: 'index_mismatch',
+        message: 'Index missing',
+        expected: contractIndex,
+        actual: undefined,
+        children: [],
+      });
+    } else {
+      // Compare name if both are modeled
+      if (contractIndex.name && matchingIndex.name && contractIndex.name !== matchingIndex.name) {
+        issues.push({
+          kind: 'index_mismatch',
+          table: tableName,
+          indexOrConstraint: contractIndex.name,
+          expected: contractIndex.name,
+          actual: matchingIndex.name,
+          message: `Table "${tableName}" has index name mismatch: expected "${contractIndex.name}", got "${matchingIndex.name}"`,
+        });
+        nodes.push({
+          status: 'fail',
+          kind: 'index',
+          name: `index(${contractIndex.columns.join(', ')})`,
+          contractPath: indexPath,
+          code: 'index_mismatch',
+          message: 'Index name mismatch',
+          expected: contractIndex.name,
+          actual: matchingIndex.name,
+          children: [],
+        });
+      } else {
+        nodes.push({
+          status: 'pass',
+          kind: 'index',
+          name: `index(${contractIndex.columns.join(', ')})`,
+          contractPath: indexPath,
+          code: '',
+          message: '',
+          expected: undefined,
+          actual: undefined,
+          children: [],
+        });
+      }
+    }
+  }
+
+  // Check for extra indexes in strict mode
+  if (strict) {
+    for (const schemaIndex of schemaIndexes) {
+      // Skip unique indexes (they're handled as unique constraints)
+      if (schemaIndex.unique) {
+        continue;
+      }
+
+      const matchingIndex = contractIndexes.find((idx) =>
+        arraysEqual(idx.columns, schemaIndex.columns),
+      );
+
+      if (!matchingIndex) {
+        issues.push({
+          kind: 'index_mismatch',
+          table: tableName,
+          message: `Extra index found in database (not in contract): ${schemaIndex.columns.join(', ')}`,
+        });
+        nodes.push({
+          status: 'fail',
+          kind: 'index',
+          name: `index(${schemaIndex.columns.join(', ')})`,
+          contractPath: `${tablePath}.indexes[${schemaIndex.columns.join(',')}]`,
+          code: 'extra_index',
+          message: 'Extra index found',
+          expected: undefined,
+          actual: schemaIndex,
+          children: [],
+        });
+      }
+    }
+  }
+
+  return nodes;
+}
+
+/**
+ * Compares extensions and returns verification nodes.
+ * Extracts extension names from contract.extensions (keys) and compares with schemaIR.extensions.
+ * Filters out the target name (e.g., 'postgres') as it's not an extension.
+ */
+function compareExtensions(
+  contractExtensions: Record<string, unknown> | undefined,
+  schemaExtensions: readonly string[],
+  contractTarget: string,
+  issues: SchemaIssue[],
+  _strict: boolean,
+): SchemaVerificationNode[] {
+  const nodes: SchemaVerificationNode[] = [];
+
+  if (!contractExtensions) {
+    return nodes;
+  }
+
+  // Extract extension names from contract (keys of extensions object)
+  // Filter out the target name - it's not an extension (e.g., 'postgres' is the target, not an extension)
+  const contractExtensionNames = Object.keys(contractExtensions).filter(
+    (name) => name !== contractTarget,
+  );
+
+  // Check each contract extension exists in schema
+  // Extension names in contract may differ from database extension names
+  // (e.g., contract has 'pgvector' but database has 'vector')
+  // We need to match more flexibly - try exact match, then check if either contains the other
+  for (const extName of contractExtensionNames) {
+    const extPath = `extensions.${extName}`;
+    // Normalize extension names for comparison (remove common prefixes like 'pg')
+    const normalizedExtName = extName.toLowerCase().replace(/^pg/, '');
+    const matchingExt = schemaExtensions.find((e) => {
+      const normalizedE = e.toLowerCase();
+      // Exact match
+      if (normalizedE === normalizedExtName || normalizedE === extName.toLowerCase()) {
+        return true;
+      }
+      // Check if one contains the other (e.g., 'pgvector' contains 'vector', 'vector' is in 'pgvector')
+      if (normalizedE.includes(normalizedExtName) || normalizedExtName.includes(normalizedE)) {
+        return true;
+      }
+      return false;
+    });
+
+    // Map extension names to descriptive labels
+    const extensionLabels: Record<string, string> = {
+      pg: 'database is postgres',
+      pgvector: 'vector extension is enabled',
+      vector: 'vector extension is enabled',
+    };
+    const extensionLabel = extensionLabels[extName] ?? `extension "${extName}" is enabled`;
+
+    if (!matchingExt) {
+      issues.push({
+        kind: 'extension_missing',
+        table: '',
+        message: `Extension "${extName}" is missing from database`,
+      });
+      nodes.push({
+        status: 'fail',
+        kind: 'extension',
+        name: extensionLabel,
+        contractPath: extPath,
+        code: 'extension_missing',
+        message: `Extension "${extName}" is missing`,
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
+    } else {
+      nodes.push({
+        status: 'pass',
+        kind: 'extension',
+        name: extensionLabel,
+        contractPath: extPath,
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
+    }
+  }
+
+  // In strict mode, we don't check for extra extensions (they're allowed)
+  // Extensions are additive - having extra extensions doesn't break the contract
+
+  return nodes;
+}
+
+/**
+ * Computes counts of pass/warn/fail nodes by traversing the tree.
+ */
+function computeCounts(node: SchemaVerificationNode): {
+  pass: number;
+  warn: number;
+  fail: number;
+  totalNodes: number;
+} {
+  let pass = 0;
+  let warn = 0;
+  let fail = 0;
+
+  function traverse(n: SchemaVerificationNode): void {
+    if (n.status === 'pass') {
+      pass++;
+    } else if (n.status === 'warn') {
+      warn++;
+    } else if (n.status === 'fail') {
+      fail++;
+    }
+
+    if (n.children) {
+      for (const child of n.children) {
+        traverse(child);
+      }
+    }
+  }
+
+  traverse(node);
+
+  return {
+    pass,
+    warn,
+    fail,
+    totalNodes: pass + warn + fail,
+  };
+}
+
+/**
  * Creates a VerifyDatabaseResult object with common structure.
  */
 function createVerifyResult(options: {
@@ -192,6 +737,23 @@ function createVerifyResult(options: {
 }
 
 /**
+ * Type metadata for SQL storage types.
+ * Maps contract storage type IDs to native database types.
+ */
+interface SqlTypeMetadata {
+  readonly typeId: string;
+  readonly familyId: 'sql';
+  readonly targetId: string;
+  readonly nativeType?: string;
+}
+
+/**
+ * Registry mapping type IDs to their metadata.
+ * Keyed by contract storage type ID (e.g., 'pg/int4@1').
+ */
+type SqlTypeMetadataRegistry = Map<string, SqlTypeMetadata>;
+
+/**
  * State fields for SQL family instance that hold assembly data.
  */
 interface SqlFamilyInstanceState {
@@ -199,6 +761,7 @@ interface SqlFamilyInstanceState {
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
+  readonly typeMetadataRegistry: SqlTypeMetadataRegistry;
 }
 
 /**
@@ -286,6 +849,54 @@ interface CreateSqlFamilyInstanceOptions {
 }
 
 /**
+ * Builds a SQL type metadata registry from extension pack manifests.
+ * Collects type metadata from target, adapter, and extension pack manifests.
+ *
+ * @param options - Descriptors for target, adapter, and extensions
+ * @returns Registry mapping type IDs to their metadata, filtered by targetId
+ */
+function buildSqlTypeMetadataRegistry(options: {
+  readonly target: ControlTargetDescriptor<'sql', string>;
+  readonly adapter: ControlAdapterDescriptor<'sql', string>;
+  readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
+}): SqlTypeMetadataRegistry {
+  const { target, adapter, extensions } = options;
+  const registry = new Map<string, SqlTypeMetadata>();
+
+  // Get targetId from adapter (they should match)
+  const targetId = adapter.targetId;
+
+  // Collect descriptors to iterate over
+  const descriptors = [target, adapter, ...extensions];
+
+  // Iterate over each descriptor's manifest
+  for (const descriptor of descriptors) {
+    const manifest = descriptor.manifest;
+    const storageTypes = manifest.types?.storage;
+
+    if (!storageTypes) {
+      continue;
+    }
+
+    // Filter for SQL family and matching targetId
+    for (const storageType of storageTypes) {
+      if (storageType.familyId === 'sql' && storageType.targetId === targetId) {
+        // Use existing entry if present, otherwise create new one
+        // Later entries (extensions) can override earlier ones (adapter/target)
+        registry.set(storageType.typeId, {
+          typeId: storageType.typeId,
+          familyId: 'sql',
+          targetId: storageType.targetId,
+          ...(storageType.nativeType !== undefined ? { nativeType: storageType.nativeType } : {}),
+        });
+      }
+    }
+  }
+
+  return registry;
+}
+
+/**
  * Creates a SQL family instance for control-plane operations.
  */
 export function createSqlFamilyInstance(
@@ -302,6 +913,9 @@ export function createSqlFamilyInstance(
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
+
+  // Build type metadata registry from manifests
+  const typeMetadataRegistry = buildSqlTypeMetadataRegistry({ target, adapter, extensions });
 
   /**
    * Strips mappings from a contract (mappings are runtime-only).
@@ -324,6 +938,7 @@ export function createSqlFamilyInstance(
     codecTypeImports,
     operationTypeImports,
     extensionIds,
+    typeMetadataRegistry,
 
     validateContractIR(contractJson: unknown): unknown {
       // Validate the contract (this normalizes and validates structure/logic)
@@ -480,17 +1095,495 @@ export function createSqlFamilyInstance(
       });
     },
 
-    async schemaVerify(_options: {
+    async schemaVerify(options: {
       readonly driver: ControlDriverInstance;
       readonly contractIR: unknown;
       readonly strict: boolean;
       readonly contractPath: string;
       readonly configPath?: string;
     }): Promise<VerifyDatabaseSchemaResult> {
-      // TODO: Implement schema verification
-      // This will build SqlTypeMetadataRegistry, call adapter introspection,
-      // compare contract vs SqlSchemaIR, and return VerifyDatabaseSchemaResult
-      throw new Error('schemaVerify not yet implemented');
+      const { driver, contractIR, strict, contractPath, configPath } = options;
+      const startTime = Date.now();
+
+      // Validate contractIR as SqlContract<SqlStorage>
+      const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
+
+      // Extract contract hashes and target
+      const contractCoreHash = contract.coreHash;
+      const contractProfileHash =
+        'profileHash' in contract && typeof contract.profileHash === 'string'
+          ? contract.profileHash
+          : undefined;
+      const contractTarget = contract.target;
+
+      // Introspect live schema
+      const controlAdapter = adapter.create() as SqlControlAdapter;
+      const schemaIR = await controlAdapter.introspect(
+        driver as ControlDriverInstance<string>,
+        contractIR,
+      );
+
+      // Compare contract vs schema IR
+      const issues: SchemaIssue[] = [];
+      const rootChildren: SchemaVerificationNode[] = [];
+
+      // Compare tables
+      const contractTables = contract.storage.tables;
+      const schemaTables = schemaIR.tables;
+
+      for (const [tableName, contractTable] of Object.entries(contractTables)) {
+        const schemaTable = schemaTables[tableName];
+        const tablePath = `storage.tables.${tableName}`;
+
+        if (!schemaTable) {
+          // Missing table
+          issues.push({
+            kind: 'missing_table',
+            table: tableName,
+            message: `Table "${tableName}" is missing from database`,
+          });
+          rootChildren.push({
+            status: 'fail',
+            kind: 'table',
+            name: `table ${tableName}`,
+            contractPath: tablePath,
+            code: 'missing_table',
+            message: `Table "${tableName}" is missing`,
+            expected: undefined,
+            actual: undefined,
+            children: [],
+          });
+          continue;
+        }
+
+        // Table exists - compare columns, constraints, etc.
+        const tableChildren: SchemaVerificationNode[] = [];
+        const columnNodes: SchemaVerificationNode[] = [];
+
+        // Compare columns
+        for (const [columnName, contractColumn] of Object.entries(contractTable.columns)) {
+          const schemaColumn = schemaTable.columns[columnName];
+          const columnPath = `${tablePath}.columns.${columnName}`;
+
+          if (!schemaColumn) {
+            // Missing column
+            issues.push({
+              kind: 'missing_column',
+              table: tableName,
+              column: columnName,
+              message: `Column "${tableName}"."${columnName}" is missing from database`,
+            });
+            columnNodes.push({
+              status: 'fail',
+              kind: 'column',
+              name: `${columnName}: missing`,
+              contractPath: columnPath,
+              code: 'missing_column',
+              message: `Column "${columnName}" is missing`,
+              expected: undefined,
+              actual: undefined,
+              children: [],
+            });
+            continue;
+          }
+
+          // Column exists - compare type and nullability
+          const columnChildren: SchemaVerificationNode[] = [];
+          let columnStatus: 'pass' | 'warn' | 'fail' = 'pass';
+
+          // Compare type using nativeType
+          // Contract stores type ID (e.g., 'pg/int4@1'), schema IR has nativeType (e.g., 'int4')
+          // We need to get nativeType from the type metadata registry for the contract type ID
+          const typeMetadata = typeMetadataRegistry.get(contractColumn.type);
+          const contractNativeType = typeMetadata?.nativeType;
+          const schemaNativeType = schemaColumn.nativeType;
+
+          if (!contractNativeType) {
+            // Contract type ID doesn't have nativeType metadata - emit warning, not failure
+            // This allows graceful degradation when metadata is missing
+            columnChildren.push({
+              status: 'warn',
+              kind: 'type',
+              name: 'type',
+              contractPath: `${columnPath}.type`,
+              code: 'type_metadata_missing',
+              message: `Contract type "${contractColumn.type}" has no nativeType metadata - native type comparison skipped`,
+              expected: { typeId: contractColumn.type },
+              actual: schemaColumn.typeId || schemaNativeType || 'unknown',
+              children: [],
+            });
+            // Status will be computed from children below
+          } else if (!schemaNativeType) {
+            // Schema IR doesn't have nativeType - this shouldn't happen either
+            issues.push({
+              kind: 'type_mismatch',
+              table: tableName,
+              column: columnName,
+              expected: contractNativeType,
+              actual: schemaColumn.typeId || 'unknown',
+              message: `Column "${tableName}"."${columnName}" has type mismatch: schema column has no nativeType`,
+            });
+            columnChildren.push({
+              status: 'fail',
+              kind: 'type',
+              name: 'type',
+              contractPath: `${columnPath}.type`,
+              code: 'type_mismatch',
+              message: 'Schema column has no nativeType',
+              expected: contractNativeType,
+              actual: schemaColumn.typeId || 'unknown',
+              children: [],
+            });
+            columnStatus = 'fail';
+          } else if (contractNativeType !== schemaNativeType) {
+            // Compare native types directly
+            issues.push({
+              kind: 'type_mismatch',
+              table: tableName,
+              column: columnName,
+              expected: contractNativeType,
+              actual: schemaNativeType,
+              message: `Column "${tableName}"."${columnName}" has type mismatch: expected "${contractNativeType}", got "${schemaNativeType}"`,
+            });
+            columnChildren.push({
+              status: 'fail',
+              kind: 'type',
+              name: 'type',
+              contractPath: `${columnPath}.type`,
+              code: 'type_mismatch',
+              message: `Type mismatch: expected ${contractNativeType}, got ${schemaNativeType}`,
+              expected: contractNativeType,
+              actual: schemaNativeType,
+              children: [],
+            });
+            columnStatus = 'fail';
+          }
+
+          // Compare nullability
+          if (contractColumn.nullable !== schemaColumn.nullable) {
+            issues.push({
+              kind: 'nullability_mismatch',
+              table: tableName,
+              column: columnName,
+              expected: String(contractColumn.nullable),
+              actual: String(schemaColumn.nullable),
+              message: `Column "${tableName}"."${columnName}" has nullability mismatch: expected ${contractColumn.nullable ? 'nullable' : 'not null'}, got ${schemaColumn.nullable ? 'nullable' : 'not null'}`,
+            });
+            columnChildren.push({
+              status: 'fail',
+              kind: 'nullability',
+              name: 'nullability',
+              contractPath: `${columnPath}.nullable`,
+              code: 'nullability_mismatch',
+              message: `Nullability mismatch: expected ${contractColumn.nullable ? 'nullable' : 'not null'}, got ${schemaColumn.nullable ? 'nullable' : 'not null'}`,
+              expected: contractColumn.nullable,
+              actual: schemaColumn.nullable,
+              children: [],
+            });
+            columnStatus = 'fail';
+          }
+
+          // Compute column status from children (fail > warn > pass)
+          const computedColumnStatus = columnChildren.some((c) => c.status === 'fail')
+            ? 'fail'
+            : columnChildren.some((c) => c.status === 'warn')
+              ? 'warn'
+              : 'pass';
+          // Use computed status if we have children, otherwise use the manually set status
+          const finalColumnStatus = columnChildren.length > 0 ? computedColumnStatus : columnStatus;
+
+          // Build column node
+          const nullableText = contractColumn.nullable ? 'nullable' : 'not nullable';
+          // Format: columnName: contractType → nativeType (nullability)
+          // Reuse contractNativeType from above scope
+          const columnTypeDisplay = contractNativeType
+            ? `${contractColumn.type} → ${contractNativeType}`
+            : contractColumn.type;
+          // Collect failure messages from children to create a summary message
+          const failureMessages = columnChildren
+            .filter((child) => child.status === 'fail' && child.message)
+            .map((child) => child.message)
+            .filter((msg): msg is string => typeof msg === 'string' && msg.length > 0);
+          const columnMessage =
+            finalColumnStatus === 'fail' && failureMessages.length > 0
+              ? failureMessages.join('; ')
+              : '';
+          const columnCode =
+            finalColumnStatus === 'fail' && columnChildren.length > 0 && columnChildren[0]
+              ? columnChildren[0].code
+              : finalColumnStatus === 'warn' && columnChildren.length > 0 && columnChildren[0]
+                ? columnChildren[0].code
+                : '';
+          columnNodes.push({
+            status: finalColumnStatus,
+            kind: 'column',
+            name: `${columnName}: ${columnTypeDisplay} (${nullableText})`,
+            contractPath: columnPath,
+            code: columnCode,
+            message: columnMessage,
+            expected: undefined,
+            actual: undefined,
+            children: columnChildren,
+          });
+        }
+
+        // Group columns under a "columns" header if we have any columns
+        if (columnNodes.length > 0) {
+          const columnsStatus = columnNodes.some((c) => c.status === 'fail')
+            ? 'fail'
+            : columnNodes.some((c) => c.status === 'warn')
+              ? 'warn'
+              : 'pass';
+          tableChildren.push({
+            status: columnsStatus,
+            kind: 'columns',
+            name: 'columns',
+            contractPath: `${tablePath}.columns`,
+            code: '',
+            message: '',
+            expected: undefined,
+            actual: undefined,
+            children: columnNodes,
+          });
+        }
+
+        // Check for extra columns in strict mode
+        if (strict) {
+          for (const [columnName, schemaColumn] of Object.entries(schemaTable.columns)) {
+            if (!contractTable.columns[columnName]) {
+              issues.push({
+                kind: 'missing_column',
+                table: tableName,
+                column: columnName,
+                message: `Extra column "${tableName}"."${columnName}" found in database (not in contract)`,
+              });
+              columnNodes.push({
+                status: 'fail',
+                kind: 'column',
+                name: `${columnName}: extra`,
+                contractPath: `${tablePath}.columns.${columnName}`,
+                code: 'extra_column',
+                message: `Extra column "${columnName}" found`,
+                expected: undefined,
+                actual: schemaColumn.typeId,
+                children: [],
+              });
+            }
+          }
+        }
+
+        // Compare primary key
+        if (contractTable.primaryKey) {
+          const pkStatus = comparePrimaryKey(
+            contractTable.primaryKey,
+            schemaTable.primaryKey,
+            tableName,
+            issues,
+          );
+          if (pkStatus === 'fail') {
+            tableChildren.push({
+              status: 'fail',
+              kind: 'primaryKey',
+              name: `primary key: ${contractTable.primaryKey.columns.join(', ')}`,
+              contractPath: `${tablePath}.primaryKey`,
+              code: 'primary_key_mismatch',
+              message: 'Primary key mismatch',
+              expected: contractTable.primaryKey,
+              actual: schemaTable.primaryKey,
+              children: [],
+            });
+          } else {
+            tableChildren.push({
+              status: 'pass',
+              kind: 'primaryKey',
+              name: `primary key: ${contractTable.primaryKey.columns.join(', ')}`,
+              contractPath: `${tablePath}.primaryKey`,
+              code: '',
+              message: '',
+              expected: undefined,
+              actual: undefined,
+              children: [],
+            });
+          }
+        } else if (schemaTable.primaryKey && strict) {
+          // Extra primary key in strict mode
+          issues.push({
+            kind: 'primary_key_mismatch',
+            table: tableName,
+            message: 'Extra primary key found in database (not in contract)',
+          });
+          tableChildren.push({
+            status: 'fail',
+            kind: 'primaryKey',
+            name: `primary key: ${schemaTable.primaryKey.columns.join(', ')}`,
+            contractPath: `${tablePath}.primaryKey`,
+            code: 'extra_primary_key',
+            message: 'Extra primary key found',
+            expected: undefined,
+            actual: schemaTable.primaryKey,
+            children: [],
+          });
+        }
+
+        // Compare foreign keys
+        const fkStatuses = compareForeignKeys(
+          contractTable.foreignKeys,
+          schemaTable.foreignKeys,
+          tableName,
+          tablePath,
+          issues,
+          strict,
+        );
+        tableChildren.push(...fkStatuses);
+
+        // Compare unique constraints
+        const uniqueStatuses = compareUniqueConstraints(
+          contractTable.uniques,
+          schemaTable.uniques,
+          tableName,
+          tablePath,
+          issues,
+          strict,
+        );
+        tableChildren.push(...uniqueStatuses);
+
+        // Compare indexes
+        const indexStatuses = compareIndexes(
+          contractTable.indexes,
+          schemaTable.indexes,
+          tableName,
+          tablePath,
+          issues,
+          strict,
+        );
+        tableChildren.push(...indexStatuses);
+
+        // Build table node
+        const tableStatus = tableChildren.some((c) => c.status === 'fail')
+          ? 'fail'
+          : tableChildren.some((c) => c.status === 'warn')
+            ? 'warn'
+            : 'pass';
+        // Collect failure messages from children to create a summary message
+        const tableFailureMessages = tableChildren
+          .filter((child) => child.status === 'fail' && child.message)
+          .map((child) => child.message)
+          .filter((msg): msg is string => typeof msg === 'string' && msg.length > 0);
+        const tableMessage =
+          tableStatus === 'fail' && tableFailureMessages.length > 0
+            ? `${tableFailureMessages.length} issue${tableFailureMessages.length === 1 ? '' : 's'}`
+            : '';
+        const tableCode =
+          tableStatus === 'fail' && tableChildren.length > 0 && tableChildren[0]
+            ? tableChildren[0].code
+            : '';
+        rootChildren.push({
+          status: tableStatus,
+          kind: 'table',
+          name: `table ${tableName}`,
+          contractPath: tablePath,
+          code: tableCode,
+          message: tableMessage,
+          expected: undefined,
+          actual: undefined,
+          children: tableChildren,
+        });
+      }
+
+      // Check for extra tables in strict mode
+      if (strict) {
+        for (const tableName of Object.keys(schemaTables)) {
+          if (!contractTables[tableName]) {
+            issues.push({
+              kind: 'missing_table',
+              table: tableName,
+              message: `Extra table "${tableName}" found in database (not in contract)`,
+            });
+            rootChildren.push({
+              status: 'fail',
+              kind: 'table',
+              name: `table ${tableName}`,
+              contractPath: `storage.tables.${tableName}`,
+              code: 'extra_table',
+              message: `Extra table "${tableName}" found`,
+              expected: undefined,
+              actual: undefined,
+              children: [],
+            });
+          }
+        }
+      }
+
+      // Compare extensions
+      const extensionStatuses = compareExtensions(
+        contract.extensions,
+        schemaIR.extensions,
+        contractTarget,
+        issues,
+        strict,
+      );
+      rootChildren.push(...extensionStatuses);
+
+      // Build root node
+      const rootStatus = rootChildren.some((c) => c.status === 'fail')
+        ? 'fail'
+        : rootChildren.some((c) => c.status === 'warn')
+          ? 'warn'
+          : 'pass';
+      const root: SchemaVerificationNode = {
+        status: rootStatus,
+        kind: 'contract',
+        name: 'contract',
+        contractPath: '',
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: rootChildren,
+      };
+
+      // Compute counts
+      const counts = computeCounts(root);
+
+      // Set ok flag
+      const ok = counts.fail === 0;
+
+      // Set code
+      const code = ok ? undefined : 'PN-SCHEMA-0001';
+
+      // Set summary
+      const summary = ok
+        ? 'Database schema satisfies contract'
+        : `Database schema does not satisfy contract (${counts.fail} failure${counts.fail === 1 ? '' : 's'})`;
+
+      const totalTime = Date.now() - startTime;
+
+      return {
+        ok,
+        ...(code ? { code } : {}),
+        summary,
+        contract: {
+          coreHash: contractCoreHash,
+          ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
+        },
+        target: {
+          expected: contractTarget,
+          actual: contractTarget,
+        },
+        schema: {
+          issues,
+          root,
+          counts,
+        },
+        meta: {
+          contractPath,
+          strict,
+          ...(configPath ? { configPath } : {}),
+        },
+        timings: {
+          total: totalTime,
+        },
+      };
     },
     async introspect(options: {
       readonly driver: ControlDriverInstance;

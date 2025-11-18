@@ -1,36 +1,36 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
   errorFileNotFound,
-  errorHashMismatch,
-  errorMarkerMissing,
   errorRuntime,
-  errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
-import type { FamilyInstance, VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
+import type {
+  FamilyInstance,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
+  formatSchemaVerifyJson,
+  formatSchemaVerifyOutput,
   formatStyledHeader,
-  formatSuccessMessage,
-  formatVerifyJson,
-  formatVerifyOutput,
 } from '../utils/output';
 import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
 import { withSpinner } from '../utils/spinner';
 
-interface DbVerifyOptions {
+interface DbSchemaVerifyOptions {
   readonly db?: string;
   readonly config?: string;
   readonly json?: string | boolean;
+  readonly strict?: boolean;
   readonly quiet?: boolean;
   readonly q?: boolean;
   readonly verbose?: boolean;
@@ -42,13 +42,14 @@ interface DbVerifyOptions {
   readonly 'no-color'?: boolean;
 }
 
-export function createDbVerifyCommand(): Command {
-  const command = new Command('verify');
+export function createDbSchemaVerifyCommand(): Command {
+  const command = new Command('schema-verify');
   setCommandDescriptions(
     command,
-    'Check the database satisfies your contract',
-    'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
-      'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
+    'Verify database schema satisfies emitted contract',
+    'Verifies that your database schema satisfies the emitted contract. Compares table structures,\n' +
+      'column types, constraints, and extensions. Reports any mismatches via a contract-shaped\n' +
+      'verification tree. This is a read-only operation that does not modify the database.',
   );
   command
     .configureHelp({
@@ -60,24 +61,23 @@ export function createDbVerifyCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--json [format]', 'Output as JSON (object or ndjson)', false)
+    .option('--strict', 'Strict mode: extra schema elements cause failures', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
     .option('-vv, --trace', 'Trace output: deep internals, stack traces')
     .option('--timestamps', 'Add timestamps to output')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
-    .action(async (options: DbVerifyOptions) => {
+    .action(async (options: DbSchemaVerifyOptions) => {
       const flags = parseGlobalFlags(options);
 
       const result = await performAction(async () => {
         // Load config (file I/O)
         const config = await loadConfig(options.config);
         const configPath = options.config || './prisma-next.config.ts';
-        const contractPathAbsolute = config.contract?.output
+        const contractPath = config.contract?.output
           ? resolve(config.contract.output)
           : resolve('src/prisma/contract.json');
-        // Convert to relative path for display
-        const contractPath = relative(process.cwd(), contractPathAbsolute);
 
         // Output header (only for human-readable output)
         if (flags.json !== 'object' && !flags.quiet) {
@@ -89,9 +89,9 @@ export function createDbVerifyCommand(): Command {
             details.push({ label: 'database', value: options.db });
           }
           const header = formatStyledHeader({
-            command: 'db verify',
-            description: 'Verify database matches emitted contract',
-            url: 'https://pris.ly/db-verify',
+            command: 'db schema-verify',
+            description: 'Verify database schema satisfies emitted contract',
+            url: 'https://pris.ly/db-schema-verify',
             details,
             flags,
           });
@@ -101,11 +101,11 @@ export function createDbVerifyCommand(): Command {
         // Load contract file (file I/O)
         let contractJsonContent: string;
         try {
-          contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
+          contractJsonContent = await readFile(contractPath, 'utf-8');
         } catch (error) {
           if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-            throw errorFileNotFound(contractPathAbsolute, {
-              why: `Contract file not found at ${contractPathAbsolute}`,
+            throw errorFileNotFound(contractPath, {
+              why: `Contract file not found at ${contractPath}`,
             });
           }
           throw errorUnexpected(error instanceof Error ? error.message : String(error), {
@@ -147,15 +147,15 @@ export function createDbVerifyCommand(): Command {
           // Validate contract using instance validator
           const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
 
-          // Call family instance verify method
-          let verifyResult: VerifyDatabaseResult;
+          // Call family instance schemaVerify method
+          let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {
-            verifyResult = (await withSpinner(
+            schemaVerifyResult = (await withSpinner(
               () =>
-                typedFamilyInstance.verify({
+                typedFamilyInstance.schemaVerify({
                   driver,
                   contractIR,
-                  expectedTargetId: config.target.targetId,
+                  strict: options.strict ?? false,
                   contractPath,
                   configPath,
                 }),
@@ -163,32 +163,12 @@ export function createDbVerifyCommand(): Command {
                 message: 'Verifying database schema...',
                 flags,
               },
-            )) as VerifyDatabaseResult;
+            )) as VerifyDatabaseSchemaResult;
           } catch (error) {
-            // Wrap errors from verify() in structured error
-            throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-              why: `Failed to verify database: ${error instanceof Error ? error.message : String(error)}`,
+            // Wrap errors from schemaVerify() in structured error
+            throw errorRuntime(error instanceof Error ? error.message : String(error), {
+              why: `Failed to verify database schema: ${error instanceof Error ? error.message : String(error)}`,
             });
-          }
-
-          // If verification failed, throw structured error
-          if (!verifyResult.ok && verifyResult.code) {
-            if (verifyResult.code === 'PN-RTM-3001') {
-              throw errorMarkerMissing();
-            }
-            if (verifyResult.code === 'PN-RTM-3002') {
-              throw errorHashMismatch({
-                expected: verifyResult.contract.coreHash,
-                ...(verifyResult.marker?.coreHash ? { actual: verifyResult.marker.coreHash } : {}),
-              });
-            }
-            if (verifyResult.code === 'PN-RTM-3003') {
-              throw errorTargetMismatch(
-                verifyResult.target.expected,
-                verifyResult.target.actual ?? 'unknown',
-              );
-            }
-            throw errorRuntime(verifyResult.summary);
           }
 
           // Add blank line after all async operations if spinners were shown
@@ -196,7 +176,8 @@ export function createDbVerifyCommand(): Command {
             console.log('');
           }
 
-          return verifyResult;
+          // Return result (don't throw for logical mismatches - handle exit code separately)
+          return schemaVerifyResult;
         } finally {
           // Ensure driver connection is closed
           await driver.close();
@@ -204,24 +185,29 @@ export function createDbVerifyCommand(): Command {
       });
 
       // Handle result - formats output and returns exit code
-      const exitCode = handleResult(result, flags, (verifyResult) => {
+      const exitCode = handleResult(result, flags, (schemaVerifyResult) => {
         // Output based on flags
         if (flags.json === 'object') {
           // JSON output to stdout
-          console.log(formatVerifyJson(verifyResult));
+          console.log(formatSchemaVerifyJson(schemaVerifyResult));
         } else {
           // Human-readable output to stdout
-          const output = formatVerifyOutput(verifyResult, flags);
+          const output = formatSchemaVerifyOutput(schemaVerifyResult, flags);
           if (output) {
             console.log(output);
           }
-          // Output success message if verification passed
-          if (verifyResult.ok && !flags.quiet) {
-            console.log(formatSuccessMessage(flags));
-          }
         }
       });
-      process.exit(exitCode);
+
+      // For logical schema mismatches, check if verification passed
+      // Infra errors already handled by handleResult (returns non-zero exit code)
+      if (result.ok && !result.value.ok) {
+        // Schema verification failed - exit with code 1
+        process.exit(1);
+      } else {
+        // Success or infra error - use exit code from handleResult
+        process.exit(exitCode);
+      }
     });
 
   return command;

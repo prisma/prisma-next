@@ -1,5 +1,5 @@
 import { relative } from 'node:path';
-import { bgGreen, blue, bold, cyan, dim, green, magenta, red } from 'colorette';
+import { bgGreen, blue, bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { Command } from 'commander';
 import stringWidth from 'string-width';
 import stripAnsi from 'strip-ansi';
@@ -21,7 +21,9 @@ export interface EmitContractResult {
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
   IntrospectSchemaResult,
+  SchemaVerificationNode,
   VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import type { CliErrorEnvelope } from './cli-errors';
 import { getLongDescription } from './command-helpers';
@@ -367,6 +369,280 @@ export function formatIntrospectOutput(
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Renders a schema verification tree structure from SchemaVerificationNode.
+ * Similar to renderSchemaTree but for verification nodes with status-based colors and glyphs.
+ */
+function renderSchemaVerificationTree(
+  node: SchemaVerificationNode,
+  flags: GlobalFlags,
+  options: {
+    readonly isLast: boolean;
+    readonly prefix: string;
+    readonly useColor: boolean;
+    readonly formatDimText: (text: string) => string;
+    readonly isRoot?: boolean;
+  },
+): string[] {
+  const { isLast, prefix, useColor, formatDimText, isRoot = false } = options;
+  const lines: string[] = [];
+
+  // Format status glyph and color based on status
+  let statusGlyph = '';
+  let statusColor: (text: string) => string = (text) => text;
+  if (useColor) {
+    switch (node.status) {
+      case 'pass':
+        statusGlyph = '✓';
+        statusColor = green;
+        break;
+      case 'warn':
+        statusGlyph = '⚠';
+        statusColor = (text) => (useColor ? yellow(text) : text);
+        break;
+      case 'fail':
+        statusGlyph = '✖';
+        statusColor = red;
+        break;
+    }
+  } else {
+    switch (node.status) {
+      case 'pass':
+        statusGlyph = '✓';
+        break;
+      case 'warn':
+        statusGlyph = '⚠';
+        break;
+      case 'fail':
+        statusGlyph = '✖';
+        break;
+    }
+  }
+
+  // Format node label with color based on kind
+  // For column nodes, we need to parse the name to color code different parts
+  let labelColor: (text: string) => string = (text) => text;
+  let formattedLabel: string = node.name;
+
+  if (useColor) {
+    switch (node.kind) {
+      case 'contract':
+      case 'schema':
+        labelColor = bold;
+        formattedLabel = labelColor(node.name);
+        break;
+      case 'table': {
+        // Parse "table tableName" format - color "table" dim, tableName cyan
+        const tableMatch = node.name.match(/^table\s+(.+)$/);
+        if (tableMatch?.[1]) {
+          const tableName = tableMatch[1];
+          formattedLabel = `${dim('table')} ${cyan(tableName)}`;
+        } else {
+          formattedLabel = dim(node.name);
+        }
+        break;
+      }
+      case 'columns':
+        labelColor = dim;
+        formattedLabel = labelColor(node.name);
+        break;
+      case 'column': {
+        // Parse column name format: "columnName: contractType → nativeType (nullability)"
+        // Color code: column name (cyan), contract type (default), native type (dim), nullability (dim)
+        const columnMatch = node.name.match(/^([^:]+):\s*(.+)$/);
+        if (columnMatch?.[1] && columnMatch[2]) {
+          const columnName = columnMatch[1];
+          const rest = columnMatch[2];
+          // Parse rest: "contractType → nativeType (nullability)"
+          // Match contract type (can contain /, @, etc.), arrow, native type, then nullability in parentheses
+          const typeMatch = rest.match(/^([^\s→]+)\s*→\s*([^\s(]+)\s*(\([^)]+\))$/);
+          if (typeMatch?.[1] && typeMatch[2] && typeMatch[3]) {
+            const contractType = typeMatch[1];
+            const nativeType = typeMatch[2];
+            const nullability = typeMatch[3];
+            formattedLabel = `${cyan(columnName)}: ${contractType} → ${dim(nativeType)} ${dim(nullability)}`;
+          } else {
+            // Fallback if format doesn't match (e.g., no native type or no nullability)
+            formattedLabel = `${cyan(columnName)}: ${rest}`;
+          }
+        } else {
+          formattedLabel = node.name;
+        }
+        break;
+      }
+      case 'type':
+      case 'nullability':
+        labelColor = (text) => text; // Default color
+        formattedLabel = labelColor(node.name);
+        break;
+      case 'primaryKey': {
+        // Parse "primary key: columnName" format - color "primary key" dim, columnName cyan
+        const pkMatch = node.name.match(/^primary key:\s*(.+)$/);
+        if (pkMatch?.[1]) {
+          const columnNames = pkMatch[1];
+          formattedLabel = `${dim('primary key')}: ${cyan(columnNames)}`;
+        } else {
+          formattedLabel = dim(node.name);
+        }
+        break;
+      }
+      case 'foreignKey':
+      case 'unique':
+      case 'index':
+        labelColor = dim;
+        formattedLabel = labelColor(node.name);
+        break;
+      case 'extension': {
+        // Parse specific extension message formats
+        // "database is postgres" -> dim "database is", cyan "postgres"
+        const dbMatch = node.name.match(/^database is\s+(.+)$/);
+        if (dbMatch?.[1]) {
+          const dbName = dbMatch[1];
+          formattedLabel = `${dim('database is')} ${cyan(dbName)}`;
+        } else {
+          // "vector extension is enabled" -> dim everything except extension name
+          // Match pattern: "extensionName extension is enabled"
+          const extMatch = node.name.match(/^([^\s]+)\s+(extension is enabled)$/);
+          if (extMatch?.[1] && extMatch[2]) {
+            const extName = extMatch[1];
+            const rest = extMatch[2];
+            formattedLabel = `${cyan(extName)} ${dim(rest)}`;
+          } else {
+            // Fallback: color entire name with magenta
+            labelColor = magenta;
+            formattedLabel = labelColor(node.name);
+          }
+        }
+        break;
+      }
+      default:
+        formattedLabel = node.name;
+        break;
+    }
+  } else {
+    formattedLabel = node.name;
+  }
+
+  const statusGlyphColored = statusColor(statusGlyph);
+
+  // Build the label with optional message for failure/warn nodes
+  let nodeLabel = formattedLabel;
+  if (
+    (node.status === 'fail' || node.status === 'warn') &&
+    node.message &&
+    node.message.length > 0
+  ) {
+    // Always show message for failure/warn nodes - it provides crucial context
+    // For parent nodes, the message summarizes child failures
+    // For leaf nodes, the message explains the specific issue
+    const messageText = formatDimText(`(${node.message})`);
+    nodeLabel = `${formattedLabel} ${messageText}`;
+  }
+
+  // Root node renders without tree characters or │ prefix
+  if (isRoot) {
+    lines.push(`${statusGlyphColored} ${nodeLabel}`);
+  } else {
+    // Determine tree character for this node
+    const treeChar = isLast ? '└' : '├';
+    const treePrefix = `${prefix}${formatDimText(treeChar)}─ `;
+    // Root's direct children don't have │ prefix, other nodes do
+    const isRootChild = prefix === '';
+    // Check if prefix already contains │ (strip ANSI codes for comparison)
+    const prefixWithoutAnsi = stripAnsi(prefix);
+    const prefixHasVerticalBar = prefixWithoutAnsi.includes('│');
+    if (isRootChild) {
+      lines.push(`${treePrefix}${statusGlyphColored} ${nodeLabel}`);
+    } else if (prefixHasVerticalBar) {
+      // Prefix already has │, so just use treePrefix directly
+      lines.push(`${treePrefix}${statusGlyphColored} ${nodeLabel}`);
+    } else {
+      lines.push(`${formatDimText('│')} ${treePrefix}${statusGlyphColored} ${nodeLabel}`);
+    }
+  }
+
+  // Render children if present
+  if (node.children && node.children.length > 0) {
+    // For root node, children start with no prefix (they'll add their own tree characters)
+    // For other nodes, calculate child prefix based on whether this is last
+    const childPrefix = isRoot ? '' : isLast ? `${prefix}   ` : `${prefix}${formatDimText('│')}  `;
+    for (let i = 0; i < node.children.length; i++) {
+      const child = node.children[i];
+      if (!child) continue;
+      const isLastChild = i === node.children.length - 1;
+      const childLines = renderSchemaVerificationTree(child, flags, {
+        isLast: isLastChild,
+        prefix: childPrefix,
+        useColor,
+        formatDimText,
+        isRoot: false,
+      });
+      lines.push(...childLines);
+    }
+  }
+
+  return lines;
+}
+
+/**
+ * Formats human-readable output for database schema verification.
+ */
+export function formatSchemaVerifyOutput(
+  result: VerifyDatabaseSchemaResult,
+  flags: GlobalFlags,
+): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatRed = createColorFormatter(useColor, red);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  // Render verification tree first
+  const treeLines = renderSchemaVerificationTree(result.schema.root, flags, {
+    isLast: true,
+    prefix: '',
+    useColor,
+    formatDimText,
+    isRoot: true,
+  });
+  // Apply prefix (for timestamps) to each tree line
+  const prefixedTreeLines = treeLines.map((line) => `${prefix}${line}`);
+  lines.push(...prefixedTreeLines);
+
+  // Add counts and timings in verbose mode
+  if (isVerbose(flags, 1)) {
+    lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    lines.push(
+      `${prefix}${formatDimText(`  pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
+    );
+  }
+
+  // Blank line before summary
+  lines.push('');
+
+  // Summary line at the end: summary with status glyph
+  if (result.ok) {
+    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
+  } else {
+    const codeText = result.code ? ` (${result.code})` : '';
+    lines.push(`${prefix}${formatRed('✖')} ${result.summary}${codeText}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Formats JSON output for database schema verification.
+ */
+export function formatSchemaVerifyJson(result: VerifyDatabaseSchemaResult): string {
+  return JSON.stringify(result, null, 2);
 }
 
 // ============================================================================

@@ -16,6 +16,13 @@ const TypesImportSpecSchema = type({
   alias: 'string',
 });
 
+const StorageTypeMetadataSchema = type({
+  typeId: 'string',
+  familyId: 'string',
+  targetId: 'string',
+  'nativeType?': 'string',
+});
+
 const ExtensionPackManifestSchema = type({
   id: 'string',
   version: 'string',
@@ -28,6 +35,7 @@ const ExtensionPackManifestSchema = type({
     'operationTypes?': type({
       import: TypesImportSpecSchema,
     }),
+    'storage?': StorageTypeMetadataSchema.array(),
   }),
   'operations?': 'unknown[]',
 });

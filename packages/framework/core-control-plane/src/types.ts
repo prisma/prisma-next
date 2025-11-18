@@ -323,6 +323,22 @@ export interface SchemaIssue {
 }
 
 /**
+ * Contract-shaped verification tree node for schema verification results.
+ * Family-agnostic structure that follows the contract structure.
+ */
+export interface SchemaVerificationNode {
+  readonly status: 'pass' | 'warn' | 'fail';
+  readonly kind: string;
+  readonly name: string;
+  readonly contractPath: string;
+  readonly code: string;
+  readonly message: string;
+  readonly expected: unknown;
+  readonly actual: unknown;
+  readonly children: readonly SchemaVerificationNode[];
+}
+
+/**
  * Result type for database schema verification operations.
  */
 export interface VerifyDatabaseSchemaResult {
@@ -339,6 +355,13 @@ export interface VerifyDatabaseSchemaResult {
   };
   readonly schema: {
     readonly issues: readonly SchemaIssue[];
+    readonly root: SchemaVerificationNode;
+    readonly counts: {
+      readonly pass: number;
+      readonly warn: number;
+      readonly fail: number;
+      readonly totalNodes: number;
+    };
   };
   readonly meta?: {
     readonly configPath?: string;

@@ -258,6 +258,12 @@ export interface ExtensionPackManifest {
     readonly operationTypes?: {
       readonly import: TypesImportSpec;
     };
+    readonly storage?: readonly {
+      readonly typeId: string;
+      readonly familyId: string;
+      readonly targetId: string;
+      readonly nativeType?: string;
+    }[];
   };
   readonly operations?: ReadonlyArray<OperationManifest>;
 }
