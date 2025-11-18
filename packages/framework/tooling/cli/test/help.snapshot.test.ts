@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { describe, expect, it } from 'vitest';
 import { createContractEmitCommand } from '../src/commands/contract-emit';
+import { createDbIntrospectCommand } from '../src/commands/db-introspect';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
 import { parseGlobalFlags } from '../src/utils/global-flags';
 import { formatCommandHelp, formatRootHelp } from '../src/utils/output';
@@ -59,6 +60,15 @@ describe('help text snapshots', () => {
 
   it('formats contract emit help with no color', () => {
     const command = createContractEmitCommand();
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const helpText = formatCommandHelp({ command, flags });
+
+    expect(helpText).toMatchSnapshot();
+  });
+
+  it('formats db introspect help', () => {
+    const command = createDbIntrospectCommand();
+    // Explicitly disable colors for consistent snapshots
     const flags = parseGlobalFlags({ 'no-color': true });
     const helpText = formatCommandHelp({ command, flags });
 
