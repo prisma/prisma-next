@@ -24,6 +24,7 @@ import {
 } from '../utils/output';
 import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
+import { withSpinner } from '../utils/spinner';
 
 interface DbSchemaVerifyOptions {
   readonly db?: string;
@@ -128,7 +129,10 @@ export function createDbSchemaVerifyCommand(): Command {
         const driverDescriptor = config.driver;
 
         // Create driver
-        const driver = await driverDescriptor.create(dbUrl);
+        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+          message: 'Connecting to database...',
+          flags,
+        });
 
         try {
           // Create family instance
@@ -146,18 +150,30 @@ export function createDbSchemaVerifyCommand(): Command {
           // Call family instance schemaVerify method
           let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {
-            schemaVerifyResult = (await typedFamilyInstance.schemaVerify({
-              driver,
-              contractIR,
-              strict: options.strict ?? false,
-              contractPath,
-              configPath,
-            })) as VerifyDatabaseSchemaResult;
+            schemaVerifyResult = (await withSpinner(
+              () =>
+                typedFamilyInstance.schemaVerify({
+                  driver,
+                  contractIR,
+                  strict: options.strict ?? false,
+                  contractPath,
+                  configPath,
+                }),
+              {
+                message: 'Verifying database schema...',
+                flags,
+              },
+            )) as VerifyDatabaseSchemaResult;
           } catch (error) {
             // Wrap errors from schemaVerify() in structured error
             throw errorRuntime(error instanceof Error ? error.message : String(error), {
               why: `Failed to verify database schema: ${error instanceof Error ? error.message : String(error)}`,
             });
+          }
+
+          // Add blank line after all async operations if spinners were shown
+          if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
+            console.log('');
           }
 
           // Return result (don't throw for logical mismatches - handle exit code separately)
