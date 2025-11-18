@@ -51,7 +51,7 @@ describe('family instance sign', () => {
       async ({ connectionString: cs }) => {
         connectionString = cs;
       },
-      { acceleratePort: 54180, databasePort: 54181, shadowDatabasePort: 54182 },
+      { acceleratePort: 54250, databasePort: 54251, shadowDatabasePort: 54252 },
     );
   }, timeouts.spinUpPpgDev);
 

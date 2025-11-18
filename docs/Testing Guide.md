@@ -456,6 +456,7 @@ database = await createDevDatabase({
 - `marker.test.ts`: 54216-54218
 - `e2e-tests/runtime.e2e.test.ts`: 54020-54112 (multiple tests, each with unique range)
 - `db-introspect.e2e.test.ts`: 54210-54212, 54213-54215
+- `sign-database.test.ts`: 54250-54252
 
 **When adding new test suites:** Assign a new port range and document it here.
 
