@@ -4,13 +4,13 @@ SQL family descriptor for Prisma Next.
 
 ## Purpose
 
-Provides the SQL family descriptor (`FamilyDescriptor`) that includes:
+Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - The SQL target family hook (`sqlTargetFamilyHook`)
 - Factory method (`create()`) to create family instances
 
 ## Responsibilities
 
-- **Family Descriptor Export**: Exports the SQL `FamilyDescriptor` for use in CLI configuration files
+- **Family Descriptor Export**: Exports the SQL `ControlFamilyDescriptor` for use in CLI configuration files
 - **Family Instance Creation**: Creates `SqlFamilyInstance` objects that implement control-plane domain actions (`verify`, `schemaVerify`, `introspect`, `emitContract`, `validateContractIR`)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
@@ -20,8 +20,9 @@ Provides the SQL family descriptor (`FamilyDescriptor`) that includes:
 ```typescript
 import sql from '@prisma-next/family-sql/control';
 
-// sql is a FamilyDescriptor with:
+// sql is a ControlFamilyDescriptor with:
 // - kind: 'family'
+// - id: 'sql'
 // - familyId: 'sql'
 // - hook: TargetFamilyHook
 // - create: (options) => SqlFamilyInstance
@@ -30,6 +31,7 @@ import sql from '@prisma-next/family-sql/control';
 const familyInstance = sql.create({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
+  driver: postgresDriverDescriptor, // Required
   extensions: [pgVectorExtensionDescriptor],
 });
 
@@ -60,7 +62,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 
 ## Package Structure
 
-- **`src/core/descriptor.ts`**: `SqlFamilyDescriptor` class implementing `FamilyDescriptor` interface (pure data + factory)
+- **`src/core/descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
 - **`src/core/instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
 - **`src/core/assembly.ts`**: Assembly helpers for building operation registries and extracting type imports from descriptors. Test utilities import `convertOperationManifest` from the same package via relative path.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
@@ -74,8 +76,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 
 ## Dependencies
 
-- **`@prisma-next/cli`**: CLI descriptor types (`FamilyDescriptor`, `OperationManifest`)
-- **`@prisma-next/core-control-plane`**: Control plane types (`ControlPlaneDriver`, `AdapterDescriptor`, etc.)
+- **`@prisma-next/core-control-plane`**: Control plane types (`ControlFamilyDescriptor`, `ControlTargetDescriptor`, `ControlAdapterDescriptor`, `ControlDriverDescriptor`, `ControlExtensionDescriptor`, `ControlDriverInstance`, etc.)
 - **`@prisma-next/sql-contract-emitter`**: SQL target family hook (`sqlTargetFamilyHook`)
 - **`@prisma-next/sql-contract-ts`**: Contract validation (`validateContract`)
 - **`@prisma-next/sql-contract`**: SQL contract types (`SqlContract`, `SqlStorage`)

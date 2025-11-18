@@ -52,6 +52,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Responsibilities
 - `.cursor/rules/adapter-capability-declaration.mdc` — Adapter capability declaration (manifest + code)
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
+- `.cursor/rules/control-plane-descriptors.mdc` — Control plane descriptor pattern (Control*Descriptor types, driver requirement)
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.

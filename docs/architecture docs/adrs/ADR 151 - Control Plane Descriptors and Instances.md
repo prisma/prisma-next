@@ -1,6 +1,6 @@
 # ADR 151 - Control Plane Descriptors and Instances
 
-**Status:** Proposed
+**Status:** Implemented
 **Date:** 2025-11-18
 **Authors:** Prisma Next Team
 **Domain:** Core, Families, Targets, Adapters, Drivers, Extensions
@@ -287,26 +287,26 @@ Non-goals for this ADR:
 - **Runtime vs control drift**: Control and runtime planes might diverge over time
   - Mitigation: A follow-up ADR defines a mirrored pattern for the execution plane
 
-### Migration plan (control plane)
+### Migration plan (control plane) - COMPLETED
 
-1. Introduce the new `Control*Descriptor` and `Control*Instance` interfaces in `@prisma-next/core-control-plane`
-2. Refactor existing core types to align with the new interfaces:
-   - `DriverDescriptor` → `ControlDriverDescriptor`
-   - `FamilyDescriptor` → `ControlFamilyDescriptor`
-   - `FamilyInstance` → `ControlFamilyInstance`
-   - `ControlPlaneDriver` → `ControlDriverInstance`
-3. Update the SQL family:
-   - Ensure `SqlControlAdapter` extends `ControlAdapterInstance<'sql', TTarget>`
-   - Introduce `SqlControlFamily` (family-specific interface) extending `ControlFamilyInstance<'sql'>`
-4. Update Postgres packs:
+1. ✅ Introduced the new `Control*Descriptor` and `Control*Instance` interfaces in `@prisma-next/core-control-plane`
+2. ✅ Removed legacy types completely:
+   - `DriverDescriptor` → removed (use `ControlDriverDescriptor`)
+   - `FamilyDescriptor` → removed (use `ControlFamilyDescriptor`)
+   - `ControlPlaneDriver` → removed (use `ControlDriverInstance`)
+   - `AdapterDescriptor`, `TargetDescriptor`, `ExtensionDescriptor` → removed (use `Control*Descriptor` variants)
+3. ✅ Updated the SQL family:
+   - `SqlControlAdapter` extends `ControlAdapterInstance<'sql', TTarget>`
+   - `SqlControlFamilyInstance` (family-specific interface) extends `ControlFamilyInstance<'sql'>`
+4. ✅ Updated Postgres packs:
    - `@prisma-next/targets-postgres/control` exports a default `ControlTargetDescriptor<'sql','postgres'>`
    - `@prisma-next/targets-postgres-adapter/control` exports a default `ControlAdapterDescriptor<'sql','postgres'>`
    - `@prisma-next/targets-postgres-driver/control` exports a default `ControlDriverDescriptor<'sql','postgres'>`
-5. Update `defineConfig` and CLI config types to expect `Control*Descriptor` shapes for the control plane
-6. Run and extend tests around:
-   - Config loading and validation
-   - `db verify` and introspection flows
-   - SQL family control-plane tests (introspect, verify)
+5. ✅ Updated `defineConfig` and CLI config types to expect `Control*Descriptor` shapes exclusively
+6. ✅ Updated all tests and CLI commands to use `Control*Descriptor` types
+7. ✅ Retained `FamilyInstance` interface for CLI command handlers (provides full method set: `validateContractIR`, `verify`, `schemaVerify`, `introspect`, `emitContract`, `toSchemaView`)
+
+**Note**: `ControlFamilyDescriptor.create()` requires a `driver` parameter even for commands that don't use it (e.g., `contract emit`) to ensure consistent descriptor patterns.
 
 ## References
 

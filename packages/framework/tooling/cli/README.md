@@ -45,6 +45,32 @@ Emit `contract.json` and `contract.d.ts` from `config.contract`.
 prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
 ```
 
+**Config File Requirements:**
+
+The `contract emit` command requires a `driver` in the config (even though it doesn't use it) because `ControlFamilyDescriptor.create()` requires it for consistency:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import postgres from '@prisma-next/targets-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import { contract } from './prisma/contract';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver, // Required even though emit doesn't use it
+  extensions: [],
+  contract: {
+    source: contract,
+    output: 'src/prisma/contract.json',
+    types: 'src/prisma/contract.d.ts',
+  },
+});
+```
+
 Options:
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
@@ -135,7 +161,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, and extensions to create a family instance
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
 4. **Verify**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
