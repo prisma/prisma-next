@@ -156,7 +156,7 @@ export function createDbVerifyCommand(): Command {
                   driver,
                   contractIR,
                   expectedTargetId: config.target.targetId,
-                  contractPath,
+                  contractPath: contractPathAbsolute,
                   configPath,
                 }),
               {
