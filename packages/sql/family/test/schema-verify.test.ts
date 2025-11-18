@@ -1,14 +1,14 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import postgresDriver from '@prisma-next/driver-postgres/control';
-import pgvector from '@prisma-next/extension-pgvector/control';
-import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgres from '@prisma-next/targets-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import pgvector from '../../../extensions/pgvector/src/exports/control';
+import postgres from '../../../targets/postgres/src/exports/control';
 import type { CodecTypes } from '../../../targets/postgres-adapter/src/core/codecs';
+import postgresAdapter from '../../../targets/postgres-adapter/src/exports/control';
+import postgresDriver from '../../../targets/postgres-driver/src/exports/control';
+import sql from '../src/exports/control';
 
 describe('family instance schemaVerify', () => {
   let connectionString: string | undefined;
@@ -72,7 +72,7 @@ describe('family instance schemaVerify', () => {
             .column('userId', { type: 'pg/int4@1', nullable: false })
             .column('title', { type: 'pg/text@1', nullable: false })
             .primaryKey(['id'])
-            .foreignKey(['userId'], 'user', ['id'])
+            .foreignKey(['userId'], { table: 'user', columns: ['id'] })
             .index(['userId']),
         )
         .build();
@@ -455,7 +455,7 @@ describe('family instance schemaVerify', () => {
             .column('userId', { type: 'pg/int4@1', nullable: false })
             .column('title', { type: 'pg/text@1', nullable: false })
             .primaryKey(['id'])
-            .foreignKey(['userId'], 'user', ['id']),
+            .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
         )
         .build();
 
