@@ -1,3 +1,5 @@
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type { FamilyInstance, IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -348,7 +350,13 @@ describe('db introspect command', () => {
         validateContractIR: vi.fn((x) => x),
       } as unknown as FamilyInstance<string>;
 
-      // Mock loadConfig with contract.output
+      // Create real contract file on disk (relative to test directory, same as config)
+      const contractPath = resolve(testSetup.testDir, 'contract.json');
+      const contractData = { target: 'postgres', storage: { tables: {} } };
+      writeFileSync(contractPath, JSON.stringify(contractData), 'utf-8');
+
+      // Mock loadConfig with contract.output pointing to the real file
+      // Note: resolve() in the command resolves relative to CWD, so we use absolute path
       const originalLoadConfig = await import('../src/config-loader');
       vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
         family: {
@@ -365,15 +373,9 @@ describe('db introspect command', () => {
         },
         db: { url: 'postgresql://user:pass@localhost/test' },
         contract: {
-          output: './contract.json',
+          output: contractPath, // Use absolute path so resolve() finds it
         },
       } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
-
-      // Mock readFile to return contract JSON
-      const fsPromises = await import('node:fs/promises');
-      const _readFileSpy = vi
-        .spyOn(fsPromises, 'readFile')
-        .mockResolvedValue(JSON.stringify({ target: 'postgres', storage: { tables: {} } }));
 
       const command = createDbIntrospectCommand();
       const exitCode = await executeCommand(command, ['--config', configPath]);
@@ -400,7 +402,12 @@ describe('db introspect command', () => {
         validateContractIR: vi.fn((x) => x),
       } as unknown as FamilyInstance<string>;
 
-      // Mock loadConfig with contract.output
+      // Create a contract file with invalid JSON (causes parse error, not ENOENT)
+      const contractPath = resolve(testSetup.testDir, 'contract.json');
+      writeFileSync(contractPath, 'invalid json content', 'utf-8');
+
+      // Mock loadConfig with contract.output pointing to the invalid file
+      // Note: resolve() in the command resolves relative to CWD, so we use absolute path
       const originalLoadConfig = await import('../src/config-loader');
       vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
         family: {
@@ -417,17 +424,12 @@ describe('db introspect command', () => {
         },
         db: { url: 'postgresql://user:pass@localhost/test' },
         contract: {
-          output: './contract.json',
+          output: contractPath, // Use absolute path so resolve() finds it
         },
       } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
 
-      // Mock readFile to throw a non-ENOENT error
-      const fsPromises = await import('node:fs/promises');
-      const readError = new Error('Permission denied');
-      (readError as { code?: string }).code = 'EACCES';
-      const _readFileSpy = vi.spyOn(fsPromises, 'readFile').mockRejectedValue(readError);
-
       const command = createDbIntrospectCommand();
+      // Should throw error when trying to parse invalid JSON
       await expect(executeCommand(command, ['--config', configPath])).rejects.toThrow();
     } finally {
       cleanupDir();

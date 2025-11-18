@@ -447,7 +447,11 @@ describe('PostgresControlAdapter', () => {
               ] as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          // Check for PRIMARY KEY query first (more specific)
+          if (
+            sql.includes("constraint_type = 'PRIMARY KEY'") &&
+            !sql.includes("constraint_type = 'UNIQUE'")
+          ) {
             return {
               rows: [
                 {
@@ -461,8 +465,8 @@ describe('PostgresControlAdapter', () => {
           if (sql.includes('FOREIGN KEY')) {
             return { rows: [] as Row[] };
           }
-          if (sql.includes('UNIQUE') && sql.includes('NOT IN')) {
-            // Unique constraint query (excludes primary keys)
+          // Check for UNIQUE query (excludes primary keys) - must have both UNIQUE constraint_type and NOT IN
+          if (sql.includes("constraint_type = 'UNIQUE'") && sql.includes('NOT IN')) {
             return {
               rows: [
                 {
