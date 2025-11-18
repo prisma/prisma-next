@@ -121,7 +121,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54220, databasePort: 54221, shadowDatabasePort: 54222 },
+        { acceleratePort: 54283, databasePort: 54284, shadowDatabasePort: 54285 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -480,7 +480,7 @@ describe('db schema-verify command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54232, databasePort: 54233, shadowDatabasePort: 54234 },
+        { acceleratePort: 54280, databasePort: 54281, shadowDatabasePort: 54282 },
       );
     },
     timeouts.spinUpPpgDev,

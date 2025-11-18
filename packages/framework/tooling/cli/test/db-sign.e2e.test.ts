@@ -186,7 +186,7 @@ describe('db sign command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54230, databasePort: 54231, shadowDatabasePort: 54232 },
+        { acceleratePort: 54260, databasePort: 54261, shadowDatabasePort: 54262 },
       );
     },
     timeouts.spinUpPpgDev,
@@ -269,7 +269,7 @@ describe('db sign command (e2e)', () => {
             cleanupDir();
           }
         },
-        { acceleratePort: 54240, databasePort: 54241, shadowDatabasePort: 54242 },
+        { acceleratePort: 54270, databasePort: 54271, shadowDatabasePort: 54272 },
       );
     },
     timeouts.spinUpPpgDev,

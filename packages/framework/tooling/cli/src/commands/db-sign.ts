@@ -184,17 +184,30 @@ export function createDbSignCommand(): Command {
           // Schema verification passed - proceed with signing
           let signResult: SignDatabaseResult;
           try {
-            signResult = (await typedFamilyInstance.sign({
-              driver,
-              contractIR,
-              contractPath: contractPathAbsolute,
-              configPath,
-            })) as SignDatabaseResult;
+            signResult = await withSpinner(
+              async () => {
+                return (await typedFamilyInstance.sign({
+                  driver,
+                  contractIR,
+                  contractPath: contractPathAbsolute,
+                  configPath,
+                })) as SignDatabaseResult;
+              },
+              {
+                message: 'Signing database...',
+                flags,
+              },
+            );
           } catch (error) {
             // Wrap errors from sign() in structured error
             throw errorRuntime(error instanceof Error ? error.message : String(error), {
               why: `Failed to sign database: ${error instanceof Error ? error.message : String(error)}`,
             });
+          }
+
+          // Add blank line after all async operations if spinners were shown
+          if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
+            console.log('');
           }
 
           return { schemaVerifyResult: undefined, signResult };

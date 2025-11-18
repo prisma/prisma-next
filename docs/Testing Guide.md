@@ -458,6 +458,8 @@ database = await createDevDatabase({
 - `e2e-tests/runtime.joins.test.ts`: 54039-54041, 54045-54047, 54130-54132, 54140-54142, 54185-54187
 - `db-introspect.e2e.test.ts`: 54210-54212, 54213-54215
 - `sign-database.test.ts`: 54250-54252
+- `db-sign.e2e.test.ts`: 54220-54222, 54260-54262, 54270-54272
+- `db-schema-verify.e2e.test.ts`: 54223-54225, 54226-54228, 54229-54231, 54280-54282, 54283-54285
 
 **When adding new test suites:** Assign a new port range and document it here.
 

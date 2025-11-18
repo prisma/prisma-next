@@ -589,7 +589,7 @@ describe('db introspect command', () => {
     // This executes the callback configured in configureHelp()
     const helpText = command.helpInformation();
     // Verify help output is present (formatHelp callback was executed)
-    expect(helpText).toContain('Inspect the live database schema');
+    expect(helpText).toContain('Inspect the database schema');
     expect(helpText).toContain('--db <url>');
     expect(helpText).toContain('--config <path>');
   });
