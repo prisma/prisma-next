@@ -122,15 +122,18 @@ export function createDbVerifyCommand(): Command {
           throw errorDriverRequired();
         }
 
+        // Store driver descriptor after null check
+        const driverDescriptor = config.driver;
+
         // Create driver
-        const driver = await config.driver.create(dbUrl);
+        const driver = await driverDescriptor.create(dbUrl);
 
         try {
           // Create family instance
           const familyInstance = config.family.create({
             target: config.target,
             adapter: config.adapter,
-            driver: config.driver!,
+            driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
           const typedFamilyInstance = familyInstance as FamilyInstance<string>;

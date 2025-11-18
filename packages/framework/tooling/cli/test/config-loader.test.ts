@@ -28,6 +28,7 @@ describe('config loader', () => {
     export default {
       family: {
         kind: 'family',
+        id: 'sql',
         familyId: 'sql',
         manifest: { id: 'sql', version: '0.0.1' },
         hook: mockHook,
@@ -38,8 +39,9 @@ describe('config loader', () => {
           introspect: async () => ({ tables: {}, extensions: [] }),
         }),
       },
-      target: { kind: 'target', familyId: 'sql', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' } },
-      adapter: { kind: 'adapter', familyId: 'sql', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' } },
+      target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+      adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+      driver: { kind: 'driver', familyId: 'sql', targetId: 'postgres', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' }, create: async () => ({ targetId: 'postgres', query: async () => ({ rows: [] }), close: async () => {} }) },
       extensions: [],
     };`;
   };
@@ -67,6 +69,7 @@ describe('config loader', () => {
       export const config = {
         family: {
           kind: 'family',
+          id: 'sql',
           familyId: 'sql',
           manifest: { id: 'sql', version: '0.0.1' },
           hook: mockHook,
@@ -78,8 +81,9 @@ describe('config loader', () => {
             introspect: async () => ({ tables: {}, extensions: [] }),
           }),
         },
-        target: { kind: 'target', familyId: 'sql', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' } },
-        adapter: { kind: 'adapter', familyId: 'sql', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' } },
+        target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+        adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+        driver: { kind: 'driver', familyId: 'sql', targetId: 'postgres', id: 'postgres', manifest: { id: 'postgres', version: '1.0.0' }, create: async () => ({ targetId: 'postgres', query: async () => ({ rows: [] }), close: async () => {} }) },
         extensions: [],
       };
       export default config;`,

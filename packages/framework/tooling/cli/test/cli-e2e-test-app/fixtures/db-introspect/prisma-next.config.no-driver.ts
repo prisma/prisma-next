@@ -1,15 +1,15 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { defineConfig } from '@prisma-next/cli/config-types';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/targets-postgres/control';
 import { contract } from './contract';
 
 // This config does not include driver
-export default defineConfig({
+// Manually create config without defineConfig to bypass validation (testing error case)
+export default {
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  // driver is missing
+  // driver is missing - this is what we're testing
   extensions: [],
   contract: {
     source: contract,
@@ -19,4 +19,4 @@ export default defineConfig({
   db: {
     url: '{{DB_URL}}', // Placeholder to be replaced in tests
   },
-});
+};

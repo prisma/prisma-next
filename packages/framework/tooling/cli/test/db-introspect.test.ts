@@ -215,6 +215,24 @@ describe('db introspect command', () => {
     const cleanupDir = testSetup.cleanup;
 
     try {
+      // Mock loadConfig to return config without db.url (bypassing validation)
+      const originalLoadConfig = await import('../src/config-loader');
+      vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn(),
+        },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        driver: {
+          create: vi.fn().mockResolvedValue({
+            query: vi.fn(),
+            close: vi.fn().mockResolvedValue(undefined),
+          }),
+        },
+        // db.url is missing - this is what we're testing
+      } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+
       const command = createDbIntrospectCommand();
       await expect(executeCommand(command, ['--config', configPath])).rejects.toThrow();
     } finally {
@@ -232,6 +250,19 @@ describe('db introspect command', () => {
     const cleanupDir = testSetup.cleanup;
 
     try {
+      // Mock loadConfig to return config without driver (bypassing validation)
+      const originalLoadConfig = await import('../src/config-loader');
+      vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn(),
+        },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        // driver is missing - this is what we're testing
+        db: { url: 'postgresql://user:pass@localhost/test' },
+      } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+
       const command = createDbIntrospectCommand();
       await expect(executeCommand(command, ['--config', configPath])).rejects.toThrow();
     } finally {
