@@ -41,7 +41,7 @@ export function createDbIntrospectCommand(): Command {
   const command = new Command('introspect');
   setCommandDescriptions(
     command,
-    'Inspect the live database schema',
+    'Inspect the database schema',
     'Reads the live database schema and displays it as a tree structure. This command\n' +
       'does not check the schema against your contract - it only shows what exists in\n' +
       'the database. Use `db verify` or `db schema-verify` to compare against your contract.',
@@ -111,7 +111,7 @@ export function createDbIntrospectCommand(): Command {
           }
           const header = formatStyledHeader({
             command: 'db introspect',
-            description: 'Inspect live database schema',
+            description: 'Inspect the database schema',
             url: 'https://pris.ly/db-introspect',
             details,
             flags,

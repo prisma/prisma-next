@@ -48,7 +48,7 @@ export function createDbSignCommand(): Command {
   const command = new Command('sign');
   setCommandDescriptions(
     command,
-    'Mark database as matching emitted contract',
+    'Sign the database with your contract so you can safely run queries',
     'Verifies that your database schema satisfies the emitted contract, and if so, writes or\n' +
       'updates the contract marker in the database. This command is idempotent and safe to run\n' +
       'in CI/deployment pipelines. The marker records that this database instance is aligned\n' +
@@ -97,7 +97,7 @@ export function createDbSignCommand(): Command {
           }
           const header = formatStyledHeader({
             command: 'db sign',
-            description: 'Mark database as matching emitted contract',
+            description: 'Sign the database with your contract so you can safely run queries',
             url: 'https://pris.ly/db-sign',
             details,
             flags,

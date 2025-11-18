@@ -45,7 +45,7 @@ export function createDbVerifyCommand(): Command {
   const command = new Command('verify');
   setCommandDescriptions(
     command,
-    'Check the database satisfies your contract',
+    'Check whether the database has been signed with your contract',
     'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
       'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
   );
@@ -92,7 +92,7 @@ export function createDbVerifyCommand(): Command {
           }
           const header = formatStyledHeader({
             command: 'db verify',
-            description: 'Verify database matches emitted contract',
+            description: 'Check whether the database has been signed with your contract',
             url: 'https://pris.ly/db-verify',
             details,
             flags,

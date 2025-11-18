@@ -35,7 +35,7 @@ export function createContractEmitCommand(): Command {
   const command = new Command('emit');
   setCommandDescriptions(
     command,
-    'Emit signed contract artifacts',
+    'Write your contract to JSON and sign it',
     'Reads your contract source (TypeScript or Prisma schema) and emits contract.json and\n' +
       'contract.d.ts. The contract.json contains the canonical contract structure, and\n' +
       'contract.d.ts provides TypeScript types for type-safe query building.',
@@ -92,7 +92,7 @@ export function createContractEmitCommand(): Command {
           const typesPath = relative(process.cwd(), outputDtsPath);
           const header = formatStyledHeader({
             command: 'contract emit',
-            description: 'Write contract artifacts',
+            description: 'Write your contract to JSON and sign it',
             url: 'https://pris.ly/contract-emit',
             details: [
               { label: 'config', value: configPath },

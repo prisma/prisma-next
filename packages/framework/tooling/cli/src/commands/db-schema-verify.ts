@@ -46,7 +46,7 @@ export function createDbSchemaVerifyCommand(): Command {
   const command = new Command('schema-verify');
   setCommandDescriptions(
     command,
-    'Verify database schema satisfies emitted contract',
+    'Check whether the database schema satisfies your contract',
     'Verifies that your database schema satisfies the emitted contract. Compares table structures,\n' +
       'column types, constraints, and extensions. Reports any mismatches via a contract-shaped\n' +
       'verification tree. This is a read-only operation that does not modify the database.',
@@ -95,7 +95,7 @@ export function createDbSchemaVerifyCommand(): Command {
           }
           const header = formatStyledHeader({
             command: 'db schema-verify',
-            description: 'Verify database schema satisfies emitted contract',
+            description: 'Check whether the database schema satisfies your contract',
             url: 'https://pris.ly/db-schema-verify',
             details,
             flags,
