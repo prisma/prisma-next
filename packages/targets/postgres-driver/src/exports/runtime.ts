@@ -54,8 +54,9 @@ function loadDriverManifest(): ExtensionPackManifest {
 
 /**
  * Postgres runtime driver instance interface.
- * SqlDriver already implements RuntimeDriverInstance shape (execute, explain, close).
- * We use intersection type to ensure both interfaces are satisfied.
+ * SqlDriver provides SQL-specific methods (execute, explain, close).
+ * RuntimeDriverInstance provides target identification (targetId).
+ * We use intersection type to combine both interfaces.
  */
 export type PostgresRuntimeDriver = RuntimeDriverInstance<'postgres'> & SqlDriver;
 

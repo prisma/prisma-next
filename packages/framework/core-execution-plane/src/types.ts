@@ -50,12 +50,6 @@ export interface RuntimeAdapterInstance<
  */
 export interface RuntimeDriverInstance<TTargetId extends string = string> {
   readonly targetId?: TTargetId;
-  execute<Row = Record<string, unknown>>(request: {
-    sql: string;
-    params?: readonly unknown[];
-  }): AsyncIterable<Row>;
-  explain?(request: { sql: string; params?: readonly unknown[] }): Promise<unknown>;
-  close(): Promise<void>;
 }
 
 /**
