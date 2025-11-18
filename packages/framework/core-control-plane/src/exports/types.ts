@@ -14,6 +14,7 @@ export type {
   FamilyInstance,
   IntrospectSchemaResult,
   SchemaIssue,
+  SchemaVerificationNode,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../types';

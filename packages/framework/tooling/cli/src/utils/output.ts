@@ -1,5 +1,5 @@
 import { relative } from 'node:path';
-import { bgGreen, blue, bold, cyan, dim, green, magenta, red } from 'colorette';
+import { bgGreen, blue, bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { Command } from 'commander';
 import stringWidth from 'string-width';
 import stripAnsi from 'strip-ansi';
@@ -21,7 +21,9 @@ export interface EmitContractResult {
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
   IntrospectSchemaResult,
+  SchemaVerificationNode,
   VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import type { CliErrorEnvelope } from './cli-errors';
 import { getLongDescription } from './command-helpers';
@@ -367,6 +369,190 @@ export function formatIntrospectOutput(
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Renders a schema verification tree structure from SchemaVerificationNode.
+ * Similar to renderSchemaTree but for verification nodes with status-based colors and glyphs.
+ */
+function renderSchemaVerificationTree(
+  node: SchemaVerificationNode,
+  flags: GlobalFlags,
+  options: {
+    readonly isLast: boolean;
+    readonly prefix: string;
+    readonly useColor: boolean;
+    readonly formatDimText: (text: string) => string;
+    readonly isRoot?: boolean;
+  },
+): string[] {
+  const { isLast, prefix, useColor, formatDimText, isRoot = false } = options;
+  const lines: string[] = [];
+
+  // Format status glyph and color based on status
+  let statusGlyph = '';
+  let statusColor: (text: string) => string = (text) => text;
+  if (useColor) {
+    switch (node.status) {
+      case 'pass':
+        statusGlyph = '✓';
+        statusColor = green;
+        break;
+      case 'warn':
+        statusGlyph = '⚠';
+        statusColor = (text) => (useColor ? yellow(text) : text);
+        break;
+      case 'fail':
+        statusGlyph = '✖';
+        statusColor = red;
+        break;
+    }
+  } else {
+    switch (node.status) {
+      case 'pass':
+        statusGlyph = '✓';
+        break;
+      case 'warn':
+        statusGlyph = '⚠';
+        break;
+      case 'fail':
+        statusGlyph = '✖';
+        break;
+    }
+  }
+
+  // Format node label with color based on kind
+  let labelColor: (text: string) => string = (text) => text;
+  if (useColor) {
+    switch (node.kind) {
+      case 'schema':
+        labelColor = bold;
+        break;
+      case 'table':
+        labelColor = cyan;
+        break;
+      case 'column':
+      case 'type':
+      case 'nullability':
+        labelColor = (text) => text; // Default color
+        break;
+      case 'primaryKey':
+      case 'foreignKey':
+      case 'unique':
+      case 'index':
+        labelColor = dim;
+        break;
+      case 'extension':
+        labelColor = magenta;
+        break;
+      default:
+        break;
+    }
+  }
+
+  const statusGlyphColored = statusColor(statusGlyph);
+  const labelColored = labelColor(node.name);
+
+  // Root node renders without tree characters or │ prefix
+  if (isRoot) {
+    lines.push(`${statusGlyphColored} ${labelColored}`);
+  } else {
+    // Determine tree character for this node
+    const treeChar = isLast ? '└' : '├';
+    const treePrefix = `${prefix}${formatDimText(treeChar)}─ `;
+    // Root's direct children don't have │ prefix, other nodes do
+    const isRootChild = prefix === '';
+    // Check if prefix already contains │ (strip ANSI codes for comparison)
+    const prefixWithoutAnsi = stripAnsi(prefix);
+    const prefixHasVerticalBar = prefixWithoutAnsi.includes('│');
+    if (isRootChild) {
+      lines.push(`${treePrefix}${statusGlyphColored} ${labelColored}`);
+    } else if (prefixHasVerticalBar) {
+      // Prefix already has │, so just use treePrefix directly
+      lines.push(`${treePrefix}${statusGlyphColored} ${labelColored}`);
+    } else {
+      lines.push(`${formatDimText('│')} ${treePrefix}${statusGlyphColored} ${labelColored}`);
+    }
+  }
+
+  // Render children if present
+  if (node.children && node.children.length > 0) {
+    // For root node, children start with no prefix (they'll add their own tree characters)
+    // For other nodes, calculate child prefix based on whether this is last
+    const childPrefix = isRoot ? '' : isLast ? `${prefix}   ` : `${prefix}${formatDimText('│')}  `;
+    for (let i = 0; i < node.children.length; i++) {
+      const child = node.children[i];
+      if (!child) continue;
+      const isLastChild = i === node.children.length - 1;
+      const childLines = renderSchemaVerificationTree(child, flags, {
+        isLast: isLastChild,
+        prefix: childPrefix,
+        useColor,
+        formatDimText,
+        isRoot: false,
+      });
+      lines.push(...childLines);
+    }
+  }
+
+  return lines;
+}
+
+/**
+ * Formats human-readable output for database schema verification.
+ */
+export function formatSchemaVerifyOutput(
+  result: VerifyDatabaseSchemaResult,
+  flags: GlobalFlags,
+): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatRed = createColorFormatter(useColor, red);
+  const _formatYellow = createColorFormatter(useColor, yellow);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  // First line: summary with status glyph
+  if (result.ok) {
+    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
+  } else {
+    const codeText = result.code ? ` (${result.code})` : '';
+    lines.push(`${prefix}${formatRed('✖')} ${result.summary}${codeText}`);
+  }
+
+  // Render verification tree
+  const treeLines = renderSchemaVerificationTree(result.schema.root, flags, {
+    isLast: true,
+    prefix: '',
+    useColor,
+    formatDimText,
+    isRoot: true,
+  });
+  // Apply prefix (for timestamps) to each tree line
+  const prefixedTreeLines = treeLines.map((line) => `${prefix}${line}`);
+  lines.push(...prefixedTreeLines);
+
+  // Add counts and timings in verbose mode
+  if (isVerbose(flags, 1)) {
+    lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    lines.push(
+      `${prefix}${formatDimText(`  pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Formats JSON output for database schema verification.
+ */
+export function formatSchemaVerifyJson(result: VerifyDatabaseSchemaResult): string {
+  return JSON.stringify(result, null, 2);
 }
 
 // ============================================================================
