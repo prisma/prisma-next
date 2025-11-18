@@ -1,0 +1,80 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`db introspect command (e2e) > outputs JSON envelope with real database 1`] = `
+{
+  "meta": {
+    "configPath": "./prisma-next.config.ts",
+    "dbUrl": "postgres://postgres:****@127.0.0.1:XXXXX/postgres?connection_limit=1&connect_timeout=0&max_idle_connection_lifetime=0&pool_timeout=0&socket_timeout=0&sslmode=disable",
+  },
+  "ok": true,
+  "schema": {
+    "annotations": {
+      "pg": {
+        "schema": "public",
+        "version": "17.4",
+      },
+    },
+    "extensions": [
+      "plpgsql",
+    ],
+    "tables": {
+      "user": {
+        "columns": {
+          "email": {
+            "name": "email",
+            "nativeType": "text",
+            "nullable": false,
+            "typeId": "unmapped",
+          },
+          "id": {
+            "name": "id",
+            "nativeType": "int4",
+            "nullable": false,
+            "typeId": "unmapped",
+          },
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "name": "user",
+        "primaryKey": {
+          "columns": [
+            "id",
+          ],
+          "name": "user_pkey",
+        },
+        "uniques": [],
+      },
+    },
+  },
+  "summary": "Schema introspected successfully",
+  "target": {
+    "familyId": "sql",
+    "id": "postgres",
+  },
+  "timings": {
+    "total": 0,
+  },
+}
+`;
+
+exports[`db introspect command (e2e) > outputs tree structure with real database 1`] = `
+"prisma-next db introspect → Inspect live database schema
+│
+│ config:               ./prisma-next.config.ts
+│ database:             postgres://postgres:****@127.0.0.1:XXXXX/postgres?connection_limit=1&connect_timeout=0&max_idle_connection_lifetime=0&pool_timeout=0&socket_timeout=0&sslmode=disable
+│
+│ Read more             https://pris.ly/db-introspect
+└
+
+sql schema (tables: 2)
+├─ table post
+│  ├─ id: int4 (not null)
+│  ├─ title: text (not null)
+│  └─ userId: int4 (null)
+├─ table user
+│  ├─ id: int4 (not null)
+│  ├─ email: text (not null)
+│  ├─ name: text (null)
+│  └─ unique index user_email_unique
+└─ extension plpgsql"
+`;
