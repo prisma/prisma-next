@@ -248,9 +248,18 @@ describe('db sign command (e2e)', () => {
             const jsonText = output.substring(firstBrace, lastBrace + 1);
             const jsonOutput = JSON.parse(jsonText);
 
-            // Normalize non-deterministic values (timing) for snapshot
+            // Normalize non-deterministic values (timing, contractPath) for snapshot
             const normalized = {
               ...jsonOutput,
+              meta: {
+                ...jsonOutput.meta,
+                contractPath: jsonOutput.meta?.contractPath
+                  ? jsonOutput.meta.contractPath.replace(
+                      /test-\d+-[a-z0-9]+/,
+                      'test-XXXXXXXX-XXXXXXXX',
+                    )
+                  : jsonOutput.meta?.contractPath,
+              },
               timings: {
                 total: expect.any(Number),
               },
