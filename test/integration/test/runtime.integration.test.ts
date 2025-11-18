@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -25,7 +24,6 @@ const adapter = createPostgresAdapter();
 
 describe('runtime execute integration', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   /** Raw Postgres client for direct interaction with the database */
   let client: Client;
 
@@ -37,10 +35,6 @@ describe('runtime execute integration', () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    sharedDriver = createPostgresDriverFromOptions({
-      connect: { client: client },
-      cursor: { disabled: true },
-    });
   }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
@@ -69,9 +63,16 @@ describe('runtime execute integration', () => {
   });
 
   it('executes a plan after onFirstUse verification', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -95,9 +96,16 @@ describe('runtime execute integration', () => {
       coreHash: 'sha256:mismatch',
     };
 
-    const runtime = createTestRuntime(mismatchedContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-    });
+    const runtime = createTestRuntime(
+      mismatchedContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -115,10 +123,17 @@ describe('runtime execute integration', () => {
   });
 
   it('blocks raw select star with lint error', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-      plugins: [lints()],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+        plugins: [lints()],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw`
@@ -139,10 +154,17 @@ describe('runtime execute integration', () => {
   });
 
   it('warns on missing limit and blocks via budget heuristic', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-      plugins: [lints(), budgets()],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+        plugins: [lints(), budgets()],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw`
@@ -158,10 +180,17 @@ describe('runtime execute integration', () => {
   });
 
   it('records unindexed predicate warning when refs lack indexes', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-      plugins: [lints()],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+        plugins: [lints()],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw('select id from "user" where email = $1 limit $2', {
@@ -182,10 +211,17 @@ describe('runtime execute integration', () => {
   });
 
   it('prevents read-only mutation when annotations intent is report', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-      plugins: [lints()],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+        plugins: [lints()],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw('insert into "user" (email) values ($1)', {
@@ -202,15 +238,22 @@ describe('runtime execute integration', () => {
   });
 
   it('respects unbounded select severity override', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-      plugins: [
-        budgets({
-          severities: { rowCount: 'warn' },
-        }),
-      ],
-      mode: 'permissive',
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+        plugins: [
+          budgets({
+            severities: { rowCount: 'warn' },
+          }),
+        ],
+        mode: 'permissive',
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw`
@@ -224,16 +267,23 @@ describe('runtime execute integration', () => {
   });
 
   it('attaches explain estimates when enabled', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-      plugins: [
-        budgets({
-          explain: { enabled: true },
-          severities: { rowCount: 'warn' },
-        }),
-      ],
-      mode: 'permissive',
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+        plugins: [
+          budgets({
+            explain: { enabled: true },
+            severities: { rowCount: 'warn' },
+          }),
+        ],
+        mode: 'permissive',
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const rawPlan = sql({ context }).raw`
@@ -248,9 +298,16 @@ describe('runtime execute integration', () => {
   });
 
   it('emits stable fingerprint for literal-only differences', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const planOne = sql({ context }).raw(

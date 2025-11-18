@@ -39,7 +39,7 @@ describe('end-to-end nested projection queries', () => {
             });
 
             const adapter = createPostgresAdapter();
-            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            const runtime = createTestRuntimeFromClient(contract, client);
             try {
               const context = createRuntimeContext({ contract, adapter, extensions: [] });
               const tables = schema<Contract>(context).tables;
@@ -121,7 +121,7 @@ describe('end-to-end nested projection queries', () => {
             });
 
             const adapter = createPostgresAdapter();
-            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            const runtime = createTestRuntimeFromClient(contract, client);
             try {
               const context = createRuntimeContext({ contract, adapter, extensions: [] });
               const tables = schema<Contract>(context).tables;
@@ -206,7 +206,7 @@ describe('end-to-end nested projection queries', () => {
             });
 
             const adapter = createPostgresAdapter();
-            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            const runtime = createTestRuntimeFromClient(contract, client);
             try {
               const context = createRuntimeContext({ contract, adapter, extensions: [] });
               const tables = schema(context).tables;
@@ -296,7 +296,7 @@ describe('end-to-end nested projection queries', () => {
             });
 
             const adapter = createPostgresAdapter();
-            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            const runtime = createTestRuntimeFromClient(contract, client);
             try {
               const context = createRuntimeContext({ contract, adapter, extensions: [] });
               const tables = schema(context).tables;

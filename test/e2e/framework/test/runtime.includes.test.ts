@@ -61,7 +61,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
 
             const adapter = createPostgresAdapter();
             const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            const runtime = createTestRuntimeFromClient(contract, client);
             try {
               const tables = schema<ContractWithCapabilities>(context).tables;
               const user = tables['user']!;
@@ -150,7 +150,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
 
             const adapter = createPostgresAdapter();
             const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            const runtime = createTestRuntimeFromClient(contract, client);
             try {
               const tables = schema<ContractWithCapabilities>(context).tables;
               const user = tables['user']!;
@@ -225,7 +225,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
 
             const adapter = createPostgresAdapter();
             const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            const runtime = createTestRuntimeFromClient(contract, client);
             try {
               const tables = schema<Contract>(context).tables;
               const user = tables['user']!;
@@ -305,7 +305,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
 
             const adapter = createPostgresAdapter();
             const context = createRuntimeContext({ contract, adapter, extensions: [] });
-            const runtime = createTestRuntimeFromClient(contract, client, adapter);
+            const runtime = createTestRuntimeFromClient(contract, client);
             try {
               const tables = schema<Contract>(context).tables;
               const user = tables['user']!;

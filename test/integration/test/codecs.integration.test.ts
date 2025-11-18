@@ -1,5 +1,4 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -52,7 +51,6 @@ const fixtureContract = validateContract(fixtureContractRaw);
 
 describe('Codecs Integration Tests', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
   const adapter = createPostgresAdapter();
 
@@ -64,10 +62,6 @@ describe('Codecs Integration Tests', () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    sharedDriver = createPostgresDriverFromOptions({
-      connect: { client },
-      cursor: { disabled: true },
-    });
   }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
@@ -98,9 +92,16 @@ describe('Codecs Integration Tests', () => {
   });
 
   it('encodes JS Date parameter to ISO string', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     const createDate = new Date('2024-01-15T10:30:00Z');
 
@@ -138,9 +139,16 @@ describe('Codecs Integration Tests', () => {
   });
 
   it('decodes timestamptz to ISO string', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     // Insert test data with ISO string timestamp
     await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
@@ -173,9 +181,16 @@ describe('Codecs Integration Tests', () => {
   });
 
   it('round-trips numbers correctly', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
       'Test User',
@@ -205,9 +220,16 @@ describe('Codecs Integration Tests', () => {
   });
 
   it('round-trips strings correctly', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
       'Test User',
@@ -237,9 +259,16 @@ describe('Codecs Integration Tests', () => {
   });
 
   it('uses codec override via annotations.codecs', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
       'Test User',
@@ -286,9 +315,16 @@ describe('Codecs Integration Tests', () => {
     // First, alter table to allow nullable created_at for this test
     await client.query('ALTER TABLE test_data ALTER COLUMN created_at DROP NOT NULL');
 
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
       'Test User',
@@ -315,9 +351,16 @@ describe('Codecs Integration Tests', () => {
   });
 
   it('decodes multiple columns with different types', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
       'Test User',
@@ -353,9 +396,16 @@ describe('Codecs Integration Tests', () => {
   });
 
   it('uses codec assignments from contract column types', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
       'Test User',
@@ -394,9 +444,16 @@ describe('Codecs Integration Tests', () => {
   });
 
   it('uses codec assignments from contract column types for WHERE clause parameters', async () => {
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      },
+    );
 
     await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
       'Test User',
