@@ -24,6 +24,8 @@ describe('db introspect command', () => {
 
   afterEach(() => {
     cleanupMocks();
+    // Restore all mocks to ensure clean state
+    vi.restoreAllMocks();
   });
 
   it('outputs tree when toSchemaView is available', async () => {
@@ -324,6 +326,256 @@ describe('db introspect command', () => {
 
       // Verify driver.close was called
       expect(mockClose).toHaveBeenCalled();
+    } finally {
+      cleanupDir();
+    }
+  });
+
+  it('loads contract when contract.output is configured', async () => {
+    const testSetup = setupTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.with-db.ts',
+      { '{{DB_URL}}': 'postgresql://user:pass@localhost/test' },
+    );
+    const configPath = testSetup.configPath;
+    const cleanupDir = testSetup.cleanup;
+
+    try {
+      const mockSchemaIR = { tables: { user: { columns: {} } } };
+      const mockFamilyInstance = {
+        introspect: vi.fn().mockResolvedValue(mockSchemaIR),
+        toSchemaView: undefined,
+        validateContractIR: vi.fn((x) => x),
+      } as unknown as FamilyInstance<string>;
+
+      // Mock loadConfig with contract.output
+      const originalLoadConfig = await import('../src/config-loader');
+      vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn().mockReturnValue(mockFamilyInstance),
+        },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        driver: {
+          create: vi.fn().mockResolvedValue({
+            query: vi.fn(),
+            close: vi.fn().mockResolvedValue(undefined),
+          }),
+        },
+        db: { url: 'postgresql://user:pass@localhost/test' },
+        contract: {
+          output: './contract.json',
+        },
+      } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+
+      // Mock readFile to return contract JSON
+      const fsPromises = await import('node:fs/promises');
+      const _readFileSpy = vi
+        .spyOn(fsPromises, 'readFile')
+        .mockResolvedValue(JSON.stringify({ target: 'postgres', storage: { tables: {} } }));
+
+      const command = createDbIntrospectCommand();
+      const exitCode = await executeCommand(command, ['--config', configPath]);
+
+      expect(exitCode).toBe(0);
+      expect(mockFamilyInstance.validateContractIR).toHaveBeenCalled();
+    } finally {
+      cleanupDir();
+    }
+  });
+
+  it('handles contract file read errors (non-ENOENT)', async () => {
+    const testSetup = setupTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.with-db.ts',
+      { '{{DB_URL}}': 'postgresql://user:pass@localhost/test' },
+    );
+    const configPath = testSetup.configPath;
+    const cleanupDir = testSetup.cleanup;
+
+    try {
+      const mockFamilyInstance = {
+        introspect: vi.fn(),
+        validateContractIR: vi.fn((x) => x),
+      } as unknown as FamilyInstance<string>;
+
+      // Mock loadConfig with contract.output
+      const originalLoadConfig = await import('../src/config-loader');
+      vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn().mockReturnValue(mockFamilyInstance),
+        },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        driver: {
+          create: vi.fn().mockResolvedValue({
+            query: vi.fn(),
+            close: vi.fn().mockResolvedValue(undefined),
+          }),
+        },
+        db: { url: 'postgresql://user:pass@localhost/test' },
+        contract: {
+          output: './contract.json',
+        },
+      } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+
+      // Mock readFile to throw a non-ENOENT error
+      const fsPromises = await import('node:fs/promises');
+      const readError = new Error('Permission denied');
+      (readError as { code?: string }).code = 'EACCES';
+      const _readFileSpy = vi.spyOn(fsPromises, 'readFile').mockRejectedValue(readError);
+
+      const command = createDbIntrospectCommand();
+      await expect(executeCommand(command, ['--config', configPath])).rejects.toThrow();
+    } finally {
+      cleanupDir();
+    }
+  });
+
+  it('uses --db option when provided', async () => {
+    const testSetup = setupTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.with-db.ts',
+      { '{{DB_URL}}': 'postgresql://user:pass@localhost/test' },
+    );
+    const configPath = testSetup.configPath;
+    const cleanupDir = testSetup.cleanup;
+
+    try {
+      const mockSchemaIR = { tables: { user: { columns: {} } } };
+      const mockFamilyInstance = {
+        introspect: vi.fn().mockResolvedValue(mockSchemaIR),
+        toSchemaView: undefined,
+        validateContractIR: vi.fn((x) => x),
+      } as unknown as FamilyInstance<string>;
+
+      // Mock loadConfig
+      const originalLoadConfig = await import('../src/config-loader');
+      vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn().mockReturnValue(mockFamilyInstance),
+        },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        driver: {
+          create: vi.fn().mockResolvedValue({
+            query: vi.fn(),
+            close: vi.fn().mockResolvedValue(undefined),
+          }),
+        },
+        db: { url: 'postgresql://config:pass@localhost/test' },
+      } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+
+      const command = createDbIntrospectCommand();
+      const exitCode = await executeCommand(command, [
+        '--config',
+        configPath,
+        '--db',
+        'postgresql://option:pass@localhost/test',
+      ]);
+
+      expect(exitCode).toBe(0);
+      // Verify that --db option takes precedence
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('postgresql://option:****@localhost/test');
+    } finally {
+      cleanupDir();
+    }
+  });
+
+  it('handles toSchemaView errors gracefully', async () => {
+    const testSetup = setupTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.with-db.ts',
+      { '{{DB_URL}}': 'postgresql://user:pass@localhost/test' },
+    );
+    const configPath = testSetup.configPath;
+    const cleanupDir = testSetup.cleanup;
+
+    try {
+      const mockSchemaIR = { tables: { user: { columns: {} } } };
+      const mockFamilyInstance = {
+        introspect: vi.fn().mockResolvedValue(mockSchemaIR),
+        toSchemaView: vi.fn().mockImplementation(() => {
+          throw new Error('Schema view failed');
+        }),
+        validateContractIR: vi.fn((x) => x),
+      } as unknown as FamilyInstance<string>;
+
+      // Mock loadConfig
+      const originalLoadConfig = await import('../src/config-loader');
+      vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn().mockReturnValue(mockFamilyInstance),
+        },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        driver: {
+          create: vi.fn().mockResolvedValue({
+            query: vi.fn(),
+            close: vi.fn().mockResolvedValue(undefined),
+          }),
+        },
+        db: { url: 'postgresql://user:pass@localhost/test' },
+      } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+
+      const command = createDbIntrospectCommand();
+      // Should not throw - error is logged but command succeeds
+      const exitCode = await executeCommand(command, ['--config', configPath, '--verbose']);
+
+      expect(exitCode).toBe(0);
+      expect(mockFamilyInstance.toSchemaView).toHaveBeenCalled();
+    } finally {
+      cleanupDir();
+    }
+  });
+
+  it('outputs in quiet mode', async () => {
+    const testSetup = setupTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.with-db.ts',
+      { '{{DB_URL}}': 'postgresql://user:pass@localhost/test' },
+    );
+    const configPath = testSetup.configPath;
+    const cleanupDir = testSetup.cleanup;
+
+    try {
+      const mockSchemaIR = { tables: { user: { columns: {} } } };
+      const mockFamilyInstance = {
+        introspect: vi.fn().mockResolvedValue(mockSchemaIR),
+        toSchemaView: undefined,
+        validateContractIR: vi.fn((x) => x),
+      } as unknown as FamilyInstance<string>;
+
+      // Mock loadConfig
+      const originalLoadConfig = await import('../src/config-loader');
+      vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn().mockReturnValue(mockFamilyInstance),
+        },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        driver: {
+          create: vi.fn().mockResolvedValue({
+            query: vi.fn(),
+            close: vi.fn().mockResolvedValue(undefined),
+          }),
+        },
+        db: { url: 'postgresql://user:pass@localhost/test' },
+      } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+
+      const command = createDbIntrospectCommand();
+      const exitCode = await executeCommand(command, ['--config', configPath, '--quiet']);
+
+      expect(exitCode).toBe(0);
+      // In quiet mode, header should not be printed
+      const output = consoleOutput.join('\n');
+      expect(output).not.toContain('db introspect');
     } finally {
       cleanupDir();
     }

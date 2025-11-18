@@ -101,7 +101,7 @@ function renderSelect(ast: SelectAst, contract?: PostgresContract): string {
 function renderProjection(ast: SelectAst, contract?: PostgresContract): string {
   return ast.project
     .map((item) => {
-      const expr = item.expr as ColumnRef | IncludeRef | OperationExpr;
+      const expr = item.expr as ColumnRef | IncludeRef | OperationExpr | LiteralExpr;
       if (expr.kind === 'includeRef') {
         // For include references, select the column from the LATERAL join alias
         // The LATERAL subquery returns a single column (the JSON array) with the alias
@@ -114,6 +114,11 @@ function renderProjection(ast: SelectAst, contract?: PostgresContract): string {
         const operation = renderOperation(expr, contract);
         const alias = quoteIdentifier(item.alias);
         return `${operation} AS ${alias}`;
+      }
+      if (expr.kind === 'literal') {
+        const literal = renderLiteral(expr);
+        const alias = quoteIdentifier(item.alias);
+        return `${literal} AS ${alias}`;
       }
       const column = renderColumn(expr as ColumnRef);
       const alias = quoteIdentifier(item.alias);

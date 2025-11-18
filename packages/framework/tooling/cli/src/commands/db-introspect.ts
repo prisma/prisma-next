@@ -97,7 +97,9 @@ export function createDbIntrospectCommand(): Command {
             { label: 'config', value: configPath },
           ];
           if (options.db) {
-            details.push({ label: 'database', value: options.db });
+            // Mask password in URL for security
+            const maskedUrl = options.db.replace(/:([^:@]+)@/, ':****@');
+            details.push({ label: 'database', value: maskedUrl });
           } else if (config.db?.url) {
             // Mask password in URL for security
             const maskedUrl = config.db.url.replace(/:([^:@]+)@/, ':****@');
