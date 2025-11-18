@@ -19,7 +19,6 @@ import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
   formatStyledHeader,
-  formatSuccessMessage,
   formatVerifyJson,
   formatVerifyOutput,
 } from '../utils/output';
@@ -72,7 +71,10 @@ export function createDbVerifyCommand(): Command {
       const result = await performAction(async () => {
         // Load config (file I/O)
         const config = await loadConfig(options.config);
-        const configPath = options.config || './prisma-next.config.ts';
+        // Normalize config path for display (match contract path format - no ./ prefix)
+        const configPath = options.config
+          ? relative(process.cwd(), resolve(options.config))
+          : 'prisma-next.config.ts';
         const contractPathAbsolute = config.contract?.output
           ? resolve(config.contract.output)
           : resolve('src/prisma/contract.json');
@@ -214,10 +216,6 @@ export function createDbVerifyCommand(): Command {
           const output = formatVerifyOutput(verifyResult, flags);
           if (output) {
             console.log(output);
-          }
-          // Output success message if verification passed
-          if (verifyResult.ok && !flags.quiet) {
-            console.log(formatSuccessMessage(flags));
           }
         }
       });

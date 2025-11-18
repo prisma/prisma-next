@@ -76,7 +76,10 @@ export function createDbSignCommand(): Command {
       const result = await performAction(async () => {
         // Load config (file I/O)
         const config = await loadConfig(options.config);
-        const configPath = options.config || './prisma-next.config.ts';
+        // Normalize config path for display (match contract path format - no ./ prefix)
+        const configPath = options.config
+          ? relative(process.cwd(), resolve(options.config))
+          : 'prisma-next.config.ts';
         const contractPathAbsolute = config.contract?.output
           ? resolve(config.contract.output)
           : resolve('src/prisma/contract.json');

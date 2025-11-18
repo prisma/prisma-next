@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
@@ -83,15 +83,21 @@ export function createContractEmitCommand(): Command {
 
         // Output header (only for human-readable output)
         if (flags.json !== 'object' && !flags.quiet) {
-          const configPath = options.config || './prisma-next.config.ts';
+          // Normalize config path for display (match contract path format - no ./ prefix)
+          const configPath = options.config
+            ? relative(process.cwd(), resolve(options.config))
+            : 'prisma-next.config.ts';
+          // Convert absolute paths to relative paths for display
+          const contractPath = relative(process.cwd(), outputJsonPath);
+          const typesPath = relative(process.cwd(), outputDtsPath);
           const header = formatStyledHeader({
             command: 'contract emit',
             description: 'Write contract artifacts',
             url: 'https://pris.ly/contract-emit',
             details: [
               { label: 'config', value: configPath },
-              { label: 'contract', value: outputJsonPath },
-              { label: 'types', value: outputDtsPath },
+              { label: 'contract', value: contractPath },
+              { label: 'types', value: typesPath },
             ],
             flags,
           });

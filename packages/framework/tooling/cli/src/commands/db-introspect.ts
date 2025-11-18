@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
@@ -70,7 +70,10 @@ export function createDbIntrospectCommand(): Command {
 
         // Load config (file I/O)
         const config = await loadConfig(options.config);
-        const configPath = options.config || './prisma-next.config.ts';
+        // Normalize config path for display (match contract path format - no ./ prefix)
+        const configPath = options.config
+          ? relative(process.cwd(), resolve(options.config))
+          : 'prisma-next.config.ts';
 
         // Optionally load contract if contract config exists
         let contractIR: unknown | undefined;
