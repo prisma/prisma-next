@@ -58,7 +58,7 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
 `;
 
 exports[`db introspect command (e2e) > outputs tree structure with real database 1`] = `
-"prisma-next db introspect → Inspect live database schema
+"prisma-next db introspect → Inspect the database schema
 │
 │ config:               prisma-next.config.ts
 │ database:             postgres://postgres:****@127.0.0.1:XXXXX/postgres?connection_limit=1&connect_timeout=0&max_idle_connection_lifetime=0&pool_timeout=0&socket_timeout=0&sslmode=disable
@@ -66,15 +66,19 @@ exports[`db introspect command (e2e) > outputs tree structure with real database
 │ Read more             https://pris.ly/db-introspect
 └
 
-sql schema (tables: 2)
+contract
 ├─ table post
-│  ├─ id: int4 (not null)
-│  ├─ title: text (not null)
-│  └─ userId: int4 (null)
+│  ├─ columns
+│  │  ├─ id: int4 (not nullable)
+│  │  ├─ title: text (not nullable)
+│  │  └─ userId: int4 (nullable)
+│  └─ primary key: id
 ├─ table user
-│  ├─ id: int4 (not null)
-│  ├─ email: text (not null)
-│  ├─ name: text (null)
+│  ├─ columns
+│  │  ├─ id: int4 (not nullable)
+│  │  ├─ email: text (not nullable)
+│  │  └─ name: text (nullable)
+│  ├─ primary key: id
 │  └─ unique index user_email_unique
-└─ extension plpgsql"
+└─ plpgsql extension is enabled"
 `;

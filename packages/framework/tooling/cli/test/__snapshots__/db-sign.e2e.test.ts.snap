@@ -1,29 +1,27 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`db sign command (e2e) > creates marker when schema matches contract 1`] = `
-"prisma-next contract emit → Write contract artifacts
-│
-│ config:               prisma-next.config.ts
-│ contract:             src/prisma/contract.json
-│ types:                src/prisma/contract.d.ts
-│
-│ Read more             https://pris.ly/contract-emit
-└
-
-✔ Emitted contract.json → src/prisma/contract.json
-✔ Emitted contract.d.ts → src/prisma/contract.d.ts
-  coreHash: sha256:52d7ac244766caf1dc02be39b650efb688c18bf0a30c4e6994800d1868d31a6e
-  profileHash: sha256:b2229734c651fdcaab54149b22bac70e00fa526125d84f3b41cbc67d3d8ee236
-✔ Success
-prisma-next db sign → Mark database as matching emitted contract
-│
-│ config:               prisma-next.config.ts
-│ contract:             src/prisma/contract.json
-│
-│ Read more             https://pris.ly/db-sign
-└
-
-✔ Database signed
-  from: none
-  to:   sha256:52d7ac244766caf1dc02be39b650efb688c18bf0a30c4e6994800d1868d31a6e"
+exports[`db sign command (e2e) > outputs JSON envelope with real database 1`] = `
+{
+  "contract": {
+    "coreHash": "sha256:52d7ac244766caf1dc02be39b650efb688c18bf0a30c4e6994800d1868d31a6e",
+    "profileHash": "sha256:b2229734c651fdcaab54149b22bac70e00fa526125d84f3b41cbc67d3d8ee236",
+  },
+  "marker": {
+    "created": true,
+    "updated": false,
+  },
+  "meta": {
+    "configPath": "prisma-next.config.ts",
+    "contractPath": "/Users/wmadden/Projects/prisma/skunkworks/prisma-next/packages/framework/tooling/cli/test/cli-e2e-test-app/test-1763482297007-4iowo9tvqq/src/prisma/contract.json",
+  },
+  "ok": true,
+  "summary": "Database signed (marker created)",
+  "target": {
+    "actual": "postgres",
+    "expected": "postgres",
+  },
+  "timings": {
+    "total": Any<Number>,
+  },
+}
 `;

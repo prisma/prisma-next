@@ -445,7 +445,7 @@ describe('end-to-end JOIN queries', () => {
             }
           });
         },
-        { acceleratePort: 54150, databasePort: 54151, shadowDatabasePort: 54152 },
+        { acceleratePort: 54185, databasePort: 54186, shadowDatabasePort: 54187 },
       );
     },
     timeouts.spinUpPpgDev,
