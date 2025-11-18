@@ -25,6 +25,7 @@ import {
 } from '../utils/output';
 import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
+import { withSpinner } from '../utils/spinner';
 
 interface DbVerifyOptions {
   readonly db?: string;
@@ -126,7 +127,10 @@ export function createDbVerifyCommand(): Command {
         const driverDescriptor = config.driver;
 
         // Create driver
-        const driver = await driverDescriptor.create(dbUrl);
+        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+          message: 'Connecting to database...',
+          flags,
+        });
 
         try {
           // Create family instance
@@ -144,13 +148,20 @@ export function createDbVerifyCommand(): Command {
           // Call family instance verify method
           let verifyResult: VerifyDatabaseResult;
           try {
-            verifyResult = (await typedFamilyInstance.verify({
-              driver,
-              contractIR,
-              expectedTargetId: config.target.targetId,
-              contractPath,
-              configPath,
-            })) as VerifyDatabaseResult;
+            verifyResult = (await withSpinner(
+              () =>
+                typedFamilyInstance.verify({
+                  driver,
+                  contractIR,
+                  expectedTargetId: config.target.targetId,
+                  contractPath,
+                  configPath,
+                }),
+              {
+                message: 'Verifying database schema...',
+                flags,
+              },
+            )) as VerifyDatabaseResult;
           } catch (error) {
             // Wrap errors from verify() in structured error
             throw errorUnexpected(error instanceof Error ? error.message : String(error), {
@@ -176,6 +187,11 @@ export function createDbVerifyCommand(): Command {
               );
             }
             throw errorRuntime(verifyResult.summary);
+          }
+
+          // Add blank line after all async operations if spinners were shown
+          if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
+            console.log('');
           }
 
           return verifyResult;
