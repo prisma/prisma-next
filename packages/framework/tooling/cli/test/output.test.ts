@@ -172,10 +172,6 @@ describe('formatIntrospectOutput', () => {
 
     const output = formatIntrospectOutput(result, schemaView, flags);
 
-    // Should contain ANSI color codes (for bold root, cyan entities, etc.)
-    // Note: formatDimText may not add ANSI codes if the text is already dimmed
-    // but labels should have colors applied
-    const _hasAnsiCodes = output.includes('\u001b[') || output.includes('\x1b[');
     // If colors are enabled, at least the root (bold) or entities (cyan) should have colors
     // For now, we'll check that the output is different from no-color mode
     const noColorOutput = formatIntrospectOutput(
