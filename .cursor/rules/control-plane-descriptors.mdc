@@ -1,3 +1,8 @@
+---
+description: Control plane descriptor and instance implementation patterns
+alwaysApply: true
+---
+
 # Control Plane Descriptors Pattern
 
 ## Overview

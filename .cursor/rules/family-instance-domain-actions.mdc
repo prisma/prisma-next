@@ -1,5 +1,6 @@
 ---
 description: Family instance domain action implementation patterns
+alwaysApply: true
 ---
 
 # Family Instance Domain Actions
