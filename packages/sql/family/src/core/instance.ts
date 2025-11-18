@@ -1718,21 +1718,21 @@ export function createSqlFamilyInstance(
     },
 
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
-      const tableCount = Object.keys(schema.tables).length;
-      const rootLabel = `sql schema (tables: ${tableCount})`;
+      const rootLabel = 'contract';
 
       // Build table nodes
       const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
         ([tableName, table]: [string, SqlTableIR]) => {
           const children: SchemaTreeNode[] = [];
 
-          // Add column nodes
+          // Add column nodes grouped under "columns"
+          const columnNodes: SchemaTreeNode[] = [];
           for (const [columnName, column] of Object.entries(table.columns)) {
-            const nullableText = column.nullable ? 'null' : 'not null';
+            const nullableText = column.nullable ? '(nullable)' : '(not nullable)';
             // Always display nativeType for introspection (database state), fall back to typeId if nativeType not available
             const typeDisplay = column.nativeType ?? column.typeId;
-            const label = `${columnName}: ${typeDisplay} (${nullableText})`;
-            children.push({
+            const label = `${columnName}: ${typeDisplay} ${nullableText}`;
+            columnNodes.push({
               kind: 'field',
               id: `column-${tableName}-${columnName}`,
               label,
@@ -1740,6 +1740,30 @@ export function createSqlFamilyInstance(
                 typeId: column.typeId,
                 nullable: column.nullable,
                 ...(column.nativeType ? { nativeType: column.nativeType } : {}),
+              },
+            });
+          }
+
+          // Add "columns" grouping node if there are columns
+          if (columnNodes.length > 0) {
+            children.push({
+              kind: 'collection',
+              id: `columns-${tableName}`,
+              label: 'columns',
+              children: columnNodes,
+            });
+          }
+
+          // Add primary key node if present
+          if (table.primaryKey) {
+            const pkColumns = table.primaryKey.columns.join(', ');
+            children.push({
+              kind: 'index',
+              id: `primary-key-${tableName}`,
+              label: `primary key: ${pkColumns}`,
+              meta: {
+                columns: table.primaryKey.columns,
+                ...(table.primaryKey.name ? { name: table.primaryKey.name } : {}),
               },
             });
           }
@@ -1802,11 +1826,11 @@ export function createSqlFamilyInstance(
         },
       );
 
-      // Add extension nodes
+      // Add extension nodes (format: "extensionName extension is enabled")
       const extensionNodes: readonly SchemaTreeNode[] = schema.extensions.map((extName) => ({
         kind: 'extension',
         id: `extension-${extName}`,
-        label: `extension ${extName}`,
+        label: `${extName} extension is enabled`,
       }));
 
       // Combine all children

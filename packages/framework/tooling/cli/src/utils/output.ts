@@ -235,7 +235,7 @@ export function formatIntrospectJson(result: IntrospectSchemaResult<unknown>): s
 
 /**
  * Renders a schema tree structure from CoreSchemaView.
- * Similar to renderCommandTree but for SchemaTreeNode structure.
+ * Matches the style of renderSchemaVerificationTree for consistency.
  */
 function renderSchemaTree(
   node: SchemaTreeNode,
@@ -251,36 +251,103 @@ function renderSchemaTree(
   const { isLast, prefix, useColor, formatDimText, isRoot = false } = options;
   const lines: string[] = [];
 
-  // Format node label with color based on kind
-  let labelColor: (text: string) => string = (text) => text;
+  // Format node label with color based on kind (matching schema-verify style)
+  let formattedLabel: string = node.label;
+
   if (useColor) {
     switch (node.kind) {
       case 'root':
-        labelColor = bold;
+        formattedLabel = bold(node.label);
         break;
-      case 'entity':
-      case 'collection':
-        labelColor = cyan;
+      case 'entity': {
+        // Parse "table tableName" format - color "table" dim, tableName cyan
+        const tableMatch = node.label.match(/^table\s+(.+)$/);
+        if (tableMatch?.[1]) {
+          const tableName = tableMatch[1];
+          formattedLabel = `${dim('table')} ${cyan(tableName)}`;
+        } else {
+          // Fallback: color entire label with cyan
+          formattedLabel = cyan(node.label);
+        }
         break;
-      case 'field':
-        labelColor = (text) => text; // Default color
+      }
+      case 'collection': {
+        // "columns" grouping node - dim the label
+        formattedLabel = dim(node.label);
         break;
-      case 'index':
-        labelColor = dim;
+      }
+      case 'field': {
+        // Parse column name format: "columnName: typeDisplay (nullability)"
+        // Color code: column name (cyan), type (default), nullability (dim)
+        const columnMatch = node.label.match(/^([^:]+):\s*(.+)$/);
+        if (columnMatch?.[1] && columnMatch[2]) {
+          const columnName = columnMatch[1];
+          const rest = columnMatch[2];
+          // Parse rest: "typeDisplay (nullability)"
+          const typeMatch = rest.match(/^([^\s(]+)\s*(\([^)]+\))$/);
+          if (typeMatch?.[1] && typeMatch[2]) {
+            const typeDisplay = typeMatch[1];
+            const nullability = typeMatch[2];
+            formattedLabel = `${cyan(columnName)}: ${typeDisplay} ${dim(nullability)}`;
+          } else {
+            // Fallback if format doesn't match
+            formattedLabel = `${cyan(columnName)}: ${rest}`;
+          }
+        } else {
+          formattedLabel = node.label;
+        }
         break;
-      case 'extension':
-        labelColor = magenta;
+      }
+      case 'index': {
+        // Parse index/unique constraint/primary key formats
+        // "primary key: columnName" -> dim "primary key", cyan columnName
+        const pkMatch = node.label.match(/^primary key:\s*(.+)$/);
+        if (pkMatch?.[1]) {
+          const columnNames = pkMatch[1];
+          formattedLabel = `${dim('primary key')}: ${cyan(columnNames)}`;
+        } else {
+          // "unique name" -> dim "unique", cyan "name"
+          const uniqueMatch = node.label.match(/^unique\s+(.+)$/);
+          if (uniqueMatch?.[1]) {
+            const name = uniqueMatch[1];
+            formattedLabel = `${dim('unique')} ${cyan(name)}`;
+          } else {
+            // "index name" or "unique index name" -> dim label prefix, cyan name
+            const indexMatch = node.label.match(/^(unique\s+)?index\s+(.+)$/);
+            if (indexMatch?.[2]) {
+              const prefix = indexMatch[1] ? `${dim('unique')} ` : '';
+              const name = indexMatch[2];
+              formattedLabel = `${prefix}${dim('index')} ${cyan(name)}`;
+            } else {
+              formattedLabel = dim(node.label);
+            }
+          }
+        }
         break;
+      }
+      case 'extension': {
+        // Parse extension message formats similar to schema-verify
+        // "extensionName extension is enabled" -> cyan extensionName, dim rest
+        const extMatch = node.label.match(/^([^\s]+)\s+(extension is enabled)$/);
+        if (extMatch?.[1] && extMatch[2]) {
+          const extName = extMatch[1];
+          const rest = extMatch[2];
+          formattedLabel = `${cyan(extName)} ${dim(rest)}`;
+        } else {
+          // Fallback: color entire label with magenta
+          formattedLabel = magenta(node.label);
+        }
+        break;
+      }
       default:
+        formattedLabel = node.label;
         break;
     }
   }
 
-  const labelColored = labelColor(node.label);
-
   // Root node renders without tree characters or │ prefix
   if (isRoot) {
-    lines.push(labelColored);
+    lines.push(formattedLabel);
   } else {
     // Determine tree character for this node
     const treeChar = isLast ? '└' : '├';
@@ -292,12 +359,12 @@ function renderSchemaTree(
     const prefixWithoutAnsi = stripAnsi(prefix);
     const prefixHasVerticalBar = prefixWithoutAnsi.includes('│');
     if (isRootChild) {
-      lines.push(`${treePrefix}${labelColored}`);
+      lines.push(`${treePrefix}${formattedLabel}`);
     } else if (prefixHasVerticalBar) {
       // Prefix already has │, so just use treePrefix directly
-      lines.push(`${treePrefix}${labelColored}`);
+      lines.push(`${treePrefix}${formattedLabel}`);
     } else {
-      lines.push(`${formatDimText('│')} ${treePrefix}${labelColored}`);
+      lines.push(`${formatDimText('│')} ${treePrefix}${formattedLabel}`);
     }
   }
 
@@ -366,7 +433,7 @@ export function formatIntrospectOutput(
 
   // Add timings in verbose mode
   if (isVerbose(flags, 1)) {
-    lines.push(`${prefix}  Total time: ${result.timings.total}ms`);
+    lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
   }
 
   return lines.join('\n');
