@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AdapterDescriptor } from '@prisma-next/cli/config-types';
-import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type { ControlAdapterDescriptor } from '@prisma-next/core-control-plane/types';
+import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { type } from 'arktype';
+import { PostgresControlAdapter } from '../core/control-adapter';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -48,15 +50,20 @@ function loadAdapterManifest(): ExtensionPackManifest {
 
 /**
  * Postgres adapter descriptor for CLI config.
- * May optionally provide a runtime factory for DB-connected commands.
  */
-const postgresAdapterDescriptor: AdapterDescriptor<'sql'> = {
+const postgresAdapterDescriptor: ControlAdapterDescriptor<
+  'sql',
+  'postgres',
+  SqlControlAdapter<'postgres'>
+> = {
   kind: 'adapter',
   familyId: 'sql',
+  targetId: 'postgres',
   id: 'postgres',
   manifest: loadAdapterManifest(),
-  // Note: create() factory can be added here for DB-connected commands
-  // For now, emit command doesn't need it
+  create(): SqlControlAdapter<'postgres'> {
+    return new PostgresControlAdapter();
+  },
 };
 
 export default postgresAdapterDescriptor;

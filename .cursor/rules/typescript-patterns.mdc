@@ -986,6 +986,43 @@ function createMockColumnBuilder(...): AnyColumnBuilder {
 - Mocking complex types where full implementation isn't needed
 - Test utilities that return simplified versions of types
 
+## Mocking Class Instances in Tests
+
+**CRITICAL**: When mocking class instances in tests, never use the spread operator (`...`) as it loses methods. Use `Object.create()` and `Object.assign()` to preserve the prototype.
+
+**❌ WRONG: Spreading class instance loses methods**
+
+```typescript
+// Spreading a class instance loses all methods
+const mockedFamily = {
+  ...config.family,  // Methods are lost!
+  verify: mockedVerify,
+};
+// config.family.validateContractIR is now undefined
+```
+
+**✅ CORRECT: Preserve prototype when mocking class instances**
+
+```typescript
+// Preserve all methods from the original class instance
+const mockedFamily = Object.create(Object.getPrototypeOf(config.family));
+Object.assign(mockedFamily, config.family, {
+  verify: mockedVerify,
+});
+// All methods (validateContractIR, convertOperationManifest, etc.) are preserved
+```
+
+**Why?**
+- The spread operator only copies enumerable own properties, not methods from the prototype
+- `Object.create(Object.getPrototypeOf(instance))` creates a new object with the same prototype
+- `Object.assign()` copies all properties (including methods) from the original instance
+- This preserves all methods while allowing you to override specific properties
+
+**When to use:**
+- Mocking class instances in tests where you need to override some properties but keep methods
+- Creating partial mocks of class instances
+- Preserving prototype chain when modifying instances
+
 ## DRY Test Patterns
 
 **Pattern**: Common patterns in test files should be extracted into helper functions with JSDoc comments explaining their purpose.

@@ -2,7 +2,6 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -25,7 +24,6 @@ const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 describe('DML E2E Tests', { timeout: 30000 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
   let contract: Contract;
   let adapter: ReturnType<typeof createPostgresAdapter>;
@@ -47,10 +45,6 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    sharedDriver = createPostgresDriverFromOptions({
-      connect: { client },
-      cursor: { disabled: true },
-    });
   }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
@@ -79,9 +73,16 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
   });
 
   it('inserts, updates, and deletes a user', async () => {
-    const runtime = createTestRuntime(contract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: true },
-    });
+    const runtime = createTestRuntime(
+      contract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: true },
+      },
+    );
 
     const userTable = tables.user;
     const userColumns = userTable.columns;

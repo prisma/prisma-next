@@ -70,13 +70,17 @@ describe('loadContractFromTs', () => {
     );
   });
 
-  it('rejects non-object contract export', async () => {
-    const contractPath = join(fixturesDir, 'function-export.ts');
+  it(
+    'rejects non-object contract export',
+    async () => {
+      const contractPath = join(fixturesDir, 'function-export.ts');
 
-    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
-      'Contract export must be an object',
-    );
-  });
+      await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+        'Contract export must be an object',
+      );
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'rejects non-serializable contract export',

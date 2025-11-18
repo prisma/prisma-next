@@ -1,5 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import { describe, expect, it } from 'vitest';
 import {
   extractCodecTypeImportsFromPacks,

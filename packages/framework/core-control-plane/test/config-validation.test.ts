@@ -7,13 +7,13 @@ function createValidConfig(overrides?: Record<string, unknown>) {
   return {
     family: {
       kind: 'family',
+      id: 'sql',
       familyId: 'sql',
       manifest: { id: 'sql', version: '0.0.1' },
       hook: {},
-      convertOperationManifest: vi.fn(),
-      validateContractIR: vi.fn(),
       create: vi.fn(() => ({
         familyId: 'sql',
+        validateContractIR: vi.fn(),
         verify: vi.fn(),
         schemaVerify: vi.fn(),
         introspect: vi.fn(),
@@ -23,22 +23,42 @@ function createValidConfig(overrides?: Record<string, unknown>) {
     target: {
       kind: 'target',
       familyId: 'sql',
+      targetId: 'postgres',
       id: 'postgres',
       manifest: {
         id: 'postgres',
         version: '15.0.0',
       },
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       ...overrides?.target,
     },
     adapter: {
       kind: 'adapter',
       familyId: 'sql',
+      targetId: 'postgres',
       id: 'postgres',
       manifest: {
         id: 'postgres',
         version: '15.0.0',
       },
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       ...overrides?.adapter,
+    },
+    driver: {
+      kind: 'driver',
+      familyId: 'sql',
+      targetId: 'postgres',
+      id: 'postgres',
+      manifest: {
+        id: 'postgres',
+        version: '15.0.0',
+      },
+      create: async () => ({
+        targetId: 'postgres',
+        query: async () => ({ rows: [] }),
+        close: async () => {},
+      }),
+      ...overrides?.driver,
     },
     ...overrides,
   };
@@ -78,8 +98,7 @@ describe('validateConfig', () => {
         kind: 'invalid',
         id: 'sql',
         hook: {},
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn(),
+        create: vi.fn(),
       },
     });
     expect(() => validateConfig(config)).toThrow(errorConfigValidation('family.kind'));
@@ -92,8 +111,6 @@ describe('validateConfig', () => {
         familyId: 123,
         manifest: { id: 'sql', version: '0.0.1' },
         hook: {},
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn(),
         create: vi.fn(),
       },
     });
@@ -105,8 +122,7 @@ describe('validateConfig', () => {
       family: {
         kind: 'family',
         id: 'sql',
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn(),
+        create: vi.fn(),
       },
     });
     expect(() => validateConfig(config1)).toThrow(errorConfigValidation('family.hook'));
@@ -116,41 +132,10 @@ describe('validateConfig', () => {
         kind: 'family',
         id: 'sql',
         hook: 'not-an-object',
-        convertOperationManifest: vi.fn(),
-        validateContractIR: vi.fn(),
+        create: vi.fn(),
       },
     });
     expect(() => validateConfig(config2)).toThrow(errorConfigValidation('family.hook'));
-  });
-
-  it('throws error when family.convertOperationManifest is not a function', () => {
-    const config = createValidConfig({
-      family: {
-        kind: 'family',
-        id: 'sql',
-        hook: {},
-        convertOperationManifest: 'not-a-function',
-        validateContractIR: vi.fn(),
-      },
-    });
-    expect(() => validateConfig(config)).toThrow(
-      errorConfigValidation('family.convertOperationManifest'),
-    );
-  });
-
-  it('throws error when family.validateContractIR is not a function', () => {
-    const config = createValidConfig({
-      family: {
-        kind: 'family',
-        id: 'sql',
-        hook: {},
-        convertOperationManifest: vi.fn(),
-        validateContractIR: 'not-a-function',
-      },
-    });
-    expect(() => validateConfig(config)).toThrow(
-      errorConfigValidation('family.validateContractIR'),
-    );
   });
 
   it('throws error when target.kind is not "target"', () => {
@@ -274,10 +259,12 @@ describe('validateConfig', () => {
           kind: 'extension',
           id: 'pg-vector',
           familyId: 'sql',
+          targetId: 'postgres',
           manifest: {
             id: 'pg-vector',
             version: '1.0.0',
           },
+          create: () => ({ familyId: 'sql', targetId: 'postgres' }),
         },
       ],
     });

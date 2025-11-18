@@ -8,8 +8,8 @@
  */
 
 import { execSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -95,7 +95,7 @@ try {
       cwd: repoRoot,
     },
   );
-} catch (error) {
+} catch (_error) {
   // If focused check fails, fall back to full check
   console.log('Focused check failed, falling back to full dependency check...');
   try {
@@ -103,7 +103,7 @@ try {
       stdio: 'inherit',
       cwd: repoRoot,
     });
-  } catch (fallbackError) {
+  } catch (_fallbackError) {
     process.exit(1);
   }
 }

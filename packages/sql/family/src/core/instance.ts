@@ -1,27 +1,77 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
-import type { OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
-  AdapterDescriptor,
-  ControlPlaneDriver,
+  ControlAdapterDescriptor,
+  ControlDriverInstance,
+  ControlExtensionDescriptor,
+  ControlFamilyInstance,
+  ControlTargetDescriptor,
   EmitContractResult,
-  ExtensionDescriptor,
-  FamilyInstance,
-  TargetDescriptor,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
+import type { OperationRegistry } from '@prisma-next/operations';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
 } from './assembly';
+import type { SqlControlAdapter } from './control-adapter';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
+
+/**
+ * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
+ * This is SQL-family-specific conversion logic.
+ * Used internally by instance creation and test utilities in the same package.
+ */
+export function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
+  return {
+    forTypeId: manifest.for,
+    method: manifest.method,
+    args: manifest.args.map((arg: OperationManifest['args'][number]) => {
+      if (arg.kind === 'typeId') {
+        if (!arg.type) {
+          throw new Error('typeId arg must have type property');
+        }
+        return { kind: 'typeId' as const, type: arg.type };
+      }
+      if (arg.kind === 'param') {
+        return { kind: 'param' as const };
+      }
+      if (arg.kind === 'literal') {
+        return { kind: 'literal' as const };
+      }
+      throw new Error(`Invalid arg kind: ${(arg as { kind: unknown }).kind}`);
+    }),
+    returns: (() => {
+      if (manifest.returns.kind === 'typeId') {
+        return { kind: 'typeId' as const, type: manifest.returns.type };
+      }
+      if (manifest.returns.kind === 'builtin') {
+        return {
+          kind: 'builtin' as const,
+          type: manifest.returns.type as 'number' | 'boolean' | 'string',
+        };
+      }
+      throw new Error(`Invalid return kind: ${(manifest.returns as { kind: unknown }).kind}`);
+    })(),
+    lowering: {
+      targetFamily: 'sql',
+      strategy: manifest.lowering.strategy,
+      template: manifest.lowering.template,
+    },
+    ...(manifest.capabilities ? { capabilities: manifest.capabilities } : {}),
+  };
+}
 
 /**
  * Extracts codec type IDs used in contract storage tables.
@@ -151,19 +201,88 @@ interface SqlFamilyInstanceState {
   readonly extensionIds: ReadonlyArray<string>;
 }
 
-export type SqlFamilyInstance = FamilyInstance<
-  'sql',
-  SqlSchemaIR,
-  VerifyDatabaseResult,
-  VerifyDatabaseSchemaResult
-> &
-  SqlFamilyInstanceState;
+/**
+ * SQL control family instance interface.
+ * Extends ControlFamilyInstance with SQL-specific domain actions.
+ */
+export interface SqlControlFamilyInstance
+  extends ControlFamilyInstance<'sql'>,
+    SqlFamilyInstanceState {
+  /**
+   * Validates a contract JSON and returns a validated ContractIR (without mappings).
+   * Mappings are runtime-only and should not be part of ContractIR.
+   */
+  validateContractIR(contractJson: unknown): unknown;
+
+  /**
+   * Verifies the database marker against the contract.
+   * Compares target, coreHash, and profileHash.
+   */
+  verify(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly expectedTargetId: string;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<VerifyDatabaseResult>;
+
+  /**
+   * Verifies the database schema against the contract.
+   * Compares contract requirements against live database schema.
+   */
+  schemaVerify(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly strict: boolean;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<VerifyDatabaseSchemaResult>;
+
+  /**
+   * Introspects the database schema and returns a family-specific schema IR.
+   *
+   * This is a read-only operation that returns a snapshot of the live database schema.
+   * The method is family-owned and delegates to target/adapter-specific introspectors
+   * to perform the actual schema introspection.
+   *
+   * @param options - Introspection options
+   * @param options.driver - Control plane driver for database connection
+   * @param options.contractIR - Optional contract IR for contract-guided introspection.
+   *   When provided, families may use it for filtering, optimization, or validation
+   *   during introspection. The contract IR does not change the meaning of "what exists"
+   *   in the database - it only guides how introspection is performed.
+   * @returns Promise resolving to the family-specific Schema IR (e.g., `SqlSchemaIR` for SQL).
+   *   The IR represents the complete schema snapshot at the time of introspection.
+   */
+  introspect(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR?: unknown;
+  }): Promise<SqlSchemaIR>;
+
+  /**
+   * Projects a SQL Schema IR into a core schema view for CLI visualization.
+   * Converts SqlSchemaIR (tables, columns, indexes, extensions) into a tree structure.
+   */
+  toSchemaView(schema: SqlSchemaIR): CoreSchemaView;
+
+  /**
+   * Emits contract JSON and DTS as strings.
+   * Uses the instance's preassembled state (operation registry, type imports, extension IDs).
+   * Handles stripping mappings and validation internally.
+   */
+  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
+}
+
+/**
+ * SQL family instance type.
+ * Maintains backward compatibility with FamilyInstance while implementing SqlControlFamilyInstance.
+ */
+export type SqlFamilyInstance = SqlControlFamilyInstance;
 
 interface CreateSqlFamilyInstanceOptions {
-  readonly target: TargetDescriptor<'sql'>;
-  readonly adapter: AdapterDescriptor<'sql'>;
-  readonly extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>;
-  readonly convertOperationManifest: (manifest: OperationManifest) => OperationSignature;
+  readonly target: ControlTargetDescriptor<'sql', string>;
+  readonly adapter: ControlAdapterDescriptor<'sql', string>;
+  readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
 }
 
 /**
@@ -172,9 +291,10 @@ interface CreateSqlFamilyInstanceOptions {
 export function createSqlFamilyInstance(
   options: CreateSqlFamilyInstanceOptions,
 ): SqlFamilyInstance {
-  const { target, adapter, extensions, convertOperationManifest } = options;
+  const { target, adapter, extensions } = options;
 
   // Build descriptors array for assembly
+  // Assembly functions only use manifest and id, so we can pass Control*Descriptor types directly
   const descriptors = [target, adapter, ...extensions];
 
   // Assemble operation registry, type imports, and extension IDs
@@ -183,6 +303,21 @@ export function createSqlFamilyInstance(
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
 
+  /**
+   * Strips mappings from a contract (mappings are runtime-only).
+   */
+  function stripMappings(contract: unknown): unknown {
+    // Type guard to check if contract has mappings
+    if (typeof contract === 'object' && contract !== null && 'mappings' in contract) {
+      const { mappings: _mappings, ...contractIR } = contract as {
+        mappings?: unknown;
+        [key: string]: unknown;
+      };
+      return contractIR;
+    }
+    return contract;
+  }
+
   return {
     familyId: 'sql',
     operationRegistry,
@@ -190,8 +325,16 @@ export function createSqlFamilyInstance(
     operationTypeImports,
     extensionIds,
 
+    validateContractIR(contractJson: unknown): unknown {
+      // Validate the contract (this normalizes and validates structure/logic)
+      const validated = validateContract<SqlContract<SqlStorage>>(contractJson);
+      // Strip mappings before returning ContractIR (mappings are runtime-only)
+      const { mappings: _mappings, ...contractIR } = validated;
+      return contractIR;
+    },
+
     async verify(verifyOptions: {
-      readonly driver: ControlPlaneDriver;
+      readonly driver: ControlDriverInstance;
       readonly contractIR: unknown;
       readonly expectedTargetId: string;
       readonly contractPath: string;
@@ -226,7 +369,11 @@ export function createSqlFamilyInstance(
       // Compute codec coverage (optional)
       let missingCodecs: readonly string[] | undefined;
       let codecCoverageSkipped = false;
-      const supportedTypeIds = collectSupportedCodecTypeIds([adapter, target, ...extensions]);
+      const supportedTypeIds = collectSupportedCodecTypeIds<'sql', string>([
+        adapter,
+        target,
+        ...extensions,
+      ]);
       if (supportedTypeIds.length === 0) {
         // Helper is present but returns empty (MVP behavior)
         // Coverage check is skipped - missingCodecs remains undefined
@@ -333,23 +480,145 @@ export function createSqlFamilyInstance(
       });
     },
 
-    async schemaVerify(): Promise<VerifyDatabaseSchemaResult> {
+    async schemaVerify(_options: {
+      readonly driver: ControlDriverInstance;
+      readonly contractIR: unknown;
+      readonly strict: boolean;
+      readonly contractPath: string;
+      readonly configPath?: string;
+    }): Promise<VerifyDatabaseSchemaResult> {
       // TODO: Implement schema verification
       // This will build SqlTypeMetadataRegistry, call adapter introspection,
       // compare contract vs SqlSchemaIR, and return VerifyDatabaseSchemaResult
       throw new Error('schemaVerify not yet implemented');
     },
-    async introspect(): Promise<SqlSchemaIR> {
-      // TODO: Implement introspection
-      // This will build SqlTypeMetadataRegistry and call adapter introspection
-      throw new Error('introspect not yet implemented');
+    async introspect(options: {
+      readonly driver: ControlDriverInstance;
+      readonly contractIR?: unknown;
+    }): Promise<SqlSchemaIR> {
+      const { driver, contractIR } = options;
+
+      // ControlAdapterDescriptor has create() method that returns SqlControlAdapter
+      const controlAdapter = adapter.create() as SqlControlAdapter;
+      return controlAdapter.introspect(driver as ControlDriverInstance<string>, contractIR);
+    },
+
+    toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
+      const tableCount = Object.keys(schema.tables).length;
+      const rootLabel = `sql schema (tables: ${tableCount})`;
+
+      // Build table nodes
+      const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
+        ([tableName, table]: [string, SqlTableIR]) => {
+          const children: SchemaTreeNode[] = [];
+
+          // Add column nodes
+          for (const [columnName, column] of Object.entries(table.columns)) {
+            const nullableText = column.nullable ? 'null' : 'not null';
+            // Always display nativeType for introspection (database state), fall back to typeId if nativeType not available
+            const typeDisplay = column.nativeType ?? column.typeId;
+            const label = `${columnName}: ${typeDisplay} (${nullableText})`;
+            children.push({
+              kind: 'field',
+              id: `column-${tableName}-${columnName}`,
+              label,
+              meta: {
+                typeId: column.typeId,
+                nullable: column.nullable,
+                ...(column.nativeType ? { nativeType: column.nativeType } : {}),
+              },
+            });
+          }
+
+          // Add unique constraint nodes
+          for (const unique of table.uniques) {
+            const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_unique`;
+            const label = `unique ${name}`;
+            children.push({
+              kind: 'index',
+              id: `unique-${tableName}-${name}`,
+              label,
+              meta: {
+                columns: unique.columns,
+                unique: true,
+              },
+            });
+          }
+
+          // Add index nodes
+          for (const index of table.indexes) {
+            const name = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
+            const label = index.unique ? `unique index ${name}` : `index ${name}`;
+            children.push({
+              kind: 'index',
+              id: `index-${tableName}-${name}`,
+              label,
+              meta: {
+                columns: index.columns,
+                unique: index.unique,
+              },
+            });
+          }
+
+          // Build table meta
+          const tableMeta: Record<string, unknown> = {};
+          if (table.primaryKey) {
+            tableMeta['primaryKey'] = table.primaryKey.columns;
+            if (table.primaryKey.name) {
+              tableMeta['primaryKeyName'] = table.primaryKey.name;
+            }
+          }
+          if (table.foreignKeys.length > 0) {
+            tableMeta['foreignKeys'] = table.foreignKeys.map((fk) => ({
+              columns: fk.columns,
+              referencedTable: fk.referencedTable,
+              referencedColumns: fk.referencedColumns,
+              ...(fk.name ? { name: fk.name } : {}),
+            }));
+          }
+
+          const node: SchemaTreeNode = {
+            kind: 'entity',
+            id: `table-${tableName}`,
+            label: `table ${tableName}`,
+            ...(Object.keys(tableMeta).length > 0 ? { meta: tableMeta } : {}),
+            ...(children.length > 0 ? { children: children as readonly SchemaTreeNode[] } : {}),
+          };
+          return node;
+        },
+      );
+
+      // Add extension nodes
+      const extensionNodes: readonly SchemaTreeNode[] = schema.extensions.map((extName) => ({
+        kind: 'extension',
+        id: `extension-${extName}`,
+        label: `extension ${extName}`,
+      }));
+
+      // Combine all children
+      const rootChildren = [...tableNodes, ...extensionNodes];
+
+      const rootNode: SchemaTreeNode = {
+        kind: 'root',
+        id: 'sql-schema',
+        label: rootLabel,
+        ...(rootChildren.length > 0 ? { children: rootChildren } : {}),
+      };
+
+      return {
+        root: rootNode,
+      };
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {
-      const ir = contractIR as ContractIR;
+      // Strip mappings if present (mappings are runtime-only)
+      const contractWithoutMappings = stripMappings(contractIR);
+
+      // Validate and normalize the contract
+      const validatedIR = this.validateContractIR(contractWithoutMappings) as ContractIR;
 
       const result = await emit(
-        ir,
+        validatedIR,
         {
           outputDir: '',
           operationRegistry,

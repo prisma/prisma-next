@@ -2,7 +2,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -57,10 +56,7 @@ describe('pgvector extension pack integration', () => {
     const packPath = join(__dirname, '../../../packages/extensions/pgvector');
     const packs = loadExtensionPacks(undefined, [packPath]);
 
-    const registry = assembleOperationRegistryFromPacks(
-      packs,
-      sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
-    );
+    const registry = assembleOperationRegistryFromPacks(packs);
 
     const operations = registry.byType('pg/vector@1');
     expect(operations.length).toBe(1);

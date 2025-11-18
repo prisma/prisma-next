@@ -1,15 +1,17 @@
-import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ExtensionPackManifest,
   OperationManifest,
-} from '@prisma-next/core-control-plane/pack-manifest-types';
+} from '@prisma-next/contract/pack-manifest-types';
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  TargetDescriptor,
+  ControlAdapterDescriptor,
+  ControlExtensionDescriptor,
+  ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
+// Import private function from same package (test utility needs it)
+import { convertOperationManifest } from './instance';
 
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).
@@ -18,7 +20,9 @@ import { createOperationRegistry } from '@prisma-next/operations';
  */
 export function assembleOperationRegistry(
   descriptors: ReadonlyArray<
-    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
   >,
   convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
@@ -40,7 +44,9 @@ export function assembleOperationRegistry(
  */
 export function extractCodecTypeImports(
   descriptors: ReadonlyArray<
-    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
   >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
@@ -60,7 +66,9 @@ export function extractCodecTypeImports(
  */
 export function extractOperationTypeImports(
   descriptors: ReadonlyArray<
-    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
   >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
@@ -81,9 +89,9 @@ export function extractOperationTypeImports(
  * Deduplicates while preserving stable order.
  */
 export function extractExtensionIds(
-  adapter: AdapterDescriptor<'sql'>,
-  target: TargetDescriptor<'sql'>,
-  extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>,
+  adapter: ControlAdapterDescriptor<'sql', string>,
+  target: ControlTargetDescriptor<'sql', string>,
+  extensions: ReadonlyArray<ControlExtensionDescriptor<'sql', string>>,
 ): ReadonlyArray<string> {
   const ids: string[] = [];
   const seen = new Set<string>();
@@ -155,7 +163,6 @@ export function extractOperationTypeImportsFromPacks(
  */
 export function assembleOperationRegistryFromPacks(
   packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-  convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 

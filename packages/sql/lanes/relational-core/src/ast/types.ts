@@ -93,7 +93,7 @@ export interface SelectAst {
   readonly includes?: ReadonlyArray<IncludeAst>;
   readonly project: ReadonlyArray<{
     alias: string;
-    expr: ColumnRef | IncludeRef | OperationExpr;
+    expr: ColumnRef | IncludeRef | OperationExpr | LiteralExpr;
   }>;
   readonly where?: BinaryExpr | ExistsExpr;
   readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;

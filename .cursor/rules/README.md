@@ -11,6 +11,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 
 ## Testing
 - `.cursor/rules/testing-guide.mdc` — Testing guide pointers and patterns
+- `.cursor/rules/test-import-patterns.mdc` — Test import patterns (source files, relative paths, don't export for tests)
 - `.cursor/rules/vitest-expect-typeof.mdc` — Type test patterns
 - `.cursor/rules/prefer-object-matcher.mdc` — Prefer object matchers over multiple individual expect().toBe() calls
 - `.cursor/rules/use-ast-factories.mdc` — Use factory functions for creating AST nodes instead of manual object creation
@@ -51,6 +52,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Responsibilities
 - `.cursor/rules/adapter-capability-declaration.mdc` — Adapter capability declaration (manifest + code)
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
+- `.cursor/rules/control-plane-descriptors.mdc` — Control plane descriptor pattern (Control*Descriptor types, driver requirement)
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.

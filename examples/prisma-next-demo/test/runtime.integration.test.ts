@@ -5,7 +5,6 @@ import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
@@ -37,10 +36,7 @@ beforeAll(async () => {
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, [pgvectorPath]);
-  const operationRegistry = assembleOperationRegistryFromPacks(
-    packs,
-    sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
-  );
+  const operationRegistry = assembleOperationRegistryFromPacks(packs);
   const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
   const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
   const extensionIds = extractExtensionIdsFromPacks(packs);

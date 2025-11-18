@@ -111,9 +111,6 @@ export function createDbVerifyCommand(): Command {
         }
         const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-        // Validate contract using family validator
-        const contractIR = config.family.validateContractIR(contractJson) as ContractIR;
-
         // Resolve database URL
         const dbUrl = options.db ?? config.db?.url;
         if (!dbUrl) {
@@ -125,24 +122,32 @@ export function createDbVerifyCommand(): Command {
           throw errorDriverRequired();
         }
 
+        // Store driver descriptor after null check
+        const driverDescriptor = config.driver;
+
         // Create driver
-        const driver = await config.driver.create(dbUrl);
+        const driver = await driverDescriptor.create(dbUrl);
 
         try {
           // Create family instance
           const familyInstance = config.family.create({
             target: config.target,
             adapter: config.adapter,
+            driver: driverDescriptor,
             extensions: config.extensions ?? [],
-          }) as FamilyInstance<string>;
+          });
+          const typedFamilyInstance = familyInstance as FamilyInstance<string>;
+
+          // Validate contract using instance validator
+          const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
 
           // Call family instance verify method
           let verifyResult: VerifyDatabaseResult;
           try {
-            verifyResult = (await familyInstance.verify({
+            verifyResult = (await typedFamilyInstance.verify({
               driver,
               contractIR,
-              expectedTargetId: config.target.id,
+              expectedTargetId: config.target.targetId,
               contractPath,
               configPath,
             })) as VerifyDatabaseResult;

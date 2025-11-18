@@ -1,9 +1,9 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
-  AdapterDescriptor,
-  ControlPlaneDriver,
-  ExtensionDescriptor,
-  TargetDescriptor,
+  ControlAdapterDescriptor,
+  ControlDriverInstance,
+  ControlExtensionDescriptor,
+  ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 
@@ -107,10 +107,12 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
  * Returns the parsed marker record or null if no marker is found.
  * This abstracts SQL-specific details from the Control Plane.
  *
- * @param driver - ControlPlaneDriver instance for executing queries
+ * @param driver - ControlDriverInstance instance for executing queries
  * @returns Promise resolving to ContractMarkerRecord or null if marker not found
  */
-export async function readMarker(driver: ControlPlaneDriver): Promise<ContractMarkerRecord | null> {
+export async function readMarker(
+  driver: ControlDriverInstance,
+): Promise<ContractMarkerRecord | null> {
   const markerStatement = readMarkerSql();
   const queryResult = await driver.query<{
     core_hash: string;
@@ -147,9 +149,11 @@ export async function readMarker(driver: ControlPlaneDriver): Promise<ContractMa
  * For MVP, we return an empty array since extracting type IDs from TypeScript modules
  * would require runtime evaluation or static analysis. This can be enhanced later.
  */
-export function collectSupportedCodecTypeIds<TFamilyId extends string>(
+export function collectSupportedCodecTypeIds<TFamilyId extends string, TTargetId extends string>(
   descriptors: ReadonlyArray<
-    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+    | ControlTargetDescriptor<TFamilyId, TTargetId>
+    | ControlAdapterDescriptor<TFamilyId, TTargetId>
+    | ControlExtensionDescriptor<TFamilyId, TTargetId>
   >,
 ): readonly string[] {
   // For MVP, return empty array

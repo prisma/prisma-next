@@ -6,7 +6,7 @@ const RULES_DIR = '.cursor/rules';
 
 const REQUIRED = ['description', 'alwaysApply'];
 
-let errors = [];
+const errors = [];
 
 const files = readdirSync(RULES_DIR).filter((f) => !/^README\.md$/i.test(f));
 
@@ -46,7 +46,7 @@ for (const file of files) {
 }
 
 if (errors.length) {
-  console.error('Rule validation failed:\n' + errors.map((e) => ` - ${e}`).join('\n'));
+  console.error(`Rule validation failed:\n${errors.map((e) => ` - ${e}`).join('\n')}`);
   process.exit(1);
 } else {
   console.log('All rules passed validation.');

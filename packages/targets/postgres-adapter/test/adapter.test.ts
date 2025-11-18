@@ -751,4 +751,178 @@ describe('createPostgresAdapter', () => {
       });
     });
   });
+
+  describe('vector type casting', () => {
+    const vectorContract = Object.freeze(
+      validateContract<PostgresContract>({
+        target: 'postgres',
+        targetFamily: 'sql' as const,
+        coreHash: 'sha256:test-core',
+        profileHash: 'sha256:test-profile',
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { type: 'pg/int4@1', nullable: false },
+                vector: { type: 'pg/vector@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    );
+
+    it('casts vector parameters in INSERT', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'user' },
+        values: {
+          vector: { kind: 'param', index: 1, name: 'vector' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: vectorContract,
+        params: [[1, 2, 3]],
+      });
+
+      expect(lowered.body.sql).toContain('$1::vector');
+    });
+
+    it('casts vector parameters in UPDATE', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: UpdateAst = {
+        kind: 'update',
+        table: { kind: 'table', name: 'user' },
+        set: {
+          vector: { kind: 'param', index: 1, name: 'vector' },
+        },
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'user', column: 'id' },
+          right: { kind: 'param', index: 2, name: 'userId' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: vectorContract,
+        params: [[1, 2, 3], 1],
+      });
+
+      expect(lowered.body.sql).toContain('$1::vector');
+    });
+
+    it('casts vector operation parameters', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [
+          {
+            alias: 'distance',
+            expr: {
+              kind: 'operation',
+              method: 'distance',
+              forTypeId: 'pg/vector@1',
+              self: { kind: 'col', table: 'user', column: 'vector' },
+              args: [{ kind: 'param', index: 1, name: 'queryVector' }],
+              returns: { kind: 'typeId', type: 'pg/float8@1' },
+              lowering: {
+                targetFamily: 'sql',
+                strategy: 'function',
+                // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+                template: '${self} <=> ${arg0}',
+              },
+            },
+          },
+        ],
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: vectorContract,
+        params: [[1, 2, 3]],
+      });
+
+      expect(lowered.body.sql).toContain('$1::vector');
+    });
+  });
+
+  describe('literal rendering', () => {
+    it('renders array literals', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [
+          {
+            alias: 'tags',
+            expr: { kind: 'literal', value: ['tag1', 'tag2', 'tag3'] },
+          },
+        ],
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+
+      expect(lowered.body.sql).toContain('ARRAY[');
+      expect(lowered.body.sql).toContain("'tag1'");
+      expect(lowered.body.sql).toContain("'tag2'");
+      expect(lowered.body.sql).toContain("'tag3'");
+    });
+
+    it('renders object literals as JSON', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [
+          {
+            alias: 'metadata',
+            expr: { kind: 'literal', value: { key: 'value', num: 42 } },
+          },
+        ],
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+
+      expect(lowered.body.sql).toContain('{"key":"value","num":42}');
+    });
+
+    it('renders nested array literals', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [
+          {
+            alias: 'matrix',
+            expr: {
+              kind: 'literal',
+              value: [
+                [1, 2],
+                [3, 4],
+              ],
+            },
+          },
+        ],
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+
+      expect(lowered.body.sql).toContain('ARRAY[');
+    });
+  });
 });

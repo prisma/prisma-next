@@ -13,18 +13,13 @@ describe('defineConfig', () => {
   const baseConfig: PrismaNextConfig = {
     family: {
       kind: 'family',
+      id: 'sql',
       familyId: 'sql',
       manifest: { id: 'sql', version: '0.0.1' },
       hook: mockHook,
-      convertOperationManifest: () => ({
-        forTypeId: '',
-        method: '',
-        args: [],
-        returns: { kind: 'builtin', type: 'string' },
-      }),
-      validateContractIR: (contract: unknown) => contract,
       create: () => ({
         familyId: 'sql',
+        validateContractIR: (contract: unknown) => contract,
         verify: async () => ({
           ok: true,
           summary: 'test',
@@ -41,19 +36,41 @@ describe('defineConfig', () => {
           timings: { total: 0 },
         }),
         introspect: async () => ({ tables: {}, extensions: [] }),
+        emitContract: async () => ({
+          contractJson: '{}',
+          contractDts: '',
+          coreHash: 'test',
+          profileHash: 'test',
+        }),
       }),
     },
     target: {
       kind: 'target',
       familyId: 'sql',
+      targetId: 'postgres',
       id: 'postgres',
       manifest: { id: 'postgres', version: '1.0.0' },
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {
       kind: 'adapter',
       familyId: 'sql',
+      targetId: 'postgres',
       id: 'postgres',
       manifest: { id: 'postgres', version: '1.0.0' },
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    },
+    driver: {
+      kind: 'driver',
+      familyId: 'sql',
+      targetId: 'postgres',
+      id: 'postgres',
+      manifest: { id: 'postgres', version: '1.0.0' },
+      create: async () => ({
+        targetId: 'postgres',
+        query: async () => ({ rows: [] }),
+        close: async () => {},
+      }),
     },
     extensions: [],
   };

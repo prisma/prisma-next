@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { TargetDescriptor } from '@prisma-next/cli/config-types';
-import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type {
+  ControlTargetDescriptor,
+  ControlTargetInstance,
+} from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,11 +52,22 @@ function loadTargetManifest(): ExtensionPackManifest {
 /**
  * Postgres target descriptor for CLI config.
  */
-const postgresTargetDescriptor: TargetDescriptor<'sql'> = {
+const postgresTargetDescriptor: ControlTargetDescriptor<
+  'sql',
+  'postgres',
+  ControlTargetInstance<'sql', 'postgres'>
+> = {
   kind: 'target',
   familyId: 'sql',
+  targetId: 'postgres',
   id: 'postgres',
   manifest: loadTargetManifest(),
+  create(): ControlTargetInstance<'sql', 'postgres'> {
+    return {
+      familyId: 'sql',
+      targetId: 'postgres',
+    };
+  },
 };
 
 export default postgresTargetDescriptor;

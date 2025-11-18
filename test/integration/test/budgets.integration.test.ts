@@ -1,5 +1,4 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -47,7 +46,6 @@ const fixtureContract = validateContract(fixtureContractRaw);
 
 describe('budgets plugin integration', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  let sharedDriver: ReturnType<typeof createPostgresDriverFromOptions>;
   let client: Client;
 
   beforeAll(async () => {
@@ -58,10 +56,6 @@ describe('budgets plugin integration', () => {
     });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    sharedDriver = createPostgresDriverFromOptions({
-      connect: { client },
-      cursor: { disabled: true },
-    });
   }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
@@ -93,16 +87,23 @@ describe('budgets plugin integration', () => {
 
   it('blocks unbounded DSL SELECT exceeding budget', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      plugins: [
-        budgets({
-          maxRows: 50, // Lower budget to ensure unbounded query exceeds it
-          defaultTableRows: 10_000,
-          tableRows: { user: 10_000 },
-        }),
-      ],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 50, // Lower budget to ensure unbounded query exceeds it
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000 },
+          }),
+        ],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -125,16 +126,23 @@ describe('budgets plugin integration', () => {
 
   it('blocks unbounded DSL SELECT when estimated equals budget', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      plugins: [
-        budgets({
-          maxRows: 10_000, // Same as tableRows to test edge case
-          defaultTableRows: 10_000,
-          tableRows: { user: 10_000 },
-        }),
-      ],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10_000, // Same as tableRows to test edge case
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000 },
+          }),
+        ],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -158,16 +166,23 @@ describe('budgets plugin integration', () => {
 
   it('allows bounded DSL SELECT within budget', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      plugins: [
-        budgets({
-          maxRows: 10_000,
-          defaultTableRows: 10_000,
-          tableRows: { user: 10_000 },
-        }),
-      ],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000 },
+          }),
+        ],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -187,16 +202,23 @@ describe('budgets plugin integration', () => {
 
   it('blocks streaming when observed rows exceed budget', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      plugins: [
-        budgets({
-          maxRows: 10,
-          defaultTableRows: 10_000,
-          tableRows: { user: 10_000 },
-        }),
-      ],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10,
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000 },
+          }),
+        ],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -221,14 +243,21 @@ describe('budgets plugin integration', () => {
 
   it('blocks unbounded raw SELECT without detectable LIMIT', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      plugins: [
-        budgets({
-          maxRows: 10_000,
-        }),
-      ],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+          }),
+        ],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const { raw } = sql({ context });
@@ -245,14 +274,21 @@ describe('budgets plugin integration', () => {
 
   it('allows raw SELECT with detectable LIMIT via annotations', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      plugins: [
-        budgets({
-          maxRows: 10_000,
-        }),
-      ],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+          }),
+        ],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const { raw } = sql({ context });
@@ -266,24 +302,31 @@ describe('budgets plugin integration', () => {
   it('logs warning when latency exceeds budget in non-strict mode', async () => {
     const logWarn = vi.fn();
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      mode: 'permissive',
-      plugins: [
-        budgets({
-          maxRows: 10_000,
-          maxLatencyMs: -1,
-          severities: {
-            latency: 'warn',
-          },
-        }),
-      ],
-      log: {
-        info: vi.fn(),
-        warn: logWarn,
-        error: vi.fn(),
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
       },
-    });
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        mode: 'permissive',
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+            maxLatencyMs: -1,
+            severities: {
+              latency: 'warn',
+            },
+          }),
+        ],
+        log: {
+          info: vi.fn(),
+          warn: logWarn,
+          error: vi.fn(),
+        },
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -308,19 +351,26 @@ describe('budgets plugin integration', () => {
 
   it('throws error when latency exceeds budget in strict mode with error severity', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'startup', requireMarker: false },
-      mode: 'strict',
-      plugins: [
-        budgets({
-          maxRows: 10_000,
-          maxLatencyMs: -1,
-          severities: {
-            latency: 'error',
-          },
-        }),
-      ],
-    });
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'startup', requireMarker: false },
+        mode: 'strict',
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+            maxLatencyMs: -1,
+            severities: {
+              latency: 'error',
+            },
+          }),
+        ],
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -344,24 +394,31 @@ describe('budgets plugin integration', () => {
   it('does not throw when latency exceeds budget in non-strict mode with error severity', async () => {
     const logWarn = vi.fn();
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      mode: 'permissive',
-      plugins: [
-        budgets({
-          maxRows: 10_000,
-          maxLatencyMs: -1,
-          severities: {
-            latency: 'error',
-          },
-        }),
-      ],
-      log: {
-        info: vi.fn(),
-        warn: logWarn,
-        error: vi.fn(),
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
       },
-    });
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        mode: 'permissive',
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+            maxLatencyMs: -1,
+            severities: {
+              latency: 'error',
+            },
+          }),
+        ],
+        log: {
+          info: vi.fn(),
+          warn: logWarn,
+          error: vi.fn(),
+        },
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;
@@ -387,23 +444,30 @@ describe('budgets plugin integration', () => {
   it('does not log warning when latency is within budget', async () => {
     const logWarn = vi.fn();
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(fixtureContract, adapter, sharedDriver, {
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      plugins: [
-        budgets({
-          maxRows: 10_000,
-          maxLatencyMs: 100_000,
-          severities: {
-            latency: 'warn',
-          },
-        }),
-      ],
-      log: {
-        info: vi.fn(),
-        warn: logWarn,
-        error: vi.fn(),
+    const runtime = createTestRuntime(
+      fixtureContract,
+      {
+        connect: { client },
+        cursor: { disabled: true },
       },
-    });
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10_000,
+            maxLatencyMs: 100_000,
+            severities: {
+              latency: 'warn',
+            },
+          }),
+        ],
+        log: {
+          info: vi.fn(),
+          warn: logWarn,
+          error: vi.fn(),
+        },
+      },
+    );
 
     const context = createTestContext(fixtureContract, adapter);
     const tables = schema(context).tables;

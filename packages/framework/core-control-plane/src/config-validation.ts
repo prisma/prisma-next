@@ -51,16 +51,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       why: 'Config.family must have hook: TargetFamilyHook',
     });
   }
-  if (typeof family['convertOperationManifest'] !== 'function') {
-    throw errorConfigValidation('family.convertOperationManifest', {
-      why: 'Config.family must have convertOperationManifest: function',
-    });
-  }
-  if (typeof family['validateContractIR'] !== 'function') {
-    throw errorConfigValidation('family.validateContractIR', {
-      why: 'Config.family must have validateContractIR: function',
-    });
-  }
   if (typeof family['create'] !== 'function') {
     throw errorConfigValidation('family.create', {
       why: 'Config.family must have create: function',
@@ -96,6 +86,17 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       why: `Config.target.familyId must match Config.family.familyId (expected: ${familyId}, got: ${target['familyId']})`,
     });
   }
+  if (typeof target['targetId'] !== 'string') {
+    throw errorConfigValidation('target.targetId', {
+      why: 'Config.target must have targetId: string',
+    });
+  }
+  if (typeof target['create'] !== 'function') {
+    throw errorConfigValidation('target.create', {
+      why: 'Config.target must have create: function',
+    });
+  }
+  const expectedTargetId = target['targetId'] as string;
 
   // Validate adapter descriptor
   const adapter = configObj['adapter'] as Record<string, unknown>;
@@ -122,6 +123,21 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
   if (adapter['familyId'] !== familyId) {
     throw errorConfigValidation('adapter.familyId', {
       why: `Config.adapter.familyId must match Config.family.familyId (expected: ${familyId}, got: ${adapter['familyId']})`,
+    });
+  }
+  if (typeof adapter['targetId'] !== 'string') {
+    throw errorConfigValidation('adapter.targetId', {
+      why: 'Config.adapter must have targetId: string',
+    });
+  }
+  if (adapter['targetId'] !== expectedTargetId) {
+    throw errorConfigValidation('adapter.targetId', {
+      why: `Config.adapter.targetId must match Config.target.targetId (expected: ${expectedTargetId}, got: ${adapter['targetId']})`,
+    });
+  }
+  if (typeof adapter['create'] !== 'function') {
+    throw errorConfigValidation('adapter.create', {
+      why: 'Config.adapter must have create: function',
     });
   }
 
@@ -164,6 +180,66 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
           why: `Config.extensions[].familyId must match Config.family.familyId (expected: ${familyId}, got: ${extObj['familyId']})`,
         });
       }
+      if (typeof extObj['targetId'] !== 'string') {
+        throw errorConfigValidation('extensions[].targetId', {
+          why: 'Config.extensions items must have targetId: string',
+        });
+      }
+      if (extObj['targetId'] !== expectedTargetId) {
+        throw errorConfigValidation('extensions[].targetId', {
+          why: `Config.extensions[].targetId must match Config.target.targetId (expected: ${expectedTargetId}, got: ${extObj['targetId']})`,
+        });
+      }
+      if (typeof extObj['create'] !== 'function') {
+        throw errorConfigValidation('extensions[].create', {
+          why: 'Config.extensions items must have create: function',
+        });
+      }
+    }
+  }
+
+  // Validate driver descriptor if present
+  if (configObj['driver'] !== undefined) {
+    const driver = configObj['driver'] as Record<string, unknown>;
+    if (driver['kind'] !== 'driver') {
+      throw errorConfigValidation('driver.kind', {
+        why: 'Config.driver must have kind: "driver"',
+      });
+    }
+    if (typeof driver['id'] !== 'string') {
+      throw errorConfigValidation('driver.id', {
+        why: 'Config.driver must have id: string',
+      });
+    }
+    if (!driver['manifest'] || typeof driver['manifest'] !== 'object') {
+      throw errorConfigValidation('driver.manifest', {
+        why: 'Config.driver must have manifest: ExtensionPackManifest',
+      });
+    }
+    if (typeof driver['familyId'] !== 'string') {
+      throw errorConfigValidation('driver.familyId', {
+        why: 'Config.driver must have familyId: string',
+      });
+    }
+    if (driver['familyId'] !== familyId) {
+      throw errorConfigValidation('driver.familyId', {
+        why: `Config.driver.familyId must match Config.family.familyId (expected: ${familyId}, got: ${driver['familyId']})`,
+      });
+    }
+    if (typeof driver['targetId'] !== 'string') {
+      throw errorConfigValidation('driver.targetId', {
+        why: 'Config.driver must have targetId: string',
+      });
+    }
+    if (driver['targetId'] !== expectedTargetId) {
+      throw errorConfigValidation('driver.targetId', {
+        why: `Config.driver.targetId must match Config.target.targetId (expected: ${expectedTargetId}, got: ${driver['targetId']})`,
+      });
+    }
+    if (typeof driver['create'] !== 'function') {
+      throw errorConfigValidation('driver.create', {
+        why: 'Config.driver must have create: function',
+      });
     }
   }
 

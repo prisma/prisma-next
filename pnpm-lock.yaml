@@ -30,8 +30,8 @@ importers:
         specifier: ^16.2.6
         version: 16.2.6
       turbo:
-        specifier: ^2.3.0
-        version: 2.5.8
+        specifier: ^2.6.1
+        version: 2.6.1
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -214,10 +214,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/extensions/pgvector:
     dependencies:
@@ -245,10 +245,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/framework/authoring/contract-authoring:
     dependencies:
@@ -261,7 +261,7 @@ importers:
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^2.1.1
-        version: 2.1.9(vitest@2.1.9(@types/node@20.19.24))
+        version: 2.1.9(vitest@2.1.9(@types/node@24.7.2))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -270,7 +270,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/framework/authoring/contract-psl:
     devDependencies:
@@ -301,7 +301,7 @@ importers:
         version: link:../../../test/utils
       '@vitest/coverage-v8':
         specifier: ^2.1.1
-        version: 2.1.9(vitest@2.1.9(@types/node@20.19.24))
+        version: 2.1.9(vitest@2.1.9(@types/node@24.7.2))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -310,7 +310,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/framework/core-control-plane:
     dependencies:
@@ -338,7 +338,29 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
+
+  packages/framework/core-execution-plane:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../core-contract
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../core-control-plane
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/framework/core-operations:
     dependencies:
@@ -357,7 +379,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/framework/core-plan:
     devDependencies:
@@ -369,7 +391,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/framework/runtime-executor:
     dependencies:
@@ -397,7 +419,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/framework/tooling/cli:
     dependencies:
@@ -607,7 +629,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/contract:
     dependencies:
@@ -623,7 +645,7 @@ importers:
         version: link:../../../test/utils
       '@vitest/coverage-v8':
         specifier: ^2.1.1
-        version: 2.1.9(vitest@2.1.9(@types/node@20.19.24))
+        version: 2.1.9(vitest@2.1.9(@types/node@24.7.2))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -632,7 +654,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/family:
     dependencies:
@@ -645,6 +667,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../framework/core-control-plane
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-execution-plane
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../contract
@@ -657,6 +682,9 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../operations
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../sql-runtime
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../schema-ir
@@ -664,9 +692,6 @@ importers:
         specifier: ^2.0.0
         version: 2.1.26
     devDependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../targets/postgres-adapter
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../targets/postgres-driver
@@ -684,10 +709,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/lanes/orm-lane:
     dependencies:
@@ -721,10 +746,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/lanes/relational-core:
     dependencies:
@@ -761,10 +786,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/lanes/sql-lane:
     dependencies:
@@ -801,10 +826,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/operations:
     dependencies:
@@ -829,7 +854,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/schema-ir:
     dependencies:
@@ -839,7 +864,7 @@ importers:
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^2.1.1
-        version: 2.1.9(vitest@2.1.9(@types/node@20.19.24))
+        version: 2.1.9(vitest@2.1.9(@types/node@24.7.2))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -848,7 +873,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/sql-runtime:
     dependencies:
@@ -891,7 +916,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/sql/tooling/emitter:
     dependencies:
@@ -913,16 +938,19 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/targets/postgres:
     dependencies:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-execution-plane
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
@@ -938,13 +966,19 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/targets/postgres-adapter:
     dependencies:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-execution-plane
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../sql/family
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../sql/contract
@@ -957,6 +991,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../sql/lanes/relational-core
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:*
+        version: link:../../sql/schema-ir
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
@@ -972,13 +1009,16 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   packages/targets/postgres-driver:
     dependencies:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../framework/core-control-plane
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../framework/core-execution-plane
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../sql/contract
@@ -1015,7 +1055,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   test/e2e/framework:
     dependencies:
@@ -1119,10 +1159,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@20.19.24))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
   test/utils:
     devDependencies:
@@ -1143,7 +1183,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.1
-        version: 2.1.9(@types/node@20.19.24)
+        version: 2.1.9(@types/node@24.7.2)
 
 packages:
 
@@ -3400,38 +3440,38 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  turbo-darwin-64@2.5.8:
-    resolution: {integrity: sha512-Dh5bCACiHO8rUXZLpKw+m3FiHtAp2CkanSyJre+SInEvEr5kIxjGvCK/8MFX8SFRjQuhjtvpIvYYZJB4AGCxNQ==}
+  turbo-darwin-64@2.6.1:
+    resolution: {integrity: sha512-Dm0HwhyZF4J0uLqkhUyCVJvKM9Rw7M03v3J9A7drHDQW0qAbIGBrUijQ8g4Q9Cciw/BXRRd8Uzkc3oue+qn+ZQ==}
     cpu: [x64]
     os: [darwin]
 
-  turbo-darwin-arm64@2.5.8:
-    resolution: {integrity: sha512-f1H/tQC9px7+hmXn6Kx/w8Jd/FneIUnvLlcI/7RGHunxfOkKJKvsoiNzySkoHQ8uq1pJnhJ0xNGTlYM48ZaJOQ==}
+  turbo-darwin-arm64@2.6.1:
+    resolution: {integrity: sha512-U0PIPTPyxdLsrC3jN7jaJUwgzX5sVUBsKLO7+6AL+OASaa1NbT1pPdiZoTkblBAALLP76FM0LlnsVQOnmjYhyw==}
     cpu: [arm64]
     os: [darwin]
 
-  turbo-linux-64@2.5.8:
-    resolution: {integrity: sha512-hMyvc7w7yadBlZBGl/bnR6O+dJTx3XkTeyTTH4zEjERO6ChEs0SrN8jTFj1lueNXKIHh1SnALmy6VctKMGnWfw==}
+  turbo-linux-64@2.6.1:
+    resolution: {integrity: sha512-eM1uLWgzv89bxlK29qwQEr9xYWBhmO/EGiH22UGfq+uXr+QW1OvNKKMogSN65Ry8lElMH4LZh0aX2DEc7eC0Mw==}
     cpu: [x64]
     os: [linux]
 
-  turbo-linux-arm64@2.5.8:
-    resolution: {integrity: sha512-LQELGa7bAqV2f+3rTMRPnj5G/OHAe2U+0N9BwsZvfMvHSUbsQ3bBMWdSQaYNicok7wOZcHjz2TkESn1hYK6xIQ==}
+  turbo-linux-arm64@2.6.1:
+    resolution: {integrity: sha512-MFFh7AxAQAycXKuZDrbeutfWM5Ep0CEZ9u7zs4Hn2FvOViTCzIfEhmuJou3/a5+q5VX1zTxQrKGy+4Lf5cdpsA==}
     cpu: [arm64]
     os: [linux]
 
-  turbo-windows-64@2.5.8:
-    resolution: {integrity: sha512-3YdcaW34TrN1AWwqgYL9gUqmZsMT4T7g8Y5Azz+uwwEJW+4sgcJkIi9pYFyU4ZBSjBvkfuPZkGgfStir5BBDJQ==}
+  turbo-windows-64@2.6.1:
+    resolution: {integrity: sha512-buq7/VAN7KOjMYi4tSZT5m+jpqyhbRU2EUTTvp6V0Ii8dAkY2tAAjQN1q5q2ByflYWKecbQNTqxmVploE0LVwQ==}
     cpu: [x64]
     os: [win32]
 
-  turbo-windows-arm64@2.5.8:
-    resolution: {integrity: sha512-eFC5XzLmgXJfnAK3UMTmVECCwuBcORrWdewoiXBnUm934DY6QN8YowC/srhNnROMpaKaqNeRpoB5FxCww3eteQ==}
+  turbo-windows-arm64@2.6.1:
+    resolution: {integrity: sha512-7w+AD5vJp3R+FB0YOj1YJcNcOOvBior7bcHTodqp90S3x3bLgpr7tE6xOea1e8JkP7GK6ciKVUpQvV7psiwU5Q==}
     cpu: [arm64]
     os: [win32]
 
-  turbo@2.5.8:
-    resolution: {integrity: sha512-5c9Fdsr9qfpT3hA0EyYSFRZj1dVVsb6KIWubA9JBYZ/9ZEAijgUEae0BBR/Xl/wekt4w65/lYLTFaP3JmwSO8w==}
+  turbo@2.6.1:
+    resolution: {integrity: sha512-qBwXXuDT3rA53kbNafGbT5r++BrhRgx3sAo0cHoDAeG9g1ItTmUMgltz3Hy7Hazy1ODqNpR+C7QwqL6DYB52yA==}
     hasBin: true
 
   type-detect@4.1.0:
@@ -4266,24 +4306,6 @@ snapshots:
       '@types/node': 24.7.2
       pg-protocol: 1.10.3
       pg-types: 2.2.0
-
-  '@vitest/coverage-v8@2.1.9(vitest@2.1.9(@types/node@20.19.24))':
-    dependencies:
-      '@ampproject/remapping': 2.3.0
-      '@bcoe/v8-coverage': 0.2.3
-      debug: 4.4.3
-      istanbul-lib-coverage: 3.2.2
-      istanbul-lib-report: 3.0.1
-      istanbul-lib-source-maps: 5.0.6
-      istanbul-reports: 3.2.0
-      magic-string: 0.30.19
-      magicast: 0.3.5
-      std-env: 3.9.0
-      test-exclude: 7.0.1
-      tinyrainbow: 1.2.0
-      vitest: 2.1.9(@types/node@20.19.24)
-    transitivePeerDependencies:
-      - supports-color
 
   '@vitest/coverage-v8@2.1.9(vitest@2.1.9(@types/node@24.7.2))':
     dependencies:
@@ -5735,32 +5757,32 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.3
 
-  turbo-darwin-64@2.5.8:
+  turbo-darwin-64@2.6.1:
     optional: true
 
-  turbo-darwin-arm64@2.5.8:
+  turbo-darwin-arm64@2.6.1:
     optional: true
 
-  turbo-linux-64@2.5.8:
+  turbo-linux-64@2.6.1:
     optional: true
 
-  turbo-linux-arm64@2.5.8:
+  turbo-linux-arm64@2.6.1:
     optional: true
 
-  turbo-windows-64@2.5.8:
+  turbo-windows-64@2.6.1:
     optional: true
 
-  turbo-windows-arm64@2.5.8:
+  turbo-windows-arm64@2.6.1:
     optional: true
 
-  turbo@2.5.8:
+  turbo@2.6.1:
     optionalDependencies:
-      turbo-darwin-64: 2.5.8
-      turbo-darwin-arm64: 2.5.8
-      turbo-linux-64: 2.5.8
-      turbo-linux-arm64: 2.5.8
-      turbo-windows-64: 2.5.8
-      turbo-windows-arm64: 2.5.8
+      turbo-darwin-64: 2.6.1
+      turbo-darwin-arm64: 2.6.1
+      turbo-linux-64: 2.6.1
+      turbo-linux-arm64: 2.6.1
+      turbo-windows-64: 2.6.1
+      turbo-windows-arm64: 2.6.1
 
   type-detect@4.1.0: {}
 
@@ -5839,6 +5861,17 @@ snapshots:
       tsconfck: 3.1.6(typescript@5.9.3)
     optionalDependencies:
       vite: 5.4.20(@types/node@20.19.24)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  vite-tsconfig-paths@5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2)):
+    dependencies:
+      debug: 4.4.3
+      globrex: 0.1.2
+      tsconfck: 3.1.6(typescript@5.9.3)
+    optionalDependencies:
+      vite: 5.4.20(@types/node@24.7.2)
     transitivePeerDependencies:
       - supports-color
       - typescript

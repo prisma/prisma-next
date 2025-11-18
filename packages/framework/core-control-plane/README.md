@@ -8,7 +8,7 @@ This package provides the core domain logic for control plane operations (contra
 
 ## Responsibilities
 
-- **Config Types**: Type definitions for Prisma Next configuration (`PrismaNextConfig`, `FamilyDescriptor`, etc.)
+- **Config Types**: Type definitions for Prisma Next configuration (`PrismaNextConfig`, `ControlFamilyDescriptor`, `ControlTargetDescriptor`, `ControlAdapterDescriptor`, `ControlDriverDescriptor`, `ControlExtensionDescriptor`)
 - **Config Validation**: Pure validation logic for config structure (no file I/O)
 - **Config Normalization**: `defineConfig()` function for normalizing config with defaults
 - **Domain Actions**:

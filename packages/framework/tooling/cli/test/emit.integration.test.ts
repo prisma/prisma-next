@@ -5,7 +5,6 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emit } from '@prisma-next/emitter';
-import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -75,10 +74,7 @@ describe('emit integration', () => {
       const packs = loadExtensionPacks(adapterPath, []);
 
       // Assemble operation registry and extract type imports from packs
-      const operationRegistry = assembleOperationRegistryFromPacks(
-        packs,
-        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
-      );
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);
@@ -150,10 +146,7 @@ describe('emit integration', () => {
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(
-        packs,
-        sqlFamilyDescriptor.convertOperationManifest.bind(sqlFamilyDescriptor),
-      );
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
       const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
       const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
       const extensionIds = extractExtensionIdsFromPacks(packs);

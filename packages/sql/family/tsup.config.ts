@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     control: 'src/exports/control.ts',
+    'control-adapter': 'src/core/control-adapter.ts',
     runtime: 'src/exports/runtime.ts',
   },
   outDir: 'dist/exports',

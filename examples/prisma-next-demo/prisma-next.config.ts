@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresDriver from '@prisma-next/driver-postgres/cli';
+import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/targets-postgres/control';

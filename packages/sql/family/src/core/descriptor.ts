@@ -1,62 +1,13 @@
+import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type {
-  ExtensionPackManifest,
-  OperationManifest,
-} from '@prisma-next/core-control-plane/pack-manifest-types';
-import type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
+  ControlAdapterDescriptor,
+  ControlDriverDescriptor,
+  ControlExtensionDescriptor,
+  ControlFamilyDescriptor,
+  ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
-import type { OperationSignature } from '@prisma-next/operations';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import { createSqlFamilyInstance, type SqlFamilyInstance } from './instance';
-
-/**
- * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
- */
-function operationManifestToSignature(manifest: OperationManifest): SqlOperationSignature {
-  return {
-    forTypeId: manifest.for,
-    method: manifest.method,
-    args: manifest.args.map((arg: OperationManifest['args'][number]) => {
-      if (arg.kind === 'typeId') {
-        if (!arg.type) {
-          throw new Error('typeId arg must have type property');
-        }
-        return { kind: 'typeId' as const, type: arg.type };
-      }
-      if (arg.kind === 'param') {
-        return { kind: 'param' as const };
-      }
-      if (arg.kind === 'literal') {
-        return { kind: 'literal' as const };
-      }
-      throw new Error(`Invalid arg kind: ${(arg as { kind: unknown }).kind}`);
-    }),
-    returns: (() => {
-      if (manifest.returns.kind === 'typeId') {
-        return { kind: 'typeId' as const, type: manifest.returns.type };
-      }
-      if (manifest.returns.kind === 'builtin') {
-        return {
-          kind: 'builtin' as const,
-          type: manifest.returns.type as 'number' | 'boolean' | 'string',
-        };
-      }
-      throw new Error(`Invalid return kind: ${(manifest.returns as { kind: unknown }).kind}`);
-    })(),
-    lowering: {
-      targetFamily: 'sql',
-      strategy: manifest.lowering.strategy,
-      template: manifest.lowering.template,
-    },
-    ...(manifest.capabilities ? { capabilities: manifest.capabilities } : {}),
-  };
-}
+import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './instance';
 
 /**
  * SQL family manifest.
@@ -68,46 +19,27 @@ const sqlFamilyManifest: ExtensionPackManifest = {
 
 /**
  * SQL family descriptor implementation.
- * Provides the SQL family hook and conversion helpers.
+ * Provides the SQL family hook and factory method.
  */
-export class SqlFamilyDescriptor implements FamilyDescriptor<'sql', SqlFamilyInstance> {
+export class SqlFamilyDescriptor
+  implements ControlFamilyDescriptor<'sql', SqlControlFamilyInstance>
+{
   readonly kind = 'family' as const;
+  readonly id = 'sql';
   readonly familyId = 'sql' as const;
   readonly manifest = sqlFamilyManifest;
   readonly hook = sqlTargetFamilyHook;
 
-  convertOperationManifest(manifest: OperationManifest): OperationSignature {
-    return operationManifestToSignature(manifest);
-  }
-
-  validateContractIR(contractJson: unknown): unknown {
-    // Validate the contract (this normalizes and validates structure/logic)
-    const validated = validateContract<SqlContract<SqlStorage>>(contractJson);
-    // Strip mappings before returning ContractIR (mappings are runtime-only)
-    const { mappings: _mappings, ...contractIR } = validated;
-    return contractIR;
-  }
-
-  stripMappings(contract: unknown): unknown {
-    // Type guard to check if contract has mappings
-    if (typeof contract === 'object' && contract !== null && 'mappings' in contract) {
-      const { mappings: _mappings, ...contractIR } = contract as {
-        mappings?: unknown;
-        [key: string]: unknown;
-      };
-      return contractIR;
-    }
-    return contract;
-  }
-
-  create(options: {
-    readonly target: TargetDescriptor<'sql'>;
-    readonly adapter: AdapterDescriptor<'sql'>;
-    readonly extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>;
-  }): SqlFamilyInstance {
+  create<TTargetId extends string>(options: {
+    readonly target: ControlTargetDescriptor<'sql', TTargetId>;
+    readonly adapter: ControlAdapterDescriptor<'sql', TTargetId>;
+    readonly driver: ControlDriverDescriptor<'sql', TTargetId>;
+    readonly extensions: readonly ControlExtensionDescriptor<'sql', TTargetId>[];
+  }): SqlControlFamilyInstance {
     return createSqlFamilyInstance({
-      ...options,
-      convertOperationManifest: this.convertOperationManifest.bind(this),
+      target: options.target,
+      adapter: options.adapter,
+      extensions: options.extensions,
     });
   }
 }

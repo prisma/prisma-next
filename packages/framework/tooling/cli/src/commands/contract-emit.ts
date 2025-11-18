@@ -1,6 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
@@ -98,6 +97,22 @@ export function createContractEmitCommand(): Command {
           console.log(header);
         }
 
+        // Create family instance (assembles operation registry, type imports, extension IDs)
+        // Note: emit command doesn't need driver, but ControlFamilyDescriptor.create() requires it
+        // We'll need to provide a minimal driver descriptor or make driver optional for emit
+        // For now, we'll require driver to be present in config even for emit
+        if (!config.driver) {
+          throw errorContractConfigMissing({
+            why: 'Config.driver is required. Even though emit does not use the driver, it is required by ControlFamilyDescriptor.create()',
+          });
+        }
+        const familyInstance = config.family.create({
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensions: config.extensions ?? [],
+        }) as FamilyInstance<string>;
+
         // Resolve contract source from config (user's config handles loading)
         let contractRaw: unknown;
         if (typeof contractConfig.source === 'function') {
@@ -106,23 +121,8 @@ export function createContractEmitCommand(): Command {
           contractRaw = contractConfig.source;
         }
 
-        // Strip mappings if family provides stripMappings function
-        const contractWithoutMappings = config.family.stripMappings
-          ? config.family.stripMappings(contractRaw)
-          : contractRaw;
-
-        // Validate and normalize the contract using family-specific validation
-        const contractIR = config.family.validateContractIR(contractWithoutMappings) as ContractIR;
-
-        // Create family instance (assembles operation registry, type imports, extension IDs)
-        const familyInstance = config.family.create({
-          target: config.target,
-          adapter: config.adapter,
-          extensions: config.extensions ?? [],
-        }) as FamilyInstance<string, unknown, unknown, unknown>;
-
-        // Call emitContract on family instance (returns strings, no file I/O)
-        const emitResult = await familyInstance.emitContract({ contractIR });
+        // Call emitContract on family instance (handles stripping mappings and validation internally)
+        const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
 
         // Create directories if needed
         mkdirSync(dirname(outputJsonPath), { recursive: true });

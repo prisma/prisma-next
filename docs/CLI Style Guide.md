@@ -134,6 +134,20 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - Heroku/Fly: colon commands (`db:…`); we prefer noun → verb (`db sign`, `db verify`) for consistency with our taxonomy.
 - Node CLI best practices: short flags, colored output that respects environment, and robust help/usage.
 
+## Loading Indicators & Spinners
+- **When to use**: Show spinners for remote operations (database connections, network requests) that may take time.
+- **Delay threshold**: Only show spinner if operation takes >100ms to avoid flicker on fast operations.
+- **Respect flags**: Disable spinners when:
+  - `--quiet` or `--silent` flag is set
+  - `--json` output is enabled (JSON should be deterministic, no animations)
+  - Non-TTY environment (CI, pipes, redirects)
+- **Implementation**: Use `ora` package for spinners. Wrap async operations with spinner utility that:
+  - Starts timer when operation begins
+  - Only creates/start spinner if operation exceeds delay threshold
+  - Shows success message with elapsed time: `✓ Operation name... (123ms)`
+  - Shows failure message on error: `✖ Operation name... failed: error message`
+- **Output spacing**: Add a single blank line after all async operations complete (not between individual operations) to separate spinner output from command results.
+
 ## Testing & Accessibility
 - Width/wrapping: measure visible width, wrap long lines (use `string-width`, `wrap-ansi`, `strip-ansi`).
   - Fixed 20-character left column width for all two-column output (help, styled headers)

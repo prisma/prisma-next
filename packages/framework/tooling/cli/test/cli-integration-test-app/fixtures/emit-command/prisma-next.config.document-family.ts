@@ -1,5 +1,5 @@
 import { defineConfig } from '@prisma-next/cli/config-types';
-import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
+import type { ControlFamilyInstance } from '@prisma-next/core-control-plane/types';
 import { contract } from './invalid-contract-document';
 
 // Create a config with document family (which doesn't exist, but we'll test the error)
@@ -13,35 +13,40 @@ const mockHook = {
 export default defineConfig({
   family: {
     kind: 'family',
+    id: 'document',
     familyId: 'document',
     manifest: { id: 'document', version: '0.0.1' },
     hook: mockHook,
-    convertOperationManifest: () => ({
-      forTypeId: '',
-      method: '',
-      args: [],
-      returns: { kind: 'builtin' as const, type: 'string' as const },
-      lowering: {
-        targetFamily: 'sql' as const,
-        strategy: 'function' as const,
-        template: '',
-      },
-    }),
-    validateContractIR: (contract: unknown) => contract,
     // Test fixture - mock family instance for testing
-    create: () => ({}) as unknown as FamilyInstance<string>,
+    create: () => ({}) as unknown as ControlFamilyInstance<string>,
   },
   target: {
     kind: 'target',
     id: 'mongodb',
     familyId: 'document',
+    targetId: 'mongodb',
     manifest: { id: 'mongodb', version: '1.0.0' },
+    create: () => ({ familyId: 'document', targetId: 'mongodb' }),
   },
   adapter: {
     kind: 'adapter',
     id: 'mongodb',
     familyId: 'document',
+    targetId: 'mongodb',
     manifest: { id: 'mongodb', version: '1.0.0' },
+    create: () => ({ familyId: 'document', targetId: 'mongodb' }),
+  },
+  driver: {
+    kind: 'driver',
+    id: 'mongodb',
+    familyId: 'document',
+    targetId: 'mongodb',
+    manifest: { id: 'mongodb', version: '1.0.0' },
+    create: async () => ({
+      targetId: 'mongodb',
+      query: async () => ({ rows: [] }),
+      close: async () => {},
+    }),
   },
   extensions: [],
   contract: {

@@ -1,23 +1,23 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
-import postgresDriver from '@prisma-next/driver-postgres/cli';
+import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgres from '@prisma-next/targets-postgres/control';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { CodecTypes } from '../../../targets/postgres-adapter/src/core/codecs';
+import postgresAdapter from '../../../targets/postgres-adapter/src/exports/control';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
-import postgres from '@prisma-next/targets-postgres/control';
-import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+} from '../../sql-runtime/src/sql-marker';
+import { executeStatement } from '../../sql-runtime/test/utils';
 
 /**
  * Creates a test contract for testing.
@@ -73,18 +73,16 @@ async function emitContract(
   contract: SqlContract<SqlStorage>,
   testDir: string,
 ): Promise<SqlContract<SqlStorage>> {
-  // Strip mappings and validate contract IR
-  const { mappings: _mappings, ...contractWithoutMappings } = contract;
-  const contractIR = sql.validateContractIR(contractWithoutMappings) as ContractIR;
-
   // Create family instance
   const familyInstance = sql.create({
     target: postgres,
     adapter: postgresAdapter,
+    driver: postgresDriver,
     extensions: [],
   });
 
-  const emitResult = await familyInstance.emitContract({ contractIR });
+  // emitContract handles stripping mappings and validation internally
+  const emitResult = await familyInstance.emitContract({ contractIR: contract });
 
   // Write contract files
   const contractJsonPath = resolve(testDir, 'output/contract.json');
@@ -105,7 +103,15 @@ function loadContract(testDir: string): { contractIR: ContractIR; contractPath: 
   const contractPath = join(testDir, 'output/contract.json');
   const contractJsonContent = readFileSync(contractPath, 'utf-8');
   const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-  const contractIR = sql.validateContractIR(contractJson) as ContractIR;
+
+  // Create family instance to validate contract
+  const familyInstance = sql.create({
+    target: postgres,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensions: [],
+  });
+  const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
   return { contractIR, contractPath };
 }
 
@@ -126,6 +132,7 @@ async function verifyDatabase(options: {
     const familyInstance = sql.create({
       target: postgres,
       adapter: postgresAdapter,
+      driver: postgresDriver,
       extensions: [],
     });
 

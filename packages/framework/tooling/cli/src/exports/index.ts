@@ -1,13 +1,3 @@
-// Re-export core-control-plane types for convenience
-export type {
-  ArgSpecManifest,
-  ExtensionPack,
-  ExtensionPackManifest,
-  LoweringSpecManifest,
-  OperationManifest,
-  ReturnSpecManifest,
-} from '@prisma-next/core-control-plane/pack-manifest-types';
-
 // CLI-specific exports
 export { createContractEmitCommand } from '../commands/contract-emit';
 export type { LoadTsContractOptions } from '../load-ts-contract';

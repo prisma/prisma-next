@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ExtensionDescriptor } from '@prisma-next/cli/config-types';
-import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,11 +49,16 @@ function loadExtensionManifest(): ExtensionPackManifest {
 /**
  * pgvector extension descriptor for CLI config.
  */
-const pgvectorExtensionDescriptor: ExtensionDescriptor<'sql'> = {
+const pgvectorExtensionDescriptor: ControlExtensionDescriptor<'sql', 'postgres'> = {
   kind: 'extension',
   familyId: 'sql',
+  targetId: 'postgres', // pgvector is postgres-specific
   id: 'pgvector',
   manifest: loadExtensionManifest(),
+  create: () => ({
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+  }),
 };
 
 export default pgvectorExtensionDescriptor;

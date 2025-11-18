@@ -1,6 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -11,7 +10,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
 import { loadConfig } from '../src/config-loader';
 import {
@@ -45,20 +44,19 @@ async function emitContractFromConfig(
     contractRaw = contractConfig.source;
   }
 
-  const contractWithoutMappings = config.family.stripMappings
-    ? config.family.stripMappings(contractRaw)
-    : contractRaw;
-
-  const contractIR = config.family.validateContractIR(contractWithoutMappings);
-
   // Create family instance (assembles operation registry, type imports, extension IDs)
+  if (!config.driver) {
+    throw new Error('Config.driver is required');
+  }
   const familyInstance = config.family.create({
     target: config.target,
     adapter: config.adapter,
+    driver: config.driver,
     extensions: config.extensions ?? [],
-  }) as FamilyInstance<string, unknown, unknown, unknown>;
+  }) as FamilyInstance<string>;
 
-  const emitResult = await familyInstance.emitContract({ contractIR: contractIR as ContractIR });
+  // emitContract handles stripping mappings and validation internally
+  const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
 
   // Write contract files
   const contractJsonPath = resolve(testDir, contractConfig.output ?? 'src/prisma/contract.json');
@@ -389,12 +387,18 @@ describe('db verify command (e2e)', () => {
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
-          const configPath = testSetup.configPath;
           const cleanupDir = testSetup.cleanup;
 
           try {
-            // Emit contract using the config
-            const contract = await emitContractFromConfig(configPath, testDir);
+            // Emit contract using a config with driver (we need driver for emitContractFromConfig)
+            // Use the with-db config which has a driver
+            const emitTestSetup = setupTestDirectoryFromFixtures(
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+            const emitConfigPath = emitTestSetup.configPath;
+            const contract = await emitContractFromConfig(emitConfigPath, testDir);
 
             await withClient(connectionString, async (client) => {
               // Setup marker schema and table
@@ -412,12 +416,38 @@ describe('db verify command (e2e)', () => {
               // withClient will close the client after this callback returns
             });
 
+            // Now test verify with the no-driver config
+            // Mock loadConfig to return config without driver (bypassing validation)
+            const originalLoadConfig = await import('../src/config-loader');
+            vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+              family: {
+                familyId: 'sql',
+                create: vi.fn(),
+              },
+              target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+              adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+              // driver is missing - this is what we're testing
+              extensions: [],
+              contract: {
+                source: contract,
+                output: 'output/contract.json',
+                types: 'output/contract.d.ts',
+              },
+              db: {
+                url: connectionString,
+              },
+            } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
             try {
               process.chdir(testDir);
               await expect(
-                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+                executeCommand(command, [
+                  '--config',
+                  'prisma-next.config.no-query-runner.ts',
+                  '--json',
+                ]),
               ).rejects.toThrow('process.exit called');
             } finally {
               process.chdir(originalCwd);

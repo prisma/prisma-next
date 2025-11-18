@@ -49,6 +49,31 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - Organize fixtures by command in subdirectories (e.g., `fixtures/emit/`, `fixtures/db-verify/`)
 - Use `setupTestDirectoryFromFixtures()` helper to create ephemeral test directories
 - **Test Cleanup**: Each test must clean up its own directory. Use `afterEach` for directories created in `beforeEach`, or call `cleanup()` in `finally` blocks. **Never use `afterAll` hooks for cleanup** - they interfere with running tests and cause race conditions.
+- **Multiple Test Directories**: When a test creates multiple test directories (e.g., in different test cases), track cleanup functions in an array and call them all in `afterEach`:
+```typescript
+let cleanupDirs: Array<() => void> = [];
+
+beforeEach(() => {
+  cleanupDirs = []; // Reset for each test
+});
+
+afterEach(() => {
+  // Clean up all test directories, even if test failed or timed out
+  for (const cleanupDir of cleanupDirs) {
+    try {
+      cleanupDir();
+    } catch (_error) {
+      // Ignore cleanup errors
+    }
+  }
+});
+
+it('test', async () => {
+  const testSetup = setupTestDirectoryFromFixtures(...);
+  cleanupDirs.push(testSetup.cleanup); // Track for afterEach cleanup
+  // ... test code
+});
+```
 
 **CLI Command Testing:**
 - Use `executeCommand()` helper from `test/utils/test-helpers.ts` to execute CLI commands
@@ -125,6 +150,39 @@ await withDevDatabase(async ({ connectionString }) => {
     // ... test code
   });
 }, { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 });
+```
+
+**CRITICAL: Dev Database Single Connection Limitation**
+
+The dev database (`withDevDatabase`) accepts only **one connection at a time**. When writing tests that use both `withClient` and CLI commands that connect to the database:
+
+1. **Close the `withClient` connection before running CLI commands** - The CLI command will need its own connection, so ensure the test's client connection is closed first
+2. **Don't nest connections** - Don't try to open a second connection while the first is still open
+
+**✅ CORRECT: Close client connection before CLI command**
+```typescript
+await withDevDatabase(async ({ connectionString }) => {
+  // Set up database schema first, then close connection
+  await withClient(connectionString, async (client) => {
+    await client.query('CREATE TABLE ...');
+    // Connection closes automatically when withClient completes
+  });
+
+  // Now CLI command can connect
+  const command = createDbIntrospectCommand();
+  await executeCommand(command, ['--config', configPath]);
+}, { acceleratePort: 54210, databasePort: 54211, shadowDatabasePort: 54212 });
+```
+
+**❌ WRONG: Nested connections cause deadlock**
+```typescript
+await withDevDatabase(async ({ connectionString }) => {
+  await withClient(connectionString, async (client) => {
+    await client.query('CREATE TABLE ...');
+    // CLI command tries to connect while client is still open - DEADLOCK!
+    await executeCommand(command, ['--config', configPath]);
+  });
+});
 ```
 
 ### Iterator Helpers

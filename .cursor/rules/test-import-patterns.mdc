@@ -251,3 +251,71 @@ import type { ContractIR } from '../../../packages/framework/core-contract/src/i
 // test/integration/test/cross-package.test.ts
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 ```
+
+## Don't Export for Tests
+
+**CRITICAL**: Never export functions, types, or utilities solely for test use. If tests in other modules need access to private implementation details, that's a code smell indicating the tests should be refactored.
+
+**❌ WRONG: Exporting for test use**
+
+```typescript
+// packages/sql/family/src/core/instance.ts
+/**
+ * Exported for test use only.
+ */
+export function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
+  // ...
+}
+
+// packages/sql/family/package.json
+{
+  "exports": {
+    "./instance": {
+      "types": "./dist/exports/instance.d.ts",
+      "import": "./dist/exports/instance.js"
+    }
+  }
+}
+
+// packages/framework/tooling/cli/test/emit.test.ts
+import { convertOperationManifest } from '@prisma-next/family-sql/instance';
+```
+
+**✅ CORRECT: Use relative imports within the same package**
+
+```typescript
+// packages/sql/family/src/core/instance.ts
+/**
+ * Converts an OperationManifest to a SqlOperationSignature.
+ * Used internally by instance creation and test utilities in the same package.
+ */
+export function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
+  // ...
+}
+
+// packages/sql/family/src/core/assembly.ts (same package)
+import { convertOperationManifest } from './instance';
+
+export function assembleOperationRegistryFromPacks(packs: ReadonlyArray<...>): OperationRegistry {
+  // Uses convertOperationManifest internally
+  const signature = convertOperationManifest(operationManifest);
+  // ...
+}
+
+// packages/framework/tooling/cli/test/emit.test.ts (different package)
+import { assembleOperationRegistryFromPacks } from '../../../../sql/family/src/core/assembly';
+// Uses the public test utility, not the private function
+const registry = assembleOperationRegistryFromPacks(packs);
+```
+
+**Why?**
+- **Same package tests**: If tests in the same module need it, use relative paths (`../src/...`)
+- **Cross-package tests**: If tests in other modules need it, that's a code smell - refactor the tests to use public APIs or test utilities
+- **Test utilities**: Create test utilities (like `assembleOperationRegistryFromPacks`) that encapsulate private functions and expose them through a public API
+- **No test-only exports**: Package exports should only include production APIs, not test-only utilities
+
+**Pattern:**
+1. Keep functions private (or exported within the same package only)
+2. Create test utilities in the same package that use private functions via relative imports
+3. Export test utilities if needed (they're part of the package's test infrastructure)
+4. Tests in other packages use the test utilities, not the private functions directly

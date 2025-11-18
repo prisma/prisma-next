@@ -45,9 +45,30 @@ Emit `contract.json` and `contract.d.ts` from `config.contract`.
 prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
 ```
 
-**Legacy alias:**
-```bash
-prisma-next emit [--config <path>]
+**Config File Requirements:**
+
+The `contract emit` command requires a `driver` in the config (even though it doesn't use it) because `ControlFamilyDescriptor.create()` requires it for consistency:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import postgres from '@prisma-next/targets-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import { contract } from './prisma/contract';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver, // Required even though emit doesn't use it
+  extensions: [],
+  contract: {
+    source: contract,
+    output: 'src/prisma/contract.json',
+    types: 'src/prisma/contract.d.ts',
+  },
+});
 ```
 
 Options:
@@ -70,8 +91,6 @@ prisma-next contract emit --json
 # Verbose output with timestamps
 prisma-next contract emit -v --timestamps
 ```
-
-**Note:** The `contract emit` command is the canonical form. The `emit` command is kept as a legacy alias for backward compatibility.
 
 ### `prisma-next db verify`
 
@@ -114,7 +133,7 @@ The `db verify` command requires a `driver` in the config to connect to the data
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import postgresDriver from '@prisma-next/driver-postgres/cli';
+import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/targets-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { contract } from './prisma/contract';
@@ -140,7 +159,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, and extensions to create a family instance
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
 4. **Verify**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
@@ -226,6 +245,158 @@ interface FamilyInstance {
 
 The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles reading the marker, comparing hashes, and checking codec coverage internally.
 
+### `prisma-next db introspect`
+
+Inspect the live database schema and display it as a human-readable tree or machine-consumable JSON.
+
+**Command:**
+```bash
+prisma-next db introspect [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+Options:
+- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--timestamps`: Add timestamps to output
+- `--color/--no-color`: Force/disable color output
+
+Examples:
+```bash
+# Use config defaults
+prisma-next db introspect
+
+# Specify database URL
+prisma-next db introspect --db postgresql://user:pass@localhost/db
+
+# JSON output
+prisma-next db introspect --json
+
+# Verbose output with timestamps
+prisma-next db introspect -v --timestamps
+```
+
+**Config File Requirements:**
+
+The `db introspect` command requires a `driver` in the config to connect to the database:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import postgres from '@prisma-next/targets-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensions: [],
+  db: {
+    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+  },
+});
+```
+
+**Introspection Process:**
+
+1. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
+2. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+3. **Introspect**: Calls `familyInstance.introspect()` which:
+   - Queries the database catalog to discover schema structure
+   - Returns a family-specific schema IR (e.g., `SqlSchemaIR` for SQL family)
+4. **Transform to Schema View**: Calls `familyInstance.toSchemaView()` to project the schema IR into a `CoreSchemaView` for display
+5. **Format Output**: Formats the schema view as a human-readable tree or JSON envelope
+
+**Output Format (TTY):**
+
+Human-readable schema tree:
+```
+sql schema (tables: 2)
+├─ table user
+│  ├─ id: int4 (not null)
+│  ├─ email: text (not null)
+│  └─ unique user_email_key
+├─ table post
+│  ├─ id: int4 (not null)
+│  ├─ title: text (not null)
+│  └─ userId: int4 (not null)
+├─ extension plpgsql
+└─ extension vector
+```
+
+**Output Format (JSON):**
+
+```json
+{
+  "ok": true,
+  "summary": "Schema introspected successfully",
+  "schema": {
+    "root": {
+      "kind": "root",
+      "id": "sql-schema",
+      "label": "sql schema (tables: 2)",
+      "children": [
+        {
+          "kind": "entity",
+          "id": "table-user",
+          "label": "table user",
+          "children": [
+            {
+              "kind": "field",
+              "id": "column-user-id",
+              "label": "id: int4 (not null)",
+              "meta": {
+                "typeId": "pg/int4@1",
+                "nullable": false,
+                "nativeType": "int4"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "meta": {
+    "configPath": "/path/to/prisma-next.config.ts",
+    "dbUrl": "postgresql://user:pass@localhost/db"
+  },
+  "timings": {
+    "total": 42
+  }
+}
+```
+
+**Error Codes:**
+- `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
+- `PN-CLI-4011`: Missing database URL — provide `--db` flag or `config.db.url` or `DATABASE_URL` environment variable
+
+**Family Requirements:**
+
+The family must provide:
+1. A `create()` method in the family descriptor that returns a `FamilyInstance` with an `introspect()` method
+2. An optional `toSchemaView()` method on the `FamilyInstance` to project family-specific schema IR into `CoreSchemaView`
+
+```typescript
+interface FamilyInstance {
+  introspect(options: {
+    driver: ControlDriverInstance;
+    contractIR?: ContractIR;
+    schema?: string;
+  }): Promise<FamilySchemaIR>;
+
+  toSchemaView?(schema: FamilySchemaIR): CoreSchemaView;
+}
+```
+
+The SQL family provides this via `@prisma-next/family-sql/control`. The `introspect()` method queries the database catalog and returns `SqlSchemaIR`, and `toSchemaView()` projects it into a `CoreSchemaView` for display.
+
+**Note:** The introspection output displays native database types (e.g., `int4`, `text`, `timestamptz`) rather than mapped codec IDs (e.g., `pg/int4@1`). This reflects the actual database state, which may be enriched with type mappings later.
+
 **Config File (`prisma-next.config.ts`):**
 
 The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.
@@ -306,7 +477,6 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - Exit codes: 0 (success), 1 (runtime error), 2 (usage/config error)
 - **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
 - **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
-- **Legacy Commands**: Legacy `emit` command is available as alias alongside canonical `contract emit`
 - **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma-next" title with command tree; command help shows "prisma-next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
 - **Command Descriptions**: Commands use `setCommandDescriptions()` to set separate short and long descriptions. See `utils/command-helpers.ts` and `.cursor/rules/cli-command-descriptions.mdc`.
 
@@ -320,10 +490,8 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
   - User's config is responsible for loading the contract (can use `loadContractFromTs` or any other method)
   - Throws error if `config.contract` is missing
 - Uses artifact paths from `config.contract.output/types` (already normalized by `defineConfig()` with defaults applied)
-- Strips mappings if family provides `stripMappings()` function
-- Uses framework CLI assembly functions to loop over descriptors
-- Calls `config.family.validateContractIR()` to validate and normalize contract
-- Passes resolved contract IR, paths, and assembly data to programmatic API (`emitContract()`)
+- Creates family instance via `config.family.create()` (assembles operation registry, type imports, extension IDs)
+- Calls `familyInstance.emitContract()` with raw contract (instance handles stripping mappings and validation internally)
 - Outputs human-readable or JSON format based on flags
 
 ### Programmatic API (`api/emit-contract.ts`)
@@ -372,10 +540,14 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 
 ### Family Descriptor (provided by family /cli entrypoint)
 - The SQL family (and other families) provide:
-  - `convertOperationManifest(manifest)` - Converts `OperationManifest` to `OperationSignature` (family-specific, e.g., SQL adds lowering spec)
+  - `create(options)` - Creates a family instance that implements domain actions
+  - `hook` - Target family hook for contract emission
+- Family instances provide:
   - `validateContractIR(contractJson)` - Validates and normalizes contract, returns ContractIR without mappings
-  - `stripMappings?(contract)` - Optionally strips runtime-only mappings from contract
-- The framework CLI handles generic looping; families provide conversion logic.
+  - `emitContract(options)` - Emits contract (handles stripping mappings and validation internally)
+  - `verify(options)` - Verifies database marker against contract
+  - `schemaVerify(options)` - Verifies database schema against contract
+  - `introspect(options)` - Introspects database schema
 
 ### Pack Manifest Types (IR)
 - Families define their manifest IR and related types under their own tooling packages. CLI treats manifests as opaque data.

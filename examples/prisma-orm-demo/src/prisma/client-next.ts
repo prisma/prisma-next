@@ -8,7 +8,7 @@ let prisma: PrismaClient | undefined;
 
 export async function getPrisma() {
   if (!prisma) {
-    const runtime = await getPrismaNextRuntime();
+    const runtime = getPrismaNextRuntime();
     const contract = validateContract(contractJson);
     prisma = new PrismaClient({
       contract,

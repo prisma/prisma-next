@@ -4,9 +4,3 @@ export type {
   PrismaNextConfig,
 } from '@prisma-next/core-control-plane/config-types';
 export { defineConfig } from '@prisma-next/core-control-plane/config-types';
-export type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
