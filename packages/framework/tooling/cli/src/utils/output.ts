@@ -422,39 +422,94 @@ function renderSchemaVerificationTree(
   }
 
   // Format node label with color based on kind
+  // For column nodes, we need to parse the name to color code different parts
   let labelColor: (text: string) => string = (text) => text;
+  let formattedLabel: string = node.name;
+
   if (useColor) {
     switch (node.kind) {
+      case 'contract':
       case 'schema':
         labelColor = bold;
+        formattedLabel = labelColor(node.name);
         break;
-      case 'table':
-        labelColor = cyan;
+      case 'table': {
+        // Parse "table tableName" format - color "table" dim, tableName cyan
+        const tableMatch = node.name.match(/^table\s+(.+)$/);
+        if (tableMatch?.[1]) {
+          const tableName = tableMatch[1];
+          formattedLabel = `${dim('table')} ${cyan(tableName)}`;
+        } else {
+          formattedLabel = dim(node.name);
+        }
         break;
-      case 'column':
+      }
+      case 'columns':
+        labelColor = dim;
+        formattedLabel = labelColor(node.name);
+        break;
+      case 'column': {
+        // Parse column name format: "columnName: contractType → nativeType (nullability)"
+        // Color code: column name (cyan), contract type (default), native type (dim), nullability (dim)
+        const columnMatch = node.name.match(/^([^:]+):\s*(.+)$/);
+        if (columnMatch?.[1] && columnMatch[2]) {
+          const columnName = columnMatch[1];
+          const rest = columnMatch[2];
+          // Parse rest: "contractType → nativeType (nullability)"
+          // Match contract type (can contain /, @, etc.), arrow, native type, then nullability in parentheses
+          const typeMatch = rest.match(/^([^\s→]+)\s*→\s*([^\s(]+)\s*(\([^)]+\))$/);
+          if (typeMatch?.[1] && typeMatch[2] && typeMatch[3]) {
+            const contractType = typeMatch[1];
+            const nativeType = typeMatch[2];
+            const nullability = typeMatch[3];
+            formattedLabel = `${cyan(columnName)}: ${contractType} → ${dim(nativeType)} ${dim(nullability)}`;
+          } else {
+            // Fallback if format doesn't match (e.g., no native type or no nullability)
+            formattedLabel = `${cyan(columnName)}: ${rest}`;
+          }
+        } else {
+          formattedLabel = node.name;
+        }
+        break;
+      }
       case 'type':
       case 'nullability':
         labelColor = (text) => text; // Default color
+        formattedLabel = labelColor(node.name);
         break;
-      case 'primaryKey':
+      case 'primaryKey': {
+        // Parse "primary key: columnName" format - color "primary key" dim, columnName cyan
+        const pkMatch = node.name.match(/^primary key:\s*(.+)$/);
+        if (pkMatch?.[1]) {
+          const columnNames = pkMatch[1];
+          formattedLabel = `${dim('primary key')}: ${cyan(columnNames)}`;
+        } else {
+          formattedLabel = dim(node.name);
+        }
+        break;
+      }
       case 'foreignKey':
       case 'unique':
       case 'index':
         labelColor = dim;
+        formattedLabel = labelColor(node.name);
         break;
       case 'extension':
         labelColor = magenta;
+        formattedLabel = labelColor(node.name);
         break;
       default:
+        formattedLabel = node.name;
         break;
     }
+  } else {
+    formattedLabel = node.name;
   }
 
   const statusGlyphColored = statusColor(statusGlyph);
-  const labelColored = labelColor(node.name);
 
   // Build the label with optional message for failure/warn nodes
-  let nodeLabel = labelColored;
+  let nodeLabel = formattedLabel;
   if (
     (node.status === 'fail' || node.status === 'warn') &&
     node.message &&
@@ -464,7 +519,7 @@ function renderSchemaVerificationTree(
     // For parent nodes, the message summarizes child failures
     // For leaf nodes, the message explains the specific issue
     const messageText = formatDimText(`(${node.message})`);
-    nodeLabel = `${labelColored} ${messageText}`;
+    nodeLabel = `${formattedLabel} ${messageText}`;
   }
 
   // Root node renders without tree characters or │ prefix
@@ -530,15 +585,7 @@ export function formatSchemaVerifyOutput(
   const formatRed = createColorFormatter(useColor, red);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  // First line: summary with status glyph
-  if (result.ok) {
-    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
-  } else {
-    const codeText = result.code ? ` (${result.code})` : '';
-    lines.push(`${prefix}${formatRed('✖')} ${result.summary}${codeText}`);
-  }
-
-  // Render verification tree
+  // Render verification tree first
   const treeLines = renderSchemaVerificationTree(result.schema.root, flags, {
     isLast: true,
     prefix: '',
@@ -556,6 +603,17 @@ export function formatSchemaVerifyOutput(
     lines.push(
       `${prefix}${formatDimText(`  pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
     );
+  }
+
+  // Blank line before summary
+  lines.push('');
+
+  // Summary line at the end: summary with status glyph
+  if (result.ok) {
+    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
+  } else {
+    const codeText = result.code ? ` (${result.code})` : '';
+    lines.push(`${prefix}${formatRed('✖')} ${result.summary}${codeText}`);
   }
 
   return lines.join('\n');

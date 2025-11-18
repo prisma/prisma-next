@@ -578,6 +578,14 @@ function compareExtensions(
       return false;
     });
 
+    // Map extension names to descriptive labels
+    const extensionLabels: Record<string, string> = {
+      pg: 'database is postgres',
+      pgvector: 'vector extension is enabled',
+      vector: 'vector extension is enabled',
+    };
+    const extensionLabel = extensionLabels[extName] ?? `extension "${extName}" is enabled`;
+
     if (!matchingExt) {
       issues.push({
         kind: 'extension_missing',
@@ -587,7 +595,7 @@ function compareExtensions(
       nodes.push({
         status: 'fail',
         kind: 'extension',
-        name: extName,
+        name: extensionLabel,
         contractPath: extPath,
         code: 'extension_missing',
         message: `Extension "${extName}" is missing`,
@@ -599,7 +607,7 @@ function compareExtensions(
       nodes.push({
         status: 'pass',
         kind: 'extension',
-        name: extName,
+        name: extensionLabel,
         contractPath: extPath,
         code: '',
         message: '',
@@ -1137,7 +1145,7 @@ export function createSqlFamilyInstance(
           rootChildren.push({
             status: 'fail',
             kind: 'table',
-            name: tableName,
+            name: `table ${tableName}`,
             contractPath: tablePath,
             code: 'missing_table',
             message: `Table "${tableName}" is missing`,
@@ -1150,6 +1158,7 @@ export function createSqlFamilyInstance(
 
         // Table exists - compare columns, constraints, etc.
         const tableChildren: SchemaVerificationNode[] = [];
+        const columnNodes: SchemaVerificationNode[] = [];
 
         // Compare columns
         for (const [columnName, contractColumn] of Object.entries(contractTable.columns)) {
@@ -1164,10 +1173,10 @@ export function createSqlFamilyInstance(
               column: columnName,
               message: `Column "${tableName}"."${columnName}" is missing from database`,
             });
-            tableChildren.push({
+            columnNodes.push({
               status: 'fail',
               kind: 'column',
-              name: `${tableName}.${columnName}`,
+              name: `${columnName}: missing`,
               contractPath: columnPath,
               code: 'missing_column',
               message: `Column "${columnName}" is missing`,
@@ -1185,8 +1194,8 @@ export function createSqlFamilyInstance(
           // Compare type using nativeType
           // Contract stores type ID (e.g., 'pg/int4@1'), schema IR has nativeType (e.g., 'int4')
           // We need to get nativeType from the type metadata registry for the contract type ID
-          const metadata = typeMetadataRegistry.get(contractColumn.type);
-          const contractNativeType = metadata?.nativeType;
+          const typeMetadata = typeMetadataRegistry.get(contractColumn.type);
+          const contractNativeType = typeMetadata?.nativeType;
           const schemaNativeType = schemaColumn.nativeType;
 
           if (!contractNativeType) {
@@ -1284,7 +1293,12 @@ export function createSqlFamilyInstance(
           const finalColumnStatus = columnChildren.length > 0 ? computedColumnStatus : columnStatus;
 
           // Build column node
-          const nullableText = contractColumn.nullable ? 'null' : 'not null';
+          const nullableText = contractColumn.nullable ? 'nullable' : 'not nullable';
+          // Format: columnName: contractType → nativeType (nullability)
+          // Reuse contractNativeType from above scope
+          const columnTypeDisplay = contractNativeType
+            ? `${contractColumn.type} → ${contractNativeType}`
+            : contractColumn.type;
           // Collect failure messages from children to create a summary message
           const failureMessages = columnChildren
             .filter((child) => child.status === 'fail' && child.message)
@@ -1300,16 +1314,36 @@ export function createSqlFamilyInstance(
               : finalColumnStatus === 'warn' && columnChildren.length > 0 && columnChildren[0]
                 ? columnChildren[0].code
                 : '';
-          tableChildren.push({
+          columnNodes.push({
             status: finalColumnStatus,
             kind: 'column',
-            name: `${tableName}.${columnName}: ${contractColumn.type} ${nullableText}`,
+            name: `${columnName}: ${columnTypeDisplay} (${nullableText})`,
             contractPath: columnPath,
             code: columnCode,
             message: columnMessage,
             expected: undefined,
             actual: undefined,
             children: columnChildren,
+          });
+        }
+
+        // Group columns under a "columns" header if we have any columns
+        if (columnNodes.length > 0) {
+          const columnsStatus = columnNodes.some((c) => c.status === 'fail')
+            ? 'fail'
+            : columnNodes.some((c) => c.status === 'warn')
+              ? 'warn'
+              : 'pass';
+          tableChildren.push({
+            status: columnsStatus,
+            kind: 'columns',
+            name: 'columns',
+            contractPath: `${tablePath}.columns`,
+            code: '',
+            message: '',
+            expected: undefined,
+            actual: undefined,
+            children: columnNodes,
           });
         }
 
@@ -1323,10 +1357,10 @@ export function createSqlFamilyInstance(
                 column: columnName,
                 message: `Extra column "${tableName}"."${columnName}" found in database (not in contract)`,
               });
-              tableChildren.push({
+              columnNodes.push({
                 status: 'fail',
                 kind: 'column',
-                name: `${tableName}.${columnName}`,
+                name: `${columnName}: extra`,
                 contractPath: `${tablePath}.columns.${columnName}`,
                 code: 'extra_column',
                 message: `Extra column "${columnName}" found`,
@@ -1350,7 +1384,7 @@ export function createSqlFamilyInstance(
             tableChildren.push({
               status: 'fail',
               kind: 'primaryKey',
-              name: `primaryKey(${contractTable.primaryKey.columns.join(', ')})`,
+              name: `primary key: ${contractTable.primaryKey.columns.join(', ')}`,
               contractPath: `${tablePath}.primaryKey`,
               code: 'primary_key_mismatch',
               message: 'Primary key mismatch',
@@ -1362,7 +1396,7 @@ export function createSqlFamilyInstance(
             tableChildren.push({
               status: 'pass',
               kind: 'primaryKey',
-              name: `primaryKey(${contractTable.primaryKey.columns.join(', ')})`,
+              name: `primary key: ${contractTable.primaryKey.columns.join(', ')}`,
               contractPath: `${tablePath}.primaryKey`,
               code: '',
               message: '',
@@ -1381,7 +1415,7 @@ export function createSqlFamilyInstance(
           tableChildren.push({
             status: 'fail',
             kind: 'primaryKey',
-            name: `primaryKey(${schemaTable.primaryKey.columns.join(', ')})`,
+            name: `primary key: ${schemaTable.primaryKey.columns.join(', ')}`,
             contractPath: `${tablePath}.primaryKey`,
             code: 'extra_primary_key',
             message: 'Extra primary key found',
@@ -1446,7 +1480,7 @@ export function createSqlFamilyInstance(
         rootChildren.push({
           status: tableStatus,
           kind: 'table',
-          name: tableName,
+          name: `table ${tableName}`,
           contractPath: tablePath,
           code: tableCode,
           message: tableMessage,
@@ -1468,7 +1502,7 @@ export function createSqlFamilyInstance(
             rootChildren.push({
               status: 'fail',
               kind: 'table',
-              name: tableName,
+              name: `table ${tableName}`,
               contractPath: `storage.tables.${tableName}`,
               code: 'extra_table',
               message: `Extra table "${tableName}" found`,
@@ -1498,8 +1532,8 @@ export function createSqlFamilyInstance(
           : 'pass';
       const root: SchemaVerificationNode = {
         status: rootStatus,
-        kind: 'schema',
-        name: 'schema',
+        kind: 'contract',
+        name: 'contract',
         contractPath: '',
         code: '',
         message: '',

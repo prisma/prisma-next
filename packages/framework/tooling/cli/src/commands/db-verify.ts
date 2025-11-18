@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import {
   errorDatabaseUrlRequired,
@@ -73,9 +73,11 @@ export function createDbVerifyCommand(): Command {
         // Load config (file I/O)
         const config = await loadConfig(options.config);
         const configPath = options.config || './prisma-next.config.ts';
-        const contractPath = config.contract?.output
+        const contractPathAbsolute = config.contract?.output
           ? resolve(config.contract.output)
           : resolve('src/prisma/contract.json');
+        // Convert to relative path for display
+        const contractPath = relative(process.cwd(), contractPathAbsolute);
 
         // Output header (only for human-readable output)
         if (flags.json !== 'object' && !flags.quiet) {
@@ -99,11 +101,11 @@ export function createDbVerifyCommand(): Command {
         // Load contract file (file I/O)
         let contractJsonContent: string;
         try {
-          contractJsonContent = await readFile(contractPath, 'utf-8');
+          contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
         } catch (error) {
           if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-            throw errorFileNotFound(contractPath, {
-              why: `Contract file not found at ${contractPath}`,
+            throw errorFileNotFound(contractPathAbsolute, {
+              why: `Contract file not found at ${contractPathAbsolute}`,
             });
           }
           throw errorUnexpected(error instanceof Error ? error.message : String(error), {
