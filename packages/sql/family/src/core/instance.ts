@@ -3,15 +3,12 @@ import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contrac
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type { OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
 import type {
-  AdapterDescriptor,
   ControlAdapterDescriptor,
   ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyInstance,
   ControlTargetDescriptor,
   EmitContractResult,
-  ExtensionDescriptor,
-  TargetDescriptor,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
@@ -27,7 +24,7 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from './assembly';
-import type { SqlControlAdapter, SqlControlAdapterDescriptor } from './control-adapter';
+import type { SqlControlAdapter } from './control-adapter';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
 /**
@@ -276,11 +273,9 @@ export interface SqlControlFamilyInstance
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
 interface CreateSqlFamilyInstanceOptions {
-  readonly target: TargetDescriptor<'sql'> | ControlTargetDescriptor<'sql', string>;
-  readonly adapter: AdapterDescriptor<'sql'> | ControlAdapterDescriptor<'sql', string>;
-  readonly extensions:
-    | ReadonlyArray<ExtensionDescriptor<'sql'>>
-    | readonly ControlExtensionDescriptor<'sql', string>[];
+  readonly target: ControlTargetDescriptor<'sql', string>;
+  readonly adapter: ControlAdapterDescriptor<'sql', string>;
+  readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
 }
 
 /**
@@ -292,22 +287,14 @@ export function createSqlFamilyInstance(
   const { target, adapter, extensions } = options;
 
   // Build descriptors array for assembly
-  // Cast to legacy types for assembly functions (they only use manifest and id)
-  const descriptors = [
-    target as TargetDescriptor<'sql'>,
-    adapter as AdapterDescriptor<'sql'>,
-    ...(extensions as ReadonlyArray<ExtensionDescriptor<'sql'>>),
-  ];
+  // Assembly functions only use manifest and id, so we can pass Control*Descriptor types directly
+  const descriptors = [target, adapter, ...extensions];
 
   // Assemble operation registry, type imports, and extension IDs
   const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds(
-    adapter as AdapterDescriptor<'sql'>,
-    target as TargetDescriptor<'sql'>,
-    extensions as ReadonlyArray<ExtensionDescriptor<'sql'>>,
-  );
+  const extensionIds = extractExtensionIds(adapter, target, extensions);
 
   /**
    * Strips mappings from a contract (mappings are runtime-only).
@@ -375,7 +362,11 @@ export function createSqlFamilyInstance(
       // Compute codec coverage (optional)
       let missingCodecs: readonly string[] | undefined;
       let codecCoverageSkipped = false;
-      const supportedTypeIds = collectSupportedCodecTypeIds([adapter, target, ...extensions]);
+      const supportedTypeIds = collectSupportedCodecTypeIds<'sql', string>([
+        adapter,
+        target,
+        ...extensions,
+      ]);
       if (supportedTypeIds.length === 0) {
         // Helper is present but returns empty (MVP behavior)
         // Coverage check is skipped - missingCodecs remains undefined
@@ -500,33 +491,9 @@ export function createSqlFamilyInstance(
     }): Promise<SqlSchemaIR> {
       const { driver, contractIR } = options;
 
-      // Handle new ControlAdapterDescriptor (it IS the control adapter descriptor)
-      if ('targetId' in adapter && 'create' in adapter) {
-        const controlAdapter = adapter.create() as SqlControlAdapter;
-        return controlAdapter.introspect(driver as ControlDriverInstance<string>, contractIR);
-      }
-
-      // Handle legacy AdapterDescriptor (has control property)
-      if ('control' in adapter && adapter.control) {
-        const controlDescriptor = adapter.control as SqlControlAdapterDescriptor;
-        if (
-          typeof controlDescriptor !== 'object' ||
-          controlDescriptor === null ||
-          !('create' in controlDescriptor) ||
-          typeof controlDescriptor.create !== 'function'
-        ) {
-          throw new Error(
-            `Adapter '${adapter.id}' control descriptor does not provide create() method`,
-          );
-        }
-
-        const controlAdapter: SqlControlAdapter = controlDescriptor.create();
-        return controlAdapter.introspect(driver as ControlDriverInstance<string>, contractIR);
-      }
-
-      throw new Error(
-        `Adapter '${adapter.id}' does not provide control adapter required for introspection`,
-      );
+      // ControlAdapterDescriptor has create() method that returns SqlControlAdapter
+      const controlAdapter = adapter.create() as SqlControlAdapter;
+      return controlAdapter.introspect(driver as ControlDriverInstance<string>, contractIR);
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {

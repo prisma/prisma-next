@@ -45,11 +45,6 @@ Emit `contract.json` and `contract.d.ts` from `config.contract`.
 prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
 ```
 
-**Legacy alias:**
-```bash
-prisma-next emit [--config <path>]
-```
-
 Options:
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object

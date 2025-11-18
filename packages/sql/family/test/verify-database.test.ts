@@ -73,10 +73,11 @@ async function emitContract(
   contract: SqlContract<SqlStorage>,
   testDir: string,
 ): Promise<SqlContract<SqlStorage>> {
-  // Create family instance first
+  // Create family instance
   const familyInstance = sql.create({
     target: postgres,
     adapter: postgresAdapter,
+    driver: postgresDriver,
     extensions: [],
   });
 
@@ -107,6 +108,7 @@ function loadContract(testDir: string): { contractIR: ContractIR; contractPath: 
   const familyInstance = sql.create({
     target: postgres,
     adapter: postgresAdapter,
+    driver: postgresDriver,
     extensions: [],
   });
   const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
@@ -130,6 +132,7 @@ async function verifyDatabase(options: {
     const familyInstance = sql.create({
       target: postgres,
       adapter: postgresAdapter,
+      driver: postgresDriver,
       extensions: [],
     });
 

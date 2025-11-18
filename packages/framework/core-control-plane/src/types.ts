@@ -192,116 +192,6 @@ export interface ControlExtensionDescriptor<
   create(): TExtensionInstance;
 }
 
-// ============================================================================
-// Legacy Types (Deprecated - use Control* types above)
-// ============================================================================
-
-/**
- * Minimal driver interface for Control Plane database operations.
- * Provides query execution and connection management.
- *
- * @template TTarget - The target ID (e.g., 'postgres', 'mysql')
- * @deprecated Use ControlDriverInstance instead. This interface uses `target` instead of `targetId`.
- * For new code, use ControlDriverInstance<TTargetId> which uses `targetId` for consistency.
- */
-export interface ControlPlaneDriver<TTarget extends string = string>
-  extends ControlDriverInstance<TTarget> {
-  /**
-   * The target ID this driver implements.
-   * Used for type tracking and runtime validation.
-   * @deprecated Use targetId instead (from ControlDriverInstance)
-   */
-  readonly target?: TTarget;
-}
-
-/**
- * Descriptor for a driver pack (e.g., Postgres driver).
- *
- * @deprecated Use ControlDriverDescriptor instead. This interface will be removed in a future version.
- * Note: DriverDescriptor uses `family: string` instead of `familyId: TFamilyId` and lacks `targetId`.
- * Migrate to ControlDriverDescriptor<TFamilyId, TTargetId, TDriverInstance> for type-safe wiring.
- */
-export interface DriverDescriptor {
-  readonly kind: 'driver';
-  readonly id: string;
-  readonly family: string;
-  readonly manifest: ExtensionPackManifest;
-  /**
-   * Creates a ControlPlaneDriver instance from a connection URL.
-   * @param url - Database connection URL
-   * @returns Promise resolving to a ControlPlaneDriver instance
-   */
-  create(url: string): Promise<ControlPlaneDriver>;
-}
-
-/**
- * Descriptor for a target family (e.g., SQL).
- * Provides the family hook and factory method.
- *
- * @deprecated Use ControlFamilyDescriptor instead. This interface will be removed in a future version.
- * Note: FamilyDescriptor.create() doesn't include driver parameter. Migrate to ControlFamilyDescriptor for the new pattern.
- */
-export interface FamilyDescriptor<TFamilyId extends string, TFamilyInstance = unknown> {
-  readonly kind: 'family';
-  readonly familyId: TFamilyId;
-  readonly manifest: ExtensionPackManifest;
-  readonly hook: TargetFamilyHook;
-  /**
-   * Creates a family instance for control-plane operations.
-   * @param options - Target, adapter, and extensions for the instance
-   * @returns Family instance that implements domain actions
-   */
-  create(options: {
-    readonly target: TargetDescriptor<TFamilyId>;
-    readonly adapter: AdapterDescriptor<TFamilyId>;
-    readonly extensions: ReadonlyArray<ExtensionDescriptor<TFamilyId>>;
-  }): TFamilyInstance;
-}
-
-/**
- * Descriptor for a target pack (e.g., Postgres target).
- *
- * @deprecated Use ControlTargetDescriptor instead. This interface will be removed in a future version.
- * Note: TargetDescriptor lacks `targetId` and `create()` method. Migrate to ControlTargetDescriptor<TFamilyId, TTargetId, TTargetInstance>.
- */
-export interface TargetDescriptor<TFamilyId extends string> {
-  readonly kind: 'target';
-  readonly familyId: TFamilyId;
-  readonly id: string;
-  readonly manifest: ExtensionPackManifest;
-}
-
-/**
- * Descriptor for an adapter pack (e.g., Postgres adapter).
- * May optionally provide a runtime factory for DB-connected commands.
- *
- * @deprecated Use ControlAdapterDescriptor instead. This interface will be removed in a future version.
- * Note: AdapterDescriptor lacks `targetId` and has optional fields. Migrate to ControlAdapterDescriptor<TFamilyId, TTargetId, TAdapterInstance>.
- */
-export interface AdapterDescriptor<TFamilyId extends string> {
-  readonly kind: 'adapter';
-  readonly familyId: TFamilyId;
-  readonly id: string;
-  readonly manifest: ExtensionPackManifest;
-  readonly create?: (...args: unknown[]) => unknown;
-  readonly adapter?: unknown;
-  readonly createControlInstance?: () => unknown;
-  readonly control?: unknown; // Family-specific control descriptor (e.g., SqlControlAdapterDescriptor)
-}
-
-/**
- * Descriptor for an extension pack (e.g., pgvector).
- *
- * @deprecated Use ControlExtensionDescriptor instead. This interface will be removed in a future version.
- * Note: ExtensionDescriptor lacks `targetId` and `create()` method. Migrate to ControlExtensionDescriptor<TFamilyId, TTargetId, TExtensionInstance>.
- */
-export interface ExtensionDescriptor<TFamilyId extends string> {
-  readonly kind: 'extension';
-  readonly familyId: TFamilyId;
-  readonly id: string;
-  readonly manifest: ExtensionPackManifest;
-}
-
 /**
  * Family instance interface for control-plane domain actions.
  * Each family implements this interface with family-specific types.
@@ -325,7 +215,7 @@ export interface FamilyInstance<
    * Compares target, coreHash, and profileHash.
    */
   verify(options: {
-    readonly driver: ControlPlaneDriver;
+    readonly driver: ControlDriverInstance;
     readonly contractIR: unknown;
     readonly expectedTargetId: string;
     readonly contractPath: string;
@@ -337,7 +227,7 @@ export interface FamilyInstance<
    * Compares contract requirements against live database schema.
    */
   schemaVerify(options: {
-    readonly driver: ControlPlaneDriver;
+    readonly driver: ControlDriverInstance;
     readonly contractIR: unknown;
     readonly strict: boolean;
     readonly contractPath: string;
@@ -361,7 +251,7 @@ export interface FamilyInstance<
    *   The IR represents the complete schema snapshot at the time of introspection.
    */
   introspect(options: {
-    readonly driver: ControlPlaneDriver;
+    readonly driver: ControlDriverInstance;
     readonly contractIR?: unknown;
   }): Promise<TSchemaIR>;
 

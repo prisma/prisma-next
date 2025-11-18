@@ -1,9 +1,9 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
-  AdapterDescriptor,
+  ControlAdapterDescriptor,
   ControlDriverInstance,
-  ExtensionDescriptor,
-  TargetDescriptor,
+  ControlExtensionDescriptor,
+  ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 
@@ -149,9 +149,11 @@ export async function readMarker(
  * For MVP, we return an empty array since extracting type IDs from TypeScript modules
  * would require runtime evaluation or static analysis. This can be enhanced later.
  */
-export function collectSupportedCodecTypeIds<TFamilyId extends string>(
+export function collectSupportedCodecTypeIds<TFamilyId extends string, TTargetId extends string>(
   descriptors: ReadonlyArray<
-    TargetDescriptor<TFamilyId> | AdapterDescriptor<TFamilyId> | ExtensionDescriptor<TFamilyId>
+    | ControlTargetDescriptor<TFamilyId, TTargetId>
+    | ControlAdapterDescriptor<TFamilyId, TTargetId>
+    | ControlExtensionDescriptor<TFamilyId, TTargetId>
   >,
 ): readonly string[] {
   // For MVP, return empty array

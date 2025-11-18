@@ -1,23 +1,18 @@
 import { dirname, join } from 'node:path';
 import { type } from 'arktype';
 import type {
-  AdapterDescriptor,
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
+  ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
-  ControlPlaneDriver,
   ControlTargetDescriptor,
-  DriverDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
 } from './types';
 
 /**
- * @deprecated Use ControlPlaneDriver from @prisma-next/core-control-plane/types instead
+ * Type alias for CLI driver instances.
  */
-export type CliDriver = ControlPlaneDriver;
+export type CliDriver = ControlDriverInstance;
 
 /**
  * Contract configuration specifying source and artifact locations.
@@ -43,29 +38,25 @@ export interface ContractConfig {
 
 /**
  * Configuration for Prisma Next CLI.
- * Supports both legacy descriptor types and new Control*Descriptor types for backward compatibility.
- * When using Control*Descriptor types, type-level compatibility is enforced (mismatched familyId/targetId combinations fail at compile time).
+ * Uses Control*Descriptor types for type-safe wiring with compile-time compatibility checks.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql'). Only used when Control*Descriptor types are used.
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
 export interface PrismaNextConfig<
   TFamilyId extends string = string,
   TTargetId extends string = string,
 > {
-  // Support both legacy and new descriptor types
-  readonly family: FamilyDescriptor<TFamilyId> | ControlFamilyDescriptor<TFamilyId>;
-  readonly target: TargetDescriptor<TFamilyId> | ControlTargetDescriptor<TFamilyId, TTargetId>;
-  readonly adapter: AdapterDescriptor<TFamilyId> | ControlAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly extensions?:
-    | ReadonlyArray<ExtensionDescriptor<TFamilyId>>
-    | readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly family: ControlFamilyDescriptor<TFamilyId>;
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
+  readonly extensions?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
   /**
    * Driver descriptor for DB-connected CLI commands.
    * Required for DB-connected commands (e.g., db verify).
    * Optional for commands that don't need database access (e.g., emit).
    */
-  readonly driver?: DriverDescriptor | ControlDriverDescriptor<TFamilyId, TTargetId>;
+  readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId>;
   readonly db?: {
     readonly url?: string;
   };
@@ -91,11 +82,11 @@ const ContractConfigSchema = type({
  * Note: This validates structure only. Descriptor objects (family, target, adapter) are validated separately.
  */
 const PrismaNextConfigSchema = type({
-  family: 'unknown', // FamilyDescriptor - validated separately
-  target: 'unknown', // TargetDescriptor - validated separately
-  adapter: 'unknown', // AdapterDescriptor - validated separately
+  family: 'unknown', // ControlFamilyDescriptor - validated separately
+  target: 'unknown', // ControlTargetDescriptor - validated separately
+  adapter: 'unknown', // ControlAdapterDescriptor - validated separately
   'extensions?': 'unknown[]',
-  'driver?': 'unknown', // DriverDescriptor - validated separately (optional)
+  'driver?': 'unknown', // ControlDriverDescriptor - validated separately (optional)
   'db?': 'unknown',
   'contract?': ContractConfigSchema,
 });

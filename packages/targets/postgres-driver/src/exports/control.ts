@@ -5,7 +5,6 @@ import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack
 import type {
   ControlDriverDescriptor,
   ControlDriverInstance,
-  DriverDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 import { Client } from 'pg';
@@ -79,21 +78,19 @@ function loadDriverManifest(): ExtensionPackManifest {
 
 /**
  * Postgres driver descriptor for CLI config.
- * Implements both legacy DriverDescriptor and new ControlDriverDescriptor for backward compatibility.
  */
-const postgresDriverDescriptor: DriverDescriptor &
-  ControlDriverDescriptor<'sql', 'postgres', PostgresControlDriver> = {
-  kind: 'driver',
-  id: 'postgres',
-  family: 'sql',
-  familyId: 'sql',
-  targetId: 'postgres',
-  manifest: loadDriverManifest(),
-  async create(url: string): Promise<PostgresControlDriver> {
-    const client = new Client({ connectionString: url });
-    await client.connect();
-    return new PostgresControlDriver(client);
-  },
-};
+const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', PostgresControlDriver> =
+  {
+    kind: 'driver',
+    id: 'postgres',
+    familyId: 'sql',
+    targetId: 'postgres',
+    manifest: loadDriverManifest(),
+    async create(url: string): Promise<PostgresControlDriver> {
+      const client = new Client({ connectionString: url });
+      await client.connect();
+      return new PostgresControlDriver(client);
+    },
+  };
 
 export default postgresDriverDescriptor;

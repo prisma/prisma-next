@@ -1,12 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
-import type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  FamilyInstance,
-  TargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -102,19 +97,21 @@ export function createContractEmitCommand(): Command {
           console.log(header);
         }
 
-        // Create family instance first (assembles operation registry, type imports, extension IDs)
-        // Support both legacy and new Control*Descriptor patterns
-        // Note: emit command doesn't need driver, so we use legacy pattern
-        const familyCreate = config.family.create as (options: {
-          target: TargetDescriptor<string>;
-          adapter: AdapterDescriptor<string>;
-          extensions: ReadonlyArray<ExtensionDescriptor<string>>;
-        }) => FamilyInstance<string, unknown, unknown, unknown>;
-        const familyInstance = familyCreate({
-          target: config.target as TargetDescriptor<string>,
-          adapter: config.adapter as AdapterDescriptor<string>,
-          extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
-        });
+        // Create family instance (assembles operation registry, type imports, extension IDs)
+        // Note: emit command doesn't need driver, but ControlFamilyDescriptor.create() requires it
+        // We'll need to provide a minimal driver descriptor or make driver optional for emit
+        // For now, we'll require driver to be present in config even for emit
+        if (!config.driver) {
+          throw errorContractConfigMissing({
+            why: 'Config.driver is required. Even though emit does not use the driver, it is required by ControlFamilyDescriptor.create()',
+          });
+        }
+        const familyInstance = config.family.create({
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensions: config.extensions ?? [],
+        }) as FamilyInstance<string>;
 
         // Resolve contract source from config (user's config handles loading)
         let contractRaw: unknown;

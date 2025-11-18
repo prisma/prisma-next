@@ -1,6 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
-import type { FamilyDescriptor } from '@prisma-next/core-control-plane/types';
+import type { ControlFamilyDescriptor } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import postgres from '@prisma-next/targets-postgres/control';
@@ -18,7 +18,7 @@ const sqlFamilyWithoutCreate = {
 
 export default defineConfig({
   // Test fixture - intentionally missing create method to test validation
-  family: sqlFamilyWithoutCreate as unknown as FamilyDescriptor<'sql', unknown>,
+  family: sqlFamilyWithoutCreate as unknown as ControlFamilyDescriptor<'sql'>,
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,

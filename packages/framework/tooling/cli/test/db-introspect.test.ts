@@ -73,8 +73,8 @@ describe('db introspect command', () => {
           familyId: 'sql',
           create: vi.fn().mockReturnValue(mockFamilyInstance),
         },
-        target: { id: 'postgres', familyId: 'sql' },
-        adapter: { id: 'postgres', familyId: 'sql' },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
         driver: {
           create: vi.fn().mockResolvedValue({
             query: vi.fn(),
@@ -125,8 +125,8 @@ describe('db introspect command', () => {
           familyId: 'sql',
           create: vi.fn().mockReturnValue(mockFamilyInstance),
         },
-        target: { id: 'postgres', familyId: 'sql' },
-        adapter: { id: 'postgres', familyId: 'sql' },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
         driver: {
           create: vi.fn().mockResolvedValue({
             query: vi.fn(),
@@ -175,8 +175,8 @@ describe('db introspect command', () => {
           familyId: 'sql',
           create: vi.fn().mockReturnValue(mockFamilyInstance),
         },
-        target: { id: 'postgres', familyId: 'sql' },
-        adapter: { id: 'postgres', familyId: 'sql' },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
         driver: {
           create: vi.fn().mockResolvedValue({
             query: vi.fn(),
@@ -267,8 +267,8 @@ describe('db introspect command', () => {
           familyId: 'sql',
           create: vi.fn().mockReturnValue(mockFamilyInstance),
         },
-        target: { id: 'postgres', familyId: 'sql' },
-        adapter: { id: 'postgres', familyId: 'sql' },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
         driver: {
           create: vi.fn().mockResolvedValue(mockDriver),
         },

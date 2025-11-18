@@ -11,14 +11,7 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
-import type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  FamilyInstance,
-  TargetDescriptor,
-  VerifyDatabaseResult,
-} from '@prisma-next/core-control-plane/types';
+import type { FamilyInstance, VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -133,36 +126,13 @@ export function createDbVerifyCommand(): Command {
         const driver = await config.driver.create(dbUrl);
 
         try {
-          // Create family instance first
-          // Support both legacy and new Control*Descriptor patterns
-          const hasTargetId =
-            'targetId' in config.target &&
-            typeof config.target.targetId === 'string' &&
-            'targetId' in config.adapter &&
-            typeof config.adapter.targetId === 'string';
-          const familyInstance = hasTargetId
-            ? // New pattern: Control*Descriptor with driver parameter
-              (
-                config.family as {
-                  create: (options: {
-                    target: unknown;
-                    adapter: unknown;
-                    driver: unknown;
-                    extensions: unknown[];
-                  }) => unknown;
-                }
-              ).create({
-                target: config.target,
-                adapter: config.adapter,
-                driver: config.driver,
-                extensions: [...(config.extensions ?? [])],
-              })
-            : // Legacy pattern: FamilyDescriptor without driver parameter
-              (config.family as FamilyDescriptor<string>).create({
-                target: config.target as TargetDescriptor<string>,
-                adapter: config.adapter as AdapterDescriptor<string>,
-                extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
-              });
+          // Create family instance
+          const familyInstance = config.family.create({
+            target: config.target,
+            adapter: config.adapter,
+            driver: config.driver!,
+            extensions: config.extensions ?? [],
+          });
           const typedFamilyInstance = familyInstance as FamilyInstance<string>;
 
           // Validate contract using instance validator
@@ -174,7 +144,7 @@ export function createDbVerifyCommand(): Command {
             verifyResult = (await typedFamilyInstance.verify({
               driver,
               contractIR,
-              expectedTargetId: config.target.id,
+              expectedTargetId: config.target.targetId,
               contractPath,
               configPath,
             })) as VerifyDatabaseResult;

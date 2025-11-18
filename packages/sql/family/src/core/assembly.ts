@@ -4,9 +4,9 @@ import type {
   OperationManifest,
 } from '@prisma-next/core-control-plane/pack-manifest-types';
 import type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  TargetDescriptor,
+  ControlAdapterDescriptor,
+  ControlExtensionDescriptor,
+  ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
@@ -20,7 +20,9 @@ import { convertOperationManifest } from './instance';
  */
 export function assembleOperationRegistry(
   descriptors: ReadonlyArray<
-    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
   >,
   convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
@@ -42,7 +44,9 @@ export function assembleOperationRegistry(
  */
 export function extractCodecTypeImports(
   descriptors: ReadonlyArray<
-    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
   >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
@@ -62,7 +66,9 @@ export function extractCodecTypeImports(
  */
 export function extractOperationTypeImports(
   descriptors: ReadonlyArray<
-    TargetDescriptor<'sql'> | AdapterDescriptor<'sql'> | ExtensionDescriptor<'sql'>
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
   >,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
@@ -83,9 +89,9 @@ export function extractOperationTypeImports(
  * Deduplicates while preserving stable order.
  */
 export function extractExtensionIds(
-  adapter: AdapterDescriptor<'sql'>,
-  target: TargetDescriptor<'sql'>,
-  extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>,
+  adapter: ControlAdapterDescriptor<'sql', string>,
+  target: ControlTargetDescriptor<'sql', string>,
+  extensions: ReadonlyArray<ControlExtensionDescriptor<'sql', string>>,
 ): ReadonlyArray<string> {
   const ids: string[] = [];
   const seen = new Set<string>();

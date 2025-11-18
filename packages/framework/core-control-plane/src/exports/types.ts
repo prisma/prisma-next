@@ -7,9 +7,7 @@ export type {
   ReturnSpecManifest,
 } from '../pack-manifest-types';
 export type {
-  // Legacy types (deprecated)
-  AdapterDescriptor,
-  // New Control* types (ADR 151)
+  // Control* types (ADR 151)
   ControlAdapterDescriptor,
   ControlAdapterInstance,
   ControlDriverDescriptor,
@@ -18,17 +16,12 @@ export type {
   ControlExtensionInstance,
   ControlFamilyDescriptor,
   ControlFamilyInstance,
-  ControlPlaneDriver,
   ControlTargetDescriptor,
   ControlTargetInstance,
-  DriverDescriptor,
   EmitContractResult,
-  ExtensionDescriptor,
-  FamilyDescriptor,
   FamilyInstance,
   IntrospectSchemaResult,
   SchemaIssue,
-  TargetDescriptor,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../types';

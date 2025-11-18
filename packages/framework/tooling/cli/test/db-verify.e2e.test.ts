@@ -1,12 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type {
-  AdapterDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  FamilyInstance,
-  TargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
+import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -50,13 +44,16 @@ async function emitContractFromConfig(
     contractRaw = contractConfig.source;
   }
 
-  // Create family instance first (assembles operation registry, type imports, extension IDs)
-  // Use legacy pattern (cast to legacy types)
-  const familyInstance = (config.family as FamilyDescriptor<string>).create({
-    target: config.target as TargetDescriptor<string>,
-    adapter: config.adapter as AdapterDescriptor<string>,
-    extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
-  }) as FamilyInstance<string, unknown, unknown, unknown>;
+  // Create family instance (assembles operation registry, type imports, extension IDs)
+  if (!config.driver) {
+    throw new Error('Config.driver is required');
+  }
+  const familyInstance = config.family.create({
+    target: config.target,
+    adapter: config.adapter,
+    driver: config.driver,
+    extensions: config.extensions ?? [],
+  }) as FamilyInstance<string>;
 
   // emitContract handles stripping mappings and validation internally
   const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });

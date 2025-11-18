@@ -7,6 +7,7 @@ function createValidConfig(overrides?: Record<string, unknown>) {
   return {
     family: {
       kind: 'family',
+      id: 'sql',
       familyId: 'sql',
       manifest: { id: 'sql', version: '0.0.1' },
       hook: {},
@@ -22,22 +23,42 @@ function createValidConfig(overrides?: Record<string, unknown>) {
     target: {
       kind: 'target',
       familyId: 'sql',
+      targetId: 'postgres',
       id: 'postgres',
       manifest: {
         id: 'postgres',
         version: '15.0.0',
       },
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       ...overrides?.target,
     },
     adapter: {
       kind: 'adapter',
       familyId: 'sql',
+      targetId: 'postgres',
       id: 'postgres',
       manifest: {
         id: 'postgres',
         version: '15.0.0',
       },
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       ...overrides?.adapter,
+    },
+    driver: {
+      kind: 'driver',
+      familyId: 'sql',
+      targetId: 'postgres',
+      id: 'postgres',
+      manifest: {
+        id: 'postgres',
+        version: '15.0.0',
+      },
+      create: async () => ({
+        targetId: 'postgres',
+        query: async () => ({ rows: [] }),
+        close: async () => {},
+      }),
+      ...overrides?.driver,
     },
     ...overrides,
   };
@@ -238,10 +259,12 @@ describe('validateConfig', () => {
           kind: 'extension',
           id: 'pg-vector',
           familyId: 'sql',
+          targetId: 'postgres',
           manifest: {
             id: 'pg-vector',
             version: '1.0.0',
           },
+          create: () => ({ familyId: 'sql', targetId: 'postgres' }),
         },
       ],
     });
