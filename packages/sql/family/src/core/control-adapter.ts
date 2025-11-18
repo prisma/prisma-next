@@ -1,4 +1,7 @@
-import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
+import type {
+  ControlAdapterInstance,
+  ControlDriverInstance,
+} from '@prisma-next/core-control-plane/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
 /**
@@ -7,10 +10,12 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
  *
  * @template TTarget - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface SqlControlAdapter<TTarget extends string = string> {
+export interface SqlControlAdapter<TTarget extends string = string>
+  extends ControlAdapterInstance<'sql', TTarget> {
   /**
    * The target ID this adapter implements.
    * Used for type tracking and runtime validation.
+   * @deprecated Use targetId from ControlAdapterInstance instead
    */
   readonly target: TTarget;
 
@@ -21,13 +26,13 @@ export interface SqlControlAdapter<TTarget extends string = string> {
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
-   * @param driver - ControlPlaneDriver instance for executing queries (target-specific)
+   * @param driver - ControlDriverInstance instance for executing queries (target-specific)
    * @param contractIR - Optional contract IR for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   introspect(
-    driver: ControlPlaneDriver,
+    driver: ControlDriverInstance<TTarget>,
     contractIR?: unknown,
     schema?: string,
   ): Promise<SqlSchemaIR>;

@@ -7,7 +7,14 @@ import {
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
-import type { FamilyInstance, IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
+import type {
+  AdapterDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  FamilyInstance,
+  IntrospectSchemaResult,
+  TargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -129,21 +136,46 @@ export function createDbIntrospectCommand(): Command {
 
         try {
           // Create family instance
-          const familyInstance = config.family.create({
-            target: config.target,
-            adapter: config.adapter,
-            extensions: config.extensions ?? [],
-          }) as FamilyInstance<string>;
+          // Support both legacy and new Control*Descriptor patterns
+          const hasTargetId =
+            'targetId' in config.target &&
+            typeof config.target.targetId === 'string' &&
+            'targetId' in config.adapter &&
+            typeof config.adapter.targetId === 'string';
+          const familyInstance = hasTargetId
+            ? // New pattern: Control*Descriptor with driver parameter
+              (
+                config.family as {
+                  create: (options: {
+                    target: unknown;
+                    adapter: unknown;
+                    driver: unknown;
+                    extensions: unknown[];
+                  }) => unknown;
+                }
+              ).create({
+                target: config.target,
+                adapter: config.adapter,
+                driver: config.driver,
+                extensions: [...(config.extensions ?? [])],
+              })
+            : // Legacy pattern: FamilyDescriptor without driver parameter
+              (config.family as FamilyDescriptor<string>).create({
+                target: config.target as TargetDescriptor<string>,
+                adapter: config.adapter as AdapterDescriptor<string>,
+                extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
+              });
+          const typedFamilyInstance = familyInstance as FamilyInstance<string>;
 
           // Validate contract IR if we loaded it
           if (contractIR) {
-            contractIR = familyInstance.validateContractIR(contractIR);
+            contractIR = typedFamilyInstance.validateContractIR(contractIR);
           }
 
           // Call family instance introspect method
           let schemaIR: unknown;
           try {
-            schemaIR = await familyInstance.introspect({
+            schemaIR = await typedFamilyInstance.introspect({
               driver,
               contractIR,
             });
@@ -156,9 +188,9 @@ export function createDbIntrospectCommand(): Command {
 
           // Optionally call toSchemaView if available
           let schemaView: CoreSchemaView | undefined;
-          if (familyInstance.toSchemaView) {
+          if (typedFamilyInstance.toSchemaView) {
             try {
-              schemaView = familyInstance.toSchemaView(schemaIR);
+              schemaView = typedFamilyInstance.toSchemaView(schemaIR);
             } catch (error) {
               // Schema view projection is optional - log but don't fail
               if (flags.verbose) {

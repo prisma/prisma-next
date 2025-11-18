@@ -1,4 +1,4 @@
-import type { ControlPlaneDriver } from '@prisma-next/core-control-plane/types';
+import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type {
   PrimaryKey,
@@ -15,6 +15,11 @@ import type {
  * Provides target-specific implementations for control-plane domain actions.
  */
 export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
+  readonly familyId = 'sql' as const;
+  readonly targetId = 'postgres' as const;
+  /**
+   * @deprecated Use targetId instead
+   */
   readonly target = 'postgres' as const;
 
   /**
@@ -24,13 +29,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
-   * @param driver - ControlPlaneDriver<'postgres'> instance for executing queries
+   * @param driver - ControlDriverInstance<'postgres'> instance for executing queries
    * @param contractIR - Optional contract IR for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   async introspect(
-    driver: ControlPlaneDriver<'postgres'>,
+    driver: ControlDriverInstance<'postgres'>,
     _contractIR?: unknown,
     schema = 'public',
   ): Promise<SqlSchemaIR> {
@@ -360,7 +365,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   /**
    * Gets the Postgres version from the database.
    */
-  private async getPostgresVersion(driver: ControlPlaneDriver): Promise<string> {
+  private async getPostgresVersion(driver: ControlDriverInstance<'postgres'>): Promise<string> {
     const result = await driver.query<{ version: string }>('SELECT version() AS version', []);
     const versionString = result.rows[0]?.version ?? '';
     // Extract version number from "PostgreSQL 15.1 ..." format

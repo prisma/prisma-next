@@ -2,7 +2,12 @@ import { dirname, join } from 'node:path';
 import { type } from 'arktype';
 import type {
   AdapterDescriptor,
+  ControlAdapterDescriptor,
+  ControlDriverDescriptor,
+  ControlExtensionDescriptor,
+  ControlFamilyDescriptor,
   ControlPlaneDriver,
+  ControlTargetDescriptor,
   DriverDescriptor,
   ExtensionDescriptor,
   FamilyDescriptor,
@@ -38,18 +43,29 @@ export interface ContractConfig {
 
 /**
  * Configuration for Prisma Next CLI.
+ * Supports both legacy descriptor types and new Control*Descriptor types for backward compatibility.
+ * When using Control*Descriptor types, type-level compatibility is enforced (mismatched familyId/targetId combinations fail at compile time).
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql'). Only used when Control*Descriptor types are used.
  */
-export interface PrismaNextConfig<TFamilyId extends string = string> {
-  readonly family: FamilyDescriptor<TFamilyId>;
-  readonly target: TargetDescriptor<TFamilyId>;
-  readonly adapter: AdapterDescriptor<TFamilyId>;
-  readonly extensions?: ReadonlyArray<ExtensionDescriptor<TFamilyId>>;
+export interface PrismaNextConfig<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  // Support both legacy and new descriptor types
+  readonly family: FamilyDescriptor<TFamilyId> | ControlFamilyDescriptor<TFamilyId>;
+  readonly target: TargetDescriptor<TFamilyId> | ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter: AdapterDescriptor<TFamilyId> | ControlAdapterDescriptor<TFamilyId, TTargetId>;
+  readonly extensions?:
+    | ReadonlyArray<ExtensionDescriptor<TFamilyId>>
+    | readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
   /**
    * Driver descriptor for DB-connected CLI commands.
    * Required for DB-connected commands (e.g., db verify).
    * Optional for commands that don't need database access (e.g., emit).
    */
-  readonly driver?: DriverDescriptor;
+  readonly driver?: DriverDescriptor | ControlDriverDescriptor<TFamilyId, TTargetId>;
   readonly db?: {
     readonly url?: string;
   };
@@ -96,9 +112,9 @@ const PrismaNextConfigSchema = type({
  * @returns Normalized config IR with defaults applied
  * @throws Error if config structure is invalid
  */
-export function defineConfig<TFamilyId extends string = string>(
-  config: PrismaNextConfig<TFamilyId>,
-): PrismaNextConfig<TFamilyId> {
+export function defineConfig<TFamilyId extends string = string, TTargetId extends string = string>(
+  config: PrismaNextConfig<TFamilyId, TTargetId>,
+): PrismaNextConfig<TFamilyId, TTargetId> {
   // Validate structure using Arktype
   const validated = PrismaNextConfigSchema(config);
   if (validated instanceof type.errors) {

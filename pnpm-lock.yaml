@@ -636,9 +636,6 @@ importers:
 
   packages/sql/family:
     dependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../targets/postgres-adapter
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../framework/tooling/cli

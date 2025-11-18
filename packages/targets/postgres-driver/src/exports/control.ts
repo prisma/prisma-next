@@ -2,9 +2,39 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
-import type { ControlPlaneDriver, DriverDescriptor } from '@prisma-next/core-control-plane/types';
+import type {
+  ControlDriverDescriptor,
+  ControlDriverInstance,
+  DriverDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 import { Client } from 'pg';
+
+/**
+ * Postgres control driver instance for control-plane operations.
+ * Implements ControlDriverInstance<'postgres'> for database queries.
+ */
+export class PostgresControlDriver implements ControlDriverInstance<'postgres'> {
+  readonly targetId = 'postgres' as const;
+  /**
+   * @deprecated Use targetId instead
+   */
+  readonly target = 'postgres' as const;
+
+  constructor(private readonly client: Client) {}
+
+  async query<Row = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[],
+  ): Promise<{ readonly rows: Row[] }> {
+    const result = await this.client.query(sql, params as unknown[] | undefined);
+    return { rows: result.rows as Row[] };
+  }
+
+  async close(): Promise<void> {
+    await this.client.end();
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,28 +79,20 @@ function loadDriverManifest(): ExtensionPackManifest {
 
 /**
  * Postgres driver descriptor for CLI config.
+ * Implements both legacy DriverDescriptor and new ControlDriverDescriptor for backward compatibility.
  */
-const postgresDriverDescriptor: DriverDescriptor = {
+const postgresDriverDescriptor: DriverDescriptor &
+  ControlDriverDescriptor<'sql', 'postgres', PostgresControlDriver> = {
   kind: 'driver',
   id: 'postgres',
   family: 'sql',
+  familyId: 'sql',
+  targetId: 'postgres',
   manifest: loadDriverManifest(),
-  async create(url: string): Promise<ControlPlaneDriver<'postgres'>> {
+  async create(url: string): Promise<PostgresControlDriver> {
     const client = new Client({ connectionString: url });
     await client.connect();
-    return {
-      target: 'postgres' as const,
-      async query<Row = Record<string, unknown>>(
-        sql: string,
-        params?: readonly unknown[],
-      ): Promise<{ readonly rows: Row[] }> {
-        const result = await client.query(sql, params as unknown[] | undefined);
-        return { rows: result.rows as Row[] };
-      },
-      async close(): Promise<void> {
-        await client.end();
-      },
-    };
+    return new PostgresControlDriver(client);
   },
 };
 

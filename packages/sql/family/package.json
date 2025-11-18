@@ -25,7 +25,6 @@
     "arktype": "^2.0.0"
   },
   "devDependencies": {
-    "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/targets-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",

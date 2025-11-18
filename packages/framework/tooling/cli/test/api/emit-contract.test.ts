@@ -1,6 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
+import type {
+  AdapterDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  FamilyInstance,
+  TargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config-loader';
@@ -48,10 +54,11 @@ describe('emitContract API', () => {
       }
 
       // Create family instance first (assembles operation registry, type imports, extension IDs)
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        extensions: config.extensions ?? [],
+      // Use legacy pattern (cast to legacy types)
+      const familyInstance = (config.family as FamilyDescriptor<string>).create({
+        target: config.target as TargetDescriptor<string>,
+        adapter: config.adapter as AdapterDescriptor<string>,
+        extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       // emitContract handles stripping mappings and validation internally
@@ -109,10 +116,11 @@ describe('emitContract API', () => {
       }
 
       // Create family instance first (assembles operation registry, type imports, extension IDs)
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        extensions: config.extensions ?? [],
+      // Use legacy pattern (cast to legacy types)
+      const familyInstance = (config.family as FamilyDescriptor<string>).create({
+        target: config.target as TargetDescriptor<string>,
+        adapter: config.adapter as AdapterDescriptor<string>,
+        extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       // emitContract handles stripping mappings and validation internally
@@ -165,10 +173,11 @@ describe('emitContract API', () => {
         }
 
         // Create family instance first (assembles operation registry, type imports, extension IDs)
-        const familyInstance = config.family.create({
-          target: config.target,
-          adapter: config.adapter,
-          extensions: config.extensions ?? [],
+        // Use legacy pattern (cast to legacy types)
+        const familyInstance = (config.family as FamilyDescriptor<string>).create({
+          target: config.target as TargetDescriptor<string>,
+          adapter: config.adapter as AdapterDescriptor<string>,
+          extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
         }) as FamilyInstance<string, unknown, unknown, unknown>;
 
         // emitContract handles stripping mappings and validation internally
@@ -213,10 +222,11 @@ describe('emitContract API', () => {
       }
 
       // Create family instance first (assembles operation registry, type imports, extension IDs)
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        extensions: config.extensions ?? [],
+      // Use legacy pattern (cast to legacy types)
+      const familyInstance = (config.family as FamilyDescriptor<string>).create({
+        target: config.target as TargetDescriptor<string>,
+        adapter: config.adapter as AdapterDescriptor<string>,
+        extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       // emitContract handles stripping mappings and validation internally
@@ -251,10 +261,11 @@ describe('emitContract API', () => {
       }
 
       // Create family instance first (assembles operation registry, type imports, extension IDs)
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        extensions: config.extensions ?? [],
+      // Use legacy pattern (cast to legacy types)
+      const familyInstance = (config.family as FamilyDescriptor<string>).create({
+        target: config.target as TargetDescriptor<string>,
+        adapter: config.adapter as AdapterDescriptor<string>,
+        extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       // emitContract handles stripping mappings and validation internally
@@ -289,10 +300,11 @@ describe('emitContract API', () => {
       }
 
       // Create family instance first (assembles operation registry, type imports, extension IDs)
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        extensions: config.extensions ?? [],
+      // Use legacy pattern (cast to legacy types)
+      const familyInstance = (config.family as FamilyDescriptor<string>).create({
+        target: config.target as TargetDescriptor<string>,
+        adapter: config.adapter as AdapterDescriptor<string>,
+        extensions: (config.extensions ?? []) as ReadonlyArray<ExtensionDescriptor<string>>,
       }) as FamilyInstance<string, unknown, unknown, unknown>;
 
       // emitContract handles stripping mappings and validation internally

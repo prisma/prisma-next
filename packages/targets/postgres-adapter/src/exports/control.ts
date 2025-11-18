@@ -3,7 +3,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AdapterDescriptor } from '@prisma-next/cli/config-types';
 import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
-import type { SqlControlAdapterDescriptor } from '@prisma-next/family-sql/control-adapter';
+import type { ControlAdapterDescriptor } from '@prisma-next/core-control-plane/types';
+import type {
+  SqlControlAdapter,
+  SqlControlAdapterDescriptor,
+} from '@prisma-next/family-sql/control-adapter';
 import { type } from 'arktype';
 import { PostgresControlAdapter } from '../core/control-adapter';
 
@@ -51,6 +55,7 @@ function loadAdapterManifest(): ExtensionPackManifest {
 /**
  * Postgres control adapter descriptor.
  * Exported from the control entrypoint for use by family instances.
+ * This is the new pattern - the adapter descriptor IS the control adapter descriptor.
  */
 const postgresControlAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
   create() {
@@ -60,15 +65,27 @@ const postgresControlAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> 
 
 /**
  * Postgres adapter descriptor for CLI config.
- * Includes reference to control adapter descriptor.
+ * Implements both legacy AdapterDescriptor and new ControlAdapterDescriptor for backward compatibility.
+ * Includes reference to control adapter descriptor for legacy compatibility.
  */
-const postgresAdapterDescriptor: AdapterDescriptor<'sql'> = {
+const postgresAdapterDescriptor = {
   kind: 'adapter',
   familyId: 'sql',
+  targetId: 'postgres',
   id: 'postgres',
   manifest: loadAdapterManifest(),
+  // Legacy: control property for backward compatibility
   control: postgresControlAdapterDescriptor,
-};
+  // New pattern: create() method returns control adapter instance
+  create(): SqlControlAdapter<'postgres'> {
+    return postgresControlAdapterDescriptor.create();
+  },
+} as AdapterDescriptor<'sql'> &
+  ControlAdapterDescriptor<
+    'sql',
+    'postgres',
+    SqlControlAdapter<'postgres'> & { readonly familyId: 'sql'; readonly targetId: 'postgres' }
+  >;
 
 export default postgresAdapterDescriptor;
 export { postgresControlAdapterDescriptor };

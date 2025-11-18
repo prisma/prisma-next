@@ -1,7 +1,7 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   AdapterDescriptor,
-  ControlPlaneDriver,
+  ControlDriverInstance,
   ExtensionDescriptor,
   TargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
@@ -107,10 +107,12 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
  * Returns the parsed marker record or null if no marker is found.
  * This abstracts SQL-specific details from the Control Plane.
  *
- * @param driver - ControlPlaneDriver instance for executing queries
+ * @param driver - ControlDriverInstance instance for executing queries
  * @returns Promise resolving to ContractMarkerRecord or null if marker not found
  */
-export async function readMarker(driver: ControlPlaneDriver): Promise<ContractMarkerRecord | null> {
+export async function readMarker(
+  driver: ControlDriverInstance,
+): Promise<ContractMarkerRecord | null> {
   const markerStatement = readMarkerSql();
   const queryResult = await driver.query<{
     core_hash: string;

@@ -4,10 +4,13 @@ import { emit } from '@prisma-next/core-control-plane/emission';
 import type { OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
 import type {
   AdapterDescriptor,
-  ControlPlaneDriver,
+  ControlAdapterDescriptor,
+  ControlDriverInstance,
+  ControlExtensionDescriptor,
+  ControlFamilyInstance,
+  ControlTargetDescriptor,
   EmitContractResult,
   ExtensionDescriptor,
-  FamilyInstance,
   TargetDescriptor,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -200,18 +203,84 @@ interface SqlFamilyInstanceState {
   readonly extensionIds: ReadonlyArray<string>;
 }
 
-export type SqlFamilyInstance = FamilyInstance<
-  'sql',
-  SqlSchemaIR,
-  VerifyDatabaseResult,
-  VerifyDatabaseSchemaResult
-> &
-  SqlFamilyInstanceState;
+/**
+ * SQL control family instance interface.
+ * Extends ControlFamilyInstance with SQL-specific domain actions.
+ */
+export interface SqlControlFamilyInstance
+  extends ControlFamilyInstance<'sql'>,
+    SqlFamilyInstanceState {
+  /**
+   * Validates a contract JSON and returns a validated ContractIR (without mappings).
+   * Mappings are runtime-only and should not be part of ContractIR.
+   */
+  validateContractIR(contractJson: unknown): unknown;
+
+  /**
+   * Verifies the database marker against the contract.
+   * Compares target, coreHash, and profileHash.
+   */
+  verify(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly expectedTargetId: string;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<VerifyDatabaseResult>;
+
+  /**
+   * Verifies the database schema against the contract.
+   * Compares contract requirements against live database schema.
+   */
+  schemaVerify(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly strict: boolean;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<VerifyDatabaseSchemaResult>;
+
+  /**
+   * Introspects the database schema and returns a family-specific schema IR.
+   *
+   * This is a read-only operation that returns a snapshot of the live database schema.
+   * The method is family-owned and delegates to target/adapter-specific introspectors
+   * to perform the actual schema introspection.
+   *
+   * @param options - Introspection options
+   * @param options.driver - Control plane driver for database connection
+   * @param options.contractIR - Optional contract IR for contract-guided introspection.
+   *   When provided, families may use it for filtering, optimization, or validation
+   *   during introspection. The contract IR does not change the meaning of "what exists"
+   *   in the database - it only guides how introspection is performed.
+   * @returns Promise resolving to the family-specific Schema IR (e.g., `SqlSchemaIR` for SQL).
+   *   The IR represents the complete schema snapshot at the time of introspection.
+   */
+  introspect(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR?: unknown;
+  }): Promise<SqlSchemaIR>;
+
+  /**
+   * Emits contract JSON and DTS as strings.
+   * Uses the instance's preassembled state (operation registry, type imports, extension IDs).
+   * Handles stripping mappings and validation internally.
+   */
+  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
+}
+
+/**
+ * SQL family instance type.
+ * Maintains backward compatibility with FamilyInstance while implementing SqlControlFamilyInstance.
+ */
+export type SqlFamilyInstance = SqlControlFamilyInstance;
 
 interface CreateSqlFamilyInstanceOptions {
-  readonly target: TargetDescriptor<'sql'>;
-  readonly adapter: AdapterDescriptor<'sql'>;
-  readonly extensions: ReadonlyArray<ExtensionDescriptor<'sql'>>;
+  readonly target: TargetDescriptor<'sql'> | ControlTargetDescriptor<'sql', string>;
+  readonly adapter: AdapterDescriptor<'sql'> | ControlAdapterDescriptor<'sql', string>;
+  readonly extensions:
+    | ReadonlyArray<ExtensionDescriptor<'sql'>>
+    | readonly ControlExtensionDescriptor<'sql', string>[];
 }
 
 /**
@@ -223,13 +292,22 @@ export function createSqlFamilyInstance(
   const { target, adapter, extensions } = options;
 
   // Build descriptors array for assembly
-  const descriptors = [target, adapter, ...extensions];
+  // Cast to legacy types for assembly functions (they only use manifest and id)
+  const descriptors = [
+    target as TargetDescriptor<'sql'>,
+    adapter as AdapterDescriptor<'sql'>,
+    ...(extensions as ReadonlyArray<ExtensionDescriptor<'sql'>>),
+  ];
 
   // Assemble operation registry, type imports, and extension IDs
   const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds(adapter, target, extensions);
+  const extensionIds = extractExtensionIds(
+    adapter as AdapterDescriptor<'sql'>,
+    target as TargetDescriptor<'sql'>,
+    extensions as ReadonlyArray<ExtensionDescriptor<'sql'>>,
+  );
 
   /**
    * Strips mappings from a contract (mappings are runtime-only).
@@ -262,7 +340,7 @@ export function createSqlFamilyInstance(
     },
 
     async verify(verifyOptions: {
-      readonly driver: ControlPlaneDriver;
+      readonly driver: ControlDriverInstance;
       readonly contractIR: unknown;
       readonly expectedTargetId: string;
       readonly contractPath: string;
@@ -404,39 +482,51 @@ export function createSqlFamilyInstance(
       });
     },
 
-    async schemaVerify(): Promise<VerifyDatabaseSchemaResult> {
+    async schemaVerify(_options: {
+      readonly driver: ControlDriverInstance;
+      readonly contractIR: unknown;
+      readonly strict: boolean;
+      readonly contractPath: string;
+      readonly configPath?: string;
+    }): Promise<VerifyDatabaseSchemaResult> {
       // TODO: Implement schema verification
       // This will build SqlTypeMetadataRegistry, call adapter introspection,
       // compare contract vs SqlSchemaIR, and return VerifyDatabaseSchemaResult
       throw new Error('schemaVerify not yet implemented');
     },
     async introspect(options: {
-      readonly driver: ControlPlaneDriver;
+      readonly driver: ControlDriverInstance;
       readonly contractIR?: unknown;
     }): Promise<SqlSchemaIR> {
       const { driver, contractIR } = options;
 
-      // Get control adapter descriptor from adapter
-      if (!adapter.control) {
-        throw new Error(
-          `Adapter '${adapter.id}' does not provide control descriptor required for introspection`,
-        );
+      // Handle new ControlAdapterDescriptor (it IS the control adapter descriptor)
+      if ('targetId' in adapter && 'create' in adapter) {
+        const controlAdapter = adapter.create() as SqlControlAdapter;
+        return controlAdapter.introspect(driver as ControlDriverInstance<string>, contractIR);
       }
 
-      const controlDescriptor = adapter.control as SqlControlAdapterDescriptor;
-      if (
-        typeof controlDescriptor !== 'object' ||
-        controlDescriptor === null ||
-        !('create' in controlDescriptor) ||
-        typeof controlDescriptor.create !== 'function'
-      ) {
-        throw new Error(
-          `Adapter '${adapter.id}' control descriptor does not provide create() method`,
-        );
+      // Handle legacy AdapterDescriptor (has control property)
+      if ('control' in adapter && adapter.control) {
+        const controlDescriptor = adapter.control as SqlControlAdapterDescriptor;
+        if (
+          typeof controlDescriptor !== 'object' ||
+          controlDescriptor === null ||
+          !('create' in controlDescriptor) ||
+          typeof controlDescriptor.create !== 'function'
+        ) {
+          throw new Error(
+            `Adapter '${adapter.id}' control descriptor does not provide create() method`,
+          );
+        }
+
+        const controlAdapter: SqlControlAdapter = controlDescriptor.create();
+        return controlAdapter.introspect(driver as ControlDriverInstance<string>, contractIR);
       }
 
-      const controlAdapter: SqlControlAdapter = controlDescriptor.create();
-      return controlAdapter.introspect(driver, contractIR);
+      throw new Error(
+        `Adapter '${adapter.id}' does not provide control adapter required for introspection`,
+      );
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {

@@ -3,35 +3,223 @@ import type { TargetFamilyHook } from '@prisma-next/contract/types';
 import type { ExtensionPackManifest } from './pack-manifest-types';
 import type { CoreSchemaView } from './schema-view';
 
+// ============================================================================
+// Control*Instance Base Interfaces (ADR 151)
+// ============================================================================
+
+/**
+ * Base interface for control-plane family instances.
+ * Families extend this with domain-specific methods.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ */
+export interface ControlFamilyInstance<TFamilyId extends string = string> {
+  readonly familyId: TFamilyId;
+}
+
+/**
+ * Base interface for control-plane target instances.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ */
+export interface ControlTargetInstance<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  readonly familyId: TFamilyId;
+  readonly targetId: TTargetId;
+}
+
+/**
+ * Base interface for control-plane adapter instances.
+ * Families extend this with family-specific adapter interfaces.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ */
+export interface ControlAdapterInstance<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  readonly familyId: TFamilyId;
+  readonly targetId: TTargetId;
+}
+
+/**
+ * Base interface for control-plane driver instances.
+ * Replaces ControlPlaneDriver with plane-first naming.
+ *
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ */
+export interface ControlDriverInstance<TTargetId extends string = string> {
+  readonly targetId?: TTargetId;
+  query<Row = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[],
+  ): Promise<{ readonly rows: Row[] }>;
+  close(): Promise<void>;
+}
+
+/**
+ * Base interface for control-plane extension instances.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ */
+export interface ControlExtensionInstance<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  readonly familyId: TFamilyId;
+  readonly targetId: TTargetId;
+}
+
+// ============================================================================
+// Control*Descriptor Interfaces (ADR 151)
+// ============================================================================
+
+/**
+ * Descriptor for a control-plane family (e.g., SQL).
+ * Provides the family hook and factory method.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TFamilyInstance - The family instance type
+ */
+export interface ControlFamilyDescriptor<
+  TFamilyId extends string,
+  TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
+> {
+  readonly kind: 'family';
+  readonly id: string;
+  readonly familyId: TFamilyId;
+  readonly manifest: ExtensionPackManifest;
+  readonly hook: TargetFamilyHook;
+  create<TTargetId extends string>(options: {
+    readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+    readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
+    readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId>;
+    readonly extensions: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+  }): TFamilyInstance;
+}
+
+/**
+ * Descriptor for a control-plane target pack (e.g., Postgres target).
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TTargetInstance - The target instance type
+ */
+export interface ControlTargetDescriptor<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TTargetInstance extends ControlTargetInstance<TFamilyId, TTargetId> = ControlTargetInstance<
+    TFamilyId,
+    TTargetId
+  >,
+> {
+  readonly kind: 'target';
+  readonly id: string;
+  readonly familyId: TFamilyId;
+  readonly targetId: TTargetId;
+  readonly manifest: ExtensionPackManifest;
+  create(): TTargetInstance;
+}
+
+/**
+ * Descriptor for a control-plane adapter pack (e.g., Postgres adapter).
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TAdapterInstance - The adapter instance type
+ */
+export interface ControlAdapterDescriptor<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TAdapterInstance extends ControlAdapterInstance<TFamilyId, TTargetId> = ControlAdapterInstance<
+    TFamilyId,
+    TTargetId
+  >,
+> {
+  readonly kind: 'adapter';
+  readonly id: string;
+  readonly familyId: TFamilyId;
+  readonly targetId: TTargetId;
+  readonly manifest: ExtensionPackManifest;
+  create(): TAdapterInstance;
+}
+
+/**
+ * Descriptor for a control-plane driver pack (e.g., Postgres driver).
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TDriverInstance - The driver instance type
+ */
+export interface ControlDriverDescriptor<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TDriverInstance extends ControlDriverInstance<TTargetId> = ControlDriverInstance<TTargetId>,
+> {
+  readonly kind: 'driver';
+  readonly id: string;
+  readonly familyId: TFamilyId;
+  readonly targetId: TTargetId;
+  readonly manifest: ExtensionPackManifest;
+  create(url: string): Promise<TDriverInstance>;
+}
+
+/**
+ * Descriptor for a control-plane extension pack (e.g., pgvector).
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TExtensionInstance - The extension instance type
+ */
+export interface ControlExtensionDescriptor<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TExtensionInstance extends ControlExtensionInstance<
+    TFamilyId,
+    TTargetId
+  > = ControlExtensionInstance<TFamilyId, TTargetId>,
+> {
+  readonly kind: 'extension';
+  readonly id: string;
+  readonly familyId: TFamilyId;
+  readonly targetId: TTargetId;
+  readonly manifest: ExtensionPackManifest;
+  create(): TExtensionInstance;
+}
+
+// ============================================================================
+// Legacy Types (Deprecated - use Control* types above)
+// ============================================================================
+
 /**
  * Minimal driver interface for Control Plane database operations.
  * Provides query execution and connection management.
  *
  * @template TTarget - The target ID (e.g., 'postgres', 'mysql')
+ * @deprecated Use ControlDriverInstance instead. This interface uses `target` instead of `targetId`.
+ * For new code, use ControlDriverInstance<TTargetId> which uses `targetId` for consistency.
  */
-export interface ControlPlaneDriver<TTarget extends string = string> {
+export interface ControlPlaneDriver<TTarget extends string = string>
+  extends ControlDriverInstance<TTarget> {
   /**
    * The target ID this driver implements.
    * Used for type tracking and runtime validation.
+   * @deprecated Use targetId instead (from ControlDriverInstance)
    */
   readonly target?: TTarget;
-
-  /**
-   * Executes a SQL query with optional parameters.
-   * @returns Promise resolving to query results with rows array
-   */
-  query<Row = Record<string, unknown>>(
-    sql: string,
-    params?: readonly unknown[],
-  ): Promise<{ readonly rows: Row[] }>;
-  /**
-   * Closes the database connection.
-   */
-  close(): Promise<void>;
 }
 
 /**
  * Descriptor for a driver pack (e.g., Postgres driver).
+ *
+ * @deprecated Use ControlDriverDescriptor instead. This interface will be removed in a future version.
+ * Note: DriverDescriptor uses `family: string` instead of `familyId: TFamilyId` and lacks `targetId`.
+ * Migrate to ControlDriverDescriptor<TFamilyId, TTargetId, TDriverInstance> for type-safe wiring.
  */
 export interface DriverDescriptor {
   readonly kind: 'driver';
@@ -49,6 +237,9 @@ export interface DriverDescriptor {
 /**
  * Descriptor for a target family (e.g., SQL).
  * Provides the family hook and factory method.
+ *
+ * @deprecated Use ControlFamilyDescriptor instead. This interface will be removed in a future version.
+ * Note: FamilyDescriptor.create() doesn't include driver parameter. Migrate to ControlFamilyDescriptor for the new pattern.
  */
 export interface FamilyDescriptor<TFamilyId extends string, TFamilyInstance = unknown> {
   readonly kind: 'family';
@@ -69,6 +260,9 @@ export interface FamilyDescriptor<TFamilyId extends string, TFamilyInstance = un
 
 /**
  * Descriptor for a target pack (e.g., Postgres target).
+ *
+ * @deprecated Use ControlTargetDescriptor instead. This interface will be removed in a future version.
+ * Note: TargetDescriptor lacks `targetId` and `create()` method. Migrate to ControlTargetDescriptor<TFamilyId, TTargetId, TTargetInstance>.
  */
 export interface TargetDescriptor<TFamilyId extends string> {
   readonly kind: 'target';
@@ -80,6 +274,9 @@ export interface TargetDescriptor<TFamilyId extends string> {
 /**
  * Descriptor for an adapter pack (e.g., Postgres adapter).
  * May optionally provide a runtime factory for DB-connected commands.
+ *
+ * @deprecated Use ControlAdapterDescriptor instead. This interface will be removed in a future version.
+ * Note: AdapterDescriptor lacks `targetId` and has optional fields. Migrate to ControlAdapterDescriptor<TFamilyId, TTargetId, TAdapterInstance>.
  */
 export interface AdapterDescriptor<TFamilyId extends string> {
   readonly kind: 'adapter';
@@ -94,6 +291,9 @@ export interface AdapterDescriptor<TFamilyId extends string> {
 
 /**
  * Descriptor for an extension pack (e.g., pgvector).
+ *
+ * @deprecated Use ControlExtensionDescriptor instead. This interface will be removed in a future version.
+ * Note: ExtensionDescriptor lacks `targetId` and `create()` method. Migrate to ControlExtensionDescriptor<TFamilyId, TTargetId, TExtensionInstance>.
  */
 export interface ExtensionDescriptor<TFamilyId extends string> {
   readonly kind: 'extension';

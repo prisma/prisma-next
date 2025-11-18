@@ -1,7 +1,5 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
@@ -9,15 +7,17 @@ import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgres from '@prisma-next/targets-postgres/control';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { CodecTypes } from '../../../targets/postgres-adapter/src/core/codecs';
+import postgresAdapter from '../../../targets/postgres-adapter/src/exports/control';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
-import postgres from '@prisma-next/targets-postgres/control';
-import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+} from '../../sql-runtime/src/sql-marker';
+import { executeStatement } from '../../sql-runtime/test/utils';
 
 /**
  * Creates a test contract for testing.

@@ -87,6 +87,13 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     });
   }
 
+  // Check if using new Control*Descriptor pattern (has targetId)
+  const hasTargetId = 'targetId' in target && typeof target['targetId'] === 'string';
+  let expectedTargetId: string | undefined;
+  if (hasTargetId) {
+    expectedTargetId = target['targetId'] as string;
+  }
+
   // Validate adapter descriptor
   const adapter = configObj['adapter'] as Record<string, unknown>;
   if (adapter['kind'] !== 'adapter') {
@@ -113,6 +120,19 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     throw errorConfigValidation('adapter.familyId', {
       why: `Config.adapter.familyId must match Config.family.familyId (expected: ${familyId}, got: ${adapter['familyId']})`,
     });
+  }
+  // Validate targetId compatibility if using Control*Descriptor pattern
+  if (hasTargetId) {
+    if (!('targetId' in adapter) || typeof adapter['targetId'] !== 'string') {
+      throw errorConfigValidation('adapter.targetId', {
+        why: 'Config.adapter must have targetId when using Control*Descriptor pattern',
+      });
+    }
+    if (adapter['targetId'] !== expectedTargetId) {
+      throw errorConfigValidation('adapter.targetId', {
+        why: `Config.adapter.targetId must match Config.target.targetId (expected: ${expectedTargetId}, got: ${adapter['targetId']})`,
+      });
+    }
   }
 
   // Validate extensions array if present
@@ -152,6 +172,62 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       if (extObj['familyId'] !== familyId) {
         throw errorConfigValidation('extensions[].familyId', {
           why: `Config.extensions[].familyId must match Config.family.familyId (expected: ${familyId}, got: ${extObj['familyId']})`,
+        });
+      }
+      // Validate targetId compatibility if using Control*Descriptor pattern
+      if (hasTargetId) {
+        if (!('targetId' in extObj) || typeof extObj['targetId'] !== 'string') {
+          throw errorConfigValidation('extensions[].targetId', {
+            why: 'Config.extensions items must have targetId when using Control*Descriptor pattern',
+          });
+        }
+        if (extObj['targetId'] !== expectedTargetId) {
+          throw errorConfigValidation('extensions[].targetId', {
+            why: `Config.extensions[].targetId must match Config.target.targetId (expected: ${expectedTargetId}, got: ${extObj['targetId']})`,
+          });
+        }
+      }
+    }
+  }
+
+  // Validate driver descriptor if present
+  if (configObj['driver'] !== undefined) {
+    const driver = configObj['driver'] as Record<string, unknown>;
+    if (driver['kind'] !== 'driver') {
+      throw errorConfigValidation('driver.kind', {
+        why: 'Config.driver must have kind: "driver"',
+      });
+    }
+    if (typeof driver['id'] !== 'string') {
+      throw errorConfigValidation('driver.id', {
+        why: 'Config.driver must have id: string',
+      });
+    }
+    if (!driver['manifest'] || typeof driver['manifest'] !== 'object') {
+      throw errorConfigValidation('driver.manifest', {
+        why: 'Config.driver must have manifest: ExtensionPackManifest',
+      });
+    }
+    // Validate familyId and targetId compatibility if using Control*Descriptor pattern
+    if (hasTargetId) {
+      if (!('familyId' in driver) || typeof driver['familyId'] !== 'string') {
+        throw errorConfigValidation('driver.familyId', {
+          why: 'Config.driver must have familyId when using Control*Descriptor pattern',
+        });
+      }
+      if (driver['familyId'] !== familyId) {
+        throw errorConfigValidation('driver.familyId', {
+          why: `Config.driver.familyId must match Config.family.familyId (expected: ${familyId}, got: ${driver['familyId']})`,
+        });
+      }
+      if (!('targetId' in driver) || typeof driver['targetId'] !== 'string') {
+        throw errorConfigValidation('driver.targetId', {
+          why: 'Config.driver must have targetId when using Control*Descriptor pattern',
+        });
+      }
+      if (driver['targetId'] !== expectedTargetId) {
+        throw errorConfigValidation('driver.targetId', {
+          why: `Config.driver.targetId must match Config.target.targetId (expected: ${expectedTargetId}, got: ${driver['targetId']})`,
         });
       }
     }
