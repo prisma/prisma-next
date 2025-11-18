@@ -890,7 +890,9 @@ describe('formatSignOutput', () => {
     const output = formatSignOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✔ Database signed (marker created)');
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: none');
+    expect(stripped).toContain('to:   sha256:abc123');
   });
 
   it('renders success message for updated marker', () => {
@@ -910,7 +912,9 @@ describe('formatSignOutput', () => {
     const output = formatSignOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✔ Database signed (marker updated from sha256:old-hash)');
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: sha256:old-hash');
+    expect(stripped).toContain('to:   sha256:abc123');
   });
 
   it('renders success message for already up-to-date marker', () => {
@@ -919,6 +923,9 @@ describe('formatSignOutput', () => {
       marker: {
         created: false,
         updated: false,
+        previous: {
+          coreHash: 'sha256:abc123',
+        },
       },
     });
     const flags = parseGlobalFlags({ 'no-color': true });
@@ -926,7 +933,9 @@ describe('formatSignOutput', () => {
     const output = formatSignOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✔ Database already signed with this contract');
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: sha256:abc123');
+    expect(stripped).toContain('to:   sha256:abc123');
   });
 
   it('includes hashes in verbose mode', () => {
@@ -936,7 +945,9 @@ describe('formatSignOutput', () => {
     const output = formatSignOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('coreHash: sha256:abc123');
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: none');
+    expect(stripped).toContain('to:   sha256:abc123');
     expect(stripped).toContain('profileHash: sha256:def456');
     expect(stripped).toContain('Total time: 42ms');
   });
@@ -958,7 +969,9 @@ describe('formatSignOutput', () => {
     const output = formatSignOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('previous coreHash: sha256:old-hash');
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: sha256:old-hash');
+    expect(stripped).toContain('to:   sha256:abc123');
     expect(stripped).toContain('previous profileHash: sha256:old-profile-hash');
   });
 

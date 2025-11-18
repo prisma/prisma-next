@@ -138,15 +138,19 @@ describe('loadContractFromTs', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('rejects imports not in custom allowlist', async () => {
-    const contractPath = join(fixturesDir, 'disallowed-import.ts');
+  it(
+    'rejects imports not in custom allowlist',
+    async () => {
+      const contractPath = join(fixturesDir, 'disallowed-import.ts');
 
-    await expect(
-      loadContractFromTs(contractPath, {
-        allowlist: ['@other/package/*'],
-      }),
-    ).rejects.toThrow('Disallowed imports detected');
-  });
+      await expect(
+        loadContractFromTs(contractPath, {
+          allowlist: ['@other/package/*'],
+        }),
+      ).rejects.toThrow('Disallowed imports detected');
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'handles allowlist pattern matching exact prefix',

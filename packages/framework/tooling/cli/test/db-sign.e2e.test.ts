@@ -237,8 +237,16 @@ describe('db sign command (e2e)', () => {
             }
 
             // Get output and parse JSON
+            // When --json is used, only JSON should be output, but filter out any non-JSON lines just in case
             const output = consoleOutput.join('\n');
-            const jsonOutput = JSON.parse(output);
+            // Find the JSON portion - look for first { and last }
+            const firstBrace = output.indexOf('{');
+            const lastBrace = output.lastIndexOf('}');
+            if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+              throw new Error(`No valid JSON found in output: ${output.substring(0, 200)}`);
+            }
+            const jsonText = output.substring(firstBrace, lastBrace + 1);
+            const jsonOutput = JSON.parse(jsonText);
 
             // Normalize non-deterministic values (timing) for snapshot
             const normalized = {

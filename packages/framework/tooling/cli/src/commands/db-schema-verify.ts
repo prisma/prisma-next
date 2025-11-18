@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import {
   errorDatabaseUrlRequired,

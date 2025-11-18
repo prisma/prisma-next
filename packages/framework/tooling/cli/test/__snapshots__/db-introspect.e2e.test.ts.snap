@@ -3,7 +3,7 @@
 exports[`db introspect command (e2e) > outputs JSON envelope with real database 1`] = `
 {
   "meta": {
-    "configPath": "./prisma-next.config.ts",
+    "configPath": "prisma-next.config.ts",
     "dbUrl": "postgres://postgres:****@127.0.0.1:XXXXX/postgres?connection_limit=1&connect_timeout=0&max_idle_connection_lifetime=0&pool_timeout=0&socket_timeout=0&sslmode=disable",
   },
   "ok": true,
@@ -60,7 +60,7 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
 exports[`db introspect command (e2e) > outputs tree structure with real database 1`] = `
 "prisma-next db introspect → Inspect live database schema
 │
-│ config:               ./prisma-next.config.ts
+│ config:               prisma-next.config.ts
 │ database:             postgres://postgres:****@127.0.0.1:XXXXX/postgres?connection_limit=1&connect_timeout=0&max_idle_connection_lifetime=0&pool_timeout=0&socket_timeout=0&sslmode=disable
 │
 │ Read more             https://pris.ly/db-introspect
