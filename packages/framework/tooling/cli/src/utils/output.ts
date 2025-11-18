@@ -242,14 +242,11 @@ function renderSchemaTree(
     readonly prefix: string;
     readonly useColor: boolean;
     readonly formatDimText: (text: string) => string;
+    readonly isRoot?: boolean;
   },
 ): string[] {
-  const { isLast, prefix, useColor, formatDimText } = options;
+  const { isLast, prefix, useColor, formatDimText, isRoot = false } = options;
   const lines: string[] = [];
-
-  // Determine tree character for this node
-  const treeChar = isLast ? '└' : '├';
-  const treePrefix = `${prefix}${formatDimText(treeChar)}─ `;
 
   // Format node label with color based on kind
   let labelColor: (text: string) => string = (text) => text;
@@ -277,11 +274,35 @@ function renderSchemaTree(
   }
 
   const labelColored = labelColor(node.label);
-  lines.push(`${formatDimText('│')} ${treePrefix}${labelColored}`);
+
+  // Root node renders without tree characters or │ prefix
+  if (isRoot) {
+    lines.push(labelColored);
+  } else {
+    // Determine tree character for this node
+    const treeChar = isLast ? '└' : '├';
+    const treePrefix = `${prefix}${formatDimText(treeChar)}─ `;
+    // Root's direct children don't have │ prefix, other nodes do
+    // But if prefix already contains │ (for nested children), don't add another
+    const isRootChild = prefix === '';
+    // Check if prefix already contains │ (strip ANSI codes for comparison)
+    const prefixWithoutAnsi = stripAnsi(prefix);
+    const prefixHasVerticalBar = prefixWithoutAnsi.includes('│');
+    if (isRootChild) {
+      lines.push(`${treePrefix}${labelColored}`);
+    } else if (prefixHasVerticalBar) {
+      // Prefix already has │, so just use treePrefix directly
+      lines.push(`${treePrefix}${labelColored}`);
+    } else {
+      lines.push(`${formatDimText('│')} ${treePrefix}${labelColored}`);
+    }
+  }
 
   // Render children if present
   if (node.children && node.children.length > 0) {
-    const childPrefix = isLast ? `${prefix}   ` : `${prefix}${formatDimText('│')}  `;
+    // For root node, children start with no prefix (they'll add their own tree characters)
+    // For other nodes, calculate child prefix based on whether this is last
+    const childPrefix = isRoot ? '' : isLast ? `${prefix}   ` : `${prefix}${formatDimText('│')}  `;
     for (let i = 0; i < node.children.length; i++) {
       const child = node.children[i];
       if (!child) continue;
@@ -291,6 +312,7 @@ function renderSchemaTree(
         prefix: childPrefix,
         useColor,
         formatDimText,
+        isRoot: false,
       });
       lines.push(...childLines);
     }
@@ -317,14 +339,17 @@ export function formatIntrospectOutput(
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   if (schemaView) {
-    // Render tree structure
+    // Render tree structure - root node is special (no tree characters)
     const treeLines = renderSchemaTree(schemaView.root, flags, {
       isLast: true,
       prefix: '',
       useColor,
       formatDimText,
+      isRoot: true,
     });
-    lines.push(...treeLines);
+    // Apply prefix (for timestamps) to each tree line
+    const prefixedTreeLines = treeLines.map((line) => `${prefix}${line}`);
+    lines.push(...prefixedTreeLines);
   } else {
     // Fallback: print summary when toSchemaView is not available
     lines.push(`${prefix}✓ ${result.summary}`);

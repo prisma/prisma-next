@@ -2,6 +2,7 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type { OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,
   ControlDriverInstance,
@@ -17,7 +18,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
@@ -259,6 +260,12 @@ export interface SqlControlFamilyInstance
   }): Promise<SqlSchemaIR>;
 
   /**
+   * Projects a SQL Schema IR into a core schema view for CLI visualization.
+   * Converts SqlSchemaIR (tables, columns, indexes, extensions) into a tree structure.
+   */
+  toSchemaView(schema: SqlSchemaIR): CoreSchemaView;
+
+  /**
    * Emits contract JSON and DTS as strings.
    * Uses the instance's preassembled state (operation registry, type imports, extension IDs).
    * Handles stripping mappings and validation internally.
@@ -494,6 +501,113 @@ export function createSqlFamilyInstance(
       // ControlAdapterDescriptor has create() method that returns SqlControlAdapter
       const controlAdapter = adapter.create() as SqlControlAdapter;
       return controlAdapter.introspect(driver as ControlDriverInstance<string>, contractIR);
+    },
+
+    toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
+      const tableCount = Object.keys(schema.tables).length;
+      const rootLabel = `sql schema (tables: ${tableCount})`;
+
+      // Build table nodes
+      const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
+        ([tableName, table]: [string, SqlTableIR]) => {
+          const children: SchemaTreeNode[] = [];
+
+          // Add column nodes
+          for (const [columnName, column] of Object.entries(table.columns)) {
+            const nullableText = column.nullable ? 'null' : 'not null';
+            // Always display nativeType for introspection (database state), fall back to typeId if nativeType not available
+            const typeDisplay = column.nativeType ?? column.typeId;
+            const label = `${columnName}: ${typeDisplay} (${nullableText})`;
+            children.push({
+              kind: 'field',
+              id: `column-${tableName}-${columnName}`,
+              label,
+              meta: {
+                typeId: column.typeId,
+                nullable: column.nullable,
+                ...(column.nativeType ? { nativeType: column.nativeType } : {}),
+              },
+            });
+          }
+
+          // Add unique constraint nodes
+          for (const unique of table.uniques) {
+            const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_unique`;
+            const label = `unique ${name}`;
+            children.push({
+              kind: 'index',
+              id: `unique-${tableName}-${name}`,
+              label,
+              meta: {
+                columns: unique.columns,
+                unique: true,
+              },
+            });
+          }
+
+          // Add index nodes
+          for (const index of table.indexes) {
+            const name = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
+            const label = index.unique ? `unique index ${name}` : `index ${name}`;
+            children.push({
+              kind: 'index',
+              id: `index-${tableName}-${name}`,
+              label,
+              meta: {
+                columns: index.columns,
+                unique: index.unique,
+              },
+            });
+          }
+
+          // Build table meta
+          const tableMeta: Record<string, unknown> = {};
+          if (table.primaryKey) {
+            tableMeta['primaryKey'] = table.primaryKey.columns;
+            if (table.primaryKey.name) {
+              tableMeta['primaryKeyName'] = table.primaryKey.name;
+            }
+          }
+          if (table.foreignKeys.length > 0) {
+            tableMeta['foreignKeys'] = table.foreignKeys.map((fk) => ({
+              columns: fk.columns,
+              referencedTable: fk.referencedTable,
+              referencedColumns: fk.referencedColumns,
+              ...(fk.name ? { name: fk.name } : {}),
+            }));
+          }
+
+          const node: SchemaTreeNode = {
+            kind: 'entity',
+            id: `table-${tableName}`,
+            label: `table ${tableName}`,
+            ...(Object.keys(tableMeta).length > 0 ? { meta: tableMeta } : {}),
+            ...(children.length > 0 ? { children: children as readonly SchemaTreeNode[] } : {}),
+          };
+          return node;
+        },
+      );
+
+      // Add extension nodes
+      const extensionNodes: readonly SchemaTreeNode[] = schema.extensions.map((extName) => ({
+        kind: 'extension',
+        id: `extension-${extName}`,
+        label: `extension ${extName}`,
+      }));
+
+      // Combine all children
+      const rootChildren = [...tableNodes, ...extensionNodes];
+
+      const rootNode: SchemaTreeNode = {
+        kind: 'root',
+        id: 'sql-schema',
+        label: rootLabel,
+        ...(rootChildren.length > 0 ? { children: rootChildren } : {}),
+      };
+
+      return {
+        root: rootNode,
+      };
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {

@@ -91,10 +91,13 @@ describe('db introspect command', () => {
       expect(mockFamilyInstance.introspect).toHaveBeenCalled();
       expect(mockFamilyInstance.toSchemaView).toHaveBeenCalledWith(mockSchemaIR);
 
-      // Check that tree output is present
+      // Check that tree output is present with proper structure
       const output = consoleOutput.join('\n');
+      expect(output).toContain('sql schema (tables: 1)');
       expect(output).toContain('table user');
       expect(output).toContain('id: pg/int4@1');
+      // Verify tree characters are present
+      expect(output).toMatch(/[├└]/);
     } finally {
       cleanupDir();
     }
@@ -144,7 +147,11 @@ describe('db introspect command', () => {
 
       // Check that summary output is present
       const output = consoleOutput.join('\n');
-      expect(output).toContain('Schema introspected successfully');
+      expect(output).toContain('✓ Schema introspected successfully');
+      // Should not contain tree structure when schema view is not available
+      // (header may contain └, but tree structure like "├─ table" should not be present)
+      expect(output).not.toMatch(/├─/);
+      expect(output).not.toMatch(/└─/);
     } finally {
       cleanupDir();
     }
@@ -191,7 +198,7 @@ describe('db introspect command', () => {
 
       expect(exitCode).toBe(0);
 
-      // Check that JSON output is present
+      // Check that JSON output is present and properly formatted
       const output = consoleOutput.join('\n');
       const jsonOutput = JSON.parse(output) as IntrospectSchemaResult<unknown>;
       expect(jsonOutput.ok).toBe(true);
@@ -200,6 +207,12 @@ describe('db introspect command', () => {
       expect(jsonOutput.target.id).toBe('postgres');
       expect(jsonOutput.schema).toEqual(mockSchemaIR);
       expect(jsonOutput.timings.total).toBeGreaterThanOrEqual(0);
+      // Verify JSON structure matches IntrospectSchemaResult shape
+      expect(jsonOutput).toHaveProperty('ok');
+      expect(jsonOutput).toHaveProperty('summary');
+      expect(jsonOutput).toHaveProperty('target');
+      expect(jsonOutput).toHaveProperty('schema');
+      expect(jsonOutput).toHaveProperty('timings');
     } finally {
       cleanupDir();
     }
