@@ -24,6 +24,7 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from './assembly';
+import type { SqlControlAdapter, SqlControlAdapterDescriptor } from './control-adapter';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
 /**
@@ -409,26 +410,33 @@ export function createSqlFamilyInstance(
       // compare contract vs SqlSchemaIR, and return VerifyDatabaseSchemaResult
       throw new Error('schemaVerify not yet implemented');
     },
-    async introspect(_options: {
+    async introspect(options: {
       readonly driver: ControlPlaneDriver;
       readonly contractIR?: unknown;
     }): Promise<SqlSchemaIR> {
-      // Implementation plan:
-      // 1. Construct SqlTypeMetadataRegistry from:
-      //    - Adapter codecs (via adapter.profile.codecs())
-      //    - Control-plane extension metadata (if extensions provide type metadata)
-      //    See docs/Sql-Type-Metadata-Design.md for type metadata construction details.
-      //
-      // 2. Delegate to target-specific introspector:
-      //    - For Postgres: call introspectPostgresSchema(driver, typeMetadataRegistry, contractIR?)
-      //    - The introspector queries the database catalog and returns SqlSchemaIR
-      //
-      // 3. Return the complete SqlSchemaIR representing the live database schema
-      //
-      // Note: This is a read-only operation. The contractIR parameter is optional and
-      // may be used for contract-guided introspection (filtering, optimization) but
-      // does not change what exists in the database.
-      throw new Error('introspect not yet implemented');
+      const { driver, contractIR } = options;
+
+      // Get control adapter descriptor from adapter
+      if (!adapter.control) {
+        throw new Error(
+          `Adapter '${adapter.id}' does not provide control descriptor required for introspection`,
+        );
+      }
+
+      const controlDescriptor = adapter.control as SqlControlAdapterDescriptor;
+      if (
+        typeof controlDescriptor !== 'object' ||
+        controlDescriptor === null ||
+        !('create' in controlDescriptor) ||
+        typeof controlDescriptor.create !== 'function'
+      ) {
+        throw new Error(
+          `Adapter '${adapter.id}' control descriptor does not provide create() method`,
+        );
+      }
+
+      const controlAdapter: SqlControlAdapter = controlDescriptor.create();
+      return controlAdapter.introspect(driver, contractIR);
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {

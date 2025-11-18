@@ -42,6 +42,10 @@
       "types": "./dist/exports/control.d.ts",
       "import": "./dist/exports/control.js"
     },
+    "./control-adapter": {
+      "types": "./dist/exports/control-adapter.d.ts",
+      "import": "./dist/exports/control-adapter.js"
+    },
     "./runtime": {
       "types": "./dist/exports/runtime.d.ts",
       "import": "./dist/exports/runtime.js"
