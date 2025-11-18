@@ -520,11 +520,11 @@ describe('formatSchemaVerifyOutput', () => {
     const output = formatSchemaVerifyOutput(result, flags);
     const lines = output.split('\n').map(stripAnsi);
 
-    // Summary should be first line
-    expect(lines[0]).toContain('Database schema does not satisfy contract');
-    // Tree should follow
-    const schemaLine = lines.find((line) => line.includes('schema'));
-    expect(schemaLine).toBeDefined();
+    // Tree should be first (root node)
+    expect(lines[0]).toContain('schema');
+    // Summary should be last line
+    const summaryLine = lines[lines.length - 1];
+    expect(summaryLine).toContain('Database schema does not satisfy contract');
   });
 
   it('returns empty string in quiet mode', () => {

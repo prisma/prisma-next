@@ -1,5 +1,5 @@
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -93,6 +93,7 @@ describe('db schema-verify command (e2e)', () => {
             sources: {},
           };
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
           try {
@@ -180,6 +181,7 @@ describe('db schema-verify command (e2e)', () => {
             sources: {},
           };
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
           try {
@@ -278,6 +280,7 @@ describe('db schema-verify command (e2e)', () => {
             sources: {},
           };
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
           try {
@@ -365,6 +368,7 @@ describe('db schema-verify command (e2e)', () => {
             sources: {},
           };
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
           try {
@@ -452,6 +456,7 @@ describe('db schema-verify command (e2e)', () => {
             sources: {},
           };
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
           try {
