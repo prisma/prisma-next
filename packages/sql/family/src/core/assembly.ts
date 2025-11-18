@@ -1,8 +1,8 @@
-import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ExtensionPackManifest,
   OperationManifest,
-} from '@prisma-next/core-control-plane/pack-manifest-types';
+} from '@prisma-next/contract/pack-manifest-types';
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,

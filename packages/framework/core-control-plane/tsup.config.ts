@@ -5,7 +5,6 @@ export default defineConfig({
     'exports/config-types': 'src/exports/config-types.ts',
     'exports/config-validation': 'src/exports/config-validation.ts',
     'exports/errors': 'src/exports/errors.ts',
-    'exports/pack-manifest-types': 'src/exports/pack-manifest-types.ts',
     'exports/types': 'src/exports/types.ts',
     'exports/emission': 'src/exports/emission.ts',
     'exports/schema-view': 'src/exports/schema-view.ts',

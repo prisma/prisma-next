@@ -1,6 +1,6 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { TargetFamilyHook } from '@prisma-next/contract/types';
-import type { ExtensionPackManifest } from './pack-manifest-types';
 import type { CoreSchemaView } from './schema-view';
 
 // ============================================================================

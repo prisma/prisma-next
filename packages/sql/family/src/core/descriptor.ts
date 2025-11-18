@@ -1,4 +1,4 @@
-import type { ExtensionPackManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
+import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,

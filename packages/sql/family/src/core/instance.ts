@@ -1,7 +1,7 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
-import type { OperationManifest } from '@prisma-next/core-control-plane/pack-manifest-types';
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,

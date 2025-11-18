@@ -19,7 +19,6 @@ export default defineConfig([
     entry: {
       index: 'src/exports/index.ts',
       'config-types': 'src/exports/config-types.ts',
-      'pack-manifest-types': 'src/exports/pack-manifest-types.ts',
       'pack-loading': 'src/pack-loading.ts',
     },
     outDir: 'dist',
