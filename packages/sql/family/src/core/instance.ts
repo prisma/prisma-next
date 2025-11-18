@@ -536,10 +536,12 @@ function compareIndexes(
 /**
  * Compares extensions and returns verification nodes.
  * Extracts extension names from contract.extensions (keys) and compares with schemaIR.extensions.
+ * Filters out the target name (e.g., 'postgres') as it's not an extension.
  */
 function compareExtensions(
   contractExtensions: Record<string, unknown> | undefined,
   schemaExtensions: readonly string[],
+  contractTarget: string,
   issues: SchemaIssue[],
   _strict: boolean,
 ): SchemaVerificationNode[] {
@@ -550,12 +552,31 @@ function compareExtensions(
   }
 
   // Extract extension names from contract (keys of extensions object)
-  const contractExtensionNames = Object.keys(contractExtensions);
+  // Filter out the target name - it's not an extension (e.g., 'postgres' is the target, not an extension)
+  const contractExtensionNames = Object.keys(contractExtensions).filter(
+    (name) => name !== contractTarget,
+  );
 
   // Check each contract extension exists in schema
+  // Extension names in contract may differ from database extension names
+  // (e.g., contract has 'pgvector' but database has 'vector')
+  // We need to match more flexibly - try exact match, then check if either contains the other
   for (const extName of contractExtensionNames) {
     const extPath = `extensions.${extName}`;
-    const matchingExt = schemaExtensions.find((e) => e === extName || e.includes(extName));
+    // Normalize extension names for comparison (remove common prefixes like 'pg')
+    const normalizedExtName = extName.toLowerCase().replace(/^pg/, '');
+    const matchingExt = schemaExtensions.find((e) => {
+      const normalizedE = e.toLowerCase();
+      // Exact match
+      if (normalizedE === normalizedExtName || normalizedE === extName.toLowerCase()) {
+        return true;
+      }
+      // Check if one contains the other (e.g., 'pgvector' contains 'vector', 'vector' is in 'pgvector')
+      if (normalizedE.includes(normalizedExtName) || normalizedExtName.includes(normalizedE)) {
+        return true;
+      }
+      return false;
+    });
 
     if (!matchingExt) {
       issues.push({
@@ -708,6 +729,23 @@ function createVerifyResult(options: {
 }
 
 /**
+ * Type metadata for SQL storage types.
+ * Maps contract storage type IDs to native database types.
+ */
+interface SqlTypeMetadata {
+  readonly typeId: string;
+  readonly familyId: 'sql';
+  readonly targetId: string;
+  readonly nativeType?: string;
+}
+
+/**
+ * Registry mapping type IDs to their metadata.
+ * Keyed by contract storage type ID (e.g., 'pg/int4@1').
+ */
+type SqlTypeMetadataRegistry = Map<string, SqlTypeMetadata>;
+
+/**
  * State fields for SQL family instance that hold assembly data.
  */
 interface SqlFamilyInstanceState {
@@ -715,6 +753,7 @@ interface SqlFamilyInstanceState {
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
+  readonly typeMetadataRegistry: SqlTypeMetadataRegistry;
 }
 
 /**
@@ -802,6 +841,54 @@ interface CreateSqlFamilyInstanceOptions {
 }
 
 /**
+ * Builds a SQL type metadata registry from extension pack manifests.
+ * Collects type metadata from target, adapter, and extension pack manifests.
+ *
+ * @param options - Descriptors for target, adapter, and extensions
+ * @returns Registry mapping type IDs to their metadata, filtered by targetId
+ */
+function buildSqlTypeMetadataRegistry(options: {
+  readonly target: ControlTargetDescriptor<'sql', string>;
+  readonly adapter: ControlAdapterDescriptor<'sql', string>;
+  readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
+}): SqlTypeMetadataRegistry {
+  const { target, adapter, extensions } = options;
+  const registry = new Map<string, SqlTypeMetadata>();
+
+  // Get targetId from adapter (they should match)
+  const targetId = adapter.targetId;
+
+  // Collect descriptors to iterate over
+  const descriptors = [target, adapter, ...extensions];
+
+  // Iterate over each descriptor's manifest
+  for (const descriptor of descriptors) {
+    const manifest = descriptor.manifest;
+    const storageTypes = manifest.types?.storage;
+
+    if (!storageTypes) {
+      continue;
+    }
+
+    // Filter for SQL family and matching targetId
+    for (const storageType of storageTypes) {
+      if (storageType.familyId === 'sql' && storageType.targetId === targetId) {
+        // Use existing entry if present, otherwise create new one
+        // Later entries (extensions) can override earlier ones (adapter/target)
+        registry.set(storageType.typeId, {
+          typeId: storageType.typeId,
+          familyId: 'sql',
+          targetId: storageType.targetId,
+          ...(storageType.nativeType !== undefined ? { nativeType: storageType.nativeType } : {}),
+        });
+      }
+    }
+  }
+
+  return registry;
+}
+
+/**
  * Creates a SQL family instance for control-plane operations.
  */
 export function createSqlFamilyInstance(
@@ -818,6 +905,9 @@ export function createSqlFamilyInstance(
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
+
+  // Build type metadata registry from manifests
+  const typeMetadataRegistry = buildSqlTypeMetadataRegistry({ target, adapter, extensions });
 
   /**
    * Strips mappings from a contract (mappings are runtime-only).
@@ -840,6 +930,7 @@ export function createSqlFamilyInstance(
     codecTypeImports,
     operationTypeImports,
     extensionIds,
+    typeMetadataRegistry,
 
     validateContractIR(contractJson: unknown): unknown {
       // Validate the contract (this normalizes and validates structure/logic)
@@ -1089,17 +1180,39 @@ export function createSqlFamilyInstance(
 
           // Column exists - compare type and nullability
           const columnChildren: SchemaVerificationNode[] = [];
-          let columnStatus: 'pass' | 'fail' = 'pass';
+          let columnStatus: 'pass' | 'warn' | 'fail' = 'pass';
 
-          // Compare type
-          if (contractColumn.type !== schemaColumn.typeId) {
+          // Compare type using nativeType
+          // Contract stores type ID (e.g., 'pg/int4@1'), schema IR has nativeType (e.g., 'int4')
+          // We need to get nativeType from the type metadata registry for the contract type ID
+          const metadata = typeMetadataRegistry.get(contractColumn.type);
+          const contractNativeType = metadata?.nativeType;
+          const schemaNativeType = schemaColumn.nativeType;
+
+          if (!contractNativeType) {
+            // Contract type ID doesn't have nativeType metadata - emit warning, not failure
+            // This allows graceful degradation when metadata is missing
+            columnChildren.push({
+              status: 'warn',
+              kind: 'type',
+              name: 'type',
+              contractPath: `${columnPath}.type`,
+              code: 'type_metadata_missing',
+              message: `Contract type "${contractColumn.type}" has no nativeType metadata - native type comparison skipped`,
+              expected: { typeId: contractColumn.type },
+              actual: schemaColumn.typeId || schemaNativeType || 'unknown',
+              children: [],
+            });
+            // Status will be computed from children below
+          } else if (!schemaNativeType) {
+            // Schema IR doesn't have nativeType - this shouldn't happen either
             issues.push({
               kind: 'type_mismatch',
               table: tableName,
               column: columnName,
-              expected: contractColumn.type,
-              actual: schemaColumn.typeId,
-              message: `Column "${tableName}"."${columnName}" has type mismatch: expected "${contractColumn.type}", got "${schemaColumn.typeId}"`,
+              expected: contractNativeType,
+              actual: schemaColumn.typeId || 'unknown',
+              message: `Column "${tableName}"."${columnName}" has type mismatch: schema column has no nativeType`,
             });
             columnChildren.push({
               status: 'fail',
@@ -1107,9 +1220,31 @@ export function createSqlFamilyInstance(
               name: 'type',
               contractPath: `${columnPath}.type`,
               code: 'type_mismatch',
-              message: `Type mismatch: expected "${contractColumn.type}", got "${schemaColumn.typeId}"`,
-              expected: contractColumn.type,
-              actual: schemaColumn.typeId,
+              message: 'Schema column has no nativeType',
+              expected: contractNativeType,
+              actual: schemaColumn.typeId || 'unknown',
+              children: [],
+            });
+            columnStatus = 'fail';
+          } else if (contractNativeType !== schemaNativeType) {
+            // Compare native types directly
+            issues.push({
+              kind: 'type_mismatch',
+              table: tableName,
+              column: columnName,
+              expected: contractNativeType,
+              actual: schemaNativeType,
+              message: `Column "${tableName}"."${columnName}" has type mismatch: expected "${contractNativeType}", got "${schemaNativeType}"`,
+            });
+            columnChildren.push({
+              status: 'fail',
+              kind: 'type',
+              name: 'type',
+              contractPath: `${columnPath}.type`,
+              code: 'type_mismatch',
+              message: `Type mismatch: expected ${contractNativeType}, got ${schemaNativeType}`,
+              expected: contractNativeType,
+              actual: schemaNativeType,
               children: [],
             });
             columnStatus = 'fail';
@@ -1139,15 +1274,39 @@ export function createSqlFamilyInstance(
             columnStatus = 'fail';
           }
 
+          // Compute column status from children (fail > warn > pass)
+          const computedColumnStatus = columnChildren.some((c) => c.status === 'fail')
+            ? 'fail'
+            : columnChildren.some((c) => c.status === 'warn')
+              ? 'warn'
+              : 'pass';
+          // Use computed status if we have children, otherwise use the manually set status
+          const finalColumnStatus = columnChildren.length > 0 ? computedColumnStatus : columnStatus;
+
           // Build column node
           const nullableText = contractColumn.nullable ? 'null' : 'not null';
+          // Collect failure messages from children to create a summary message
+          const failureMessages = columnChildren
+            .filter((child) => child.status === 'fail' && child.message)
+            .map((child) => child.message)
+            .filter((msg): msg is string => typeof msg === 'string' && msg.length > 0);
+          const columnMessage =
+            finalColumnStatus === 'fail' && failureMessages.length > 0
+              ? failureMessages.join('; ')
+              : '';
+          const columnCode =
+            finalColumnStatus === 'fail' && columnChildren.length > 0 && columnChildren[0]
+              ? columnChildren[0].code
+              : finalColumnStatus === 'warn' && columnChildren.length > 0 && columnChildren[0]
+                ? columnChildren[0].code
+                : '';
           tableChildren.push({
-            status: columnStatus,
+            status: finalColumnStatus,
             kind: 'column',
             name: `${tableName}.${columnName}: ${contractColumn.type} ${nullableText}`,
             contractPath: columnPath,
-            code: '',
-            message: '',
+            code: columnCode,
+            message: columnMessage,
             expected: undefined,
             actual: undefined,
             children: columnChildren,
@@ -1271,13 +1430,26 @@ export function createSqlFamilyInstance(
           : tableChildren.some((c) => c.status === 'warn')
             ? 'warn'
             : 'pass';
+        // Collect failure messages from children to create a summary message
+        const tableFailureMessages = tableChildren
+          .filter((child) => child.status === 'fail' && child.message)
+          .map((child) => child.message)
+          .filter((msg): msg is string => typeof msg === 'string' && msg.length > 0);
+        const tableMessage =
+          tableStatus === 'fail' && tableFailureMessages.length > 0
+            ? `${tableFailureMessages.length} issue${tableFailureMessages.length === 1 ? '' : 's'}`
+            : '';
+        const tableCode =
+          tableStatus === 'fail' && tableChildren.length > 0 && tableChildren[0]
+            ? tableChildren[0].code
+            : '';
         rootChildren.push({
           status: tableStatus,
           kind: 'table',
           name: tableName,
           contractPath: tablePath,
-          code: '',
-          message: '',
+          code: tableCode,
+          message: tableMessage,
           expected: undefined,
           actual: undefined,
           children: tableChildren,
@@ -1312,6 +1484,7 @@ export function createSqlFamilyInstance(
       const extensionStatuses = compareExtensions(
         contract.extensions,
         schemaIR.extensions,
+        contractTarget,
         issues,
         strict,
       );

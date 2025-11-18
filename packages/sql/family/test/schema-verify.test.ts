@@ -1,5 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
+import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -649,6 +650,196 @@ describe('family instance schemaVerify', () => {
         // In permissive mode, extra columns don't cause failures
         expect(result.ok).toBe(true);
         expect(result.schema.counts.fail).toBe(0);
+      } finally {
+        await driver.close();
+      }
+    });
+  });
+
+  describe('type metadata registry', () => {
+    it('registry contains known type IDs with expected native types', () => {
+      const familyInstance = sql.create({
+        target: postgres,
+        adapter: postgresAdapter,
+        driver: postgresDriver,
+        extensions: [],
+      });
+
+      const registry = familyInstance.typeMetadataRegistry;
+
+      // Verify known Postgres types are present
+      expect(registry.has('pg/int4@1')).toBe(true);
+      const int4Metadata = registry.get('pg/int4@1');
+      expect(int4Metadata?.nativeType).toBe('int4');
+      expect(int4Metadata?.familyId).toBe('sql');
+      expect(int4Metadata?.targetId).toBe('postgres');
+
+      expect(registry.has('pg/text@1')).toBe(true);
+      const textMetadata = registry.get('pg/text@1');
+      expect(textMetadata?.nativeType).toBe('text');
+
+      expect(registry.has('pg/timestamptz@1')).toBe(true);
+      const timestamptzMetadata = registry.get('pg/timestamptz@1');
+      expect(timestamptzMetadata?.nativeType).toBe('timestamptz');
+
+      expect(registry.has('pg/bool@1')).toBe(true);
+      const boolMetadata = registry.get('pg/bool@1');
+      expect(boolMetadata?.nativeType).toBe('bool');
+    });
+
+    it('registry includes extension pack types', () => {
+      const familyInstance = sql.create({
+        target: postgres,
+        adapter: postgresAdapter,
+        driver: postgresDriver,
+        extensions: [pgvector],
+      });
+
+      const registry = familyInstance.typeMetadataRegistry;
+
+      // Verify pgvector type is present
+      expect(registry.has('pg/vector@1')).toBe(true);
+      const vectorMetadata = registry.get('pg/vector@1');
+      expect(vectorMetadata?.nativeType).toBe('vector');
+      expect(vectorMetadata?.familyId).toBe('sql');
+      expect(vectorMetadata?.targetId).toBe('postgres');
+    });
+
+    it('type mismatch with metadata present returns failure', async () => {
+      if (!connectionString) {
+        throw new Error('Connection string not set');
+      }
+
+      await withClient(connectionString, async (client) => {
+        await client.query('DROP TABLE IF EXISTS "user"');
+        // Create table with mismatched type: contract expects integer, DB has bigint
+        await client.query(`
+          CREATE TABLE "user" (
+            id BIGINT PRIMARY KEY,
+            email TEXT NOT NULL
+          )
+        `);
+      });
+
+      const contract = defineContract<CodecTypes>()
+        .target('postgres')
+        .table('user', (t) =>
+          t
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('email', { type: 'pg/text@1', nullable: false })
+            .primaryKey(['id']),
+        )
+        .build();
+
+      const driver = await postgresDriver.create(connectionString);
+      try {
+        const familyInstance = sql.create({
+          target: postgres,
+          adapter: postgresAdapter,
+          driver: postgresDriver,
+          extensions: [],
+        });
+
+        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+        const result = await familyInstance.schemaVerify({
+          driver,
+          contractIR: validatedContract,
+          strict: false,
+          contractPath: './contract.json',
+        });
+
+        // Should fail due to type mismatch (integer vs bigint)
+        expect(result.ok).toBe(false);
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(
+          result.schema.issues.some(
+            (i) => i.kind === 'type_mismatch' && i.table === 'user' && i.column === 'id',
+          ),
+        ).toBe(true);
+      } finally {
+        await driver.close();
+      }
+    });
+
+    it('type without metadata emits warning, not failure', async () => {
+      if (!connectionString) {
+        throw new Error('Connection string not set');
+      }
+
+      await withClient(connectionString, async (client) => {
+        await client.query('DROP TABLE IF EXISTS "user"');
+        await client.query(`
+          CREATE TABLE "user" (
+            id INTEGER PRIMARY KEY,
+            email TEXT NOT NULL
+          )
+        `);
+      });
+
+      // Create a contract with a type ID that doesn't exist in the registry
+      // We'll use a fake type ID to simulate missing metadata
+      const contract = defineContract<CodecTypes>()
+        .target('postgres')
+        .table('user', (t) =>
+          t
+            .column('id', { type: 'pg/int4@1', nullable: false })
+            .column('email', { type: 'pg/text@1', nullable: false })
+            .primaryKey(['id']),
+        )
+        .build();
+
+      // Modify contract to use a type ID not in the registry
+      const contractWithUnknownType = {
+        ...contract,
+        storage: {
+          ...contract.storage,
+          tables: {
+            ...contract.storage.tables,
+            user: {
+              ...contract.storage.tables.user,
+              columns: {
+                ...contract.storage.tables.user.columns,
+                email: {
+                  ...contract.storage.tables.user.columns.email,
+                  type: 'pg/unknown-type@1' as const, // Type not in registry
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const driver = await postgresDriver.create(connectionString);
+      try {
+        const familyInstance = sql.create({
+          target: postgres,
+          adapter: postgresAdapter,
+          driver: postgresDriver,
+          extensions: [],
+        });
+
+        const validatedContract =
+          validateContract<SqlContract<SqlStorage>>(contractWithUnknownType);
+        const result = await familyInstance.schemaVerify({
+          driver,
+          contractIR: validatedContract,
+          strict: false,
+          contractPath: './contract.json',
+        });
+
+        // Should have warnings for missing metadata, but not fail
+        // The verification should still pass (ok=true) because missing metadata is a warning
+        // However, we need to check for warn nodes in the tree
+        const findWarnNode = (node: typeof result.schema.root): boolean => {
+          if (node.status === 'warn' && node.code === 'type_metadata_missing') {
+            return true;
+          }
+          return node.children.some(findWarnNode);
+        };
+
+        // Should have at least one warning node for missing metadata
+        expect(findWarnNode(result.schema.root)).toBe(true);
+        expect(result.schema.counts.warn).toBeGreaterThan(0);
       } finally {
         await driver.close();
       }

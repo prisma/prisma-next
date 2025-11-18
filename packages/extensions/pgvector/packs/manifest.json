@@ -25,7 +25,15 @@
         "named": "OperationTypes",
         "alias": "PgVectorOperationTypes"
       }
-    }
+    },
+    "storage": [
+      {
+        "typeId": "pg/vector@1",
+        "familyId": "sql",
+        "targetId": "postgres",
+        "nativeType": "vector"
+      }
+    ]
   },
   "operations": [
     {

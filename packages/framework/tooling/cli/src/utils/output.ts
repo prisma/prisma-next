@@ -453,9 +453,23 @@ function renderSchemaVerificationTree(
   const statusGlyphColored = statusColor(statusGlyph);
   const labelColored = labelColor(node.name);
 
+  // Build the label with optional message for failure/warn nodes
+  let nodeLabel = labelColored;
+  if (
+    (node.status === 'fail' || node.status === 'warn') &&
+    node.message &&
+    node.message.length > 0
+  ) {
+    // Always show message for failure/warn nodes - it provides crucial context
+    // For parent nodes, the message summarizes child failures
+    // For leaf nodes, the message explains the specific issue
+    const messageText = formatDimText(`(${node.message})`);
+    nodeLabel = `${labelColored} ${messageText}`;
+  }
+
   // Root node renders without tree characters or │ prefix
   if (isRoot) {
-    lines.push(`${statusGlyphColored} ${labelColored}`);
+    lines.push(`${statusGlyphColored} ${nodeLabel}`);
   } else {
     // Determine tree character for this node
     const treeChar = isLast ? '└' : '├';
@@ -466,12 +480,12 @@ function renderSchemaVerificationTree(
     const prefixWithoutAnsi = stripAnsi(prefix);
     const prefixHasVerticalBar = prefixWithoutAnsi.includes('│');
     if (isRootChild) {
-      lines.push(`${treePrefix}${statusGlyphColored} ${labelColored}`);
+      lines.push(`${treePrefix}${statusGlyphColored} ${nodeLabel}`);
     } else if (prefixHasVerticalBar) {
       // Prefix already has │, so just use treePrefix directly
-      lines.push(`${treePrefix}${statusGlyphColored} ${labelColored}`);
+      lines.push(`${treePrefix}${statusGlyphColored} ${nodeLabel}`);
     } else {
-      lines.push(`${formatDimText('│')} ${treePrefix}${statusGlyphColored} ${labelColored}`);
+      lines.push(`${formatDimText('│')} ${treePrefix}${statusGlyphColored} ${nodeLabel}`);
     }
   }
 
@@ -514,7 +528,6 @@ export function formatSchemaVerifyOutput(
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatRed = createColorFormatter(useColor, red);
-  const _formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   // First line: summary with status glyph
