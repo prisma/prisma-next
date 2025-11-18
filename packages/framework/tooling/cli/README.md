@@ -397,6 +397,216 @@ The SQL family provides this via `@prisma-next/family-sql/control`. The `introsp
 
 **Note:** The introspection output displays native database types (e.g., `int4`, `text`, `timestamptz`) rather than mapped codec IDs (e.g., `pg/int4@1`). This reflects the actual database state, which may be enriched with type mappings later.
 
+### `prisma-next db sign`
+
+Mark the database as matching the emitted contract by writing or updating the contract marker. This command verifies that the database schema satisfies the contract before signing, ensuring the marker is only written when the database is fully aligned.
+
+**Command:**
+```bash
+prisma-next db sign [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+Options:
+- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--timestamps`: Add timestamps to output
+- `--color/--no-color`: Force/disable color output
+
+Examples:
+```bash
+# Use config defaults
+prisma-next db sign
+
+# Specify database URL
+prisma-next db sign --db postgresql://user:pass@localhost/db
+
+# JSON output
+prisma-next db sign --json
+
+# Verbose output with timestamps
+prisma-next db sign -v --timestamps
+```
+
+**Config File Requirements:**
+
+The `db sign` command requires a `driver` in the config to connect to the database and a `contract.output` path to locate the emitted contract:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import postgres from '@prisma-next/targets-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import { contract } from './prisma/contract';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensions: [],
+  contract: {
+    source: contract,
+    output: 'src/prisma/contract.json',
+    types: 'src/prisma/contract.d.ts',
+  },
+  db: {
+    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+  },
+});
+```
+
+**Signing Process:**
+
+1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
+2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+4. **Schema Verification (Precondition)**: Calls `familyInstance.schemaVerify()` to verify the database schema matches the contract:
+   - If verification fails: Prints schema verification output and exits with code 1 (marker is not written)
+   - If verification passes: Proceeds to marker signing
+5. **Sign**: Calls `familyInstance.sign()` which:
+   - Ensures the marker schema and table exist
+   - Reads any existing marker from the database
+   - Compares contract hashes with existing marker:
+     - If marker is missing: Inserts a new marker row
+     - If hashes differ: Updates the existing marker row
+     - If hashes match: No-op (idempotent)
+
+**Output Format (TTY):**
+
+Success (new marker):
+```
+✓ Database signed (marker created)
+  coreHash: sha256:abc123...
+  profileHash: sha256:def456...
+  Total time: 42ms
+```
+
+Success (updated marker):
+```
+✓ Database signed (marker updated from sha256:old-hash)
+  coreHash: sha256:abc123...
+  profileHash: sha256:def456...
+  previous coreHash: sha256:old-hash
+  Total time: 42ms
+```
+
+Success (already up-to-date):
+```
+✓ Database already signed with this contract
+  coreHash: sha256:abc123...
+  profileHash: sha256:def456...
+  Total time: 42ms
+```
+
+Failure (schema mismatch):
+```
+✖ Schema verification failed
+  [Schema verification tree output]
+```
+
+**Output Format (JSON):**
+
+```json
+{
+  "ok": true,
+  "summary": "Database signed (marker created)",
+  "contract": {
+    "coreHash": "sha256:abc123...",
+    "profileHash": "sha256:def456..."
+  },
+  "target": {
+    "expected": "postgres",
+    "actual": "postgres"
+  },
+  "marker": {
+    "created": true,
+    "updated": false
+  },
+  "meta": {
+    "configPath": "/path/to/prisma-next.config.ts",
+    "contractPath": "/path/to/src/prisma/contract.json"
+  },
+  "timings": {
+    "total": 42
+  }
+}
+```
+
+For updated markers:
+```json
+{
+  "ok": true,
+  "summary": "Database signed (marker updated from sha256:old-hash)",
+  "contract": {
+    "coreHash": "sha256:abc123...",
+    "profileHash": "sha256:def456..."
+  },
+  "target": {
+    "expected": "postgres",
+    "actual": "postgres"
+  },
+  "marker": {
+    "created": false,
+    "updated": true,
+    "previous": {
+      "coreHash": "sha256:old-hash",
+      "profileHash": "sha256:old-profile-hash"
+    }
+  },
+  "meta": {
+    "configPath": "/path/to/prisma-next.config.ts",
+    "contractPath": "/path/to/src/prisma/contract.json"
+  },
+  "timings": {
+    "total": 42
+  }
+}
+```
+
+**Error Codes:**
+- `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
+- `PN-CLI-4011`: Missing database URL — provide `--db` flag or `config.db.url` or `DATABASE_URL` environment variable
+- Exit code 1: Schema verification failed — database schema does not match contract (marker is not written)
+
+**Relationship to Other Commands:**
+- **`db schema-verify`**: `db sign` calls `schemaVerify` as a precondition before writing the marker. If schema verification fails, `db sign` exits without writing the marker.
+- **`db verify`**: `db verify` checks that the marker exists and matches the contract. `db sign` writes the marker that `db verify` checks.
+
+**Idempotency:**
+The `db sign` command is idempotent and safe to run multiple times:
+- If the marker already matches the contract (same hashes), no database changes are made
+- The command reports success in all cases (new marker, updated marker, or already up-to-date)
+- Safe to run in CI/deployment pipelines
+
+**Family Requirements:**
+The family must provide a `create()` method in the family descriptor that returns a `FamilyInstance` with `schemaVerify()` and `sign()` methods:
+
+```typescript
+interface FamilyInstance {
+  schemaVerify(options: {
+    driver: ControlDriverInstance;
+    contractIR: ContractIR;
+    strict: boolean;
+    contractPath: string;
+    configPath?: string;
+  }): Promise<VerifyDatabaseSchemaResult>;
+
+  sign(options: {
+    driver: ControlDriverInstance;
+    contractIR: ContractIR;
+    contractPath: string;
+    configPath?: string;
+  }): Promise<SignDatabaseResult>;
+}
+```
+
+The SQL family provides this via `@prisma-next/family-sql/control`. The `sign()` method handles ensuring the marker schema/table exist, reading existing markers, comparing hashes, and writing/updating markers internally.
+
 **Config File (`prisma-next.config.ts`):**
 
 The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.

@@ -15,6 +15,7 @@ export type {
   IntrospectSchemaResult,
   SchemaIssue,
   SchemaVerificationNode,
+  SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../types';

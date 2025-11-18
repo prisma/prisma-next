@@ -22,6 +22,7 @@ import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-p
 import type {
   IntrospectSchemaResult,
   SchemaVerificationNode,
+  SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
@@ -642,6 +643,55 @@ export function formatSchemaVerifyOutput(
  * Formats JSON output for database schema verification.
  */
 export function formatSchemaVerifyJson(result: VerifyDatabaseSchemaResult): string {
+  return JSON.stringify(result, null, 2);
+}
+
+// ============================================================================
+// Sign Output Formatters
+// ============================================================================
+
+/**
+ * Formats human-readable output for database sign.
+ */
+export function formatSignOutput(result: SignDatabaseResult, flags: GlobalFlags): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  if (result.ok) {
+    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
+    if (isVerbose(flags, 1)) {
+      lines.push(`${prefix}${formatDimText(`  coreHash: ${result.contract.coreHash}`)}`);
+      if (result.contract.profileHash) {
+        lines.push(`${prefix}${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
+      }
+      if (result.marker.previous) {
+        lines.push(
+          `${prefix}${formatDimText(`  previous coreHash: ${result.marker.previous.coreHash ?? 'unknown'}`)}`,
+        );
+        if (result.marker.previous.profileHash) {
+          lines.push(
+            `${prefix}${formatDimText(`  previous profileHash: ${result.marker.previous.profileHash}`)}`,
+          );
+        }
+      }
+      lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Formats JSON output for database sign.
+ */
+export function formatSignJson(result: SignDatabaseResult): string {
   return JSON.stringify(result, null, 2);
 }
 

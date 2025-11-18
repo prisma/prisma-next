@@ -201,6 +201,7 @@ export interface FamilyInstance<
   TSchemaIR = unknown,
   TVerifyResult = unknown,
   TSchemaVerifyResult = unknown,
+  TSignResult = unknown,
 > {
   readonly familyId: TFamilyId;
 
@@ -233,6 +234,18 @@ export interface FamilyInstance<
     readonly contractPath: string;
     readonly configPath?: string;
   }): Promise<TSchemaVerifyResult>;
+
+  /**
+   * Signs the database with the contract marker.
+   * Writes or updates the contract marker if schema verification passes.
+   * This operation is idempotent - if the marker already matches, no changes are made.
+   */
+  sign(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<TSignResult>;
 
   /**
    * Introspects the database schema and returns a family-specific schema IR.
@@ -400,6 +413,38 @@ export interface IntrospectSchemaResult<TSchemaIR = unknown> {
   readonly meta?: {
     readonly configPath?: string;
     readonly dbUrl?: string;
+  };
+  readonly timings: {
+    readonly total: number;
+  };
+}
+
+/**
+ * Result type for database signing operations.
+ * Returned when writing or updating the contract marker in the database.
+ */
+export interface SignDatabaseResult {
+  readonly ok: boolean;
+  readonly summary: string;
+  readonly contract: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+  readonly target: {
+    readonly expected: string;
+    readonly actual?: string;
+  };
+  readonly marker: {
+    readonly created: boolean;
+    readonly updated: boolean;
+    readonly previous?: {
+      readonly coreHash?: string;
+      readonly profileHash?: string;
+    };
+  };
+  readonly meta?: {
+    readonly configPath?: string;
+    readonly contractPath: string;
   };
   readonly timings: {
     readonly total: number;

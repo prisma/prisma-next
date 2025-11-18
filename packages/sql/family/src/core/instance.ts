@@ -12,6 +12,7 @@ import type {
   EmitContractResult,
   SchemaIssue,
   SchemaVerificationNode,
+  SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
@@ -27,6 +28,11 @@ import type {
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import {
+  ensureSchemaStatement,
+  ensureTableStatement,
+  writeContractMarker,
+} from '@prisma-next/sql-runtime';
 import type {
   SqlForeignKeyIR,
   SqlIndexIR,
@@ -800,6 +806,18 @@ export interface SqlControlFamilyInstance
     readonly contractPath: string;
     readonly configPath?: string;
   }): Promise<VerifyDatabaseSchemaResult>;
+
+  /**
+   * Signs the database with the contract marker.
+   * Writes or updates the contract marker if schema verification passes.
+   * This operation is idempotent - if the marker already matches, no changes are made.
+   */
+  sign(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<SignDatabaseResult>;
 
   /**
    * Introspects the database schema and returns a family-specific schema IR.
@@ -1578,6 +1596,108 @@ export function createSqlFamilyInstance(
         meta: {
           contractPath,
           strict,
+          ...(configPath ? { configPath } : {}),
+        },
+        timings: {
+          total: totalTime,
+        },
+      };
+    },
+    async sign(options: {
+      readonly driver: ControlDriverInstance;
+      readonly contractIR: unknown;
+      readonly contractPath: string;
+      readonly configPath?: string;
+    }): Promise<SignDatabaseResult> {
+      const { driver, contractIR, contractPath, configPath } = options;
+      const startTime = Date.now();
+
+      // Validate contractIR as SqlContract<SqlStorage>
+      const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
+
+      // Extract contract hashes and target
+      const contractCoreHash = contract.coreHash;
+      const contractProfileHash =
+        'profileHash' in contract && typeof contract.profileHash === 'string'
+          ? contract.profileHash
+          : contractCoreHash;
+      const contractTarget = contract.target;
+
+      // Ensure marker schema and table exist
+      await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
+      await driver.query(ensureTableStatement.sql, ensureTableStatement.params);
+
+      // Read existing marker
+      const existingMarker = await readMarker(driver);
+
+      // Determine if we need to write/update marker
+      let markerCreated = false;
+      let markerUpdated = false;
+      let previousHashes: { coreHash?: string; profileHash?: string } | undefined;
+
+      if (!existingMarker) {
+        // No marker exists - insert new one
+        const write = writeContractMarker({
+          coreHash: contractCoreHash,
+          profileHash: contractProfileHash,
+          contractJson: contractIR,
+          canonicalVersion: 1,
+        });
+        await driver.query(write.insert.sql, write.insert.params);
+        markerCreated = true;
+      } else {
+        // Marker exists - check if hashes match
+        const existingCoreHash = existingMarker.coreHash;
+        const existingProfileHash = existingMarker.profileHash;
+
+        if (existingCoreHash !== contractCoreHash || existingProfileHash !== contractProfileHash) {
+          // Hashes differ - update marker
+          previousHashes = {
+            coreHash: existingCoreHash,
+            profileHash: existingProfileHash,
+          };
+          const write = writeContractMarker({
+            coreHash: contractCoreHash,
+            profileHash: contractProfileHash,
+            contractJson: contractIR,
+            canonicalVersion: existingMarker.canonicalVersion ?? 1,
+          });
+          await driver.query(write.update.sql, write.update.params);
+          markerUpdated = true;
+        }
+        // If hashes match, no-op (idempotent)
+      }
+
+      // Build summary message
+      let summary: string;
+      if (markerCreated) {
+        summary = 'Database signed (marker created)';
+      } else if (markerUpdated) {
+        summary = `Database signed (marker updated from ${previousHashes?.coreHash ?? 'unknown'})`;
+      } else {
+        summary = 'Database already signed with this contract';
+      }
+
+      const totalTime = Date.now() - startTime;
+
+      return {
+        ok: true,
+        summary,
+        contract: {
+          coreHash: contractCoreHash,
+          profileHash: contractProfileHash,
+        },
+        target: {
+          expected: contractTarget,
+          actual: contractTarget,
+        },
+        marker: {
+          created: markerCreated,
+          updated: markerUpdated,
+          ...(previousHashes ? { previous: previousHashes } : {}),
+        },
+        meta: {
+          contractPath,
           ...(configPath ? { configPath } : {}),
         },
         timings: {
