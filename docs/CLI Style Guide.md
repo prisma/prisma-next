@@ -19,7 +19,7 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 
 ## Output Style
 - Tone: friendly‑approachable, polished, concise. Symbols only (no emojis).
-- Symbols: success `✓`, error `✖`, warn `⚠`, info `ℹ`, step `›`, arrow `→`.
+- Symbols: success `✔`, error `✖`, warn `⚠`, info `ℹ`, step `›`, arrow `→`.
 - Colors: success=green, error=red, warn=yellow, info=cyan, accent=magenta, secondary text=dim.
 - Paths: Show relative paths from current working directory (not absolute paths) for better readability
 - Banners: only for `init` (first‑run experience). Otherwise, focus on getting work done.
@@ -144,7 +144,7 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - **Implementation**: Use `ora` package for spinners. Wrap async operations with spinner utility that:
   - Starts timer when operation begins
   - Only creates/start spinner if operation exceeds delay threshold
-  - Shows success message with elapsed time: `✓ Operation name... (123ms)`
+  - Shows success message with elapsed time: `✔ Operation name... (123ms)`
   - Shows failure message on error: `✖ Operation name... failed: error message`
 - **Output spacing**: Add a single blank line after all async operations complete (not between individual operations) to separate spinner output from command results.
 

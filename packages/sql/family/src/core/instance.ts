@@ -1646,16 +1646,17 @@ export function createSqlFamilyInstance(
         await driver.query(write.insert.sql, write.insert.params);
         markerCreated = true;
       } else {
-        // Marker exists - check if hashes match
+        // Marker exists - always capture previous hashes for output
         const existingCoreHash = existingMarker.coreHash;
         const existingProfileHash = existingMarker.profileHash;
 
+        previousHashes = {
+          coreHash: existingCoreHash,
+          profileHash: existingProfileHash,
+        };
+
         if (existingCoreHash !== contractCoreHash || existingProfileHash !== contractProfileHash) {
           // Hashes differ - update marker
-          previousHashes = {
-            coreHash: existingCoreHash,
-            profileHash: existingProfileHash,
-          };
           const write = writeContractMarker({
             coreHash: contractCoreHash,
             profileHash: contractProfileHash,
@@ -1665,7 +1666,7 @@ export function createSqlFamilyInstance(
           await driver.query(write.update.sql, write.update.params);
           markerUpdated = true;
         }
-        // If hashes match, no-op (idempotent)
+        // If hashes match, no-op (idempotent) - but previousHashes is still set for output
       }
 
       // Build summary message

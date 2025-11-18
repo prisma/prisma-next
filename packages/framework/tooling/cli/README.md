@@ -480,7 +480,7 @@ export default defineConfig({
 
 Success (new marker):
 ```
-✓ Database signed (marker created)
+✔ Database signed (marker created)
   coreHash: sha256:abc123...
   profileHash: sha256:def456...
   Total time: 42ms
@@ -488,7 +488,7 @@ Success (new marker):
 
 Success (updated marker):
 ```
-✓ Database signed (marker updated from sha256:old-hash)
+✔ Database signed (marker updated from sha256:old-hash)
   coreHash: sha256:abc123...
   profileHash: sha256:def456...
   previous coreHash: sha256:old-hash
@@ -497,7 +497,7 @@ Success (updated marker):
 
 Success (already up-to-date):
 ```
-✓ Database already signed with this contract
+✔ Database already signed with this contract
   coreHash: sha256:abc123...
   profileHash: sha256:def456...
   Total time: 42ms
@@ -731,7 +731,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 ### Output Formatting (`utils/output.ts`)
 - **Command Output Formatters**: Format human-readable output for commands (emit, verify, etc.)
   - Paths are shown as relative paths from current working directory (using `relative(process.cwd(), path)`)
-  - Success indicators use consistent checkmark (✓) throughout
+  - Success indicators use consistent checkmark (✔) throughout
 - **Error Output Formatters**: Format error output for human-readable and JSON display
 - **Styled Headers**: `formatStyledHeader()` creates styled headers for command output with "prisma-next <command> ➜ <description>" format
   - Parameter labels include colons (e.g., `config:`, `contract:`)

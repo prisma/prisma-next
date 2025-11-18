@@ -114,7 +114,7 @@ describe('db schema-verify command (e2e)', () => {
             const normalized = stripped.replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX');
 
             // Verify success output
-            expect(normalized).toContain('✓ Database schema satisfies contract');
+            expect(normalized).toContain('✔ Database schema satisfies contract');
             expect(normalized).toContain('schema');
             expect(normalized).toContain('user');
           } finally {
@@ -475,7 +475,7 @@ describe('db schema-verify command (e2e)', () => {
             const stripped = stripAnsi(output);
 
             // Verify success in permissive mode
-            expect(stripped).toContain('✓ Database schema satisfies contract');
+            expect(stripped).toContain('✔ Database schema satisfies contract');
           } finally {
             cleanupDir();
           }

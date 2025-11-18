@@ -24,10 +24,10 @@ import {
   formatSignJson,
   formatSignOutput,
   formatStyledHeader,
-  formatSuccessMessage,
 } from '../utils/output';
 import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
+import { withSpinner } from '../utils/spinner';
 
 interface DbSignOptions {
   readonly db?: string;
@@ -148,16 +148,24 @@ export function createDbSignCommand(): Command {
           // Validate contract using instance validator
           const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
 
-          // Schema verification precondition
+          // Schema verification precondition with spinner
           let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {
-            schemaVerifyResult = (await typedFamilyInstance.schemaVerify({
-              driver,
-              contractIR,
-              strict: false,
-              contractPath: contractPathAbsolute,
-              configPath,
-            })) as VerifyDatabaseSchemaResult;
+            schemaVerifyResult = await withSpinner(
+              async () => {
+                return (await typedFamilyInstance.schemaVerify({
+                  driver,
+                  contractIR,
+                  strict: false,
+                  contractPath: contractPathAbsolute,
+                  configPath,
+                })) as VerifyDatabaseSchemaResult;
+              },
+              {
+                message: 'Verifying database satisfies contract',
+                flags,
+              },
+            );
           } catch (error) {
             // Wrap errors from schemaVerify() in structured error
             throw errorRuntime(error instanceof Error ? error.message : String(error), {
@@ -219,10 +227,6 @@ export function createDbSignCommand(): Command {
             const output = formatSignOutput(signResult, flags);
             if (output) {
               console.log(output);
-            }
-            // Output success message if signing succeeded
-            if (signResult.ok && !flags.quiet) {
-              console.log(formatSuccessMessage(flags));
             }
           }
         }

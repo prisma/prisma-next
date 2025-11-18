@@ -215,7 +215,7 @@ describe('formatIntrospectOutput', () => {
     const output = formatIntrospectOutput(result, undefined, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Schema introspected successfully');
+    expect(stripped).toContain('✔ Schema introspected successfully');
   });
 
   it('includes target and dbUrl in verbose mode when schema view is undefined', () => {
@@ -237,7 +237,7 @@ describe('formatIntrospectOutput', () => {
     const output = formatIntrospectOutput(result, undefined, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Schema introspected successfully');
+    expect(stripped).toContain('✔ Schema introspected successfully');
     expect(stripped).not.toContain('Target:');
     expect(stripped).not.toContain('Database:');
     expect(stripped).not.toContain('Total time:');
@@ -261,7 +261,7 @@ describe('formatIntrospectOutput', () => {
     const output = formatIntrospectOutput(result, undefined, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Schema introspected successfully');
+    expect(stripped).toContain('✔ Schema introspected successfully');
     expect(stripped).toContain('Target: sql/postgres');
     expect(stripped).not.toContain('Database:');
   });
@@ -456,7 +456,7 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('user');
     expect(stripped).toContain('post');
     // Status glyphs should be present
-    expect(stripped).toContain('✓');
+    expect(stripped).toContain('✔');
     expect(stripped).toContain('✖');
   });
 
@@ -503,7 +503,7 @@ describe('formatSchemaVerifyOutput', () => {
     const output = formatSchemaVerifyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Database schema satisfies contract');
+    expect(stripped).toContain('✔ Database schema satisfies contract');
   });
 
   it('includes code in failure summary', () => {
@@ -890,7 +890,7 @@ describe('formatSignOutput', () => {
     const output = formatSignOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Database signed (marker created)');
+    expect(stripped).toContain('✔ Database signed (marker created)');
   });
 
   it('renders success message for updated marker', () => {
@@ -910,7 +910,7 @@ describe('formatSignOutput', () => {
     const output = formatSignOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Database signed (marker updated from sha256:old-hash)');
+    expect(stripped).toContain('✔ Database signed (marker updated from sha256:old-hash)');
   });
 
   it('renders success message for already up-to-date marker', () => {
@@ -926,7 +926,7 @@ describe('formatSignOutput', () => {
     const output = formatSignOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Database already signed with this contract');
+    expect(stripped).toContain('✔ Database already signed with this contract');
   });
 
   it('includes hashes in verbose mode', () => {

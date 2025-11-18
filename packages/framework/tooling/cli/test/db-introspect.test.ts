@@ -151,7 +151,7 @@ describe('db introspect command', () => {
 
       // Check that summary output is present
       const output = consoleOutput.join('\n');
-      expect(output).toContain('✓ Schema introspected successfully');
+      expect(output).toContain('✔ Schema introspected successfully');
       // Should not contain tree structure when schema view is not available
       // (header may contain └, but tree structure like "├─ table" should not be present)
       expect(output).not.toMatch(/├─/);

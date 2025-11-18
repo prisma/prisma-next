@@ -92,8 +92,8 @@ export function formatEmitOutput(result: EmitContractResult, flags: GlobalFlags)
   const jsonPath = relative(process.cwd(), result.files.json);
   const dtsPath = relative(process.cwd(), result.files.dts);
 
-  lines.push(`${prefix}✓ Emitted contract.json → ${jsonPath}`);
-  lines.push(`${prefix}✓ Emitted contract.d.ts → ${dtsPath}`);
+  lines.push(`${prefix}✔ Emitted contract.json → ${jsonPath}`);
+  lines.push(`${prefix}✔ Emitted contract.d.ts → ${dtsPath}`);
   lines.push(`${prefix}  coreHash: ${result.coreHash}`);
   if (result.profileHash) {
     lines.push(`${prefix}  profileHash: ${result.profileHash}`);
@@ -186,7 +186,7 @@ export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFl
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   if (result.ok) {
-    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
+    lines.push(`${prefix}${formatGreen('✔')} ${result.summary}`);
     lines.push(`${prefix}${formatDimText(`  coreHash: ${result.contract.coreHash}`)}`);
     if (result.contract.profileHash) {
       lines.push(`${prefix}${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
@@ -355,7 +355,7 @@ export function formatIntrospectOutput(
     lines.push(...prefixedTreeLines);
   } else {
     // Fallback: print summary when toSchemaView is not available
-    lines.push(`${prefix}✓ ${result.summary}`);
+    lines.push(`${prefix}✔ ${result.summary}`);
     if (isVerbose(flags, 1)) {
       lines.push(`${prefix}  Target: ${result.target.familyId}/${result.target.id}`);
       if (result.meta?.dbUrl) {
@@ -396,7 +396,7 @@ function renderSchemaVerificationTree(
   if (useColor) {
     switch (node.status) {
       case 'pass':
-        statusGlyph = '✓';
+        statusGlyph = '✔';
         statusColor = green;
         break;
       case 'warn':
@@ -411,7 +411,7 @@ function renderSchemaVerificationTree(
   } else {
     switch (node.status) {
       case 'pass':
-        statusGlyph = '✓';
+        statusGlyph = '✔';
         break;
       case 'warn':
         statusGlyph = '⚠';
@@ -630,7 +630,7 @@ export function formatSchemaVerifyOutput(
 
   // Summary line at the end: summary with status glyph
   if (result.ok) {
-    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
+    lines.push(`${prefix}${formatGreen('✔')} ${result.summary}`);
   } else {
     const codeText = result.code ? ` (${result.code})` : '';
     lines.push(`${prefix}${formatRed('✖')} ${result.summary}${codeText}`);
@@ -665,21 +665,24 @@ export function formatSignOutput(result: SignDatabaseResult, flags: GlobalFlags)
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   if (result.ok) {
-    lines.push(`${prefix}${formatGreen('✓')} ${result.summary}`);
+    // Main success message in white (not dimmed)
+    lines.push(`${prefix}${formatGreen('✔')} Database signed`);
+
+    // Show from -> to hashes with clear labels
+    const previousHash = result.marker.previous?.coreHash ?? 'none';
+    const currentHash = result.contract.coreHash;
+
+    lines.push(`${prefix}${formatDimText(`  from: ${previousHash}`)}`);
+    lines.push(`${prefix}${formatDimText(`  to:   ${currentHash}`)}`);
+
     if (isVerbose(flags, 1)) {
-      lines.push(`${prefix}${formatDimText(`  coreHash: ${result.contract.coreHash}`)}`);
       if (result.contract.profileHash) {
         lines.push(`${prefix}${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
       }
-      if (result.marker.previous) {
+      if (result.marker.previous?.profileHash) {
         lines.push(
-          `${prefix}${formatDimText(`  previous coreHash: ${result.marker.previous.coreHash ?? 'unknown'}`)}`,
+          `${prefix}${formatDimText(`  previous profileHash: ${result.marker.previous.profileHash}`)}`,
         );
-        if (result.marker.previous.profileHash) {
-          lines.push(
-            `${prefix}${formatDimText(`  previous profileHash: ${result.marker.previous.profileHash}`)}`,
-          );
-        }
       }
       lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
     }
@@ -990,7 +993,7 @@ export function formatStyledHeader(options: {
 export function formatSuccessMessage(flags: GlobalFlags): string {
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
-  return `${formatGreen('✓')} Success`;
+  return `${formatGreen('✔')} Success`;
 }
 
 // ============================================================================
