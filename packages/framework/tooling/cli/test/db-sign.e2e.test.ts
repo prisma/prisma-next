@@ -85,8 +85,15 @@ describe('db sign command (e2e)', () => {
             const output = consoleOutput.join('\n');
             const stripped = stripAnsi(output);
 
-            // Normalize database URL (port number) in output for snapshot
-            const normalized = stripped.replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX');
+            // Normalize paths and database URL for snapshot
+            let normalized = stripped;
+            // Replace file paths
+            normalized = normalized.replace(
+              /\/(?:Users|home|tmp|var|opt|mnt|root|[A-Z]:\\?)[^\s\n]*/g,
+              '<path>',
+            );
+            // Normalize database URL (port number)
+            normalized = normalized.replace(/(127\.0\.0\.1|localhost):\d+/g, '127.0.0.1:XXXXX');
 
             // Verify marker was created in database
             await withClient(connectionString, async (client) => {
@@ -254,10 +261,7 @@ describe('db sign command (e2e)', () => {
               meta: {
                 ...jsonOutput.meta,
                 contractPath: jsonOutput.meta?.contractPath
-                  ? jsonOutput.meta.contractPath.replace(
-                      /test-\d+-[a-z0-9]+/,
-                      'test-XXXXXXXX-XXXXXXXX',
-                    )
+                  ? jsonOutput.meta.contractPath.replace(/^.*\//, '<path>/')
                   : jsonOutput.meta?.contractPath,
               },
               timings: {
