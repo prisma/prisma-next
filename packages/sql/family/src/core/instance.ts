@@ -1646,17 +1646,20 @@ export function createSqlFamilyInstance(
         await driver.query(write.insert.sql, write.insert.params);
         markerCreated = true;
       } else {
-        // Marker exists - always capture previous hashes for output
+        // Marker exists - check if hashes differ
         const existingCoreHash = existingMarker.coreHash;
         const existingProfileHash = existingMarker.profileHash;
 
-        previousHashes = {
-          coreHash: existingCoreHash,
-          profileHash: existingProfileHash,
-        };
+        // Compare hashes (use strict equality to ensure exact match)
+        const coreHashMatches = existingCoreHash === contractCoreHash;
+        const profileHashMatches = existingProfileHash === contractProfileHash;
 
-        if (existingCoreHash !== contractCoreHash || existingProfileHash !== contractProfileHash) {
-          // Hashes differ - update marker
+        if (!coreHashMatches || !profileHashMatches) {
+          // Hashes differ - update marker and capture previous hashes for output
+          previousHashes = {
+            coreHash: existingCoreHash,
+            profileHash: existingProfileHash,
+          };
           const write = writeContractMarker({
             coreHash: contractCoreHash,
             profileHash: contractProfileHash,
@@ -1666,7 +1669,7 @@ export function createSqlFamilyInstance(
           await driver.query(write.update.sql, write.update.params);
           markerUpdated = true;
         }
-        // If hashes match, no-op (idempotent) - but previousHashes is still set for output
+        // If hashes match, no-op (idempotent) - previousHashes remains undefined
       }
 
       // Build summary message
