@@ -151,7 +151,7 @@ describe('db introspect command', () => {
 
       // Check that summary output is present
       const output = consoleOutput.join('\n');
-      expect(output).toContain('✓ Schema introspected successfully');
+      expect(output).toContain('✔ Schema introspected successfully');
       // Should not contain tree structure when schema view is not available
       // (header may contain └, but tree structure like "├─ table" should not be present)
       expect(output).not.toMatch(/├─/);
@@ -589,7 +589,7 @@ describe('db introspect command', () => {
     // This executes the callback configured in configureHelp()
     const helpText = command.helpInformation();
     // Verify help output is present (formatHelp callback was executed)
-    expect(helpText).toContain('Inspect the live database schema');
+    expect(helpText).toContain('Inspect the database schema');
     expect(helpText).toContain('--db <url>');
     expect(helpText).toContain('--config <path>');
   });

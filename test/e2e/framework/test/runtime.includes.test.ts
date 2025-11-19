@@ -342,7 +342,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
             }
           });
         },
-        { acceleratePort: 54120, databasePort: 54121, shadowDatabasePort: 54122 },
+        { acceleratePort: 54123, databasePort: 54124, shadowDatabasePort: 54125 },
       );
     },
     timeouts.spinUpPpgDev,

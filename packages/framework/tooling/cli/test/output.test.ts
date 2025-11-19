@@ -2,6 +2,7 @@ import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view
 import type {
   IntrospectSchemaResult,
   SchemaVerificationNode,
+  SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import stripAnsi from 'strip-ansi';
@@ -12,6 +13,8 @@ import {
   formatIntrospectOutput,
   formatSchemaVerifyJson,
   formatSchemaVerifyOutput,
+  formatSignJson,
+  formatSignOutput,
 } from '../src/utils/output';
 
 describe('formatIntrospectOutput', () => {
@@ -212,7 +215,7 @@ describe('formatIntrospectOutput', () => {
     const output = formatIntrospectOutput(result, undefined, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Schema introspected successfully');
+    expect(stripped).toContain('✔ Schema introspected successfully');
   });
 
   it('includes target and dbUrl in verbose mode when schema view is undefined', () => {
@@ -234,7 +237,7 @@ describe('formatIntrospectOutput', () => {
     const output = formatIntrospectOutput(result, undefined, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Schema introspected successfully');
+    expect(stripped).toContain('✔ Schema introspected successfully');
     expect(stripped).not.toContain('Target:');
     expect(stripped).not.toContain('Database:');
     expect(stripped).not.toContain('Total time:');
@@ -258,7 +261,7 @@ describe('formatIntrospectOutput', () => {
     const output = formatIntrospectOutput(result, undefined, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Schema introspected successfully');
+    expect(stripped).toContain('✔ Schema introspected successfully');
     expect(stripped).toContain('Target: sql/postgres');
     expect(stripped).not.toContain('Database:');
   });
@@ -453,7 +456,7 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('user');
     expect(stripped).toContain('post');
     // Status glyphs should be present
-    expect(stripped).toContain('✓');
+    expect(stripped).toContain('✔');
     expect(stripped).toContain('✖');
   });
 
@@ -500,7 +503,7 @@ describe('formatSchemaVerifyOutput', () => {
     const output = formatSchemaVerifyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✓ Database schema satisfies contract');
+    expect(stripped).toContain('✔ Database schema satisfies contract');
   });
 
   it('includes code in failure summary', () => {
@@ -851,5 +854,215 @@ describe('formatSchemaVerifyJson', () => {
     expect(parsed.schema.root.status).toBe('fail');
     expect(parsed.schema.counts.fail).toBe(2);
     expect(parsed.meta?.strict).toBe(true);
+  });
+});
+
+describe('formatSignOutput', () => {
+  const createSignResult = (overrides?: Partial<SignDatabaseResult>): SignDatabaseResult => ({
+    ok: true,
+    summary: 'Database signed (marker created)',
+    contract: {
+      coreHash: 'sha256:abc123',
+      profileHash: 'sha256:def456',
+    },
+    target: {
+      expected: 'postgres',
+      actual: 'postgres',
+    },
+    marker: {
+      created: true,
+      updated: false,
+    },
+    meta: {
+      contractPath: './contract.json',
+      configPath: './prisma-next.config.ts',
+    },
+    timings: {
+      total: 42,
+    },
+    ...overrides,
+  });
+
+  it('renders success message for new marker', () => {
+    const result = createSignResult();
+    const flags = parseGlobalFlags({ 'no-color': true });
+
+    const output = formatSignOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: none');
+    expect(stripped).toContain('to:   sha256:abc123');
+  });
+
+  it('renders success message for updated marker', () => {
+    const result = createSignResult({
+      summary: 'Database signed (marker updated from sha256:old-hash)',
+      marker: {
+        created: false,
+        updated: true,
+        previous: {
+          coreHash: 'sha256:old-hash',
+          profileHash: 'sha256:old-profile-hash',
+        },
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+
+    const output = formatSignOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: sha256:old-hash');
+    expect(stripped).toContain('to:   sha256:abc123');
+  });
+
+  it('renders success message for already up-to-date marker', () => {
+    const result = createSignResult({
+      summary: 'Database already signed with this contract',
+      marker: {
+        created: false,
+        updated: false,
+        previous: {
+          coreHash: 'sha256:abc123',
+        },
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+
+    const output = formatSignOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: sha256:abc123');
+    expect(stripped).toContain('to:   sha256:abc123');
+  });
+
+  it('includes hashes in verbose mode', () => {
+    const result = createSignResult();
+    const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
+
+    const output = formatSignOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: none');
+    expect(stripped).toContain('to:   sha256:abc123');
+    expect(stripped).toContain('profileHash: sha256:def456');
+    expect(stripped).toContain('Total time: 42ms');
+  });
+
+  it('includes previous hashes in verbose mode when marker was updated', () => {
+    const result = createSignResult({
+      summary: 'Database signed (marker updated from sha256:old-hash)',
+      marker: {
+        created: false,
+        updated: true,
+        previous: {
+          coreHash: 'sha256:old-hash',
+          profileHash: 'sha256:old-profile-hash',
+        },
+      },
+    });
+    const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
+
+    const output = formatSignOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('✔ Database signed');
+    expect(stripped).toContain('from: sha256:old-hash');
+    expect(stripped).toContain('to:   sha256:abc123');
+    expect(stripped).toContain('previous profileHash: sha256:old-profile-hash');
+  });
+
+  it('returns empty string in quiet mode', () => {
+    const result = createSignResult();
+    const flags = parseGlobalFlags({ quiet: true, 'no-color': true });
+
+    const output = formatSignOutput(result, flags);
+
+    expect(output).toBe('');
+  });
+});
+
+describe('formatSignJson', () => {
+  const createSignResult = (overrides?: Partial<SignDatabaseResult>): SignDatabaseResult => ({
+    ok: true,
+    summary: 'Database signed (marker created)',
+    contract: {
+      coreHash: 'sha256:abc123',
+      profileHash: 'sha256:def456',
+    },
+    target: {
+      expected: 'postgres',
+      actual: 'postgres',
+    },
+    marker: {
+      created: true,
+      updated: false,
+    },
+    meta: {
+      contractPath: './contract.json',
+      configPath: './prisma-next.config.ts',
+    },
+    timings: {
+      total: 42,
+    },
+    ...overrides,
+  });
+
+  it('formats new marker result as JSON', () => {
+    const result = createSignResult();
+    const output = formatSignJson(result);
+    const parsed = JSON.parse(output) as SignDatabaseResult;
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.summary).toBe('Database signed (marker created)');
+    expect(parsed.contract.coreHash).toBe('sha256:abc123');
+    expect(parsed.contract.profileHash).toBe('sha256:def456');
+    expect(parsed.marker.created).toBe(true);
+    expect(parsed.marker.updated).toBe(false);
+    expect(parsed.timings.total).toBe(42);
+  });
+
+  it('formats updated marker result as JSON', () => {
+    const result = createSignResult({
+      summary: 'Database signed (marker updated from sha256:old-hash)',
+      marker: {
+        created: false,
+        updated: true,
+        previous: {
+          coreHash: 'sha256:old-hash',
+          profileHash: 'sha256:old-profile-hash',
+        },
+      },
+    });
+    const output = formatSignJson(result);
+    const parsed = JSON.parse(output) as SignDatabaseResult;
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.summary).toBe('Database signed (marker updated from sha256:old-hash)');
+    expect(parsed.marker.created).toBe(false);
+    expect(parsed.marker.updated).toBe(true);
+    expect(parsed.marker.previous?.coreHash).toBe('sha256:old-hash');
+    expect(parsed.marker.previous?.profileHash).toBe('sha256:old-profile-hash');
+  });
+
+  it('formats already up-to-date marker result as JSON', () => {
+    const result = createSignResult({
+      summary: 'Database already signed with this contract',
+      marker: {
+        created: false,
+        updated: false,
+      },
+    });
+    const output = formatSignJson(result);
+    const parsed = JSON.parse(output) as SignDatabaseResult;
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.summary).toBe('Database already signed with this contract');
+    expect(parsed.marker.created).toBe(false);
+    expect(parsed.marker.updated).toBe(false);
+    expect(parsed.marker.previous).toBeUndefined();
   });
 });

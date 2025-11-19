@@ -5,28 +5,31 @@ import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
   errorFileNotFound,
-  errorHashMismatch,
-  errorMarkerMissing,
   errorRuntime,
-  errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
-import type { FamilyInstance, VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
+import type {
+  FamilyInstance,
+  SignDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
+  formatSchemaVerifyJson,
+  formatSchemaVerifyOutput,
+  formatSignJson,
+  formatSignOutput,
   formatStyledHeader,
-  formatVerifyJson,
-  formatVerifyOutput,
 } from '../utils/output';
 import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
 import { withSpinner } from '../utils/spinner';
 
-interface DbVerifyOptions {
+interface DbSignOptions {
   readonly db?: string;
   readonly config?: string;
   readonly json?: string | boolean;
@@ -41,13 +44,15 @@ interface DbVerifyOptions {
   readonly 'no-color'?: boolean;
 }
 
-export function createDbVerifyCommand(): Command {
-  const command = new Command('verify');
+export function createDbSignCommand(): Command {
+  const command = new Command('sign');
   setCommandDescriptions(
     command,
-    'Check whether the database has been signed with your contract',
-    'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
-      'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
+    'Sign the database with your contract so you can safely run queries',
+    'Verifies that your database schema satisfies the emitted contract, and if so, writes or\n' +
+      'updates the contract marker in the database. This command is idempotent and safe to run\n' +
+      'in CI/deployment pipelines. The marker records that this database instance is aligned\n' +
+      'with a specific contract version.',
   );
   command
     .configureHelp({
@@ -65,7 +70,7 @@ export function createDbVerifyCommand(): Command {
     .option('--timestamps', 'Add timestamps to output')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
-    .action(async (options: DbVerifyOptions) => {
+    .action(async (options: DbSignOptions) => {
       const flags = parseGlobalFlags(options);
 
       const result = await performAction(async () => {
@@ -91,9 +96,9 @@ export function createDbVerifyCommand(): Command {
             details.push({ label: 'database', value: options.db });
           }
           const header = formatStyledHeader({
-            command: 'db verify',
-            description: 'Check whether the database has been signed with your contract',
-            url: 'https://pris.ly/db-verify',
+            command: 'db sign',
+            description: 'Sign the database with your contract so you can safely run queries',
+            url: 'https://pris.ly/db-sign',
             details,
             flags,
           });
@@ -131,10 +136,7 @@ export function createDbVerifyCommand(): Command {
         const driverDescriptor = config.driver;
 
         // Create driver
-        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
-          message: 'Connecting to database...',
-          flags,
-        });
+        const driver = await driverDescriptor.create(dbUrl);
 
         try {
           // Create family instance
@@ -149,48 +151,58 @@ export function createDbVerifyCommand(): Command {
           // Validate contract using instance validator
           const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
 
-          // Call family instance verify method
-          let verifyResult: VerifyDatabaseResult;
+          // Schema verification precondition with spinner
+          let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {
-            verifyResult = (await withSpinner(
-              () =>
-                typedFamilyInstance.verify({
+            schemaVerifyResult = await withSpinner(
+              async () => {
+                return (await typedFamilyInstance.schemaVerify({
                   driver,
                   contractIR,
-                  expectedTargetId: config.target.targetId,
+                  strict: false,
                   contractPath: contractPathAbsolute,
                   configPath,
-                }),
+                })) as VerifyDatabaseSchemaResult;
+              },
               {
-                message: 'Verifying database schema...',
+                message: 'Verifying database satisfies contract',
                 flags,
               },
-            )) as VerifyDatabaseResult;
+            );
           } catch (error) {
-            // Wrap errors from verify() in structured error
-            throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-              why: `Failed to verify database: ${error instanceof Error ? error.message : String(error)}`,
+            // Wrap errors from schemaVerify() in structured error
+            throw errorRuntime(error instanceof Error ? error.message : String(error), {
+              why: `Failed to verify database schema: ${error instanceof Error ? error.message : String(error)}`,
             });
           }
 
-          // If verification failed, throw structured error
-          if (!verifyResult.ok && verifyResult.code) {
-            if (verifyResult.code === 'PN-RTM-3001') {
-              throw errorMarkerMissing();
-            }
-            if (verifyResult.code === 'PN-RTM-3002') {
-              throw errorHashMismatch({
-                expected: verifyResult.contract.coreHash,
-                ...(verifyResult.marker?.coreHash ? { actual: verifyResult.marker.coreHash } : {}),
-              });
-            }
-            if (verifyResult.code === 'PN-RTM-3003') {
-              throw errorTargetMismatch(
-                verifyResult.target.expected,
-                verifyResult.target.actual ?? 'unknown',
-              );
-            }
-            throw errorRuntime(verifyResult.summary);
+          // If schema verification failed, return both results for handling outside performAction
+          if (!schemaVerifyResult.ok) {
+            return { schemaVerifyResult, signResult: undefined };
+          }
+
+          // Schema verification passed - proceed with signing
+          let signResult: SignDatabaseResult;
+          try {
+            signResult = await withSpinner(
+              async () => {
+                return (await typedFamilyInstance.sign({
+                  driver,
+                  contractIR,
+                  contractPath: contractPathAbsolute,
+                  configPath,
+                })) as SignDatabaseResult;
+              },
+              {
+                message: 'Signing database...',
+                flags,
+              },
+            );
+          } catch (error) {
+            // Wrap errors from sign() in structured error
+            throw errorRuntime(error instanceof Error ? error.message : String(error), {
+              why: `Failed to sign database: ${error instanceof Error ? error.message : String(error)}`,
+            });
           }
 
           // Add blank line after all async operations if spinners were shown
@@ -198,7 +210,7 @@ export function createDbVerifyCommand(): Command {
             console.log('');
           }
 
-          return verifyResult;
+          return { schemaVerifyResult: undefined, signResult };
         } finally {
           // Ensure driver connection is closed
           await driver.close();
@@ -206,20 +218,45 @@ export function createDbVerifyCommand(): Command {
       });
 
       // Handle result - formats output and returns exit code
-      const exitCode = handleResult(result, flags, (verifyResult) => {
-        // Output based on flags
-        if (flags.json === 'object') {
-          // JSON output to stdout
-          console.log(formatVerifyJson(verifyResult));
-        } else {
-          // Human-readable output to stdout
-          const output = formatVerifyOutput(verifyResult, flags);
-          if (output) {
-            console.log(output);
+      const exitCode = handleResult(result, flags, (value) => {
+        const { schemaVerifyResult, signResult } = value;
+
+        // If schema verification failed, format and print schema verification output
+        if (schemaVerifyResult && !schemaVerifyResult.ok) {
+          if (flags.json === 'object') {
+            console.log(formatSchemaVerifyJson(schemaVerifyResult));
+          } else {
+            const output = formatSchemaVerifyOutput(schemaVerifyResult, flags);
+            if (output) {
+              console.log(output);
+            }
+          }
+          // Don't proceed to sign output formatting
+          return;
+        }
+
+        // Schema verification passed - format sign output
+        if (signResult) {
+          if (flags.json === 'object') {
+            console.log(formatSignJson(signResult));
+          } else {
+            const output = formatSignOutput(signResult, flags);
+            if (output) {
+              console.log(output);
+            }
           }
         }
       });
-      process.exit(exitCode);
+
+      // For logical schema mismatches, check if schema verification passed
+      // Infra errors already handled by handleResult (returns non-zero exit code)
+      if (result.ok && result.value.schemaVerifyResult && !result.value.schemaVerifyResult.ok) {
+        // Schema verification failed - exit with code 1
+        process.exit(1);
+      } else {
+        // Success or infra error - use exit code from handleResult
+        process.exit(exitCode);
+      }
     });
 
   return command;

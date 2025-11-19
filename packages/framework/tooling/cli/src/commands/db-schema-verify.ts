@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import {
   errorDatabaseUrlRequired,
@@ -46,7 +46,7 @@ export function createDbSchemaVerifyCommand(): Command {
   const command = new Command('schema-verify');
   setCommandDescriptions(
     command,
-    'Verify database schema satisfies emitted contract',
+    'Check whether the database schema satisfies your contract',
     'Verifies that your database schema satisfies the emitted contract. Compares table structures,\n' +
       'column types, constraints, and extensions. Reports any mismatches via a contract-shaped\n' +
       'verification tree. This is a read-only operation that does not modify the database.',
@@ -74,10 +74,15 @@ export function createDbSchemaVerifyCommand(): Command {
       const result = await performAction(async () => {
         // Load config (file I/O)
         const config = await loadConfig(options.config);
-        const configPath = options.config || './prisma-next.config.ts';
-        const contractPath = config.contract?.output
+        // Normalize config path for display (match contract path format - no ./ prefix)
+        const configPath = options.config
+          ? relative(process.cwd(), resolve(options.config))
+          : 'prisma-next.config.ts';
+        const contractPathAbsolute = config.contract?.output
           ? resolve(config.contract.output)
           : resolve('src/prisma/contract.json');
+        // Convert to relative path for display
+        const contractPath = relative(process.cwd(), contractPathAbsolute);
 
         // Output header (only for human-readable output)
         if (flags.json !== 'object' && !flags.quiet) {
@@ -90,7 +95,7 @@ export function createDbSchemaVerifyCommand(): Command {
           }
           const header = formatStyledHeader({
             command: 'db schema-verify',
-            description: 'Verify database schema satisfies emitted contract',
+            description: 'Check whether the database schema satisfies your contract',
             url: 'https://pris.ly/db-schema-verify',
             details,
             flags,
@@ -101,11 +106,11 @@ export function createDbSchemaVerifyCommand(): Command {
         // Load contract file (file I/O)
         let contractJsonContent: string;
         try {
-          contractJsonContent = await readFile(contractPath, 'utf-8');
+          contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
         } catch (error) {
           if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-            throw errorFileNotFound(contractPath, {
-              why: `Contract file not found at ${contractPath}`,
+            throw errorFileNotFound(contractPathAbsolute, {
+              why: `Contract file not found at ${contractPathAbsolute}`,
             });
           }
           throw errorUnexpected(error instanceof Error ? error.message : String(error), {
@@ -156,7 +161,7 @@ export function createDbSchemaVerifyCommand(): Command {
                   driver,
                   contractIR,
                   strict: options.strict ?? false,
-                  contractPath,
+                  contractPath: contractPathAbsolute,
                   configPath,
                 }),
               {
