@@ -5,8 +5,8 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/targets-postgres/control';
-import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { CodecTypes } from '../../../targets/postgres-adapter/src/core/codecs';
 import postgresAdapter from '../../../targets/postgres-adapter/src/exports/control';
 import {
@@ -44,15 +44,22 @@ function createTestContract(): SqlContract<SqlStorage> {
 }
 
 describe('family instance sign', () => {
+  let database: DevDatabase | undefined;
   let connectionString: string | undefined;
 
   beforeAll(async () => {
-    await withDevDatabase(
-      async ({ connectionString: cs }) => {
-        connectionString = cs;
-      },
-      { acceleratePort: 54250, databasePort: 54251, shadowDatabasePort: 54252 },
-    );
+    database = await createDevDatabase({
+      acceleratePort: 54250,
+      databasePort: 54251,
+      shadowDatabasePort: 54252,
+    });
+    connectionString = database.connectionString;
+  }, timeouts.spinUpPpgDev);
+
+  afterAll(async () => {
+    if (database) {
+      await database.close();
+    }
   }, timeouts.spinUpPpgDev);
 
   describe('new marker creation', () => {
