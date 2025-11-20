@@ -179,4 +179,70 @@ describe('contract builder methods', () => {
     expect(contract.extensions).toEqual({ pack: { config: true } });
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
   });
+
+  it('includes unique constraints in contract', () => {
+    const contract = defineContract<CodecTypes>()
+      .target('postgres')
+      .table('user', (t) =>
+        t
+          .column('id', { type: 'pg/int4@1' })
+          .column('email', { type: 'pg/text@1' })
+          .primaryKey(['id'])
+          .unique(['email']),
+      )
+      .build();
+    expect(contract.storage.tables.user.uniques).toEqual([{ columns: ['email'] }]);
+  });
+
+  it('includes index constraints in contract', () => {
+    const contract = defineContract<CodecTypes>()
+      .target('postgres')
+      .table('user', (t) =>
+        t
+          .column('id', { type: 'pg/int4@1' })
+          .column('email', { type: 'pg/text@1' })
+          .primaryKey(['id'])
+          .index(['email']),
+      )
+      .build();
+    expect(contract.storage.tables.user.indexes).toEqual([{ columns: ['email'] }]);
+  });
+
+  it('includes foreign key constraints in contract', () => {
+    const contract = defineContract<CodecTypes>()
+      .target('postgres')
+      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('post', (t) =>
+        t
+          .column('id', { type: 'pg/int4@1' })
+          .column('userId', { type: 'pg/int4@1' })
+          .primaryKey(['id'])
+          .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
+      )
+      .build();
+    expect(contract.storage.tables.post.foreignKeys).toEqual([
+      { columns: ['userId'], references: { table: 'user', columns: ['id'] } },
+    ]);
+  });
+
+  it('includes multiple constraints in contract', () => {
+    const contract = defineContract<CodecTypes>()
+      .target('postgres')
+      .table('user', (t) =>
+        t
+          .column('id', { type: 'pg/int4@1' })
+          .column('email', { type: 'pg/text@1' })
+          .column('username', { type: 'pg/text@1' })
+          .primaryKey(['id'])
+          .unique(['email'])
+          .unique(['username'])
+          .index(['username']),
+      )
+      .build();
+    expect(contract.storage.tables.user.uniques).toEqual([
+      { columns: ['email'] },
+      { columns: ['username'] },
+    ]);
+    expect(contract.storage.tables.user.indexes).toEqual([{ columns: ['username'] }]);
+  });
 });

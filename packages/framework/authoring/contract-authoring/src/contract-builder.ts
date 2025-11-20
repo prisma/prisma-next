@@ -7,6 +7,8 @@ import type {
 import { ModelBuilder } from './model-builder';
 import { TableBuilder } from './table-builder';
 
+type ExtractTableState<T> = T extends { build(): infer R } ? R : never;
+
 export class ContractBuilder<
   Target extends string | undefined = undefined,
   Tables extends Record<
@@ -72,19 +74,12 @@ export class ContractBuilder<
     });
   }
 
-  table<
-    TableName extends string,
-    T extends TableBuilder<
-      TableName,
-      Record<string, { readonly name: string; readonly nullable: boolean; readonly type: string }>,
-      readonly string[] | undefined
-    >,
-  >(
+  table<TableName extends string, T = TableBuilder<TableName>>(
     name: TableName,
     callback: (t: TableBuilder<TableName>) => T | undefined,
   ): ContractBuilder<
     Target,
-    Tables & Record<TableName, ReturnType<T['build']>>,
+    Tables & Record<TableName, ExtractTableState<T>>,
     Models,
     CoreHash,
     Extensions,
@@ -97,7 +92,7 @@ export class ContractBuilder<
 
     return new ContractBuilder<
       Target,
-      Tables & Record<TableName, ReturnType<T['build']>>,
+      Tables & Record<TableName, ExtractTableState<T>>,
       Models,
       CoreHash,
       Extensions,
@@ -105,7 +100,7 @@ export class ContractBuilder<
     >({
       ...this.state,
       tables: { ...this.state.tables, [name]: tableState } as Tables &
-        Record<TableName, ReturnType<T['build']>>,
+        Record<TableName, ExtractTableState<T>>,
     });
   }
 

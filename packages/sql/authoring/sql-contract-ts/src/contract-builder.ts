@@ -1,8 +1,11 @@
 import type {
   ColumnBuilderState,
+  ForeignKeyConstraintState,
+  IndexConstraintState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
+  UniqueConstraintState,
 } from '@prisma-next/contract-authoring';
 import {
   type BuildModels,
@@ -10,7 +13,10 @@ import {
   type BuildStorageColumn,
   ContractBuilder,
   type ExtractColumns,
+  type ExtractForeignKeys,
+  type ExtractIndexes,
   type ExtractPrimaryKey,
+  type ExtractUniques,
   ModelBuilder,
   type Mutable,
   TableBuilder,
@@ -23,6 +29,8 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { computeMappings } from './contract';
+
+type ExtractTableState<T> = T extends { build(): infer R } ? R : never;
 
 /**
  * Type-level mappings structure for contracts built via `defineContract()`.
@@ -48,6 +56,9 @@ type BuildStorageTable<
   _TableName extends string,
   Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
   PK extends readonly string[] | undefined,
+  Uniques extends ReadonlyArray<UniqueConstraintState> = ReadonlyArray<never>,
+  Indexes extends ReadonlyArray<IndexConstraintState> = ReadonlyArray<never>,
+  ForeignKeys extends ReadonlyArray<ForeignKeyConstraintState> = ReadonlyArray<never>,
 > = {
   readonly columns: {
     readonly [K in keyof Columns]: Columns[K] extends ColumnBuilderState<
@@ -58,9 +69,9 @@ type BuildStorageTable<
       ? BuildStorageColumn<Null & boolean, TType>
       : never;
   };
-  readonly uniques: ReadonlyArray<never>;
-  readonly indexes: ReadonlyArray<never>;
-  readonly foreignKeys: ReadonlyArray<never>;
+  readonly uniques: Uniques;
+  readonly indexes: Indexes;
+  readonly foreignKeys: ForeignKeys;
 } & (PK extends readonly string[]
   ? { readonly primaryKey: { readonly columns: PK } }
   : Record<string, never>);
@@ -79,7 +90,10 @@ type BuildStorage<
     readonly [K in keyof Tables]: BuildStorageTable<
       K & string,
       ExtractColumns<Tables[K]>,
-      ExtractPrimaryKey<Tables[K]>
+      ExtractPrimaryKey<Tables[K]>,
+      ExtractUniques<Tables[K]>,
+      ExtractIndexes<Tables[K]>,
+      ExtractForeignKeys<Tables[K]>
     >;
   };
 };
@@ -97,7 +111,10 @@ type BuildStorageTables<
   readonly [K in keyof Tables]: BuildStorageTable<
     K & string,
     ExtractColumns<Tables[K]>,
-    ExtractPrimaryKey<Tables[K]>
+    ExtractPrimaryKey<Tables[K]>,
+    ExtractUniques<Tables[K]>,
+    ExtractIndexes<Tables[K]>,
+    ExtractForeignKeys<Tables[K]>
   >;
 };
 
@@ -195,6 +212,9 @@ class SqlContractBuilder<
       type TableKey = typeof tableName;
       type ColumnDefs = ExtractColumns<Tables[TableKey]>;
       type PrimaryKey = ExtractPrimaryKey<Tables[TableKey]>;
+      type Uniques = ExtractUniques<Tables[TableKey]>;
+      type Indexes = ExtractIndexes<Tables[TableKey]>;
+      type ForeignKeys = ExtractForeignKeys<Tables[TableKey]>;
 
       const columns = {} as Partial<{
         [K in keyof ColumnDefs]: BuildStorageColumn<
@@ -223,9 +243,9 @@ class SqlContractBuilder<
             ColumnDefs[K]['type']
           >;
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
+        uniques: tableState.uniques ?? [],
+        indexes: tableState.indexes ?? [],
+        foreignKeys: tableState.foreignKeys ?? [],
         ...(tableState.primaryKey
           ? {
               primaryKey: {
@@ -233,7 +253,14 @@ class SqlContractBuilder<
               },
             }
           : {}),
-      } as unknown as BuildStorageTable<TableKey & string, ColumnDefs, PrimaryKey>;
+      } as unknown as BuildStorageTable<
+        TableKey & string,
+        ColumnDefs,
+        PrimaryKey,
+        Uniques,
+        Indexes,
+        ForeignKeys
+      >;
 
       (storageTables as Mutable<BuildStorageTables<Tables>>)[tableName] = table;
     }
@@ -402,20 +429,13 @@ class SqlContractBuilder<
     });
   }
 
-  override table<
-    TableName extends string,
-    T extends TableBuilder<
-      TableName,
-      Record<string, ColumnBuilderState<string, boolean, string>>,
-      readonly string[] | undefined
-    >,
-  >(
+  override table<TableName extends string, T = TableBuilder<TableName>>(
     name: TableName,
     callback: (t: TableBuilder<TableName>) => T | undefined,
   ): SqlContractBuilder<
     CodecTypes,
     Target,
-    Tables & Record<TableName, ReturnType<T['build']>>,
+    Tables & Record<TableName, ExtractTableState<T>>,
     Models,
     CoreHash,
     Extensions,
@@ -429,7 +449,7 @@ class SqlContractBuilder<
     return new SqlContractBuilder<
       CodecTypes,
       Target,
-      Tables & Record<TableName, ReturnType<T['build']>>,
+      Tables & Record<TableName, ExtractTableState<T>>,
       Models,
       CoreHash,
       Extensions,
@@ -437,7 +457,7 @@ class SqlContractBuilder<
     >({
       ...this.state,
       tables: { ...this.state.tables, [name]: tableState } as Tables &
-        Record<TableName, ReturnType<T['build']>>,
+        Record<TableName, ExtractTableState<T>>,
     });
   }
 

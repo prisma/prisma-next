@@ -8,14 +8,39 @@ export interface ColumnBuilderState<
   readonly type: Type;
 }
 
+export type UniqueConstraintState = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+};
+
+export type IndexConstraintState = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+};
+
+export type ForeignKeyConstraintState = {
+  readonly columns: readonly string[];
+  readonly references: {
+    readonly table: string;
+    readonly columns: readonly string[];
+  };
+  readonly name?: string;
+};
+
 export interface TableBuilderState<
   Name extends string,
   Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
   PrimaryKey extends readonly string[] | undefined,
+  Uniques extends ReadonlyArray<UniqueConstraintState> = ReadonlyArray<never>,
+  Indexes extends ReadonlyArray<IndexConstraintState> = ReadonlyArray<never>,
+  ForeignKeys extends ReadonlyArray<ForeignKeyConstraintState> = ReadonlyArray<never>,
 > {
   readonly name: Name;
   readonly columns: Columns;
   readonly primaryKey?: PrimaryKey;
+  readonly uniques?: Uniques;
+  readonly indexes?: Indexes;
+  readonly foreignKeys?: ForeignKeys;
 }
 
 export type RelationDefinition = {

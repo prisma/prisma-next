@@ -32,6 +32,58 @@ export type ExtractPrimaryKey<
   ? PK
   : never;
 
+export type ExtractUniques<
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, boolean, string>>,
+    readonly string[] | undefined
+  >,
+> = T extends TableBuilderState<
+  string,
+  Record<string, ColumnBuilderState<string, boolean, string>>,
+  readonly string[] | undefined,
+  infer U extends ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>
+>
+  ? U
+  : ReadonlyArray<never>;
+
+export type ExtractIndexes<
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, boolean, string>>,
+    readonly string[] | undefined
+  >,
+> = T extends TableBuilderState<
+  string,
+  Record<string, ColumnBuilderState<string, boolean, string>>,
+  readonly string[] | undefined,
+  ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>,
+  infer I extends ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>
+>
+  ? I
+  : ReadonlyArray<never>;
+
+export type ExtractForeignKeys<
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, boolean, string>>,
+    readonly string[] | undefined
+  >,
+> = T extends TableBuilderState<
+  string,
+  Record<string, ColumnBuilderState<string, boolean, string>>,
+  readonly string[] | undefined,
+  ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>,
+  ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>,
+  infer F extends ReadonlyArray<{
+    readonly columns: readonly string[];
+    readonly references: { readonly table: string; readonly columns: readonly string[] };
+    readonly name?: string;
+  }>
+>
+  ? F
+  : ReadonlyArray<never>;
+
 export type BuildStorage<
   Tables extends Record<
     string,
