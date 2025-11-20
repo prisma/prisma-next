@@ -143,6 +143,38 @@ function executeOperation(
         right: value,
       });
     },
+    gt(value: ParamPlaceholder) {
+      return Object.freeze({
+        kind: 'binary' as const,
+        op: 'gt' as const,
+        left: operationExpr,
+        right: value,
+      });
+    },
+    lt(value: ParamPlaceholder) {
+      return Object.freeze({
+        kind: 'binary' as const,
+        op: 'lt' as const,
+        left: operationExpr,
+        right: value,
+      });
+    },
+    gte(value: ParamPlaceholder) {
+      return Object.freeze({
+        kind: 'binary' as const,
+        op: 'gte' as const,
+        left: operationExpr,
+        right: value,
+      });
+    },
+    lte(value: ParamPlaceholder) {
+      return Object.freeze({
+        kind: 'binary' as const,
+        op: 'lte' as const,
+        left: operationExpr,
+        right: value,
+      });
+    },
     asc() {
       return Object.freeze({
         kind: 'order' as const,

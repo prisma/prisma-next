@@ -148,7 +148,17 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
       : renderParam(rightExpr as ParamRef, contract);
   // Only wrap in parentheses if it's an operation expression
   const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
-  return `${leftRendered} = ${right}`;
+
+  // Map operators to SQL symbols
+  const operatorMap: Record<BinaryExpr['op'], string> = {
+    eq: '=',
+    gt: '>',
+    lt: '<',
+    gte: '>=',
+    lte: '<=',
+  };
+
+  return `${leftRendered} ${operatorMap[expr.op]} ${right}`;
 }
 
 function renderColumn(ref: ColumnRef): string {

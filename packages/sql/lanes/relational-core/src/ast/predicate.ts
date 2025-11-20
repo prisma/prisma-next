@@ -8,7 +8,7 @@ import type {
 } from './types';
 
 export function createBinaryExpr(
-  op: 'eq',
+  op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte',
   left: ColumnRef | OperationExpr,
   right: ParamRef,
 ): BinaryExpr {

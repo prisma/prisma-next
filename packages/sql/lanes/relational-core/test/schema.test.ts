@@ -255,6 +255,82 @@ describe('schema', () => {
     });
   });
 
+  it('column builder gt creates binary builder', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    const binary = idColumn.gt(param('userId'));
+    expect({
+      defined: binary !== undefined,
+      kind: binary.kind,
+      op: binary.op,
+    }).toMatchObject({
+      defined: true,
+      kind: 'binary',
+      op: 'gt',
+    });
+  });
+
+  it('column builder lt creates binary builder', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    const binary = idColumn.lt(param('userId'));
+    expect({
+      defined: binary !== undefined,
+      kind: binary.kind,
+      op: binary.op,
+    }).toMatchObject({
+      defined: true,
+      kind: 'binary',
+      op: 'lt',
+    });
+  });
+
+  it('column builder gte creates binary builder', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    const binary = idColumn.gte(param('userId'));
+    expect({
+      defined: binary !== undefined,
+      kind: binary.kind,
+      op: binary.op,
+    }).toMatchObject({
+      defined: true,
+      kind: 'binary',
+      op: 'gte',
+    });
+  });
+
+  it('column builder lte creates binary builder', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    const binary = idColumn.lte(param('userId'));
+    expect({
+      defined: binary !== undefined,
+      kind: binary.kind,
+      op: binary.op,
+    }).toMatchObject({
+      defined: true,
+      kind: 'binary',
+      op: 'lte',
+    });
+  });
+
   it('column builder asc creates order builder', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);

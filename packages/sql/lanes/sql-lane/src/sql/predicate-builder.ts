@@ -64,7 +64,7 @@ export function buildWhereExpr(
 
   const rightParam = createParamRef(index, paramName);
   return {
-    expr: createBinaryExpr('eq', leftExpr, rightParam),
+    expr: createBinaryExpr(where.op, leftExpr, rightParam),
     ...(codecId ? { codecId } : {}),
     paramName,
   };
