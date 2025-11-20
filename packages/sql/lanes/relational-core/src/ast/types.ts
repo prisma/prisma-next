@@ -44,7 +44,7 @@ export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is Operat
 
 export interface BinaryExpr {
   readonly kind: 'bin';
-  readonly op: 'eq';
+  readonly op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
   readonly left: ColumnRef | OperationExpr;
   readonly right: ParamRef;
 }

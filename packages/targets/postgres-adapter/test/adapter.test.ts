@@ -71,6 +71,86 @@ describe('createPostgresAdapter', () => {
     });
   });
 
+  it('renders gt operator correctly', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+      where: {
+        kind: 'bin',
+        op: 'gt',
+        left: { kind: 'col', table: 'user', column: 'id' },
+        right: { kind: 'param', index: 1, name: 'minId' },
+      },
+    } as const;
+
+    const lowered = adapter.lower(ast, { contract, params: [10] });
+
+    expect(lowered.body.sql).toContain('"user"."id" > $1');
+  });
+
+  it('renders lt operator correctly', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+      where: {
+        kind: 'bin',
+        op: 'lt',
+        left: { kind: 'col', table: 'user', column: 'id' },
+        right: { kind: 'param', index: 1, name: 'maxId' },
+      },
+    } as const;
+
+    const lowered = adapter.lower(ast, { contract, params: [100] });
+
+    expect(lowered.body.sql).toContain('"user"."id" < $1');
+  });
+
+  it('renders gte operator correctly', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+      where: {
+        kind: 'bin',
+        op: 'gte',
+        left: { kind: 'col', table: 'user', column: 'id' },
+        right: { kind: 'param', index: 1, name: 'minId' },
+      },
+    } as const;
+
+    const lowered = adapter.lower(ast, { contract, params: [10] });
+
+    expect(lowered.body.sql).toContain('"user"."id" >= $1');
+  });
+
+  it('renders lte operator correctly', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+      where: {
+        kind: 'bin',
+        op: 'lte',
+        left: { kind: 'col', table: 'user', column: 'id' },
+        right: { kind: 'param', index: 1, name: 'maxId' },
+      },
+    } as const;
+
+    const lowered = adapter.lower(ast, { contract, params: [100] });
+
+    expect(lowered.body.sql).toContain('"user"."id" <= $1');
+  });
+
   describe('includeMany with LATERAL + json_agg', () => {
     it('renders LATERAL + json_agg correctly', () => {
       const adapter = createPostgresAdapter();

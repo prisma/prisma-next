@@ -76,6 +76,70 @@ export class ColumnBuilderImpl<
     }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   }
 
+  gt(
+    this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
+    value: ParamPlaceholder,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    if (value.kind !== 'param-placeholder') {
+      throw planInvalid('Parameter placeholder required for column comparison');
+    }
+
+    return Object.freeze({
+      kind: 'binary' as const,
+      op: 'gt' as const,
+      left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+      right: value,
+    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  }
+
+  lt(
+    this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
+    value: ParamPlaceholder,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    if (value.kind !== 'param-placeholder') {
+      throw planInvalid('Parameter placeholder required for column comparison');
+    }
+
+    return Object.freeze({
+      kind: 'binary' as const,
+      op: 'lt' as const,
+      left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+      right: value,
+    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  }
+
+  gte(
+    this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
+    value: ParamPlaceholder,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    if (value.kind !== 'param-placeholder') {
+      throw planInvalid('Parameter placeholder required for column comparison');
+    }
+
+    return Object.freeze({
+      kind: 'binary' as const,
+      op: 'gte' as const,
+      left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+      right: value,
+    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  }
+
+  lte(
+    this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
+    value: ParamPlaceholder,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    if (value.kind !== 'param-placeholder') {
+      throw planInvalid('Parameter placeholder required for column comparison');
+    }
+
+    return Object.freeze({
+      kind: 'binary' as const,
+      op: 'lte' as const,
+      left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+      right: value,
+    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  }
+
   asc(
     this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
   ): OrderBuilder<ColumnName, ColumnMeta, JsType> {

@@ -58,7 +58,7 @@ export function buildWhereExpr(
   }
 
   return {
-    expr: createBinaryExpr('eq', leftExpr, createParamRef(index, paramName)),
+    expr: createBinaryExpr(where.op, leftExpr, createParamRef(index, paramName)),
     ...(codecId ? { codecId } : {}),
     paramName,
   };

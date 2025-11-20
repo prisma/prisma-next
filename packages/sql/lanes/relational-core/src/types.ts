@@ -40,6 +40,10 @@ export type ColumnBuilder<
   readonly column: ColumnName;
   readonly columnMeta: ColumnMeta;
   eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   // Helper property for type extraction (not used at runtime)
@@ -61,7 +65,7 @@ export interface BinaryBuilder<
   JsType = unknown,
 > {
   readonly kind: 'binary';
-  readonly op: 'eq';
+  readonly op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
   readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly right: ParamPlaceholder;
 }

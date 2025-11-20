@@ -402,6 +402,110 @@ describe('sql DSL builder', () => {
     }).toThrow('Parameter placeholder required for column comparison');
   });
 
+  it('builds query with gt filter', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userColumns = tables.user.columns;
+
+    const plan = sql({ context })
+      .from(tables.user)
+      .select({
+        id: userColumns.id,
+        email: userColumns.email,
+      })
+      .where(userColumns.id.gt(param('minId')))
+      .build({ params: { minId: 10 } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'select',
+      where: {
+        kind: 'bin',
+        op: 'gt',
+        left: createColumnRef('user', 'id'),
+      },
+    });
+  });
+
+  it('builds query with lt filter', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userColumns = tables.user.columns;
+
+    const plan = sql({ context })
+      .from(tables.user)
+      .select({
+        id: userColumns.id,
+        email: userColumns.email,
+      })
+      .where(userColumns.id.lt(param('maxId')))
+      .build({ params: { maxId: 100 } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'select',
+      where: {
+        kind: 'bin',
+        op: 'lt',
+        left: createColumnRef('user', 'id'),
+      },
+    });
+  });
+
+  it('builds query with gte filter', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userColumns = tables.user.columns;
+
+    const plan = sql({ context })
+      .from(tables.user)
+      .select({
+        id: userColumns.id,
+        email: userColumns.email,
+      })
+      .where(userColumns.id.gte(param('minId')))
+      .build({ params: { minId: 10 } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'select',
+      where: {
+        kind: 'bin',
+        op: 'gte',
+        left: createColumnRef('user', 'id'),
+      },
+    });
+  });
+
+  it('builds query with lte filter', () => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userColumns = tables.user.columns;
+
+    const plan = sql({ context })
+      .from(tables.user)
+      .select({
+        id: userColumns.id,
+        email: userColumns.email,
+      })
+      .where(userColumns.id.lte(param('maxId')))
+      .build({ params: { maxId: 100 } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'select',
+      where: {
+        kind: 'bin',
+        op: 'lte',
+        left: createColumnRef('user', 'id'),
+      },
+    });
+  });
+
   it('handles column builder __jsType getter', () => {
     const contract = loadContract('contract');
     const adapter = createStubAdapter();
