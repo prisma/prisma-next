@@ -1,27 +1,37 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BinaryExpr, ColumnRef, OperationExpr } from '@prisma-next/sql-relational-core/ast';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  LogicalExpr,
+  OperationExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   createBinaryExpr,
   createColumnRef,
+  createLogicalExpr,
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyPredicateBuilder,
+  BinaryBuilder,
+  LogicalBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import { errorMissingParameter } from '../utils/errors';
 
 export interface BuildWhereExprResult {
-  expr: BinaryExpr;
+  expr: BinaryExpr | LogicalExpr;
   codecId?: string;
-  paramName: string;
+  paramName?: string;
 }
 
-export function buildWhereExpr(
+function buildBinaryExpr(
   contract: SqlContract<SqlStorage>,
   where: BinaryBuilder,
   paramsMap: Record<string, unknown>,
   descriptors: ParamDescriptor[],
   values: unknown[],
-): BuildWhereExprResult {
+): { expr: BinaryExpr; codecId?: string; paramName: string } {
   const placeholder = where.right;
   const paramName = placeholder.name;
 
@@ -68,4 +78,37 @@ export function buildWhereExpr(
     ...(codecId ? { codecId } : {}),
     paramName,
   };
+}
+
+export function buildWhereExpr(
+  contract: SqlContract<SqlStorage>,
+  where: AnyPredicateBuilder,
+  paramsMap: Record<string, unknown>,
+  descriptors: ParamDescriptor[],
+  values: unknown[],
+): BuildWhereExprResult {
+  if (where.kind === 'logical') {
+    const logical = where as LogicalBuilder;
+    // Recursively build left side (can be BinaryBuilder or LogicalBuilder)
+    const leftResult = buildWhereExpr(
+      contract,
+      logical.left as AnyPredicateBuilder,
+      paramsMap,
+      descriptors,
+      values,
+    );
+    // Right side can be BinaryBuilder or LogicalBuilder (nested logical expressions)
+    const rightResult = buildWhereExpr(contract, logical.right, paramsMap, descriptors, values);
+
+    return {
+      expr: createLogicalExpr(logical.op, leftResult.expr, rightResult.expr),
+      ...(leftResult.codecId || rightResult.codecId
+        ? { codecId: leftResult.codecId ?? rightResult.codecId }
+        : {}),
+    };
+  }
+
+  // BinaryBuilder case
+  const binary = where as BinaryBuilder;
+  return buildBinaryExpr(contract, binary, paramsMap, descriptors, values);
 }

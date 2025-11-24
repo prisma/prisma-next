@@ -331,6 +331,118 @@ describe('schema', () => {
     });
   });
 
+  it('binary builder and creates logical builder', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
+
+    const binary1 = idColumn.eq(param('id'));
+    const binary2 = emailColumn.eq(param('email'));
+    const logical = binary1.and(binary2);
+
+    expect({
+      defined: logical !== undefined,
+      kind: logical.kind,
+      op: logical.op,
+      leftKind: logical.left.kind,
+      rightKind: logical.right.kind,
+    }).toMatchObject({
+      defined: true,
+      kind: 'logical',
+      op: 'and',
+      leftKind: 'binary',
+      rightKind: 'binary',
+    });
+  });
+
+  it('binary builder or creates logical builder', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
+
+    const binary1 = idColumn.eq(param('id'));
+    const binary2 = emailColumn.eq(param('email'));
+    const logical = binary1.or(binary2);
+
+    expect({
+      defined: logical !== undefined,
+      kind: logical.kind,
+      op: logical.op,
+      leftKind: logical.left.kind,
+      rightKind: logical.right.kind,
+    }).toMatchObject({
+      defined: true,
+      kind: 'logical',
+      op: 'or',
+      leftKind: 'binary',
+      rightKind: 'binary',
+    });
+  });
+
+  it('logical builder and chains correctly', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
+
+    const binary1 = idColumn.eq(param('id'));
+    const binary2 = emailColumn.eq(param('email'));
+    const binary3 = idColumn.gt(param('minId'));
+    const logical1 = binary1.and(binary2);
+    const logical2 = logical1.and(binary3);
+
+    expect({
+      defined: logical2 !== undefined,
+      kind: logical2.kind,
+      op: logical2.op,
+      leftKind: logical2.left.kind,
+      rightKind: logical2.right.kind,
+    }).toMatchObject({
+      defined: true,
+      kind: 'logical',
+      op: 'and',
+      leftKind: 'logical',
+      rightKind: 'binary',
+    });
+  });
+
+  it('logical builder or chains correctly', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+    const idColumn = userTable.columns.id;
+    const emailColumn = userTable.columns.email;
+
+    const binary1 = idColumn.eq(param('id'));
+    const binary2 = emailColumn.eq(param('email'));
+    const binary3 = idColumn.gt(param('minId'));
+    const logical1 = binary1.or(binary2);
+    const logical2 = logical1.or(binary3);
+
+    expect({
+      defined: logical2 !== undefined,
+      kind: logical2.kind,
+      op: logical2.op,
+      leftKind: logical2.left.kind,
+      rightKind: logical2.right.kind,
+    }).toMatchObject({
+      defined: true,
+      kind: 'logical',
+      op: 'or',
+      leftKind: 'logical',
+      rightKind: 'binary',
+    });
+  });
+
   it('column builder asc creates order builder', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);

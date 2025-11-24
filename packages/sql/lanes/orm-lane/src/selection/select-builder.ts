@@ -5,6 +5,7 @@ import type {
   ExistsExpr,
   IncludeAst,
   IncludeRef,
+  LogicalExpr,
   OperationExpr,
   SelectAst,
   TableRef,
@@ -63,7 +64,7 @@ export function buildSelectAst(
   table: TableRef,
   projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>,
   includesAst: ReadonlyArray<IncludeAst> | undefined,
-  whereExpr: BinaryExpr | ExistsExpr | undefined,
+  whereExpr: BinaryExpr | ExistsExpr | LogicalExpr | undefined,
   orderByClause:
     | ReadonlyArray<{
         expr: ColumnRef | OperationExpr;
@@ -83,7 +84,7 @@ export function buildSelectAst(
     from: TableRef;
     project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
     includes?: ReadonlyArray<IncludeAst>;
-    where?: BinaryExpr | ExistsExpr;
+    where?: BinaryExpr | ExistsExpr | LogicalExpr;
     orderBy?: ReadonlyArray<{
       expr: ColumnRef | OperationExpr;
       dir: Direction;

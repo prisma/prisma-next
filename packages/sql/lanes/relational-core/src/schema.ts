@@ -8,6 +8,7 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
 import type { TableRef } from './ast/types';
+import { addLogicalMethodsToBinaryBuilder } from './logical-builder';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type { QueryLaneContext } from './query-lane-context';
 import type {
@@ -68,12 +69,14 @@ export class ColumnBuilderImpl<
       throw planInvalid('Parameter placeholder required for column comparison');
     }
 
-    return Object.freeze({
+    const binary = {
       kind: 'binary' as const,
       op: 'eq' as const,
       left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       right: value,
-    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    } as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+
+    return addLogicalMethodsToBinaryBuilder(binary);
   }
 
   gt(
@@ -84,12 +87,14 @@ export class ColumnBuilderImpl<
       throw planInvalid('Parameter placeholder required for column comparison');
     }
 
-    return Object.freeze({
+    const binary = {
       kind: 'binary' as const,
       op: 'gt' as const,
       left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       right: value,
-    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    } as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+
+    return addLogicalMethodsToBinaryBuilder(binary);
   }
 
   lt(
@@ -100,12 +105,14 @@ export class ColumnBuilderImpl<
       throw planInvalid('Parameter placeholder required for column comparison');
     }
 
-    return Object.freeze({
+    const binary = {
       kind: 'binary' as const,
       op: 'lt' as const,
       left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       right: value,
-    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    } as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+
+    return addLogicalMethodsToBinaryBuilder(binary);
   }
 
   gte(
@@ -116,12 +123,14 @@ export class ColumnBuilderImpl<
       throw planInvalid('Parameter placeholder required for column comparison');
     }
 
-    return Object.freeze({
+    const binary = {
       kind: 'binary' as const,
       op: 'gte' as const,
       left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       right: value,
-    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    } as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+
+    return addLogicalMethodsToBinaryBuilder(binary);
   }
 
   lte(
@@ -132,12 +141,14 @@ export class ColumnBuilderImpl<
       throw planInvalid('Parameter placeholder required for column comparison');
     }
 
-    return Object.freeze({
+    const binary = {
       kind: 'binary' as const,
       op: 'lte' as const,
       left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       right: value,
-    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    } as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+
+    return addLogicalMethodsToBinaryBuilder(binary);
   }
 
   asc(

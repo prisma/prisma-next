@@ -10,9 +10,12 @@ import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyColumnBuilder,
   AnyOrderBuilder,
+  AnyPredicateBuilder,
   BinaryBuilder,
+  LogicalBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
+import { addLogicalMethodsToBinaryBuilder } from '../../../relational-core/src/logical-builder';
 import { buildMeta, createPlan, createPlanWithExists } from '../../src/plan/plan-assembly';
 import type { IncludeState } from '../../src/relations/include-plan';
 import type { ProjectionState } from '../../src/selection/projection';
@@ -79,6 +82,30 @@ describe('plan assembly', () => {
       desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
       __jsType: undefined,
     } as unknown as AnyColumnBuilder;
+  }
+
+  // Helper to create mock binary builder with stub and/or methods
+  function createMockBinaryBuilder(
+    left: AnyColumnBuilder | OperationExpr,
+    op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte',
+    right: { kind: 'param-placeholder'; name: string },
+  ): BinaryBuilder {
+    return {
+      kind: 'binary',
+      op,
+      left,
+      right,
+      and(_expr: AnyPredicateBuilder): LogicalBuilder {
+        throw new Error(
+          'and() should not be called on mock BinaryBuilder - use addLogicalMethodsToBinaryBuilder',
+        );
+      },
+      or(_expr: AnyPredicateBuilder): LogicalBuilder {
+        throw new Error(
+          'or() should not be called on mock BinaryBuilder - use addLogicalMethodsToBinaryBuilder',
+        );
+      },
+    };
   }
 
   describe('buildMeta', () => {
@@ -259,12 +286,15 @@ describe('plan assembly', () => {
         columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
       };
 
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: createColumnRef('user', 'id') as unknown as BinaryBuilder['left'],
-        right: { kind: 'param-placeholder', name: 'userId' },
-        op: 'eq',
-      };
+      const columnBuilder = createMockColumnBuilder('user', 'id', {
+        type: 'pg/int4@1',
+        nullable: false,
+      });
+      const whereBase = createMockBinaryBuilder(columnBuilder, 'eq', {
+        kind: 'param-placeholder',
+        name: 'userId',
+      });
+      const where = addLogicalMethodsToBinaryBuilder(whereBase);
 
       const args = {
         contract,
@@ -311,14 +341,16 @@ describe('plan assembly', () => {
         },
       };
 
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          _operationExpr: operationExpr,
-        } as unknown as BinaryBuilder['left'],
-        right: { kind: 'param-placeholder', name: 'value' },
-        op: 'eq',
-      };
+      const columnBuilderWithOp = createMockColumnBuilder('user', 'id', {
+        type: 'pg/int4@1',
+        nullable: false,
+      });
+      (columnBuilderWithOp as { _operationExpr?: OperationExpr })._operationExpr = operationExpr;
+      const whereBase = createMockBinaryBuilder(columnBuilderWithOp, 'eq', {
+        kind: 'param-placeholder',
+        name: 'value',
+      });
+      const where = addLogicalMethodsToBinaryBuilder(whereBase);
 
       const args = {
         contract,
@@ -338,6 +370,58 @@ describe('plan assembly', () => {
         columnCount: 1,
         columnTable: 'user',
         columnColumn: 'id',
+      });
+    });
+
+    it('builds meta with nested logical expression in where clause', () => {
+      const projection: ProjectionState = {
+        aliases: ['id'],
+        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+      };
+
+      const idColumn = createMockColumnBuilder('user', 'id', {
+        type: 'pg/int4@1',
+        nullable: false,
+      });
+      const emailColumn = createMockColumnBuilder('user', 'email', {
+        type: 'pg/text@1',
+        nullable: false,
+      });
+      const whereBase1 = createMockBinaryBuilder(idColumn, 'eq', {
+        kind: 'param-placeholder',
+        name: 'id1',
+      });
+      const whereBase2 = createMockBinaryBuilder(emailColumn, 'eq', {
+        kind: 'param-placeholder',
+        name: 'email1',
+      });
+      const whereBase3 = createMockBinaryBuilder(emailColumn, 'eq', {
+        kind: 'param-placeholder',
+        name: 'email2',
+      });
+      const where1 = addLogicalMethodsToBinaryBuilder(whereBase1);
+      const where2 = addLogicalMethodsToBinaryBuilder(whereBase2);
+      const where3 = addLogicalMethodsToBinaryBuilder(whereBase3);
+      const where = where1.and(where2.or(where3));
+
+      const args = {
+        contract,
+        table,
+        projection,
+        where,
+        paramDescriptors: [],
+      };
+
+      const meta = buildMeta(args);
+
+      // Should collect columns from all predicates: id, email (from where2), email (from where3)
+      // email appears twice but should be deduplicated by Map key
+      expect({
+        columnCount: meta.refs?.columns?.length,
+        columns: meta.refs?.columns?.map((c) => `${c.table}.${c.column}`).sort(),
+      }).toMatchObject({
+        columnCount: 2, // id and email (deduplicated)
+        columns: ['user.email', 'user.id'],
       });
     });
 
@@ -450,12 +534,11 @@ describe('plan assembly', () => {
               createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
             ],
           },
-          childWhere: {
-            kind: 'binary',
-            left: createColumnRef('post', 'id') as unknown as BinaryBuilder['left'],
-            right: { kind: 'param-placeholder', name: 'postId' },
-            op: 'eq',
-          } as BinaryBuilder,
+          childWhere: createMockBinaryBuilder(
+            createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
+            'eq',
+            { kind: 'param-placeholder', name: 'postId' },
+          ),
         },
       ];
 

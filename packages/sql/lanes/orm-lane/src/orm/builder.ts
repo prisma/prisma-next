@@ -6,10 +6,9 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
-  BinaryBuilder,
+  AnyPredicateBuilder,
   BuildOptions,
   InferNestedProjectionRow,
   NestedProjection,
@@ -57,7 +56,7 @@ export class OrmModelBuilderImpl<
   private readonly contract: TContract;
   private readonly modelName: ModelName;
   private table: TableRef;
-  private wherePredicate: AnyBinaryBuilder | undefined = undefined;
+  private wherePredicate: AnyPredicateBuilder | undefined = undefined;
   private relationFilters: RelationFilter[] = [];
   private includes: OrmIncludeState[] = [];
   private orderByExpr: AnyOrderBuilder | undefined = undefined;
@@ -86,7 +85,7 @@ export class OrmModelBuilderImpl<
 
   get where(): OrmWhereProperty<TContract, CodecTypes, ModelName, Includes, Row> {
     const whereFn = (
-      fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+      fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
     ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row> => {
       const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Includes, Row>(
         { context: this.context },
@@ -308,17 +307,21 @@ export class OrmModelBuilderImpl<
                   | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
               ) =>
                 | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-                | AnyBinaryBuilder,
+                | AnyPredicateBuilder,
             ) => {
               const result = fn(builderWithAccessor);
               // If result is a AnyBinaryBuilder, wrap it in a builder
-              if (result && 'kind' in result && result.kind === 'binary') {
+              if (
+                result &&
+                'kind' in result &&
+                (result.kind === 'binary' || result.kind === 'logical')
+              ) {
                 const wrappedBuilder = new OrmRelationFilterBuilderImpl<
                   TContract,
                   CodecTypes,
                   typeof childModelName
                 >({ context: self.context }, childModelName);
-                wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                wrappedBuilder['wherePredicate'] = result as AnyPredicateBuilder;
                 return self._applyRelationFilter(
                   prop,
                   childModelName,
@@ -343,16 +346,20 @@ export class OrmModelBuilderImpl<
                   | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
               ) =>
                 | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-                | AnyBinaryBuilder,
+                | AnyPredicateBuilder,
             ) => {
               const result = fn(builderWithAccessor);
-              if (result && 'kind' in result && result.kind === 'binary') {
+              if (
+                result &&
+                'kind' in result &&
+                (result.kind === 'binary' || result.kind === 'logical')
+              ) {
                 const wrappedBuilder = new OrmRelationFilterBuilderImpl<
                   TContract,
                   CodecTypes,
                   typeof childModelName
                 >({ context: self.context }, childModelName);
-                wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                wrappedBuilder['wherePredicate'] = result as AnyPredicateBuilder;
                 return self._applyRelationFilter(
                   prop,
                   childModelName,
@@ -377,16 +384,20 @@ export class OrmModelBuilderImpl<
                   | ModelColumnAccessor<TContract, CodecTypes, typeof childModelName>,
               ) =>
                 | OrmRelationFilterBuilder<TContract, CodecTypes, typeof childModelName>
-                | AnyBinaryBuilder,
+                | AnyPredicateBuilder,
             ) => {
               const result = fn(builderWithAccessor);
-              if (result && 'kind' in result && result.kind === 'binary') {
+              if (
+                result &&
+                'kind' in result &&
+                (result.kind === 'binary' || result.kind === 'logical')
+              ) {
                 const wrappedBuilder = new OrmRelationFilterBuilderImpl<
                   TContract,
                   CodecTypes,
                   typeof childModelName
                 >({ context: self.context }, childModelName);
-                wrappedBuilder['wherePredicate'] = result as AnyBinaryBuilder;
+                wrappedBuilder['wherePredicate'] = result as AnyPredicateBuilder;
                 return self._applyRelationFilter(
                   prop,
                   childModelName,
@@ -622,7 +633,7 @@ export class OrmModelBuilderImpl<
       includes: includesForMeta.length > 0 ? includesForMeta : undefined,
       paramDescriptors,
       paramCodecs: Object.keys(paramCodecs).length > 0 ? paramCodecs : undefined,
-      where: this.wherePredicate as BinaryBuilder | undefined,
+      where: this.wherePredicate,
       orderBy: this.orderByExpr,
     } as MetaBuildArgs);
 
@@ -667,7 +678,7 @@ export class OrmModelBuilderImpl<
   }
 
   findUnique(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
     options?: BuildOptions,
   ): SqlQueryPlan<Row> {
     return this.where(where).take(1).findMany(options);
@@ -679,7 +690,7 @@ export class OrmModelBuilderImpl<
   }
 
   update(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
     data: Record<string, unknown>,
     options?: BuildOptions,
   ): SqlQueryPlan<number> {
@@ -695,7 +706,7 @@ export class OrmModelBuilderImpl<
   }
 
   delete(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
     options?: BuildOptions,
   ): SqlQueryPlan<number> {
     const context = createOrmContext(this.context);

@@ -55,6 +55,17 @@ export interface ExistsExpr {
   readonly subquery: SelectAst;
 }
 
+export interface LogicalExpr {
+  readonly kind: 'logical';
+  readonly op: 'and' | 'or';
+  readonly left: BinaryExpr | ExistsExpr | LogicalExpr;
+  readonly right: BinaryExpr | ExistsExpr | LogicalExpr;
+}
+
+export function isLogicalExpr(expr: BinaryExpr | ExistsExpr | LogicalExpr): expr is LogicalExpr {
+  return expr.kind === 'logical';
+}
+
 export type JoinOnExpr = {
   readonly kind: 'eqCol';
   readonly left: ColumnRef;
@@ -79,7 +90,7 @@ export interface IncludeAst {
   readonly child: {
     readonly table: TableRef;
     readonly on: JoinOnExpr;
-    readonly where?: BinaryExpr | ExistsExpr;
+    readonly where?: BinaryExpr | ExistsExpr | LogicalExpr;
     readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
     readonly limit?: number;
     readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef | OperationExpr }>;
@@ -95,7 +106,7 @@ export interface SelectAst {
     alias: string;
     expr: ColumnRef | IncludeRef | OperationExpr | LiteralExpr;
   }>;
-  readonly where?: BinaryExpr | ExistsExpr;
+  readonly where?: BinaryExpr | ExistsExpr | LogicalExpr;
   readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
   readonly limit?: number;
 }
@@ -111,14 +122,14 @@ export interface UpdateAst {
   readonly kind: 'update';
   readonly table: TableRef;
   readonly set: Record<string, ColumnRef | ParamRef>;
-  readonly where: BinaryExpr;
+  readonly where: BinaryExpr | LogicalExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 
 export interface DeleteAst {
   readonly kind: 'delete';
   readonly table: TableRef;
-  readonly where: BinaryExpr;
+  readonly where: BinaryExpr | LogicalExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 

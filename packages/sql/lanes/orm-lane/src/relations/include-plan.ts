@@ -5,6 +5,7 @@ import type {
   ColumnRef,
   ExistsExpr,
   IncludeAst,
+  LogicalExpr,
   OperationExpr,
   ParamRef,
   TableRef,
@@ -13,9 +14,9 @@ import { compact } from '@prisma-next/sql-relational-core/ast';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
+  AnyPredicateBuilder,
   BuildOptions,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
@@ -51,7 +52,7 @@ export interface IncludeState {
     right: StorageColumn;
   };
   readonly childProjection: ProjectionState;
-  readonly childWhere?: AnyBinaryBuilder;
+  readonly childWhere?: AnyPredicateBuilder;
   readonly childOrderBy?: AnyOrderBuilder;
   readonly childLimit?: number;
 }
@@ -135,7 +136,7 @@ export function buildIncludeAsts(
       filteredProjection as ProjectionInput,
     );
 
-    let childWhere: BinaryExpr | undefined;
+    let childWhere: BinaryExpr | LogicalExpr | undefined;
     if (includeState.childWhere) {
       const whereResult = buildWhereExpr(
         includeState.childWhere,
@@ -237,7 +238,7 @@ export function buildExistsSubqueries(
       });
     }
 
-    let childWhere: BinaryExpr | undefined;
+    let childWhere: BinaryExpr | LogicalExpr | undefined;
     if (filter.childWhere) {
       const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
       const paramDescriptors: ParamDescriptor[] = [];
@@ -252,7 +253,7 @@ export function buildExistsSubqueries(
       childWhere = whereResult.expr;
     }
 
-    let subqueryWhere: BinaryExpr | undefined = childWhere;
+    let subqueryWhere: BinaryExpr | LogicalExpr | undefined = childWhere;
     if (joinConditions.length > 0) {
       const firstJoinCondition = joinConditions[0];
       if (firstJoinCondition) {
@@ -295,9 +296,9 @@ export function buildExistsSubqueries(
 }
 
 export function combineWhereClauses(
-  mainWhere: BinaryExpr | ExistsExpr | undefined,
+  mainWhere: BinaryExpr | ExistsExpr | LogicalExpr | undefined,
   existsExprs: ExistsExpr[],
-): BinaryExpr | ExistsExpr | undefined {
+): BinaryExpr | ExistsExpr | LogicalExpr | undefined {
   if (existsExprs.length === 1) {
     return existsExprs[0];
   }

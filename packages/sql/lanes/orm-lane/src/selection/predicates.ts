@@ -1,11 +1,20 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BinaryExpr, ColumnRef, OperationExpr } from '@prisma-next/sql-relational-core/ast';
-import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
-import { createBinaryExpr, createColumnRef, createParamRef } from '../utils/ast';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  LogicalExpr,
+  OperationExpr,
+} from '@prisma-next/sql-relational-core/ast';
+import type {
+  AnyPredicateBuilder,
+  BinaryBuilder,
+  LogicalBuilder,
+} from '@prisma-next/sql-relational-core/types';
+import { createBinaryExpr, createColumnRef, createLogicalExpr, createParamRef } from '../utils/ast';
 import { errorMissingParameter } from '../utils/errors';
 
-export function buildWhereExpr(
+function buildBinaryExpr(
   where: BinaryBuilder,
   contract: SqlContract<SqlStorage>,
   paramsMap: Record<string, unknown>,
@@ -60,4 +69,41 @@ export function buildWhereExpr(
     ...(codecId ? { codecId } : {}),
     paramName,
   };
+}
+
+export function buildWhereExpr(
+  where: AnyPredicateBuilder,
+  contract: SqlContract<SqlStorage>,
+  paramsMap: Record<string, unknown>,
+  descriptors: ParamDescriptor[],
+  values: unknown[],
+): {
+  expr: BinaryExpr | LogicalExpr;
+  codecId?: string;
+  paramName?: string;
+} {
+  if (where.kind === 'logical') {
+    const logical = where as LogicalBuilder;
+    // Recursively build left side (can be BinaryBuilder or LogicalBuilder)
+    const leftResult = buildWhereExpr(
+      logical.left as AnyPredicateBuilder,
+      contract,
+      paramsMap,
+      descriptors,
+      values,
+    );
+    // Right side can be BinaryBuilder or LogicalBuilder (nested logical expressions)
+    const rightResult = buildWhereExpr(logical.right, contract, paramsMap, descriptors, values);
+
+    return {
+      expr: createLogicalExpr(logical.op, leftResult.expr, rightResult.expr),
+      ...(leftResult.codecId || rightResult.codecId
+        ? { codecId: leftResult.codecId ?? rightResult.codecId }
+        : {}),
+    };
+  }
+
+  // BinaryBuilder case
+  const binary = where as BinaryBuilder;
+  return buildBinaryExpr(binary, contract, paramsMap, descriptors, values);
 }

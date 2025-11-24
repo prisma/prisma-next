@@ -1,12 +1,14 @@
 import type {
+  BinaryExpr,
   ColumnRef,
+  LogicalExpr,
   OperationExpr,
   ParamRef,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
+import { createBinaryExpr, createExistsExpr, createLogicalExpr } from '../../src/ast/predicate';
 import { createSelectAst } from '../../src/ast/select';
 
 describe('ast/predicate', () => {
@@ -119,6 +121,86 @@ describe('ast/predicate', () => {
 
       expect(existsExpr.subquery).toBe(subquery);
       expect(existsExpr.subquery.from.name).toBe('post');
+    });
+  });
+
+  describe('createLogicalExpr', () => {
+    it('creates logical expr with and operator', () => {
+      const left: BinaryExpr = createBinaryExpr(
+        'eq',
+        createColumnRef('user', 'id'),
+        createParamRef(0, 'id'),
+      );
+      const right: BinaryExpr = createBinaryExpr(
+        'eq',
+        createColumnRef('user', 'email'),
+        createParamRef(1, 'email'),
+      );
+
+      const logicalExpr = createLogicalExpr('and', left, right);
+
+      expect(logicalExpr).toEqual({
+        kind: 'logical',
+        op: 'and',
+        left,
+        right,
+      });
+      expect(logicalExpr.kind).toBe('logical');
+      expect(logicalExpr.op).toBe('and');
+      expect(logicalExpr.left).toBe(left);
+      expect(logicalExpr.right).toBe(right);
+    });
+
+    it('creates logical expr with or operator', () => {
+      const left: BinaryExpr = createBinaryExpr(
+        'eq',
+        createColumnRef('user', 'id'),
+        createParamRef(0, 'id'),
+      );
+      const right: BinaryExpr = createBinaryExpr(
+        'eq',
+        createColumnRef('user', 'email'),
+        createParamRef(1, 'email'),
+      );
+
+      const logicalExpr = createLogicalExpr('or', left, right);
+
+      expect(logicalExpr).toEqual({
+        kind: 'logical',
+        op: 'or',
+        left,
+        right,
+      });
+      expect(logicalExpr.kind).toBe('logical');
+      expect(logicalExpr.op).toBe('or');
+      expect(logicalExpr.left).toBe(left);
+      expect(logicalExpr.right).toBe(right);
+    });
+
+    it('creates nested logical expr', () => {
+      const left: BinaryExpr = createBinaryExpr(
+        'eq',
+        createColumnRef('user', 'id'),
+        createParamRef(0, 'id'),
+      );
+      const right: BinaryExpr = createBinaryExpr(
+        'eq',
+        createColumnRef('user', 'email'),
+        createParamRef(1, 'email'),
+      );
+      const nested: LogicalExpr = createLogicalExpr('and', left, right);
+      const outer: BinaryExpr = createBinaryExpr(
+        'gt',
+        createColumnRef('user', 'id'),
+        createParamRef(2, 'minId'),
+      );
+
+      const logicalExpr = createLogicalExpr('or', nested, outer);
+
+      expect(logicalExpr.kind).toBe('logical');
+      expect(logicalExpr.op).toBe('or');
+      expect(logicalExpr.left).toBe(nested);
+      expect(logicalExpr.right).toBe(outer);
     });
   });
 });

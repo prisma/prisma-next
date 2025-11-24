@@ -23,6 +23,7 @@ const contract = Object.freeze(
           columns: {
             id: { type: 'pg/int4@1', nullable: false },
             email: { type: 'pg/text@1', nullable: false },
+            name: { type: 'pg/text@1', nullable: false },
             createdAt: { type: 'pg/timestamptz@1', nullable: false },
           },
           uniques: [],
@@ -743,6 +744,276 @@ describe('createPostgresAdapter', () => {
         expect(lowered.body.sql).toContain('NOT EXISTS');
         expect(lowered.body.sql).toContain('SELECT "post"."id" AS "id" FROM "post"');
         expect(lowered.body.sql).toContain('WHERE "post"."userId" = $1');
+      });
+
+      it('lowers SELECT with AND logical expression in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'logical',
+            op: 'and',
+            left: {
+              kind: 'bin',
+              op: 'eq',
+              left: { kind: 'col', table: 'user', column: 'id' },
+              right: { kind: 'param', index: 1, name: 'id' },
+            },
+            right: {
+              kind: 'bin',
+              op: 'eq',
+              left: { kind: 'col', table: 'user', column: 'email' },
+              right: { kind: 'param', index: 2, name: 'email' },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [1, 'test@example.com'] });
+
+        expect(lowered.body.sql).toBe(
+          'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."id" = $1 AND "user"."email" = $2',
+        );
+        expect(lowered.body.params).toEqual([1, 'test@example.com']);
+      });
+
+      it('lowers SELECT with OR logical expression in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'logical',
+            op: 'or',
+            left: {
+              kind: 'bin',
+              op: 'eq',
+              left: { kind: 'col', table: 'user', column: 'id' },
+              right: { kind: 'param', index: 1, name: 'id1' },
+            },
+            right: {
+              kind: 'bin',
+              op: 'eq',
+              left: { kind: 'col', table: 'user', column: 'id' },
+              right: { kind: 'param', index: 2, name: 'id2' },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [1, 2] });
+
+        expect(lowered.body.sql).toBe(
+          'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."id" = $1 OR "user"."id" = $2',
+        );
+        expect(lowered.body.params).toEqual([1, 2]);
+      });
+
+      it('lowers SELECT with nested AND/OR expression: (a AND b) OR c', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'logical',
+            op: 'or',
+            left: {
+              kind: 'logical',
+              op: 'and',
+              left: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'param', index: 1, name: 'id' },
+              },
+              right: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'email' },
+                right: { kind: 'param', index: 2, name: 'email' },
+              },
+            },
+            right: {
+              kind: 'bin',
+              op: 'eq',
+              left: { kind: 'col', table: 'user', column: 'id' },
+              right: { kind: 'param', index: 3, name: 'id2' },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: [1, 'test@example.com', 2],
+        });
+
+        expect(lowered.body.sql).toBe(
+          'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."id" = $1 AND "user"."email" = $2 OR "user"."id" = $3',
+        );
+        expect(lowered.body.params).toEqual([1, 'test@example.com', 2]);
+      });
+
+      it('lowers SELECT with nested OR/AND expression: a AND (b OR c)', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'logical',
+            op: 'and',
+            left: {
+              kind: 'bin',
+              op: 'eq',
+              left: { kind: 'col', table: 'user', column: 'id' },
+              right: { kind: 'param', index: 1, name: 'id' },
+            },
+            right: {
+              kind: 'logical',
+              op: 'or',
+              left: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'email' },
+                right: { kind: 'param', index: 2, name: 'email' },
+              },
+              right: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'name' },
+                right: { kind: 'param', index: 3, name: 'name' },
+              },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: [1, 'test@example.com', 'Test User'],
+        });
+
+        expect(lowered.body.sql).toBe(
+          'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."id" = $1 AND ("user"."email" = $2 OR "user"."name" = $3)',
+        );
+        expect(lowered.body.params).toEqual([1, 'test@example.com', 'Test User']);
+      });
+
+      it('lowers SELECT with complex nested expression: (a OR b) AND (c OR d)', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'logical',
+            op: 'and',
+            left: {
+              kind: 'logical',
+              op: 'or',
+              left: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'param', index: 1, name: 'id1' },
+              },
+              right: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'param', index: 2, name: 'id2' },
+              },
+            },
+            right: {
+              kind: 'logical',
+              op: 'or',
+              left: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'email' },
+                right: { kind: 'param', index: 3, name: 'email' },
+              },
+              right: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'name' },
+                right: { kind: 'param', index: 4, name: 'name' },
+              },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: [1, 2, 'test@example.com', 'Test User'],
+        });
+
+        expect(lowered.body.sql).toBe(
+          'SELECT "user"."id" AS "id" FROM "user" WHERE ("user"."id" = $1 OR "user"."id" = $2) AND ("user"."email" = $3 OR "user"."name" = $4)',
+        );
+        expect(lowered.body.params).toEqual([1, 2, 'test@example.com', 'Test User']);
+      });
+
+      it('lowers SELECT with deeply nested expression: a AND (b OR (c AND d))', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'logical',
+            op: 'and',
+            left: {
+              kind: 'bin',
+              op: 'eq',
+              left: { kind: 'col', table: 'user', column: 'id' },
+              right: { kind: 'param', index: 1, name: 'id' },
+            },
+            right: {
+              kind: 'logical',
+              op: 'or',
+              left: {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'email' },
+                right: { kind: 'param', index: 2, name: 'email' },
+              },
+              right: {
+                kind: 'logical',
+                op: 'and',
+                left: {
+                  kind: 'bin',
+                  op: 'eq',
+                  left: { kind: 'col', table: 'user', column: 'name' },
+                  right: { kind: 'param', index: 3, name: 'name' },
+                },
+                right: {
+                  kind: 'bin',
+                  op: 'gt',
+                  left: { kind: 'col', table: 'user', column: 'id' },
+                  right: { kind: 'param', index: 4, name: 'minId' },
+                },
+              },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: [1, 'test@example.com', 'Test User', 10],
+        });
+
+        expect(lowered.body.sql).toBe(
+          'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."id" = $1 AND ("user"."email" = $2 OR "user"."name" = $3 AND "user"."id" > $4)',
+        );
+        expect(lowered.body.params).toEqual([1, 'test@example.com', 'Test User', 10]);
       });
     });
 

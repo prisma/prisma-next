@@ -13,18 +13,23 @@ import { compact } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyColumnBuilder,
   AnyOrderBuilder,
-  BinaryBuilder,
+  AnyPredicateBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import type { IncludeState } from '../relations/include-plan';
 import type { ProjectionState } from '../selection/projection';
-import { collectColumnRefs, getColumnInfo, isOperationExpr } from '../utils/guards';
+import {
+  collectColumnInfoFromPredicate,
+  collectColumnRefs,
+  getColumnInfo,
+  isOperationExpr,
+} from '../utils/guards';
 
 export interface MetaBuildArgs {
   readonly contract: SqlContract<SqlStorage>;
   readonly table: TableRef;
   readonly projection: ProjectionState;
   readonly includes?: ReadonlyArray<IncludeState>;
-  readonly where?: BinaryBuilder;
+  readonly where?: AnyPredicateBuilder;
   readonly orderBy?: AnyOrderBuilder;
   readonly paramDescriptors: ParamDescriptor[];
   readonly paramCodecs?: Record<string, string>;
@@ -80,11 +85,14 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         }
       }
       if (include.childWhere) {
-        const colInfo = getColumnInfo(include.childWhere.left);
-        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-          table: colInfo.table,
-          column: colInfo.column,
-        });
+        // Traverse the predicate tree to collect all column references
+        const columnInfos = collectColumnInfoFromPredicate(include.childWhere);
+        for (const colInfo of columnInfos) {
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
+          });
+        }
       }
       if (include.childOrderBy) {
         const orderBy = include.childOrderBy as unknown as {
@@ -102,24 +110,13 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.where) {
-    const whereLeft = args.where.left;
-    const operationExpr = (whereLeft as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
-      const allRefs = collectColumnRefs(operationExpr);
-      for (const ref of allRefs) {
-        refsColumns.set(`${ref.table}.${ref.column}`, {
-          table: ref.table,
-          column: ref.column,
-        });
-      }
-    } else {
-      const colBuilder = whereLeft as unknown as { table?: string; column?: string };
-      if (colBuilder.table && colBuilder.column) {
-        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-          table: colBuilder.table,
-          column: colBuilder.column,
-        });
-      }
+    // Traverse the predicate tree to collect all column references
+    const columnInfos = collectColumnInfoFromPredicate(args.where);
+    for (const colInfo of columnInfos) {
+      refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+        table: colInfo.table,
+        column: colInfo.column,
+      });
     }
   }
 

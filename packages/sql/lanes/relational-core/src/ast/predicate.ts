@@ -2,6 +2,7 @@ import type {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
+  LogicalExpr,
   OperationExpr,
   ParamRef,
   SelectAst,
@@ -25,5 +26,18 @@ export function createExistsExpr(not: boolean, subquery: SelectAst): ExistsExpr 
     kind: 'exists',
     not,
     subquery,
+  };
+}
+
+export function createLogicalExpr(
+  op: 'and' | 'or',
+  left: BinaryExpr | ExistsExpr | LogicalExpr,
+  right: BinaryExpr | ExistsExpr | LogicalExpr,
+): LogicalExpr {
+  return {
+    kind: 'logical',
+    op,
+    left,
+    right,
   };
 }

@@ -78,11 +78,16 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
-        const colInfo = getColumnInfo(include.childWhere.left);
-        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-          table: colInfo.table,
-          column: colInfo.column,
-        });
+        // Handle BinaryBuilder - extract column info from left side
+        if (include.childWhere.kind === 'binary') {
+          const colInfo = getColumnInfo(include.childWhere.left);
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
+          });
+        }
+        // For LogicalBuilder, column refs are extracted from BinaryExpr AST nodes
+        // during buildIncludeAst, so we don't need to handle it here
       }
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {

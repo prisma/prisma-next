@@ -148,6 +148,55 @@ describe('orm base builder', () => {
     expect((plan as { ast: { limit: number } }).ast?.limit).toBe(1);
   });
 
+  it('builds plan with nested logical expression on right-hand side', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const builderWithWhere = (
+      builder as {
+        where: (fn: (m: unknown) => unknown) => unknown;
+      }
+    ).where((m: unknown) => {
+      const model = m as {
+        createdAt: { eq: (p: unknown) => unknown };
+        email: { eq: (p: unknown) => unknown };
+      };
+      const createdAtEq = model.createdAt.eq(param('a')) as unknown as {
+        and: (expr: unknown) => unknown;
+      };
+      const emailEq1 = model.email.eq(param('p1')) as unknown as {
+        or: (expr: unknown) => unknown;
+      };
+      const emailEq2 = model.email.eq(param('p2'));
+      return createdAtEq.and(emailEq1.or(emailEq2));
+    });
+    const plan = (
+      builderWithWhere as {
+        findMany: (options?: { params?: Record<string, unknown> }) => unknown;
+      }
+    ).findMany({
+      params: { a: new Date('2024-01-01'), p1: 'test1@example.com', p2: 'test2@example.com' },
+    });
+
+    expect(plan).toBeDefined();
+    expect((plan as { meta: { lane: string } }).meta.lane).toBe('orm');
+    const ast = plan as { ast: { kind: string; where?: unknown } };
+    expect(ast.ast?.kind).toBe('select');
+    if (ast.ast?.where) {
+      const where = ast.ast.where as { kind: string; op: string; left?: unknown; right?: unknown };
+      expect(where.kind).toBe('logical');
+      expect(where.op).toBe('and');
+      if (where.right && typeof where.right === 'object' && 'kind' in where.right) {
+        const right = where.right as { kind: string; op: string };
+        expect(right.kind).toBe('logical');
+        expect(right.op).toBe('or');
+      }
+    }
+    expect((plan as { params: unknown[] }).params).toEqual([
+      new Date('2024-01-01'),
+      'test1@example.com',
+      'test2@example.com',
+    ]);
+  });
+
   it('uses fieldName as fallback when fieldToColumn and field.column are missing', () => {
     const contractWithMissingMapping = {
       ...contract,

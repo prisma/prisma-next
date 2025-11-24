@@ -2,9 +2,9 @@ import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
+  AnyPredicateBuilder,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
 import type { ProjectionState } from '../utils/state';
@@ -31,10 +31,10 @@ export interface MetaBuildArgs {
       readonly right: unknown;
     };
     readonly childProjection: ProjectionState;
-    readonly childWhere?: AnyBinaryBuilder;
+    readonly childWhere?: AnyPredicateBuilder;
     readonly childOrderBy?: AnyOrderBuilder;
   }>;
-  readonly where?: AnyBinaryBuilder;
+  readonly where?: AnyPredicateBuilder;
   readonly orderBy?: AnyOrderBuilder;
   readonly paramDescriptors: ParamDescriptor[];
   readonly paramCodecs?: Record<string, string>;

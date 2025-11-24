@@ -9,6 +9,7 @@ import type {
   InsertAst,
   JoinAst,
   LiteralExpr,
+  LogicalExpr,
   LowererContext,
   OperationExpr,
   ParamRef,
@@ -127,13 +128,41 @@ function renderProjection(ast: SelectAst, contract?: PostgresContract): string {
     .join(', ');
 }
 
-function renderWhere(expr: BinaryExpr | ExistsExpr, contract?: PostgresContract): string {
+function renderWhere(
+  expr: BinaryExpr | ExistsExpr | LogicalExpr,
+  contract?: PostgresContract,
+): string {
   if (expr.kind === 'exists') {
     const notKeyword = expr.not ? 'NOT ' : '';
     const subquery = renderSelect(expr.subquery, contract);
     return `${notKeyword}EXISTS (${subquery})`;
   }
+  if (expr.kind === 'logical') {
+    return renderLogical(expr, contract);
+  }
   return renderBinary(expr, contract);
+}
+
+function renderLogical(expr: LogicalExpr, contract?: PostgresContract): string {
+  const left = renderWhere(expr.left, contract);
+  const right = renderWhere(expr.right, contract);
+
+  // Determine if parentheses are needed for left side
+  // - OR expressions need parentheses when inside AND expressions (for correctness, OR has lower precedence)
+  // - AND expressions do NOT need parentheses when inside OR expressions (AND has higher precedence, evaluated first)
+  const leftNeedsParens =
+    expr.left.kind === 'logical' && expr.left.op === 'or' && expr.op === 'and';
+  const leftRendered = leftNeedsParens ? `(${left})` : left;
+
+  // Determine if parentheses are needed for right side
+  // - OR expressions need parentheses when inside AND expressions (for correctness, OR has lower precedence)
+  // - AND expressions do NOT need parentheses when inside OR expressions (AND has higher precedence, evaluated first)
+  const rightNeedsParens =
+    expr.right.kind === 'logical' && expr.right.op === 'or' && expr.op === 'and';
+  const rightRendered = rightNeedsParens ? `(${right})` : right;
+
+  const operator = expr.op.toUpperCase();
+  return `${leftRendered} ${operator} ${rightRendered}`;
 }
 
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
@@ -398,7 +427,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     return `${column} = ${value}`;
   });
 
-  const whereClause = ` WHERE ${renderBinary(ast.where, contract)}`;
+  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';
@@ -408,7 +437,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
 
 function renderDelete(ast: DeleteAst, contract?: PostgresContract): string {
   const table = quoteIdentifier(ast.table.name);
-  const whereClause = ` WHERE ${renderBinary(ast.where, contract)}`;
+  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';

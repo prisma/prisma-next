@@ -1,8 +1,8 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
+  AnyPredicateBuilder,
   JoinOnPredicate,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
@@ -89,7 +89,7 @@ export function buildProjectionState(
     readonly table: TableRef;
     readonly on: JoinOnPredicate;
     readonly childProjection: ProjectionState;
-    readonly childWhere?: AnyBinaryBuilder;
+    readonly childWhere?: AnyPredicateBuilder;
     readonly childOrderBy?: AnyOrderBuilder;
     readonly childLimit?: number;
   }>,

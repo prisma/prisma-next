@@ -2,7 +2,7 @@ import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { AnyBinaryBuilder, AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type { AnyColumnBuilder, AnyPredicateBuilder } from '@prisma-next/sql-relational-core/types';
 import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
 
 export class OrmRelationFilterBuilderImpl<
@@ -14,7 +14,7 @@ export class OrmRelationFilterBuilderImpl<
   private readonly context: QueryLaneContext<TContract>;
   private readonly contract: TContract;
   private readonly childModelName: ChildModelName;
-  private wherePredicate: AnyBinaryBuilder | undefined = undefined;
+  private wherePredicate: AnyPredicateBuilder | undefined = undefined;
   private modelAccessor: ModelColumnAccessor<TContract, CodecTypes, ChildModelName> | undefined =
     undefined;
 
@@ -26,7 +26,7 @@ export class OrmRelationFilterBuilderImpl<
   }
 
   where(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyBinaryBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyPredicateBuilder,
   ): OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName> {
     const builder = new OrmRelationFilterBuilderImpl<TContract, CodecTypes, ChildModelName>(
       { context: this.context },
@@ -39,7 +39,7 @@ export class OrmRelationFilterBuilderImpl<
     return builder;
   }
 
-  getWherePredicate(): AnyBinaryBuilder | undefined {
+  getWherePredicate(): AnyPredicateBuilder | undefined {
     return this.wherePredicate;
   }
 

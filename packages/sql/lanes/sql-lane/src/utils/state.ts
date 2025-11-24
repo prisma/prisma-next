@@ -1,8 +1,8 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
+  AnyPredicateBuilder,
   JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
 
@@ -22,7 +22,7 @@ export interface IncludeState {
   readonly table: TableRef;
   readonly on: JoinOnPredicate;
   readonly childProjection: ProjectionState;
-  readonly childWhere?: AnyBinaryBuilder;
+  readonly childWhere?: AnyPredicateBuilder;
   readonly childOrderBy?: AnyOrderBuilder;
   readonly childLimit?: number;
 }
@@ -32,7 +32,7 @@ export interface BuilderState {
   joins?: ReadonlyArray<JoinState>;
   includes?: ReadonlyArray<IncludeState>;
   projection?: ProjectionState;
-  where?: AnyBinaryBuilder;
+  where?: AnyPredicateBuilder;
   orderBy?: AnyOrderBuilder;
   limit?: number;
 }

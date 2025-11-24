@@ -4,7 +4,14 @@ import { planInvalid } from '@prisma-next/plan';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from './ast/types';
-import type { AnyColumnBuilder, ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
+import { addLogicalMethodsToBinaryBuilder } from './logical-builder';
+import type {
+  AnyColumnBuilder,
+  BinaryBuilder,
+  ColumnBuilder,
+  OperationTypes,
+  ParamPlaceholder,
+} from './types';
 
 function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
   return (
@@ -136,44 +143,49 @@ function executeOperation(
       return returnColumnMeta;
     },
     eq(value: ParamPlaceholder) {
-      return Object.freeze({
+      const binary = {
         kind: 'binary' as const,
         op: 'eq' as const,
         left: operationExpr,
         right: value,
-      });
+      } as BinaryBuilder<string, StorageColumn, unknown>;
+      return addLogicalMethodsToBinaryBuilder(binary);
     },
     gt(value: ParamPlaceholder) {
-      return Object.freeze({
+      const binary = {
         kind: 'binary' as const,
         op: 'gt' as const,
         left: operationExpr,
         right: value,
-      });
+      } as BinaryBuilder<string, StorageColumn, unknown>;
+      return addLogicalMethodsToBinaryBuilder(binary);
     },
     lt(value: ParamPlaceholder) {
-      return Object.freeze({
+      const binary = {
         kind: 'binary' as const,
         op: 'lt' as const,
         left: operationExpr,
         right: value,
-      });
+      } as BinaryBuilder<string, StorageColumn, unknown>;
+      return addLogicalMethodsToBinaryBuilder(binary);
     },
     gte(value: ParamPlaceholder) {
-      return Object.freeze({
+      const binary = {
         kind: 'binary' as const,
         op: 'gte' as const,
         left: operationExpr,
         right: value,
-      });
+      } as BinaryBuilder<string, StorageColumn, unknown>;
+      return addLogicalMethodsToBinaryBuilder(binary);
     },
     lte(value: ParamPlaceholder) {
-      return Object.freeze({
+      const binary = {
         kind: 'binary' as const,
         op: 'lte' as const,
         left: operationExpr,
         right: value,
-      });
+      } as BinaryBuilder<string, StorageColumn, unknown>;
+      return addLogicalMethodsToBinaryBuilder(binary);
     },
     asc() {
       return Object.freeze({

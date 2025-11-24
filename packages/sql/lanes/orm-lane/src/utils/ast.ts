@@ -4,6 +4,7 @@ export {
   createDeleteAst,
   createInsertAst,
   createJoinOnExpr,
+  createLogicalExpr,
   createOrderByItem,
   createParamRef,
   createSelectAst,

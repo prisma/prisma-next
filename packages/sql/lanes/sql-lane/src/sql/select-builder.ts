@@ -20,9 +20,8 @@ import {
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
-  AnyBinaryBuilder,
   AnyOrderBuilder,
-  BinaryBuilder,
+  AnyPredicateBuilder,
   BuildOptions,
   InferNestedProjectionRow,
   JoinOnBuilder,
@@ -238,7 +237,7 @@ export class SelectBuilderImpl<
     );
   }
 
-  where(expr: AnyBinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+  where(expr: AnyPredicateBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         context: this.context,
@@ -315,6 +314,9 @@ export class SelectBuilderImpl<
 
     if (whereResult?.codecId && whereResult.paramName) {
       paramCodecs[whereResult.paramName] = whereResult.codecId;
+    } else if (whereResult?.codecId) {
+      // For LogicalExpr, we might not have a single paramName, so we can't set paramCodecs
+      // This is fine - paramCodecs are optional metadata
     }
 
     const orderByClause = this.state.orderBy
@@ -417,7 +419,7 @@ export class SelectBuilderImpl<
       projection: ProjectionState;
       joins?: ReadonlyArray<JoinState>;
       includes?: ReadonlyArray<IncludeState>;
-      where?: BinaryBuilder;
+      where?: AnyPredicateBuilder;
       orderBy?: AnyOrderBuilder;
       paramDescriptors: ParamDescriptor[];
       paramCodecs?: Record<string, string>;

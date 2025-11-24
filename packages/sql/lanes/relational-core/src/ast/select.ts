@@ -6,6 +6,7 @@ import type {
   IncludeAst,
   IncludeRef,
   JoinAst,
+  LogicalExpr,
   OperationExpr,
   SelectAst,
   TableRef,
@@ -20,7 +21,7 @@ export interface CreateSelectAstOptions {
     alias: string;
     expr: ColumnRef | IncludeRef | OperationExpr;
   }>;
-  readonly where?: BinaryExpr | ExistsExpr;
+  readonly where?: BinaryExpr | ExistsExpr | LogicalExpr;
   readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
   readonly limit?: number;
 }

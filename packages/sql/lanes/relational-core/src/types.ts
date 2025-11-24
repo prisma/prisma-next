@@ -66,6 +66,17 @@ export interface BinaryBuilder<
   readonly op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
   readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly right: ParamPlaceholder;
+  and(expr: AnyPredicateBuilder): LogicalBuilder;
+  or(expr: AnyPredicateBuilder): LogicalBuilder;
+}
+
+export interface LogicalBuilder {
+  readonly kind: 'logical';
+  readonly op: 'and' | 'or';
+  readonly left: BinaryBuilder | LogicalBuilder;
+  readonly right: AnyPredicateBuilder;
+  and(expr: AnyPredicateBuilder): LogicalBuilder;
+  or(expr: AnyPredicateBuilder): LogicalBuilder;
 }
 
 // Helper aliases for usage sites where the specific column parameters are irrelevant
@@ -78,6 +89,7 @@ export interface BinaryBuilder<
 export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, any>;
 export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
 export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
+export type AnyPredicateBuilder = AnyBinaryBuilder | LogicalBuilder;
 
 export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
   return (

@@ -516,4 +516,191 @@ describe('sql DSL builder', () => {
     const jsType = (idColumn as { __jsType: unknown }).__jsType;
     expect(jsType).toBeUndefined();
   });
+
+  describe('where clauses with AND/OR', () => {
+    it('builds plan with AND logical expression', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ context })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .where(userColumns.id.eq(param('id')).and(userColumns.email.eq(param('email'))))
+        .build({ params: { id: 1, email: 'test@example.com' } });
+
+      expect(plan.ast.kind).toBe('select');
+      if (plan.ast.kind === 'select') {
+        expect(plan.ast.where).toMatchObject({
+          kind: 'logical',
+          op: 'and',
+          left: {
+            kind: 'bin',
+            op: 'eq',
+            left: { table: 'user', column: 'id' },
+          },
+          right: {
+            kind: 'bin',
+            op: 'eq',
+            left: { table: 'user', column: 'email' },
+          },
+        });
+      }
+      expect(plan.params).toEqual([1, 'test@example.com']);
+    });
+
+    it('builds plan with OR logical expression', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ context })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .where(userColumns.id.eq(param('id1')).or(userColumns.id.eq(param('id2'))))
+        .build({ params: { id1: 1, id2: 2 } });
+
+      expect(plan.ast.kind).toBe('select');
+      if (plan.ast.kind === 'select') {
+        expect(plan.ast.where).toMatchObject({
+          kind: 'logical',
+          op: 'or',
+          left: {
+            kind: 'bin',
+            op: 'eq',
+            left: { table: 'user', column: 'id' },
+          },
+          right: {
+            kind: 'bin',
+            op: 'eq',
+            left: { table: 'user', column: 'id' },
+          },
+        });
+      }
+      expect(plan.params).toEqual([1, 2]);
+    });
+
+    it('builds plan with nested AND/OR logical expression', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ context })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .where(
+          userColumns.id
+            .eq(param('id1'))
+            .and(userColumns.email.eq(param('email')))
+            .or(userColumns.id.eq(param('id2'))),
+        )
+        .build({ params: { id1: 1, email: 'test@example.com', id2: 2 } });
+
+      expect(plan.ast.kind).toBe('select');
+      if (plan.ast.kind === 'select') {
+        expect(plan.ast.where).toMatchObject({
+          kind: 'logical',
+          op: 'or',
+          left: {
+            kind: 'logical',
+            op: 'and',
+          },
+          right: {
+            kind: 'bin',
+            op: 'eq',
+          },
+        });
+      }
+      expect(plan.params).toEqual([1, 'test@example.com', 2]);
+    });
+
+    it('builds plan with complex nested logical expression', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ context })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .where(
+          userColumns.id
+            .eq(param('id1'))
+            .and(userColumns.email.eq(param('email')))
+            .or(userColumns.id.eq(param('id2')))
+            .and(userColumns.email.eq(param('email2'))),
+        )
+        .build({
+          params: { id1: 1, email: 'test@example.com', id2: 2, email2: 'test2@example.com' },
+        });
+
+      expect(plan.ast.kind).toBe('select');
+      if (plan.ast.kind === 'select') {
+        expect(plan.ast.where).toMatchObject({
+          kind: 'logical',
+          op: 'and',
+          left: {
+            kind: 'logical',
+            op: 'or',
+          },
+          right: {
+            kind: 'bin',
+            op: 'eq',
+          },
+        });
+      }
+      expect(plan.params).toEqual([1, 'test@example.com', 2, 'test2@example.com']);
+    });
+
+    it('builds plan with nested logical expression on right-hand side', () => {
+      const userColumns = tables.user.columns;
+
+      const plan = sql<Contract, CodecTypes>({ context })
+        .from(tables.user)
+        .select({
+          id: userColumns.id,
+          email: userColumns.email,
+        })
+        .where(
+          userColumns.createdAt
+            .eq(param('a'))
+            .and(userColumns.email.eq(param('p1')).or(userColumns.email.eq(param('p2')))),
+        )
+        .build({
+          params: { a: new Date('2024-01-01'), p1: 'test1@example.com', p2: 'test2@example.com' },
+        });
+
+      expect(plan.ast.kind).toBe('select');
+      if (plan.ast.kind === 'select') {
+        expect(plan.ast.where).toMatchObject({
+          kind: 'logical',
+          op: 'and',
+          left: {
+            kind: 'bin',
+            op: 'eq',
+          },
+          right: {
+            kind: 'logical',
+            op: 'or',
+            left: {
+              kind: 'bin',
+              op: 'eq',
+            },
+            right: {
+              kind: 'bin',
+              op: 'eq',
+            },
+          },
+        });
+      }
+      expect(plan.params).toEqual([
+        new Date('2024-01-01'),
+        'test1@example.com',
+        'test2@example.com',
+      ]);
+    });
+  });
 });
