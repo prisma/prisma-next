@@ -368,4 +368,89 @@ describe('schema', () => {
       dir: 'desc',
     });
   });
+
+  it('column builder gt throws error for invalid param', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    expect(() => {
+      idColumn.gt({ kind: 'invalid' } as unknown as ReturnType<typeof param>);
+    }).toThrow('Parameter placeholder required for column comparison');
+  });
+
+  it('column builder lt throws error for invalid param', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    expect(() => {
+      idColumn.lt({ kind: 'invalid' } as unknown as ReturnType<typeof param>);
+    }).toThrow('Parameter placeholder required for column comparison');
+  });
+
+  it('column builder gte throws error for invalid param', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    expect(() => {
+      idColumn.gte({ kind: 'invalid' } as unknown as ReturnType<typeof param>);
+    }).toThrow('Parameter placeholder required for column comparison');
+  });
+
+  it('column builder lte throws error for invalid param', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    expect(() => {
+      idColumn.lte({ kind: 'invalid' } as unknown as ReturnType<typeof param>);
+    }).toThrow('Parameter placeholder required for column comparison');
+  });
+
+  it('throws error for unknown table', () => {
+    const contractWithUnknownTable = validateContract<TestContract>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { type: 'pg/int4@1', nullable: false },
+              email: { type: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithUnknownTable, adapter);
+    // Manually manipulate storage to set table to undefined to test error path
+    // This tests the branch where storage.tables[tableName] is undefined
+    const storage = context.contract.storage as unknown as MutableStorage;
+    // Set the table to undefined (bypassing TypeScript type checking for test purposes)
+    storage.tables.user = undefined as unknown as typeof storage.tables.user;
+
+    expect(() => {
+      schema(context).tables;
+    }).toThrow('Unknown table user');
+  });
 });
