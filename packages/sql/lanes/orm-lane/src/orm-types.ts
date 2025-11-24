@@ -10,7 +10,9 @@ import type {
   ComputeColumnJsType,
   InferNestedProjectionRow,
   NestedProjection,
+  ParamPlaceholder,
 } from '@prisma-next/sql-relational-core/types';
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { OrmIncludeChildBuilder } from './orm-include-child';
 
 export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {
@@ -208,6 +210,9 @@ export interface OrmModelBuilder<
 > {
   where: OrmWhereProperty<TContract, CodecTypes, ModelName, Includes, Row>;
   include: OrmIncludeAccessor<TContract, CodecTypes, ModelName, Includes, Row>;
+  cursor(
+    fn: (model: CursorModelAccessor<TContract, CodecTypes, ModelName>) => AnyCursorPredicate | undefined,
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>;
   orderBy(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyOrderBuilder,
   ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>;
@@ -240,6 +245,59 @@ export interface OrmModelBuilder<
   ): SqlQueryPlan<number>;
 }
 
+// Cursor builder - only exposes gt/lt/gte/lte operations (no eq, no chaining)
+export interface CursorBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
+> {
+  readonly kind: 'cursor-builder';
+  readonly column: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
+  gt(value: ParamPlaceholder): CursorPredicate<ColumnName, ColumnMeta, JsType>;
+  lt(value: ParamPlaceholder): CursorPredicate<ColumnName, ColumnMeta, JsType>;
+  gte(value: ParamPlaceholder): CursorPredicate<ColumnName, ColumnMeta, JsType>;
+  lte(value: ParamPlaceholder): CursorPredicate<ColumnName, ColumnMeta, JsType>;
+  // NO eq, and, or methods
+}
+
+// Cursor predicate - cannot be chained with and/or
+export interface CursorPredicate<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
+> {
+  readonly kind: 'cursor-predicate';
+  readonly op: 'gt' | 'lt' | 'gte' | 'lte';
+  readonly column: ColumnBuilder<ColumnName, ColumnMeta, JsType>;
+  readonly param: ParamPlaceholder;
+  // NO and/or methods - cannot be chained
+}
+
+export type AnyCursorPredicate = CursorPredicate<string, StorageColumn, unknown>;
+
+// Cursor model accessor - exposes columns as CursorBuilder
+export type CursorModelAccessor<
+  TContract extends SqlContract<SqlStorage>,
+  CodecTypes extends Record<string, { output: unknown }>,
+  ModelName extends string,
+> = TContract['models'][ModelName] extends { fields: infer Fields }
+  ? Fields extends Record<string, unknown>
+    ? {
+        readonly [K in keyof Fields & string]: CursorBuilder<
+          K,
+          ModelColumnMeta<TContract, ModelName, FieldColumnName<TContract, ModelName, K>>,
+          ComputeColumnJsType<
+            TContract,
+            ModelToTableName<TContract, ModelName>,
+            FieldColumnName<TContract, ModelName, K>,
+            ModelColumnMeta<TContract, ModelName, FieldColumnName<TContract, ModelName, K>>,
+            CodecTypes
+          >
+        >;
+      }
+    : never
+  : never;
+
 export type ModelColumnAccessor<
   TContract extends SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { output: unknown }>,
@@ -257,7 +315,19 @@ export type ModelColumnAccessor<
             ModelColumnMeta<TContract, ModelName, FieldColumnName<TContract, ModelName, K>>,
             CodecTypes
           >
-        >;
+        > & {
+          cursor: CursorBuilder<
+            K,
+            ModelColumnMeta<TContract, ModelName, FieldColumnName<TContract, ModelName, K>>,
+            ComputeColumnJsType<
+              TContract,
+              ModelToTableName<TContract, ModelName>,
+              FieldColumnName<TContract, ModelName, K>,
+              ModelColumnMeta<TContract, ModelName, FieldColumnName<TContract, ModelName, K>>,
+              CodecTypes
+            >
+          >;
+        };
       }
     : never
   : never;

@@ -11,6 +11,7 @@ This package provides the ORM query builder that compiles model-based queries to
 - **ORM query builder**: Model-based query builder (`orm()`)
 - **Include compilation**: ORM includes compile to SQL lane primitives like `includeMany`
 - **Relation filters**: Filter queries by related model properties (`some`, `none`, `every`)
+- **Cursor pagination**: Cursor-based pagination with automatic ORDER BY generation
 - **Model accessors**: Type-safe access to models and their columns/relations
 
 ## Dependencies
@@ -49,6 +50,7 @@ src/
 ├── selection/        # Query selection building
 │   ├── predicates.ts # WHERE clause building
 │   ├── ordering.ts   # ORDER BY clause building
+│   ├── cursor.ts     # Cursor pagination utilities
 │   ├── pagination.ts # LIMIT/OFFSET handling
 │   ├── projection.ts # SELECT projection flattening
 │   ├── join.ts       # JOIN ON expression building
@@ -77,6 +79,94 @@ src/
 - **Centralized errors**: All error messages come from `utils/errors.ts`
 - **Type-safe**: Proper generic types throughout, avoiding `any`
 - **Immutable state**: Builder state is immutable, methods return new instances
+
+## Cursor Pagination
+
+Cursor-based pagination provides efficient pagination for large datasets by using a cursor value (typically a primary key or timestamp) to retrieve the next set of results.
+
+### Usage
+
+```typescript
+import { orm } from '@prisma-next/sql-orm-lane/orm';
+import { param } from '@prisma-next/sql-relational-core/param';
+
+const o = orm<Contract>({ context });
+
+// Forward pagination (gt/gte) - returns items after cursor, ordered ASC
+const plan = o.user()
+  .cursor((u) => lastId !== undefined ? u.id.gt(param('lastId')) : undefined)
+  .take(10)
+  .findMany({ params: { lastId: 42 } });
+
+// Backward pagination (lt/lte) - returns items before cursor, ordered DESC
+const plan = o.user()
+  .cursor((u) => lastId !== undefined ? u.id.lt(param('lastId')) : undefined)
+  .take(10)
+  .findMany({ params: { lastId: 42 } });
+```
+
+### Key Features
+
+- **Tight API**: `CursorBuilder` only exposes `gt`, `lt`, `gte`, `lte` operations (no `eq`, no chaining with `and/or`)
+- **Automatic ORDER BY**: Cursor automatically generates ORDER BY clauses:
+  - `gt` or `gte` → `column ASC`
+  - `lt` or `lte` → `column DESC`
+- **WHERE combination**: Cursor predicate is combined with existing WHERE clauses using `AND`
+- **ORDER BY override**: Cursor ORDER BY takes precedence over explicit `orderBy()` calls
+- **Optional cursor**: Returning `undefined` from the cursor function skips cursor pagination
+
+### CursorBuilder API
+
+The `CursorBuilder` type provides a restricted API for cursor operations:
+
+```typescript
+interface CursorBuilder {
+  gt(value: ParamPlaceholder): CursorPredicate;   // Greater than
+  lt(value: ParamPlaceholder): CursorPredicate;   // Less than
+  gte(value: ParamPlaceholder): CursorPredicate;  // Greater than or equal
+  lte(value: ParamPlaceholder): CursorPredicate;  // Less than or equal
+  // NO eq, and, or methods - cannot be chained
+}
+```
+
+### Accessing Cursor Builder
+
+The `cursor()` method provides a `CursorModelAccessor` where columns are `CursorBuilder` instances directly:
+
+```typescript
+const plan = o.user()
+  .cursor((u) => {
+    // u.id is a CursorBuilder (not ColumnBuilder)
+    // Direct access to gt/lt/gte/lte methods
+    return u.id.gt(param('lastId'));
+  })
+  .findMany({ params: { lastId: 42 } });
+```
+
+### Combining with Other Query Methods
+
+Cursor can be combined with other query methods:
+
+```typescript
+// Cursor with WHERE clause
+const plan = o.user()
+  .where((u) => u.email.eq(param('email')))
+  .cursor((u) => u.id.gt(param('lastId')))
+  .take(10)
+  .findMany({ params: { email: 'test@example.com', lastId: 42 } });
+
+// Cursor overrides explicit orderBy
+const plan = o.user()
+  .orderBy((u) => u.createdAt.desc())  // This will be overridden
+  .cursor((u) => u.id.gt(param('lastId')))  // ORDER BY id ASC
+  .findMany({ params: { lastId: 42 } });
+```
+
+### Limitations
+
+- **Single-field cursors only**: Multi-field cursors (composite cursors) are not yet supported
+- **No chaining**: Cursor predicates cannot be chained with `and/or` operations
+- **No equality**: Cursor does not support `eq` operations (use `where()` instead)
 
 ## Related Packages
 

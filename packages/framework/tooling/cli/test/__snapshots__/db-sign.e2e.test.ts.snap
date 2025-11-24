@@ -53,3 +53,29 @@ exports[`db sign command (e2e) > outputs JSON envelope with real database 1`] = 
   },
 }
 `;
+
+exports[`db sign command (e2e) > outputs JSON envelope with real database 2`] = `
+{
+  "contract": {
+    "coreHash": "sha256:52d7ac244766caf1dc02be39b650efb688c18bf0a30c4e6994800d1868d31a6e",
+    "profileHash": "sha256:b2229734c651fdcaab54149b22bac70e00fa526125d84f3b41cbc67d3d8ee236",
+  },
+  "marker": {
+    "created": true,
+    "updated": false,
+  },
+  "meta": {
+    "configPath": "prisma-next.config.ts",
+    "contractPath": "<path>/contract.json",
+  },
+  "ok": true,
+  "summary": "Database signed (marker created)",
+  "target": {
+    "actual": "postgres",
+    "expected": "postgres",
+  },
+  "timings": {
+    "total": Any<Number>,
+  },
+}
+`;

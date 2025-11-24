@@ -21,6 +21,8 @@ import type { OrmIncludeChildBuilder } from '../orm-include-child';
 import { OrmIncludeChildBuilderImpl } from '../orm-include-child';
 import { OrmRelationFilterBuilderImpl } from '../orm-relation-filter';
 import type {
+  AnyCursorPredicate,
+  CursorModelAccessor,
   IncludeAccumulator,
   ModelColumnAccessor,
   OrmBuilderOptions,
@@ -35,11 +37,16 @@ import {
   buildIncludeAsts,
   combineWhereClauses,
 } from '../relations/include-plan';
+import {
+  buildCursorOrderBy,
+  createCursorBuilder,
+  cursorPredicateToBinaryBuilder,
+} from '../selection/cursor';
 import { buildOrderByClause } from '../selection/ordering';
 import { buildWhereExpr } from '../selection/predicates';
 import { buildProjectionState, type ProjectionInput } from '../selection/projection';
 import { buildProjectionItems, buildSelectAst } from '../selection/select-builder';
-import { createTableRef } from '../utils/ast';
+import { createLogicalExpr, createTableRef } from '../utils/ast';
 import { errorModelNotFound, errorTableNotFound, errorUnknownTable } from '../utils/errors';
 import { createOrmContext } from './context';
 import type { OrmIncludeState, RelationFilter } from './state';
@@ -59,6 +66,7 @@ export class OrmModelBuilderImpl<
   private wherePredicate: AnyPredicateBuilder | undefined = undefined;
   private relationFilters: RelationFilter[] = [];
   private includes: OrmIncludeState[] = [];
+  private cursorPredicate: AnyCursorPredicate | undefined = undefined;
   private orderByExpr: AnyOrderBuilder | undefined = undefined;
   private limitValue: number | undefined = undefined;
   private offsetValue: number | undefined = undefined;
@@ -95,6 +103,7 @@ export class OrmModelBuilderImpl<
       builder.wherePredicate = fn(this._getModelAccessor());
       builder.relationFilters = this.relationFilters;
       builder.includes = this.includes;
+      builder.cursorPredicate = this.cursorPredicate;
       builder.orderByExpr = this.orderByExpr;
       builder.limitValue = this.limitValue;
       builder.offsetValue = this.offsetValue;
@@ -242,6 +251,7 @@ export class OrmModelBuilderImpl<
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
     builder.includes = [...this.includes, includeState];
+    builder.cursorPredicate = this.cursorPredicate;
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = this.limitValue;
     builder.offsetValue = this.offsetValue;
@@ -463,6 +473,26 @@ export class OrmModelBuilderImpl<
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = [...this.relationFilters, relationFilter];
     builder.includes = this.includes;
+    builder.cursorPredicate = this.cursorPredicate;
+    builder.orderByExpr = this.orderByExpr;
+    builder.limitValue = this.limitValue;
+    builder.offsetValue = this.offsetValue;
+    builder.projection = this.projection;
+    return builder;
+  }
+
+  cursor(
+    fn: (model: CursorModelAccessor<TContract, CodecTypes, ModelName>) => AnyCursorPredicate | undefined,
+  ): OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row> {
+    const builder = new OrmModelBuilderImpl<TContract, CodecTypes, ModelName, Includes, Row>(
+      { context: this.context },
+      this.modelName,
+    );
+    builder['table'] = this.table;
+    builder.wherePredicate = this.wherePredicate;
+    builder.relationFilters = this.relationFilters;
+    builder.includes = this.includes;
+    builder.cursorPredicate = fn(this._getCursorModelAccessor());
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = this.limitValue;
     builder.offsetValue = this.offsetValue;
@@ -481,6 +511,7 @@ export class OrmModelBuilderImpl<
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
     builder.includes = this.includes;
+    builder.cursorPredicate = this.cursorPredicate;
     builder.orderByExpr = fn(this._getModelAccessor());
     builder.limitValue = this.limitValue;
     builder.offsetValue = this.offsetValue;
@@ -497,6 +528,7 @@ export class OrmModelBuilderImpl<
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
     builder.includes = this.includes;
+    builder.cursorPredicate = this.cursorPredicate;
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = n;
     builder.offsetValue = this.offsetValue;
@@ -515,6 +547,7 @@ export class OrmModelBuilderImpl<
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
     builder.includes = this.includes;
+    builder.cursorPredicate = this.cursorPredicate;
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = this.limitValue;
     builder.offsetValue = n;
@@ -542,6 +575,7 @@ export class OrmModelBuilderImpl<
     builder.wherePredicate = this.wherePredicate;
     builder.relationFilters = this.relationFilters;
     builder.includes = this.includes;
+    builder.cursorPredicate = this.cursorPredicate;
     builder.orderByExpr = this.orderByExpr;
     builder.limitValue = this.limitValue;
     builder.offsetValue = this.offsetValue;
@@ -604,13 +638,40 @@ export class OrmModelBuilderImpl<
     const whereResult = this.wherePredicate
       ? buildWhereExpr(this.wherePredicate, this.contract, paramsMap, paramDescriptors, paramValues)
       : undefined;
-    const whereExpr = whereResult?.expr;
+    let whereExpr = whereResult?.expr;
     if (whereResult?.codecId && whereResult.paramName) {
       paramCodecs[whereResult.paramName] = whereResult.codecId;
     }
 
-    // Build orderBy clause
-    const orderByClause = buildOrderByClause(this.orderByExpr);
+    // Build cursor predicate if cursorPredicate is defined
+    let cursorOrderBy: AnyOrderBuilder | undefined = undefined;
+    if (this.cursorPredicate) {
+      const cursorBinary = cursorPredicateToBinaryBuilder(this.cursorPredicate);
+      const cursorWhereResult = buildWhereExpr(
+        cursorBinary,
+        this.contract,
+        paramsMap,
+        paramDescriptors,
+        paramValues,
+      );
+      if (cursorWhereResult) {
+        // Combine cursor WHERE with existing WHERE using AND
+        if (whereExpr) {
+          whereExpr = createLogicalExpr('and', whereExpr, cursorWhereResult.expr);
+        } else {
+          whereExpr = cursorWhereResult.expr;
+        }
+        if (cursorWhereResult.codecId && cursorWhereResult.paramName) {
+          paramCodecs[cursorWhereResult.paramName] = cursorWhereResult.codecId;
+        }
+      }
+
+      // Auto-generate ORDER BY from cursor (overrides explicit orderBy)
+      cursorOrderBy = buildCursorOrderBy(this.cursorPredicate);
+    }
+
+    // Build orderBy clause (cursor ORDER BY takes precedence over explicit orderBy)
+    const orderByClause = buildOrderByClause(cursorOrderBy ?? this.orderByExpr);
 
     // Build main projection items
     const projectEntries = buildProjectionItems(projectionState, includesForMeta);
@@ -719,7 +780,7 @@ export class OrmModelBuilderImpl<
     );
   }
 
-  private _getModelAccessor(): ModelColumnAccessor<TContract, CodecTypes, ModelName> {
+  private _getCursorModelAccessor(): CursorModelAccessor<TContract, CodecTypes, ModelName> {
     const tableName = this.contract.mappings.modelToTable?.[this.modelName];
     if (!tableName) {
       errorModelNotFound(this.modelName);
@@ -730,7 +791,7 @@ export class OrmModelBuilderImpl<
       errorTableNotFound(tableName);
     }
 
-    const accessor: Record<string, AnyColumnBuilder> = {};
+    const accessor: Record<string, unknown> = {};
     const model = this.contract.models[this.modelName];
     if (!model || typeof model !== 'object' || !('fields' in model)) {
       throw planInvalid(`Model ${this.modelName} does not have fields`);
@@ -746,7 +807,44 @@ export class OrmModelBuilderImpl<
         fieldName;
       const column = table.columns[columnName];
       if (column) {
-        accessor[fieldName] = column as AnyColumnBuilder;
+        accessor[fieldName] = createCursorBuilder(column as AnyColumnBuilder);
+      }
+    }
+
+    return accessor as CursorModelAccessor<TContract, CodecTypes, ModelName>;
+  }
+
+  private _getModelAccessor(): ModelColumnAccessor<TContract, CodecTypes, ModelName> {
+    const tableName = this.contract.mappings.modelToTable?.[this.modelName];
+    if (!tableName) {
+      errorModelNotFound(this.modelName);
+    }
+    const schemaHandle = schema(this.context);
+    const table = schemaHandle.tables[tableName];
+    if (!table) {
+      errorTableNotFound(tableName);
+    }
+
+    const accessor: Record<string, AnyColumnBuilder & { cursor: unknown }> = {};
+    const model = this.contract.models[this.modelName];
+    if (!model || typeof model !== 'object' || !('fields' in model)) {
+      throw planInvalid(`Model ${this.modelName} does not have fields`);
+    }
+    const modelFields = model.fields as Record<string, { column?: string }>;
+
+    for (const fieldName in modelFields) {
+      const field = modelFields[fieldName];
+      if (!field) continue;
+      const columnName =
+        this.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ??
+        field.column ??
+        fieldName;
+      const column = table.columns[columnName];
+      if (column) {
+        const columnBuilder = column as AnyColumnBuilder;
+        accessor[fieldName] = Object.assign(columnBuilder, {
+          cursor: createCursorBuilder(columnBuilder),
+        });
       }
     }
 
