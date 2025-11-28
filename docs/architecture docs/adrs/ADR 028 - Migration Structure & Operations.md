@@ -52,7 +52,7 @@ Together, they form composable primitives: ADR 028 provides the mechanisms, ADR 
 - **Edge**: Directed transition fromCoreHash -> toCoreHash with:
   - edgeId deterministic id derived from content-addressed hashing (see Edge attestation)
   - fromContract, toContract complete contract JSON for state reconstruction
-  - hints planner hints and strategies used during planning
+  - hints planner hints and strategies used during planning (derived from authoring-layer annotations or planner configuration, not from the canonical contract IR)
   - ops list in JSON IR or typed program reference
   - pre and post check sets
   - labels optional metadata like branch or tag
