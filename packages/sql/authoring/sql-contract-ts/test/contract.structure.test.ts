@@ -83,7 +83,7 @@ describe('validateContract structure validation', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
-      /Column.*validation failed|type.*must be.*string/,
+      /nativeType.*must be.*string|Column.*validation failed/,
     );
   });
 

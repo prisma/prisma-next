@@ -800,7 +800,7 @@ describe('family instance schemaVerify', () => {
                 ...contract.storage.tables.user.columns,
                 email: {
                   ...contract.storage.tables.user.columns.email,
-                  type: 'pg/unknown-type@1' as const, // Type not in registry
+                  codecId: 'pg/unknown-type@1' as const, // Type not in registry
                 },
               },
             },

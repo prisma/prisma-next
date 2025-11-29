@@ -69,9 +69,13 @@ describe('contract.d.ts imports resolution', () => {
           tables: {
             user: {
               columns: {
-                id: { type: 'pg/int4@1', nullable: false },
-                email: { type: 'pg/text@1', nullable: false },
-                createdAt: { type: 'pg/timestamptz@1', nullable: false },
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                createdAt: {
+                  codecId: 'pg/timestamptz@1',
+                  nativeType: 'timestamptz',
+                  nullable: false,
+                },
               },
               primaryKey: { columns: ['id'] },
               uniques: [],
@@ -80,9 +84,9 @@ describe('contract.d.ts imports resolution', () => {
             },
             post: {
               columns: {
-                id: { type: 'pg/int4@1', nullable: false },
-                title: { type: 'pg/text@1', nullable: false },
-                userId: { type: 'pg/int4@1', nullable: false },
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
               },
               primaryKey: { columns: ['id'] },
               uniques: [],
@@ -255,8 +259,8 @@ type UserIdColumn = UserColumns['id'];
           tables: {
             user: {
               columns: {
-                id: { type: 'pg/int4@1', nullable: false },
-                email: { type: 'pg/text@1', nullable: false },
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
               primaryKey: { columns: ['id'] },
               uniques: [],
@@ -316,7 +320,7 @@ const _relations: Relations = contract.relations;
 type UserTable = Tables['user'];
 type UserColumns = UserTable['columns'];
 type UserIdColumn = UserColumns['id'];
-type UserIdType = UserIdColumn['type'];
+type UserIdCodecId = UserIdColumn['codecId'];
 
 // Verify CodecTypes is available
 // biome-ignore lint/suspicious/noExplicitAny: test code with type assertions

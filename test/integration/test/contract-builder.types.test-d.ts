@@ -1,5 +1,9 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { dataTypes } from '@prisma-next/adapter-postgres/codec-types';
+import {
+  int4Column,
+  textColumn,
+  timestamptzColumn,
+} from '@prisma-next/adapter-postgres/column-types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -16,9 +20,9 @@ test('builder contract types match fixture contract types', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', { type: 'pg/int4@1', nullable: false })
-        .column('email', { type: 'pg/text@1', nullable: false })
-        .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
+        .column('id', { type: int4Column, nullable: false })
+        .column('email', { type: textColumn, nullable: false })
+        .column('createdAt', { type: timestamptzColumn, nullable: false })
         .primaryKey(['id']),
     )
     .model('User', 'user', (m) =>
@@ -42,9 +46,9 @@ test('ResultType inference works identically to fixture contract', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', { type: 'pg/int4@1', nullable: false })
-        .column('email', { type: 'pg/text@1', nullable: false })
-        .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
+        .column('id', { type: int4Column, nullable: false })
+        .column('email', { type: textColumn, nullable: false })
+        .column('createdAt', { type: timestamptzColumn, nullable: false })
         .primaryKey(['id']),
     )
     .model('User', 'user', (m) =>
@@ -109,9 +113,9 @@ test('codec type inference via type option', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', { type: dataTypes.int4, nullable: false })
-        .column('email', { type: dataTypes.text, nullable: false })
-        .column('createdAt', { type: dataTypes.timestamptz, nullable: false })
+        .column('id', { type: int4Column, nullable: false })
+        .column('email', { type: textColumn, nullable: false })
+        .column('createdAt', { type: timestamptzColumn, nullable: false })
         .primaryKey(['id']),
     )
     .model('User', 'user', (m) =>
@@ -155,8 +159,8 @@ test('contract structure type matches SqlContract', () => {
     .target('postgres')
     .table('user', (t) =>
       t
-        .column('id', { type: 'pg/int4@1', nullable: false })
-        .column('email', { type: 'pg/text@1', nullable: false }),
+        .column('id', { type: int4Column, nullable: false })
+        .column('email', { type: textColumn, nullable: false }),
     )
     .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
     .build();

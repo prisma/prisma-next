@@ -16,18 +16,28 @@ const fixtureSubdir = 'db-introspect';
 describe('db introspect command', () => {
   let consoleOutput: string[] = [];
   let cleanupMocks: () => void;
+  let cleanupDirs: Array<() => void> = [];
 
   beforeEach(() => {
     // Set up console and process.exit mocks
     const mocks = setupCommandMocks();
     consoleOutput = mocks.consoleOutput;
     cleanupMocks = mocks.cleanup;
+    cleanupDirs = [];
   });
 
   afterEach(() => {
     cleanupMocks();
     // Restore all mocks to ensure clean state
     vi.restoreAllMocks();
+    // Clean up all test directories, even if test failed or timed out
+    for (const cleanupDir of cleanupDirs) {
+      try {
+        cleanupDir();
+      } catch (_error) {
+        // Ignore cleanup errors
+      }
+    }
   });
 
   it('outputs tree when toSchemaView is available', async () => {
@@ -38,6 +48,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       // Mock the config loader to return a config with mocked family instance
@@ -115,6 +126,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const mockSchemaIR = { tables: { user: { columns: {} } } };
@@ -169,6 +181,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const mockSchemaIR = { tables: { user: { columns: {} } } };
@@ -230,6 +243,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       // Mock loadConfig to return config without db.url (bypassing validation)
@@ -265,6 +279,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       // Mock loadConfig to return config without driver (bypassing validation)
@@ -295,6 +310,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const mockClose = vi.fn().mockResolvedValue(undefined);
@@ -341,6 +357,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const mockSchemaIR = { tables: { user: { columns: {} } } };
@@ -395,6 +412,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const mockFamilyInstance = {
@@ -444,6 +462,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const mockSchemaIR = { tables: { user: { columns: {} } } };
@@ -496,6 +515,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const mockSchemaIR = { tables: { user: { columns: {} } } };
