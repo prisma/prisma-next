@@ -77,13 +77,11 @@ import type { RuntimeAdapterInstance } from '@prisma-next/core-execution-plane/t
 const adapter: RuntimeAdapterInstance<'sql', 'postgres'> = adapterDescriptor.create();
 ```
 
-## Package Location
+## Package Classification
 
-This package is part of the **framework domain**, **core layer**, **runtime plane**:
-- **Domain**: framework (target-agnostic)
+- **Domain**: framework
 - **Layer**: core
 - **Plane**: runtime
-- **Path**: `packages/framework/core-execution-plane`
 
 ## Related Documentation
 

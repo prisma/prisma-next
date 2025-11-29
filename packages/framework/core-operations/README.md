@@ -88,13 +88,11 @@ const hasCapability = hasAllCapabilities(
 );
 ```
 
-## Package Location
+## Package Classification
 
-This package is part of the **framework domain**, **core layer**, **shared plane**:
-- **Domain**: framework (target-agnostic)
+- **Domain**: framework
 - **Layer**: core
 - **Plane**: shared
-- **Path**: `packages/framework/core-operations`
 
 ## Related Documentation
 

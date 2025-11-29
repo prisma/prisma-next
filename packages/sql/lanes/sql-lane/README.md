@@ -2,6 +2,12 @@
 
 Relational DSL and raw SQL helpers for Prisma Next.
 
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: lanes
+- **Plane**: runtime
+
 ## Overview
 
 This package provides the relational query DSL and raw SQL helpers for building SQL queries. It is part of the SQL lanes ring and depends on `@prisma-next/sql-relational-core` for schema and column builders.

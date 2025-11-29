@@ -71,13 +71,11 @@ This package follows the standard `exports/` directory pattern:
 
 This enables subpath imports like `@prisma-next/plan/errors` and `@prisma-next/plan/types` if needed in the future.
 
-## Package Location
+## Package Classification
 
-This package is part of the **framework domain**, **core layer**, **shared plane**:
-- **Domain**: framework (target-agnostic)
+- **Domain**: framework
 - **Layer**: core
 - **Plane**: shared
-- **Path**: `packages/framework/core-plan`
 
 ## Related Subsystems
 

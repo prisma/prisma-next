@@ -2,6 +2,12 @@
 
 Compatibility layer for migrating from Prisma ORM to Prisma Next.
 
+## Package Classification
+
+- **Domain**: extensions
+- **Layer**: compat
+- **Plane**: runtime
+
 ## Overview
 
 The compatibility package provides a compatibility layer that allows existing Prisma ORM code to work with Prisma Next. It provides a subset of Prisma Client API surface that maps to Prisma Next's query builder and runtime.

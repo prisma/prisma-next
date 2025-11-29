@@ -4,6 +4,12 @@
 
 This package contains the target-agnostic contract authoring builder core for Prisma Next.
 
+## Package Classification
+
+- **Domain**: framework
+- **Layer**: authoring
+- **Plane**: migration
+
 ## Overview
 
 This package provides generic builder primitives that can be composed with target-family specific types (e.g., SQL) to create contract authoring surfaces. It is part of the authoring ring and depends only on `@prisma-next/contract` and core packages.

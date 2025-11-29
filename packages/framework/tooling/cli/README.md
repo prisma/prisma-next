@@ -825,13 +825,11 @@ pnpm test:integration       # Run integration tests only
 pnpm test:e2e               # Run e2e tests only
 ```
 
-## Package Location
+## Package Classification
 
-This package is part of the **framework domain**, **tooling layer**, **migration plane**:
-- **Domain**: framework (target-agnostic)
+- **Domain**: framework
 - **Layer**: tooling
 - **Plane**: migration
-- **Path**: `packages/framework/tooling/cli`
 
 ## See Also
 

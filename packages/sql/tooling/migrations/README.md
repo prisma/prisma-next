@@ -2,6 +2,12 @@
 
 SQL migration planner and in-memory migration IR for Prisma Next.
 
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: tooling
+- **Plane**: migration
+
 ## Overview
 
 This package provides the SQL-family-owned migration planning logic and in-memory migration IR for Prisma Next. It's part of the SQL tooling layer (migration plane) and implements the core diffing algorithm that compares contracts and live database schemas to produce migration plans.

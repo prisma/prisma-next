@@ -4,6 +4,12 @@
 
 This package will contain the PSL parser and IR for Prisma Next.
 
+## Package Classification
+
+- **Domain**: framework
+- **Layer**: authoring
+- **Plane**: migration
+
 ## Overview
 
 This package is part of the authoring ring and will provide PSL (Prisma Schema Language) parsing and IR generation capabilities.

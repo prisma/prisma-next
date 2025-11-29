@@ -106,13 +106,11 @@ flowchart TD
 
 - **`arktype`**: Runtime type validation for manifests
 
-## Package Location
+## Package Classification
 
-This package is part of the **framework domain**, **tooling layer**, **migration plane**:
-- **Domain**: framework (target-agnostic)
+- **Domain**: framework
 - **Layer**: tooling
 - **Plane**: migration
-- **Path**: `packages/framework/tooling/emitter`
 
 ## Related Subsystems
 

@@ -2,6 +2,12 @@
 
 PostgreSQL pgvector extension pack for Prisma Next.
 
+## Package Classification
+
+- **Domain**: extensions
+- **Layer**: adapters
+- **Plane**: multi-plane (shared, migration, runtime)
+
 ## Overview
 
 This extension pack adds support for the `vector` data type and vector similarity operations (e.g., cosine distance) for PostgreSQL databases with the pgvector extension installed.

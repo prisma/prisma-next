@@ -2,6 +2,12 @@
 
 ORM builder, include compilation, and relation filters for Prisma Next.
 
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: lanes
+- **Plane**: runtime
+
 ## Overview
 
 This package provides the ORM query builder that compiles model-based queries to SQL lane primitives. It is part of the SQL lanes ring and depends on `@prisma-next/sql-relational-core` for schema access.

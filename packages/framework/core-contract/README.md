@@ -2,6 +2,12 @@
 
 Data contract type definitions and JSON schema for Prisma Next.
 
+## Package Classification
+
+- **Domain**: framework
+- **Layer**: core
+- **Plane**: shared
+
 ## Overview
 
 This package provides TypeScript type definitions and JSON Schemas for Prisma Next data contracts. The data contract is the canonical description of an application's data model and storage layout, independent of any specific query language or database target.

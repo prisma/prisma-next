@@ -2,6 +2,12 @@
 
 SQL family descriptor for Prisma Next.
 
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: tooling
+- **Plane**: multi-plane (shared, migration, runtime)
+
 ## Purpose
 
 Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:

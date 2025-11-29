@@ -102,13 +102,11 @@ throw errorConfigFileNotFound('prisma-next.config.ts', {
 });
 ```
 
-## Package Location
+## Package Classification
 
-This package is part of the **framework domain**, **core layer**, **migration plane**:
-- **Domain**: framework (target-agnostic)
+- **Domain**: framework
 - **Layer**: core
-- **Plane**: migration (control plane operations)
-- **Path**: `packages/framework/core-control-plane`
+- **Plane**: migration
 
 ## Related Documentation
 

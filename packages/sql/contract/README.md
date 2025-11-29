@@ -2,6 +2,12 @@
 
 SQL contract types, validators, and IR factories for Prisma Next.
 
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: core
+- **Plane**: shared
+
 ## Overview
 
 This package provides TypeScript type definitions, Arktype validators, and factory functions for constructing SQL contract structures. It is located in the **shared plane**, making it available to both migration-plane (authoring, emitter) and runtime-plane (lanes, runtime) packages.

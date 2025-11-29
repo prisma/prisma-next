@@ -4,6 +4,12 @@
 
 This package will contain the TypeScript authoring surface for Prisma Next.
 
+## Package Classification
+
+- **Domain**: framework
+- **Layer**: authoring
+- **Plane**: migration
+
 ## Overview
 
 This package is part of the authoring ring and will provide TypeScript-based contract authoring capabilities.

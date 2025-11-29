@@ -4,6 +4,12 @@
 
 This directory is a placeholder for future document family packages (MongoDB, Firestore, etc.).
 
+## Package Classification
+
+- **Domain**: document
+- **Layer**: (future)
+- **Plane**: (future)
+
 ## Overview
 
 This directory signals the intended structure for document family packages, which will mirror the SQL family layout:

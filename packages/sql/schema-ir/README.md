@@ -125,15 +125,13 @@ const result = await verifyDatabaseSchema({
 });
 ```
 
+## Package Classification
+
+- **Domain**: sql
+- **Layer**: core
+- **Plane**: shared
+
 ## Architecture
-
-### Package Location
-
-- **Domain**: `sql`
-- **Layer**: `core`
-- **Plane**: `shared`
-
-This package sits at the core layer in the shared plane, making it accessible to both migration-plane (authoring, tooling, targets) and runtime-plane (lanes, runtime, adapters) packages.
 
 
 ## Related Documentation
