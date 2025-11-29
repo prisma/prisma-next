@@ -1212,7 +1212,7 @@ export function createSqlFamilyInstance(
           // Compare type using nativeType directly
           // Contract now stores nativeType directly (e.g., 'int4'), schema IR has nativeType (e.g., 'int4')
           const contractNativeType = contractColumn.nativeType;
-          const schemaNativeType = schemaColumn.nativeType ?? schemaColumn.typeId;
+          const schemaNativeType = schemaColumn.nativeType;
 
           if (!contractNativeType) {
             // Contract column doesn't have nativeType - this shouldn't happen with new contract format
@@ -1237,14 +1237,14 @@ export function createSqlFamilyInstance(
             });
             columnStatus = 'fail';
           } else if (!schemaNativeType) {
-            // Schema IR doesn't have nativeType or typeId - this shouldn't happen
+            // Schema IR doesn't have nativeType - this shouldn't happen
             issues.push({
               kind: 'type_mismatch',
               table: tableName,
               column: columnName,
               expected: contractNativeType,
               actual: 'unknown',
-              message: `Column "${tableName}"."${columnName}" has type mismatch: schema column has no nativeType or typeId`,
+              message: `Column "${tableName}"."${columnName}" has type mismatch: schema column has no nativeType`,
             });
             columnChildren.push({
               status: 'fail',
@@ -1252,7 +1252,7 @@ export function createSqlFamilyInstance(
               name: 'type',
               contractPath: `${columnPath}.nativeType`,
               code: 'type_mismatch',
-              message: 'Schema column has no nativeType or typeId',
+              message: 'Schema column has no nativeType',
               expected: contractNativeType,
               actual: 'unknown',
               children: [],
@@ -1407,7 +1407,7 @@ export function createSqlFamilyInstance(
                 code: 'extra_column',
                 message: `Extra column "${columnName}" found`,
                 expected: undefined,
-                actual: schemaColumn.typeId,
+                actual: schemaColumn.nativeType,
                 children: [],
               });
             }
@@ -1756,17 +1756,16 @@ export function createSqlFamilyInstance(
           const columnNodes: SchemaTreeNode[] = [];
           for (const [columnName, column] of Object.entries(table.columns)) {
             const nullableText = column.nullable ? '(nullable)' : '(not nullable)';
-            // Always display nativeType for introspection (database state), fall back to typeId if nativeType not available
-            const typeDisplay = column.nativeType ?? column.typeId;
+            // Always display nativeType for introspection (database state)
+            const typeDisplay = column.nativeType;
             const label = `${columnName}: ${typeDisplay} ${nullableText}`;
             columnNodes.push({
               kind: 'field',
               id: `column-${tableName}-${columnName}`,
               label,
               meta: {
-                typeId: column.typeId,
+                nativeType: column.nativeType,
                 nullable: column.nullable,
-                ...(column.nativeType ? { nativeType: column.nativeType } : {}),
               },
             });
           }
