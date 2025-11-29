@@ -19,7 +19,7 @@ import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-// Now contract has full type information: contract.storage.tables.user.columns.id.type === 'pg/int4@1'
+// Now contract has full type information: contract.storage.tables.user.columns.id.codecId === 'pg/int4@1'
 ```
 
 **✅ CORRECT: Define contract type inline for tests**
@@ -33,8 +33,8 @@ type MyContract = SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly email: { readonly type: 'pg/text@1'; nullable: false };
+          readonly id: { readonly nativeType: 'int4'; readonly codecId: 'pg/int4@1'; nullable: false };
+          readonly email: { readonly nativeType: 'text'; readonly codecId: 'pg/text@1'; nullable: false };
         };
       };
     };
@@ -52,8 +52,8 @@ const contract = validateContract<MyContract>({
     tables: {
       user: {
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          email: { type: 'pg/text@1', nullable: false },
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
         },
       },
     },
@@ -75,7 +75,7 @@ import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
 // ❌ Types will be inferred as 'unknown' - this won't work!
-// contract.storage.tables.user.columns.id.type === unknown (not 'pg/int4@1')
+// contract.storage.tables.user.columns.id.codecId === unknown (not 'pg/int4@1')
 ```
 
 ## Why This Matters

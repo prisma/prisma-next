@@ -19,7 +19,7 @@ if (!contractTable.columns[columnName]) {
 }
 
 const columnMeta = contractTable.columns[columnName];
-const codecId = columnMeta?.type; // Optional chaining unnecessary
+const codecId = columnMeta?.codecId; // Optional chaining unnecessary
 if (codecId && paramName) {
   paramCodecs[paramName] = codecId;
 }
@@ -47,14 +47,14 @@ if (!contractTable.columns[columnName]) {
 
 // Assert that data exists (non-null assertion or explicit check)
 const columnMeta = contractTable.columns[columnName]!;
-const codecId = columnMeta.type; // Required property, no optional chaining
+const codecId = columnMeta.codecId; // Required property, no optional chaining
 
-if (codecId && paramName) {
+if (paramName) {
   paramCodecs[paramName] = codecId;
 }
 
 paramDescriptors.push({
-  ...(codecId ? { type: codecId } : {}),
+  type: codecId,
   nullable: columnMeta.nullable, // Required property, no optional check
 });
 ```
@@ -93,7 +93,7 @@ Don't use assertions when:
 **Before:**
 ```typescript
 const columnMeta = contractTable.columns[columnName];
-const codecId = columnMeta?.type;
+const codecId = columnMeta?.codecId;
 if (codecId && paramName) {
   paramCodecs[paramName] = codecId;
 }
@@ -102,8 +102,8 @@ if (codecId && paramName) {
 **After:**
 ```typescript
 const columnMeta = contractTable.columns[columnName]!;
-const codecId = columnMeta.type;
-if (codecId && paramName) {
+const codecId = columnMeta.codecId; // Required property
+if (paramName) {
   paramCodecs[paramName] = codecId;
 }
 ```
@@ -118,21 +118,21 @@ After refactoring to use assertions, remove tests that:
 **Example of test to remove:**
 ```typescript
 // ❌ Remove: Tests impossible state
-it('builds plan without codecId when column type is missing', () => {
-  const contractWithoutType = {
+it('builds plan without codecId when column codecId is missing', () => {
+  const contractWithoutCodecId = {
     ...contract,
     storage: {
       tables: {
         user: {
           columns: {
-            email: { nullable: true } as { nullable: true; type?: string },
+            email: { nativeType: 'text', nullable: true } as { nativeType: string; nullable: true; codecId?: string },
           },
         },
       },
     },
   } as SqlContract<SqlStorage>; // Type assertion bypasses validation
 
-  // This test is unrealistic - StorageColumn requires 'type'
+  // This test is unrealistic - StorageColumn requires 'codecId'
 });
 ```
 
@@ -140,11 +140,12 @@ it('builds plan without codecId when column type is missing', () => {
 
 **Good patterns:**
 - Using `columnMeta!` after validating column exists
-- Accessing `columnMeta.type` directly (required property)
+- Accessing `columnMeta.codecId` directly (required property)
+- Accessing `columnMeta.nativeType` directly (required property)
 - Using `columnMeta.nullable` directly (required property)
 
 **Bad patterns (to avoid):**
-- Optional chaining (`columnMeta?.type`) after validation
+- Optional chaining (`columnMeta?.codecId`) after validation
 - Conditional property spreading (`...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {})`) for required properties
 - Tests that use type assertions to test impossible states
 

@@ -13,6 +13,15 @@ This package provides TypeScript type definitions, Arktype validators, and facto
 - **IR Factories**: Provides pure factory functions for constructing contract IR structures in tests and authoring
 - **Shared Plane Access**: Enables both migration-plane and runtime-plane packages to import SQL contract types without violating plane boundaries
 
+## StorageColumn Structure
+
+Each `StorageColumn` in SQL contracts includes both:
+- **`nativeType`** (required): Native database type identifier (e.g., `'int4'`, `'text'`, `'vector'`) - used for database structure verification and migration planning
+- **`codecId`** (required): Codec identifier (e.g., `'pg/int4@1'`, `'pg/text@1'`, `'pg/vector@1'`) - used for query builders and runtime codecs
+- **`nullable`** (required): Whether the column is nullable
+
+Both `nativeType` and `codecId` are required to ensure contracts are consumable by both the application (via codec IDs) and the database (via native types). See `docs/briefs/Sql-Contract-Native-and-Codec-Types.md` for details.
+
 ## Package Contents
 
 - **TypeScript Types**: Type definitions for `SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, and related types
@@ -58,14 +67,14 @@ Use factory functions to construct contract IR structures in tests:
 ```typescript
 import { col, table, storage, model, contract, pk, unique, index, fk } from '@prisma-next/sql-contract/exports/factories';
 
-// Create a column
-const idColumn = col('pg/int4@1', false);
+// Create a column (nativeType, codecId, nullable)
+const idColumn = col('int4', 'pg/int4@1', false);
 
 // Create a table
 const userTable = table(
   {
-    id: col('pg/int4@1'),
-    email: col('pg/text@1'),
+    id: col('int4', 'pg/int4@1'),
+    email: col('text', 'pg/text@1'),
   },
   {
     pk: pk('id'),
