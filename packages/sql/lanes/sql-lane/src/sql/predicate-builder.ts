@@ -43,22 +43,21 @@ export function buildWhereExpr(
     const colBuilder = where.left as unknown as {
       table: string;
       column: string;
-      columnMeta?: { type?: string; nullable?: boolean };
+      columnMeta?: { codecId?: string; nullable?: boolean };
     };
-    const meta = (colBuilder.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+    const meta = (colBuilder.columnMeta ?? {}) as { codecId?: string; nullable?: boolean };
 
     descriptors.push({
       name: paramName,
       source: 'dsl',
       refs: { table: colBuilder.table, column: colBuilder.column },
-      ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
+      ...(typeof meta.codecId === 'string' ? { type: meta.codecId } : {}),
       ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
     });
 
     const contractTable = contract.storage.tables[colBuilder.table];
     const columnMeta = contractTable?.columns[colBuilder.column];
-    // Use codecId if present, otherwise fallback to deprecated type field
-    codecId = columnMeta?.codecId ?? columnMeta?.type;
+    codecId = columnMeta?.codecId;
 
     leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
   }

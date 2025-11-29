@@ -43,8 +43,7 @@ export const sqlTargetFamilyHook = {
       const table = tableUnknown as StorageTable;
       for (const [colName, colUnknown] of Object.entries(table.columns)) {
         const col = colUnknown as { codecId?: string; type?: string; nullable?: boolean };
-        // Use codecId if present, otherwise fallback to deprecated type field
-        const codecId = col.codecId ?? col.type;
+        const codecId = col.codecId;
         if (!codecId) {
           throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);
         }
@@ -356,8 +355,7 @@ export type Relations = Contract['relations'];
             continue;
           }
 
-          // Use codecId if present, otherwise fallback to deprecated type field
-          const typeId = column.codecId ?? column.type ?? 'string';
+          const typeId = column.codecId ?? 'string';
           const nullable = column.nullable ?? false;
           const jsType = nullable
             ? `CodecTypes['${typeId}']['output'] | null`
