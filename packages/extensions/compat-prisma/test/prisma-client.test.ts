@@ -24,10 +24,10 @@ const testContract: SqlContract<SqlStorage> = {
     tables: {
       user: {
         columns: {
-          id: { type: 'pg/text@1', nullable: false },
-          email: { type: 'pg/text@1', nullable: false },
-          name: { type: 'pg/text@1', nullable: false },
-          createdAt: { type: 'pg/timestamptz@1', nullable: false },
+          id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          createdAt: { nativeType: 'timestamptz', codecId: 'pg/timestamptz@1', nullable: false },
         },
         uniques: [],
         indexes: [],

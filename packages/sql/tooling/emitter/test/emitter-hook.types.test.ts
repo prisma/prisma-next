@@ -32,7 +32,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             },
           },
         },
@@ -54,7 +54,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'unknown/type@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'unknown/type@1', nullable: false },
             },
           },
         },
@@ -76,7 +76,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'invalid-format', nullable: false },
+              id: { nativeType: 'int4', codecId: 'invalid-format', nullable: false },
             },
           },
         },
@@ -87,7 +87,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
-    }).toThrow('invalid type ID format');
+    }).toThrow('invalid codec ID format');
   });
 
   it('validates types from loaded packs even if not in extensions', () => {
@@ -96,7 +96,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'postgres/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'postgres/int4@1', nullable: false },
             },
           },
         },
@@ -129,7 +129,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
-    }).toThrow('is missing type');
+    }).toThrow('is missing codecId');
   });
 
   it('validates types with type ID that fails regex match', () => {
@@ -138,7 +138,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'invalid@format', nullable: false },
+              id: { nativeType: 'int4', codecId: 'invalid@format', nullable: false },
             },
           },
         },
@@ -149,7 +149,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
-    }).toThrow('invalid type ID format');
+    }).toThrow('invalid codec ID format');
   });
 
   it('validates types with empty storage', () => {

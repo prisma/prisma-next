@@ -82,7 +82,7 @@ test('ResultType inference works identically to fixture contract', () => {
     extensions: [],
   });
   const fixtureTables = schema(fixtureContext).tables;
-  const fixtureUserTable = fixtureTables.user;
+  const fixtureUserTable = fixtureTables['user'];
   if (!fixtureUserTable) throw new Error('fixture user table not found');
   const _fixturePlan = sql({ context: fixtureContext })
     .from(fixtureUserTable)

@@ -26,8 +26,8 @@ describe('insert builder', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: true },
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],

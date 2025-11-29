@@ -91,9 +91,9 @@ describe('builder integration', () => {
     expectTypeOf(userTableType.columns).toHaveProperty('createdAt');
 
     // Verify column types are literal (canonicalized)
-    expectTypeOf(userTableType.columns.id.type).toEqualTypeOf<'pg/int4@1'>();
-    expectTypeOf(userTableType.columns.email.type).toEqualTypeOf<'pg/text@1'>();
-    expectTypeOf(userTableType.columns.createdAt.type).toEqualTypeOf<'pg/timestamptz@1'>();
+    expectTypeOf(userTableType.columns.id.codecId).toEqualTypeOf<'pg/int4@1'>();
+    expectTypeOf(userTableType.columns.email.codecId).toEqualTypeOf<'pg/text@1'>();
+    expectTypeOf(userTableType.columns.createdAt.codecId).toEqualTypeOf<'pg/timestamptz@1'>();
 
     // Verify nullable is literal false, not boolean
     expectTypeOf(userTableType.columns.id.nullable).toEqualTypeOf<false>();
@@ -284,10 +284,10 @@ describe('builder integration', () => {
     expect(builderContract.targetFamily).toBe(fixtureContract.targetFamily);
     const builderUserTable = builderContract.storage.tables.user;
     const fixtureUserTable = fixtureContract.storage.tables.user;
-    expect(builderUserTable?.columns.id?.type).toBe(fixtureUserTable?.columns.id?.type);
-    expect(builderUserTable?.columns.email?.type).toBe(fixtureUserTable?.columns.email?.type);
-    expect(builderUserTable?.columns.createdAt?.type).toBe(
-      fixtureUserTable?.columns.createdAt?.type,
+    expect(builderUserTable?.columns.id?.codecId).toBe(fixtureUserTable?.columns.id?.codecId);
+    expect(builderUserTable?.columns.email?.codecId).toBe(fixtureUserTable?.columns.email?.codecId);
+    expect(builderUserTable?.columns.createdAt?.codecId).toBe(
+      fixtureUserTable?.columns.createdAt?.codecId,
     );
     const builderUserModel = builderContract.models.User as unknown as ModelDefinition;
     const fixtureUserModel = fixtureContract.models.User as unknown as ModelDefinition;
@@ -325,8 +325,8 @@ describe('builder integration', () => {
       .build();
 
     // Type checks - verify type preserves literal types
-    expectTypeOf(contract.storage.tables.user.columns.id.type).toEqualTypeOf<'pg/int4@1'>();
-    expectTypeOf(contract.storage.tables.user.columns.email.type).toEqualTypeOf<'pg/text@1'>();
+    expectTypeOf(contract.storage.tables.user.columns.id.codecId).toEqualTypeOf<'pg/int4@1'>();
+    expectTypeOf(contract.storage.tables.user.columns.email.codecId).toEqualTypeOf<'pg/text@1'>();
   });
 
   it('validates type format', () => {

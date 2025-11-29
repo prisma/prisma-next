@@ -1,5 +1,5 @@
 import { createOperationRegistry } from '@prisma-next/operations';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { DeleteAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -10,6 +10,8 @@ import type { OrmContext } from '../../src/orm/context';
 import type { ModelColumnAccessor } from '../../src/orm-types';
 
 describe('delete builder', () => {
+  const int4Column: StorageColumn = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+
   const contract: SqlContract<SqlStorage> = {
     schemaVersion: '1',
     target: 'postgres',
@@ -28,7 +30,7 @@ describe('delete builder', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
+            id: int4Column,
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -133,7 +135,7 @@ describe('delete builder', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: int4Column,
             },
             primaryKey: { columns: ['id'] },
             uniques: [],

@@ -19,8 +19,16 @@ export type Contract = SqlContract<
     readonly tables: {
       readonly user: {
         columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly email: { readonly type: 'pg/text@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'pg/int4@1';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'pg/text@1';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
@@ -29,10 +37,26 @@ export type Contract = SqlContract<
       };
       readonly post: {
         columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly userId: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly title: { readonly type: 'pg/text@1'; readonly nullable: false };
-          readonly published: { readonly type: 'pg/bool@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'pg/int4@1';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly userId: {
+            readonly nativeType: 'pg/int4@1';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'pg/text@1';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly published: {
+            readonly nativeType: 'pg/bool@1';
+            readonly codecId: 'pg/bool@1';
+            readonly nullable: false;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
@@ -41,9 +65,21 @@ export type Contract = SqlContract<
       };
       readonly comment: {
         columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly postId: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly content: { readonly type: 'pg/text@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'pg/int4@1';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly postId: {
+            readonly nativeType: 'pg/int4@1';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly content: {
+            readonly nativeType: 'pg/text@1';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];

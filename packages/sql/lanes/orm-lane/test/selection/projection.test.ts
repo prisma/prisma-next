@@ -1,3 +1,4 @@
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder, NestedProjection } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
@@ -13,16 +14,42 @@ function createMockColumnBuilder(
   column: string,
   columnMeta: { type: string; nullable: boolean },
 ): AnyColumnBuilder {
+  const normalizedMeta = convertColumnMeta(columnMeta);
   return {
     kind: 'column',
     table,
     column,
-    columnMeta,
+    columnMeta: normalizedMeta,
     eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
     asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
     desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
     __jsType: undefined,
   } as unknown as AnyColumnBuilder;
+}
+
+function convertColumnMeta(meta: { type: string; nullable: boolean }): StorageColumn {
+  return {
+    nativeType: inferNativeType(meta.type),
+    codecId: meta.type,
+    nullable: meta.nullable,
+  };
+}
+
+function inferNativeType(typeId: string): string {
+  switch (typeId) {
+    case 'pg/int4@1':
+      return 'int4';
+    case 'pg/text@1':
+      return 'text';
+    case 'pg/timestamptz@1':
+      return 'timestamptz';
+    case 'core/json@1':
+      return 'jsonb';
+    case 'pgvector/vector@1':
+      return 'vector';
+    default:
+      return typeId;
+  }
 }
 
 describe('projection', () => {
@@ -88,7 +115,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -110,7 +137,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -120,7 +147,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'email',
-        columnMeta: { type: 'pg/text@1', nullable: true },
+        columnMeta: convertColumnMeta({ type: 'pg/text@1', nullable: true }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -145,7 +172,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -180,7 +207,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -205,7 +232,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -258,7 +285,7 @@ describe('projection', () => {
         firstColumn: {
           kind: 'column',
           table: 'post',
-          columnMeta: { type: 'core/json@1' },
+          columnMeta: convertColumnMeta({ type: 'core/json@1', nullable: true }),
         },
       });
     });
@@ -278,7 +305,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -288,7 +315,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'email',
-        columnMeta: { type: 'pg/text@1', nullable: true },
+        columnMeta: convertColumnMeta({ type: 'pg/text@1', nullable: true }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -330,7 +357,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -374,7 +401,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
