@@ -400,13 +400,31 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
 
         if (columns) {
           // Normalize columns: add nullable: false if missing
+          // Handle legacy structure: if column has 'type' but no 'codecId'/'nativeType', migrate it
           const normalizedColumns: Record<string, unknown> = {};
           for (const [columnName, column] of Object.entries(columns)) {
             const columnObj = column as Record<string, unknown>;
-            normalizedColumns[columnName] = {
+            const normalizedColumn: Record<string, unknown> = {
               ...columnObj,
               nullable: columnObj['nullable'] ?? false,
             };
+
+            // Handle legacy structure: migrate 'type' to 'codecId' and 'nativeType'
+            if ('type' in columnObj && typeof columnObj['type'] === 'string') {
+              const legacyType = columnObj['type'] as string;
+              // If codecId/nativeType are missing, use legacy type as both (temporary)
+              // This allows old JSON contracts to still validate, but they should be migrated
+              if (!('codecId' in columnObj)) {
+                normalizedColumn['codecId'] = legacyType;
+              }
+              if (!('nativeType' in columnObj)) {
+                normalizedColumn['nativeType'] = legacyType; // Temporary - should be migrated
+              }
+              // Remove legacy 'type' field
+              delete normalizedColumn['type'];
+            }
+
+            normalizedColumns[columnName] = normalizedColumn;
           }
 
           // Normalize table arrays: add empty arrays if missing

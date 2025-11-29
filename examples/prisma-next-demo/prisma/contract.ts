@@ -1,5 +1,11 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import {
+  int4Column,
+  textColumn,
+  timestamptzColumn,
+} from '@prisma-next/adapter-postgres/column-types';
 import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
+import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 
 type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
@@ -8,18 +14,18 @@ export const contract = defineContract<AllCodecTypes>()
   .target('postgres')
   .table('user', (t) =>
     t
-      .column('id', { type: 'pg/int4@1', nullable: false })
-      .column('email', { type: 'pg/text@1', nullable: false })
-      .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
+      .column('id', { type: int4Column, nullable: false })
+      .column('email', { type: textColumn, nullable: false })
+      .column('createdAt', { type: timestamptzColumn, nullable: false })
       .primaryKey(['id']),
   )
   .table('post', (t) =>
     t
-      .column('id', { type: 'pg/int4@1', nullable: false })
-      .column('title', { type: 'pg/text@1', nullable: false })
-      .column('userId', { type: 'pg/int4@1', nullable: false })
-      .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
-      .column('embedding', { type: 'pg/vector@1', nullable: true })
+      .column('id', { type: int4Column, nullable: false })
+      .column('title', { type: textColumn, nullable: false })
+      .column('userId', { type: int4Column, nullable: false })
+      .column('createdAt', { type: timestamptzColumn, nullable: false })
+      .column('embedding', { type: vectorColumn, nullable: true })
       .primaryKey(['id'])
       .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),
   )

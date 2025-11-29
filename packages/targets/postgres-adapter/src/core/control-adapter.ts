@@ -105,8 +105,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
         columns[colRow.column_name] = {
           name: colRow.column_name,
-          // Placeholder typeId - enrichment will replace this with actual codec ID
-          typeId: 'unmapped',
           nativeType,
           nullable: colRow.is_nullable === 'YES',
         };

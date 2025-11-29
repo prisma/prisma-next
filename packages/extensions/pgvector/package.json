@@ -38,6 +38,10 @@
       "types": "./dist/exports/codec-types.d.ts",
       "import": "./dist/exports/codec-types.js"
     },
+    "./column-types": {
+      "types": "./dist/exports/column-types.d.ts",
+      "import": "./dist/exports/column-types.js"
+    },
     "./operation-types": {
       "types": "./dist/exports/operation-types.d.ts",
       "import": "./dist/exports/operation-types.js"

@@ -137,14 +137,17 @@ class SqlContractBuilder<
    * - `indexes`: defaults to `[]` (empty array)
    * - `foreignKeys`: defaults to `[]` (empty array)
    * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
-   * - `nativeType`: looked up from type metadata registry using `codecId`
+   * - `nativeType`: extracted from column type descriptor if provided, otherwise looked up via `getNativeType` or set temporarily
    *
    * The contract builder is the **only** place where normalization should occur.
    * Validators, parsers, and emitters should assume the contract is already normalized.
    *
+   * **Recommended**: Use column type descriptors (e.g., `int4Column`, `textColumn`) when defining columns.
+   * This ensures `nativeType` is set correctly at build time without requiring registry lookups.
+   *
    * @param options - Optional build options
    * @param options.getNativeType - Optional function to lookup nativeType from codecId.
-   *   If not provided, nativeType must be set explicitly or will be handled at emission time.
+   *   Only used for legacy string-based column types. Descriptor-based columns already include nativeType.
    * @returns A normalized SqlContract with all required fields present
    */
   build(options?: {
@@ -213,11 +216,17 @@ class SqlContractBuilder<
         const columnState = tableState.columns[columnName];
         if (!columnState) continue;
         const codecId = columnState.type;
-        // Lookup nativeType from registry if provided
-        // If getNativeType is provided but returns undefined, that's an error
-        // If getNativeType is not provided, nativeType will be resolved at emission time
+
+        // Determine nativeType:
+        // 1. If nativeType is already set (from column type descriptor), use it
+        // 2. Otherwise, lookup from registry if getNativeType is provided
+        // 3. Otherwise, use codecId as temporary fallback (for legacy string-based types)
         let nativeType: string;
-        if (options?.getNativeType) {
+        if (columnState.nativeType !== undefined) {
+          // Descriptor-based: nativeType was set when column was defined
+          nativeType = columnState.nativeType;
+        } else if (options?.getNativeType) {
+          // Legacy with registry: lookup nativeType from registry
           const lookedUp = options.getNativeType(codecId);
           if (!lookedUp) {
             throw new Error(
@@ -227,11 +236,11 @@ class SqlContractBuilder<
           }
           nativeType = lookedUp;
         } else {
-          // If registry lookup not available, use codecId as temporary value
+          // Legacy without registry: use codecId as temporary value
           // This will be resolved during emission when registry is available
-          // Note: This is not ideal per the brief (prefers construction time), but allows builder to work
           nativeType = codecId; // Temporary - will be replaced during emission
         }
+
         columns[columnName as keyof ColumnDefs] = {
           nativeType,
           codecId,

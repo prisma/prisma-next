@@ -5,6 +5,7 @@ export default defineConfig({
     adapter: 'src/exports/adapter.ts',
     types: 'src/exports/types.ts',
     'codec-types': 'src/exports/codec-types.ts',
+    'column-types': 'src/exports/column-types.ts',
     control: 'src/exports/control.ts',
     runtime: 'src/exports/runtime.ts',
   },
