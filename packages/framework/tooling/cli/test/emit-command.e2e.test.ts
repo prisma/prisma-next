@@ -8,324 +8,314 @@ import {
   getExitCode,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
+  withTempDir,
 } from './utils/test-helpers';
 
 // Fixture subdirectory for emit tests
 const fixtureSubdir = 'emit';
 
-describe('contract emit command (e2e)', () => {
-  let consoleOutput: string[] = [];
-  let consoleErrors: string[] = [];
-  let cleanupMocks: () => void;
-  let cleanupDirs: Array<() => void> = [];
+withTempDir(({ createTempDir }) => {
+  describe('contract emit command (e2e)', () => {
+    let consoleOutput: string[] = [];
+    let consoleErrors: string[] = [];
+    let cleanupMocks: () => void;
 
-  beforeEach(() => {
-    // Set up console and process.exit mocks
-    const mocks = setupCommandMocks();
-    consoleOutput = mocks.consoleOutput;
-    consoleErrors = mocks.consoleErrors;
-    cleanupMocks = mocks.cleanup;
-    cleanupDirs = [];
-  });
+    beforeEach(() => {
+      // Set up console and process.exit mocks
+      const mocks = setupCommandMocks();
+      consoleOutput = mocks.consoleOutput;
+      consoleErrors = mocks.consoleErrors;
+      cleanupMocks = mocks.cleanup;
+    });
 
-  afterEach(() => {
-    cleanupMocks();
-    // Clean up all test directories, even if test failed or timed out
-    for (const cleanupDir of cleanupDirs) {
-      try {
-        cleanupDir();
-      } catch (_error) {
-        // Ignore cleanup errors
-      }
-    }
-  });
+    afterEach(() => {
+      cleanupMocks();
+    });
 
-  it(
-    'emits contract.json and contract.d.ts with canonical command',
-    async () => {
-      // Set up test directory from fixtures
-      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
-      const testDir = testSetup.testDir;
-      const outputDir = testSetup.outputDir;
-      const cleanupDir = testSetup.cleanup;
-      cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+    it(
+      'emits contract.json and contract.d.ts with canonical command',
+      async () => {
+        // Set up test directory from fixtures
+        const testSetup = setupTestDirectoryFromFixtures(
+          createTempDir,
+          fixtureSubdir,
+          'prisma-next.config.emit.ts',
+        );
+        const testDir = testSetup.testDir;
+        const outputDir = testSetup.outputDir;
 
-      try {
-        const command = createContractEmitCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          // executeCommand doesn't throw for exit code 0, so if it completes, we know it succeeded
-          await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
-        } finally {
-          process.chdir(originalCwd);
+        {
+          const command = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            // executeCommand doesn't throw for exit code 0, so if it completes, we know it succeeded
+            await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Check exit code is 0 (success)
+          const exitCode = getExitCode();
+          expect(exitCode).toBe(0);
+
+          // Parse and verify JSON output
+          const jsonOutput = consoleOutput.join('\n');
+          expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+          const parsed = JSON.parse(jsonOutput);
+          expect(parsed).toMatchObject({
+            ok: true,
+            coreHash: expect.any(String),
+            outDir: expect.any(String),
+            files: {
+              json: expect.any(String),
+              dts: expect.any(String),
+            },
+            timings: {
+              total: expect.any(Number),
+            },
+          });
+
+          // Verify files were actually created
+          const contractJsonPath = join(outputDir, 'contract.json');
+          const contractDtsPath = join(outputDir, 'contract.d.ts');
+
+          expect(existsSync(contractJsonPath)).toBe(true);
+          expect(existsSync(contractDtsPath)).toBe(true);
+
+          // Verify contract.json content
+          const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+          expect(contractJson).toMatchObject({
+            targetFamily: 'sql',
+            _generated: expect.anything(),
+          });
+
+          // Verify contract.d.ts content
+          const contractDts = readFileSync(contractDtsPath, 'utf-8');
+          expect(contractDts).toContain('export type Contract');
+          expect(contractDts).toContain('CodecTypes');
+
+          // Verify JSON output matches actual files
+          expect(parsed.files.json).toBe(contractJsonPath);
+          expect(parsed.files.dts).toBe(contractDtsPath);
+          expect(parsed.coreHash).toBe(contractJson.coreHash);
         }
-
-        // Check exit code is 0 (success)
-        const exitCode = getExitCode();
-        expect(exitCode).toBe(0);
-
-        // Parse and verify JSON output
-        const jsonOutput = consoleOutput.join('\n');
-        expect(() => JSON.parse(jsonOutput)).not.toThrow();
-
-        const parsed = JSON.parse(jsonOutput);
-        expect(parsed).toMatchObject({
-          ok: true,
-          coreHash: expect.any(String),
-          outDir: expect.any(String),
-          files: {
-            json: expect.any(String),
-            dts: expect.any(String),
-          },
-          timings: {
-            total: expect.any(Number),
-          },
-        });
-
-        // Verify files were actually created
-        const contractJsonPath = join(outputDir, 'contract.json');
-        const contractDtsPath = join(outputDir, 'contract.d.ts');
-
-        expect(existsSync(contractJsonPath)).toBe(true);
-        expect(existsSync(contractDtsPath)).toBe(true);
-
-        // Verify contract.json content
-        const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
-        expect(contractJson).toMatchObject({
-          targetFamily: 'sql',
-          _generated: expect.anything(),
-        });
-
-        // Verify contract.d.ts content
-        const contractDts = readFileSync(contractDtsPath, 'utf-8');
-        expect(contractDts).toContain('export type Contract');
-        expect(contractDts).toContain('CodecTypes');
-
-        // Verify JSON output matches actual files
-        expect(parsed.files.json).toBe(contractJsonPath);
-        expect(parsed.files.dts).toBe(contractDtsPath);
-        expect(parsed.coreHash).toBe(contractJson.coreHash);
-      } finally {
-        cleanupDir();
-      }
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'outputs JSON when --json flag is provided',
-    async () => {
-      // Set up test directory from fixtures
-      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
-      const testDir = testSetup.testDir;
-      const cleanupDir = testSetup.cleanup;
-      cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
-
-      try {
-        const command = createContractEmitCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
-        } finally {
-          process.chdir(originalCwd);
-        }
-
-        // Check exit code is 0 (success)
-        const exitCode = getExitCode();
-        expect(exitCode).toBe(0);
-
-        // Check that output is valid JSON
-        const jsonOutput = consoleOutput.join('\n');
-        expect(() => JSON.parse(jsonOutput)).not.toThrow();
-
-        const parsed = JSON.parse(jsonOutput);
-        expect(parsed).toMatchObject({
-          ok: true,
-          coreHash: expect.any(String),
-          outDir: expect.any(String),
-          files: {
-            json: expect.any(String),
-            dts: expect.any(String),
-          },
-          timings: {
-            total: expect.any(Number),
-          },
-        });
-      } finally {
-        cleanupDir();
-      }
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it('throws error with PN-CLI code when config file is missing', async () => {
-    // Set up test directory from fixtures (but we'll use a non-existent config)
-    const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
-    const testDir = testSetup.testDir;
-    const cleanupDir = testSetup.cleanup;
-    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
-
-    try {
-      const command = createContractEmitCommand();
-      const originalCwd = process.cwd();
-      try {
-        process.chdir(testDir);
-        // Commands don't throw - they call process.exit() with non-zero exit code
-        // executeCommand will catch the process.exit error and re-throw for non-zero codes
-        // Match the pattern from emit-command.test.ts: include command name in args
-        await expect(
-          executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
-            '--config',
-            'nonexistent.config.ts',
-            '--json',
-          ]),
-        ).rejects.toThrow('process.exit called');
-      } finally {
-        process.chdir(originalCwd);
-      }
-
-      // Check exit code is non-zero (error)
-      const exitCode = getExitCode();
-      expect(exitCode).not.toBe(0);
-      expect(exitCode).toBe(2); // Config errors should have exit code 2
-
-      // Parse and verify JSON error output
-      const errorOutput = consoleErrors.join('\n');
-      expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-      const parsed = JSON.parse(errorOutput);
-      expect(parsed).toMatchObject({
-        code: 'PN-CLI-4001',
-        summary: expect.any(String),
-        why: expect.any(String),
-        fix: expect.any(String),
-      });
-    } finally {
-      cleanupDir();
-    }
-  });
-
-  it('throws error with PN-CLI code when contract config is missing', async () => {
-    // Set up test directory from fixtures with no-contract config
-    const testSetup = setupTestDirectoryFromFixtures(
-      fixtureSubdir,
-      'prisma-next.config.no-contract.ts',
+      },
+      timeouts.typeScriptCompilation,
     );
-    const testDir = testSetup.testDir;
-    const cleanupDir = testSetup.cleanup;
-    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
-    try {
-      const command = createContractEmitCommand();
-      const originalCwd = process.cwd();
-      try {
-        process.chdir(testDir);
-        // Commands don't throw - they call process.exit() with non-zero exit code
-        // executeCommand will catch the process.exit error and re-throw for non-zero codes
-        // Match the pattern from emit-command.test.ts: include command name in args
-        await expect(
-          executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
-            '--config',
-            'prisma-next.config.ts',
-            '--json',
-          ]),
-        ).rejects.toThrow('process.exit called');
-      } finally {
-        process.chdir(originalCwd);
+    it(
+      'outputs JSON when --json flag is provided',
+      async () => {
+        // Set up test directory from fixtures
+        const testSetup = setupTestDirectoryFromFixtures(
+          createTempDir,
+          fixtureSubdir,
+          'prisma-next.config.emit.ts',
+        );
+        const testDir = testSetup.testDir;
+
+        {
+          const command = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Check exit code is 0 (success)
+          const exitCode = getExitCode();
+          expect(exitCode).toBe(0);
+
+          // Check that output is valid JSON
+          const jsonOutput = consoleOutput.join('\n');
+          expect(() => JSON.parse(jsonOutput)).not.toThrow();
+
+          const parsed = JSON.parse(jsonOutput);
+          expect(parsed).toMatchObject({
+            ok: true,
+            coreHash: expect.any(String),
+            outDir: expect.any(String),
+            files: {
+              json: expect.any(String),
+              dts: expect.any(String),
+            },
+            timings: {
+              total: expect.any(Number),
+            },
+          });
+        }
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    it('throws error with PN-CLI code when config file is missing', async () => {
+      // Set up test directory from fixtures (but we'll use a non-existent config)
+      const testSetup = setupTestDirectoryFromFixtures(
+        createTempDir,
+        fixtureSubdir,
+        'prisma-next.config.emit.ts',
+      );
+      const testDir = testSetup.testDir;
+
+      {
+        const command = createContractEmitCommand();
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDir);
+          // Commands don't throw - they call process.exit() with non-zero exit code
+          // executeCommand will catch the process.exit error and re-throw for non-zero codes
+          // Match the pattern from emit-command.test.ts: include command name in args
+          await expect(
+            executeCommand(command, [
+              'node',
+              'cli.js',
+              'emit',
+              '--config',
+              'nonexistent.config.ts',
+              '--json',
+            ]),
+          ).rejects.toThrow('process.exit called');
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        // Check exit code is non-zero (error)
+        const exitCode = getExitCode();
+        expect(exitCode).not.toBe(0);
+        expect(exitCode).toBe(2); // Config errors should have exit code 2
+
+        // Parse and verify JSON error output
+        const errorOutput = consoleErrors.join('\n');
+        expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+        const parsed = JSON.parse(errorOutput);
+        expect(parsed).toMatchObject({
+          code: 'PN-CLI-4001',
+          summary: expect.any(String),
+          why: expect.any(String),
+          fix: expect.any(String),
+        });
       }
+    });
 
-      // Check exit code is non-zero (error)
-      const exitCode = getExitCode();
-      expect(exitCode).not.toBe(0);
+    it('throws error with PN-CLI code when contract config is missing', async () => {
+      // Set up test directory from fixtures with no-contract config
+      const testSetup = setupTestDirectoryFromFixtures(
+        createTempDir,
+        fixtureSubdir,
+        'prisma-next.config.no-contract.ts',
+      );
+      const testDir = testSetup.testDir;
 
-      // Parse and verify JSON error output
-      const errorOutput = consoleErrors.join('\n');
-      expect(() => JSON.parse(errorOutput)).not.toThrow();
+      {
+        const command = createContractEmitCommand();
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDir);
+          // Commands don't throw - they call process.exit() with non-zero exit code
+          // executeCommand will catch the process.exit error and re-throw for non-zero codes
+          // Match the pattern from emit-command.test.ts: include command name in args
+          await expect(
+            executeCommand(command, [
+              'node',
+              'cli.js',
+              'emit',
+              '--config',
+              'prisma-next.config.ts',
+              '--json',
+            ]),
+          ).rejects.toThrow('process.exit called');
+        } finally {
+          process.chdir(originalCwd);
+        }
 
-      const parsed = JSON.parse(errorOutput);
-      expect(parsed).toMatchObject({
-        code: expect.stringMatching(/^PN-CLI-/),
-        summary: expect.any(String),
-        why: expect.any(String),
-        fix: expect.any(String),
-      });
-    } finally {
-      cleanupDir();
-    }
+        // Check exit code is non-zero (error)
+        const exitCode = getExitCode();
+        expect(exitCode).not.toBe(0);
+
+        // Parse and verify JSON error output
+        const errorOutput = consoleErrors.join('\n');
+        expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+        const parsed = JSON.parse(errorOutput);
+        expect(parsed).toMatchObject({
+          code: expect.stringMatching(/^PN-CLI-/),
+          summary: expect.any(String),
+          why: expect.any(String),
+          fix: expect.any(String),
+        });
+      }
+    });
+
+    it(
+      'outputs timings in verbose mode',
+      async () => {
+        // Set up test directory from fixtures
+        const testSetup = setupTestDirectoryFromFixtures(
+          createTempDir,
+          fixtureSubdir,
+          'prisma-next.config.emit.ts',
+        );
+        const testDir = testSetup.testDir;
+
+        {
+          const command = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            await executeCommand(command, ['--config', 'prisma-next.config.ts', '--verbose']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Check exit code is 0 (success)
+          const exitCode = getExitCode();
+          expect(exitCode).toBe(0);
+
+          // Check that output includes timing information
+          const output = consoleOutput.join('\n');
+          expect(output).toContain('Total time');
+        }
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    it(
+      'suppresses output in quiet mode',
+      async () => {
+        // Set up test directory from fixtures
+        const testSetup = setupTestDirectoryFromFixtures(
+          createTempDir,
+          fixtureSubdir,
+          'prisma-next.config.emit.ts',
+        );
+        const testDir = testSetup.testDir;
+
+        {
+          const command = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            await executeCommand(command, ['--config', 'prisma-next.config.ts', '--quiet']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Check exit code is 0 (success)
+          const exitCode = getExitCode();
+          expect(exitCode).toBe(0);
+
+          // In quiet mode, only errors should be output
+          // Since this is a success case, consoleOutput should be empty or minimal
+          const output = consoleOutput.join('\n');
+          expect(output).toBe('');
+        }
+      },
+      timeouts.typeScriptCompilation,
+    );
   });
-
-  it(
-    'outputs timings in verbose mode',
-    async () => {
-      // Set up test directory from fixtures
-      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
-      const testDir = testSetup.testDir;
-      const cleanupDir = testSetup.cleanup;
-      cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
-
-      try {
-        const command = createContractEmitCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts', '--verbose']);
-        } finally {
-          process.chdir(originalCwd);
-        }
-
-        // Check exit code is 0 (success)
-        const exitCode = getExitCode();
-        expect(exitCode).toBe(0);
-
-        // Check that output includes timing information
-        const output = consoleOutput.join('\n');
-        expect(output).toContain('Total time');
-      } finally {
-        cleanupDir();
-      }
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'suppresses output in quiet mode',
-    async () => {
-      // Set up test directory from fixtures
-      const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
-      const testDir = testSetup.testDir;
-      const cleanupDir = testSetup.cleanup;
-      cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
-
-      try {
-        const command = createContractEmitCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await executeCommand(command, ['--config', 'prisma-next.config.ts', '--quiet']);
-        } finally {
-          process.chdir(originalCwd);
-        }
-
-        // Check exit code is 0 (success)
-        const exitCode = getExitCode();
-        expect(exitCode).toBe(0);
-
-        // In quiet mode, only errors should be output
-        // Since this is a success case, consoleOutput should be empty or minimal
-        const output = consoleOutput.join('\n');
-        expect(output).toBe('');
-      } finally {
-        cleanupDir();
-      }
-    },
-    timeouts.typeScriptCompilation,
-  );
 });
