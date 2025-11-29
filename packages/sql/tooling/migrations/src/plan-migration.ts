@@ -73,10 +73,10 @@ function primaryKeyMatches(contractPK: PrimaryKey, schemaPK: PrimaryKey | undefi
  * Helper to check if a column type is compatible.
  * For init mode, we check if types match exactly or if the schema column
  * can be widened to match the contract (e.g., nullable -> non-nullable is not allowed in init).
+ * Compares native types directly (not codec IDs).
  */
 function columnTypeCompatible(contractColumn: StorageColumn, schemaColumn: SqlColumnIR): boolean {
-  // Type IDs must match exactly for init mode
-  if (contractColumn.type !== schemaColumn.typeId) {
+  if (contractColumn.nativeType !== schemaColumn.typeId) {
     return false;
   }
   // Nullability: contract nullable=true can match schema nullable=true or false (widening)
@@ -144,12 +144,12 @@ function planTableOperations(
       // Column exists - check compatibility
       if (!columnTypeCompatible(contractColumn, schemaColumn)) {
         throw new SqlMigrationPlanningError(
-          `Column "${tableName}"."${columnName}" has incompatible type or nullability: contract requires type "${contractColumn.type}" nullable=${contractColumn.nullable}, schema has type "${schemaColumn.typeId}" nullable=${schemaColumn.nullable}`,
+          `Column "${tableName}"."${columnName}" has incompatible type or nullability: contract requires nativeType "${contractColumn.nativeType}" nullable=${contractColumn.nullable}, schema has type "${schemaColumn.typeId}" nullable=${schemaColumn.nullable}`,
           'PN-MIGRATION-0002',
           {
             table: tableName,
             column: columnName,
-            contractType: contractColumn.type,
+            contractNativeType: contractColumn.nativeType,
             contractNullable: contractColumn.nullable,
             schemaType: schemaColumn.typeId,
             schemaNullable: schemaColumn.nullable,

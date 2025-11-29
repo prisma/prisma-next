@@ -92,8 +92,8 @@ describe('planMigration', () => {
           storage: storage({
             user: table(
               {
-                id: col('pg/int4@1', false),
-                email: col('pg/text@1', false),
+                id: col('int4', 'pg/int4@1', false),
+                email: col('text', 'pg/text@1', false),
               },
               {
                 pk: pk('id'),
@@ -117,8 +117,8 @@ describe('planMigration', () => {
         kind: 'createTable',
         table: 'user',
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          email: { type: 'pg/text@1', nullable: false },
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
         },
         primaryKey: { columns: ['id'] },
         uniques: [{ columns: ['email'] }],
@@ -134,8 +134,8 @@ describe('planMigration', () => {
           storage: storage({
             user: table(
               {
-                id: col('pg/int4@1', false),
-                email: col('pg/text@1', false),
+                id: col('int4', 'pg/int4@1', false),
+                email: col('text', 'pg/text@1', false),
               },
               {
                 pk: pk('id'),
@@ -145,9 +145,9 @@ describe('planMigration', () => {
             ),
             post: table(
               {
-                id: col('pg/int4@1', false),
-                userId: col('pg/int4@1', false),
-                title: col('pg/text@1', false),
+                id: col('int4', 'pg/int4@1', false),
+                userId: col('int4', 'pg/int4@1', false),
+                title: col('text', 'pg/text@1', false),
               },
               {
                 pk: pk('id'),
@@ -189,16 +189,16 @@ describe('planMigration', () => {
           coreHash: 'sha256:test',
           storage: storage({
             user: table({
-              id: col('pg/int4@1', false),
-              email: col('pg/text@1', false),
-              name: col('pg/text@1', true),
+              id: col('int4', 'pg/int4@1', false),
+              email: col('text', 'pg/text@1', false),
+              name: col('text', 'pg/text@1', true),
             }),
           }),
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
-        email: { name: 'email', typeId: 'pg/text@1', nullable: false },
+        id: { name: 'id', typeId: 'int4', nullable: false },
+        email: { name: 'email', typeId: 'text', nullable: false },
       });
 
       const plan = planMigration({
@@ -213,7 +213,7 @@ describe('planMigration', () => {
         kind: 'addColumn',
         table: 'user',
         column: 'name',
-        definition: { type: 'pg/text@1', nullable: true },
+        definition: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
       });
     });
 
@@ -226,8 +226,8 @@ describe('planMigration', () => {
           storage: storage({
             user: table(
               {
-                id: col('pg/int4@1', false),
-                email: col('pg/text@1', false),
+                id: col('int4', 'pg/int4@1', false),
+                email: col('text', 'pg/text@1', false),
               },
               {
                 pk: pk('id'),
@@ -237,8 +237,8 @@ describe('planMigration', () => {
             ),
             post: table(
               {
-                id: col('pg/int4@1', false),
-                userId: col('pg/int4@1', false),
+                id: col('int4', 'pg/int4@1', false),
+                userId: col('int4', 'pg/int4@1', false),
               },
               {
                 pk: pk('id'),
@@ -250,14 +250,14 @@ describe('planMigration', () => {
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
-        email: { name: 'email', typeId: 'pg/text@1', nullable: false },
+        id: { name: 'id', typeId: 'int4', nullable: false },
+        email: { name: 'email', typeId: 'text', nullable: false },
       });
       liveSchema.tables['post'] = {
         name: 'post',
         columns: {
-          id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
-          userId: { name: 'userId', typeId: 'pg/int4@1', nullable: false },
+          id: { name: 'id', typeId: 'int4', nullable: false },
+          userId: { name: 'userId', typeId: 'int4', nullable: false },
         },
         primaryKey: undefined,
         foreignKeys: [],
@@ -291,8 +291,8 @@ describe('planMigration', () => {
           storage: storage({
             user: table(
               {
-                id: col('pg/int4@1', false),
-                email: col('pg/text@1', false),
+                id: col('int4', 'pg/int4@1', false),
+                email: col('text', 'pg/text@1', false),
               },
               {
                 pk: pk('id'),
@@ -305,8 +305,8 @@ describe('planMigration', () => {
       const liveSchema = createSchemaIRWithTable(
         'user',
         {
-          id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
-          email: { name: 'email', typeId: 'pg/text@1', nullable: false },
+          id: { name: 'id', typeId: 'int4', nullable: false },
+          email: { name: 'email', typeId: 'text', nullable: false },
         },
         {
           primaryKey: { columns: ['id'] },
@@ -316,7 +316,7 @@ describe('planMigration', () => {
       // Add extra column not in contract
       liveSchema.tables['user'].columns['extra'] = {
         name: 'extra',
-        typeId: 'pg/text@1',
+        typeId: 'text',
         nullable: true,
       };
 
@@ -339,19 +339,19 @@ describe('planMigration', () => {
           coreHash: 'sha256:test',
           storage: storage({
             user: table({
-              id: col('pg/int4@1', false),
+              id: col('int4', 'pg/int4@1', false),
             }),
           }),
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
+        id: { name: 'id', typeId: 'int4', nullable: false },
       });
       // Add extra table not in contract
       liveSchema.tables['extra'] = {
         name: 'extra',
         columns: {
-          id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
+          id: { name: 'id', typeId: 'int4', nullable: false },
         },
         foreignKeys: [],
         uniques: [],
@@ -378,15 +378,15 @@ describe('planMigration', () => {
           coreHash: 'sha256:test',
           storage: storage({
             user: table({
-              id: col('pg/int4@1', false),
-              email: col('pg/text@1', false),
+              id: col('int4', 'pg/int4@1', false),
+              email: col('text', 'pg/text@1', false),
             }),
           }),
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
-        email: { name: 'email', typeId: 'pg/int8@1', nullable: false }, // Wrong type
+        id: { name: 'id', typeId: 'int4', nullable: false },
+        email: { name: 'email', typeId: 'int8', nullable: false }, // Wrong type
       });
 
       expect(() => {
@@ -407,15 +407,15 @@ describe('planMigration', () => {
           coreHash: 'sha256:test',
           storage: storage({
             user: table({
-              id: col('pg/int4@1', false),
-              email: col('pg/text@1', false), // Contract requires non-null
+              id: col('int4', 'pg/int4@1', false),
+              email: col('text', 'pg/text@1', false), // Contract requires non-null
             }),
           }),
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
-        email: { name: 'email', typeId: 'pg/text@1', nullable: true }, // Schema has nullable
+        id: { name: 'id', typeId: 'int4', nullable: false },
+        email: { name: 'email', typeId: 'text', nullable: true }, // Schema has nullable
       });
 
       expect(() => {
@@ -437,8 +437,8 @@ describe('planMigration', () => {
           storage: storage({
             user: table(
               {
-                id: col('pg/int4@1', false),
-                email: col('pg/text@1', false),
+                id: col('int4', 'pg/int4@1', false),
+                email: col('text', 'pg/text@1', false),
               },
               {
                 pk: pk('id'),
@@ -450,8 +450,8 @@ describe('planMigration', () => {
       const liveSchema = createSchemaIRWithTable(
         'user',
         {
-          id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
-          email: { name: 'email', typeId: 'pg/text@1', nullable: false },
+          id: { name: 'id', typeId: 'int4', nullable: false },
+          email: { name: 'email', typeId: 'text', nullable: false },
         },
         {
           primaryKey: { columns: ['email'] }, // Different PK
@@ -476,7 +476,7 @@ describe('planMigration', () => {
           coreHash: 'sha256:test',
           storage: storage({
             user: table({
-              id: col('pg/int4@1', false),
+              id: col('int4', 'pg/int4@1', false),
             }),
           }),
         }),
@@ -503,7 +503,7 @@ describe('planMigration', () => {
           coreHash: 'sha256:test',
           storage: storage({
             user: table({
-              id: col('pg/int4@1', false),
+              id: col('int4', 'pg/int4@1', false),
             }),
           }),
           extensions: {
@@ -537,7 +537,7 @@ describe('planMigration', () => {
           coreHash: 'sha256:test',
           storage: storage({
             user: table({
-              id: col('pg/int4@1', false),
+              id: col('int4', 'pg/int4@1', false),
             }),
           }),
           extensions: {
@@ -571,7 +571,7 @@ describe('planMigration', () => {
           coreHash: 'sha256:test',
           storage: storage({
             user: table({
-              id: col('pg/int4@1', false),
+              id: col('int4', 'pg/int4@1', false),
             }),
           }),
         }),
