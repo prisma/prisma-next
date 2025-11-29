@@ -4,6 +4,13 @@
 
 Most teams today assume that **versioned migrations in source control** are the only safe way to evolve a production schema. Historically, “db push”‑style commands have been positioned as dev‑only conveniences. This design proposes a new path:
 
+This document builds on the **Migration System** subsystem and **ADR 028 – Migration Structure & Operations**:
+
+- See `docs/architecture docs/subsystems/7. Migration System.md` for markers, edges, and ledgers.
+- See `docs/architecture docs/adrs/ADR 028 - Migration Structure & Operations.md` for the migration IR and canonicalization.
+
+Those documents define the core primitives; this one specifies how `db update` reuses them for a planner‑authored, migrationless surface.
+
 - The **contract** is the source of truth for application expectations.
 - A **planner** can synthesize a **deterministic, lossless change plan** from the database’s current contract to the desired contract.
 - A **runner** can execute that plan safely, with full verification and audit, **without requiring hand-authored migration files on disk**.
@@ -48,6 +55,9 @@ The **canonical contract IR** (what is emitted as `contract.json`, hashed into `
 - It is **planner-agnostic**:
   - No planner hints.
   - No deprecation/delete flags that exist solely to drive migration planning.
+  - No rollout or environment-specific policy decisions.
+
+In other words, the canonical contract IR **never encodes planner or rollout decisions**; those live only in **authoring metadata** and **migration history**, and are interpreted by the migration planner/control-plane.
 
 Given the semantics:
 
@@ -85,7 +95,7 @@ This preserves the contract’s role as **“required shape”** while letting a
   - `contract.json` in the repo at the point of invocation
 - **Current database state**:
   - DB marker row, which includes `{ core_hash, profile_hash, contract_json, ... }`.
-  - The planner reads `contract_json` as the current contract; the hashes are used to name the edge and to validate marker equality before apply.
+  - The planner reads `contract_json` as the environment’s **marker contract** (its current contract); the hashes are used to name the edge and to validate marker equality before apply.
   - Live schema (introspected as needed for pre/post checks).
 - **Authoring metadata**:
   - `@deprecated` / `@deleted` states.
@@ -111,7 +121,9 @@ This preserves the contract’s role as **“required shape”** while letting a
   - Ops list (DDL/DML IR).
   - Pre/post checks per operation.
 
-This edge uses the **same IR as normal migrations**, but is **planner-authored and ephemeral**: it need not be checked into `migrations/`, though it is still logged.
+The planner reasons **purely in contract space**: it diffs the marker contract against the desired contract, guided by authoring metadata and policy. It does **not** diff directly against the live schema; live schema is only consulted via pre/post checks at apply-time.
+
+This edge uses the **same IR as normal migrations** (as defined in ADR 028 and the Migration System subsystem), but is **planner-authored and ephemeral**: it need not be checked into `migrations/`, though it is still logged.
 
 ### Behavior (Runner)
 
@@ -139,7 +151,7 @@ prisma-next db update --db <url>
   - Only planner-allowed operations per policy.
   - Aborts if a required change cannot be expressed as a safe plan.
 
-Optional flags could later extend this (for example `--allow-destructive`), but the base semantics are “no data loss unless explicitly and narrowly allowed.”
+Optional flags could later extend this (for example `--allow-destructive`), but the base semantics are “no data loss unless explicitly and narrowly allowed.” Even with such flags, the planner continues to operate **only on contract deltas and extension-defined operations**; there is no escape hatch for arbitrary SQL.
 
 ---
 
@@ -330,7 +342,7 @@ This ensures `db update` works not just for “vanilla SQL” but for the full e
   - Semantic reshapes (splits/joins, enum value removal, complex data migrations) still require:
     - Explicit migrations, and/or
     - Userland data migration scripts and rollout choreography.
-  - `db update` should reject such changes with actionable errors, not try to be clever.
+  - `db update` should reject such changes with actionable errors, not try to be clever. For example: `PN-CLI-4xxx: Destructive change requires on-disk migration (narrowing column type from text to varchar(10)).`
 
 - **Migrations-on-disk remain first-class**
   - Teams can continue to use hand-authored or planner-generated migrations in Git for:
@@ -343,6 +355,17 @@ This ensures `db update` works not just for “vanilla SQL” but for the full e
     - Active to deprecated to deleted lifecycle at its own pace.
   - CI enforces that you do not skip phases for a given environment.
 
+---
+
+## Related Commands
+
+`db update` sits alongside other contract-driven commands:
+
+- **`prisma-next contract verify`** (`docs/Contract-Verify-Command.md`): Validates that a contract is well-formed and compatible with its family/target.
+- **`prisma-next db schema verify`** (`docs/Db-Schema-Verify-Command.md`): Checks that a database’s live schema satisfies a given contract without changing the database.
+- **`prisma-next db sign`** (`docs/Db-Sign-Command.md`): Writes or refreshes the contract marker for an existing database, establishing its current contract state.
+
 Together, this defines a **contract-driven, planner-authored `db update`** story that remains faithful to the core architecture (contracts, markers, edges), but offers a migrationless ergonomic surface for a large, safe subset of schema evolution.
+
 
 
