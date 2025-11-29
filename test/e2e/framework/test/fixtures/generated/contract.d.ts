@@ -20,12 +20,12 @@ export type Contract = SqlContract<
       readonly user: {
         columns: {
           readonly id: {
-            readonly nativeType: 'pg/int4@1';
+            readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
           readonly email: {
-            readonly nativeType: 'pg/text@1';
+            readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
@@ -38,22 +38,22 @@ export type Contract = SqlContract<
       readonly post: {
         columns: {
           readonly id: {
-            readonly nativeType: 'pg/int4@1';
+            readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
           readonly userId: {
-            readonly nativeType: 'pg/int4@1';
+            readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
           readonly title: {
-            readonly nativeType: 'pg/text@1';
+            readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
           readonly published: {
-            readonly nativeType: 'pg/bool@1';
+            readonly nativeType: 'bool';
             readonly codecId: 'pg/bool@1';
             readonly nullable: false;
           };
@@ -66,17 +66,17 @@ export type Contract = SqlContract<
       readonly comment: {
         columns: {
           readonly id: {
-            readonly nativeType: 'pg/int4@1';
+            readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
           readonly postId: {
-            readonly nativeType: 'pg/int4@1';
+            readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
           readonly content: {
-            readonly nativeType: 'pg/text@1';
+            readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
