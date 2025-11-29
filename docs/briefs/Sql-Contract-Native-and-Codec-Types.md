@@ -136,8 +136,8 @@ type SqlStorageColumn = {
   nativeType: string;     // e.g. 'int4', 'text', 'vector'
 
   // Codec identifier (for query builders and runtime codecs).
-  // Optional to allow bare structural contracts, but present for normal SQL family use.
-  codecId?: string;       // e.g. 'pg/int4@1', 'pg/text@1', 'pg/vector@1'
+  // Required - contracts must be consumable by both application and database.
+  codecId: string;       // e.g. 'pg/int4@1', 'pg/text@1', 'pg/vector@1'
 
   nullable: boolean;
   default?: unknown;
@@ -158,7 +158,7 @@ Design notes:
   - It is application configuration, but we accept having it in the contract for pragmatic reasons.
 
 - **Hashing / `coreHash`**
-  - For the SQL family, both `nativeType` and `codecId` (when present) are part of the canonical contract IR:
+  - For the SQL family, both `nativeType` and `codecId` are part of the canonical contract IR:
     - Changing either changes `coreHash`.
   - This reflects the idea that:
     - A change to storage type is a **contract breaking** change.
@@ -221,13 +221,12 @@ This keeps:
 
 Changes:
 
-- Update SQL-specific contract types to use `nativeType` + optional `codecId` for columns.
+- Update SQL-specific contract types to use `nativeType` + required `codecId` for columns.
 - Update Arktype schemas to validate the new shape:
   - `nativeType: string` required.
-  - `'codecId?' : 'string'` optional.
+  - `codecId: 'string'` required.
 - Ensure `validateContract<SqlContract<SqlStorage>>`:
-  - Enforces presence of `nativeType` for SQL columns.
-  - Keeps `codecId` optional (to allow purely structural contracts for some use cases).
+  - Enforces presence of both `nativeType` and `codecId` for SQL columns.
 
 ### 2. SQL Contract Authoring & Emission
 
@@ -245,10 +244,9 @@ Changes:
       - Lookup `nativeType` for that `codecId` and target.
     - Write both into the contract IR:
       - `nativeType` (required).
-      - `codecId` (optional but present for normal SQL use).
+      - `codecId` (required).
 - Ensure that authoring surfaces:
-  - Either require codec IDs explicitly, or:
-  - Provide a default codec for each native type (if we want a more declarative authoring experience).
+  - Require codec IDs explicitly for all columns.
 
 ### 3. Schema Verification (`db schema-verify`)
 
@@ -265,7 +263,7 @@ Changes:
   - Ignore `codecId` for structural comparison.
 - Optionally:
   - Use the type registry at verification time to:
-    - Check that `codecId` (if present) and `nativeType` agree with manifests.
+    - Check that `codecId` and `nativeType` agree with manifests.
     - Emit warnings or errors when they diverge.
 
 Downstream tools that only have:
@@ -295,7 +293,7 @@ Changes:
   // Nullability logic remains as in Slice 1
   ```
 
-- Codec IDs are not considered for compatibility in the planner:
+- Codec IDs are not considered for compatibility in the planner (only `nativeType` is used):
   - If we later want to plan codec-level changes, they can be modeled as extension or application-level operations, not as structural schema changes.
 
 This aligns migration planning with the new contract shape and makes it robust for tools that only see contract + schema.
@@ -310,12 +308,11 @@ This aligns migration planning with the new contract shape and makes it robust f
 
 Changes:
 
-- Update builders that currently read `StorageColumn.type` as a codec ID to instead read `codecId` (or updated field name):
+- Update builders that currently read `StorageColumn.type` as a codec ID to instead read `codecId`:
   - This is largely a mechanical rename and field change.
-- For cases where no `codecId` is present:
-  - Decide default behavior (e.g. derive a default codec from `nativeType` using type metadata registry).
+- All columns must have `codecId` present - no default behavior needed.
 
-The key point: query builders remain codec-driven, but they no longer need to infer anything from native types unless we want them to.
+The key point: query builders remain codec-driven and can always rely on `codecId` being present.
 
 ### 6. Marker and Downstream Tools
 
@@ -343,10 +340,10 @@ This section outlines a concrete, multi-step plan to move from the current imple
 ### Step 1: Update SQL Contract Types and Schemas
 
 - [ ] In `@prisma-next/sql-contract`:
-  - [ ] Introduce `nativeType` and `codecId?` on the SQL-specific `StorageColumn` type.
+  - [ ] Introduce `nativeType` and `codecId` on the SQL-specific `StorageColumn` type.
   - [ ] Update Arktype schemas to validate:
     - `nativeType: 'string'` (required).
-    - `'codecId?': 'string'` (optional).
+    - `codecId: 'string'` (required).
   - [ ] Keep existing `type` property for backward compatibility if needed, or:
     - [ ] Deprecate/replace it with `codecId` in a structured way.
 
@@ -365,10 +362,9 @@ This section outlines a concrete, multi-step plan to move from the current imple
     - [ ] Write both `nativeType` and `codecId` into the contract.
 
 - [ ] Ensure that:
-  - [ ] If `codecId` is absent (pure structural contract):
-    - `nativeType` is still present (author must provide it or default rules apply).
-  - [ ] If `codecId` is present but registry has no `nativeType`:
-    - Treat this as a validation error or, at minimum, a strong warning in authoring.
+  - [ ] Both `codecId` and `nativeType` are always present for all columns.
+  - [ ] If registry has no `nativeType` for `codecId`:
+    - Treat this as a validation error in authoring.
 
 ### Step 3: Update Schema Verification to Use Native Types
 
@@ -402,11 +398,8 @@ This section outlines a concrete, multi-step plan to move from the current imple
 ### Step 5: Adjust Query Builders and Runtime
 
 - [ ] In SQL lane and ORM lane:
-  - [ ] Update all usages of `StorageColumn.type` (as codec ID) to use `codecId` (or the new field name).
-  - [ ] Where `codecId` is missing:
-    - [ ] Decide default behavior:
-      - Use type metadata registry to infer a default codec from `nativeType`, or
-      - Treat missing `codecId` as an error for lanes that require codecs.
+  - [ ] Update all usages of `StorageColumn.type` (as codec ID) to use `codecId`.
+  - [ ] All columns must have `codecId` - treat missing `codecId` as an error.
 
 - [ ] In runtime:
   - [ ] Ensure plan building and result decoding are wired only to `codecId`, not `nativeType`.
