@@ -5,7 +5,7 @@ import {
   ensureTableStatement,
   readContractMarker,
   writeContractMarker,
-} from '@prisma-next/sql-runtime/sql-marker';
+} from '@prisma-next/sql-runtime';
 import { type } from 'arktype';
 
 /**
@@ -128,8 +128,8 @@ export async function writeMarker(
   const writeStatements = writeContractMarker({
     coreHash: input.coreHash,
     profileHash: input.profileHash,
-    contractJson: input.contractJson,
-    canonicalVersion: input.canonicalVersion,
+    ...(input.contractJson !== undefined ? { contractJson: input.contractJson } : {}),
+    ...(input.canonicalVersion !== undefined ? { canonicalVersion: input.canonicalVersion } : {}),
   });
 
   // Use INSERT for new marker, UPDATE for existing

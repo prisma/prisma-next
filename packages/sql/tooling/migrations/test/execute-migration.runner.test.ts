@@ -4,8 +4,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { describe, expect, it } from 'vitest';
 import { SqlMigrationExecutionError } from '../src/errors';
 import { executeMigration } from '../src/execute-migration';
-import type { SqlMigrationExecutor } from '../src/executor';
-import { AdvisoryLockError } from '../src/executor';
+import { AdvisoryLockError, type SqlMigrationExecutor } from '../src/executor';
 import type { SqlMigrationPlan } from '../src/ir';
 
 /**

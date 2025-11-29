@@ -27,7 +27,7 @@ export async function acquireAdvisoryLock(
       [lockKey],
     );
 
-    if (result.rows.length === 0 || !result.rows[0]) {
+    if (result.rows.length === 0 || result.rows[0] === undefined) {
       throw new AdvisoryLockError(
         'Failed to acquire advisory lock: unexpected query result',
         lockKey,
@@ -36,8 +36,8 @@ export async function acquireAdvisoryLock(
 
     const acquired = result.rows[0].pg_try_advisory_lock;
 
-    if (!acquired) {
-      // Lock is already held by another session
+    if (acquired !== true) {
+      // Lock is already held by another session (or query returned false/null)
       throw new AdvisoryLockError(
         'Advisory lock is already held by another session. Another migration may be in progress.',
         lockKey,

@@ -1,9 +1,11 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlDriverInstance,
   ControlExtensionDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { SqlMigrationExecutionError } from '@prisma-next/sql-migrations/errors';
 import type { SqlMigrationExecutor } from '@prisma-next/sql-migrations/executor';
+import type { SqlMigrationOperation, SqlMigrationPlan } from '@prisma-next/sql-migrations/ir';
 import { acquireAdvisoryLock, releaseAdvisoryLock } from './advisory-locks';
 import { executeOperation } from './execute-operations';
 import { ensureLedgerTable, generateEdgeId, writeLedgerEntry } from './ledger';
@@ -21,11 +23,16 @@ export function createPostgresMigrationExecutor(
   _extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[],
 ): SqlMigrationExecutor<ControlDriverInstance<'postgres'>> {
   return {
-    async readMarker(driverInstance) {
+    async readMarker(
+      driverInstance: ControlDriverInstance<'postgres'>,
+    ): Promise<ContractMarkerRecord | null> {
       return await readMarker(driverInstance);
     },
 
-    async validateMarkerState(plan, marker) {
+    async validateMarkerState(
+      plan: SqlMigrationPlan,
+      marker: ContractMarkerRecord | null,
+    ): Promise<void> {
       if (plan.mode === 'init') {
         if (marker !== null) {
           throw new SqlMigrationExecutionError(
@@ -61,7 +68,10 @@ export function createPostgresMigrationExecutor(
       }
     },
 
-    async withMigrationLock(driverInstance, fn) {
+    async withMigrationLock<R>(
+      driverInstance: ControlDriverInstance<'postgres'>,
+      fn: () => Promise<R>,
+    ): Promise<R> {
       await acquireAdvisoryLock(driverInstance);
       try {
         return await fn();
@@ -70,13 +80,17 @@ export function createPostgresMigrationExecutor(
       }
     },
 
-    async ensureInfrastructure(driverInstance) {
+    async ensureInfrastructure(driverInstance: ControlDriverInstance<'postgres'>): Promise<void> {
       await ensureSchema(driverInstance);
       await ensureMarkerTable(driverInstance);
       await ensureLedgerTable(driverInstance);
     },
 
-    async applyOperation(driverInstance, operation, index) {
+    async applyOperation(
+      driverInstance: ControlDriverInstance<'postgres'>,
+      operation: SqlMigrationOperation,
+      index: number,
+    ): Promise<void> {
       try {
         const statement = executeOperation(operation);
         await driverInstance.query(statement.sql, statement.params);
@@ -94,7 +108,11 @@ export function createPostgresMigrationExecutor(
       }
     },
 
-    async updateMarker(driverInstance, plan, marker) {
+    async updateMarker(
+      driverInstance: ControlDriverInstance<'postgres'>,
+      plan: SqlMigrationPlan,
+      marker: ContractMarkerRecord | null,
+    ): Promise<void> {
       await writeMarker(
         driverInstance,
         {
@@ -107,7 +125,11 @@ export function createPostgresMigrationExecutor(
       );
     },
 
-    async writeLedger(driverInstance, plan, operationsApplied) {
+    async writeLedger(
+      driverInstance: ControlDriverInstance<'postgres'>,
+      plan: SqlMigrationPlan,
+      operationsApplied: number,
+    ): Promise<void> {
       const edgeId = generateEdgeId(plan.fromContract.coreHash, plan.toContract.coreHash);
       await writeLedgerEntry(driverInstance, {
         edgeId,

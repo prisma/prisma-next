@@ -44,7 +44,9 @@ export function executeCreateTable(operation: CreateTableOperation): SqlStatemen
   const columns: string[] = [];
 
   // Add all columns
-  for (const [columnName, column] of Object.entries(operation.columns)) {
+  for (const [columnName, column] of Object.entries(operation.columns) as Array<
+    [string, StorageColumn]
+  >) {
     columns.push(columnDefinition(columnName, column));
   }
 
@@ -208,7 +210,7 @@ export function executeOperation(operation: SqlMigrationOperation): SqlStatement
       return executeExtensionOperation(operation);
     default: {
       // Exhaustiveness check
-      const _exhaustive: never = operation;
+      const _exhaustive: never = operation as never;
       throw new Error(`Unknown operation kind: ${(_exhaustive as { kind: string }).kind}`);
     }
   }

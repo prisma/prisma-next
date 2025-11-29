@@ -1978,7 +1978,7 @@ export function createSqlFamilyInstance(
       const { driver, plan } = options;
 
       // Get adapter from instance state
-      const controlAdapter = adapter.create();
+      const controlAdapter = adapter.create() as SqlControlAdapter<string>;
 
       // Create executor from adapter
       const executor = controlAdapter.createMigrationExecutor(driver, extensions ?? []);

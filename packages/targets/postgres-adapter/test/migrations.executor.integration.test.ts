@@ -2,9 +2,11 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import { col, contract, fk, pk, storage, table } from '@prisma-next/sql-contract/factories';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { planMigration } from '@prisma-next/sql-migrations';
-import { executeMigration } from '@prisma-next/sql-migrations/execute-migration';
-import type { SqlMigrationPlan } from '@prisma-next/sql-migrations/ir';
+import {
+  executeMigration,
+  planMigration,
+  type SqlMigrationPlan,
+} from '@prisma-next/sql-migrations';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { readMarker } from '../src/core/migrations/marker';
@@ -377,7 +379,7 @@ describe('Postgres migration executor integration', () => {
         throw new Error('Connection string not set');
       }
 
-      const contract = validateContract<SqlContract<SqlStorage>>(createTestContract());
+      const testContract = validateContract<SqlContract<SqlStorage>>(createTestContract());
 
       // Create marker first
       const driver = await postgresDriver.create(connectionString);
@@ -397,7 +399,7 @@ describe('Postgres migration executor integration', () => {
         `);
         await driver.query(
           'insert into prisma_contract.marker (id, core_hash, profile_hash) values (1, $1, $2)',
-          [contract.coreHash, contract.profileHash ?? contract.coreHash],
+          [testContract.coreHash, testContract.profileHash ?? testContract.coreHash],
         );
 
         // Try to execute init migration
@@ -412,7 +414,7 @@ describe('Postgres migration executor integration', () => {
               mappings: {},
             }),
           ),
-          toContract: contract,
+          toContract: testContract,
           operations: [
             {
               kind: 'createTable',
