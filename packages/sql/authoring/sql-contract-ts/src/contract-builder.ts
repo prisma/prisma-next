@@ -137,13 +137,19 @@ class SqlContractBuilder<
    * - `indexes`: defaults to `[]` (empty array)
    * - `foreignKeys`: defaults to `[]` (empty array)
    * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
+   * - `nativeType`: looked up from type metadata registry using `codecId`
    *
    * The contract builder is the **only** place where normalization should occur.
    * Validators, parsers, and emitters should assume the contract is already normalized.
    *
+   * @param options - Optional build options
+   * @param options.getNativeType - Optional function to lookup nativeType from codecId.
+   *   If not provided, nativeType must be set explicitly or will be handled at emission time.
    * @returns A normalized SqlContract with all required fields present
    */
-  build(): Target extends string
+  build(options?: {
+    getNativeType?: (codecId: string) => string | undefined;
+  }): Target extends string
     ? SqlContract<
         BuildStorage<Tables>,
         BuildModels<Models>,
@@ -206,8 +212,28 @@ class SqlContractBuilder<
       for (const columnName in tableState.columns) {
         const columnState = tableState.columns[columnName];
         if (!columnState) continue;
+        const codecId = columnState.type;
+        // Lookup nativeType from registry if provided
+        // If getNativeType is provided but returns undefined, that's an error
+        // If getNativeType is not provided, nativeType will be resolved at emission time
+        let nativeType: string;
+        if (options?.getNativeType) {
+          nativeType = options.getNativeType(codecId);
+          if (!nativeType) {
+            throw new Error(
+              `Cannot determine nativeType for codecId "${codecId}" in column "${columnName}" of table "${tableName}". ` +
+                'The type metadata registry has no nativeType mapping for this codecId.',
+            );
+          }
+        } else {
+          // If registry lookup not available, use codecId as temporary value
+          // This will be resolved during emission when registry is available
+          // Note: This is not ideal per the brief (prefers construction time), but allows builder to work
+          nativeType = codecId; // Temporary - will be replaced during emission
+        }
         columns[columnName as keyof ColumnDefs] = {
-          type: columnState.type,
+          nativeType,
+          codecId,
           nullable: (columnState.nullable ?? false) as ColumnDefs[keyof ColumnDefs]['nullable'] &
             boolean,
         } as BuildStorageColumn<

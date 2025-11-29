@@ -120,15 +120,22 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
           typeof table.columns === 'object' &&
           table.columns !== null
         ) {
-          const columns = table.columns as Record<string, { type?: string } | undefined>;
+          const columns = table.columns as Record<
+            string,
+            { codecId?: string; type?: string } | undefined
+          >;
           for (const column of Object.values(columns)) {
-            if (
-              column &&
-              typeof column === 'object' &&
-              'type' in column &&
-              typeof column.type === 'string'
-            ) {
-              typeIds.add(column.type);
+            if (column && typeof column === 'object') {
+              // Prefer codecId, fallback to deprecated type field for backward compatibility
+              const codecId =
+                'codecId' in column && typeof column.codecId === 'string'
+                  ? column.codecId
+                  : 'type' in column && typeof column.type === 'string'
+                    ? column.type
+                    : undefined;
+              if (codecId) {
+                typeIds.add(codecId);
+              }
             }
           }
         }
@@ -1209,47 +1216,52 @@ export function createSqlFamilyInstance(
           const columnChildren: SchemaVerificationNode[] = [];
           let columnStatus: 'pass' | 'warn' | 'fail' = 'pass';
 
-          // Compare type using nativeType
-          // Contract stores type ID (e.g., 'pg/int4@1'), schema IR has nativeType (e.g., 'int4')
-          // We need to get nativeType from the type metadata registry for the contract type ID
-          const typeMetadata = typeMetadataRegistry.get(contractColumn.type);
-          const contractNativeType = typeMetadata?.nativeType;
-          const schemaNativeType = schemaColumn.nativeType;
+          // Compare type using nativeType directly
+          // Contract now stores nativeType directly (e.g., 'int4'), schema IR has nativeType (e.g., 'int4')
+          const contractNativeType = contractColumn.nativeType;
+          const schemaNativeType = schemaColumn.nativeType ?? schemaColumn.typeId;
 
           if (!contractNativeType) {
-            // Contract type ID doesn't have nativeType metadata - emit warning, not failure
-            // This allows graceful degradation when metadata is missing
-            columnChildren.push({
-              status: 'warn',
-              kind: 'type',
-              name: 'type',
-              contractPath: `${columnPath}.type`,
-              code: 'type_metadata_missing',
-              message: `Contract type "${contractColumn.type}" has no nativeType metadata - native type comparison skipped`,
-              expected: { typeId: contractColumn.type },
-              actual: schemaColumn.typeId || schemaNativeType || 'unknown',
-              children: [],
-            });
-            // Status will be computed from children below
-          } else if (!schemaNativeType) {
-            // Schema IR doesn't have nativeType - this shouldn't happen either
+            // Contract column doesn't have nativeType - this shouldn't happen with new contract format
             issues.push({
               kind: 'type_mismatch',
               table: tableName,
               column: columnName,
-              expected: contractNativeType,
-              actual: schemaColumn.typeId || 'unknown',
-              message: `Column "${tableName}"."${columnName}" has type mismatch: schema column has no nativeType`,
+              expected: 'nativeType required',
+              actual: schemaNativeType || 'unknown',
+              message: `Column "${tableName}"."${columnName}" is missing nativeType in contract`,
             });
             columnChildren.push({
               status: 'fail',
               kind: 'type',
               name: 'type',
-              contractPath: `${columnPath}.type`,
+              contractPath: `${columnPath}.nativeType`,
               code: 'type_mismatch',
-              message: 'Schema column has no nativeType',
+              message: 'Contract column is missing nativeType',
+              expected: 'nativeType required',
+              actual: schemaNativeType || 'unknown',
+              children: [],
+            });
+            columnStatus = 'fail';
+          } else if (!schemaNativeType) {
+            // Schema IR doesn't have nativeType or typeId - this shouldn't happen
+            issues.push({
+              kind: 'type_mismatch',
+              table: tableName,
+              column: columnName,
               expected: contractNativeType,
-              actual: schemaColumn.typeId || 'unknown',
+              actual: 'unknown',
+              message: `Column "${tableName}"."${columnName}" has type mismatch: schema column has no nativeType or typeId`,
+            });
+            columnChildren.push({
+              status: 'fail',
+              kind: 'type',
+              name: 'type',
+              contractPath: `${columnPath}.nativeType`,
+              code: 'type_mismatch',
+              message: 'Schema column has no nativeType or typeId',
+              expected: contractNativeType,
+              actual: 'unknown',
               children: [],
             });
             columnStatus = 'fail';
@@ -1267,7 +1279,7 @@ export function createSqlFamilyInstance(
               status: 'fail',
               kind: 'type',
               name: 'type',
-              contractPath: `${columnPath}.type`,
+              contractPath: `${columnPath}.nativeType`,
               code: 'type_mismatch',
               message: `Type mismatch: expected ${contractNativeType}, got ${schemaNativeType}`,
               expected: contractNativeType,
@@ -1275,6 +1287,25 @@ export function createSqlFamilyInstance(
               children: [],
             });
             columnStatus = 'fail';
+          }
+
+          // Optionally validate that codecId (if present) and nativeType agree with registry
+          if (contractColumn.codecId) {
+            const typeMetadata = typeMetadataRegistry.get(contractColumn.codecId);
+            if (typeMetadata?.nativeType && typeMetadata.nativeType !== contractNativeType) {
+              // Warning: codecId and nativeType don't agree with registry
+              columnChildren.push({
+                status: 'warn',
+                kind: 'type',
+                name: 'type_consistency',
+                contractPath: `${columnPath}.codecId`,
+                code: 'type_consistency_warning',
+                message: `codecId "${contractColumn.codecId}" maps to nativeType "${typeMetadata.nativeType}" in registry, but contract has "${contractNativeType}"`,
+                expected: typeMetadata.nativeType,
+                actual: contractNativeType,
+                children: [],
+              });
+            }
           }
 
           // Compare nullability
@@ -1312,11 +1343,11 @@ export function createSqlFamilyInstance(
 
           // Build column node
           const nullableText = contractColumn.nullable ? 'nullable' : 'not nullable';
-          // Format: columnName: contractType → nativeType (nullability)
+          // Format: columnName: nativeType (codecId) (nullability)
           // Reuse contractNativeType from above scope
-          const columnTypeDisplay = contractNativeType
-            ? `${contractColumn.type} → ${contractNativeType}`
-            : contractColumn.type;
+          const columnTypeDisplay = contractColumn.codecId
+            ? `${contractNativeType} (${contractColumn.codecId})`
+            : contractNativeType;
           // Collect failure messages from children to create a summary message
           const failureMessages = columnChildren
             .filter((child) => child.status === 'fail' && child.message)

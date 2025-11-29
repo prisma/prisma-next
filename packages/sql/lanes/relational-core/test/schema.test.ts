@@ -217,11 +217,11 @@ describe('schema', () => {
 
     expect({
       hasColumnMeta: idColumn.columnMeta !== undefined,
-      type: idColumn.columnMeta.type,
+      codecId: idColumn.columnMeta.codecId ?? idColumn.columnMeta.type,
       nullable: idColumn.columnMeta.nullable,
     }).toMatchObject({
       hasColumnMeta: true,
-      type: 'pg/int4@1',
+      codecId: 'pg/int4@1',
       nullable: false,
     });
   });

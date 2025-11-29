@@ -57,7 +57,8 @@ export function buildWhereExpr(
 
     const contractTable = contract.storage.tables[colBuilder.table];
     const columnMeta = contractTable?.columns[colBuilder.column];
-    codecId = columnMeta?.type;
+    // Use codecId if present, otherwise fallback to deprecated type field
+    codecId = columnMeta?.codecId ?? columnMeta?.type;
 
     leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
   }

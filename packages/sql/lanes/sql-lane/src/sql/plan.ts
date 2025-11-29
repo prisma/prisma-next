@@ -201,10 +201,12 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
     } else {
       // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as { columnMeta?: { type?: string } };
+      const col = column as unknown as { columnMeta?: { codecId?: string; type?: string } };
       const columnMeta = col.columnMeta;
-      if (columnMeta?.type) {
-        projectionTypes[alias] = columnMeta.type;
+      // Use codecId if present, otherwise fallback to deprecated type field
+      const codecId = columnMeta?.codecId ?? columnMeta?.type;
+      if (codecId) {
+        projectionTypes[alias] = codecId;
       }
     }
   }
@@ -227,12 +229,14 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         projectionCodecs[alias] = operationExpr.returns.type;
       }
     } else {
-      // Use columnMeta.type directly as typeId (already canonicalized)
+      // Use columnMeta.codecId directly as typeId (already canonicalized)
       // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as { columnMeta?: { type?: string } };
+      const col = column as unknown as { columnMeta?: { codecId?: string; type?: string } };
       const columnMeta = col.columnMeta;
-      if (columnMeta?.type) {
-        projectionCodecs[alias] = columnMeta.type;
+      // Use codecId if present, otherwise fallback to deprecated type field
+      const codecId = columnMeta?.codecId ?? columnMeta?.type;
+      if (codecId) {
+        projectionCodecs[alias] = codecId;
       }
     }
   }
