@@ -1,5 +1,3 @@
-import type { StartServerOptions } from '@prisma/dev';
-import { unstable_startServer } from '@prisma/dev';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -11,34 +9,10 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
-import { timeouts } from '@prisma-next/test-utils';
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '../src/prisma-client';
-
-function normalizeConnectionString(raw: string): string {
-  const url = new URL(raw);
-  if (url.hostname === 'localhost' || url.hostname === '::1') {
-    url.hostname = '127.0.0.1';
-  }
-  return url.toString();
-}
-
-interface DevDatabase {
-  readonly connectionString: string;
-  close(): Promise<void>;
-}
-
-async function createDevDatabase(options?: StartServerOptions): Promise<DevDatabase> {
-  const server = await unstable_startServer(options);
-
-  return {
-    connectionString: normalizeConnectionString(server.database.connectionString),
-    async close() {
-      await server.close();
-    },
-  };
-}
 
 const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
