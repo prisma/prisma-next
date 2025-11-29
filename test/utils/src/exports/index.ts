@@ -1,6 +1,6 @@
 import type { StartServerOptions } from '@prisma/dev';
 import { unstable_startServer } from '@prisma/dev';
-import getPort, { portNumbers } from 'get-port';
+import getPort from 'get-port';
 import { Client } from 'pg';
 
 export * from '../timeouts';
@@ -20,49 +20,18 @@ export interface DevDatabase {
 }
 
 /**
- * Port allocation counter to avoid contention by starting from different port ranges.
- * Each allocation increments this counter, ensuring parallel tests don't all start
- * from the beginning of the port range.
- */
-let portAllocationCounter = 0;
-const PORT_COUNTER_INCREMENT = 100; // Increment by 100 ports each time to create spacing
-
-/**
- * Gets the next port range offset based on the allocation counter.
- * This ensures different test processes start from different parts of the port range.
- */
-function getNextPortOffset(): number {
-  // Use atomic-like increment (simple counter is fine for Node.js single-threaded event loop)
-  const current = portAllocationCounter;
-  portAllocationCounter = (portAllocationCounter + PORT_COUNTER_INCREMENT) % 50_000; // Wrap around
-  return current;
-}
-
-/**
  * Allocates available ports automatically using get-port.
- * Uses port range 10,000-65,000 to find available ports for parallel test execution.
- * Uses a counter to offset the starting port range, reducing contention.
+ * Lets the OS pick ephemeral ports for parallel-safe allocation.
  */
 async function allocatePorts(): Promise<{
   acceleratePort: number;
   databasePort: number;
   shadowDatabasePort: number;
 }> {
-  // Get offset to avoid all tests starting from the same port range
-  const offset = getNextPortOffset();
-  const baseMinPort = 10_000;
-  const baseMaxPort = 65_000;
-  const availableRange = baseMaxPort - baseMinPort; // 55,000 ports available
-
-  // Calculate offset within available range (wrap around if needed)
-  const effectiveOffset = offset % availableRange;
-  const minPort = baseMinPort + effectiveOffset;
-  const maxPort = baseMaxPort;
-
   const [acceleratePort, databasePort, shadowDatabasePort] = await Promise.all([
-    getPort({ host: '127.0.0.1', port: portNumbers(minPort, maxPort) }),
-    getPort({ host: '127.0.0.1', port: portNumbers(minPort, maxPort) }),
-    getPort({ host: '127.0.0.1', port: portNumbers(minPort, maxPort) }),
+    getPort({ host: '127.0.0.1' }),
+    getPort({ host: '127.0.0.1' }),
+    getPort({ host: '127.0.0.1' }),
   ]);
 
   return { acceleratePort, databasePort, shadowDatabasePort };
@@ -83,13 +52,22 @@ function isPortError(error: unknown): boolean {
   // Check error message as fallback (handles wrapped errors)
   if ('message' in error && typeof error.message === 'string') {
     const message = error.message;
-    return (
-      message.includes('Port number') &&
-      (message.includes('is not available') || message.includes('not available'))
-    );
+    // Match patterns like "Port number `11601` is not available for service database."
+    if (
+      (message.includes('Port number') || message.includes('port number')) &&
+      (message.includes('is not available') ||
+        message.includes('not available') ||
+        message.includes('not available for service'))
+    ) {
+      return true;
+    }
   }
   // Check constructor name as additional fallback
   if (error instanceof Error && error.constructor.name === 'PortNotAvailableError') {
+    return true;
+  }
+  // Check if error has a code property that might indicate port errors
+  if ('code' in error && typeof error.code === 'string' && error.code.includes('PORT')) {
     return true;
   }
   return false;
@@ -105,9 +83,16 @@ export async function createDevDatabase(options?: StartServerOptions): Promise<D
   let currentOptions: StartServerOptions = options || {};
   let lastError: unknown;
 
-  // Small initial delay to spread out concurrent attempts (reduces initial contention)
-  if (!options?.acceleratePort && !options?.databasePort && !options?.shadowDatabasePort) {
-    const initialJitter = Math.random() * 50; // 0-50ms random delay
+  // If no ports provided, allocate them before first attempt
+  if (
+    !currentOptions.acceleratePort &&
+    !currentOptions.databasePort &&
+    !currentOptions.shadowDatabasePort
+  ) {
+    const allocatedPorts = await allocatePorts();
+    currentOptions = { ...currentOptions, ...allocatedPorts };
+    // Larger initial delay to spread out concurrent attempts (reduces initial contention)
+    const initialJitter = Math.random() * 100; // 0-100ms random delay
     await new Promise((resolve) => setTimeout(resolve, initialJitter));
   }
 
@@ -122,13 +107,19 @@ export async function createDevDatabase(options?: StartServerOptions): Promise<D
       };
     } catch (error) {
       lastError = error;
+      const isPort = isPortError(error);
       // If it's a port error and we have retries left, allocate new ports and retry
-      if (isPortError(error) && attempt < maxRetries - 1) {
-        // Wait 50ms before retrying to reduce contention
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        // Allocate new ports for the next attempt
+      if (isPort && attempt < maxRetries - 1) {
+        // Exponential backoff: 50ms base delay, increasing with each attempt
+        // Plus random jitter to avoid thundering herd
+        const baseDelay = 50;
+        const exponentialDelay = baseDelay * 2 ** attempt;
+        const jitter = Math.random() * 50; // 0-50ms random jitter
+        const totalDelay = exponentialDelay + jitter;
+        await new Promise((resolve) => setTimeout(resolve, totalDelay));
+        // Allocate new ports for the next attempt (always get fresh ports)
         const newPorts = await allocatePorts();
-        // Merge new ports, ensuring we replace any existing port values
+        // Replace all port values to ensure we're using fresh ports
         currentOptions = {
           ...currentOptions,
           acceleratePort: newPorts.acceleratePort,
