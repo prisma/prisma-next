@@ -36,7 +36,7 @@ export function buildWhereExpr(
     const colBuilder = where.left as unknown as {
       table: string;
       column: string;
-      columnMeta?: { codecId?: string; nullable?: boolean };
+      columnMeta?: { codecId: string; nullable?: boolean };
     };
     const meta = (colBuilder.columnMeta ?? {}) as { codecId?: string; nullable?: boolean };
 

@@ -144,6 +144,11 @@ export const sqlTargetFamilyHook = {
             `Table "${tableName}" column "${colName}" is missing required field "nativeType" (must be a string)`,
           );
         }
+        if (!col.codecId || typeof col.codecId !== 'string') {
+          throw new Error(
+            `Table "${tableName}" column "${colName}" is missing required field "codecId" (must be a string)`,
+          );
+        }
       }
 
       if (!Array.isArray(table.uniques)) {
@@ -284,10 +289,9 @@ export type Relations = Contract['relations'];
       for (const [colName, col] of Object.entries(table.columns)) {
         const nullable = col.nullable ? 'true' : 'false';
         const nativeType = col.nativeType ? `'${col.nativeType}'` : 'string';
-        const codecId = col.codecId ? `'${col.codecId}'` : undefined;
-        const codecIdPart = codecId ? `; readonly codecId: ${codecId}` : '';
+        const codecId = col.codecId ? `'${col.codecId}'` : 'string';
         columns.push(
-          `readonly ${colName}: { readonly nativeType: ${nativeType}${codecIdPart}; readonly nullable: ${nullable} }`,
+          `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable} }`,
         );
       }
 
@@ -355,7 +359,7 @@ export type Relations = Contract['relations'];
             continue;
           }
 
-          const typeId = column.codecId ?? 'string';
+          const typeId = column.codecId;
           const nullable = column.nullable ?? false;
           const jsType = nullable
             ? `CodecTypes['${typeId}']['output'] | null`

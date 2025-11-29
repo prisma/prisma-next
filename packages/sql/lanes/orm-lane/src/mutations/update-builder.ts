@@ -68,7 +68,7 @@ export function buildUpdatePlan<
     const index = paramValues.push(value);
 
     const codecId = columnMeta.codecId;
-    if (codecId && paramName) {
+    if (paramName) {
       paramCodecs[paramName] = codecId;
     }
 

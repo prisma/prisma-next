@@ -92,7 +92,7 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
     const index = paramValues.push(value);
 
     const codecId = columnMeta.codecId;
-    if (codecId && paramName) {
+    if (paramName) {
       paramCodecs[paramName] = codecId;
     }
 

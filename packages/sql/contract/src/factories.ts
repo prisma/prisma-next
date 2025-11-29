@@ -15,26 +15,19 @@ import type {
 } from './types';
 
 /**
- * Creates a StorageColumn with nativeType and optional codecId.
+ * Creates a StorageColumn with nativeType and codecId.
  *
  * @param nativeType - Native database type identifier (e.g., 'int4', 'text', 'vector')
- * @param codecId - Optional codec identifier (e.g., 'pg/int4@1', 'pg/text@1')
+ * @param codecId - Codec identifier (e.g., 'pg/int4@1', 'pg/text@1')
  * @param nullable - Whether the column is nullable (default: false)
- * @returns StorageColumn with nativeType and optional codecId
+ * @returns StorageColumn with nativeType and codecId
  */
-export function col(
-  nativeType: string,
-  codecId: string | undefined = undefined,
-  nullable = false,
-): StorageColumn {
-  const column: StorageColumn = {
+export function col(nativeType: string, codecId: string, nullable = false): StorageColumn {
+  return {
     nativeType,
+    codecId,
     nullable,
   };
-  if (codecId !== undefined) {
-    column.codecId = codecId;
-  }
-  return column;
 }
 
 export function pk(...columns: readonly string[]): PrimaryKey {

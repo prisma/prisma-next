@@ -8,9 +8,7 @@ export function extractTypeIds(contract: SqlContract<SqlStorage>): Set<string> {
   for (const table of Object.values(contract.storage.tables)) {
     for (const column of Object.values(table.columns)) {
       const codecId = column.codecId;
-      if (codecId) {
-        typeIds.add(codecId);
-      }
+      typeIds.add(codecId);
     }
   }
 
@@ -23,10 +21,8 @@ function extractTypeIdsFromColumns(contract: SqlContract<SqlStorage>): Map<strin
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
       const codecId = column.codecId;
-      if (codecId) {
-        const key = `${tableName}.${columnName}`;
-        typeIds.set(key, codecId);
-      }
+      const key = `${tableName}.${columnName}`;
+      typeIds.set(key, codecId);
     }
   }
 

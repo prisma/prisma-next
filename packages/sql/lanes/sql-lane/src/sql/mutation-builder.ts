@@ -133,7 +133,7 @@ export class InsertBuilderImpl<
 
       const columnMeta = contractTable.columns[columnName];
       const codecId = columnMeta?.codecId;
-      if (codecId && paramName) {
+      if (paramName && codecId) {
         paramCodecs[paramName] = codecId;
       }
 
@@ -282,7 +282,7 @@ export class UpdateBuilderImpl<
 
       const columnMeta = contractTable.columns[columnName];
       const codecId = columnMeta?.codecId;
-      if (codecId && paramName) {
+      if (paramName && codecId) {
         paramCodecs[paramName] = codecId;
       }
 

@@ -44,13 +44,15 @@ export type ColumnBuilder<
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   // Helper property for type extraction (not used at runtime)
   readonly __jsType: JsType;
-} & (ColumnMeta['type'] extends keyof Operations
-  ? OperationMethods<
-      OperationsForTypeId<ColumnMeta['type'], Operations>,
-      ColumnName,
-      StorageColumn,
-      JsType
-    >
+} & (ColumnMeta['codecId'] extends string
+  ? ColumnMeta['codecId'] extends keyof Operations
+    ? OperationMethods<
+        OperationsForTypeId<ColumnMeta['codecId'] & string, Operations>,
+        ColumnName,
+        StorageColumn,
+        JsType
+      >
+    : Record<string, never>
   : Record<string, never>);
 
 export interface BinaryBuilder<
@@ -70,8 +72,31 @@ export interface BinaryBuilder<
 // "any type that extends OperationTypes" in a way that works for assignment.
 // Contract-specific OperationTypes (e.g., PgVectorOperationTypes) are not assignable
 // to the base OperationTypes in generic parameter position, even though they extend it structurally.
-// biome-ignore lint/suspicious/noExplicitAny: AnyColumnBuilder must accept column builders with any operation types
-export type AnyColumnBuilder = ColumnBuilder<string, StorageColumn, unknown, any>;
+// Helper type that accepts any ColumnBuilder regardless of its generic parameters
+// This is needed because conditional types in ColumnBuilder create incompatible intersection types
+// when Operations differs, even though structurally they're compatible
+type AnyColumnBuilderBase = {
+  readonly kind: 'column';
+  readonly table: string;
+  readonly column: string;
+  readonly columnMeta: StorageColumn;
+  eq(value: ParamPlaceholder): AnyBinaryBuilder;
+  asc(): AnyOrderBuilder;
+  desc(): AnyOrderBuilder;
+  readonly __jsType: unknown;
+  // Allow any operation methods (from conditional type)
+  readonly [key: string]: unknown;
+};
+
+export type AnyColumnBuilder =
+  | ColumnBuilder<
+      string,
+      StorageColumn,
+      unknown,
+      // biome-ignore lint/suspicious/noExplicitAny: AnyColumnBuilder must accept column builders with any operation types
+      any
+    >
+  | AnyColumnBuilderBase;
 export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
 export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
 
@@ -239,7 +264,7 @@ type OperationReturn<
  * Computes JavaScript type for a column at column creation time.
  *
  * Type inference:
- * - Read columnMeta.type as typeId string literal
+ * - Read columnMeta.codecId as typeId string literal
  * - Look up CodecTypes[typeId].output
  * - Apply nullability: nullable ? Output | null : Output
  */
