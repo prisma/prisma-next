@@ -682,6 +682,9 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../authoring/sql-contract-ts
+      '@prisma-next/sql-migrations':
+        specifier: workspace:*
+        version: link:../tooling/migrations
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../operations
@@ -929,6 +932,34 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../contract
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../../test/utils
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite-tsconfig-paths:
+        specifier: ^5.1.4
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@24.7.2))
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.9(@types/node@24.7.2)
+
+  packages/sql/tooling/migrations:
+    dependencies:
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../contract
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../authoring/sql-contract-ts
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:*
+        version: link:../../schema-ir
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

@@ -47,6 +47,7 @@ This package is the control plane entry point for the SQL family. It composes:
 - `@prisma-next/sql-contract-emitter` - Provides the SQL family hook
 - `@prisma-next/sql-operations` - SQL operation signature types
 - `@prisma-next/sql-contract-ts` - Contract validation
+- `@prisma-next/sql-migrations` - Migration planning logic and IR
 
 The framework CLI uses this descriptor to:
 1. Create family instances for control-plane operations (via `create()`)
@@ -58,6 +59,7 @@ Family instances implement domain actions:
 - **`introspect()`**: Introspects database schema and returns `SqlSchemaIR`
 - **`toSchemaView(schema)`**: Projects `SqlSchemaIR` into `CoreSchemaView` for human-readable display. Always displays native database types (e.g., `int4`, `text`) rather than mapped codec IDs (e.g., `pg/int4@1`) to reflect actual database state.
 - **`emitContract({ contractIR })`**: Emits contract JSON and DTS as strings. Handles stripping mappings and validation internally. Uses preassembled state (operation registry, type imports, extension IDs).
+- **`planMigration({ fromContract, toContract, liveSchema, policy })`**: Plans migration operations from one contract to another, consulting live database schema. Returns an in-memory `SqlMigrationPlan` IR describing the operations needed to transition from the source contract to the target contract. Used by `db init` and `db update` commands.
 
 The descriptor is "pure data + factory" - it only provides the hook and factory method. All family-specific logic lives on the instance.
 
@@ -84,6 +86,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 - **`@prisma-next/sql-contract-ts`**: Contract validation (`validateContract`)
 - **`@prisma-next/sql-contract`**: SQL contract types (`SqlContract`, `SqlStorage`)
 - **`@prisma-next/sql-operations`**: SQL operation signature types (`SqlOperationSignature`)
+- **`@prisma-next/sql-migrations`**: Migration planning logic (`planMigration`) and migration IR types
 
 **Dependents:**
 - CLI configuration files import this package to register the SQL family

@@ -27,6 +27,8 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { MigrationPolicy, SqlMigrationPlan } from '@prisma-next/sql-migrations';
+import { planMigration as planMigrationImpl } from '@prisma-next/sql-migrations';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
   ensureSchemaStatement,
@@ -852,6 +854,22 @@ export interface SqlControlFamilyInstance
    * Handles stripping mappings and validation internally.
    */
   emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
+
+  /**
+   * Plans migration operations from one contract to another, consulting live schema.
+   * Returns an in-memory MigrationPlan IR describing the operations needed to transition
+   * from the source contract to the target contract, constrained by the live database schema
+   * and the migration policy.
+   */
+  planMigration(options: {
+    readonly fromContract: unknown;
+    readonly toContract: unknown;
+    readonly liveSchema: SqlSchemaIR;
+    readonly policy: {
+      readonly mode: 'init' | 'update';
+      readonly allowedOperationClasses: readonly ('additive' | 'widening' | 'destructive')[];
+    };
+  }): SqlMigrationPlan;
 }
 
 /**
@@ -1912,6 +1930,30 @@ export function createSqlFamilyInstance(
         coreHash: result.coreHash,
         profileHash: result.profileHash,
       };
+    },
+
+    planMigration(options: {
+      readonly fromContract: unknown;
+      readonly toContract: unknown;
+      readonly liveSchema: SqlSchemaIR;
+      readonly policy: {
+        readonly mode: 'init' | 'update';
+        readonly allowedOperationClasses: readonly ('additive' | 'widening' | 'destructive')[];
+      };
+    }): SqlMigrationPlan {
+      const { fromContract, toContract, liveSchema, policy } = options;
+
+      // Validate and normalize contracts
+      const validatedFromContract = validateContract<SqlContract<SqlStorage>>(fromContract);
+      const validatedToContract = validateContract<SqlContract<SqlStorage>>(toContract);
+
+      // Delegate to the planner implementation
+      return planMigrationImpl({
+        fromContract: validatedFromContract,
+        toContract: validatedToContract,
+        liveSchema,
+        policy: policy as MigrationPolicy,
+      });
     },
   };
 }
