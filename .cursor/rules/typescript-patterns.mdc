@@ -442,31 +442,28 @@ const runtime = createRuntime({ contract: testContract, adapter });
 
 ## Test Port Management
 
-**Issue**: Parallel test execution causes port conflicts when multiple tests use the same hardcoded ports.
-
-**Solution**: Assign unique port ranges to each test suite.
+**Automatic Port Allocation**: Ports are automatically allocated using `get-port` to find available ports in the range 10,000-65,000. This eliminates port conflicts in parallel test execution without requiring manual port assignment.
 
 ### Pattern
 
 ```typescript
-// packages/compat-prisma/test/prisma-client.test.ts
-database = await createDevDatabase({
-  acceleratePort: 54000,
-  databasePort: 54001,
-  shadowDatabasePort: 54002,
-});
+// Ports are automatically allocated - no need to specify them
+const database = await createDevDatabase();
 
-// packages/runtime/test/codecs.integration.test.ts
-database = await createDevDatabase({
-  acceleratePort: 54003,  // Different range
-  databasePort: 54004,
-  shadowDatabasePort: 54005,
+// Or with withDevDatabase
+await withDevDatabase(async ({ connectionString }) => {
+  await withClient(connectionString, async (client) => {
+    // ... test code
+  });
 });
 ```
 
-### Current Port Assignments
+### Benefits
 
-- `compat-prisma`: 54000-54002
+- No port conflicts: Ports are checked for availability before use
+- No manual assignment: No need to track and assign port ranges
+- Better parallel execution: Multiple tests can run simultaneously without conflicts
+- Simpler code: Less boilerplate in test files
 - `codecs.integration.test.ts`: 54003-54005
 - `budgets.integration.test.ts`: 54010-54012
 - `runtime.integration.test.ts`: 53213-53215

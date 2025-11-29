@@ -97,11 +97,7 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
   let prismaPN: PrismaClient;
 
   beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 54000,
-      databasePort: 54001,
-      shadowDatabasePort: 54002,
-    });
+    database = await createDevDatabase();
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
 

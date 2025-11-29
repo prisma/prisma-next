@@ -48,11 +48,7 @@ describe('family instance sign', () => {
   let connectionString: string | undefined;
 
   beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 54250,
-      databasePort: 54251,
-      shadowDatabasePort: 54252,
-    });
+    database = await createDevDatabase();
     connectionString = database.connectionString;
   }, timeouts.spinUpPpgDev);
 

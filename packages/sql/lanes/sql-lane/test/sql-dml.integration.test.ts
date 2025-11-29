@@ -59,11 +59,7 @@ describe('DML Integration Tests', () => {
   const adapter = createPostgresAdapter();
 
   beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 54160,
-      databasePort: 54161,
-      shadowDatabasePort: 54162,
-    });
+    database = await createDevDatabase();
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
   }, timeouts.spinUpPpgDev);

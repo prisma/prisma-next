@@ -49,11 +49,7 @@ describe('budgets plugin integration', () => {
   let client: Client;
 
   beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 54013,
-      databasePort: 54014,
-      shadowDatabasePort: 54015,
-    });
+    database = await createDevDatabase();
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
   }, timeouts.spinUpPpgDev);

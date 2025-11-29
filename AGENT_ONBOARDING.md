@@ -931,18 +931,14 @@ export type Contract = SqlContract<...>;
 **Solution**: Assign unique port ranges to each test suite:
 
 ```typescript
-// packages/compat-prisma/test/prisma-client.test.ts
-database = await createDevDatabase({
-  acceleratePort: 54000,
-  databasePort: 54001,
-  shadowDatabasePort: 54002,
-});
+// Ports are automatically allocated - no need to specify them
+const database = await createDevDatabase();
 
-// packages/runtime/test/codecs.integration.test.ts
-database = await createDevDatabase({
-  acceleratePort: 54003,  // Different range
-  databasePort: 54004,
-  shadowDatabasePort: 54005,
+// Or with withDevDatabase
+await withDevDatabase(async ({ connectionString }) => {
+  await withClient(connectionString, async (client) => {
+    // ... test code
+  });
 });
 ```
 
@@ -1046,7 +1042,6 @@ describe('end-to-end tests', () => {
           }
         });
       },
-      { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
     );
   });
 });

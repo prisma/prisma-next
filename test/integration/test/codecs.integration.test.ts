@@ -55,11 +55,7 @@ describe('Codecs Integration Tests', () => {
   const adapter = createPostgresAdapter();
 
   beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 54003,
-      databasePort: 54004,
-      shadowDatabasePort: 54005,
-    });
+    database = await createDevDatabase();
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
   }, timeouts.spinUpPpgDev);

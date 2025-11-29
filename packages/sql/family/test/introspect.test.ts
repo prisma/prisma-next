@@ -10,11 +10,7 @@ describe('family instance introspect', () => {
   let connectionString: string | undefined;
 
   beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 54180,
-      databasePort: 54181,
-      shadowDatabasePort: 54182,
-    });
+    database = await createDevDatabase();
     connectionString = database.connectionString;
   }, timeouts.spinUpPpgDev);
 

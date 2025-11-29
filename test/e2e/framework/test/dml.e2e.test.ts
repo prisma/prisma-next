@@ -25,97 +25,94 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
   it('inserts, updates, and deletes a user', async () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-    await withDevDatabase(
-      async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('DROP TABLE IF EXISTS "user"');
-            await c.query('CREATE TABLE "user" (id SERIAL PRIMARY KEY, email TEXT NOT NULL)');
+    await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await withClient(connectionString, async (client: import('pg').Client) => {
+        await setupE2EDatabase(client, contract, async (c: typeof client) => {
+          await c.query('DROP TABLE IF EXISTS "user"');
+          await c.query('CREATE TABLE "user" (id SERIAL PRIMARY KEY, email TEXT NOT NULL)');
+        });
+
+        const adapter = createPostgresAdapter();
+        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const runtime = createTestRuntimeFromClient(contract, client);
+        try {
+          const tables = schema<Contract>(context).tables;
+          const userTable = tables.user!;
+          const userColumns = userTable.columns;
+          const builder = sql({ context });
+
+          // Insert
+          const insertPlan = builder
+            .insert(userTable, {
+              email: param('email'),
+            })
+            .returning(userColumns.id!, userColumns.email!)
+            .build({
+              params: {
+                email: 'e2e@example.com',
+              },
+            });
+
+          const insertRows = await executePlanAndCollect(runtime, insertPlan);
+          type InsertRow = ResultType<typeof insertPlan>;
+          expect(insertRows.length).toBe(1);
+          expect(insertRows[0]).toMatchObject({
+            id: expect.any(Number),
+            email: 'e2e@example.com',
           });
 
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [] });
-          const runtime = createTestRuntimeFromClient(contract, client);
-          try {
-            const tables = schema<Contract>(context).tables;
-            const userTable = tables.user!;
-            const userColumns = userTable.columns;
-            const builder = sql({ context });
-
-            // Insert
-            const insertPlan = builder
-              .insert(userTable, {
-                email: param('email'),
-              })
-              .returning(userColumns.id!, userColumns.email!)
-              .build({
-                params: {
-                  email: 'e2e@example.com',
-                },
-              });
-
-            const insertRows = await executePlanAndCollect(runtime, insertPlan);
-            type InsertRow = ResultType<typeof insertPlan>;
-            expect(insertRows.length).toBe(1);
-            expect(insertRows[0]).toMatchObject({
-              id: expect.any(Number),
-              email: 'e2e@example.com',
-            });
-
-            const firstRow = insertRows[0] as InsertRow | undefined;
-            const userId = firstRow?.id;
-            if (userId === undefined) {
-              throw new Error('Expected insert to return id');
-            }
-
-            // Update
-            const updatePlan = builder
-              .update(userTable, {
-                email: param('newEmail'),
-              })
-              .where(userColumns.id!.eq(param('userId')))
-              .returning(userColumns.id!, userColumns.email!)
-              .build({
-                params: {
-                  newEmail: 'updated-e2e@example.com',
-                  userId,
-                },
-              });
-
-            const updateRows = await executePlanAndCollect(runtime, updatePlan);
-            expect(updateRows.length).toBe(1);
-            expect(updateRows[0]).toMatchObject({
-              id: userId,
-              email: 'updated-e2e@example.com',
-            });
-
-            // Delete
-            const deletePlan = builder
-              .delete(userTable)
-              .where(userColumns.id!.eq(param('userId')))
-              .returning(userColumns.id!, userColumns.email!)
-              .build({
-                params: {
-                  userId,
-                },
-              });
-
-            const deleteRows = await executePlanAndCollect(runtime, deletePlan);
-            expect(deleteRows.length).toBe(1);
-            expect(deleteRows[0]).toMatchObject({
-              id: userId,
-              email: 'updated-e2e@example.com',
-            });
-
-            // Verify deleted
-            const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [userId]);
-            expect(selectResult.rows.length).toBe(0);
-          } finally {
-            await runtime.close();
+          const firstRow = insertRows[0] as InsertRow | undefined;
+          const userId = firstRow?.id;
+          if (userId === undefined) {
+            throw new Error('Expected insert to return id');
           }
-        });
-      },
-      { acceleratePort: 54036, databasePort: 54037, shadowDatabasePort: 54038 },
-    );
+
+          // Update
+          const updatePlan = builder
+            .update(userTable, {
+              email: param('newEmail'),
+            })
+            .where(userColumns.id!.eq(param('userId')))
+            .returning(userColumns.id!, userColumns.email!)
+            .build({
+              params: {
+                newEmail: 'updated-e2e@example.com',
+                userId,
+              },
+            });
+
+          const updateRows = await executePlanAndCollect(runtime, updatePlan);
+          expect(updateRows.length).toBe(1);
+          expect(updateRows[0]).toMatchObject({
+            id: userId,
+            email: 'updated-e2e@example.com',
+          });
+
+          // Delete
+          const deletePlan = builder
+            .delete(userTable)
+            .where(userColumns.id!.eq(param('userId')))
+            .returning(userColumns.id!, userColumns.email!)
+            .build({
+              params: {
+                userId,
+              },
+            });
+
+          const deleteRows = await executePlanAndCollect(runtime, deletePlan);
+          expect(deleteRows.length).toBe(1);
+          expect(deleteRows[0]).toMatchObject({
+            id: userId,
+            email: 'updated-e2e@example.com',
+          });
+
+          // Verify deleted
+          const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [userId]);
+          expect(selectResult.rows.length).toBe(0);
+        } finally {
+          await runtime.close();
+        }
+      });
+    });
   });
 });
