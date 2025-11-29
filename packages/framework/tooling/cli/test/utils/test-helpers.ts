@@ -10,7 +10,7 @@ import {
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Command } from 'commander';
-import { vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Use a shared fixture package directory that has the necessary dependencies
@@ -164,19 +164,68 @@ export function setupCommandMocks(): {
 }
 
 /**
+ * Decorator that wraps test suites to automatically manage temporary directory cleanup.
+ * Sets up `beforeEach` and `afterEach` hooks to track and clean up directories per test.
+ *
+ * @example
+ * ```typescript
+ * withTempDir(({ createTempDir }) => {
+ *   describe('test suite', () => {
+ *     it('test', () => {
+ *       const testDir = createTempDir();
+ *       // ... use testDir
+ *       // Directory is automatically cleaned up after the test
+ *     });
+ *   });
+ * });
+ * ```
+ */
+export function withTempDir(callback: (context: { createTempDir: () => string }) => void): void {
+  const tempDirs = new Set<string>();
+
+  beforeEach(() => {
+    // Reset the set of directories for each test
+    tempDirs.clear();
+  });
+
+  afterEach(() => {
+    // Clean up all directories created during this test
+    for (const dir of tempDirs) {
+      try {
+        if (existsSync(dir)) {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      } catch (_error) {
+        // Ignore cleanup errors
+      }
+    }
+    tempDirs.clear();
+  });
+
+  const createTempDir = (): string => {
+    const testDir = createTestDir();
+    tempDirs.add(testDir);
+    return testDir;
+  };
+
+  callback({ createTempDir });
+}
+
+/**
  * Sets up a test directory by copying files from a fixture subdirectory.
  * Test directories are subdirectories of cli-e2e-test-app and inherit workspace
  * dependencies from the parent package.json at the root. jiti will resolve workspace
  * packages by walking up to find the parent package.json.
  * Optionally replaces placeholders in config files.
- * Returns paths and cleanup function.
+ * Returns paths (cleanup is handled automatically by withTempDir decorator).
  */
 export function setupTestDirectoryFromFixtures(
+  createTempDir: () => string,
   fixtureSubdir: string,
   configFileName = 'prisma-next.config.ts',
   replacements?: Record<string, string>,
 ) {
-  const testDir = createTestDir();
+  const testDir = createTempDir();
   const outputDir = join(testDir, 'output');
   mkdirSync(outputDir, { recursive: true });
 
@@ -207,13 +256,7 @@ export function setupTestDirectoryFromFixtures(
     writeFileSync(configPath, configContent, 'utf-8');
   }
 
-  const cleanup = () => {
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
-  };
-
-  return { testDir, contractPath: join(testDir, 'contract.ts'), outputDir, configPath, cleanup };
+  return { testDir, contractPath: join(testDir, 'contract.ts'), outputDir, configPath };
 }
 
 /**
