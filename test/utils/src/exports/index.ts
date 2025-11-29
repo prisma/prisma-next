@@ -1,6 +1,6 @@
-import { randomInt } from 'node:crypto';
 import type { StartServerOptions } from '@prisma/dev';
 import { unstable_startServer } from '@prisma/dev';
+import getPort, { portNumbers } from 'get-port';
 import { Client } from 'pg';
 
 export * from '../timeouts';
@@ -20,6 +20,24 @@ export interface DevDatabase {
 }
 
 /**
+ * Allocates available ports automatically using get-port.
+ * Uses port range 10,000-65,000 to find available ports for parallel test execution.
+ */
+async function allocatePorts(): Promise<{
+  acceleratePort: number;
+  databasePort: number;
+  shadowDatabasePort: number;
+}> {
+  const [acceleratePort, databasePort, shadowDatabasePort] = await Promise.all([
+    getPort({ host: '127.0.0.1', port: portNumbers(10_000, 65_000) }),
+    getPort({ host: '127.0.0.1', port: portNumbers(10_000, 65_000) }),
+    getPort({ host: '127.0.0.1', port: portNumbers(10_000, 65_000) }),
+  ]);
+
+  return { acceleratePort, databasePort, shadowDatabasePort };
+}
+
+/**
  * Creates a dev database instance for testing.
  * Automatically handles connection string normalization and cleanup.
  */
@@ -34,43 +52,22 @@ export async function createDevDatabase(options?: StartServerOptions): Promise<D
 }
 
 /**
- * Generates random ports for parallel test execution.
- * Uses a base port range (55000-64999) to provide 10,000 possible ports,
- * allowing for many parallel test executions without conflicts.
- */
-function generateRandomPorts(): {
-  acceleratePort: number;
-  databasePort: number;
-  shadowDatabasePort: number;
-} {
-  // Use base port 55000-64999 to avoid conflicts with other services
-  // Generate random offset for each test to avoid conflicts in parallel execution
-  // 10,000 port range provides ample space for many parallel tests
-  const basePort = 55000 + randomInt(0, 10000);
-  return {
-    acceleratePort: basePort,
-    databasePort: basePort + 1,
-    shadowDatabasePort: basePort + 2,
-  };
-}
-
-/**
  * Executes a function with a dev database, automatically cleaning up afterward.
- * If no ports are provided, random ports will be generated to avoid conflicts in parallel execution.
+ * If no ports are provided, available ports will be automatically allocated to avoid conflicts in parallel execution.
  */
 export async function withDevDatabase<T>(
   fn: (ctx: DevDatabase) => Promise<T>,
   options?: StartServerOptions,
 ): Promise<T> {
-  // If no ports specified, generate random ones to avoid conflicts in parallel execution
+  // If no ports specified, automatically allocate available ones to avoid conflicts in parallel execution
   const finalOptions: StartServerOptions = options || {};
   if (
     !finalOptions.acceleratePort &&
     !finalOptions.databasePort &&
     !finalOptions.shadowDatabasePort
   ) {
-    const randomPorts = generateRandomPorts();
-    Object.assign(finalOptions, randomPorts);
+    const allocatedPorts = await allocatePorts();
+    Object.assign(finalOptions, allocatedPorts);
   }
   const database = await createDevDatabase(finalOptions);
   try {
