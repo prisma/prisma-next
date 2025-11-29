@@ -37,7 +37,7 @@ Today, for the SQL family:
   - `'pg/int4@1'`
   - `'pg/text@1'`
   - `'pg/vector@1'`
-- The SQL schema IR (`SqlSchemaIR` in `@prisma-next/sql-schema-ir`) exposes `SqlColumnIR.typeId` as a **native DB type**, e.g.:
+- The SQL schema IR (`SqlSchemaIR` in `@prisma-next/sql-schema-ir`) exposes `SqlColumnIR.nativeType` as a **native DB type**, e.g.:
   - `'int4'`
   - `'text'`
   - `'vector'`
@@ -46,7 +46,7 @@ The Slice 1 migration planner implementation (`planMigration` in `@prisma-next/s
 
 ```ts
 // Simplified
-if (contractColumn.type !== schemaColumn.typeId) {
+if (contractColumn.nativeType !== schemaColumn.nativeType) {
   return false;
 }
 ```
@@ -80,7 +80,7 @@ This registry is used by **schema verification** and is available to the planner
 Given the current shapes:
 
 - `StorageColumn.type` is a codec ID.
-- `SqlColumnIR.typeId` is a native DB type.
+- `SqlColumnIR.nativeType` is a native DB type.
 
 Several issues arise:
 
@@ -132,7 +132,7 @@ type StorageColumn = {
 // Proposed (SQL family)
 type SqlStorageColumn = {
   // Native DB type identifier (for structure, verification, migrations).
-  // This should align with SqlSchemaIR.SqlColumnIR.typeId.
+  // This should align with SqlSchemaIR.SqlColumnIR.nativeType.
   nativeType: string;     // e.g. 'int4', 'text', 'vector'
 
   // Codec identifier (for query builders and runtime codecs).
@@ -258,7 +258,7 @@ Changes:
 Changes:
 
 - Adjust schema verification logic to:
-  - Compare `contractColumn.nativeType` directly to `SqlSchemaIR.table.column.typeId`.
+  - Compare `contractColumn.nativeType` directly to `SqlSchemaIR.table.column.nativeType`.
   - Apply nullability and other structural rules as today.
   - Ignore `codecId` for structural comparison.
 - Optionally:
@@ -287,7 +287,7 @@ Changes:
 
   ```ts
   // New comparison
-  if (contractColumn.nativeType !== schemaColumn.typeId) {
+  if (contractColumn.nativeType !== schemaColumn.nativeType) {
     return false; // type mismatch
   }
   // Nullability logic remains as in Slice 1
@@ -370,7 +370,7 @@ This section outlines a concrete, multi-step plan to move from the current imple
 
 - [ ] In SQL family `schemaVerify` implementation:
   - [ ] Change type comparison to:
-    - Compare `contractColumn.nativeType` to `SqlSchemaIR.table.column.typeId`.
+    - Compare `contractColumn.nativeType` to `SqlSchemaIR.table.column.nativeType`.
   - [ ] Retain existing nullability and other structural checks.
   - [ ] Optionally:
     - [ ] Use `codecId` + type registry to validate that `nativeType` and codec metadata agree.
@@ -383,7 +383,7 @@ This section outlines a concrete, multi-step plan to move from the current imple
 
 - [ ] In `@prisma-next/sql-migrations`:
   - [ ] Refactor `columnTypeCompatible` to:
-    - Compare `contractColumn.nativeType` to `schemaColumn.typeId`.
+    - Compare `contractColumn.nativeType` to `schemaColumn.nativeType`.
     - Apply nullability rules unchanged.
   - [ ] Remove any direct comparison of codec ID to native type ID.
 
