@@ -27,8 +27,15 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { ExecuteMigrationResult, MigrationPolicy, SqlMigrationPlan } from '@prisma-next/sql-migrations';
-import { executeMigration as executeMigrationImpl, planMigration as planMigrationImpl } from '@prisma-next/sql-migrations';
+import type {
+  ExecuteMigrationResult,
+  MigrationPolicy,
+  SqlMigrationPlan,
+} from '@prisma-next/sql-migrations';
+import {
+  executeMigration as executeMigrationImpl,
+  planMigration as planMigrationImpl,
+} from '@prisma-next/sql-migrations';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
   ensureSchemaStatement,

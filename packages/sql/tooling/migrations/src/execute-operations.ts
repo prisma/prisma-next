@@ -60,9 +60,7 @@ export function executeCreateTable(operation: CreateTableOperation): SqlStatemen
   // Add unique constraints (if present)
   for (const unique of operation.uniques) {
     const uniqueColumns = unique.columns.map(quoteIdentifier).join(', ');
-    const uniqueName = unique.name
-      ? `CONSTRAINT ${quoteIdentifier(unique.name)} `
-      : '';
+    const uniqueName = unique.name ? `CONSTRAINT ${quoteIdentifier(unique.name)} ` : '';
     columns.push(`${uniqueName}UNIQUE (${uniqueColumns})`);
   }
 
@@ -208,10 +206,10 @@ export function executeOperation(operation: SqlMigrationOperation): SqlStatement
       return executeAddIndex(operation);
     case 'extensionOperation':
       return executeExtensionOperation(operation);
-    default:
+    default: {
       // Exhaustiveness check
       const _exhaustive: never = operation;
       throw new Error(`Unknown operation kind: ${(_exhaustive as { kind: string }).kind}`);
+    }
   }
 }
-

@@ -7,7 +7,10 @@ export class AdvisoryLockError extends Error {
   readonly code = 'PN-MIGRATION-LOCK-0001';
   readonly domain = 'migrate.schema';
 
-  constructor(message: string, public readonly key?: bigint) {
+  constructor(
+    message: string,
+    public readonly key?: bigint,
+  ) {
     super(message);
     this.name = 'AdvisoryLockError';
   }
@@ -30,7 +33,7 @@ export async function acquireAdvisoryLock(
   // TODO: Enhance to derive key from dbUuid in marker.meta per ADR 043
   // Key derivation: xxhash64("prisma-next:migrate.schema:{dbUuid}:-:-")
   // For now, use a simple deterministic key based on domain
-  const lockKey = BigInt(0x1234567890abcdef); // Fixed key for v1
+  const lockKey = BigInt('0x1234567890abcdef'); // Fixed key for v1
 
   try {
     // Use pg_try_advisory_lock which returns true if lock acquired, false if already held
@@ -40,7 +43,10 @@ export async function acquireAdvisoryLock(
     );
 
     if (result.rows.length === 0 || !result.rows[0]) {
-      throw new AdvisoryLockError('Failed to acquire advisory lock: unexpected query result', lockKey);
+      throw new AdvisoryLockError(
+        'Failed to acquire advisory lock: unexpected query result',
+        lockKey,
+      );
     }
 
     const acquired = result.rows[0].pg_try_advisory_lock;
@@ -76,7 +82,7 @@ export async function releaseAdvisoryLock(
   driver: ControlDriverInstance<'postgres'>,
 ): Promise<void> {
   // Use the same lock key as acquireAdvisoryLock
-  const lockKey = BigInt(0x1234567890abcdef); // Fixed key for v1
+  const lockKey = BigInt('0x1234567890abcdef'); // Fixed key for v1
 
   try {
     // Use pg_advisory_unlock which returns true if lock released, false if not held by this session
@@ -91,4 +97,3 @@ export async function releaseAdvisoryLock(
     }
   }
 }
-

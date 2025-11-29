@@ -1,21 +1,21 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
+  ControlAdapterInstance,
   ControlDriverInstance,
   ControlExtensionDescriptor,
 } from '@prisma-next/core-control-plane/types';
-import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import {
-  ensureSchemaStatement,
-  ensureTableStatement,
-  readContractMarker,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
 import { type } from 'arktype';
 import { AdvisoryLockError, acquireAdvisoryLock, releaseAdvisoryLock } from './advisory-locks';
 import { SqlMigrationExecutionError } from './errors';
 import { executeOperation } from './execute-operations';
 import type { ExecuteMigrationResult, SqlMigrationPlan } from './ir';
 import { ensureLedgerTable, generateEdgeId, writeLedgerEntry } from './ledger';
+import {
+  ensureSchemaStatement,
+  ensureTableStatement,
+  readContractMarker,
+  writeContractMarker,
+} from './marker-utils';
 
 /**
  * Parses meta field from database result.
@@ -143,7 +143,7 @@ async function readMarker(
 export async function executeMigration(options: {
   readonly plan: SqlMigrationPlan;
   readonly driver: ControlDriverInstance<'postgres'>;
-  readonly adapter: SqlControlAdapter<'postgres'>;
+  readonly adapter: ControlAdapterInstance<'sql', 'postgres'>;
   readonly extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[];
 }): Promise<ExecuteMigrationResult> {
   const { plan, driver } = options;

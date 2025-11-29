@@ -1,5 +1,5 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
-import { ensureSchemaStatement } from '@prisma-next/sql-runtime';
+import { ensureSchemaStatement } from './marker-utils';
 
 /**
  * SQL statement for ensuring the ledger table exists.
@@ -23,9 +23,7 @@ export const ensureLedgerTableStatement = {
 /**
  * Ensures the prisma_contract schema and ledger table exist.
  */
-export async function ensureLedgerTable(
-  driver: ControlDriverInstance<'postgres'>,
-): Promise<void> {
+export async function ensureLedgerTable(driver: ControlDriverInstance<'postgres'>): Promise<void> {
   // Ensure schema exists
   await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
   // Ensure ledger table exists
@@ -89,4 +87,3 @@ export function generateEdgeId(fromCoreHash: string, toCoreHash: string): string
   // TODO: Enhance to use content-addressed hash per ADR 028
   return `edge_${fromCoreHash.slice(0, 8)}_${toCoreHash.slice(0, 8)}`;
 }
-

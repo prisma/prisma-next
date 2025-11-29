@@ -1,16 +1,15 @@
-import { col, contract, fk, pk, storage, table } from '@prisma-next/sql-contract/factories';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
+import { col, contract, fk, pk, storage, table } from '@prisma-next/sql-contract/factories';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import postgresAdapter from '../../../targets/postgres-adapter/src/exports/control';
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
-import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
-import { readContractMarker } from '@prisma-next/sql-runtime';
-import { SqlMigrationExecutionError } from '../src/errors';
 import { executeMigration } from '../src/execute-migration';
 import type { SqlMigrationPlan } from '../src/ir';
+import { readContractMarker } from '../src/marker-utils';
 import { planMigration } from '../src/plan-migration';
 import { createEmptySchemaIR } from './plan-migration.basic.test';
 
@@ -458,7 +457,7 @@ describe('executeMigration integration', () => {
           )
         `);
         await driver.query(
-          `insert into prisma_contract.marker (id, core_hash, profile_hash) values (1, $1, $2)`,
+          'insert into prisma_contract.marker (id, core_hash, profile_hash) values (1, $1, $2)',
           [contract.coreHash, contract.profileHash ?? contract.coreHash],
         );
 
@@ -534,7 +533,7 @@ describe('executeMigration integration', () => {
       // Acquire lock in first connection
       const driver1 = await postgresDriver.create(connectionString);
       try {
-        await driver1.query('SELECT pg_try_advisory_lock($1)', [BigInt(0x1234567890abcdef)]);
+        await driver1.query('SELECT pg_try_advisory_lock($1)', [BigInt('0x1234567890abcdef')]);
 
         // Try to execute migration in second connection
         const driver2 = await postgresDriver.create(connectionString);
@@ -554,7 +553,7 @@ describe('executeMigration integration', () => {
           await driver2.close();
         }
       } finally {
-        await driver1.query('SELECT pg_advisory_unlock($1)', [BigInt(0x1234567890abcdef)]);
+        await driver1.query('SELECT pg_advisory_unlock($1)', [BigInt('0x1234567890abcdef')]);
         await driver1.close();
       }
     });
@@ -633,4 +632,3 @@ describe('executeMigration integration', () => {
     });
   });
 });
-
