@@ -1285,7 +1285,20 @@ export function createSqlFamilyInstance(
           // Optionally validate that codecId (if present) and nativeType agree with registry
           if (contractColumn.codecId) {
             const typeMetadata = typeMetadataRegistry.get(contractColumn.codecId);
-            if (typeMetadata?.nativeType && typeMetadata.nativeType !== contractNativeType) {
+            if (!typeMetadata) {
+              // Warning: codecId not found in registry
+              columnChildren.push({
+                status: 'warn',
+                kind: 'type',
+                name: 'type_metadata_missing',
+                contractPath: `${columnPath}.codecId`,
+                code: 'type_metadata_missing',
+                message: `codecId "${contractColumn.codecId}" not found in type metadata registry`,
+                expected: contractColumn.codecId,
+                actual: undefined,
+                children: [],
+              });
+            } else if (typeMetadata.nativeType && typeMetadata.nativeType !== contractNativeType) {
               // Warning: codecId and nativeType don't agree with registry
               columnChildren.push({
                 status: 'warn',

@@ -268,20 +268,28 @@ type OperationReturn<
  * - Look up CodecTypes[typeId].output
  * - Apply nullability: nullable ? Output | null : Output
  */
+type ColumnMetaTypeId<ColumnMeta> = ColumnMeta extends { codecId: infer CodecId extends string }
+  ? CodecId
+  : ColumnMeta extends { type: infer TypeId extends string }
+    ? TypeId
+    : never;
+
 export type ComputeColumnJsType<
   _Contract extends SqlContract<SqlStorage>,
   _TableName extends string,
   _ColumnName extends string,
   ColumnMeta extends StorageColumn,
   CodecTypes extends Record<string, { readonly output: unknown }>,
-> = ColumnMeta extends { type: infer T; nullable: infer N }
-  ? T extends string
-    ? ExtractCodecOutputType<T, CodecTypes> extends infer CodecOutput
-      ? [CodecOutput] extends [never]
-        ? unknown // Codec not found in CodecTypes
-        : N extends true
-          ? CodecOutput | null
-          : CodecOutput
+> = ColumnMeta extends { nullable: infer Nullable }
+  ? ColumnMetaTypeId<ColumnMeta> extends infer TypeId
+    ? TypeId extends string
+      ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
+        ? [CodecOutput] extends [never]
+          ? unknown // Codec not found in CodecTypes
+          : Nullable extends true
+            ? CodecOutput | null
+            : CodecOutput
+        : unknown
       : unknown
     : unknown
   : unknown;

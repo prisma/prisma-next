@@ -127,9 +127,6 @@ class SqlContractBuilder<
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > extends ContractBuilder<Target, Tables, Models, CoreHash, Extensions, Capabilities> {
   /**
-   * Builds and normalizes the contract.
-   *
-   * **Responsibility: Normalization**
    * This method is responsible for normalizing the contract IR by setting default values
    * for all required fields:
    * - `nullable`: defaults to `false` if not provided
@@ -137,22 +134,17 @@ class SqlContractBuilder<
    * - `indexes`: defaults to `[]` (empty array)
    * - `foreignKeys`: defaults to `[]` (empty array)
    * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
-   * - `nativeType`: extracted from column type descriptor if provided, otherwise looked up via `getNativeType` or set temporarily
+   * - `nativeType`: extracted from column type descriptor when columns are defined
    *
    * The contract builder is the **only** place where normalization should occur.
    * Validators, parsers, and emitters should assume the contract is already normalized.
    *
-   * **Recommended**: Use column type descriptors (e.g., `int4Column`, `textColumn`) when defining columns.
-   * This ensures `nativeType` is set correctly at build time without requiring registry lookups.
+   * **Required**: Use column type descriptors (e.g., `int4Column`, `textColumn`) when defining columns.
+   * This ensures `nativeType` is set correctly at build time.
    *
-   * @param options - Optional build options
-   * @param options.getNativeType - Optional function to lookup nativeType from codecId.
-   *   Only used for legacy string-based column types. Descriptor-based columns already include nativeType.
    * @returns A normalized SqlContract with all required fields present
    */
-  build(options?: {
-    getNativeType?: (codecId: string) => string | undefined;
-  }): Target extends string
+  build(): Target extends string
     ? SqlContract<
         BuildStorage<Tables>,
         BuildModels<Models>,
@@ -218,28 +210,14 @@ class SqlContractBuilder<
         const codecId = columnState.type;
 
         // Determine nativeType:
-        // 1. If nativeType is already set (from column type descriptor), use it
-        // 2. Otherwise, lookup from registry if getNativeType is provided
-        // 3. Otherwise, use codecId as temporary fallback (for legacy string-based types)
-        let nativeType: string;
-        if (columnState.nativeType !== undefined) {
-          // Descriptor-based: nativeType was set when column was defined
-          nativeType = columnState.nativeType;
-        } else if (options?.getNativeType) {
-          // Legacy with registry: lookup nativeType from registry
-          const lookedUp = options.getNativeType(codecId);
-          if (!lookedUp) {
-            throw new Error(
-              `Cannot determine nativeType for codecId "${codecId}" in column "${columnName}" of table "${tableName}". ` +
-                'The type metadata registry has no nativeType mapping for this codecId.',
-            );
-          }
-          nativeType = lookedUp;
-        } else {
-          // Legacy without registry: use codecId as temporary value
-          // This will be resolved during emission when registry is available
-          nativeType = codecId; // Temporary - will be replaced during emission
+        // nativeType must be set from column type descriptor when column is defined
+        if (columnState.nativeType === undefined) {
+          throw new Error(
+            `Cannot determine nativeType for codecId "${codecId}" in column "${columnName}" of table "${tableName}". ` +
+              'Provide a column type descriptor (e.g., int4Column).',
+          );
         }
+        const nativeType = columnState.nativeType;
 
         columns[columnName as keyof ColumnDefs] = {
           nativeType,
