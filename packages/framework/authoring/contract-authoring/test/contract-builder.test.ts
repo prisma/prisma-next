@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type { ColumnTypeDescriptor } from '../src/builder-state';
 import { ContractBuilder, defineContract } from '../src/contract-builder';
+
+const intColumn: ColumnTypeDescriptor = { codecId: 'test/int@1', nativeType: 'int4' };
 
 describe('ContractBuilder', () => {
   it('creates builder with defineContract', () => {
@@ -17,7 +20,7 @@ describe('ContractBuilder', () => {
   it('manages table state', () => {
     const builder = defineContract();
     const withTable = builder.table('user', (t) =>
-      t.column('id', { type: 'test/int@1' }).primaryKey(['id']),
+      t.column('id', { type: intColumn }).primaryKey(['id']),
     );
     expect(withTable).toBeInstanceOf(ContractBuilder);
     expect(withTable).not.toBe(builder);

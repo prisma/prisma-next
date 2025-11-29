@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 import type { CodecTypes } from './fixtures/contract.d';
+import { columnDescriptor } from './helpers/column-descriptor';
+
+const int4Column = columnDescriptor('pg/int4@1');
+const textColumn = columnDescriptor('pg/text@1');
 
 describe('contract builder normalization', () => {
   it('normalizes nullable to false when not provided', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
 
@@ -18,8 +22,8 @@ describe('contract builder normalization', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', { type: 'pg/int4@1', nullable: false })
-          .column('email', { type: 'pg/text@1', nullable: true }),
+          .column('id', { type: int4Column, nullable: false })
+          .column('email', { type: textColumn, nullable: true }),
       )
       .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
       .build();
@@ -31,7 +35,7 @@ describe('contract builder normalization', () => {
   it('normalizes uniques to empty array when not provided', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
 
@@ -42,7 +46,7 @@ describe('contract builder normalization', () => {
   it('normalizes indexes to empty array when not provided', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
 
@@ -53,7 +57,7 @@ describe('contract builder normalization', () => {
   it('normalizes foreignKeys to empty array when not provided', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
 
@@ -64,7 +68,7 @@ describe('contract builder normalization', () => {
   it('normalizes relations to empty object when not provided', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
 
@@ -80,14 +84,14 @@ describe('contract builder normalization', () => {
       .target('postgres')
       .table('user', (t) =>
         t
-          .column('id', { type: 'pg/int4@1', nullable: false })
-          .column('email', { type: 'pg/text@1', nullable: false })
+          .column('id', { type: int4Column, nullable: false })
+          .column('email', { type: textColumn, nullable: false })
           .primaryKey(['id']),
       )
       .table('post', (t) =>
         t
-          .column('id', { type: 'pg/int4@1', nullable: false })
-          .column('userId', { type: 'pg/int4@1', nullable: false })
+          .column('id', { type: int4Column, nullable: false })
+          .column('userId', { type: int4Column, nullable: false })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
@@ -116,7 +120,7 @@ describe('contract builder normalization', () => {
   it('normalizes contract-level relations to empty object', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
 
