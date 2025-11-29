@@ -27,8 +27,8 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { MigrationPolicy, SqlMigrationPlan } from '@prisma-next/sql-migrations';
-import { planMigration as planMigrationImpl } from '@prisma-next/sql-migrations';
+import type { ExecuteMigrationResult, MigrationPolicy, SqlMigrationPlan } from '@prisma-next/sql-migrations';
+import { executeMigration as executeMigrationImpl, planMigration as planMigrationImpl } from '@prisma-next/sql-migrations';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
   ensureSchemaStatement,
@@ -870,6 +870,16 @@ export interface SqlControlFamilyInstance
       readonly allowedOperationClasses: readonly ('additive' | 'widening' | 'destructive')[];
     };
   }): SqlMigrationPlan;
+
+  /**
+   * Executes a migration plan, applying operations to the database and updating the marker.
+   * Validates marker state, acquires advisory lock, applies operations, updates marker,
+   * and writes ledger entry atomically.
+   */
+  executeMigration(options: {
+    readonly driver: ControlDriverInstance;
+    readonly plan: SqlMigrationPlan;
+  }): Promise<ExecuteMigrationResult>;
 }
 
 /**
@@ -1953,6 +1963,28 @@ export function createSqlFamilyInstance(
         toContract: validatedToContract,
         liveSchema,
         policy: policy as MigrationPolicy,
+      });
+    },
+
+    async executeMigration(options: {
+      readonly driver: ControlDriverInstance;
+      readonly plan: SqlMigrationPlan;
+    }): Promise<ExecuteMigrationResult> {
+      const { driver, plan } = options;
+
+      // Type-safe driver casting to PostgreSQL
+      const postgresDriver = driver as ControlDriverInstance<'postgres'>;
+
+      // Get adapter from instance state
+      const controlAdapter = adapter.create() as SqlControlAdapter<'postgres'>;
+
+      // Delegate to the execution implementation
+      // Cast extensions to postgres-specific type (safe since driver is postgres)
+      return executeMigrationImpl({
+        plan,
+        driver: postgresDriver,
+        adapter: controlAdapter,
+        extensions: (extensions ?? []) as readonly ControlExtensionDescriptor<'sql', 'postgres'>[],
       });
     },
   };

@@ -951,15 +951,30 @@ importers:
 
   packages/sql/tooling/migrations:
     dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../framework/core-contract
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../../framework/core-control-plane
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../family
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../authoring/sql-contract-ts
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../sql-runtime
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../../schema-ir
+      arktype:
+        specifier: ^2.0.0
+        version: 2.1.26
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

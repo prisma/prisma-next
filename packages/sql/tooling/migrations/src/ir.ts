@@ -125,3 +125,18 @@ export type SqlMigrationPlan = {
   readonly summary?: string;
   readonly diagnostics?: readonly string[];
 };
+
+/**
+ * Result of executing a migration plan.
+ */
+export type ExecuteMigrationResult = {
+  readonly ok: boolean;
+  readonly operationsApplied: number;
+  readonly markerUpdated: boolean;
+  readonly summary: string;
+  readonly error?: {
+    readonly code: string;
+    readonly message: string;
+    readonly details?: Record<string, unknown>;
+  };
+};
