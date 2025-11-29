@@ -67,8 +67,7 @@ export function buildUpdatePlan<
     const value = assertParameterExists(paramsMap, paramName);
     const index = paramValues.push(value);
 
-    // Use codecId if present, otherwise fallback to deprecated type field
-    const codecId = columnMeta.codecId ?? columnMeta.type;
+    const codecId = columnMeta.codecId;
     if (codecId && paramName) {
       paramCodecs[paramName] = codecId;
     }

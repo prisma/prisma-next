@@ -201,10 +201,9 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
     } else {
       // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as { columnMeta?: { codecId?: string; type?: string } };
+      const col = column as unknown as { columnMeta?: { codecId?: string } };
       const columnMeta = col.columnMeta;
-      // Use codecId if present, otherwise fallback to deprecated type field
-      const codecId = columnMeta?.codecId ?? columnMeta?.type;
+      const codecId = columnMeta?.codecId;
       if (codecId) {
         projectionTypes[alias] = codecId;
       }
@@ -231,10 +230,9 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     } else {
       // Use columnMeta.codecId directly as typeId (already canonicalized)
       // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as { columnMeta?: { codecId?: string; type?: string } };
+      const col = column as unknown as { columnMeta?: { codecId?: string } };
       const columnMeta = col.columnMeta;
-      // Use codecId if present, otherwise fallback to deprecated type field
-      const codecId = columnMeta?.codecId ?? columnMeta?.type;
+      const codecId = columnMeta?.codecId;
       if (codecId) {
         projectionCodecs[alias] = codecId;
       }

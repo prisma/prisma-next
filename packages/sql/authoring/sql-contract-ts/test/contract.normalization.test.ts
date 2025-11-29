@@ -704,8 +704,8 @@ describe('computeMappings', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: false },
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -737,7 +737,7 @@ describe('computeMappings', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -779,7 +779,7 @@ describe('computeMappings', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -788,8 +788,8 @@ describe('computeMappings', () => {
         },
         post: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            user_id: { type: 'pg/int4@1', nullable: false },
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],

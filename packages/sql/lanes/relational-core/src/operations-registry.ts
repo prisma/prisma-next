@@ -124,7 +124,7 @@ function executeOperation(
   const returnColumnMeta: StorageColumn = returnTypeId
     ? {
         ...columnMeta,
-        type: returnTypeId,
+        codecId: returnTypeId,
       }
     : columnMeta;
 
@@ -193,8 +193,11 @@ export function attachOperationsToColumnBuilder<
     return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
 
-  // Use codecId if present, otherwise fallback to deprecated type field
-  const typeId = columnMeta.codecId ?? columnMeta.type;
+  // Use codecId if present
+  const typeId = columnMeta.codecId;
+  if (!typeId) {
+    return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
+  }
 
   const operations = registry.byType(typeId) as SqlOperationSignature[];
   if (operations.length === 0) {

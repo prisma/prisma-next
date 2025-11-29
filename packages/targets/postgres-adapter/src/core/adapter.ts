@@ -172,7 +172,7 @@ function renderParam(
   if (contract && tableName && columnName) {
     const tableMeta = contract.storage.tables[tableName];
     const columnMeta = tableMeta?.columns[columnName];
-    if (columnMeta?.type === 'pg/vector@1') {
+    if (columnMeta?.codecId === 'pg/vector@1') {
       return `$${ref.index}::vector`;
     }
   }
@@ -353,7 +353,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
   const values = Object.entries(ast.values).map(([colName, val]) => {
     if (val.kind === 'param') {
       const columnMeta = tableMeta?.columns[colName];
-      const isVector = columnMeta?.type === 'pg/vector@1';
+      const isVector = columnMeta?.codecId === 'pg/vector@1';
       return isVector ? `$${val.index}::vector` : `$${val.index}`;
     }
     if (val.kind === 'col') {
@@ -378,7 +378,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     let value: string;
     if (val.kind === 'param') {
       const columnMeta = tableMeta?.columns[col];
-      const isVector = columnMeta?.type === 'pg/vector@1';
+      const isVector = columnMeta?.codecId === 'pg/vector@1';
       value = isVector ? `$${val.index}::vector` : `$${val.index}`;
     } else if (val.kind === 'col') {
       value = `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;

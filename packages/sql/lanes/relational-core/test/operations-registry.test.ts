@@ -11,8 +11,16 @@ type TestContract = SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly vector: { readonly type: 'pgvector/vector@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly vector: {
+            readonly nativeType: 'vector';
+            readonly codecId: 'pgvector/vector@1';
+            readonly nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -31,7 +39,11 @@ type TestContractWithIdOnly = SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -54,8 +66,8 @@ describe('operations-registry', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            vector: { type: 'pgvector/vector@1', nullable: false },
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            vector: { nativeType: 'vector', codecId: 'pgvector/vector@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -133,8 +145,8 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: { nativeType: 'vector', codecId: 'pgvector/vector@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -156,8 +168,8 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: { nativeType: 'vector', codecId: 'pgvector/vector@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -229,8 +241,8 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: { nativeType: 'vector', codecId: 'pgvector/vector@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -288,8 +300,8 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: { nativeType: 'vector', codecId: 'pgvector/vector@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -317,8 +329,8 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: { nativeType: 'vector', codecId: 'pgvector/vector@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -421,8 +433,8 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: { nativeType: 'vector', codecId: 'pgvector/vector@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -577,7 +589,7 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -645,7 +657,7 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -703,7 +715,7 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -759,7 +771,7 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],

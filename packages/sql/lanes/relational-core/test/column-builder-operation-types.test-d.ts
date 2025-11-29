@@ -18,7 +18,7 @@ test('ColumnBuilder includes operation methods when operations are provided', ()
 
   type TestColumnBuilder = ColumnBuilder<
     'vector',
-    { type: 'pgvector/vector@1'; nullable: false },
+    { nativeType: 'vector'; codecId: 'pgvector/vector@1'; nullable: false },
     unknown,
     TestOperations
   >;
@@ -44,7 +44,7 @@ test('ColumnBuilder does not include operations for different typeId', () => {
 
   type TestColumnBuilder = ColumnBuilder<
     'text',
-    { type: 'pg/text@1'; nullable: false },
+    { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false },
     unknown,
     TestOperations
   >;
@@ -58,7 +58,7 @@ test('ColumnBuilder handles empty operations', () => {
 
   type TestColumnBuilder = ColumnBuilder<
     'vector',
-    { type: 'pgvector/vector@1'; nullable: false },
+    { nativeType: 'vector'; codecId: 'pgvector/vector@1'; nullable: false },
     unknown,
     EmptyOperations
   >;

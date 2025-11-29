@@ -193,10 +193,9 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         projectionTypes[alias] = operationExpr.returns.type;
       }
     } else {
-      const colMeta = col as unknown as { columnMeta?: { codecId?: string; type?: string } };
+      const colMeta = col as unknown as { columnMeta?: { codecId?: string } };
       const columnMeta = colMeta.columnMeta;
-      // Use codecId if present, otherwise fallback to deprecated type field
-      const codecId = columnMeta?.codecId ?? columnMeta?.type;
+      const codecId = columnMeta?.codecId;
       if (codecId) {
         projectionTypes[alias] = codecId;
       }
@@ -221,8 +220,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     } else {
       const col = column as unknown as { columnMeta?: { codecId?: string; type?: string } };
       const columnMeta = col.columnMeta;
-      // Use codecId if present, otherwise fallback to deprecated type field
-      const codecId = columnMeta?.codecId ?? columnMeta?.type;
+      const codecId = columnMeta?.codecId;
       if (codecId) {
         projectionCodecs[alias] = codecId;
       }

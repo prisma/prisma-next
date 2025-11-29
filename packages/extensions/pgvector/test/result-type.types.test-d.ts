@@ -16,9 +16,21 @@ type ContractWithNullableVector = SqlContract<
     readonly tables: {
       readonly post: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly title: { readonly type: 'pg/text@1'; nullable: false };
-          readonly embedding: { readonly type: 'pg/vector@1'; nullable: true };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            nullable: false;
+          };
+          readonly embedding: {
+            readonly nativeType: 'vector';
+            readonly codecId: 'pg/vector@1';
+            nullable: true;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly never[];
@@ -44,8 +56,16 @@ type ContractWithNonNullableVector = SqlContract<
     readonly tables: {
       readonly post: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly embedding: { readonly type: 'pg/vector@1'; nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly embedding: {
+            readonly nativeType: 'vector';
+            readonly codecId: 'pg/vector@1';
+            nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly never[];
@@ -75,9 +95,9 @@ test('ResultType correctly infers number[] for vector column', () => {
       tables: {
         post: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            title: { type: 'pg/text@1', nullable: false },
-            embedding: { type: 'pg/vector@1', nullable: true },
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            embedding: { nativeType: 'vector', codecId: 'pg/vector@1', nullable: true },
           },
           uniques: [],
           indexes: [],
@@ -142,8 +162,8 @@ test('ResultType correctly infers number[] for non-nullable vector column', () =
       tables: {
         post: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            embedding: { type: 'pg/vector@1', nullable: false },
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            embedding: { nativeType: 'vector', codecId: 'pg/vector@1', nullable: false },
           },
           uniques: [],
           indexes: [],
