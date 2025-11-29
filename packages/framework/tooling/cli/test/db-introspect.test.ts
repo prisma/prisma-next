@@ -564,6 +564,7 @@ describe('db introspect command', () => {
     );
     const configPath = testSetup.configPath;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const mockSchemaIR = { tables: { user: { columns: {} } } };

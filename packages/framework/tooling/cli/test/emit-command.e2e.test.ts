@@ -17,6 +17,7 @@ describe('contract emit command (e2e)', () => {
   let consoleOutput: string[] = [];
   let consoleErrors: string[] = [];
   let cleanupMocks: () => void;
+  let cleanupDirs: Array<() => void> = [];
 
   beforeEach(() => {
     // Set up console and process.exit mocks
@@ -24,10 +25,19 @@ describe('contract emit command (e2e)', () => {
     consoleOutput = mocks.consoleOutput;
     consoleErrors = mocks.consoleErrors;
     cleanupMocks = mocks.cleanup;
+    cleanupDirs = [];
   });
 
   afterEach(() => {
     cleanupMocks();
+    // Clean up all test directories, even if test failed or timed out
+    for (const cleanupDir of cleanupDirs) {
+      try {
+        cleanupDir();
+      } catch (_error) {
+        // Ignore cleanup errors
+      }
+    }
   });
 
   it(
@@ -38,6 +48,7 @@ describe('contract emit command (e2e)', () => {
       const testDir = testSetup.testDir;
       const outputDir = testSetup.outputDir;
       const cleanupDir = testSetup.cleanup;
+      cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
       try {
         const command = createContractEmitCommand();
@@ -109,6 +120,7 @@ describe('contract emit command (e2e)', () => {
       const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
       const testDir = testSetup.testDir;
       const cleanupDir = testSetup.cleanup;
+      cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
       try {
         const command = createContractEmitCommand();
@@ -153,6 +165,7 @@ describe('contract emit command (e2e)', () => {
     const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
     const testDir = testSetup.testDir;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const command = createContractEmitCommand();
@@ -205,6 +218,7 @@ describe('contract emit command (e2e)', () => {
     );
     const testDir = testSetup.testDir;
     const cleanupDir = testSetup.cleanup;
+    cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
     try {
       const command = createContractEmitCommand();
@@ -255,6 +269,7 @@ describe('contract emit command (e2e)', () => {
       const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
       const testDir = testSetup.testDir;
       const cleanupDir = testSetup.cleanup;
+      cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
       try {
         const command = createContractEmitCommand();
@@ -287,6 +302,7 @@ describe('contract emit command (e2e)', () => {
       const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.emit.ts');
       const testDir = testSetup.testDir;
       const cleanupDir = testSetup.cleanup;
+      cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
 
       try {
         const command = createContractEmitCommand();
