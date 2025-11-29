@@ -15,11 +15,8 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
-    "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/sql-schema-ir": "workspace:*",
-    "arktype": "^2.0.0"
+    "@prisma-next/sql-schema-ir": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -35,6 +32,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./executor": {
+      "types": "./dist/executor.d.ts",
+      "import": "./dist/executor.js"
+    },
+    "./execute-migration": {
+      "types": "./dist/execute-migration.d.ts",
+      "import": "./dist/execute-migration.js"
+    },
+    "./ir": {
+      "types": "./dist/ir.d.ts",
+      "import": "./dist/ir.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
     }
   }
 }

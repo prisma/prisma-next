@@ -1,7 +1,9 @@
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
+  ControlExtensionDescriptor,
 } from '@prisma-next/core-control-plane/types';
+import type { SqlMigrationExecutor } from '@prisma-next/sql-migrations/executor';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
 /**
@@ -36,6 +38,18 @@ export interface SqlControlAdapter<TTarget extends string = string>
     contractIR?: unknown,
     schema?: string,
   ): Promise<SqlSchemaIR>;
+
+  /**
+   * Creates a migration executor for executing migrations.
+   *
+   * @param driver - ControlDriverInstance instance for executing queries (target-specific)
+   * @param extensions - Extension descriptors (for extension operation support)
+   * @returns Migration executor implementing DB-specific migration behavior
+   */
+  createMigrationExecutor(
+    driver: ControlDriverInstance<TTarget>,
+    extensions: readonly ControlExtensionDescriptor<'sql', TTarget>[],
+  ): SqlMigrationExecutor<ControlDriverInstance<TTarget>>;
 }
 
 /**

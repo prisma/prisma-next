@@ -1,5 +1,5 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
-import { ensureSchemaStatement } from './marker-utils';
+import { ensureSchemaStatement } from '@prisma-next/sql-runtime/sql-marker';
 
 /**
  * SQL statement for ensuring the ledger table exists.

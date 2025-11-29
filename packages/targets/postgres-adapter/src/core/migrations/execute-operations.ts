@@ -8,7 +8,7 @@ import type {
   CreateTableOperation,
   ExtensionOperation,
   SqlMigrationOperation,
-} from './ir';
+} from '@prisma-next/sql-migrations/ir';
 
 /**
  * SQL statement with parameters.

@@ -1,4 +1,7 @@
-import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
+import type {
+  ControlDriverInstance,
+  ControlExtensionDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type {
   PrimaryKey,
@@ -9,6 +12,7 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { createPostgresMigrationExecutor } from './migrations/executor';
 
 /**
  * Postgres control plane adapter for control-plane operations like introspection.
@@ -358,6 +362,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       extensions,
       annotations,
     };
+  }
+
+  /**
+   * Creates a migration executor for executing migrations.
+   */
+  createMigrationExecutor(
+    driver: ControlDriverInstance<'postgres'>,
+    extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[],
+  ) {
+    return createPostgresMigrationExecutor(driver, extensions);
   }
 
   /**

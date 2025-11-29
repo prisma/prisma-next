@@ -1,20 +1,5 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
-
-/**
- * Error thrown when advisory lock cannot be acquired.
- */
-export class AdvisoryLockError extends Error {
-  readonly code = 'PN-MIGRATION-LOCK-0001';
-  readonly domain = 'migrate.schema';
-
-  constructor(
-    message: string,
-    public readonly key?: bigint,
-  ) {
-    super(message);
-    this.name = 'AdvisoryLockError';
-  }
-}
+import { AdvisoryLockError } from '@prisma-next/sql-migrations/executor';
 
 /**
  * Acquires a PostgreSQL advisory lock for the migrate.schema domain.
@@ -23,8 +8,8 @@ export class AdvisoryLockError extends Error {
  * Future enhancement: derive key from dbUuid stored in marker.meta per ADR 043.
  *
  * @param driver - PostgreSQL driver instance
- * @returns Promise resolving to true if lock acquired, false if already held
- * @throws AdvisoryLockError if lock acquisition fails for other reasons
+ * @returns Promise resolving to true if lock acquired
+ * @throws AdvisoryLockError if lock cannot be acquired
  */
 export async function acquireAdvisoryLock(
   driver: ControlDriverInstance<'postgres'>,

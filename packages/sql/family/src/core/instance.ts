@@ -32,10 +32,8 @@ import type {
   MigrationPolicy,
   SqlMigrationPlan,
 } from '@prisma-next/sql-migrations';
-import {
-  executeMigration as executeMigrationImpl,
-  planMigration as planMigrationImpl,
-} from '@prisma-next/sql-migrations';
+import { planMigration as planMigrationImpl } from '@prisma-next/sql-migrations';
+import { executeMigration as executeMigrationImpl } from '@prisma-next/sql-migrations/execute-migration';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
   ensureSchemaStatement,
@@ -1979,19 +1977,17 @@ export function createSqlFamilyInstance(
     }): Promise<ExecuteMigrationResult> {
       const { driver, plan } = options;
 
-      // Type-safe driver casting to PostgreSQL
-      const postgresDriver = driver as ControlDriverInstance<'postgres'>;
-
       // Get adapter from instance state
-      const controlAdapter = adapter.create() as SqlControlAdapter<'postgres'>;
+      const controlAdapter = adapter.create();
 
-      // Delegate to the execution implementation
-      // Cast extensions to postgres-specific type (safe since driver is postgres)
+      // Create executor from adapter
+      const executor = controlAdapter.createMigrationExecutor(driver, extensions ?? []);
+
+      // Delegate to the generic execution implementation
       return executeMigrationImpl({
         plan,
-        driver: postgresDriver,
-        adapter: controlAdapter,
-        extensions: (extensions ?? []) as readonly ControlExtensionDescriptor<'sql', 'postgres'>[],
+        driver,
+        executor,
       });
     },
   };
