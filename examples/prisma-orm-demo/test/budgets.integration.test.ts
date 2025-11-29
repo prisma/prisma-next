@@ -83,8 +83,8 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           throw new Error('User table not found');
         }
         const userColumns = userTable.columns;
-        const idColumn = userColumns.id;
-        const emailColumn = userColumns.email;
+        const idColumn = userColumns['id'];
+        const emailColumn = userColumns['email'];
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }
@@ -176,8 +176,8 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           throw new Error('User table not found');
         }
         const userColumns = userTable.columns;
-        const idColumn = userColumns.id;
-        const emailColumn = userColumns.email;
+        const idColumn = userColumns['id'];
+        const emailColumn = userColumns['email'];
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }
@@ -267,8 +267,8 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
           throw new Error('User table not found');
         }
         const userColumns = userTable.columns;
-        const idColumn = userColumns.id;
-        const emailColumn = userColumns.email;
+        const idColumn = userColumns['id'];
+        const emailColumn = userColumns['email'];
         if (!idColumn || !emailColumn) {
           throw new Error('Columns id or email not found');
         }

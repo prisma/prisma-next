@@ -19,10 +19,26 @@ export type Contract = SqlContract<
     readonly tables: {
       readonly User: {
         columns: {
-          readonly id: { readonly type: 'pg/text@1'; readonly nullable: false };
-          readonly email: { readonly type: 'pg/text@1'; readonly nullable: false };
-          readonly name: { readonly type: 'pg/text@1'; readonly nullable: false };
-          readonly createdAt: { readonly type: 'pg/timestamptz@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly name: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly createdAt: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];

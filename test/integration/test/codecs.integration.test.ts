@@ -1,5 +1,5 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -15,6 +15,12 @@ import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+const makeColumn = (nativeType: string, codecId: string, nullable: boolean): StorageColumn => ({
+  nativeType,
+  codecId,
+  nullable,
+});
+
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
@@ -25,10 +31,10 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
     tables: {
       test_data: {
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          name: { type: 'pg/text@1', nullable: false },
-          score: { type: 'pg/float8@1', nullable: false },
-          created_at: { type: 'pg/timestamptz@1', nullable: false },
+          id: makeColumn('int4', 'pg/int4@1', false),
+          name: makeColumn('text', 'pg/text@1', false),
+          score: makeColumn('float8', 'pg/float8@1', false),
+          created_at: makeColumn('timestamptz', 'pg/timestamptz@1', false),
         },
         primaryKey: {
           columns: ['id'],

@@ -31,16 +31,24 @@
       "User": {
         "columns": {
           "createdAt": {
-            "type": "pg/timestamptz@1"
+            "nativeType": "timestamptz",
+            "codecId": "pg/timestamptz@1",
+            "nullable": false
           },
           "email": {
-            "type": "pg/text@1"
+            "nativeType": "text",
+            "codecId": "pg/text@1",
+            "nullable": false
           },
           "id": {
-            "type": "pg/text@1"
+            "nativeType": "text",
+            "codecId": "pg/text@1",
+            "nullable": false
           },
           "name": {
-            "type": "pg/text@1"
+            "nativeType": "text",
+            "codecId": "pg/text@1",
+            "nullable": false
           }
         },
         "foreignKeys": [],

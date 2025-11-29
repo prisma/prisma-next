@@ -182,7 +182,7 @@ describe('guards', () => {
         kind: 'column' as const,
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       } as ColumnBuilder;
 
       expect(isOperationExpr(columnBuilder)).toBe(false);
@@ -210,7 +210,7 @@ describe('guards', () => {
         kind: 'column' as const,
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       } as ColumnBuilder;
 
       const result = getColumnInfo(columnBuilder);
@@ -280,7 +280,7 @@ describe('guards', () => {
         kind: 'column' as const,
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       } as ColumnBuilder;
 
       expect(isColumnBuilder(columnBuilder)).toBe(true);

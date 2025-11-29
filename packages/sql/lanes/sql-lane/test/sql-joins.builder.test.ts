@@ -15,8 +15,16 @@ type ContractWithPosts = SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly email: { readonly type: 'pg/text@1'; nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -25,9 +33,21 @@ type ContractWithPosts = SqlContract<
       };
       readonly post: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly title: { readonly type: 'pg/text@1'; nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly userId: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -36,9 +56,21 @@ type ContractWithPosts = SqlContract<
       };
       readonly comment: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly postId: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly content: { readonly type: 'pg/text@1'; nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly postId: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly content: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -64,8 +96,8 @@ const contractWithPosts = validateContract<ContractWithPosts>({
     tables: {
       user: {
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          email: { type: 'pg/text@1', nullable: false },
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
         },
         primaryKey: { columns: ['id'] },
         uniques: [],
@@ -74,9 +106,9 @@ const contractWithPosts = validateContract<ContractWithPosts>({
       },
       post: {
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          userId: { type: 'pg/int4@1', nullable: false },
-          title: { type: 'pg/text@1', nullable: false },
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
         },
         primaryKey: { columns: ['id'] },
         uniques: [],
@@ -85,9 +117,9 @@ const contractWithPosts = validateContract<ContractWithPosts>({
       },
       comment: {
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          postId: { type: 'pg/int4@1', nullable: false },
-          content: { type: 'pg/text@1', nullable: false },
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          postId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          content: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
         },
         primaryKey: { columns: ['id'] },
         uniques: [],
