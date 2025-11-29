@@ -120,22 +120,15 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
           typeof table.columns === 'object' &&
           table.columns !== null
         ) {
-          const columns = table.columns as Record<
-            string,
-            { codecId?: string; type?: string } | undefined
-          >;
+          const columns = table.columns as Record<string, { codecId: string } | undefined>;
           for (const column of Object.values(columns)) {
-            if (column && typeof column === 'object') {
-              // Prefer codecId, fallback to deprecated type field for backward compatibility
-              const codecId =
-                'codecId' in column && typeof column.codecId === 'string'
-                  ? column.codecId
-                  : 'type' in column && typeof column.type === 'string'
-                    ? column.type
-                    : undefined;
-              if (codecId) {
-                typeIds.add(codecId);
-              }
+            if (
+              column &&
+              typeof column === 'object' &&
+              'codecId' in column &&
+              typeof column.codecId === 'string'
+            ) {
+              typeIds.add(column.codecId);
             }
           }
         }

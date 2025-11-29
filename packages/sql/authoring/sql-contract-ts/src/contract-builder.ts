@@ -218,13 +218,14 @@ class SqlContractBuilder<
         // If getNativeType is not provided, nativeType will be resolved at emission time
         let nativeType: string;
         if (options?.getNativeType) {
-          nativeType = options.getNativeType(codecId);
-          if (!nativeType) {
+          const lookedUp = options.getNativeType(codecId);
+          if (!lookedUp) {
             throw new Error(
               `Cannot determine nativeType for codecId "${codecId}" in column "${columnName}" of table "${tableName}". ` +
                 'The type metadata registry has no nativeType mapping for this codecId.',
             );
           }
+          nativeType = lookedUp;
         } else {
           // If registry lookup not available, use codecId as temporary value
           // This will be resolved during emission when registry is available

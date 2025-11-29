@@ -21,7 +21,8 @@ import type { O } from 'ts-toolbelt';
  * This validates the shape and types of the contract structure.
  */
 const StorageColumnSchema = type.declare<StorageColumn>().type({
-  type: 'string',
+  nativeType: 'string',
+  codecId: 'string',
   nullable: 'boolean',
 });
 

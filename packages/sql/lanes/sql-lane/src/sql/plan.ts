@@ -201,7 +201,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
     } else {
       // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as { columnMeta?: { codecId?: string } };
+      const col = column as unknown as { columnMeta?: { codecId: string } };
       const columnMeta = col.columnMeta;
       const codecId = columnMeta?.codecId;
       if (codecId) {
@@ -230,7 +230,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     } else {
       // Use columnMeta.codecId directly as typeId (already canonicalized)
       // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as { columnMeta?: { codecId?: string } };
+      const col = column as unknown as { columnMeta?: { codecId: string } };
       const columnMeta = col.columnMeta;
       const codecId = columnMeta?.codecId;
       if (codecId) {
