@@ -46,8 +46,8 @@ describe('family instance planMigration', () => {
         storage: storage({
           user: table(
             {
-              id: col('pg/int4@1', false),
-              email: col('pg/text@1', false),
+              id: col('int4', 'pg/int4@1', false),
+              email: col('text', 'pg/text@1', false),
             },
             {
               pk: pk('id'),
@@ -92,8 +92,8 @@ describe('family instance planMigration', () => {
         storage: storage({
           user: table(
             {
-              id: col('pg/int4@1', false),
-              email: col('pg/text@1', false),
+              id: col('int4', 'pg/int4@1', false),
+              email: col('text', 'pg/text@1', false),
             },
             {
               pk: pk('id'),
@@ -107,8 +107,8 @@ describe('family instance planMigration', () => {
         user: {
           name: 'user',
           columns: {
-            id: { name: 'id', typeId: 'pg/int4@1', nullable: false },
-            email: { name: 'email', typeId: 'pg/text@1', nullable: false },
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            email: { name: 'email', nativeType: 'text', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [],

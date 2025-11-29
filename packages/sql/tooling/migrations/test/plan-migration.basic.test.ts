@@ -197,8 +197,8 @@ describe('planMigration', () => {
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'int4', nullable: false },
-        email: { name: 'email', typeId: 'text', nullable: false },
+        id: { name: 'id', nativeType: 'int4', nullable: false },
+        email: { name: 'email', nativeType: 'text', nullable: false },
       });
 
       const plan = planMigration({
@@ -250,14 +250,14 @@ describe('planMigration', () => {
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'int4', nullable: false },
-        email: { name: 'email', typeId: 'text', nullable: false },
+        id: { name: 'id', nativeType: 'int4', nullable: false },
+        email: { name: 'email', nativeType: 'text', nullable: false },
       });
       liveSchema.tables['post'] = {
         name: 'post',
         columns: {
-          id: { name: 'id', typeId: 'int4', nullable: false },
-          userId: { name: 'userId', typeId: 'int4', nullable: false },
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          userId: { name: 'userId', nativeType: 'int4', nullable: false },
         },
         primaryKey: undefined,
         foreignKeys: [],
@@ -305,8 +305,8 @@ describe('planMigration', () => {
       const liveSchema = createSchemaIRWithTable(
         'user',
         {
-          id: { name: 'id', typeId: 'int4', nullable: false },
-          email: { name: 'email', typeId: 'text', nullable: false },
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          email: { name: 'email', nativeType: 'text', nullable: false },
         },
         {
           primaryKey: { columns: ['id'] },
@@ -316,7 +316,7 @@ describe('planMigration', () => {
       // Add extra column not in contract
       liveSchema.tables['user'].columns['extra'] = {
         name: 'extra',
-        typeId: 'text',
+        nativeType: 'text',
         nullable: true,
       };
 
@@ -345,13 +345,13 @@ describe('planMigration', () => {
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'int4', nullable: false },
+        id: { name: 'id', nativeType: 'int4', nullable: false },
       });
       // Add extra table not in contract
       liveSchema.tables['extra'] = {
         name: 'extra',
         columns: {
-          id: { name: 'id', typeId: 'int4', nullable: false },
+          id: { name: 'id', nativeType: 'int4', nullable: false },
         },
         foreignKeys: [],
         uniques: [],
@@ -385,8 +385,8 @@ describe('planMigration', () => {
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'int4', nullable: false },
-        email: { name: 'email', typeId: 'int8', nullable: false }, // Wrong type
+        id: { name: 'id', nativeType: 'int4', nullable: false },
+        email: { name: 'email', nativeType: 'int8', nullable: false }, // Wrong type
       });
 
       expect(() => {
@@ -414,8 +414,8 @@ describe('planMigration', () => {
         }),
       );
       const liveSchema = createSchemaIRWithTable('user', {
-        id: { name: 'id', typeId: 'int4', nullable: false },
-        email: { name: 'email', typeId: 'text', nullable: true }, // Schema has nullable
+        id: { name: 'id', nativeType: 'int4', nullable: false },
+        email: { name: 'email', nativeType: 'text', nullable: true }, // Schema has nullable
       });
 
       expect(() => {
@@ -450,8 +450,8 @@ describe('planMigration', () => {
       const liveSchema = createSchemaIRWithTable(
         'user',
         {
-          id: { name: 'id', typeId: 'int4', nullable: false },
-          email: { name: 'email', typeId: 'text', nullable: false },
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          email: { name: 'email', nativeType: 'text', nullable: false },
         },
         {
           primaryKey: { columns: ['email'] }, // Different PK
