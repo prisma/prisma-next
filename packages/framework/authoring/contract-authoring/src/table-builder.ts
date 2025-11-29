@@ -20,49 +20,39 @@ export class TableBuilder<
 
   column<
     ColName extends string,
-    TypeId extends string,
+    Descriptor extends ColumnTypeDescriptor,
     Nullable extends boolean | undefined = undefined,
   >(
     name: ColName,
     options: {
-      type: TypeId | ColumnTypeDescriptor;
+      type: Descriptor;
       nullable?: Nullable;
     },
   ): TableBuilder<
     Name,
     Columns &
-      Record<ColName, ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>>,
+      Record<
+        ColName,
+        ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
+      >,
     PrimaryKey
   > {
     const nullable = (options.nullable ?? false) as Nullable extends true ? true : false;
-
-    // Handle descriptor object or string type
-    let type: string;
-    let nativeType: string | undefined;
-
-    if (typeof options.type === 'string') {
-      // Legacy string-based type
-      if (!options.type.includes('@')) {
-        throw new Error(`type must be in format "namespace/name@version", got "${options.type}"`);
-      }
-      type = options.type;
-      nativeType = undefined;
-    } else {
-      // Descriptor-based type
-      type = options.type.codecId;
-      nativeType = options.type.nativeType;
-    }
+    const { codecId, nativeType } = options.type;
 
     const columnState = {
       name,
       nullable,
-      type: type as TypeId,
-      ...(nativeType !== undefined ? { nativeType } : {}),
-    } as ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>;
+      type: codecId,
+      nativeType,
+    } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
     return new TableBuilder(
       this._name,
       { ...this._columns, [name]: columnState } as Columns &
-        Record<ColName, ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>>,
+        Record<
+          ColName,
+          ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
+        >,
       this._primaryKey,
     );
   }

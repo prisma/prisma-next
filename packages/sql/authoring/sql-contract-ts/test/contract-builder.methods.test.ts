@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 import type { CodecTypes } from './fixtures/contract.d';
+import { columnDescriptor } from './helpers/column-descriptor';
+
+const int4Column = columnDescriptor('pg/int4@1');
 
 describe('contract builder methods', () => {
   it('throws when building without target', () => {
@@ -51,7 +54,7 @@ describe('contract builder methods', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
       .table('user', (t) => {
-        const builder = t.column('id', { type: 'pg/int4@1' });
+        const builder = t.column('id', { type: int4Column });
         return builder;
       })
       .build();
@@ -61,7 +64,7 @@ describe('contract builder methods', () => {
   it('model callback can return undefined', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', () => undefined)
       .build();
     expect(contract.models.User).toBeDefined();
@@ -70,7 +73,7 @@ describe('contract builder methods', () => {
   it('model callback can return different builder', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => {
         const builder = m.field('id', 'id');
         return builder;
@@ -82,7 +85,7 @@ describe('contract builder methods', () => {
   it('builds table without primary key', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }))
+      .table('user', (t) => t.column('id', { type: int4Column }))
       .build();
     expect(contract.storage.tables.user.columns.id).toBeDefined();
     expect(contract.storage.tables.user['primaryKey']).toBeUndefined();
@@ -91,11 +94,11 @@ describe('contract builder methods', () => {
   it('builds model with relations', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .table('post', (t) =>
         t
-          .column('id', { type: 'pg/int4@1' })
-          .column('userId', { type: 'pg/int4@1' })
+          .column('id', { type: int4Column })
+          .column('userId', { type: int4Column })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) => m.field('id', 'id'))
@@ -124,17 +127,17 @@ describe('contract builder methods', () => {
   it('builds contract with multiple tables and models', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .table('post', (t) =>
         t
-          .column('id', { type: 'pg/int4@1' })
-          .column('userId', { type: 'pg/int4@1' })
+          .column('id', { type: int4Column })
+          .column('userId', { type: int4Column })
           .primaryKey(['id']),
       )
       .table('comment', (t) =>
         t
-          .column('id', { type: 'pg/int4@1' })
-          .column('postId', { type: 'pg/int4@1' })
+          .column('id', { type: int4Column })
+          .column('postId', { type: int4Column })
           .primaryKey(['id']),
       )
       .model('User', 'user', (m) => m.field('id', 'id'))
@@ -160,7 +163,7 @@ describe('contract builder methods', () => {
   it('handles empty model state gracefully', () => {
     const contract = defineContract<CodecTypes>()
       .target('postgres')
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', () => undefined)
       .build();
     expect(contract.models).toBeDefined();
@@ -172,7 +175,7 @@ describe('contract builder methods', () => {
       .coreHash('sha256:custom')
       .extensions({ pack: { config: true } })
       .capabilities({ feature: { enabled: true } })
-      .table('user', (t) => t.column('id', { type: 'pg/int4@1' }).primaryKey(['id']))
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
     expect(contract.coreHash).toBe('sha256:custom');

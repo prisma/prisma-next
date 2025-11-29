@@ -27,8 +27,7 @@ export type SqlAnnotations = {
  */
 export type SqlColumnIR = {
   readonly name: string;
-  readonly typeId: string; // codec id, e.g. 'pg/int4@1'
-  readonly nativeType?: string; // explicit DB type, e.g. 'integer', 'vector'
+  readonly nativeType: string; // explicit DB type, e.g. 'integer', 'vector'
   readonly nullable: boolean;
   readonly annotations?: SqlAnnotations; // column-level metadata
 };
