@@ -91,7 +91,8 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
     const value = assertParameterExists(paramsMap, paramName);
     const index = paramValues.push(value);
 
-    const codecId = columnMeta.type;
+    // Use codecId if present, otherwise fallback to deprecated type field
+    const codecId = columnMeta.codecId ?? columnMeta.type;
     if (codecId && paramName) {
       paramCodecs[paramName] = codecId;
     }

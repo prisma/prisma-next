@@ -132,7 +132,8 @@ export class InsertBuilderImpl<
       const index = paramValues.push(value);
 
       const columnMeta = contractTable.columns[columnName];
-      const codecId = columnMeta?.type;
+      // Use codecId if present, otherwise fallback to deprecated type field
+      const codecId = columnMeta?.codecId ?? columnMeta?.type;
       if (codecId && paramName) {
         paramCodecs[paramName] = codecId;
       }
@@ -281,7 +282,8 @@ export class UpdateBuilderImpl<
       const index = paramValues.push(value);
 
       const columnMeta = contractTable.columns[columnName];
-      const codecId = columnMeta?.type;
+      // Use codecId if present, otherwise fallback to deprecated type field
+      const codecId = columnMeta?.codecId ?? columnMeta?.type;
       if (codecId && paramName) {
         paramCodecs[paramName] = codecId;
       }

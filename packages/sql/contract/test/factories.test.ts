@@ -3,28 +3,40 @@ import { col, contract, fk, index, model, pk, storage, table, unique } from '../
 
 describe('SQL contract factories', () => {
   describe('col', () => {
-    it('creates a StorageColumn with type and nullable', () => {
-      const column = col('pg/int4@1', false);
+    it('creates a StorageColumn with nativeType, codecId and nullable', () => {
+      const column = col('int4', 'pg/int4@1', false);
       expect(column).toEqual({
-        type: 'pg/int4@1',
+        nativeType: 'int4',
+        codecId: 'pg/int4@1',
         nullable: false,
       });
     });
 
     it('defaults nullable to false', () => {
-      const column = col('pg/text@1');
+      const column = col('text', 'pg/text@1');
       expect(column).toEqual({
-        type: 'pg/text@1',
+        nativeType: 'text',
+        codecId: 'pg/text@1',
         nullable: false,
       });
     });
 
     it('creates nullable column', () => {
-      const column = col('pg/text@1', true);
+      const column = col('text', 'pg/text@1', true);
       expect(column).toEqual({
-        type: 'pg/text@1',
+        nativeType: 'text',
+        codecId: 'pg/text@1',
         nullable: true,
       });
+    });
+
+    it('creates column without codecId', () => {
+      const column = col('int4', undefined, false);
+      expect(column).toEqual({
+        nativeType: 'int4',
+        nullable: false,
+      });
+      expect(column.codecId).toBeUndefined();
     });
   });
 
@@ -123,12 +135,12 @@ describe('SQL contract factories', () => {
   describe('table', () => {
     it('creates a StorageTable with columns', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
-        email: col('pg/text@1'),
+        id: col('int4', 'pg/int4@1'),
+        email: col('text', 'pg/text@1'),
       });
       expect(userTable.columns).toEqual({
-        id: { type: 'pg/int4@1', nullable: false },
-        email: { type: 'pg/text@1', nullable: false },
+        id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+        email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
       });
       expect(userTable.uniques).toEqual([]);
       expect(userTable.indexes).toEqual([]);
@@ -138,8 +150,8 @@ describe('SQL contract factories', () => {
     it('creates table with primary key', () => {
       const userTable = table(
         {
-          id: col('pg/int4@1'),
-          email: col('pg/text@1'),
+          id: col('int4', 'pg/int4@1'),
+          email: col('text', 'pg/text@1'),
         },
         { pk: pk('id') },
       );
@@ -149,8 +161,8 @@ describe('SQL contract factories', () => {
     it('creates table with unique constraints', () => {
       const userTable = table(
         {
-          id: col('pg/int4@1'),
-          email: col('pg/text@1'),
+          id: col('int4', 'pg/int4@1'),
+          email: col('text', 'pg/text@1'),
         },
         { uniques: [unique('email')] },
       );
@@ -160,8 +172,8 @@ describe('SQL contract factories', () => {
     it('creates table with indexes', () => {
       const userTable = table(
         {
-          id: col('pg/int4@1'),
-          email: col('pg/text@1'),
+          id: col('int4', 'pg/int4@1'),
+          email: col('text', 'pg/text@1'),
         },
         { indexes: [index('email')] },
       );
@@ -171,8 +183,8 @@ describe('SQL contract factories', () => {
     it('creates table with foreign keys', () => {
       const postTable = table(
         {
-          id: col('pg/int4@1'),
-          userId: col('pg/int4@1'),
+          id: col('int4', 'pg/int4@1'),
+          userId: col('int4', 'pg/int4@1'),
         },
         { fks: [fk(['userId'], 'user', ['id'])] },
       );
@@ -187,9 +199,9 @@ describe('SQL contract factories', () => {
     it('creates table with all constraints', () => {
       const postTable = table(
         {
-          id: col('pg/int4@1'),
-          userId: col('pg/int4@1'),
-          title: col('pg/text@1'),
+          id: col('int4', 'pg/int4@1'),
+          userId: col('int4', 'pg/int4@1'),
+          title: col('text', 'pg/text@1'),
         },
         {
           pk: pk('id'),
@@ -247,8 +259,8 @@ describe('SQL contract factories', () => {
   describe('storage', () => {
     it('creates SqlStorage from tables', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
-        email: col('pg/text@1'),
+        id: col('int4', 'pg/int4@1'),
+        email: col('text', 'pg/text@1'),
       });
       const s = storage({ user: userTable });
       expect(s.tables).toEqual({
@@ -260,7 +272,7 @@ describe('SQL contract factories', () => {
   describe('contract', () => {
     it('creates a SqlContract with minimal options', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -279,8 +291,8 @@ describe('SQL contract factories', () => {
 
     it('creates contract with models', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
-        email: col('pg/text@1'),
+        id: col('int4', 'pg/int4@1'),
+        email: col('text', 'pg/text@1'),
       });
       const s = storage({ user: userTable });
       const m = {
@@ -300,7 +312,7 @@ describe('SQL contract factories', () => {
 
     it('creates contract with relations', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const relations = {
@@ -319,7 +331,7 @@ describe('SQL contract factories', () => {
 
     it('creates contract with profileHash', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -333,7 +345,7 @@ describe('SQL contract factories', () => {
 
     it('creates contract with capabilities', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const capabilities = {
@@ -354,7 +366,7 @@ describe('SQL contract factories', () => {
 
     it('creates contract with extensions', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const extensions = {
@@ -374,7 +386,7 @@ describe('SQL contract factories', () => {
 
     it('creates contract with meta', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const meta = {
@@ -392,7 +404,7 @@ describe('SQL contract factories', () => {
 
     it('creates contract with sources', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const sources = {
@@ -412,7 +424,7 @@ describe('SQL contract factories', () => {
 
     it('creates contract with mappings', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const mappings = {

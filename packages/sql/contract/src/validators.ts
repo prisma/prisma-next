@@ -15,7 +15,8 @@ import type {
 } from './types';
 
 const StorageColumnSchema = type.declare<StorageColumn>().type({
-  type: 'string',
+  nativeType: 'string',
+  'codecId?': 'string',
   nullable: 'boolean',
 });
 
