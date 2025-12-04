@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import type { ContractIR } from '@prisma-next/contract/ir';
@@ -368,7 +369,6 @@ describe('family instance verify', () => {
 
           // Modify the contract JSON to remove profileHash
           const contractJsonPath = resolve(testDirWithDb, 'output/contract.json');
-          const { readFile, writeFile } = await import('node:fs/promises');
           const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
           const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
           // Remove profileHash if present

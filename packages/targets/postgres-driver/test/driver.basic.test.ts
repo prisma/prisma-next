@@ -1,4 +1,5 @@
 import { timeouts } from '@prisma-next/test-utils';
+import type { Client, Pool } from 'pg';
 import { newDb } from 'pg-mem';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -22,7 +23,7 @@ describe('@prisma-next/driver-postgres', () => {
       const pool = new Pool();
 
       const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as import('pg').Pool },
+        connect: { pool: pool as unknown as Pool },
         cursor: { disabled: true },
       });
 
@@ -57,7 +58,7 @@ describe('@prisma-next/driver-postgres', () => {
       const pool = new Pool();
 
       const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as import('pg').Pool },
+        connect: { pool: pool as unknown as Pool },
         cursor: { batchSize: 1 },
       });
 
@@ -93,7 +94,7 @@ describe('@prisma-next/driver-postgres', () => {
       const pool = new Pool();
 
       const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as import('pg').Pool },
+        connect: { pool: pool as unknown as Pool },
         cursor: { batchSize: 2 },
       });
 
@@ -132,7 +133,7 @@ describe('@prisma-next/driver-postgres', () => {
       const pool = new Pool();
 
       const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as import('pg').Pool },
+        connect: { pool: pool as unknown as Pool },
       });
 
       cleanup = async () => {
@@ -169,7 +170,7 @@ describe('@prisma-next/driver-postgres', () => {
       const pool = new Pool();
 
       const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as import('pg').Pool },
+        connect: { pool: pool as unknown as Pool },
       });
 
       cleanup = async () => {
@@ -199,7 +200,7 @@ describe('@prisma-next/driver-postgres', () => {
       const client = new Client();
 
       const driver = createPostgresDriverFromOptions({
-        connect: { client: client as unknown as import('pg').Client },
+        connect: { client: client as unknown as Client },
       });
 
       cleanup = async () => {
@@ -224,7 +225,7 @@ describe('@prisma-next/driver-postgres', () => {
     const client = new Client();
 
     const driver = createPostgresDriverFromOptions({
-      connect: { client: client as unknown as import('pg').Client },
+      connect: { client: client as unknown as Client },
     });
 
     cleanup = async () => {
@@ -248,7 +249,7 @@ describe('@prisma-next/driver-postgres', () => {
       const pool = new Pool();
 
       const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as import('pg').Pool },
+        connect: { pool: pool as unknown as Pool },
       });
 
       await driver.connect();
@@ -268,7 +269,7 @@ describe('@prisma-next/driver-postgres', () => {
       const pool = new Pool();
 
       const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as import('pg').Pool },
+        connect: { pool: pool as unknown as Pool },
       });
 
       cleanup = async () => {
@@ -307,7 +308,7 @@ describe('@prisma-next/driver-postgres', () => {
       };
 
       const driver = createPostgresDriver('postgresql://test', {
-        poolFactory: MockPool as typeof import('pg').Pool,
+        poolFactory: MockPool as typeof Pool,
       });
 
       cleanup = async () => {
@@ -342,7 +343,7 @@ describe('@prisma-next/driver-postgres', () => {
       };
 
       const driver = createPostgresDriver('postgresql://test', {
-        poolFactory: CustomPool as typeof import('pg').Pool,
+        poolFactory: CustomPool as typeof Pool,
       });
 
       cleanup = async () => {

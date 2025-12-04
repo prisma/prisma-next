@@ -26,9 +26,9 @@ describe('end-to-end JOIN queries', () => {
     async () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await withClient(connectionString, async (client) => {
+          await setupE2EDatabase(client, contract, async (c) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -97,9 +97,9 @@ describe('end-to-end JOIN queries', () => {
     async () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await withClient(connectionString, async (client) => {
+          await setupE2EDatabase(client, contract, async (c) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -178,9 +178,9 @@ describe('end-to-end JOIN queries', () => {
     async () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await withClient(connectionString, async (client) => {
+          await setupE2EDatabase(client, contract, async (c) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -250,9 +250,9 @@ describe('end-to-end JOIN queries', () => {
     async () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await withClient(connectionString, async (client) => {
+          await setupE2EDatabase(client, contract, async (c) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
@@ -330,9 +330,9 @@ describe('end-to-end JOIN queries', () => {
     async () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await withClient(connectionString, async (client) => {
+          await setupE2EDatabase(client, contract, async (c) => {
             await c.query('drop table if exists "comment"');
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
