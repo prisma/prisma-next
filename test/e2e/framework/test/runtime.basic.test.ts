@@ -36,9 +36,9 @@ describe('end-to-end basic queries', () => {
     async () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await withClient(connectionString, async (client) => {
+          await setupE2EDatabase(client, contract, async (c) => {
             await c.query('drop table if exists "user"');
             await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [

@@ -86,11 +86,11 @@ describe('db sign command (e2e)', () => {
 
           // Normalize paths and database URL for snapshot
           let normalized = stripped;
-          // Replace file paths
-          normalized = normalized.replace(
-            /\/(?:Users|home|tmp|var|opt|mnt|root|[A-Z]:\\?)[^\s\n]*/g,
-            '<path>',
-          );
+          // Replace Unix absolute paths (starting with / at word boundary, not part of relative paths)
+          // Match / followed by non-whitespace, but ensure it's an absolute path (starts line or after whitespace/colon)
+          normalized = normalized.replace(/(^|\s|:)\/([A-Za-z0-9_\-.]+\/)+[^\s\n:]+/g, '$1<path>');
+          // Replace Windows drive-letter paths (C:\... or C:/...)
+          normalized = normalized.replace(/[A-Z]:[\\/][^\s\n:]+/g, '<path>');
           // Normalize database URL (port number)
           normalized = normalized.replace(/(127\.0\.0\.1|localhost):\d+/g, '127.0.0.1:XXXXX');
 
@@ -239,23 +239,46 @@ describe('db sign command (e2e)', () => {
           // Get output and parse JSON
           // When --json is used, only JSON should be output, but filter out any non-JSON lines just in case
           const output = consoleOutput.join('\n');
-          // Find the JSON portion - look for first { and last }
-          const firstBrace = output.indexOf('{');
-          const lastBrace = output.lastIndexOf('}');
-          if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-            throw new Error(`No valid JSON found in output: ${output.substring(0, 200)}`);
+          // Find the JSON portion by scanning from the end for the last contiguous JSON block
+          const lines = output.split('\n');
+          let jsonText: string | undefined;
+          let jsonOutput: Record<string, unknown> | undefined;
+
+          // Try to find JSON starting from the last line and expanding backwards
+          for (let endLine = lines.length - 1; endLine >= 0; endLine--) {
+            for (let startLine = endLine; startLine >= 0; startLine--) {
+              const candidate = lines
+                .slice(startLine, endLine + 1)
+                .join('\n')
+                .trim();
+              if (candidate.startsWith('{') && candidate.endsWith('}')) {
+                try {
+                  jsonOutput = JSON.parse(candidate) as Record<string, unknown>;
+                  jsonText = candidate;
+                  break;
+                } catch {
+                  // Continue trying with a larger block
+                }
+              }
+            }
+            if (jsonText) break;
           }
-          const jsonText = output.substring(firstBrace, lastBrace + 1);
-          const jsonOutput = JSON.parse(jsonText);
+
+          if (!jsonText || !jsonOutput) {
+            throw new Error(
+              `No valid JSON found in output. Output length: ${output.length} chars. First 200 chars: ${output.substring(0, 200)}`,
+            );
+          }
 
           // Normalize non-deterministic values (timing, contractPath) for snapshot
-          const normalized = {
+          const meta = jsonOutput['meta'] as Record<string, unknown> | undefined;
+          const normalized: Record<string, unknown> = {
             ...jsonOutput,
             meta: {
-              ...jsonOutput.meta,
-              contractPath: jsonOutput.meta?.contractPath
-                ? jsonOutput.meta.contractPath.replace(/^.*\//, '<path>/')
-                : jsonOutput.meta?.contractPath,
+              ...meta,
+              contractPath: meta?.['contractPath']
+                ? String(meta['contractPath']).replace(/^.*\//, '<path>/')
+                : meta?.['contractPath'],
             },
             timings: {
               total: expect.any(Number),
@@ -263,11 +286,17 @@ describe('db sign command (e2e)', () => {
           };
 
           // Verify structure
-          expect(normalized.ok).toBe(true);
-          expect(normalized.summary).toBeDefined();
-          expect(normalized.contract.coreHash).toBeDefined();
-          expect(normalized.marker.created).toBe(true);
-          expect(normalized.marker.updated).toBe(false);
+          expect(normalized).toMatchObject({
+            ok: true,
+            summary: expect.any(String),
+            contract: {
+              coreHash: expect.any(String),
+            },
+            marker: {
+              created: true,
+              updated: false,
+            },
+          });
 
           // Snapshot test for JSON output
           expect(normalized).toMatchSnapshot();

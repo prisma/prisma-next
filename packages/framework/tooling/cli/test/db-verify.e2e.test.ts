@@ -85,6 +85,7 @@ describe('db verify command (e2e)', () => {
 
   afterEach(() => {
     cleanupMocks();
+    vi.restoreAllMocks();
   });
 
   it(
@@ -379,15 +380,16 @@ describe('db verify command (e2e)', () => {
         const testDir = testSetup.testDir;
         const cleanupDir = testSetup.cleanup;
 
+        // Emit contract using a config with driver (we need driver for emitContractFromConfig)
+        // Use the with-db config which has a driver
+        const emitTestSetup = setupTestDirectoryFromFixtures(
+          fixtureSubdir,
+          'prisma-next.config.with-db.ts',
+          { '{{DB_URL}}': connectionString },
+        );
+        const emitConfigPath = emitTestSetup.configPath;
+
         try {
-          // Emit contract using a config with driver (we need driver for emitContractFromConfig)
-          // Use the with-db config which has a driver
-          const emitTestSetup = setupTestDirectoryFromFixtures(
-            fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
-          );
-          const emitConfigPath = emitTestSetup.configPath;
           const contract = await emitContractFromConfig(emitConfigPath, testDir);
 
           await withClient(connectionString, async (client) => {
@@ -409,7 +411,7 @@ describe('db verify command (e2e)', () => {
           // Now test verify with the no-driver config
           // Mock loadConfig to return config without driver (bypassing validation)
           const originalLoadConfig = await import('../src/config-loader');
-          vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+          const loadConfigSpy = vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
             family: {
               familyId: 'sql',
               create: vi.fn(),
@@ -428,38 +430,43 @@ describe('db verify command (e2e)', () => {
             },
           } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
 
-          const command = createDbVerifyCommand();
-          const originalCwd = process.cwd();
           try {
-            process.chdir(testDir);
-            await expect(
-              executeCommand(command, [
-                '--config',
-                'prisma-next.config.no-query-runner.ts',
-                '--json',
-              ]),
-            ).rejects.toThrow('process.exit called');
+            const command = createDbVerifyCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await expect(
+                executeCommand(command, [
+                  '--config',
+                  'prisma-next.config.no-query-runner.ts',
+                  '--json',
+                ]),
+              ).rejects.toThrow('process.exit called');
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            // Check exit code is non-zero (error)
+            const exitCode = getExitCode();
+            expect(exitCode).not.toBe(0);
+
+            const errorOutput = consoleErrors.join('\n');
+            expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+            const parsed = JSON.parse(errorOutput);
+            expect(parsed).toMatchObject({
+              code: 'PN-CLI-4010',
+              summary: expect.any(String),
+              why: expect.any(String),
+              fix: expect.any(String),
+            });
+            expect(parsed.summary).toContain('Driver is required for DB-connected commands');
+            expect(parsed.fix).toContain('Add driver to prisma-next.config.ts');
           } finally {
-            process.chdir(originalCwd);
+            loadConfigSpy.mockRestore();
           }
-
-          // Check exit code is non-zero (error)
-          const exitCode = getExitCode();
-          expect(exitCode).not.toBe(0);
-
-          const errorOutput = consoleErrors.join('\n');
-          expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-          const parsed = JSON.parse(errorOutput);
-          expect(parsed).toMatchObject({
-            code: 'PN-CLI-4010',
-            summary: expect.any(String),
-            why: expect.any(String),
-            fix: expect.any(String),
-          });
-          expect(parsed.summary).toContain('Driver is required for DB-connected commands');
-          expect(parsed.fix).toContain('Add driver to prisma-next.config.ts');
         } finally {
+          emitTestSetup.cleanup();
           cleanupDir();
         }
       });

@@ -60,31 +60,60 @@ beforeAll(async () => {
   contract = validateContract<Contract>(contractJson);
 }, timeouts.typeScriptCompilation);
 
+/**
+ * Creates a test runtime with adapter, context, pool, driver, and runtime configured.
+ * Returns both runtime and pool for cleanup.
+ */
+function createTestRuntime(
+  connectionString: string,
+  contract: Contract,
+): {
+  runtime: ReturnType<typeof createRuntime>;
+  pool: Pool;
+} {
+  const adapter = createPostgresAdapter();
+  const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
+  const pool = new Pool({ connectionString });
+  const driver = createPostgresDriverFromOptions({
+    connect: { pool },
+    cursor: { disabled: true },
+  });
+  const runtime = createRuntime({
+    context,
+    adapter,
+    driver,
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    plugins: [
+      budgets({
+        maxRows: 10_000,
+        defaultTableRows: 10_000,
+        tableRows: { user: 10_000, post: 10_000 },
+      }),
+    ],
+  });
+  return { runtime, pool };
+}
+
+/**
+ * Closes the test runtime.
+ */
+async function closeTestRuntime({
+  runtime,
+  pool: _pool,
+}: {
+  runtime: ReturnType<typeof createRuntime>;
+  pool: Pool;
+}): Promise<void> {
+  await runtime.close();
+  // Pool is closed by runtime.close() -> driver.close(), so we don't need to call pool.end() here
+}
+
 describe('ORM integration tests', () => {
   it(
     'orm.getUsers returns users with selected fields, respects limit and ordering',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
-        const runtime = createRuntime({
-          context,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
-        });
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
           await stampMarker({
@@ -116,7 +145,7 @@ describe('ORM integration tests', () => {
           });
           expect(users[0]).not.toMatchObject({ posts: expect.anything() });
         } finally {
-          await runtime.close();
+          await closeTestRuntime({ runtime, pool });
         }
       });
     },
@@ -127,26 +156,7 @@ describe('ORM integration tests', () => {
     'orm.getUserById returns single user by ID',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
-        const runtime = createRuntime({
-          context,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
-        });
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
           await stampMarker({
@@ -176,7 +186,7 @@ describe('ORM integration tests', () => {
             createdAt: expect.anything(),
           });
         } finally {
-          await runtime.close();
+          await closeTestRuntime({ runtime, pool });
         }
       });
     },
@@ -187,26 +197,7 @@ describe('ORM integration tests', () => {
     'orm relation filters: where.related.posts.some() returns users with at least one post',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
-        const runtime = createRuntime({
-          context,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
-        });
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
           await stampMarker({
@@ -243,7 +234,7 @@ describe('ORM integration tests', () => {
             email: expect.anything(),
           });
         } finally {
-          await runtime.close();
+          await closeTestRuntime({ runtime, pool });
         }
       });
     },
@@ -254,26 +245,7 @@ describe('ORM integration tests', () => {
     'orm includes: include.posts() returns users with nested posts arrays',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
-        const runtime = createRuntime({
-          context,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
-        });
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
           await stampMarker({
@@ -311,7 +283,7 @@ describe('ORM integration tests', () => {
             posts: expect.any(Array),
           });
         } finally {
-          await runtime.close();
+          await closeTestRuntime({ runtime, pool });
         }
       });
     },
@@ -322,26 +294,7 @@ describe('ORM integration tests', () => {
     'orm writes: create() inserts a user',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
-        const runtime = createRuntime({
-          context,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
-        });
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
           await stampMarker({
@@ -372,7 +325,7 @@ describe('ORM integration tests', () => {
           );
           expect(rowCount).toBe(1);
         } finally {
-          await runtime.close();
+          await closeTestRuntime({ runtime, pool });
         }
       });
     },
@@ -383,26 +336,7 @@ describe('ORM integration tests', () => {
     'orm writes: update() updates a user',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
-        const runtime = createRuntime({
-          context,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
-        });
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
           await stampMarker({
@@ -433,7 +367,7 @@ describe('ORM integration tests', () => {
           });
           expect(email).toBe('alice-updated@example.com');
         } finally {
-          await runtime.close();
+          await closeTestRuntime({ runtime, pool });
         }
       });
     },
@@ -444,26 +378,7 @@ describe('ORM integration tests', () => {
     'orm writes: delete() deletes a user',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
-        const runtime = createRuntime({
-          context,
-          adapter,
-          driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
-        });
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
           await stampMarker({
@@ -497,7 +412,7 @@ describe('ORM integration tests', () => {
           );
           expect(rowCount).toBe(0);
         } finally {
-          await runtime.close();
+          await closeTestRuntime({ runtime, pool });
         }
       });
     },

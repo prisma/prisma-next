@@ -9,7 +9,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/targets-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { CodecTypes } from '../../../targets/postgres-adapter/src/core/codecs';
 import postgresAdapter from '../../../targets/postgres-adapter/src/exports/control';
 import {
@@ -149,17 +149,6 @@ async function verifyDatabase(options: {
 }
 
 describe('family instance verify', () => {
-  let cleanupDir: () => void;
-
-  beforeEach(() => {
-    const testSetup = createTestDir();
-    cleanupDir = testSetup.cleanup;
-  });
-
-  afterEach(() => {
-    cleanupDir();
-  });
-
   it(
     'verifies database with matching marker via driver',
     async () => {
