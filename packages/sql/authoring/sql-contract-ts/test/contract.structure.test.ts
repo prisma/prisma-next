@@ -94,7 +94,11 @@ describe('validateContract structure validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: 'yes' as unknown as boolean },
+              id: {
+                nativeType: 'text',
+                codecId: 'pg/text@1',
+                nullable: 'yes' as unknown as boolean,
+              },
             },
           },
         },

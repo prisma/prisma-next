@@ -170,13 +170,17 @@ describe('contract emit command (CLI process e2e)', () => {
       const userTable = tables?.['user'] as Record<string, unknown> | undefined;
       const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
       if (userTable && originalUserTable) {
-        const columns = userTable['columns'] as Record<string, { type?: string }> | undefined;
+        const columns = userTable['columns'] as
+          | Record<string, { nativeType?: string; codecId?: string }>
+          | undefined;
         const originalColumns = originalUserTable['columns'] as
-          | Record<string, { type?: string }>
+          | Record<string, { nativeType?: string; codecId?: string }>
           | undefined;
         if (columns && originalColumns) {
-          expect(columns['id']?.type).toBe(originalColumns['id']?.type);
-          expect(columns['email']?.type).toBe(originalColumns['email']?.type);
+          expect(columns['id']?.codecId).toBe(originalColumns['id']?.codecId);
+          expect(columns['email']?.codecId).toBe(originalColumns['email']?.codecId);
+          expect(columns['id']?.nativeType).toBe(originalColumns['id']?.nativeType);
+          expect(columns['email']?.nativeType).toBe(originalColumns['email']?.nativeType);
         }
       }
     },

@@ -92,6 +92,9 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
     const index = paramValues.push(value);
 
     const codecId = columnMeta.codecId;
+    if (!codecId) {
+      throw new Error(`Column ${tableName}.${columnName} is missing codecId`);
+    }
     if (paramName) {
       paramCodecs[paramName] = codecId;
     }

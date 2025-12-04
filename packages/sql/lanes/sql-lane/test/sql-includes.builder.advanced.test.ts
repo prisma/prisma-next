@@ -8,22 +8,31 @@ import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
 import type { CodecTypes } from './fixtures/contract.d';
 
+// Type aliases for common column types
+type Int4Column = {
+  readonly nativeType: 'int4';
+  readonly codecId: 'pg/int4@1';
+  readonly nullable: false;
+};
+type TextColumn = {
+  readonly nativeType: 'text';
+  readonly codecId: 'pg/text@1';
+  readonly nullable: false;
+};
+type TimestamptzColumn = {
+  readonly nativeType: 'timestamptz';
+  readonly codecId: 'pg/timestamptz@1';
+  readonly nullable: false;
+};
+
 // Define a fully-typed contract type with capabilities
 type ContractWithCapabilities = SqlContract<
   {
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
+          readonly id: Int4Column;
+          readonly email: TextColumn;
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -32,26 +41,10 @@ type ContractWithCapabilities = SqlContract<
       };
       readonly post: {
         readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly userId: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
-          readonly createdAt: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            nullable: false;
-          };
+          readonly id: Int4Column;
+          readonly userId: Int4Column;
+          readonly title: TextColumn;
+          readonly createdAt: TimestamptzColumn;
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -78,16 +71,8 @@ type ContractWithoutCapabilities = SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
+          readonly id: Int4Column;
+          readonly email: TextColumn;
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -96,21 +81,9 @@ type ContractWithoutCapabilities = SqlContract<
       };
       readonly post: {
         readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly userId: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
+          readonly id: Int4Column;
+          readonly userId: Int4Column;
+          readonly title: TextColumn;
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];

@@ -34,14 +34,14 @@ export function validateContractCodecMappings(
   contract: SqlContract<SqlStorage>,
 ): void {
   const typeIds = extractTypeIdsFromColumns(contract);
-  const invalidCodecs: Array<{ table: string; column: string; typeId: string }> = [];
+  const invalidCodecs: Array<{ table: string; column: string; codecId: string }> = [];
 
-  for (const [key, typeId] of typeIds.entries()) {
-    if (!registry.has(typeId)) {
+  for (const [key, codecId] of typeIds.entries()) {
+    if (!registry.has(codecId)) {
       const parts = key.split('.');
       const table = parts[0] ?? '';
       const column = parts[1] ?? '';
-      invalidCodecs.push({ table, column, typeId });
+      invalidCodecs.push({ table, column, codecId });
     }
   }
 
@@ -53,7 +53,7 @@ export function validateContractCodecMappings(
 
     throw runtimeError(
       'RUNTIME.CODEC_MISSING',
-      `Missing codec implementations for column typeIds: ${invalidCodecs.map((c) => `${c.table}.${c.column} (${c.typeId})`).join(', ')}`,
+      `Missing codec implementations for column codecIds: ${invalidCodecs.map((c) => `${c.table}.${c.column} (${c.codecId})`).join(', ')}`,
       details,
     );
   }

@@ -431,6 +431,6 @@ With this refactor, the SQL family’s contract IR becomes a **complete descript
 - The contract (including the DB-stored marker) and
 - A live schema snapshot
 
-can perform meaningful structural verification and migration planning purely from native types, while query builders and runtime remain codec-aware using the same contract. This aligns the contract more closely with the actual database while still serving as a single source of truth for application-level configuration.***
+can perform meaningful structural verification and migration planning purely from native types, while query builders and runtime remain codec-aware using the same contract. This aligns the contract more closely with the actual database while still serving as a single source of truth for application-level configuration.
 
 

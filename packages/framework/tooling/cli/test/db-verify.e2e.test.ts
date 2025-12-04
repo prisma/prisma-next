@@ -1,8 +1,5 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
+import { join } from 'node:path';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -12,10 +9,10 @@ import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
-import { loadConfig } from '../src/config-loader';
 import {
   executeCommand,
   getExitCode,
+  loadContractFromDisk,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
@@ -23,53 +20,6 @@ import {
 
 // Fixture subdirectory for db-verify tests
 const fixtureSubdir = 'db-verify';
-
-/**
- * Emits the contract to disk using the config file.
- * Returns the validated contract for use in tests.
- */
-async function emitContractFromConfig(
-  configPath: string,
-  testDir: string,
-): Promise<SqlContract<SqlStorage>> {
-  const config = await loadConfig(configPath);
-  if (!config.contract) {
-    throw new Error('Config.contract is required');
-  }
-
-  const contractConfig = config.contract;
-  let contractRaw: unknown;
-  if (typeof contractConfig.source === 'function') {
-    contractRaw = await contractConfig.source();
-  } else {
-    contractRaw = contractConfig.source;
-  }
-
-  // Create family instance (assembles operation registry, type imports, extension IDs)
-  if (!config.driver) {
-    throw new Error('Config.driver is required');
-  }
-  const familyInstance = config.family.create({
-    target: config.target,
-    adapter: config.adapter,
-    driver: config.driver,
-    extensions: config.extensions ?? [],
-  }) as FamilyInstance<string>;
-
-  // emitContract handles stripping mappings and validation internally
-  const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
-
-  // Write contract files
-  const contractJsonPath = resolve(testDir, contractConfig.output ?? 'src/prisma/contract.json');
-  const contractDtsPath = resolve(testDir, contractConfig.types ?? 'src/prisma/contract.d.ts');
-  mkdirSync(dirname(contractJsonPath), { recursive: true });
-  mkdirSync(dirname(contractDtsPath), { recursive: true });
-  writeFileSync(contractJsonPath, emitResult.contractJson, 'utf-8');
-  writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
-
-  const contractJson = JSON.parse(emitResult.contractJson) as Record<string, unknown>;
-  return validateContract<SqlContract<SqlStorage>>(contractJson);
-}
 
 withTempDir(({ createTempDir }) => {
   describe('db verify command (e2e)', () => {
@@ -102,11 +52,11 @@ withTempDir(({ createTempDir }) => {
               { '{{DB_URL}}': connectionString },
             );
             const testDir = testSetup.testDir;
-            const configPath = testSetup.configPath;
 
             {
-              // Emit contract using the config
-              const contract = await emitContractFromConfig(configPath, testDir);
+              // Load precomputed contract from disk
+              const contractJsonPath = join(testDir, 'output', 'contract.json');
+              const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
               await withClient(connectionString, async (client) => {
                 // Setup marker schema and table
@@ -181,7 +131,6 @@ withTempDir(({ createTempDir }) => {
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
-          const configPath = testSetup.configPath;
 
           {
             await withClient(connectionString, async (client) => {
@@ -191,8 +140,9 @@ withTempDir(({ createTempDir }) => {
               // withClient will close the client after this callback returns
             });
 
-            // Emit contract using the config
-            await emitContractFromConfig(configPath, testDir);
+            // Load precomputed contract from disk (contract.json is copied by setupTestDirectoryFromFixtures)
+            const contractJsonPath = join(testDir, 'output', 'contract.json');
+            loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
@@ -238,11 +188,11 @@ withTempDir(({ createTempDir }) => {
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
-          const configPath = testSetup.configPath;
 
           {
-            // Emit contract using the config
-            const contract = await emitContractFromConfig(configPath, testDir);
+            // Load precomputed contract from disk
+            const contractJsonPath = join(testDir, 'output', 'contract.json');
+            const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
             await withClient(connectionString, async (client) => {
               // Setup marker schema and table
@@ -315,7 +265,6 @@ withTempDir(({ createTempDir }) => {
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
-          const configPath = testSetup.configPath;
 
           {
             await withClient(connectionString, async (client) => {
@@ -325,8 +274,9 @@ withTempDir(({ createTempDir }) => {
               // withClient will close the client after this callback returns
             });
 
-            // Emit contract using the config
-            await emitContractFromConfig(configPath, testDir);
+            // Load precomputed contract from disk (contract.json is copied by setupTestDirectoryFromFixtures)
+            const contractJsonPath = join(testDir, 'output', 'contract.json');
+            loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
             const command = createDbVerifyCommand();
             const originalCwd = process.cwd();
@@ -374,16 +324,16 @@ withTempDir(({ createTempDir }) => {
           const testDir = testSetup.testDir;
 
           {
-            // Emit contract using a config with driver (we need driver for emitContractFromConfig)
-            // Use the with-db config which has a driver
+            // Load precomputed contract from disk
+            // Use the with-db config setup to get the contract files
             const emitTestSetup = setupTestDirectoryFromFixtures(
               createTempDir,
               fixtureSubdir,
               'prisma-next.config.with-db.ts',
               { '{{DB_URL}}': connectionString },
             );
-            const emitConfigPath = emitTestSetup.configPath;
-            const contract = await emitContractFromConfig(emitConfigPath, testDir);
+            const contractJsonPath = join(emitTestSetup.testDir, 'output', 'contract.json');
+            const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
             await withClient(connectionString, async (client) => {
               // Setup marker schema and table

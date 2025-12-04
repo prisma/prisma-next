@@ -29,15 +29,6 @@ describe('SQL contract factories', () => {
         nullable: true,
       });
     });
-
-    it('creates column without codecId', () => {
-      const column = col('int4', undefined, false);
-      expect(column).toEqual({
-        nativeType: 'int4',
-        nullable: false,
-      });
-      expect(column.codecId).toBeUndefined();
-    });
   });
 
   describe('pk', () => {

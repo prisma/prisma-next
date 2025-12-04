@@ -9,6 +9,8 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { Command } from 'commander';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -242,6 +244,20 @@ export function setupTestDirectoryFromFixtures(
     copyFileSync(fixtureContractPath, contractPath);
   }
 
+  // Copy precomputed contract.json and contract.d.ts if they exist
+  const fixtureContractJsonPath = join(fixturesSubdirPath, 'contract.json');
+  const fixtureContractDtsPath = join(fixturesSubdirPath, 'contract.d.ts');
+  if (existsSync(fixtureContractJsonPath)) {
+    const contractJsonPath = join(testDir, 'output', 'contract.json');
+    mkdirSync(dirname(contractJsonPath), { recursive: true });
+    copyFileSync(fixtureContractJsonPath, contractJsonPath);
+  }
+  if (existsSync(fixtureContractDtsPath)) {
+    const contractDtsPath = join(testDir, 'output', 'contract.d.ts');
+    mkdirSync(dirname(contractDtsPath), { recursive: true });
+    copyFileSync(fixtureContractDtsPath, contractDtsPath);
+  }
+
   // Copy and process config file
   const configPath = join(testDir, 'prisma-next.config.ts');
   const fixtureConfigPath = join(fixturesSubdirPath, configFileName);
@@ -314,6 +330,19 @@ export function setupIntegrationTestDirectoryFromFixtures(
   };
 
   return { testDir, contractPath: join(testDir, 'contract.ts'), outputDir, configPath, cleanup };
+}
+
+/**
+ * Loads a contract from disk (already-emitted artifact).
+ * This helper DRYs up the common pattern of loading contracts in e2e tests.
+ * The contract type should be specified from the emitted contract.d.ts file.
+ */
+export function loadContractFromDisk<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+>(contractJsonPath: string): TContract {
+  const contractJsonContent = readFileSync(contractJsonPath, 'utf-8');
+  const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  return validateContract<TContract>(contractJson);
 }
 
 /**

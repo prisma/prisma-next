@@ -62,42 +62,40 @@ withTempDir(({ createTempDir }) => {
             process.chdir(originalCwd);
           }
 
-          {
-            const command = createDbSignCommand();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            // Get output and strip ANSI for snapshot
-            const output = consoleOutput.join('\n');
-            const stripped = stripAnsi(output);
-
-            // Normalize paths and database URL for snapshot
-            let normalized = stripped;
-            // Replace file paths
-            normalized = normalized.replace(
-              /\/(?:Users|home|tmp|var|opt|mnt|root|[A-Z]:\\?)[^\s\n]*/g,
-              '<path>',
-            );
-            // Normalize database URL (port number)
-            normalized = normalized.replace(/(127\.0\.0\.1|localhost):\d+/g, '127.0.0.1:XXXXX');
-
-            // Verify marker was created in database
-            await withClient(connectionString, async (client) => {
-              const result = await client.query(
-                'select core_hash, profile_hash from prisma_contract.marker where id = $1',
-                [1],
-              );
-              expect(result.rows.length).toBe(1);
-              expect(result.rows[0]?.core_hash).toBeDefined();
-            });
-
-            // Snapshot test for output
-            expect(normalized).toMatchSnapshot();
+          const command = createDbSignCommand();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
           }
+
+          // Get output and strip ANSI for snapshot
+          const output = consoleOutput.join('\n');
+          const stripped = stripAnsi(output);
+
+          // Normalize paths and database URL for snapshot
+          let normalized = stripped;
+          // Replace file paths
+          normalized = normalized.replace(
+            /\/(?:Users|home|tmp|var|opt|mnt|root|[A-Z]:\\?)[^\s\n]*/g,
+            '<path>',
+          );
+          // Normalize database URL (port number)
+          normalized = normalized.replace(/(127\.0\.0\.1|localhost):\d+/g, '127.0.0.1:XXXXX');
+
+          // Verify marker was created in database
+          await withClient(connectionString, async (client) => {
+            const result = await client.query(
+              'select core_hash, profile_hash from prisma_contract.marker where id = $1',
+              [1],
+            );
+            expect(result.rows.length).toBe(1);
+            expect(result.rows[0]?.core_hash).toBeDefined();
+          });
+
+          // Snapshot test for output
+          expect(normalized).toMatchSnapshot();
         });
       },
       timeouts.spinUpPpgDev,

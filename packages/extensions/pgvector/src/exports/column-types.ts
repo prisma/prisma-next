@@ -7,7 +7,7 @@
 
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 
-export const vectorColumn: ColumnTypeDescriptor = {
+export const vectorColumn = {
   codecId: 'pg/vector@1',
   nativeType: 'vector',
-} as const;
+} as const satisfies ColumnTypeDescriptor;

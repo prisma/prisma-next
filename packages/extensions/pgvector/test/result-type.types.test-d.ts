@@ -19,17 +19,17 @@ type ContractWithNullableVector = SqlContract<
           readonly id: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly title: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly embedding: {
             readonly nativeType: 'vector';
             readonly codecId: 'pg/vector@1';
-            nullable: true;
+            readonly nullable: true;
           };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
@@ -59,12 +59,12 @@ type ContractWithNonNullableVector = SqlContract<
           readonly id: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly embedding: {
             readonly nativeType: 'vector';
             readonly codecId: 'pg/vector@1';
-            nullable: false;
+            readonly nullable: false;
           };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
