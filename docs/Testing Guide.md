@@ -126,7 +126,6 @@ it('returns multiple rows with correct types', async () => {
         }
       });
     },
-    { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
   );
 });
 
@@ -266,7 +265,7 @@ await withDevDatabase(async ({ connectionString }) => {
   await withClient(connectionString, async (client) => {
     // ... test code
   });
-}, { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 });
+});
 
 // Iterator helpers (generic)
 const results = await collectAsync(someAsyncIterable);
@@ -428,40 +427,25 @@ await withClient(connectionString, async (client) => {
 
 ### Port Management
 
-**Issue:** Parallel test execution causes port conflicts
-
-**Solution:** Assign unique port ranges to each test suite
+**Automatic Port Allocation:** Ports are automatically allocated using `get-port` to find available ports in the range 10,000-65,000. This eliminates port conflicts in parallel test execution without requiring manual port assignment.
 
 ```typescript
-// packages/runtime/test/codecs.integration.test.ts
-database = await createDevDatabase({
-  acceleratePort: 54003,
-  databasePort: 54004,
-  shadowDatabasePort: 54005,
+// Ports are automatically allocated - no need to specify them
+await withDevDatabase(async ({ connectionString }) => {
+  await withClient(connectionString, async (client) => {
+    // ... test code
+  });
 });
 
-// packages/runtime/test/budgets.integration.test.ts
-database = await createDevDatabase({
-  acceleratePort: 54010,  // Different range
-  databasePort: 54011,
-  shadowDatabasePort: 54012,
-});
+// Or for createDevDatabase
+const database = await createDevDatabase();
 ```
 
-**Current port assignments:**
-- `compat-prisma`: 54000-54002
-- `codecs.integration.test.ts`: 54003-54005
-- `budgets.integration.test.ts`: 54010-54012
-- `runtime.integration.test.ts`: 53213-53215
-- `marker.test.ts`: 54216-54218
-- `e2e-tests/runtime.e2e.test.ts`: 54020-54112 (multiple tests, each with unique range)
-- `e2e-tests/runtime.joins.test.ts`: 54039-54041, 54045-54047, 54130-54132, 54140-54142, 54185-54187
-- `db-introspect.e2e.test.ts`: 54210-54212, 54213-54215
-- `sign-database.test.ts`: 54250-54252
-- `db-sign.e2e.test.ts`: 54220-54222, 54260-54262, 54270-54272
-- `db-schema-verify.e2e.test.ts`: 54223-54225, 54226-54228, 54229-54231, 54280-54282, 54283-54285
-
-**When adding new test suites:** Assign a new port range and document it here.
+**Benefits:**
+- No port conflicts: Ports are checked for availability before use
+- No manual assignment: No need to track and assign port ranges
+- Better parallel execution: Multiple tests can run simultaneously without conflicts
+- Simpler code: Less boilerplate in test files
 
 ### AST Node Creation
 

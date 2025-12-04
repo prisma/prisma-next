@@ -38,11 +38,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
     tables = schema(context).tables;
     builder = sql({ context });
 
-    database = await createDevDatabase({
-      acceleratePort: 54033,
-      databasePort: 54034,
-      shadowDatabasePort: 54035,
-    });
+    database = await createDevDatabase();
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
   }, timeouts.spinUpPpgDev);

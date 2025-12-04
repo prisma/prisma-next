@@ -60,68 +60,101 @@ beforeAll(async () => {
   contract = validateContract<Contract>(contractJson);
 }, timeouts.typeScriptCompilation);
 
+/**
+ * Creates a test runtime with adapter, context, pool, driver, and runtime configured.
+ * Returns both runtime and pool for cleanup.
+ */
+function createTestRuntime(
+  connectionString: string,
+  contract: Contract,
+): {
+  runtime: ReturnType<typeof createRuntime>;
+  pool: Pool;
+} {
+  const adapter = createPostgresAdapter();
+  const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
+  const pool = new Pool({ connectionString });
+  const driver = createPostgresDriverFromOptions({
+    connect: { pool },
+    cursor: { disabled: true },
+  });
+  const runtime = createRuntime({
+    context,
+    adapter,
+    driver,
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    plugins: [
+      budgets({
+        maxRows: 10_000,
+        defaultTableRows: 10_000,
+        tableRows: { user: 10_000, post: 10_000 },
+      }),
+    ],
+  });
+  return { runtime, pool };
+}
+
+/**
+ * Closes the test runtime and pool.
+ */
+async function closeTestRuntime({
+  runtime,
+  pool,
+}: {
+  runtime: ReturnType<typeof createRuntime>;
+  pool: Pool;
+}): Promise<void> {
+  try {
+    await runtime.close();
+  } finally {
+    // Only close pool if runtime.close() didn't already close it (e.g., if it threw)
+    // Check if pool is already ended to avoid "Called end on pool more than once" error
+    if (!(pool as { ended?: boolean }).ended) {
+      await pool.end();
+    }
+  }
+}
+
 describe('ORM integration tests', () => {
   it(
     'orm.getUsers returns users with selected fields, respects limit and ordering',
     async () => {
-      await withDevDatabase(
-        async ({ connectionString }: { connectionString: string }) => {
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-          const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
-          const runtime = createRuntime({
-            context,
-            adapter,
-            driver,
-            verify: { mode: 'onFirstUse', requireMarker: false },
-            plugins: [
-              budgets({
-                maxRows: 10_000,
-                defaultTableRows: 10_000,
-                tableRows: { user: 10_000, post: 10_000 },
-              }),
-            ],
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          try {
-            await stampMarker({
-              connectionString,
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-            });
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query('truncate table "user" restart identity');
+            await client.query(
+              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now()), ($3, now())',
+              ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
+            );
+          });
 
-            await withClient(connectionString, async (client: import('pg').Client) => {
-              await client.query(
-                'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-              );
-              await client.query('truncate table "user" restart identity');
-              await client.query(
-                'insert into "user" (email, "createdAt") values ($1, now()), ($2, now()), ($3, now())',
-                ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
-              );
-            });
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormGetUsers } = await import('../src/queries/orm-get-users');
+          const users = await ormGetUsers(2, runtime);
 
-            process.env['DATABASE_URL'] = connectionString;
-            const { ormGetUsers } = await import('../src/queries/orm-get-users');
-            const users = await ormGetUsers(2, runtime);
-
-            expect(users).toHaveLength(2);
-            expect(users[0]).toMatchObject({
-              id: expect.any(Number),
-              email: expect.any(String),
-              createdAt: expect.anything(),
-            });
-            expect(users[0]).not.toMatchObject({ posts: expect.anything() });
-          } finally {
-            await runtime.close();
-          }
-        },
-        { acceleratePort: 54030, databasePort: 54031, shadowDatabasePort: 54032 },
-      );
+          expect(users).toHaveLength(2);
+          expect(users[0]).toMatchObject({
+            id: expect.any(Number),
+            email: expect.any(String),
+            createdAt: expect.anything(),
+          });
+          expect(users[0]).not.toMatchObject({ posts: expect.anything() });
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
     },
     timeouts.typeScriptCompilation,
   );
@@ -129,62 +162,40 @@ describe('ORM integration tests', () => {
   it(
     'orm.getUserById returns single user by ID',
     async () => {
-      await withDevDatabase(
-        async ({ connectionString }: { connectionString: string }) => {
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-          const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
-          const runtime = createRuntime({
-            context,
-            adapter,
-            driver,
-            verify: { mode: 'onFirstUse', requireMarker: false },
-            plugins: [
-              budgets({
-                maxRows: 10_000,
-                defaultTableRows: 10_000,
-                tableRows: { user: 10_000, post: 10_000 },
-              }),
-            ],
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          try {
-            await stampMarker({
-              connectionString,
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-            });
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query('truncate table "user" restart identity');
+            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+              'alice@example.com',
+            ]);
+          });
 
-            await withClient(connectionString, async (client: import('pg').Client) => {
-              await client.query(
-                'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-              );
-              await client.query('truncate table "user" restart identity');
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                'alice@example.com',
-              ]);
-            });
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
+          const user = await ormGetUserById(1, runtime);
 
-            process.env['DATABASE_URL'] = connectionString;
-            const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
-            const user = await ormGetUserById(1, runtime);
-
-            expect(user).not.toBeNull();
-            expect(user).toMatchObject({
-              id: 1,
-              email: 'alice@example.com',
-              createdAt: expect.anything(),
-            });
-          } finally {
-            await runtime.close();
-          }
-        },
-        { acceleratePort: 54033, databasePort: 54034, shadowDatabasePort: 54035 },
-      );
+          expect(user).not.toBeNull();
+          expect(user).toMatchObject({
+            id: 1,
+            email: 'alice@example.com',
+            createdAt: expect.anything(),
+          });
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
     },
     timeouts.spinUpPpgDev,
   );
@@ -192,69 +203,47 @@ describe('ORM integration tests', () => {
   it(
     'orm relation filters: where.related.posts.some() returns users with at least one post',
     async () => {
-      await withDevDatabase(
-        async ({ connectionString }: { connectionString: string }) => {
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-          const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
-          const runtime = createRuntime({
-            context,
-            adapter,
-            driver,
-            verify: { mode: 'onFirstUse', requireMarker: false },
-            plugins: [
-              budgets({
-                maxRows: 10_000,
-                defaultTableRows: 10_000,
-                tableRows: { user: 10_000, post: 10_000 },
-              }),
-            ],
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          try {
-            await stampMarker({
-              connectionString,
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-            });
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query(
+              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+            );
+            await client.query('truncate table "post", "user" restart identity cascade');
+            await client.query(
+              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
+              ['alice@example.com', 'bob@example.com'],
+            );
+            await client.query(
+              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now())',
+              ['First Post', 1],
+            );
+          });
 
-            await withClient(connectionString, async (client: import('pg').Client) => {
-              await client.query(
-                'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-              );
-              await client.query(
-                'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-              );
-              await client.query('truncate table "post", "user" restart identity cascade');
-              await client.query(
-                'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
-                ['alice@example.com', 'bob@example.com'],
-              );
-              await client.query(
-                'insert into "post" (title, "userId", "createdAt") values ($1, $2, now())',
-                ['First Post', 1],
-              );
-            });
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
+          const users = await ormGetUsersWithPosts(runtime);
 
-            process.env['DATABASE_URL'] = connectionString;
-            const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
-            const users = await ormGetUsersWithPosts(runtime);
-
-            expect(users.length).toBeGreaterThan(0);
-            expect(users[0]).toMatchObject({
-              id: expect.anything(),
-              email: expect.anything(),
-            });
-          } finally {
-            await runtime.close();
-          }
-        },
-        { acceleratePort: 54036, databasePort: 54037, shadowDatabasePort: 54038 },
-      );
+          expect(users.length).toBeGreaterThan(0);
+          expect(users[0]).toMatchObject({
+            id: expect.anything(),
+            email: expect.anything(),
+          });
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
     },
     timeouts.spinUpPpgDev,
   );
@@ -262,70 +251,48 @@ describe('ORM integration tests', () => {
   it(
     'orm includes: include.posts() returns users with nested posts arrays',
     async () => {
-      await withDevDatabase(
-        async ({ connectionString }: { connectionString: string }) => {
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-          const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
-          const runtime = createRuntime({
-            context,
-            adapter,
-            driver,
-            verify: { mode: 'onFirstUse', requireMarker: false },
-            plugins: [
-              budgets({
-                maxRows: 10_000,
-                defaultTableRows: 10_000,
-                tableRows: { user: 10_000, post: 10_000 },
-              }),
-            ],
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          try {
-            await stampMarker({
-              connectionString,
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-            });
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query(
+              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+            );
+            await client.query('truncate table "post", "user" restart identity cascade');
+            await client.query(
+              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
+              ['alice@example.com', 'bob@example.com'],
+            );
+            await client.query(
+              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now()), ($3, $2, now()), ($4, $5, now())',
+              ['First Post', 1, 'Second Post', 'Third Post', 2],
+            );
+          });
 
-            await withClient(connectionString, async (client: import('pg').Client) => {
-              await client.query(
-                'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-              );
-              await client.query(
-                'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-              );
-              await client.query('truncate table "post", "user" restart identity cascade');
-              await client.query(
-                'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
-                ['alice@example.com', 'bob@example.com'],
-              );
-              await client.query(
-                'insert into "post" (title, "userId", "createdAt") values ($1, $2, now()), ($3, $2, now()), ($4, $5, now())',
-                ['First Post', 1, 'Second Post', 'Third Post', 2],
-              );
-            });
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
+          const users = await ormGetUsersWithPosts(10, runtime);
 
-            process.env['DATABASE_URL'] = connectionString;
-            const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
-            const users = await ormGetUsersWithPosts(10, runtime);
-
-            expect(users.length).toBeGreaterThan(0);
-            expect(users[0]).toMatchObject({
-              id: expect.anything(),
-              email: expect.anything(),
-              posts: expect.any(Array),
-            });
-          } finally {
-            await runtime.close();
-          }
-        },
-        { acceleratePort: 54039, databasePort: 54040, shadowDatabasePort: 54041 },
-      );
+          expect(users.length).toBeGreaterThan(0);
+          expect(users[0]).toMatchObject({
+            id: expect.anything(),
+            email: expect.anything(),
+            posts: expect.any(Array),
+          });
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
     },
     timeouts.spinUpPpgDev,
   );
@@ -333,63 +300,41 @@ describe('ORM integration tests', () => {
   it(
     'orm writes: create() inserts a user',
     async () => {
-      await withDevDatabase(
-        async ({ connectionString }: { connectionString: string }) => {
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-          const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
-          const runtime = createRuntime({
-            context,
-            adapter,
-            driver,
-            verify: { mode: 'onFirstUse', requireMarker: false },
-            plugins: [
-              budgets({
-                maxRows: 10_000,
-                defaultTableRows: 10_000,
-                tableRows: { user: 10_000, post: 10_000 },
-              }),
-            ],
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          try {
-            await stampMarker({
-              connectionString,
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-            });
-
-            await withClient(connectionString, async (client: import('pg').Client) => {
-              await client.query(
-                'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-              );
-              await client.query('truncate table "user" restart identity');
-            });
-
-            process.env['DATABASE_URL'] = connectionString;
-            const { ormCreateUser } = await import('../src/queries/orm-writes');
-            const affectedRows = await ormCreateUser('alice@example.com', runtime);
-
-            expect(affectedRows).toBe(1);
-
-            const rowCount = await withClient(
-              connectionString,
-              async (client: import('pg').Client) => {
-                const result = await client.query('select count(*)::int as count from "user"');
-                return result.rows[0]?.count as number;
-              },
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
-            expect(rowCount).toBe(1);
-          } finally {
-            await runtime.close();
-          }
-        },
-        { acceleratePort: 54042, databasePort: 54043, shadowDatabasePort: 54044 },
-      );
+            await client.query('truncate table "user" restart identity');
+          });
+
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormCreateUser } = await import('../src/queries/orm-writes');
+          const affectedRows = await ormCreateUser('alice@example.com', runtime);
+
+          expect(affectedRows).toBe(1);
+
+          const rowCount = await withClient(
+            connectionString,
+            async (client: import('pg').Client) => {
+              const result = await client.query('select count(*)::int as count from "user"');
+              return result.rows[0]?.count as number;
+            },
+          );
+          expect(rowCount).toBe(1);
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
     },
     timeouts.spinUpPpgDev,
   );
@@ -397,66 +342,41 @@ describe('ORM integration tests', () => {
   it(
     'orm writes: update() updates a user',
     async () => {
-      await withDevDatabase(
-        async ({ connectionString }: { connectionString: string }) => {
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-          const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
-          const runtime = createRuntime({
-            context,
-            adapter,
-            driver,
-            verify: { mode: 'onFirstUse', requireMarker: false },
-            plugins: [
-              budgets({
-                maxRows: 10_000,
-                defaultTableRows: 10_000,
-                tableRows: { user: 10_000, post: 10_000 },
-              }),
-            ],
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          try {
-            await stampMarker({
-              connectionString,
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-            });
-
-            await withClient(connectionString, async (client: import('pg').Client) => {
-              await client.query(
-                'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-              );
-              await client.query('truncate table "user" restart identity');
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                'alice@example.com',
-              ]);
-            });
-
-            process.env['DATABASE_URL'] = connectionString;
-            const { ormUpdateUser } = await import('../src/queries/orm-writes');
-            const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
-
-            expect(affectedRows).toBe(1);
-
-            const email = await withClient(
-              connectionString,
-              async (client: import('pg').Client) => {
-                const result = await client.query('select email from "user" where id = $1', [1]);
-                return result.rows[0]?.email as string;
-              },
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
-            expect(email).toBe('alice-updated@example.com');
-          } finally {
-            await runtime.close();
-          }
-        },
-        { acceleratePort: 54045, databasePort: 54046, shadowDatabasePort: 54047 },
-      );
+            await client.query('truncate table "user" restart identity');
+            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+              'alice@example.com',
+            ]);
+          });
+
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormUpdateUser } = await import('../src/queries/orm-writes');
+          const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
+
+          expect(affectedRows).toBe(1);
+
+          const email = await withClient(connectionString, async (client: import('pg').Client) => {
+            const result = await client.query('select email from "user" where id = $1', [1]);
+            return result.rows[0]?.email as string;
+          });
+          expect(email).toBe('alice-updated@example.com');
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
     },
     timeouts.spinUpPpgDev,
   );
@@ -464,66 +384,44 @@ describe('ORM integration tests', () => {
   it(
     'orm writes: delete() deletes a user',
     async () => {
-      await withDevDatabase(
-        async ({ connectionString }: { connectionString: string }) => {
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-          const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
-          const runtime = createRuntime({
-            context,
-            adapter,
-            driver,
-            verify: { mode: 'onFirstUse', requireMarker: false },
-            plugins: [
-              budgets({
-                maxRows: 10_000,
-                defaultTableRows: 10_000,
-                tableRows: { user: 10_000, post: 10_000 },
-              }),
-            ],
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          try {
-            await stampMarker({
-              connectionString,
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
-            });
-
-            await withClient(connectionString, async (client: import('pg').Client) => {
-              await client.query(
-                'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-              );
-              await client.query('truncate table "user" restart identity');
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                'alice@example.com',
-              ]);
-            });
-
-            process.env['DATABASE_URL'] = connectionString;
-            const { ormDeleteUser } = await import('../src/queries/orm-writes');
-            const affectedRows = await ormDeleteUser(1, runtime);
-
-            expect(affectedRows).toBe(1);
-
-            const rowCount = await withClient(
-              connectionString,
-              async (client: import('pg').Client) => {
-                const result = await client.query('select count(*)::int as count from "user"');
-                return result.rows[0]?.count as number;
-              },
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
-            expect(rowCount).toBe(0);
-          } finally {
-            await runtime.close();
-          }
-        },
-        { acceleratePort: 54048, databasePort: 54049, shadowDatabasePort: 54050 },
-      );
+            await client.query('truncate table "user" restart identity');
+            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+              'alice@example.com',
+            ]);
+          });
+
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormDeleteUser } = await import('../src/queries/orm-writes');
+          const affectedRows = await ormDeleteUser(1, runtime);
+
+          expect(affectedRows).toBe(1);
+
+          const rowCount = await withClient(
+            connectionString,
+            async (client: import('pg').Client) => {
+              const result = await client.query('select count(*)::int as count from "user"');
+              return result.rows[0]?.count as number;
+            },
+          );
+          expect(rowCount).toBe(0);
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
     },
     timeouts.spinUpPpgDev,
   );

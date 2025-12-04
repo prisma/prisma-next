@@ -104,7 +104,7 @@ The repository is organized by **Domains → Layers → Planes**:
 - Examples: `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`, `@prisma-next/compat-prisma`.
 
 **General Principles**:
-- **Core contract types** (`ContractBase`) live in `@prisma-next/contract` (legacy package, will be migrated)
+- **Core contract types** (`ContractBase`) live in `@prisma-next/contract` (located at `packages/framework/core-contract/`)
 - **Target-neutral operations** (operation registry, capability helpers) live in `@prisma-next/operations` (framework/core layer)
 - **Emitter is hook-based**: Target family hooks (e.g., SQL) extend emission with family-specific validation and type generation
 - **Adapters are extension packs**: Adapters and extension packs use the same manifest structure and are treated identically
@@ -504,7 +504,7 @@ const deletePlan = o.user().delete(
 
 - **Plans are immutable** - Built once, never mutated
 - **One query = one statement** - No hidden multi-queries
-- **Unified Plan interface** - All plans use the same `ExecutionPlan<Row, Ast>` interface per ADR 011 (with `Plan<Row>` as a legacy alias in the current implementation):
+- **Unified Plan interface** - All plans use the same `ExecutionPlan<Row, Ast>` interface per ADR 011:
   ```typescript
   interface ExecutionPlan<Row = unknown, Ast = unknown> {
     readonly sql: string;
@@ -512,8 +512,6 @@ const deletePlan = o.user().delete(
     readonly ast?: Ast;        // Optional - present for lanes that build an AST
     readonly meta: PlanMeta;   // Unified metadata with lane as string
   }
-  // For backwards compatibility, Plan<Row> is a type alias for ExecutionPlan<Row, unknown>
-  type Plan<Row = unknown> = ExecutionPlan<Row, unknown>;
   ```
 - **Core is lane-agnostic** - Never use discriminated unions based on `lane` field. The `lane` field is metadata only, not for type narrowing. Use optional fields (`ast?`) to distinguish capabilities.
 - **Plans include metadata**: `{ ast?, params, meta: { refs?, projection?, projectionTypes?, target, targetFamily?, coreHash, profileHash?, lane, annotations?, paramDescriptors } }`
@@ -931,27 +929,18 @@ export type Contract = SqlContract<...>;
 **Solution**: Assign unique port ranges to each test suite:
 
 ```typescript
-// packages/compat-prisma/test/prisma-client.test.ts
-database = await createDevDatabase({
-  acceleratePort: 54000,
-  databasePort: 54001,
-  shadowDatabasePort: 54002,
-});
+// Ports are automatically allocated - no need to specify them
+const database = await createDevDatabase();
 
-// packages/runtime/test/codecs.integration.test.ts
-database = await createDevDatabase({
-  acceleratePort: 54003,  // Different range
-  databasePort: 54004,
-  shadowDatabasePort: 54005,
+// Or with withDevDatabase
+await withDevDatabase(async ({ connectionString }) => {
+  await withClient(connectionString, async (client) => {
+    // ... test code
+  });
 });
 ```
 
-**Current port assignments:**
-- `compat-prisma`: 54000-54002
-- `codecs.integration.test.ts`: 54003-54005
-- `budgets.integration.test.ts`: 54010-54012
-- `runtime.integration.test.ts`: 53213-53215
-- `marker.test.ts`: 54216-54218
+**Note**: Ports are automatically allocated, so you don't need to specify them. Use `createDevDatabase()` or `withDevDatabase()` without port options to get automatic port allocation.
 
 ## 🧪 Testing
 
@@ -1046,7 +1035,6 @@ describe('end-to-end tests', () => {
           }
         });
       },
-      { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
     );
   });
 });

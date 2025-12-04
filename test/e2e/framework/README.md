@@ -76,7 +76,6 @@ await withDevDatabase(
       }
     });
   },
-  { acceleratePort: 54020, databasePort: 54021, shadowDatabasePort: 54022 },
 );
 ```
 

@@ -14,11 +14,7 @@ describe('family instance schemaVerify', () => {
   let connectionString: string | undefined;
 
   beforeAll(async () => {
-    const database = await createDevDatabase({
-      acceleratePort: 54190,
-      databasePort: 54191,
-      shadowDatabasePort: 54192,
-    });
+    const database = await createDevDatabase();
     connectionString = database.connectionString;
     return async () => {
       await database.close();

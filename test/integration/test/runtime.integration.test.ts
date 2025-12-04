@@ -28,11 +28,7 @@ describe('runtime execute integration', () => {
   let client: Client;
 
   beforeAll(async () => {
-    database = await createDevDatabase({
-      acceleratePort: 53213,
-      databasePort: 53214,
-      shadowDatabasePort: 53215,
-    });
+    database = await createDevDatabase();
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
   }, timeouts.spinUpPpgDev);
