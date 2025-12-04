@@ -208,6 +208,10 @@ withTempDir(({ createTempDir }) => {
             process.chdir(originalCwd);
           }
 
+          // Clear console output before running the command we want to test
+          // (previous commands like 'contract emit' may have added output)
+          const outputStartIndex = consoleOutput.length;
+
           const command = createDbSignCommand();
           try {
             process.chdir(testSetup.testDir);
@@ -216,47 +220,9 @@ withTempDir(({ createTempDir }) => {
             process.chdir(originalCwd);
           }
 
-          // Get output and parse JSON
-          // When --json is used, only JSON should be output, but filter out any non-JSON lines just in case
-          const output = consoleOutput.join('\n');
-          // Find the JSON portion by scanning from the end for the last contiguous JSON block
-          const lines = output.split('\n');
-          let jsonText: string | undefined;
-          let jsonOutput: Record<string, unknown> | undefined;
-          let lastParseError: Error | undefined;
-
-          // Try to find JSON starting from the last line and expanding backwards
-          // This handles cases where logs contain braces or output is truncated
-          for (let endLine = lines.length - 1; endLine >= 0; endLine--) {
-            for (let startLine = endLine; startLine >= 0; startLine--) {
-              const candidate = lines
-                .slice(startLine, endLine + 1)
-                .join('\n')
-                .trim();
-              // Only attempt to parse if it looks like JSON (starts with { and ends with })
-              if (candidate.startsWith('{') && candidate.endsWith('}')) {
-                try {
-                  jsonOutput = JSON.parse(candidate) as Record<string, unknown>;
-                  jsonText = candidate;
-                  break;
-                } catch (error) {
-                  // Track the last parse error for better error messages
-                  lastParseError = error instanceof Error ? error : new Error(String(error));
-                  // Continue trying with a larger block
-                }
-              }
-            }
-            if (jsonText) break;
-          }
-
-          if (!jsonText || !jsonOutput) {
-            const errorDetails = lastParseError
-              ? ` Last parse error: ${lastParseError.message}`
-              : '';
-            throw new Error(
-              `No valid JSON found in output. Output length: ${output.length} chars. First 200 chars: ${output.substring(0, 200)}.${errorDetails}`,
-            );
-          }
+          // Get output and parse JSON (only from this command)
+          const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
+          const jsonOutput = JSON.parse(output) as Record<string, unknown>;
 
           // Normalize non-deterministic values (timing, contractPath) for snapshot
           const meta = jsonOutput['meta'] as Record<string, unknown> | undefined;

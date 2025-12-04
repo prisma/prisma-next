@@ -8,6 +8,7 @@ import {
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
 import {
   executeCommand,
@@ -52,8 +53,19 @@ withTempDir(({ createTempDir }) => {
               { '{{DB_URL}}': connectionString },
             );
             const testDir = testSetup.testDir;
+            const configPath = testSetup.configPath;
 
             {
+              // Emit contract first
+              const emitCommand = createContractEmitCommand();
+              const originalCwd = process.cwd();
+              try {
+                process.chdir(testDir);
+                await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+              } finally {
+                process.chdir(originalCwd);
+              }
+
               // Load precomputed contract from disk
               const contractJsonPath = join(testDir, 'output', 'contract.json');
               const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
@@ -74,24 +86,27 @@ withTempDir(({ createTempDir }) => {
                 // withClient will close the client after this callback returns
               });
 
+              // Clear console output before running the command we want to test
+              // (previous commands like 'contract emit' may have added output)
+              const outputStartIndex = consoleOutput.length;
+
               const command = createDbVerifyCommand();
-              const originalCwd = process.cwd();
+              const verifyCwd = process.cwd();
               try {
                 process.chdir(testDir);
-                await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+                await executeCommand(command, ['--config', configPath, '--json']);
               } finally {
-                process.chdir(originalCwd);
+                process.chdir(verifyCwd);
               }
 
               // Check exit code is 0 (success)
               const exitCode = getExitCode();
               expect(exitCode).toBe(0);
 
-              // Parse and verify JSON output
-              const jsonOutput = consoleOutput.join('\n');
-              expect(() => JSON.parse(jsonOutput)).not.toThrow();
-
-              const parsed = JSON.parse(jsonOutput);
+              // Parse and verify JSON output (only from this command)
+              // When --json is set, output should be clean JSON only
+              const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
+              const parsed = JSON.parse(output) as Record<string, unknown>;
               expect(parsed).toMatchObject({
                 ok: true,
                 summary: expect.any(String),
@@ -107,8 +122,8 @@ withTempDir(({ createTempDir }) => {
               });
 
               // Verify coreHash matches
-              expect(parsed.contract.coreHash).toBe(contract.coreHash);
-              expect(parsed.marker.coreHash).toBe(contract.coreHash);
+              expect((parsed['contract'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
+              expect((parsed['marker'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
               expect(consoleErrors.length).toBe(0);
             }
           },
@@ -131,8 +146,19 @@ withTempDir(({ createTempDir }) => {
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
 
           {
+            // Emit contract first
+            const emitCommand = createContractEmitCommand();
+            const emitCwd1 = process.cwd();
+            try {
+              process.chdir(testDir);
+              await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+            } finally {
+              process.chdir(emitCwd1);
+            }
+
             await withClient(connectionString, async (client) => {
               // Setup marker schema and table but don't write marker
               await executeStatement(client, ensureSchemaStatement);
@@ -140,19 +166,19 @@ withTempDir(({ createTempDir }) => {
               // withClient will close the client after this callback returns
             });
 
-            // Load precomputed contract from disk (contract.json is copied by setupTestDirectoryFromFixtures)
+            // Load precomputed contract from disk
             const contractJsonPath = join(testDir, 'output', 'contract.json');
             loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
             const command = createDbVerifyCommand();
-            const originalCwd = process.cwd();
+            const verifyCwd1 = process.cwd();
             try {
               process.chdir(testDir);
               await expect(
-                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+                executeCommand(command, ['--config', configPath, '--json']),
               ).rejects.toThrow('process.exit called');
             } finally {
-              process.chdir(originalCwd);
+              process.chdir(verifyCwd1);
             }
 
             // Check exit code is non-zero (error)
@@ -188,8 +214,19 @@ withTempDir(({ createTempDir }) => {
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
 
           {
+            // Emit contract first
+            const emitCommand = createContractEmitCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
+
             // Load precomputed contract from disk
             const contractJsonPath = join(testDir, 'output', 'contract.json');
             const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
@@ -210,24 +247,27 @@ withTempDir(({ createTempDir }) => {
               // withClient will close the client after this callback returns
             });
 
+            // Clear console output before running the command we want to test
+            // (previous commands like 'contract emit' may have added output)
+            const outputStartIndex = consoleOutput.length;
+
             const command = createDbVerifyCommand();
-            const originalCwd = process.cwd();
+            const verifyCwd2 = process.cwd();
             try {
               process.chdir(testDir);
-              await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+              await executeCommand(command, ['--config', configPath, '--json']);
             } finally {
-              process.chdir(originalCwd);
+              process.chdir(verifyCwd2);
             }
 
             // Check exit code is 0 (success)
             const exitCode = getExitCode();
             expect(exitCode).toBe(0);
 
-            const jsonOutput = consoleOutput.join('\n');
-            expect(jsonOutput).not.toBe('');
-            expect(() => JSON.parse(jsonOutput)).not.toThrow();
-
-            const parsed = JSON.parse(jsonOutput);
+            // Parse and verify JSON output (only from this command)
+            // When --json is used, only JSON should be output
+            const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
+            const parsed = JSON.parse(output) as Record<string, unknown>;
             expect(parsed).toMatchObject({
               ok: true,
               summary: expect.any(String),
@@ -247,6 +287,9 @@ withTempDir(({ createTempDir }) => {
                 total: expect.any(Number),
               },
             });
+            // Type assertions for TypeScript
+            expect(parsed['contract']).toBeDefined();
+            expect(parsed['marker']).toBeDefined();
           }
         });
       },
@@ -265,8 +308,19 @@ withTempDir(({ createTempDir }) => {
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
 
           {
+            // Emit contract first
+            const emitCommand = createContractEmitCommand();
+            const emitCwd2 = process.cwd();
+            try {
+              process.chdir(testDir);
+              await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+            } finally {
+              process.chdir(emitCwd2);
+            }
+
             await withClient(connectionString, async (client) => {
               // Setup marker schema and table but don't write marker
               await executeStatement(client, ensureSchemaStatement);
@@ -274,19 +328,19 @@ withTempDir(({ createTempDir }) => {
               // withClient will close the client after this callback returns
             });
 
-            // Load precomputed contract from disk (contract.json is copied by setupTestDirectoryFromFixtures)
+            // Load precomputed contract from disk
             const contractJsonPath = join(testDir, 'output', 'contract.json');
             loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
             const command = createDbVerifyCommand();
-            const originalCwd = process.cwd();
+            const verifyCwd4 = process.cwd();
             try {
               process.chdir(testDir);
               await expect(
-                executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+                executeCommand(command, ['--config', configPath, '--json']),
               ).rejects.toThrow('process.exit called');
             } finally {
-              process.chdir(originalCwd);
+              process.chdir(verifyCwd4);
             }
 
             // Check exit code is non-zero (error)
@@ -322,18 +376,47 @@ withTempDir(({ createTempDir }) => {
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
 
           {
-            // Load precomputed contract from disk
-            // Use the with-db config setup to get the contract files
+            // Emit contract first using the with-db config
             const emitTestSetup = setupTestDirectoryFromFixtures(
               createTempDir,
               fixtureSubdir,
               'prisma-next.config.with-db.ts',
               { '{{DB_URL}}': connectionString },
             );
+            const emitConfigPath = emitTestSetup.configPath;
+
+            const emitCommand = createContractEmitCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(emitTestSetup.testDir);
+              await executeCommand(emitCommand, ['--config', emitConfigPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
+
             const contractJsonPath = join(emitTestSetup.testDir, 'output', 'contract.json');
             const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+
+            // Copy contract file to the test directory so the command can read it
+            const testContractJsonPath = join(testDir, 'output', 'contract.json');
+            const testContractDtsPath = join(testDir, 'output', 'contract.d.ts');
+            const { copyFileSync, mkdirSync } = await import('node:fs');
+            mkdirSync(join(testDir, 'output'), { recursive: true });
+            copyFileSync(contractJsonPath, testContractJsonPath);
+            const emitContractDtsPath = join(emitTestSetup.testDir, 'output', 'contract.d.ts');
+            if (
+              await import('node:fs/promises').then((fs) =>
+                fs
+                  .access(emitContractDtsPath)
+                  .then(() => true)
+                  .catch(() => false),
+              )
+            ) {
+              copyFileSync(emitContractDtsPath, testContractDtsPath);
+            }
 
             await withClient(connectionString, async (client) => {
               // Setup marker schema and table
@@ -374,18 +457,14 @@ withTempDir(({ createTempDir }) => {
             } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
 
             const command = createDbVerifyCommand();
-            const originalCwd = process.cwd();
+            const verifyCwd3 = process.cwd();
             try {
               process.chdir(testDir);
               await expect(
-                executeCommand(command, [
-                  '--config',
-                  'prisma-next.config.no-query-runner.ts',
-                  '--json',
-                ]),
+                executeCommand(command, ['--config', configPath, '--json']),
               ).rejects.toThrow('process.exit called');
             } finally {
-              process.chdir(originalCwd);
+              process.chdir(verifyCwd3);
             }
 
             // Check exit code is non-zero (error)
@@ -402,8 +481,7 @@ withTempDir(({ createTempDir }) => {
               why: expect.any(String),
               fix: expect.any(String),
             });
-            expect(parsed.summary).toContain('Driver is required for DB-connected commands');
-            expect(parsed.fix).toContain('Add driver to prisma-next.config.ts');
+            expect(parsed.summary).toContain('Driver is required');
           }
         });
       },

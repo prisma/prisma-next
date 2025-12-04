@@ -39,23 +39,6 @@ function convertColumnMeta(meta: {
   };
 }
 
-function _inferNativeType(typeId: string): string {
-  switch (typeId) {
-    case 'pg/int4@1':
-      return 'int4';
-    case 'pg/text@1':
-      return 'text';
-    case 'pg/timestamptz@1':
-      return 'timestamptz';
-    case 'core/json@1':
-      return 'jsonb';
-    case 'pgvector/vector@1':
-      return 'vector';
-    default:
-      return typeId;
-  }
-}
-
 describe('projection', () => {
   describe('AliasTracker', () => {
     it('registers alias for path', () => {

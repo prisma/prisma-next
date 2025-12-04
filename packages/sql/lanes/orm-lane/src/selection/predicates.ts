@@ -44,13 +44,22 @@ export function buildWhereExpr(
       name: paramName,
       source: 'dsl',
       refs: { table: colBuilder.table, column: colBuilder.column },
-      ...(typeof meta.codecId === 'string' ? { type: meta.codecId } : {}),
       ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
     });
 
     const contractTable = contract.storage.tables[colBuilder.table];
     const columnMeta = contractTable?.columns[colBuilder.column];
     codecId = columnMeta?.codecId;
+
+    // Update descriptor with codecId and nativeType
+    const descriptor = descriptors[descriptors.length - 1];
+    if (descriptor && columnMeta) {
+      descriptors[descriptors.length - 1] = {
+        ...descriptor,
+        ...(columnMeta.codecId ? { codecId: columnMeta.codecId } : {}),
+        ...(columnMeta.nativeType ? { nativeType: columnMeta.nativeType } : {}),
+      };
+    }
 
     leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
   }

@@ -59,7 +59,8 @@ export function parseGlobalFlags(options: CliOptions): GlobalFlags {
   }
 
   // Color: respect NO_COLOR env var, --color/--no-color flags
-  if (process.env['NO_COLOR']) {
+  // When JSON output is enabled (any format), disable color to ensure clean JSON output
+  if (process.env['NO_COLOR'] || flags.json) {
     flags.color = false;
   } else if (options['no-color']) {
     flags.color = false;

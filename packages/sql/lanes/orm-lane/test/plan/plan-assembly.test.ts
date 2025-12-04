@@ -247,7 +247,11 @@ describe('plan assembly', () => {
             nativeType: 'int4',
             nullable: false,
           }),
-          createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
+          createMockColumnBuilder('post', '', {
+            codecId: 'core/json@1',
+            nativeType: 'jsonb',
+            nullable: true,
+          }),
         ],
       };
 
@@ -257,8 +261,8 @@ describe('plan assembly', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'join-on',
-            left: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
-            right: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+            left: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
+            right: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
           },
           childProjection: {
             aliases: ['id'],
@@ -494,7 +498,11 @@ describe('plan assembly', () => {
             nativeType: 'int4',
             nullable: false,
           }),
-          createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
+          createMockColumnBuilder('post', '', {
+            codecId: 'core/json@1',
+            nativeType: 'jsonb',
+            nullable: true,
+          }),
         ],
       };
 
@@ -504,8 +512,8 @@ describe('plan assembly', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'join-on',
-            left: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
-            right: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+            left: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
+            right: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
           },
           childProjection: {
             aliases: ['id'],
@@ -550,7 +558,11 @@ describe('plan assembly', () => {
             nativeType: 'int4',
             nullable: false,
           }),
-          createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
+          createMockColumnBuilder('post', '', {
+            codecId: 'core/json@1',
+            nativeType: 'jsonb',
+            nullable: true,
+          }),
         ],
       };
 
@@ -560,8 +572,8 @@ describe('plan assembly', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'join-on',
-            left: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
-            right: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+            left: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
+            right: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
           },
           childProjection: {
             aliases: ['id'],
@@ -699,7 +711,11 @@ describe('plan assembly', () => {
             kind: 'column',
             table: '',
             column: '',
-            columnMeta: convertColumnMeta({ type: 'core/json@1', nullable: true }),
+            columnMeta: convertColumnMeta({
+              codecId: 'core/json@1',
+              nativeType: 'jsonb',
+              nullable: true,
+            }),
             eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
             asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
             desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -714,8 +730,8 @@ describe('plan assembly', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'join-on',
-            left: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
-            right: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+            left: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
+            right: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
           },
           childProjection: {
             aliases: ['id'],
