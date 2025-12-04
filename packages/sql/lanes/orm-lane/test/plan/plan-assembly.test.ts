@@ -67,7 +67,7 @@ describe('plan assembly', () => {
   function createMockColumnBuilder(
     table: string,
     column: string,
-    columnMeta: { type: string; nullable: boolean },
+    columnMeta: { codecId: string; nativeType: string; nullable: boolean },
   ): AnyColumnBuilder {
     const normalizedMeta = convertColumnMeta(columnMeta);
     return {
@@ -82,36 +82,29 @@ describe('plan assembly', () => {
     } as unknown as AnyColumnBuilder;
   }
 
-  function convertColumnMeta(meta: { type: string; nullable: boolean }): StorageColumn {
+  function convertColumnMeta(meta: {
+    codecId: string;
+    nativeType: string;
+    nullable: boolean;
+  }): StorageColumn {
     return {
-      nativeType: inferNativeType(meta.type),
-      codecId: meta.type,
+      nativeType: meta.nativeType,
+      codecId: meta.codecId,
       nullable: meta.nullable,
     };
-  }
-
-  function inferNativeType(typeId: string): string {
-    switch (typeId) {
-      case 'pg/int4@1':
-        return 'int4';
-      case 'pg/text@1':
-        return 'text';
-      case 'pg/timestamptz@1':
-        return 'timestamptz';
-      case 'core/json@1':
-        return 'jsonb';
-      case 'pgvector/vector@1':
-        return 'vector';
-      default:
-        return typeId;
-    }
   }
 
   describe('buildMeta', () => {
     it('builds meta with simple projection', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+        columns: [
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
+        ],
       };
 
       const args = {
@@ -166,7 +159,11 @@ describe('plan assembly', () => {
             kind: 'column',
             table: 'user',
             column: 'id',
-            columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+            columnMeta: convertColumnMeta({
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
+              nullable: false,
+            }),
             _operationExpr: operationExpr,
           } as unknown as ProjectionState['columns'][0],
         ],
@@ -218,7 +215,11 @@ describe('plan assembly', () => {
             kind: 'column',
             table: 'user',
             column: 'id',
-            columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+            columnMeta: convertColumnMeta({
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
+              nullable: false,
+            }),
             _operationExpr: operationExpr,
           } as unknown as ProjectionState['columns'][0],
         ],
@@ -241,7 +242,11 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['id', 'posts'],
         columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
           createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
         ],
       };
@@ -258,7 +263,11 @@ describe('plan assembly', () => {
           childProjection: {
             aliases: ['id'],
             columns: [
-              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
+              createMockColumnBuilder('post', 'id', {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+              }),
             ],
           },
         },
@@ -282,7 +291,13 @@ describe('plan assembly', () => {
     it('builds meta with where clause', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+        columns: [
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
+        ],
       };
 
       const where: BinaryBuilder = {
@@ -316,7 +331,13 @@ describe('plan assembly', () => {
     it('builds meta with where clause operation expr', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+        columns: [
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
+        ],
       };
 
       const operationExpr: OperationExpr = {
@@ -370,7 +391,13 @@ describe('plan assembly', () => {
     it('builds meta with orderBy clause', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+        columns: [
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
+        ],
       };
 
       const orderBy: AnyOrderBuilder = {
@@ -405,7 +432,13 @@ describe('plan assembly', () => {
     it('builds meta with orderBy operation expr', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+        columns: [
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
+        ],
       };
 
       const operationExpr: OperationExpr = {
@@ -456,7 +489,11 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['id', 'posts'],
         columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
           createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
         ],
       };
@@ -473,7 +510,11 @@ describe('plan assembly', () => {
           childProjection: {
             aliases: ['id'],
             columns: [
-              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
+              createMockColumnBuilder('post', 'id', {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+              }),
             ],
           },
           childWhere: {
@@ -504,7 +545,11 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['id', 'posts'],
         columns: [
-          createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
           createMockColumnBuilder('post', '', { type: 'core/json@1', nullable: true }),
         ],
       };
@@ -521,7 +566,11 @@ describe('plan assembly', () => {
           childProjection: {
             aliases: ['id'],
             columns: [
-              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
+              createMockColumnBuilder('post', 'id', {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+              }),
             ],
           },
           childOrderBy: {
@@ -552,7 +601,13 @@ describe('plan assembly', () => {
     it('builds meta with paramCodecs merged with projection codecs', () => {
       const projection: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false })],
+        columns: [
+          createMockColumnBuilder('user', 'id', {
+            codecId: 'pg/int4@1',
+            nativeType: 'int4',
+            nullable: false,
+          }),
+        ],
       };
 
       const args = {
@@ -665,7 +720,11 @@ describe('plan assembly', () => {
           childProjection: {
             aliases: ['id'],
             columns: [
-              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
+              createMockColumnBuilder('post', 'id', {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+              }),
             ],
           },
         },

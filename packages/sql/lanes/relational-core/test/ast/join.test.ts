@@ -2,6 +2,10 @@ import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { JoinOnExpr, TableRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import {
+  int4Column as int4ColumnType,
+  textColumn as textColumnType,
+} from '../../../../../targets/postgres-adapter/src/exports/column-types';
 import { createColumnRef, createTableRef } from '../../src/ast/common';
 import { createJoin, createJoinOnBuilder, createJoinOnExpr } from '../../src/ast/join';
 import { schema } from '../../src/schema';
@@ -62,8 +66,8 @@ describe('ast/join', () => {
       tables: {
         user: {
           columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            id: { ...int4ColumnType, nullable: false },
+            email: { ...textColumnType, nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -72,8 +76,8 @@ describe('ast/join', () => {
         },
         post: {
           columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            id: { ...int4ColumnType, nullable: false },
+            userId: { ...int4ColumnType, nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],

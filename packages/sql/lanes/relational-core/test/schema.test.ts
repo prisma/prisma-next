@@ -1,6 +1,10 @@
 import type { ExtractCodecTypes, SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { describe, expect, it } from 'vitest';
+import {
+  int4Column as int4ColumnType,
+  textColumn as textColumnType,
+} from '../../../../targets/postgres-adapter/src/exports/column-types';
 import { param } from '../src/param';
 import type { SchemaHandle } from '../src/schema';
 import { schema } from '../src/schema';
@@ -55,8 +59,8 @@ describe('schema', () => {
       tables: {
         user: {
           columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            id: { ...int4ColumnType, nullable: false },
+            email: { ...textColumnType, nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],

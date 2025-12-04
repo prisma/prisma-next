@@ -50,7 +50,7 @@ describe('validateContract edge cases', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -112,7 +112,7 @@ describe('validateContract edge cases', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -151,7 +151,7 @@ describe('validateContract edge cases', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -191,7 +191,7 @@ describe('validateContract edge cases', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -231,7 +231,7 @@ describe('validateContract edge cases', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],

@@ -12,8 +12,8 @@ const contract = validateContract<PostgresContract>({
     tables: {
       user: {
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          vector: { type: 'pgvector/vector@1', nullable: false },
+          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
         },
         uniques: [],
         indexes: [],

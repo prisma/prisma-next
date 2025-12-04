@@ -93,8 +93,8 @@ describe('emitter', () => {
           tables: {
             user: {
               columns: {
-                id: { type: 'pg/int4@1', nullable: false },
-                email: { type: 'pg/text@1', nullable: false },
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
               primaryKey: { columns: ['id'] },
               uniques: [],
@@ -202,7 +202,7 @@ describe('emitter', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             },
             uniques: [],
             indexes: [],
@@ -233,7 +233,7 @@ describe('emitter', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             },
             uniques: [],
             indexes: [],
@@ -261,7 +261,7 @@ describe('emitter', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             },
             uniques: [],
             indexes: [],
@@ -290,7 +290,7 @@ describe('emitter', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             },
             uniques: [],
             indexes: [],
@@ -319,7 +319,7 @@ describe('emitter', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             },
             uniques: [],
             indexes: [],

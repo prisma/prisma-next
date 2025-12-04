@@ -19,7 +19,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1' },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -44,7 +44,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             indexes: [],
@@ -68,7 +68,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -92,7 +92,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -116,7 +116,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -211,7 +211,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -310,7 +310,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -350,7 +350,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -375,7 +375,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -400,7 +400,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -425,7 +425,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -450,7 +450,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -475,7 +475,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -513,7 +513,7 @@ describe('validateContract normalization', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -522,7 +522,7 @@ describe('validateContract normalization', () => {
           },
           post: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -576,7 +576,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -585,8 +585,8 @@ describe('validateContract normalization', () => {
           },
           Post: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
-              userId: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -651,7 +651,7 @@ describe('validateContract normalization', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -660,8 +660,8 @@ describe('validateContract normalization', () => {
           },
           Post: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
-              userId: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],

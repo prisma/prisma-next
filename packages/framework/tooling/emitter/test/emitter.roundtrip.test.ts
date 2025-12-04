@@ -84,7 +84,7 @@ describe('emitter round-trip', () => {
           tables: {
             user: {
               columns: {
-                id: { type: 'pg/int4@1', nullable: false },
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
               },
               primaryKey: { columns: ['id'] },
               uniques: [],
@@ -163,8 +163,8 @@ describe('emitter round-trip', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               name: { type: 'pg/text@1', nullable: true },
             },
             primaryKey: { columns: ['id'] },
@@ -174,9 +174,9 @@ describe('emitter round-trip', () => {
           },
           post: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              title: { type: 'pg/text@1', nullable: false },
-              user_id: { type: 'pg/int4@1', nullable: false },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -239,8 +239,8 @@ describe('emitter round-trip', () => {
           user: {
             columns: {
               id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: true },
-              name: { type: 'pg/text@1', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
+              name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],

@@ -12,7 +12,7 @@ import {
 function createMockColumnBuilder(
   table: string,
   column: string,
-  columnMeta: { type: string; nullable: boolean },
+  columnMeta: { codecId: string; nativeType: string; nullable: boolean },
 ): AnyColumnBuilder {
   const normalizedMeta = convertColumnMeta(columnMeta);
   return {
@@ -27,15 +27,19 @@ function createMockColumnBuilder(
   } as unknown as AnyColumnBuilder;
 }
 
-function convertColumnMeta(meta: { type: string; nullable: boolean }): StorageColumn {
+function convertColumnMeta(meta: {
+  codecId: string;
+  nativeType: string;
+  nullable: boolean;
+}): StorageColumn {
   return {
-    nativeType: inferNativeType(meta.type),
-    codecId: meta.type,
+    nativeType: meta.nativeType,
+    codecId: meta.codecId,
     nullable: meta.nullable,
   };
 }
 
-function inferNativeType(typeId: string): string {
+function _inferNativeType(typeId: string): string {
   switch (typeId) {
     case 'pg/int4@1':
       return 'int4';
@@ -115,7 +119,11 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+        columnMeta: convertColumnMeta({
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -137,7 +145,11 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+        columnMeta: convertColumnMeta({
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -147,7 +159,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'email',
-        columnMeta: convertColumnMeta({ type: 'pg/text@1', nullable: true }),
+        columnMeta: convertColumnMeta({ codecId: 'pg/text@1', nativeType: 'text', nullable: true }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -172,7 +184,11 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+        columnMeta: convertColumnMeta({
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -207,7 +223,11 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+        columnMeta: convertColumnMeta({
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -232,7 +252,11 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+        columnMeta: convertColumnMeta({
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -258,16 +282,25 @@ describe('projection', () => {
           table: { kind: 'table' as const, name: 'post' },
           on: {
             kind: 'join-on' as const,
-            left: createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+            left: createMockColumnBuilder('user', 'id', {
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
+              nullable: false,
+            }),
             right: createMockColumnBuilder('post', 'userId', {
-              type: 'pg/int4@1',
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
               nullable: false,
             }),
           },
           childProjection: {
             aliases: ['id'],
             columns: [
-              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
+              createMockColumnBuilder('post', 'id', {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+              }),
             ],
           },
         },
@@ -285,7 +318,11 @@ describe('projection', () => {
         firstColumn: {
           kind: 'column',
           table: 'post',
-          columnMeta: convertColumnMeta({ type: 'core/json@1', nullable: true }),
+          columnMeta: convertColumnMeta({
+            codecId: 'core/json@1',
+            nativeType: 'jsonb',
+            nullable: true,
+          }),
         },
       });
     });
@@ -305,7 +342,11 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+        columnMeta: convertColumnMeta({
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -315,7 +356,7 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'email',
-        columnMeta: convertColumnMeta({ type: 'pg/text@1', nullable: true }),
+        columnMeta: convertColumnMeta({ codecId: 'pg/text@1', nativeType: 'text', nullable: true }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -357,7 +398,11 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+        columnMeta: convertColumnMeta({
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -373,16 +418,25 @@ describe('projection', () => {
           table: { kind: 'table' as const, name: 'post' },
           on: {
             kind: 'join-on' as const,
-            left: createMockColumnBuilder('user', 'id', { type: 'pg/int4@1', nullable: false }),
+            left: createMockColumnBuilder('user', 'id', {
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
+              nullable: false,
+            }),
             right: createMockColumnBuilder('post', 'userId', {
-              type: 'pg/int4@1',
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
               nullable: false,
             }),
           },
           childProjection: {
             aliases: ['id'],
             columns: [
-              createMockColumnBuilder('post', 'id', { type: 'pg/int4@1', nullable: false }),
+              createMockColumnBuilder('post', 'id', {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+              }),
             ],
           },
         },
@@ -401,7 +455,11 @@ describe('projection', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: convertColumnMeta({ type: 'pg/int4@1', nullable: false }),
+        columnMeta: convertColumnMeta({
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
         asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
         desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
