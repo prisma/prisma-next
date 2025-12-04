@@ -95,24 +95,24 @@ function createTestRuntime(
 }
 
 /**
- * Closes the test runtime.
+ * Closes the test runtime and pool.
  */
 async function closeTestRuntime({
   runtime,
-  pool: _pool,
+  pool,
 }: {
   runtime: ReturnType<typeof createRuntime>;
   pool: Pool;
 }): Promise<void> {
   await runtime.close();
-  // Pool is closed by runtime.close() -> driver.close(), so we don't need to call pool.end() here
+  await pool.end();
 }
 
 describe('ORM integration tests', () => {
   it(
     'orm.getUsers returns users with selected fields, respects limit and ordering',
     async () => {
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await withDevDatabase(async ({ connectionString }) => {
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -122,7 +122,7 @@ describe('ORM integration tests', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
@@ -155,7 +155,7 @@ describe('ORM integration tests', () => {
   it(
     'orm.getUserById returns single user by ID',
     async () => {
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await withDevDatabase(async ({ connectionString }) => {
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -165,7 +165,7 @@ describe('ORM integration tests', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
@@ -196,7 +196,7 @@ describe('ORM integration tests', () => {
   it(
     'orm relation filters: where.related.posts.some() returns users with at least one post',
     async () => {
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await withDevDatabase(async ({ connectionString }) => {
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -206,7 +206,7 @@ describe('ORM integration tests', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
@@ -244,7 +244,7 @@ describe('ORM integration tests', () => {
   it(
     'orm includes: include.posts() returns users with nested posts arrays',
     async () => {
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await withDevDatabase(async ({ connectionString }) => {
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -254,7 +254,7 @@ describe('ORM integration tests', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
@@ -293,7 +293,7 @@ describe('ORM integration tests', () => {
   it(
     'orm writes: create() inserts a user',
     async () => {
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await withDevDatabase(async ({ connectionString }) => {
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -303,7 +303,7 @@ describe('ORM integration tests', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
@@ -335,7 +335,7 @@ describe('ORM integration tests', () => {
   it(
     'orm writes: update() updates a user',
     async () => {
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await withDevDatabase(async ({ connectionString }) => {
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -345,7 +345,7 @@ describe('ORM integration tests', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
@@ -377,7 +377,7 @@ describe('ORM integration tests', () => {
   it(
     'orm writes: delete() deletes a user',
     async () => {
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await withDevDatabase(async ({ connectionString }) => {
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -387,7 +387,7 @@ describe('ORM integration tests', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );

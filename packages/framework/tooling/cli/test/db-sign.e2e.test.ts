@@ -86,10 +86,9 @@ describe('db sign command (e2e)', () => {
 
           // Normalize paths and database URL for snapshot
           let normalized = stripped;
-          // Replace Unix absolute paths (starting with / at word boundary, not part of relative paths)
-          // Match / followed by non-whitespace, but ensure it's an absolute path (starts line or after whitespace/colon)
-          normalized = normalized.replace(/(^|\s|:)\/([A-Za-z0-9_\-.]+\/)+[^\s\n:]+/g, '$1<path>');
-          // Replace Windows drive-letter paths (C:\... or C:/...)
+          // Replace Unix absolute paths: any path starting with / followed by non-whitespace characters
+          normalized = normalized.replace(/\/[^\s\n:]+/g, '<path>');
+          // Replace Windows drive-letter paths: C:\... or C:/... followed by path characters
           normalized = normalized.replace(/[A-Z]:[\\/][^\s\n:]+/g, '<path>');
           // Normalize database URL (port number)
           normalized = normalized.replace(/(127\.0\.0\.1|localhost):\d+/g, '127.0.0.1:XXXXX');
@@ -243,20 +242,25 @@ describe('db sign command (e2e)', () => {
           const lines = output.split('\n');
           let jsonText: string | undefined;
           let jsonOutput: Record<string, unknown> | undefined;
+          let lastParseError: Error | undefined;
 
           // Try to find JSON starting from the last line and expanding backwards
+          // This handles cases where logs contain braces or output is truncated
           for (let endLine = lines.length - 1; endLine >= 0; endLine--) {
             for (let startLine = endLine; startLine >= 0; startLine--) {
               const candidate = lines
                 .slice(startLine, endLine + 1)
                 .join('\n')
                 .trim();
+              // Only attempt to parse if it looks like JSON (starts with { and ends with })
               if (candidate.startsWith('{') && candidate.endsWith('}')) {
                 try {
                   jsonOutput = JSON.parse(candidate) as Record<string, unknown>;
                   jsonText = candidate;
                   break;
-                } catch {
+                } catch (error) {
+                  // Track the last parse error for better error messages
+                  lastParseError = error instanceof Error ? error : new Error(String(error));
                   // Continue trying with a larger block
                 }
               }
@@ -265,8 +269,11 @@ describe('db sign command (e2e)', () => {
           }
 
           if (!jsonText || !jsonOutput) {
+            const errorDetails = lastParseError
+              ? ` Last parse error: ${lastParseError.message}`
+              : '';
             throw new Error(
-              `No valid JSON found in output. Output length: ${output.length} chars. First 200 chars: ${output.substring(0, 200)}`,
+              `No valid JSON found in output. Output length: ${output.length} chars. First 200 chars: ${output.substring(0, 200)}.${errorDetails}`,
             );
           }
 
