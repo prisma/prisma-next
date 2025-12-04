@@ -77,7 +77,8 @@ export function buildUpdatePlan<
         name: paramName,
         table: tableName,
         column: columnName,
-        type: codecId,
+        codecId: codecId,
+        nativeType: columnMeta.nativeType,
         nullable: columnMeta.nullable,
       }),
     );

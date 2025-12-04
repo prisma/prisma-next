@@ -15,7 +15,7 @@ const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
   validateTypes: (ir: ContractIR, _ctx: ValidationContext) => {
     const storage = ir.storage as
-      | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
+      | { tables?: Record<string, { columns?: Record<string, { codecId?: string }> }> }
       | undefined;
     if (!storage?.tables) {
       return;
@@ -34,22 +34,22 @@ const mockSqlHook: TargetFamilyHook = {
     for (const [tableName, table] of Object.entries(storage.tables)) {
       if (!table.columns) continue;
       for (const [colName, col] of Object.entries(table.columns)) {
-        if (!col.type) {
-          throw new Error(`Column "${colName}" in table "${tableName}" is missing type`);
+        if (!col.codecId) {
+          throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);
         }
 
-        if (!typeIdRegex.test(col.type)) {
+        if (!typeIdRegex.test(col.codecId)) {
           throw new Error(
-            `Column "${colName}" in table "${tableName}" has invalid type ID format "${col.type}". Expected format: ns/name@version`,
+            `Column "${colName}" in table "${tableName}" has invalid codecId format "${col.codecId}". Expected format: ns/name@version`,
           );
         }
 
-        const match = col.type.match(typeIdRegex);
+        const match = col.codecId.match(typeIdRegex);
         if (match?.[1]) {
           const namespace = match[1];
           if (!referencedNamespaces.has(namespace)) {
             throw new Error(
-              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions`,
+              `Column "${colName}" in table "${tableName}" uses codecId "${col.codecId}" from namespace "${namespace}" which is not referenced in contract.extensions`,
             );
           }
         }
@@ -172,7 +172,7 @@ describe('emitter', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'invalid-format', nullable: false },
+              id: { codecId: 'invalid-format', nativeType: 'int4', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -192,7 +192,7 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('invalid type ID format');
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('invalid codecId format');
   });
 
   it('throws error when targetFamily is missing', async () => {

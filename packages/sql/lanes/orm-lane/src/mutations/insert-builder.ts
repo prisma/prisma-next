@@ -104,7 +104,8 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
         name: paramName,
         table: tableName,
         column: columnName,
-        type: codecId,
+        codecId: codecId,
+        nativeType: columnMeta.nativeType,
         nullable: columnMeta.nullable,
       }),
     );

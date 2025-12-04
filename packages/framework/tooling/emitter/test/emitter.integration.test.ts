@@ -34,17 +34,18 @@ const mockSqlHook: TargetFamilyHook = {
     for (const [tableName, table] of Object.entries(storage.tables)) {
       if (!table.columns) continue;
       for (const [colName, col] of Object.entries(table.columns)) {
-        if (!col.type) {
-          throw new Error(`Column "${colName}" in table "${tableName}" is missing type`);
+        const column = col as { codecId?: string };
+        if (!column.codecId) {
+          throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);
         }
 
-        if (!typeIdRegex.test(col.type)) {
+        if (!typeIdRegex.test(column.codecId)) {
           throw new Error(
-            `Column "${colName}" in table "${tableName}" has invalid type ID format "${col.type}". Expected format: ns/name@version`,
+            `Column "${colName}" in table "${tableName}" has invalid codecId format "${column.codecId}". Expected format: ns/name@version`,
           );
         }
 
-        const match = col.type.match(typeIdRegex);
+        const match = column.codecId.match(typeIdRegex);
         if (match?.[1]) {
           const namespace = match[1];
           if (!referencedNamespaces.has(namespace)) {
@@ -52,7 +53,7 @@ const mockSqlHook: TargetFamilyHook = {
               continue;
             }
             throw new Error(
-              `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions`,
+              `Column "${colName}" in table "${tableName}" uses codecId "${column.codecId}" from namespace "${namespace}" which is not referenced in contract.extensions`,
             );
           }
         }

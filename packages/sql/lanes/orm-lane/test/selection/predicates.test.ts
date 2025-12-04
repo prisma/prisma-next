@@ -87,7 +87,8 @@ describe('predicates', () => {
         descriptorName: descriptors[0]?.name,
         descriptorSource: descriptors[0]?.source,
         descriptorRefs: descriptors[0]?.refs,
-        descriptorType: descriptors[0]?.type,
+        descriptorCodecId: descriptors[0]?.codecId,
+        descriptorNativeType: descriptors[0]?.nativeType,
         descriptorNullable: descriptors[0]?.nullable,
       }).toMatchObject({
         exprKind: 'bin',
@@ -101,7 +102,8 @@ describe('predicates', () => {
         descriptorName: 'userId',
         descriptorSource: 'dsl',
         descriptorRefs: { table: 'user', column: 'id' },
-        descriptorType: 'pg/int4@1',
+        descriptorCodecId: 'pg/int4@1',
+        descriptorNativeType: 'int4',
         descriptorNullable: false,
       });
     });
@@ -202,7 +204,7 @@ describe('predicates', () => {
       expect(result.codecId).toBeUndefined();
     });
 
-    it('builds where expr without type in descriptor when columnMeta.type is missing', () => {
+    it('builds where expr with codecId from contract when columnMeta.codecId is missing', () => {
       const where: BinaryBuilder = {
         kind: 'binary',
         left: {
@@ -224,7 +226,9 @@ describe('predicates', () => {
 
       buildWhereExpr(where, contract, paramsMap, descriptors, values);
 
-      expect(descriptors[0]?.type).toBeUndefined();
+      // codecId and nativeType come from contract, not columnMeta
+      expect(descriptors[0]?.codecId).toBe('pg/int4@1');
+      expect(descriptors[0]?.nativeType).toBe('int4');
     });
 
     it('builds where expr without nullable in descriptor when columnMeta.nullable is missing', () => {
