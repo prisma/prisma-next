@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
@@ -356,7 +357,6 @@ describe('family instance verify', () => {
 
           // Modify the contract JSON to remove profileHash
           const contractJsonPath = resolve(testDirWithDb, 'output/contract.json');
-          const { readFile, writeFile } = await import('node:fs/promises');
           const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
           const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
           // Remove profileHash if present
