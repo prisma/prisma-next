@@ -134,7 +134,7 @@ class SqlContractBuilder<
    * - `indexes`: defaults to `[]` (empty array)
    * - `foreignKeys`: defaults to `[]` (empty array)
    * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
-   * - `nativeType`: extracted from column type descriptor when columns are defined
+   * - `nativeType`: required field set from column type descriptor when columns are defined
    *
    * The contract builder is the **only** place where normalization should occur.
    * Validators, parsers, and emitters should assume the contract is already normalized.
@@ -208,15 +208,6 @@ class SqlContractBuilder<
         const columnState = tableState.columns[columnName];
         if (!columnState) continue;
         const codecId = columnState.type;
-
-        // Determine nativeType:
-        // nativeType must be set from column type descriptor when column is defined
-        if (columnState.nativeType === undefined) {
-          throw new Error(
-            `Cannot determine nativeType for codecId "${codecId}" in column "${columnName}" of table "${tableName}". ` +
-              'Provide a column type descriptor (e.g., int4Column).',
-          );
-        }
         const nativeType = columnState.nativeType;
 
         columns[columnName as keyof ColumnDefs] = {

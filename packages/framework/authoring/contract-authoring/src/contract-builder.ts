@@ -1,4 +1,5 @@
 import type {
+  ColumnBuilderState,
   ContractBuilderState,
   ModelBuilderState,
   RelationDefinition,
@@ -13,7 +14,7 @@ export class ContractBuilder<
     string,
     TableBuilderState<
       string,
-      Record<string, { readonly name: string; readonly nullable: boolean; readonly type: string }>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >
   > = Record<never, never>,
@@ -76,7 +77,7 @@ export class ContractBuilder<
     TableName extends string,
     T extends TableBuilder<
       TableName,
-      Record<string, { readonly name: string; readonly nullable: boolean; readonly type: string }>,
+      Record<string, ColumnBuilderState<string, boolean, string>>,
       readonly string[] | undefined
     >,
   >(

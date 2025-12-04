@@ -15,7 +15,7 @@ export interface ColumnBuilderState<
   readonly name: Name;
   readonly nullable: Nullable;
   readonly type: Type;
-  readonly nativeType?: string; // Optional: set when using column type descriptors
+  readonly nativeType: string;
 }
 
 export interface TableBuilderState<
