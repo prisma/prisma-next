@@ -107,7 +107,11 @@ async function closeTestRuntime({
   try {
     await runtime.close();
   } finally {
-    await pool.end();
+    // Only close pool if runtime.close() didn't already close it (e.g., if it threw)
+    // Check if pool is already ended to avoid "Called end on pool more than once" error
+    if (!(pool as { ended?: boolean }).ended) {
+      await pool.end();
+    }
   }
 }
 

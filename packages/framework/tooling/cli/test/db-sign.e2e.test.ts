@@ -114,8 +114,9 @@ describe('db sign command (e2e)', () => {
 
         // Normalize paths and database URL for snapshot
         let normalized = stripped;
-        // Replace Unix absolute paths: any path starting with / followed by non-whitespace characters
-        normalized = normalized.replace(/\/[^\s\n:]+/g, '<path>');
+        // Replace Unix absolute paths: / at start of line or after whitespace (but not after : to avoid URLs)
+        // Match / followed by path segments, but exclude URLs (://)
+        normalized = normalized.replace(/(^|\s)\/([A-Za-z0-9_\-./]+)/g, '$1<path>');
         // Replace Windows drive-letter paths: C:\... or C:/... followed by path characters
         normalized = normalized.replace(/[A-Z]:[\\/][^\s\n:]+/g, '<path>');
         // Normalize database URL (port number)
