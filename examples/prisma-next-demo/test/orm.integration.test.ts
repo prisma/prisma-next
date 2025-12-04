@@ -104,8 +104,11 @@ async function closeTestRuntime({
   runtime: ReturnType<typeof createRuntime>;
   pool: Pool;
 }): Promise<void> {
-  await runtime.close();
-  await pool.end();
+  try {
+    await runtime.close();
+  } finally {
+    await pool.end();
+  }
 }
 
 describe('ORM integration tests', () => {

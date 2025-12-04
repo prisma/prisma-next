@@ -20,6 +20,52 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
+/**
+ * Sets up the join test schema by dropping and creating user/post/comment tables.
+ * Calls the provided setup function for test-specific data insertion.
+ */
+async function setupJoinTestSchema(
+  client: Parameters<Parameters<typeof withClient>[1]>[0],
+  contract: Contract,
+  setupFn: (c: Parameters<Parameters<typeof withClient>[1]>[0]) => Promise<void>,
+): Promise<void> {
+  await setupE2EDatabase(client, contract, async (c) => {
+    await c.query('drop table if exists "comment"');
+    await c.query('drop table if exists "post"');
+    await c.query('drop table if exists "user"');
+    await c.query('create table "user" (id serial primary key, email text not null)');
+    await c.query(
+      'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+    );
+    await c.query(
+      'create table "comment" (id serial primary key, "postId" int4 not null, content text not null)',
+    );
+    await setupFn(c);
+  });
+}
+
+/**
+ * Creates a test runtime and context for join tests.
+ * Returns runtime, context, and tables for use in tests.
+ */
+function createJoinTestRuntime(
+  client: Parameters<Parameters<typeof withClient>[1]>[0],
+  contract: Contract,
+): {
+  runtime: ReturnType<typeof createTestRuntimeFromClient>;
+  context: ReturnType<typeof createRuntimeContext>;
+  tables: ReturnType<typeof schema<Contract>>['tables'];
+} {
+  const runtime = createTestRuntimeFromClient(contract, client);
+  const context = createRuntimeContext({
+    contract,
+    adapter: createPostgresAdapter(),
+    extensions: [],
+  });
+  const tables = schema(context).tables;
+  return { runtime, context, tables };
+}
+
 describe('end-to-end JOIN queries', () => {
   it(
     'INNER JOIN returns matching rows',
@@ -28,14 +74,7 @@ describe('end-to-end JOIN queries', () => {
 
       await withDevDatabase(async ({ connectionString }) => {
         await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
+          await setupJoinTestSchema(client, contract, async (c) => {
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
               'ada@example.com',
               'tess@example.com',
@@ -47,16 +86,10 @@ describe('end-to-end JOIN queries', () => {
             );
           });
 
-          const runtime = createTestRuntimeFromClient(contract, client);
+          const { runtime, context, tables } = createJoinTestRuntime(client, contract);
+          const user = tables.user!;
+          const post = tables.post!;
           try {
-            const context = createRuntimeContext({
-              contract,
-              adapter: createPostgresAdapter(),
-              extensions: [],
-            });
-            const tables = schema(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
             const plan = sql({ context })
               .from(user)
               .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
@@ -102,14 +135,7 @@ describe('end-to-end JOIN queries', () => {
 
       await withDevDatabase(async ({ connectionString }) => {
         await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
+          await setupJoinTestSchema(client, contract, async (c) => {
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
               'ada@example.com',
               'tess@example.com',
@@ -121,16 +147,10 @@ describe('end-to-end JOIN queries', () => {
             ]);
           });
 
-          const runtime = createTestRuntimeFromClient(contract, client);
+          const { runtime, context, tables } = createJoinTestRuntime(client, contract);
+          const user = tables.user!;
+          const post = tables.post!;
           try {
-            const context = createRuntimeContext({
-              contract,
-              adapter: createPostgresAdapter(),
-              extensions: [],
-            });
-            const tables = schema<Contract>(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
             const plan = sql({ context })
               .from(user)
               .leftJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
@@ -186,14 +206,7 @@ describe('end-to-end JOIN queries', () => {
 
       await withDevDatabase(async ({ connectionString }) => {
         await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
+          await setupJoinTestSchema(client, contract, async (c) => {
             await c.query('insert into "user" (email) values ($1)', ['ada@example.com']);
             await c.query('insert into "post" ("userId", title) values ($1, $2), ($3, $4)', [
               1,
@@ -203,16 +216,10 @@ describe('end-to-end JOIN queries', () => {
             ]);
           });
 
-          const runtime = createTestRuntimeFromClient(contract, client);
+          const { runtime, context, tables } = createJoinTestRuntime(client, contract);
+          const user = tables.user!;
+          const post = tables.post!;
           try {
-            const context = createRuntimeContext({
-              contract,
-              adapter: createPostgresAdapter(),
-              extensions: [],
-            });
-            const tables = schema<Contract>(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
             const plan = sql({ context })
               .from(user)
               .rightJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
@@ -261,14 +268,7 @@ describe('end-to-end JOIN queries', () => {
 
       await withDevDatabase(async ({ connectionString }) => {
         await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
+          await setupJoinTestSchema(client, contract, async (c) => {
             await c.query('insert into "user" (email) values ($1), ($2)', [
               'ada@example.com',
               'tess@example.com',
@@ -281,16 +281,10 @@ describe('end-to-end JOIN queries', () => {
             ]);
           });
 
-          const runtime = createTestRuntimeFromClient(contract, client);
+          const { runtime, context, tables } = createJoinTestRuntime(client, contract);
+          const user = tables.user!;
+          const post = tables.post!;
           try {
-            const context = createRuntimeContext({
-              contract,
-              adapter: createPostgresAdapter(),
-              extensions: [],
-            });
-            const tables = schema<Contract>(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
             const plan = sql({ context })
               .from(user)
               .fullJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
@@ -344,17 +338,7 @@ describe('end-to-end JOIN queries', () => {
 
       await withDevDatabase(async ({ connectionString }) => {
         await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
-            );
-            await c.query(
-              'create table "comment" (id serial primary key, "postId" int4 not null, content text not null)',
-            );
+          await setupJoinTestSchema(client, contract, async (c) => {
             await c.query('insert into "user" (email) values ($1), ($2)', [
               'ada@example.com',
               'tess@example.com',
@@ -371,17 +355,11 @@ describe('end-to-end JOIN queries', () => {
             ]);
           });
 
-          const runtime = createTestRuntimeFromClient(contract, client);
+          const { runtime, context, tables } = createJoinTestRuntime(client, contract);
+          const user = tables.user!;
+          const post = tables.post!;
+          const comment = tables.comment!;
           try {
-            const context = createRuntimeContext({
-              contract,
-              adapter: createPostgresAdapter(),
-              extensions: [],
-            });
-            const tables = schema(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
-            const comment = tables.comment!;
             const plan = sql({ context })
               .from(user)
               .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
