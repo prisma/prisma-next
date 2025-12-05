@@ -1220,7 +1220,9 @@ const plan = o.user().include.posts((child: unknown) => {
 
 **Type Assertions for Dynamic Proxy Objects:**
 
-**Pattern**: When working with dynamic proxy objects (e.g., ORM model registry), cast to `unknown` first, then to the specific shape.
+**Pattern**: When working with dynamic proxy objects (e.g., ORM model registry) **in test files only**, cast to `unknown` first, then to the specific shape.
+
+**Note**: This pattern is **only acceptable in test code**. Production code must use type predicates. See "Forbidden: Blind Type Casts" section above.
 
 **❌ WRONG: Direct type assertion**
 
@@ -1228,9 +1230,10 @@ const plan = o.user().include.posts((child: unknown) => {
 const builder = (o as { user: () => unknown }).user();
 ```
 
-**✅ CORRECT: Cast to `unknown` first**
+**✅ CORRECT: Cast to `unknown` first (test code only)**
 
 ```typescript
+// ✅ ACCEPTABLE: In test file only - working with dynamic proxy
 const builder = (o as unknown as { user: () => unknown }).user();
 ```
 
@@ -1238,6 +1241,7 @@ const builder = (o as unknown as { user: () => unknown }).user();
 - Dynamic proxy objects have complex types that TypeScript can't always infer correctly
 - Casting to `unknown` first allows TypeScript to accept the subsequent type assertion
 - This pattern is common when working with Proxy-based APIs
+- **Exception to blind cast rule**: Test code only
 
 ## Test Mock Type Assertions
 

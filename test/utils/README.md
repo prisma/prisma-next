@@ -76,6 +76,7 @@ Adapter-agnostic column type descriptors for test fixtures. These match common P
 - `boolColumn`: Boolean type
 - `float4Column`, `float8Column`: Floating-point types
 - `timestampColumn`, `timestamptzColumn`: Timestamp types
+- `vectorColumn`: pgvector vector type (for extension testing)
 
 **Usage:**
 ```typescript
