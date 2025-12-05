@@ -8,6 +8,9 @@ import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
 
+// Define CodecTypes type for contract mappings
+type CodecTypes = Record<string, { readonly output: unknown }>;
+
 // Define a fully-typed contract type with capabilities
 type ContractWithCapabilities = SqlContract<
   {
@@ -146,7 +149,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities>({ context })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -181,7 +184,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities>({ context })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -211,7 +214,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities>({ context })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -243,7 +246,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities>({ context })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -278,7 +281,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities>({ context })
+    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
