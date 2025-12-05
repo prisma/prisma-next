@@ -149,8 +149,76 @@ it('builds plan without codecId when column codecId is missing', () => {
 - Conditional property spreading (`...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {})`) for required properties
 - Tests that use type assertions to test impossible states
 
+## Schema Validation Redundancy
+
+**CRITICAL**: Don't re-validate structural properties that are already validated by schema validators (e.g., Arktype).
+
+**❌ WRONG: Re-validating properties already validated by Arktype**
+
+```typescript
+// validateStructure() re-checking properties that Arktype already validates
+for (const [colName, col] of Object.entries(table.columns)) {
+  if (typeof col.nullable !== 'boolean') {
+    throw new Error(`Column "${colName}" is missing required field "nullable"`);
+  }
+  if (!col.nativeType || typeof col.nativeType !== 'string') {
+    throw new Error(`Column "${colName}" is missing required field "nativeType"`);
+  }
+  if (!col.codecId || typeof col.codecId !== 'string') {
+    throw new Error(`Column "${colName}" is missing required field "codecId"`);
+  }
+}
+```
+
+**Why this is wrong:**
+- Arktype's `StorageColumnSchema` already validates `nullable`, `nativeType`, and `codecId` as required fields
+- These checks create impossible code paths (contracts that pass Arktype validation but fail these checks)
+- Requires awkward tests that bypass type checking to test impossible states
+- Adds maintenance burden when schema changes
+
+**✅ CORRECT: Focus on logical validation that schema validators can't do**
+
+```typescript
+// validateStructure() focuses on logical consistency (references, relationships)
+// Column structure is already validated by Arktype - no need to re-check here
+for (const [tableName, table] of Object.entries(storage.tables)) {
+  const columnNames = new Set(Object.keys(table.columns));
+
+  // Validate foreign key references (logical validation, not structural)
+  for (const fk of table.foreignKeys) {
+    for (const colName of fk.columns) {
+      if (!columnNames.has(colName)) {
+        throw new Error(`ForeignKey references non-existent column "${colName}"`);
+      }
+    }
+    // Validate referenced table exists (logical validation)
+    if (!tableNames.has(fk.references.table)) {
+      throw new Error(`ForeignKey references non-existent table "${fk.references.table}"`);
+    }
+  }
+}
+```
+
+**Validation Responsibility Separation:**
+
+- **Schema Validators (Arktype)**: Validate structural properties (required fields, types, shapes)
+- **Logical Validators (`validateStructure`)**: Validate logical consistency (references, relationships, constraints)
+
+**When to add validation checks:**
+- ✅ Validating references (foreign keys, model references)
+- ✅ Validating relationships (model-to-table mappings)
+- ✅ Validating constraint consistency (primary key columns exist)
+- ❌ Re-validating structural properties already validated by schema validators
+
+**Benefits:**
+- Eliminates redundant code and tests
+- Clear separation of concerns (structural vs logical validation)
+- Easier to maintain (schema changes don't require updating multiple validators)
+- Better error messages (schema validator catches structural issues early)
+
 ## Related Rules
 
 - `.cursor/rules/use-ast-factories.mdc`: Use factory functions for AST nodes
 - `.cursor/rules/typescript-patterns.mdc`: TypeScript best practices
 - `.cursor/rules/testing-guide.mdc`: Testing best practices
+- `.cursor/rules/arktype-usage.mdc`: Arktype validation patterns
