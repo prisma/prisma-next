@@ -62,26 +62,24 @@ withTempDir(({ createTempDir }) => {
           );
           const configPath = testSetup.configPath;
 
-          {
-            const command = createDbIntrospectCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            // Get output and strip ANSI for snapshot
-            const output = consoleOutput.join('\n');
-            const stripped = stripAnsi(output);
-
-            // Normalize database URL (port number) in output for snapshot
-            const normalized = stripped.replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX');
-
-            // Snapshot test for tree output
-            expect(normalized).toMatchSnapshot();
+          const command = createDbIntrospectCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
           }
+
+          // Get output and strip ANSI for snapshot
+          const output = consoleOutput.join('\n');
+          const stripped = stripAnsi(output);
+
+          // Normalize database URL (port number) in output for snapshot
+          const normalized = stripped.replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX');
+
+          // Snapshot test for tree output
+          expect(normalized).toMatchSnapshot();
         });
       },
       timeouts.spinUpPpgDev,
@@ -110,38 +108,36 @@ withTempDir(({ createTempDir }) => {
           );
           const configPath = testSetup.configPath;
 
-          {
-            const command = createDbIntrospectCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--json', '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            // Get output and parse JSON
-            const output = consoleOutput.join('\n');
-            const jsonOutput = JSON.parse(output);
-
-            // Normalize non-deterministic values (dbUrl and timing) for snapshot
-            const normalized = {
-              ...jsonOutput,
-              meta: {
-                ...jsonOutput.meta,
-                dbUrl: jsonOutput.meta?.dbUrl
-                  ? jsonOutput.meta.dbUrl.replace(/127\.0\.0\.1:\d+/, '127.0.0.1:XXXXX')
-                  : jsonOutput.meta?.dbUrl,
-              },
-              timings: {
-                ...jsonOutput.timings,
-                total: 0, // Normalize timing to 0 for snapshot
-              },
-            };
-
-            // Snapshot test for JSON output
-            expect(normalized).toMatchSnapshot();
+          const command = createDbIntrospectCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, ['--config', configPath, '--json', '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
           }
+
+          // Get output and parse JSON
+          const output = consoleOutput.join('\n');
+          const jsonOutput = JSON.parse(output);
+
+          // Normalize non-deterministic values (dbUrl and timing) for snapshot
+          const normalized = {
+            ...jsonOutput,
+            meta: {
+              ...jsonOutput.meta,
+              dbUrl: jsonOutput.meta?.dbUrl
+                ? jsonOutput.meta.dbUrl.replace(/127\.0\.0\.1:\d+/, '127.0.0.1:XXXXX')
+                : jsonOutput.meta?.dbUrl,
+            },
+            timings: {
+              ...jsonOutput.timings,
+              total: 0, // Normalize timing to 0 for snapshot
+            },
+          };
+
+          // Snapshot test for JSON output
+          expect(normalized).toMatchSnapshot();
         });
       },
       timeouts.spinUpPpgDev,
