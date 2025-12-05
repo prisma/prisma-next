@@ -1,8 +1,18 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 
-const contractObj = defineContract<CodecTypes>()
+// Adapter-agnostic column type descriptors
+const int4Column: ColumnTypeDescriptor = {
+  codecId: 'pg/int4@1',
+  nativeType: 'int4',
+} as const;
+
+const textColumn: ColumnTypeDescriptor = {
+  codecId: 'pg/text@1',
+  nativeType: 'text',
+} as const;
+
+const contractObj = defineContract<Record<string, never>>()
   .target('postgres')
   .table('user', (t) =>
     t

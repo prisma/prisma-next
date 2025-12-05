@@ -288,8 +288,8 @@ export type Relations = Contract['relations'];
       const columns: string[] = [];
       for (const [colName, col] of Object.entries(table.columns)) {
         const nullable = col.nullable ? 'true' : 'false';
-        const nativeType = col.nativeType ? `'${col.nativeType}'` : 'string';
-        const codecId = col.codecId ? `'${col.codecId}'` : 'string';
+        const nativeType = `'${col.nativeType}'`;
+        const codecId = `'${col.codecId}'`;
         columns.push(
           `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable} }`,
         );

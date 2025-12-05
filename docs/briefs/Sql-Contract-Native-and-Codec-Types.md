@@ -344,8 +344,7 @@ This section outlines a concrete, multi-step plan to move from the current imple
   - [ ] Update Arktype schemas to validate:
     - `nativeType: 'string'` (required).
     - `codecId: 'string'` (required).
-  - [ ] Keep existing `type` property for backward compatibility if needed, or:
-    - [ ] Deprecate/replace it with `codecId` in a structured way.
+  - [ ] Replace `type` with `codecId` and `nativeType` across SQL contract types and implementations.
 
 - [ ] In `@prisma-next/sql-contract-ts`:
   - [ ] Update TS contract builder surfaces to:

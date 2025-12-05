@@ -8,7 +8,7 @@ export type {
 } from '@prisma-next/runtime-executor';
 export { budgets, lints } from '@prisma-next/runtime-executor';
 export {
-  extractTypeIds,
+  extractCodecIds,
   validateCodecRegistryCompleteness,
   validateContractCodecMappings,
 } from '../codecs/validation';

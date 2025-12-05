@@ -18,12 +18,12 @@ type ContractWithCapabilities = SqlContract<
           readonly id: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly email: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
-            nullable: false;
+            readonly nullable: false;
           };
         };
         readonly uniques: readonly [];
@@ -35,22 +35,22 @@ type ContractWithCapabilities = SqlContract<
           readonly id: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly userId: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly title: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly createdAt: {
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
-            nullable: false;
+            readonly nullable: false;
           };
         };
         readonly uniques: readonly [];

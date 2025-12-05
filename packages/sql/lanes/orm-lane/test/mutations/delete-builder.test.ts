@@ -129,34 +129,12 @@ describe('delete builder', () => {
   });
 
   it('builds delete plan with codecId', () => {
-    const contractWithCodec: SqlContract<SqlStorage> = {
-      ...contract,
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: int4Column,
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-
-    const contextWithCodec: OrmContext<SqlContract<SqlStorage>> = {
-      ...context,
-      contract: contractWithCodec,
-    };
-
     // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
     const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;
     };
 
-    const plan = buildDeletePlan(contextWithCodec, 'User', where, getModelAccessor, {
+    const plan = buildDeletePlan(context, 'User', where, getModelAccessor, {
       params: { userId: 1 },
     });
 

@@ -2,41 +2,41 @@ import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
-export function extractTypeIds(contract: SqlContract<SqlStorage>): Set<string> {
-  const typeIds = new Set<string>();
+export function extractCodecIds(contract: SqlContract<SqlStorage>): Set<string> {
+  const codecIds = new Set<string>();
 
   for (const table of Object.values(contract.storage.tables)) {
     for (const column of Object.values(table.columns)) {
       const codecId = column.codecId;
-      typeIds.add(codecId);
+      codecIds.add(codecId);
     }
   }
 
-  return typeIds;
+  return codecIds;
 }
 
-function extractTypeIdsFromColumns(contract: SqlContract<SqlStorage>): Map<string, string> {
-  const typeIds = new Map<string, string>();
+function extractCodecIdsFromColumns(contract: SqlContract<SqlStorage>): Map<string, string> {
+  const codecIds = new Map<string, string>();
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
       const codecId = column.codecId;
       const key = `${tableName}.${columnName}`;
-      typeIds.set(key, codecId);
+      codecIds.set(key, codecId);
     }
   }
 
-  return typeIds;
+  return codecIds;
 }
 
 export function validateContractCodecMappings(
   registry: CodecRegistry,
   contract: SqlContract<SqlStorage>,
 ): void {
-  const typeIds = extractTypeIdsFromColumns(contract);
+  const codecIds = extractCodecIdsFromColumns(contract);
   const invalidCodecs: Array<{ table: string; column: string; codecId: string }> = [];
 
-  for (const [key, codecId] of typeIds.entries()) {
+  for (const [key, codecId] of codecIds.entries()) {
     if (!registry.has(codecId)) {
       const parts = key.split('.');
       const table = parts[0] ?? '';

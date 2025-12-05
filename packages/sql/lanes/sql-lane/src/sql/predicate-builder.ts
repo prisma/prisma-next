@@ -1,5 +1,5 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { BinaryExpr, ColumnRef, OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   createBinaryExpr,
@@ -55,7 +55,7 @@ export function buildWhereExpr(
     });
 
     const contractTable = contract.storage.tables[colBuilder.table];
-    const columnMeta = contractTable?.columns[colBuilder.column];
+    const columnMeta: StorageColumn | undefined = contractTable?.columns[colBuilder.column];
     codecId = columnMeta?.codecId;
 
     // Update descriptor with codecId and nativeType
@@ -63,8 +63,8 @@ export function buildWhereExpr(
     if (descriptor && columnMeta) {
       descriptors[descriptors.length - 1] = {
         ...descriptor,
-        ...(columnMeta.codecId ? { codecId: columnMeta.codecId } : {}),
-        ...(columnMeta.nativeType ? { nativeType: columnMeta.nativeType } : {}),
+        codecId: columnMeta.codecId,
+        nativeType: columnMeta.nativeType,
       };
     }
 

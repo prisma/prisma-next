@@ -168,16 +168,8 @@ withTempDir(({ createTempDir }) => {
           process.chdir(testDir);
           // Commands don't throw - they call process.exit() with non-zero exit code
           // executeCommand will catch the process.exit error and re-throw for non-zero codes
-          // Match the pattern from emit-command.test.ts: include command name in args
           await expect(
-            executeCommand(command, [
-              'node',
-              'cli.js',
-              'emit',
-              '--config',
-              'nonexistent.config.ts',
-              '--json',
-            ]),
+            executeCommand(command, ['--config', 'nonexistent.config.ts', '--json']),
           ).rejects.toThrow('process.exit called');
         } finally {
           process.chdir(originalCwd);
