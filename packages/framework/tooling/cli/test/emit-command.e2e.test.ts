@@ -152,16 +152,17 @@ withTempDir(({ createTempDir }) => {
       timeouts.typeScriptCompilation,
     );
 
-    it('throws error with PN-CLI code when config file is missing', async () => {
-      // Set up test directory from fixtures (but we'll use a non-existent config)
-      const testSetup = setupTestDirectoryFromFixtures(
-        createTempDir,
-        fixtureSubdir,
-        'prisma-next.config.emit.ts',
-      );
-      const testDir = testSetup.testDir;
+    it(
+      'throws error with PN-CLI code when config file is missing',
+      async () => {
+        // Set up test directory from fixtures (but we'll use a non-existent config)
+        const testSetup = setupTestDirectoryFromFixtures(
+          createTempDir,
+          fixtureSubdir,
+          'prisma-next.config.emit.ts',
+        );
+        const testDir = testSetup.testDir;
 
-      {
         const command = createContractEmitCommand();
         const originalCwd = process.cwd();
         try {
@@ -191,8 +192,9 @@ withTempDir(({ createTempDir }) => {
           why: expect.any(String),
           fix: expect.any(String),
         });
-      }
-    });
+      },
+      timeouts.typeScriptCompilation,
+    );
 
     it('throws error with PN-CLI code when contract config is missing', async () => {
       // Set up test directory from fixtures with no-contract config

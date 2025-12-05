@@ -46,7 +46,10 @@ export function getExitCode(): number | undefined {
  */
 export async function executeCommand(command: Command, args: string[]): Promise<number> {
   try {
-    await command.parseAsync(args);
+    // Use { from: 'user' } to tell Commander these are user args, not process.argv format
+    // process.argv format would be ['node', 'script.js', '--option', 'value']
+    // User args format is just ['--option', 'value']
+    await command.parseAsync(args, { from: 'user' });
     // Command completed successfully without calling process.exit()
     return 0;
   } catch (error) {
