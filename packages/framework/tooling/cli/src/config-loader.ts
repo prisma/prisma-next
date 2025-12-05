@@ -29,7 +29,7 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
     // When a specific config file was requested, verify it was actually loaded
     // (c12 falls back to searching by name if the specified file doesn't exist)
     if (resolvedConfigPath && result.configFile !== resolvedConfigPath) {
-      throw errorConfigFileNotFound(configPath);
+      throw errorConfigFileNotFound(resolvedConfigPath);
     }
 
     // Check if config is missing or empty (c12 may return empty object when file doesn't exist)

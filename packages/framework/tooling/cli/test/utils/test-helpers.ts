@@ -248,16 +248,15 @@ export function setupTestDirectoryFromFixtures(
   }
 
   // Copy precomputed contract.json and contract.d.ts if they exist
+  // Note: outputDir was already created above, so no need for mkdirSync here
   const fixtureContractJsonPath = join(fixturesSubdirPath, 'contract.json');
   const fixtureContractDtsPath = join(fixturesSubdirPath, 'contract.d.ts');
   if (existsSync(fixtureContractJsonPath)) {
-    const contractJsonPath = join(testDir, 'output', 'contract.json');
-    mkdirSync(dirname(contractJsonPath), { recursive: true });
+    const contractJsonPath = join(outputDir, 'contract.json');
     copyFileSync(fixtureContractJsonPath, contractJsonPath);
   }
   if (existsSync(fixtureContractDtsPath)) {
-    const contractDtsPath = join(testDir, 'output', 'contract.d.ts');
-    mkdirSync(dirname(contractDtsPath), { recursive: true });
+    const contractDtsPath = join(outputDir, 'contract.d.ts');
     copyFileSync(fixtureContractDtsPath, contractDtsPath);
   }
 
