@@ -148,7 +148,7 @@ type SqlStorageColumn = {
 Design notes:
 
 - **Native type is authoritative for DB structure**
-  - All DB-structure operations (schema verify, migration planning, `db init`, `db update`) use `nativeType` to compare against `SqlSchemaIR.typeId`.
+  - All DB-structure operations (schema verify, migration planning, `db init`, `db update`) use `nativeType` to compare against `SqlSchemaIR.nativeType`.
   - Codec IDs are ignored for structural compatibility checks.
 
 - **Codec ID is an overlay**
@@ -325,10 +325,10 @@ The key point: query builders remain codec-driven and can always rely on `codecI
 **Downstream tools:**
 
 - Tools that only have:
-  - The marker’s contract JSON, and
+  - The marker's contract JSON, and
   - Access to introspection (`SqlSchemaIR`),
   - Can:
-    - Validate schema vs contract by comparing `nativeType` to `typeId`.
+    - Validate schema vs contract by comparing `contractColumn.nativeType` to `schemaColumn.nativeType`.
     - Optionally analyze codec usage via `codecId` if needed.
 
 ---

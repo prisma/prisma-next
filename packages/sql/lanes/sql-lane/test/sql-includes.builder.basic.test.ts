@@ -7,7 +7,6 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
-import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type with capabilities
 type ContractWithCapabilities = SqlContract<
@@ -147,7 +146,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -162,12 +161,17 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes).toBeDefined();
-    expect(ast?.includes?.length).toBe(1);
-    expect(ast?.includes?.[0]?.kind).toBe('includeMany');
-    expect(ast?.includes?.[0]?.alias).toBe('post');
-    expect(ast?.includes?.[0]?.child.table.name).toBe('post');
-    expect(ast?.includes?.[0]?.child.project.length).toBe(2);
+    expect(ast.includes).toMatchObject([
+      {
+        kind: 'includeMany',
+        alias: 'post',
+        child: {
+          table: { name: 'post' },
+          project: expect.any(Array),
+        },
+      },
+    ]);
+    expect(ast.includes?.[0]?.child.project).toHaveLength(2);
   });
 
   it('builds a plan with includeMany using custom alias', () => {
@@ -177,7 +181,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -193,9 +197,11 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes).toBeDefined();
-    expect(ast?.includes?.length).toBe(1);
-    expect(ast?.includes?.[0]?.alias).toBe('posts');
+    expect(ast.includes).toMatchObject([
+      {
+        alias: 'posts',
+      },
+    ]);
   });
 
   it('builds a plan with includeMany with child where clause', () => {
@@ -205,7 +211,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -223,8 +229,11 @@ describe('SQL builder includeMany', () => {
       .build({ params: { title: 'Test' } });
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes?.[0]?.child.where).toBeDefined();
-    expect(ast?.includes?.[0]?.child.where?.kind).toBe('bin');
+    expect(ast.includes?.[0]?.child).toMatchObject({
+      where: {
+        kind: 'bin',
+      },
+    });
   });
 
   it('builds a plan with includeMany with child orderBy clause', () => {
@@ -234,7 +243,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -252,9 +261,14 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes?.[0]?.child.orderBy).toBeDefined();
-    expect(ast?.includes?.[0]?.child.orderBy?.length).toBe(1);
-    expect(ast?.includes?.[0]?.child.orderBy?.[0]?.dir).toBe('desc');
+    expect(ast.includes?.[0]?.child).toMatchObject({
+      orderBy: [
+        {
+          dir: 'desc',
+        },
+      ],
+    });
+    expect(ast.includes?.[0]?.child.orderBy).toHaveLength(1);
   });
 
   it('builds a plan with includeMany with child limit clause', () => {
@@ -264,7 +278,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,

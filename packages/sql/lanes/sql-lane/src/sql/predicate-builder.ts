@@ -8,11 +8,11 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
-import { errorMissingParameter } from '../utils/errors';
+import { errorMissingParameter, errorUnknownColumn, errorUnknownTable } from '../utils/errors';
 
 export interface BuildWhereExprResult {
   expr: BinaryExpr;
-  codecId?: string;
+  codecId: string | undefined;
   paramName: string;
 }
 
@@ -44,30 +44,38 @@ export function buildWhereExpr(
     const colBuilder = where.left as unknown as {
       table: string;
       column: string;
-      columnMeta?: { codecId: string; nullable?: boolean };
     };
-    const meta = (colBuilder.columnMeta ?? {}) as { codecId?: string; nullable?: boolean };
 
+    const contractTable = contract.storage.tables[colBuilder.table];
+    if (!contractTable) {
+      errorUnknownTable(colBuilder.table);
+    }
+
+    const columnMeta: StorageColumn | undefined = contractTable.columns[colBuilder.column];
+    if (!columnMeta) {
+      errorUnknownColumn(colBuilder.column, colBuilder.table);
+    }
+
+    // Construct descriptor directly from validated StorageColumn
     descriptors.push({
       name: paramName,
       source: 'dsl',
       refs: { table: colBuilder.table, column: colBuilder.column },
-      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+      nullable: columnMeta.nullable,
+      codecId: columnMeta.codecId,
+      nativeType: columnMeta.nativeType,
     });
-
-    const contractTable = contract.storage.tables[colBuilder.table];
-    const columnMeta: StorageColumn | undefined = contractTable?.columns[colBuilder.column];
-    codecId = columnMeta?.codecId;
 
     augmentDescriptorWithColumnMeta(descriptors, columnMeta);
 
+    codecId = columnMeta.codecId;
     leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
   }
 
   const rightParam = createParamRef(index, paramName);
   return {
     expr: createBinaryExpr('eq', leftExpr, rightParam),
-    ...(codecId ? { codecId } : {}),
+    codecId,
     paramName,
   };
 }

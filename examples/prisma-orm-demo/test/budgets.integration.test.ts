@@ -23,9 +23,11 @@ const contract = validateContract<Contract>(contractJson);
 /**
  * Extracts id and email columns from user table, throwing if either is missing.
  */
-function getUserIdAndEmailColumns(userTable: { columns: Record<string, AnyColumnBuilder> }): {
-  idColumn: AnyColumnBuilder;
-  emailColumn: AnyColumnBuilder;
+function getUserIdAndEmailColumns<T extends Record<string, unknown>>(userTable: {
+  columns: T;
+}): {
+  idColumn: T['id'];
+  emailColumn: T['email'];
 } {
   const userColumns = userTable.columns;
   const idColumn = userColumns['id'];

@@ -201,18 +201,18 @@ withTempDir(({ createTempDir }) => {
         // Check that JSON output is present and properly formatted
         const output = consoleOutput.join('\n');
         const jsonOutput = JSON.parse(output) as IntrospectSchemaResult<unknown>;
-        expect(jsonOutput.ok).toBe(true);
-        expect(jsonOutput.summary).toBe('Schema introspected successfully');
-        expect(jsonOutput.target.familyId).toBe('sql');
-        expect(jsonOutput.target.id).toBe('postgres');
-        expect(jsonOutput.schema).toEqual(mockSchemaIR);
-        expect(jsonOutput.timings.total).toBeGreaterThanOrEqual(0);
-        // Verify JSON structure matches IntrospectSchemaResult shape
-        expect(jsonOutput).toHaveProperty('ok');
-        expect(jsonOutput).toHaveProperty('summary');
-        expect(jsonOutput).toHaveProperty('target');
-        expect(jsonOutput).toHaveProperty('schema');
-        expect(jsonOutput).toHaveProperty('timings');
+        expect(jsonOutput).toMatchObject({
+          ok: true,
+          summary: 'Schema introspected successfully',
+          target: {
+            familyId: 'sql',
+            id: 'postgres',
+          },
+          schema: mockSchemaIR,
+          timings: {
+            total: expect.any(Number),
+          },
+        });
       }
     });
 
