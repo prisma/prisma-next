@@ -1,26 +1,13 @@
+import type { PgVectorOperations } from '@prisma-next/test-utils';
 import { expectTypeOf, test } from 'vitest';
 import type { ColumnBuilder } from '../src/types';
 
 test('ColumnBuilder includes operation methods when operations are provided', () => {
-  type TestOperations = {
-    'pgvector/vector@1': {
-      cosineDistance: {
-        args: ReadonlyArray<{ kind: 'typeId'; type: 'pgvector/vector@1' }>;
-        returns: { kind: 'builtin'; type: 'number' };
-        lowering: {
-          targetFamily: 'sql';
-          strategy: 'function';
-          template: string;
-        };
-      };
-    };
-  };
-
   type TestColumnBuilder = ColumnBuilder<
     'vector',
-    { nativeType: 'vector'; codecId: 'pgvector/vector@1'; nullable: false },
+    { nativeType: 'vector'; codecId: 'pg/vector@1'; nullable: false },
     unknown,
-    TestOperations
+    PgVectorOperations
   >;
 
   expectTypeOf<TestColumnBuilder>().toHaveProperty('cosineDistance');
@@ -28,25 +15,11 @@ test('ColumnBuilder includes operation methods when operations are provided', ()
 });
 
 test('ColumnBuilder does not include operations for different typeId', () => {
-  type TestOperations = {
-    'pgvector/vector@1': {
-      cosineDistance: {
-        args: ReadonlyArray<{ kind: 'typeId'; type: 'pgvector/vector@1' }>;
-        returns: { kind: 'builtin'; type: 'number' };
-        lowering: {
-          targetFamily: 'sql';
-          strategy: 'function';
-          template: string;
-        };
-      };
-    };
-  };
-
   type TestColumnBuilder = ColumnBuilder<
     'text',
     { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false },
     unknown,
-    TestOperations
+    PgVectorOperations
   >;
 
   type CosineDistanceMethod = TestColumnBuilder extends { cosineDistance: infer M } ? M : never;
@@ -58,7 +31,7 @@ test('ColumnBuilder handles empty operations', () => {
 
   type TestColumnBuilder = ColumnBuilder<
     'vector',
-    { nativeType: 'vector'; codecId: 'pgvector/vector@1'; nullable: false },
+    { nativeType: 'vector'; codecId: 'pg/vector@1'; nullable: false },
     unknown,
     EmptyOperations
   >;

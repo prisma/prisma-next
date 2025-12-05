@@ -96,6 +96,35 @@ const contract = defineContract<Record<string, never>>()
 
 **Note**: These descriptors are dependency-free and match the `ColumnTypeDescriptor` shape from `@prisma-next/contract-authoring`, but are defined locally to keep test-utils dependency-free.
 
+### Operation Descriptors
+
+Adapter-agnostic operation type descriptors for type-level test fixtures. These match common PostgreSQL operation patterns but don't depend on any target-specific packages. Use these in type-level tests to avoid duplication.
+
+**Available types:**
+- `PgVectorOperations`: Operations for `pg/vector@1` (cosineDistance, l2Distance)
+- `PgTextOperations`: Operations for `pg/text@1` (length)
+- `CombinedTestOperations`: Combined type with both vector and text operations
+- `OperationTypeSignature`: Base type for operation signatures
+
+**Usage:**
+```typescript
+import type { PgVectorOperations, CombinedTestOperations } from '@prisma-next/test-utils/operation-descriptors';
+import type { ColumnBuilder, OperationsForTypeId } from '@prisma-next/sql-relational-core/types';
+
+// Use in type-level tests
+type TestColumnBuilder = ColumnBuilder<
+  'vector',
+  { nativeType: 'vector'; codecId: 'pg/vector@1'; nullable: false },
+  unknown,
+  PgVectorOperations
+>;
+
+// Test operation type extraction
+type VectorOps = OperationsForTypeId<'pg/vector@1', CombinedTestOperations>;
+```
+
+**Note**: These types are dependency-free and match the `OperationTypes` shape from `@prisma-next/sql-relational-core/types`, but are defined locally to keep test-utils dependency-free.
+
 ### Timeout Configuration
 
 Centralized timeout values with environment variable support. All timeouts respect the `TEST_TIMEOUT_MULTIPLIER` environment variable (set to `3` in CI).
@@ -174,6 +203,7 @@ import { loadContractFromDisk, emitAndVerifyContract } from './utils';
 
 ## Exports
 
-- `.`: All test utilities (database helpers, async iterable helpers, timeouts)
+- `.`: All test utilities (database helpers, async iterable helpers, column descriptors, operation descriptors, timeouts)
 - `./column-descriptors`: Adapter-agnostic column type descriptors for test fixtures
+- `./operation-descriptors`: Adapter-agnostic operation type descriptors for type-level test fixtures
 

@@ -13,7 +13,7 @@ const contract = validateContract<PostgresContract>({
       user: {
         columns: {
           id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          vector: { codecId: 'pgvector/vector@1', nativeType: 'vector', nullable: false },
+          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
         },
         uniques: [],
         indexes: [],
@@ -33,7 +33,7 @@ describe('Operation lowering', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'cosineDistance',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [{ kind: 'param', index: 1, name: 'other' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -63,7 +63,7 @@ describe('Operation lowering', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'cosineSimilarity',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [{ kind: 'param', index: 1, name: 'other' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -85,7 +85,7 @@ describe('Operation lowering', () => {
     };
 
     const lowered = adapter.lower(ast, { contract, params: [42] });
-    expect(lowered.body.sql).toContain('cosine_similarity("user"."vector", $1)');
+    expect(lowered.body.sql).toContain('cosine_similarity("user"."vector", $1::vector)');
     expect(lowered.body.sql).toContain('AS "similarity"');
   });
 
@@ -93,7 +93,7 @@ describe('Operation lowering', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'cosineSimilarity',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [
         { kind: 'col', table: 'user', column: 'otherVector' },
@@ -117,7 +117,7 @@ describe('Operation lowering', () => {
 
     const lowered = adapter.lower(ast, { contract, params: [42] });
     expect(lowered.body.sql).toContain(
-      'cosine_similarity("user"."vector", "user"."otherVector", $1, 42)',
+      'cosine_similarity("user"."vector", "user"."otherVector", $1::vector, 42)',
     );
   });
 
@@ -125,7 +125,7 @@ describe('Operation lowering', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'cosineDistance',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [{ kind: 'param', index: 1, name: 'other' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -150,14 +150,14 @@ describe('Operation lowering', () => {
     };
 
     const lowered = adapter.lower(ast, { contract, params: [42, 0.5] });
-    expect(lowered.body.sql).toContain('WHERE ("user"."vector" <=> $1) = $2');
+    expect(lowered.body.sql).toContain('WHERE ("user"."vector" <=> $1::vector) = $2');
   });
 
   it('lowers operation in orderBy clause', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'cosineDistance',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [{ kind: 'param', index: 1, name: 'other' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -177,14 +177,14 @@ describe('Operation lowering', () => {
     };
 
     const lowered = adapter.lower(ast, { contract, params: [42] });
-    expect(lowered.body.sql).toContain('ORDER BY "user"."vector" <=> $1 ASC');
+    expect(lowered.body.sql).toContain('ORDER BY "user"."vector" <=> $1::vector ASC');
   });
 
   it('lowers operation with literal argument', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'cosineDistance',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [{ kind: 'literal', value: [1, 2, 3] }],
       returns: { kind: 'builtin', type: 'number' },
@@ -236,7 +236,7 @@ describe('Operation lowering', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'cosineDistance',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [{ kind: 'literal', value: 42 }],
       returns: { kind: 'builtin', type: 'number' },
@@ -341,10 +341,10 @@ describe('Operation lowering', () => {
     const innerOperation: OperationExpr = {
       kind: 'operation',
       method: 'normalize',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [],
-      returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
@@ -356,7 +356,7 @@ describe('Operation lowering', () => {
     const outerOperation: OperationExpr = {
       kind: 'operation',
       method: 'cosineDistance',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col', table: 'user', column: 'vector' },
       args: [innerOperation],
       returns: { kind: 'builtin', type: 'number' },
@@ -382,7 +382,7 @@ describe('Operation lowering', () => {
     const operationExpr = {
       kind: 'operation' as const,
       method: 'cosineDistance',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: { kind: 'col' as const, table: 'user', column: 'vector' },
       args: [{ kind: 'invalid' as 'param', index: 1 }],
       returns: { kind: 'builtin' as const, type: 'number' as const },

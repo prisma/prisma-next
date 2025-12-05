@@ -39,10 +39,10 @@ describe('buildMeta', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'normalize',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: createColumnRef('user', 'id'),
       args: [],
-      returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
@@ -77,10 +77,10 @@ describe('buildMeta', () => {
       normalized: 'operation:normalize',
     });
     expect(meta.projectionTypes).toEqual({
-      normalized: 'pgvector/vector@1',
+      normalized: 'pg/vector@1',
     });
     expect(meta.annotations?.codecs).toEqual({
-      normalized: 'pgvector/vector@1',
+      normalized: 'pg/vector@1',
     });
   });
 
@@ -88,7 +88,7 @@ describe('buildMeta', () => {
     const operationExpr: OperationExpr = {
       kind: 'operation',
       method: 'cosineDistance',
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       self: createColumnRef('user', 'id'),
       args: [],
       returns: { kind: 'builtin', type: 'number' },

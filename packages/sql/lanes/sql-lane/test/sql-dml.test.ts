@@ -295,7 +295,7 @@ describe('DML builders', () => {
             columns: {
               id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              vector: { nativeType: 'vector', codecId: 'pgvector/vector@1', nullable: false },
+              vector: { nativeType: 'vector', codecId: 'pg/vector@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -315,7 +315,7 @@ describe('DML builders', () => {
         {
           operations: () => [
             {
-              forTypeId: 'pgvector/vector@1',
+              forTypeId: 'pg/vector@1',
               method: 'cosineDistance',
               args: [{ kind: 'param' }],
               returns: { kind: 'builtin', type: 'number' },

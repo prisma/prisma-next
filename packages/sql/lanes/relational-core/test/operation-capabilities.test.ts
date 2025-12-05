@@ -36,7 +36,7 @@ describe('Operation capability gating', () => {
     });
 
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -91,7 +91,7 @@ describe('Operation capability gating', () => {
     });
 
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -146,7 +146,7 @@ describe('Operation capability gating', () => {
     });
 
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -204,7 +204,7 @@ describe('Operation capability gating', () => {
     });
 
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },

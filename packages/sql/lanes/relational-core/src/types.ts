@@ -152,9 +152,9 @@ export type OperationTypeSignature = {
  * Example:
  * ```typescript
  * type MyOperations: OperationTypes = {
- *   'pgvector/vector@1': {
+ *   'pg/vector@1': {
  *     cosineDistance: {
- *       args: [{ kind: 'typeId'; type: 'pgvector/vector@1' }];
+ *       args: [{ kind: 'typeId'; type: 'pg/vector@1' }];
  *       returns: { kind: 'builtin'; type: 'number' };
  *       lowering: { targetFamily: 'sql'; strategy: 'function'; template: '...' };
  *     };
@@ -184,7 +184,7 @@ export type CodecTypes = Record<string, { readonly output: unknown }>;
  *
  * @example
  * ```typescript
- * type Ops = OperationsForTypeId<'pgvector/vector@1', MyOperations>;
+ * type Ops = OperationsForTypeId<'pg/vector@1', MyOperations>;
  * // Ops = { cosineDistance: { ... }, l2Distance: { ... } }
  * ```
  */

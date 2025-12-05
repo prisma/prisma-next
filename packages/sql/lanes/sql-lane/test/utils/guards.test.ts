@@ -35,10 +35,10 @@ describe('guards', () => {
       const operation1: OperationExpr = {
         kind: 'operation',
         method: 'normalize',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: baseCol,
         args: [],
-        returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        returns: { kind: 'typeId', type: 'pg/vector@1' },
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
@@ -49,7 +49,7 @@ describe('guards', () => {
       const operation2: OperationExpr = {
         kind: 'operation',
         method: 'cosineDistance',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: operation1,
         args: [],
         returns: { kind: 'builtin', type: 'number' },
@@ -123,10 +123,10 @@ describe('guards', () => {
       const innerOp: OperationExpr = {
         kind: 'operation',
         method: 'normalize',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: col1,
         args: [],
-        returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        returns: { kind: 'typeId', type: 'pg/vector@1' },
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
@@ -137,7 +137,7 @@ describe('guards', () => {
       const outerOp: OperationExpr = {
         kind: 'operation',
         method: 'cosineDistance',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: innerOp,
         args: [col2],
         returns: { kind: 'builtin', type: 'number' },
@@ -162,10 +162,10 @@ describe('guards', () => {
       const operation: OperationExpr = {
         kind: 'operation',
         method: 'normalize',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: colRef,
         args: [],
-        returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        returns: { kind: 'typeId', type: 'pg/vector@1' },
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
@@ -222,10 +222,10 @@ describe('guards', () => {
       const operation: OperationExpr = {
         kind: 'operation',
         method: 'normalize',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: baseCol,
         args: [],
-        returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        returns: { kind: 'typeId', type: 'pg/vector@1' },
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
@@ -243,10 +243,10 @@ describe('guards', () => {
       const innerOp: OperationExpr = {
         kind: 'operation',
         method: 'normalize',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: baseCol,
         args: [],
-        returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        returns: { kind: 'typeId', type: 'pg/vector@1' },
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',
@@ -257,7 +257,7 @@ describe('guards', () => {
       const outerOp: OperationExpr = {
         kind: 'operation',
         method: 'cosineDistance',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: innerOp,
         args: [],
         returns: { kind: 'builtin', type: 'number' },
@@ -291,10 +291,10 @@ describe('guards', () => {
       const operation: OperationExpr = {
         kind: 'operation',
         method: 'normalize',
-        forTypeId: 'pgvector/vector@1',
+        forTypeId: 'pg/vector@1',
         self: colRef,
         args: [],
-        returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+        returns: { kind: 'typeId', type: 'pg/vector@1' },
         lowering: {
           targetFamily: 'sql',
           strategy: 'function',

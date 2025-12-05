@@ -59,6 +59,6 @@ export const timestamptzColumn: ColumnTypeDescriptor = {
 } as const;
 
 export const vectorColumn: ColumnTypeDescriptor = {
-  codecId: 'pgvector/vector@1',
+  codecId: 'pg/vector@1',
   nativeType: 'vector',
 } as const;
