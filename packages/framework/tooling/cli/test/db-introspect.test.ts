@@ -41,70 +41,68 @@ withTempDir(({ createTempDir }) => {
       );
       const configPath = testSetup.configPath;
 
-      {
-        // Mock the config loader to return a config with mocked family instance
-        const mockSchemaIR = { tables: { user: { columns: {} } } };
-        const mockSchemaView: CoreSchemaView = {
-          root: {
-            kind: 'root',
-            id: 'sql-schema',
-            label: 'sql schema (tables: 1)',
-            children: [
-              {
-                kind: 'entity',
-                id: 'table-user',
-                label: 'table user',
-                children: [
-                  {
-                    kind: 'field',
-                    id: 'column-id',
-                    label: 'id: pg/int4@1 (not null)',
-                  },
-                ],
-              },
-            ],
-          },
-        };
+      // Mock the config loader to return a config with mocked family instance
+      const mockSchemaIR = { tables: { user: { columns: {} } } };
+      const mockSchemaView: CoreSchemaView = {
+        root: {
+          kind: 'root',
+          id: 'sql-schema',
+          label: 'sql schema (tables: 1)',
+          children: [
+            {
+              kind: 'entity',
+              id: 'table-user',
+              label: 'table user',
+              children: [
+                {
+                  kind: 'field',
+                  id: 'column-id',
+                  label: 'id: pg/int4@1 (not null)',
+                },
+              ],
+            },
+          ],
+        },
+      };
 
-        const mockFamilyInstance = {
-          introspect: vi.fn().mockResolvedValue(mockSchemaIR),
-          toSchemaView: vi.fn().mockReturnValue(mockSchemaView),
-          validateContractIR: vi.fn((x) => x),
-        } as unknown as FamilyInstance<string>;
+      const mockFamilyInstance = {
+        introspect: vi.fn().mockResolvedValue(mockSchemaIR),
+        toSchemaView: vi.fn().mockReturnValue(mockSchemaView),
+        validateContractIR: vi.fn((x) => x),
+      } as unknown as FamilyInstance<string>;
 
-        // Mock loadConfig to return config with mocked family
-        const originalLoadConfig = await import('../src/config-loader');
-        vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
-          family: {
-            familyId: 'sql',
-            create: vi.fn().mockReturnValue(mockFamilyInstance),
-          },
-          target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
-          adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
-          driver: {
-            create: vi.fn().mockResolvedValue({
-              query: vi.fn(),
-              close: vi.fn().mockResolvedValue(undefined),
-            }),
-          },
-          db: { url: 'postgresql://user:pass@localhost/test' },
-        } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
+      // Mock loadConfig to return config with mocked family
+      const originalLoadConfig = await import('../src/config-loader');
+      vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn().mockReturnValue(mockFamilyInstance),
+        },
+        target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
+        driver: {
+          create: vi.fn().mockResolvedValue({
+            query: vi.fn(),
+            close: vi.fn().mockResolvedValue(undefined),
+          }),
+        },
+        db: { url: 'postgresql://user:pass@localhost/test' },
+      } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
 
-        const command = createDbIntrospectCommand();
-        const exitCode = await executeCommand(command, ['--config', configPath]);
+      const command = createDbIntrospectCommand();
+      const exitCode = await executeCommand(command, ['--config', configPath]);
 
-        expect(exitCode).toBe(0);
-        expect(mockFamilyInstance.introspect).toHaveBeenCalled();
-        expect(mockFamilyInstance.toSchemaView).toHaveBeenCalledWith(mockSchemaIR);
+      expect(exitCode).toBe(0);
+      expect(mockFamilyInstance.introspect).toHaveBeenCalled();
+      expect(mockFamilyInstance.toSchemaView).toHaveBeenCalledWith(mockSchemaIR);
 
-        // Check that tree output is present with proper structure
-        const output = consoleOutput.join('\n');
-        expect(output).toContain('sql schema (tables: 1)');
-        expect(output).toContain('table user');
-        expect(output).toContain('id: pg/int4@1');
-        // Verify tree characters are present
-        expect(output).toMatch(/[├└]/);
-      }
+      // Check that tree output is present with proper structure
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('sql schema (tables: 1)');
+      expect(output).toContain('table user');
+      expect(output).toContain('id: pg/int4@1');
+      // Verify tree characters are present
+      expect(output).toMatch(/[├└]/);
     });
 
     it('outputs summary when toSchemaView is not available', async () => {
