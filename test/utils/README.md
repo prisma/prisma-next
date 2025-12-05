@@ -66,6 +66,35 @@ flowchart TD
 - `collectAsync(iterable)`: Collects all values from an async iterable
 - `drainAsyncIterable(iterable)`: Drains an async iterable without collecting
 
+### Column Descriptors
+
+Adapter-agnostic column type descriptors for test fixtures. These match common PostgreSQL types but don't depend on `@prisma-next/adapter-postgres` or any target-specific packages. Use these in test fixtures to avoid adapter/target dependencies.
+
+**Available descriptors:**
+- `int4Column`, `int2Column`, `int8Column`: Integer types
+- `textColumn`: Text type
+- `boolColumn`: Boolean type
+- `float4Column`, `float8Column`: Floating-point types
+- `timestampColumn`, `timestamptzColumn`: Timestamp types
+
+**Usage:**
+```typescript
+import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+
+const contract = defineContract<Record<string, never>>()
+  .target('postgres')
+  .table('user', (t) =>
+    t
+      .column('id', { type: int4Column, nullable: false })
+      .column('email', { type: textColumn, nullable: false })
+      .primaryKey(['id']),
+  )
+  .build();
+```
+
+**Note**: These descriptors are dependency-free and match the `ColumnTypeDescriptor` shape from `@prisma-next/contract-authoring`, but are defined locally to keep test-utils dependency-free.
+
 ### Timeout Configuration
 
 Centralized timeout values with environment variable support. All timeouts respect the `TEST_TIMEOUT_MULTIPLIER` environment variable (set to `3` in CI).
@@ -144,5 +173,6 @@ import { loadContractFromDisk, emitAndVerifyContract } from './utils';
 
 ## Exports
 
-- `.`: All test utilities
+- `.`: All test utilities (database helpers, async iterable helpers, timeouts)
+- `./column-descriptors`: Adapter-agnostic column type descriptors for test fixtures
 

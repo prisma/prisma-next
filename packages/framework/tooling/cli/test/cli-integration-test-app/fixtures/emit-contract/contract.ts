@@ -1,16 +1,5 @@
-import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-
-// Adapter-agnostic column type descriptors
-const int4Column: ColumnTypeDescriptor = {
-  codecId: 'pg/int4@1',
-  nativeType: 'int4',
-} as const;
-
-const textColumn: ColumnTypeDescriptor = {
-  codecId: 'pg/text@1',
-  nativeType: 'text',
-} as const;
+import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 
 const contractObj = defineContract<Record<string, never>>()
   .target('postgres')
