@@ -143,7 +143,7 @@ describe('emitter', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'unknown/type@1', nullable: false },
+              id: { codecId: 'unknown/type@1', nativeType: 'unknown_type', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],

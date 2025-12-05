@@ -33,16 +33,13 @@ This package was created in Phase 1 and refactored in Phase 2. It now composes t
 ## Architecture
 
 - **Composes generic core**: Uses `@prisma-next/contract-authoring` for generic builder state management (`TableBuilder`, `ModelBuilder`, `ContractBuilder` base class)
-- **SQL-specific types**: Provides SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) from `@prisma-next/sql-target`
+- **SQL-specific types**: Provides SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) from `@prisma-next/sql-contract/types`
 - **SQL-specific validation**: Implements SQL-specific contract validation (`validateContractStructure`, `validateContractLogic`, `validateContract`) and normalization (`normalizeContract`)
 - **SQL-specific build()**: Implements SQL-specific `build()` method in `SqlContractBuilder` that constructs `SqlContract` instances with SQL-specific structure (uniques, indexes, foreignKeys arrays)
-
-## Architecture
 
 This package is part of the package layering architecture:
 - **Location**: `packages/sql/authoring/sql-contract-ts` (SQL family namespace)
 - **Ring**: SQL family namespace (can import from core, authoring, targets, and other SQL family packages)
-- **Dependencies**: `@prisma-next/contract`, `@prisma-next/sql-target`, `arktype`, `ts-toolbelt`
 
 ## Exports
 
@@ -76,7 +73,7 @@ const contract = defineContract<CodecTypes>()
 
 ```typescript
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Contract } from './contract.d';
 
 // From JSON import

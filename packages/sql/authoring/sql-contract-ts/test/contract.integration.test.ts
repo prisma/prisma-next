@@ -81,7 +81,7 @@ describe('validateContract', () => {
     };
     const result = validateContract<SqlContract<SqlStorage>>(contractJson);
     // After validation, types should match the type parameter
-    expectTypeOf(result).toMatchTypeOf<SqlContract<SqlStorage>>();
+    expectTypeOf(result).toEqualTypeOf<SqlContract<SqlStorage>>();
     // Verify structure is validated at runtime
     expect(result.storage.tables).toHaveProperty('User');
     expect(result.storage.tables['User']?.columns).toHaveProperty('id');

@@ -211,6 +211,7 @@ describe('predicates', () => {
           kind: 'column',
           table: 'user',
           column: 'id',
+          // @ts-expect-error - Testing fallback behavior with intentionally incomplete columnMeta
           columnMeta: { nullable: false } as unknown as StorageColumn,
           eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
           asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
@@ -238,6 +239,7 @@ describe('predicates', () => {
           kind: 'column',
           table: 'user',
           column: 'id',
+          // @ts-expect-error - Testing fallback behavior with intentionally incomplete columnMeta
           columnMeta: { codecId: 'pg/int4@1' } as unknown as StorageColumn,
           eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
           asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),

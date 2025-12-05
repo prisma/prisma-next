@@ -1,3 +1,5 @@
+import { copyFileSync, mkdirSync } from 'node:fs';
+import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
@@ -55,77 +57,75 @@ withTempDir(({ createTempDir }) => {
             const testDir = testSetup.testDir;
             const configPath = testSetup.configPath;
 
-            {
-              // Emit contract first
-              const emitCommand = createContractEmitCommand();
-              const originalCwd = process.cwd();
-              try {
-                process.chdir(testDir);
-                await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-              } finally {
-                process.chdir(originalCwd);
-              }
-
-              // Load precomputed contract from disk
-              const contractJsonPath = join(testDir, 'output', 'contract.json');
-              const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
-
-              await withClient(connectionString, async (client) => {
-                // Setup marker schema and table
-                await executeStatement(client, ensureSchemaStatement);
-                await executeStatement(client, ensureTableStatement);
-
-                // Write marker matching contract
-                const write = writeContractMarker({
-                  coreHash: contract.coreHash,
-                  profileHash: contract.profileHash ?? contract.coreHash,
-                  contractJson: contract,
-                  canonicalVersion: 1,
-                });
-                await executeStatement(client, write.insert);
-                // withClient will close the client after this callback returns
-              });
-
-              // Clear console output before running the command we want to test
-              // (previous commands like 'contract emit' may have added output)
-              const outputStartIndex = consoleOutput.length;
-
-              const command = createDbVerifyCommand();
-              const verifyCwd = process.cwd();
-              try {
-                process.chdir(testDir);
-                await executeCommand(command, ['--config', configPath, '--json']);
-              } finally {
-                process.chdir(verifyCwd);
-              }
-
-              // Check exit code is 0 (success)
-              const exitCode = getExitCode();
-              expect(exitCode).toBe(0);
-
-              // Parse and verify JSON output (only from this command)
-              // When --json is set, output should be clean JSON only
-              const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
-              const parsed = JSON.parse(output) as Record<string, unknown>;
-              expect(parsed).toMatchObject({
-                ok: true,
-                summary: expect.any(String),
-                contract: {
-                  coreHash: expect.any(String),
-                },
-                marker: {
-                  coreHash: expect.any(String),
-                },
-                target: {
-                  expected: expect.any(String),
-                },
-              });
-
-              // Verify coreHash matches
-              expect((parsed['contract'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
-              expect((parsed['marker'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
-              expect(consoleErrors.length).toBe(0);
+            // Emit contract first
+            const emitCommand = createContractEmitCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
             }
+
+            // Load precomputed contract from disk
+            const contractJsonPath = join(testDir, 'output', 'contract.json');
+            const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+
+            await withClient(connectionString, async (client) => {
+              // Setup marker schema and table
+              await executeStatement(client, ensureSchemaStatement);
+              await executeStatement(client, ensureTableStatement);
+
+              // Write marker matching contract
+              const write = writeContractMarker({
+                coreHash: contract.coreHash,
+                profileHash: contract.profileHash ?? contract.coreHash,
+                contractJson: contract,
+                canonicalVersion: 1,
+              });
+              await executeStatement(client, write.insert);
+              // withClient will close the client after this callback returns
+            });
+
+            // Clear console output before running the command we want to test
+            // (previous commands like 'contract emit' may have added output)
+            const outputStartIndex = consoleOutput.length;
+
+            const command = createDbVerifyCommand();
+            const verifyCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await executeCommand(command, ['--config', configPath, '--json']);
+            } finally {
+              process.chdir(verifyCwd);
+            }
+
+            // Check exit code is 0 (success)
+            const exitCode = getExitCode();
+            expect(exitCode).toBe(0);
+
+            // Parse and verify JSON output (only from this command)
+            // When --json is set, output should be clean JSON only
+            const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
+            const parsed = JSON.parse(output) as Record<string, unknown>;
+            expect(parsed).toMatchObject({
+              ok: true,
+              summary: expect.any(String),
+              contract: {
+                coreHash: expect.any(String),
+              },
+              marker: {
+                coreHash: expect.any(String),
+              },
+              target: {
+                expected: expect.any(String),
+              },
+            });
+
+            // Verify coreHash matches
+            expect((parsed['contract'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
+            expect((parsed['marker'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
+            expect(consoleErrors.length).toBe(0);
           },
           // Use random ports to avoid conflicts in CI (no options = random ports)
           {},
@@ -287,9 +287,6 @@ withTempDir(({ createTempDir }) => {
                 total: expect.any(Number),
               },
             });
-            // Type assertions for TypeScript
-            expect(parsed['contract']).toBeDefined();
-            expect(parsed['marker']).toBeDefined();
           }
         });
       },
@@ -330,7 +327,9 @@ withTempDir(({ createTempDir }) => {
 
             // Load precomputed contract from disk
             const contractJsonPath = join(testDir, 'output', 'contract.json');
-            loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+            const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+            expect(contract).toBeDefined();
+            expect(contract.coreHash).toBeDefined();
 
             const command = createDbVerifyCommand();
             const verifyCwd4 = process.cwd();
@@ -403,19 +402,14 @@ withTempDir(({ createTempDir }) => {
             // Copy contract file to the test directory so the command can read it
             const testContractJsonPath = join(testDir, 'output', 'contract.json');
             const testContractDtsPath = join(testDir, 'output', 'contract.d.ts');
-            const { copyFileSync, mkdirSync } = await import('node:fs');
             mkdirSync(join(testDir, 'output'), { recursive: true });
             copyFileSync(contractJsonPath, testContractJsonPath);
             const emitContractDtsPath = join(emitTestSetup.testDir, 'output', 'contract.d.ts');
-            if (
-              await import('node:fs/promises').then((fs) =>
-                fs
-                  .access(emitContractDtsPath)
-                  .then(() => true)
-                  .catch(() => false),
-              )
-            ) {
+            try {
+              await access(emitContractDtsPath);
               copyFileSync(emitContractDtsPath, testContractDtsPath);
+            } catch {
+              // contract.d.ts doesn't exist, skip copying
             }
 
             await withClient(connectionString, async (client) => {

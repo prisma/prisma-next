@@ -12,7 +12,7 @@ import { schema } from '../src/schema';
 import { createStubAdapter, createTestContext } from './utils';
 
 describe('ColumnBuilder operations', () => {
-  const contract = validateContract<SqlContract<SqlStorage>>({
+  const contract = validateContract({
     target: 'postgres',
     targetFamily: 'sql',
     coreHash: 'test-hash',
@@ -34,7 +34,7 @@ describe('ColumnBuilder operations', () => {
     models: {},
     relations: {},
     mappings: {},
-  });
+  } as const);
 
   it('exposes registered methods on columns with matching typeId', () => {
     const signature: SqlOperationSignature = {
