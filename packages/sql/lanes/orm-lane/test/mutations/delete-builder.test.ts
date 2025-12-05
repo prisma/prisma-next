@@ -101,7 +101,7 @@ describe('delete builder', () => {
     });
   });
 
-  it('builds delete plan with annotations', () => {
+  it('includes write intent and mutation flag in annotations', () => {
     // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
     const where = (model: any) => {
       return model.id.eq(param('userId')) as AnyBinaryBuilder;

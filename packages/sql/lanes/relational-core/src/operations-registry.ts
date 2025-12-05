@@ -193,13 +193,13 @@ export function attachOperationsToColumnBuilder<
     return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
 
-  // Use codecId if present
-  const typeId = columnMeta.codecId;
-  if (!typeId) {
+  // Use codecId to look up operations registered for this column's type
+  const codecId = columnMeta.codecId;
+  if (!codecId) {
     return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
 
-  const operations = registry.byType(typeId) as SqlOperationSignature[];
+  const operations = registry.byType(codecId) as SqlOperationSignature[];
   if (operations.length === 0) {
     return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }

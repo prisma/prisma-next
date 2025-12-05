@@ -35,8 +35,8 @@
  * //           {
  * //             kind: 'field',
  * //             id: 'column-id',
- * //             label: 'id: pg/int4@1 (not null)',
- * //             meta: { nativeType: 'pg/int4@1', nullable: false, ... }
+ * //             label: 'id: int4 (pg/int4@1, not null)',
+ * //             meta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false, ... }
  * //           },
  * //           {
  * //             kind: 'index',

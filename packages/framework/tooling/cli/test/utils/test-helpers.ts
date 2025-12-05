@@ -342,8 +342,26 @@ export function setupIntegrationTestDirectoryFromFixtures(
 export function loadContractFromDisk<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 >(contractJsonPath: string): TContract {
-  const contractJsonContent = readFileSync(contractJsonPath, 'utf-8');
-  const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  if (!existsSync(contractJsonPath)) {
+    throw new Error(`Contract file not found: ${contractJsonPath}`);
+  }
+
+  let contractJsonContent: string;
+  try {
+    contractJsonContent = readFileSync(contractJsonPath, 'utf-8');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read contract file ${contractJsonPath}: ${message}`);
+  }
+
+  let contractJson: Record<string, unknown>;
+  try {
+    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse contract JSON from ${contractJsonPath}: ${message}`);
+  }
+
   return validateContract<TContract>(contractJson);
 }
 
