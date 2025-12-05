@@ -6,6 +6,7 @@ import {
   createColumnRef,
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
+import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { errorMissingParameter } from '../utils/errors';
 
@@ -58,15 +59,7 @@ export function buildWhereExpr(
     const columnMeta: StorageColumn | undefined = contractTable?.columns[colBuilder.column];
     codecId = columnMeta?.codecId;
 
-    // Update descriptor with codecId and nativeType
-    const descriptor = descriptors[descriptors.length - 1];
-    if (descriptor && columnMeta) {
-      descriptors[descriptors.length - 1] = {
-        ...descriptor,
-        codecId: columnMeta.codecId,
-        nativeType: columnMeta.nativeType,
-      };
-    }
+    augmentDescriptorWithColumnMeta(descriptors, columnMeta);
 
     leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
   }

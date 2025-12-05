@@ -3,6 +3,7 @@ import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/ru
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import {
   budgets,
   createRuntime,
@@ -22,9 +23,9 @@ const contract = validateContract<Contract>(contractJson);
 /**
  * Extracts id and email columns from user table, throwing if either is missing.
  */
-function getUserIdAndEmailColumns(userTable: { columns: Record<string, unknown> }): {
-  idColumn: unknown;
-  emailColumn: unknown;
+function getUserIdAndEmailColumns(userTable: { columns: Record<string, AnyColumnBuilder> }): {
+  idColumn: AnyColumnBuilder;
+  emailColumn: AnyColumnBuilder;
 } {
   const userColumns = userTable.columns;
   const idColumn = userColumns['id'];

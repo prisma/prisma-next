@@ -1,5 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   LoweredStatement,
   OperationExpr,
@@ -69,29 +69,20 @@ describe('plan assembly', () => {
     column: string,
     columnMeta: { codecId: string; nativeType: string; nullable: boolean },
   ): AnyColumnBuilder {
-    const normalizedMeta = convertColumnMeta(columnMeta);
     return {
       kind: 'column',
       table,
       column,
-      columnMeta: normalizedMeta,
+      columnMeta: {
+        nativeType: columnMeta.nativeType,
+        codecId: columnMeta.codecId,
+        nullable: columnMeta.nullable,
+      },
       eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
       asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
       desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
       __jsType: undefined,
     } as unknown as AnyColumnBuilder;
-  }
-
-  function convertColumnMeta(meta: {
-    codecId: string;
-    nativeType: string;
-    nullable: boolean;
-  }): StorageColumn {
-    return {
-      nativeType: meta.nativeType,
-      codecId: meta.codecId,
-      nullable: meta.nullable,
-    };
   }
 
   describe('buildMeta', () => {
@@ -159,11 +150,11 @@ describe('plan assembly', () => {
             kind: 'column',
             table: 'user',
             column: 'id',
-            columnMeta: convertColumnMeta({
-              codecId: 'pg/int4@1',
+            columnMeta: {
               nativeType: 'int4',
+              codecId: 'pg/int4@1',
               nullable: false,
-            }),
+            },
             _operationExpr: operationExpr,
           } as unknown as ProjectionState['columns'][0],
         ],
@@ -215,11 +206,11 @@ describe('plan assembly', () => {
             kind: 'column',
             table: 'user',
             column: 'id',
-            columnMeta: convertColumnMeta({
-              codecId: 'pg/int4@1',
+            columnMeta: {
               nativeType: 'int4',
+              codecId: 'pg/int4@1',
               nullable: false,
-            }),
+            },
             _operationExpr: operationExpr,
           } as unknown as ProjectionState['columns'][0],
         ],
@@ -261,8 +252,8 @@ describe('plan assembly', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'join-on',
-            left: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
-            right: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
+            left: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            right: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },
           childProjection: {
             aliases: ['id'],
@@ -512,8 +503,8 @@ describe('plan assembly', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'join-on',
-            left: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
-            right: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
+            left: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            right: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },
           childProjection: {
             aliases: ['id'],
@@ -572,8 +563,8 @@ describe('plan assembly', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'join-on',
-            left: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
-            right: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
+            left: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            right: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },
           childProjection: {
             aliases: ['id'],
@@ -711,11 +702,11 @@ describe('plan assembly', () => {
             kind: 'column',
             table: '',
             column: '',
-            columnMeta: convertColumnMeta({
-              codecId: 'core/json@1',
+            columnMeta: {
               nativeType: 'jsonb',
+              codecId: 'core/json@1',
               nullable: true,
-            }),
+            },
             eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
             asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
             desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -730,8 +721,8 @@ describe('plan assembly', () => {
           table: { kind: 'table', name: 'post' },
           on: {
             kind: 'join-on',
-            left: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
-            right: convertColumnMeta({ codecId: 'pg/int4@1', nativeType: 'int4', nullable: false }),
+            left: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            right: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },
           childProjection: {
             aliases: ['id'],

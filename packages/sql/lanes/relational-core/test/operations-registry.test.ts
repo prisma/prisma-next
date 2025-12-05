@@ -1,9 +1,11 @@
 import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import {
+  int4Column as int4ColumnType,
+  vectorColumn as vectorColumnType,
+} from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { vectorColumn as vectorColumnType } from '../../../../extensions/pgvector/src/exports/column-types';
-import { int4Column as int4ColumnType } from '../../../../targets/postgres-adapter/src/exports/column-types';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { createStubAdapter, createTestContext } from './utils';
@@ -20,7 +22,7 @@ type TestContract = SqlContract<
           };
           readonly vector: {
             readonly nativeType: 'vector';
-            readonly codecId: 'pg/vector@1';
+            readonly codecId: 'pgvector/vector@1';
             readonly nullable: false;
           };
         };
@@ -85,9 +87,9 @@ describe('operations-registry', () => {
 
   it('attaches operations when registry is provided', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -126,9 +128,9 @@ describe('operations-registry', () => {
 
   it('filters operations by capabilities when capabilities are required', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       capabilities: ['postgres.lateral'],
       lowering: {
@@ -222,9 +224,9 @@ describe('operations-registry', () => {
 
   it('filters operations when capabilities are missing', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       capabilities: ['postgres.lateral'],
       lowering: {
@@ -281,9 +283,9 @@ describe('operations-registry', () => {
 
   it('handles operations with multiple capability requirements', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       capabilities: ['postgres.lateral', 'postgres.jsonAgg'],
       lowering: {
@@ -384,9 +386,9 @@ describe('operations-registry', () => {
 
   it('handles operations with no capabilities requirement', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -414,9 +416,9 @@ describe('operations-registry', () => {
 
   it('handles operations when contractCapabilities is undefined', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       capabilities: ['postgres.lateral'],
       lowering: {
@@ -468,9 +470,9 @@ describe('operations-registry', () => {
 
   it('throws error for wrong number of arguments', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -505,7 +507,7 @@ describe('operations-registry', () => {
 
   it('throws error for invalid param argument', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -538,9 +540,9 @@ describe('operations-registry', () => {
 
   it('throws error for invalid column builder argument', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pg/vector@1',
+      forTypeId: 'pgvector/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
