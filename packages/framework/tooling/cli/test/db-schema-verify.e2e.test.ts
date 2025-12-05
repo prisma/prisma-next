@@ -15,6 +15,49 @@ import {
 // Fixture subdirectory for db-schema-verify e2e tests
 const fixtureSubdir = 'db-schema-verify';
 
+/**
+ * Creates a test contract JSON structure with the given tables.
+ * Each table must have columns, and optionally uniques.
+ * Primary key defaults to ['id'] for all tables.
+ */
+function createTestContract(
+  tables: Record<
+    string,
+    {
+      columns: Record<string, { codecId: string; nativeType: string; nullable: boolean }>;
+      uniques?: Array<{ columns: string[] }>;
+    }
+  >,
+) {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    coreHash: 'sha256:test',
+    storage: {
+      tables: Object.fromEntries(
+        Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
+          name,
+          {
+            columns,
+            primaryKey: { columns: ['id'] },
+            uniques,
+            indexes: [],
+            foreignKeys: [],
+          },
+        ]),
+      ),
+    },
+    models: {},
+    relations: {},
+    mappings: {},
+    extensions: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+  };
+}
+
 withTempDir(({ createTempDir }) => {
   describe('db schema-verify command (e2e)', () => {
     let consoleOutput: string[] = [];
@@ -58,33 +101,15 @@ withTempDir(({ createTempDir }) => {
           const configPath = testSetup.configPath;
 
           // Create contract.json matching the schema
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [{ columns: ['email'] }],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
+              uniques: [{ columns: ['email'] }],
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -138,33 +163,14 @@ withTempDir(({ createTempDir }) => {
           const configPath = testSetup.configPath;
 
           // Create contract.json matching the schema
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -219,43 +225,20 @@ withTempDir(({ createTempDir }) => {
           const configPath = testSetup.configPath;
 
           // Create contract.json with missing table
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
-                post: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+            post: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -309,33 +292,14 @@ withTempDir(({ createTempDir }) => {
           const configPath = testSetup.configPath;
 
           // Create contract.json without extra column
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -389,33 +353,14 @@ withTempDir(({ createTempDir }) => {
           const configPath = testSetup.configPath;
 
           // Create contract.json without extra column
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -469,33 +414,14 @@ export default defineConfig({
         mkdirSync(dirname(configPath), { recursive: true });
         writeFileSync(configPath, configContent, 'utf-8');
 
-        const contractJson = {
-          schemaVersion: '1',
-          target: 'postgres',
-          targetFamily: 'sql',
-          coreHash: 'sha256:test',
-          storage: {
-            tables: {
-              user: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                  email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
+        const contractJson = createTestContract({
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
           },
-          models: {},
-          relations: {},
-          mappings: {},
-          extensions: {},
-          capabilities: {},
-          meta: {},
-          sources: {},
-        };
+        });
         const contractPath = resolve(testDir, 'src/prisma/contract.json');
         mkdirSync(dirname(contractPath), { recursive: true });
         writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -514,7 +440,7 @@ export default defineConfig({
 
         // Verify that database URL required error was thrown
         const errorOutput = consoleErrors.join('\n');
-        const allOutput = consoleOutput.join('\n') + '\n' + errorOutput;
+        const allOutput = `${consoleOutput.join('\n')}\n${errorOutput}`;
         // Error should be in either consoleErrors or consoleOutput
         expect(allOutput).toMatch(/PN-CLI-4005|Database URL is required/i);
       },
@@ -555,7 +481,7 @@ export default defineConfig({
     );
 
     it(
-      'handles contract file read errors (non-ENOENT)',
+      'handles contract JSON parse errors (invalid JSON content)',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const testSetup = setupTestDirectoryFromFixtures(
@@ -566,7 +492,7 @@ export default defineConfig({
           );
           const configPath = testSetup.configPath;
 
-          // Create a contract file with invalid JSON (causes parse error, not ENOENT)
+          // Create a contract file with invalid JSON (causes JSON.parse SyntaxError)
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, 'invalid json content', 'utf-8');
@@ -613,33 +539,14 @@ export default defineConfig({
           );
           const configPath = testSetup.configPath;
 
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -682,33 +589,14 @@ export default defineConfig({
           );
           const configPath = testSetup.configPath;
 
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -752,33 +640,14 @@ export default defineConfig({
           const configPath = testSetup.configPath;
 
           // Contract expects both id and email columns, but database only has id
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -827,33 +696,14 @@ export default defineConfig({
             );
             const configPath = testSetup.configPath;
 
-            const contractJson = {
-              schemaVersion: '1',
-              target: 'postgres',
-              targetFamily: 'sql',
-              coreHash: 'sha256:test',
-              storage: {
-                tables: {
-                  user: {
-                    columns: {
-                      id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                      email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                    },
-                    primaryKey: { columns: ['id'] },
-                    uniques: [],
-                    indexes: [],
-                    foreignKeys: [],
-                  },
+            const contractJson = createTestContract({
+              user: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
                 },
               },
-              models: {},
-              relations: {},
-              mappings: {},
-              extensions: {},
-              capabilities: {},
-              meta: {},
-              sources: {},
-            };
+            });
             const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
             mkdirSync(dirname(contractPath), { recursive: true });
             writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -867,10 +717,7 @@ export default defineConfig({
               process.chdir(originalCwd);
             }
 
-            // Check that blank line was added after spinner output
             const output = consoleOutput.join('\n');
-            // The blank line appears after spinner messages, so we check for double newline
-            // or that output contains the verification result after a blank line
             expect(output).toContain('Database schema satisfies contract');
           });
         } finally {
@@ -901,33 +748,14 @@ export default defineConfig({
           );
           const configPath = testSetup.configPath;
 
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
@@ -989,33 +817,14 @@ export default defineConfig({
           const modifiedConfig = configContent.replace(/driver:\s*postgresDriver,?\s*\n/g, '');
           await writeFile(configPath, modifiedConfig, 'utf-8');
 
-          const contractJson = {
-            schemaVersion: '1',
-            target: 'postgres',
-            targetFamily: 'sql',
-            coreHash: 'sha256:test',
-            storage: {
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-            models: {},
-            relations: {},
-            mappings: {},
-            extensions: {},
-            capabilities: {},
-            meta: {},
-            sources: {},
-          };
+          });
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           mkdirSync(dirname(contractPath), { recursive: true });
           writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');

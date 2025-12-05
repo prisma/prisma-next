@@ -3,12 +3,13 @@ import { dirname, resolve } from 'node:path';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createDbSignCommand } from '../src/commands/db-sign';
 import {
   executeCommand,
   getExitCode,
+  runDbSign,
   setupCommandMocks,
+  setupDbSignFixture,
   setupTestDirectoryFromFixtures,
   withTempDir,
 } from './utils/test-helpers';
@@ -38,42 +39,13 @@ withTempDir(({ createTempDir }) => {
       'creates marker when schema matches contract',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          // Set up database schema first, then close connection
-          await withClient(connectionString, async (client) => {
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL
-              )
-            `);
-          });
-
-          // Set up test directory with config and contract
-          const testSetup = setupTestDirectoryFromFixtures(
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
             createTempDir,
             fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
           );
-          const configPath = testSetup.configPath;
 
-          // Emit contract first
-          const emitCommand = createContractEmitCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
-
-          const command = createDbSignCommand();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(command, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
+          await runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']);
 
           // Get output and strip ANSI for snapshot
           const output = consoleOutput.join('\n');
@@ -111,44 +83,21 @@ withTempDir(({ createTempDir }) => {
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           // Set up database schema that does NOT match contract (missing table)
-          await withClient(connectionString, async (client) => {
-            // Create a different table, not "user"
-            await client.query(`
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+            `
               CREATE TABLE IF NOT EXISTS "post" (
                 id SERIAL PRIMARY KEY,
                 title TEXT NOT NULL
               )
-            `);
-          });
-
-          // Set up test directory with config and contract
-          const testSetup = setupTestDirectoryFromFixtures(
-            createTempDir,
-            fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
+            `,
           );
-          const configPath = testSetup.configPath;
 
-          // Emit contract first
-          const emitCommand = createContractEmitCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
-
-          const command = createDbSignCommand();
-          try {
-            process.chdir(testSetup.testDir);
-            await expect(
-              executeCommand(command, ['--config', configPath, '--no-color']),
-            ).rejects.toThrow();
-          } finally {
-            process.chdir(originalCwd);
-          }
+          await expect(
+            runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']),
+          ).rejects.toThrow();
 
           // Verify marker was NOT created in database
           await withClient(connectionString, async (client) => {
@@ -184,46 +133,17 @@ withTempDir(({ createTempDir }) => {
       'outputs JSON envelope with real database',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          // Set up database schema first, then close connection
-          await withClient(connectionString, async (client) => {
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL
-              )
-            `);
-          });
-
-          // Set up test directory with config and contract
-          const testSetup = setupTestDirectoryFromFixtures(
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
             createTempDir,
             fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
           );
-          const configPath = testSetup.configPath;
-
-          // Emit contract first
-          const emitCommand = createContractEmitCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
 
           // Clear console output before running the command we want to test
           // (previous commands like 'contract emit' may have added output)
           const outputStartIndex = consoleOutput.length;
 
-          const command = createDbSignCommand();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(command, ['--config', configPath, '--json', '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
+          await runDbSign(testSetup, configPath, ['--config', configPath, '--json', '--no-color']);
 
           // Get output and parse JSON (only from this command)
           const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
@@ -339,40 +259,13 @@ withTempDir(({ createTempDir }) => {
       'handles quiet mode flag',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL
-              )
-            `);
-          });
-
-          const testSetup = setupTestDirectoryFromFixtures(
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
             createTempDir,
             fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
           );
-          const configPath = testSetup.configPath;
 
-          // Emit contract first
-          const emitCommand = createContractEmitCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
-
-          const command = createDbSignCommand();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(command, ['--config', configPath, '--quiet', '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
+          await runDbSign(testSetup, configPath, ['--config', configPath, '--quiet', '--no-color']);
 
           // In quiet mode, only errors should be output
           const output = consoleOutput.join('\n');
@@ -386,32 +279,16 @@ withTempDir(({ createTempDir }) => {
       'exits with code 1 when schema verification fails',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            // Create a table that doesn't match the contract (missing column)
-            await client.query(`
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+            `
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY
               )
-            `);
-          });
-
-          const testSetup = setupTestDirectoryFromFixtures(
-            createTempDir,
-            fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
+            `,
           );
-          const configPath = testSetup.configPath;
-
-          // Emit contract first
-          const emitCommand = createContractEmitCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
 
           // Contract expects both id and email columns, but database only has id
           // Modify the emitted contract to expect email column
@@ -425,16 +302,10 @@ withTempDir(({ createTempDir }) => {
           };
           await writeFile(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
-          const command = createDbSignCommand();
-          try {
-            process.chdir(testSetup.testDir);
-            // executeCommand throws for non-zero exit codes
-            await expect(
-              executeCommand(command, ['--config', configPath, '--no-color']),
-            ).rejects.toThrow('process.exit called');
-          } finally {
-            process.chdir(originalCwd);
-          }
+          // executeCommand throws for non-zero exit codes
+          await expect(
+            runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']),
+          ).rejects.toThrow('process.exit called');
 
           // Verify that schema verification failure was detected (exit code 1)
           expect(getExitCode()).toBe(1);
@@ -452,32 +323,16 @@ withTempDir(({ createTempDir }) => {
       'outputs JSON when schema verification fails with --json flag',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            // Create a table that doesn't match the contract (missing column)
-            await client.query(`
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+            `
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY
               )
-            `);
-          });
-
-          const testSetup = setupTestDirectoryFromFixtures(
-            createTempDir,
-            fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
+            `,
           );
-          const configPath = testSetup.configPath;
-
-          // Emit contract first
-          const emitCommand = createContractEmitCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
 
           // Contract expects both id and email columns, but database only has id
           // Modify the emitted contract to expect email column
@@ -494,16 +349,10 @@ withTempDir(({ createTempDir }) => {
           // Clear console output before running the command we want to test
           const outputStartIndex = consoleOutput.length;
 
-          const command = createDbSignCommand();
-          try {
-            process.chdir(testSetup.testDir);
-            // executeCommand throws for non-zero exit codes
-            await expect(
-              executeCommand(command, ['--config', configPath, '--json', '--no-color']),
-            ).rejects.toThrow('process.exit called');
-          } finally {
-            process.chdir(originalCwd);
-          }
+          // executeCommand throws for non-zero exit codes
+          await expect(
+            runDbSign(testSetup, configPath, ['--config', configPath, '--json', '--no-color']),
+          ).rejects.toThrow('process.exit called');
 
           // Verify that schema verification failure was detected (exit code 1)
           expect(getExitCode()).toBe(1);
@@ -511,9 +360,11 @@ withTempDir(({ createTempDir }) => {
           // Verify that JSON output was printed (not human-readable output)
           const output = consoleOutput.slice(outputStartIndex).join('\n');
           const jsonOutput = JSON.parse(output);
-          expect(jsonOutput.ok).toBe(false);
-          expect(jsonOutput.summary).toContain('does not satisfy contract');
-          expect(jsonOutput.schema).toBeDefined();
+          expect(jsonOutput).toMatchObject({
+            ok: false,
+            summary: expect.stringContaining('does not satisfy contract'),
+            schema: expect.anything(),
+          });
         });
       },
       timeouts.spinUpPpgDev,
@@ -523,43 +374,16 @@ withTempDir(({ createTempDir }) => {
       'formats sign output when schema verification passes',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          await withClient(connectionString, async (client) => {
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL
-              )
-            `);
-          });
-
-          const testSetup = setupTestDirectoryFromFixtures(
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
             createTempDir,
             fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
           );
-          const configPath = testSetup.configPath;
-
-          // Emit contract first
-          const emitCommand = createContractEmitCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
 
           // Clear console output before running the command we want to test
           const outputStartIndex = consoleOutput.length;
 
-          const command = createDbSignCommand();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(command, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
+          await runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']);
 
           // Verify that sign output was formatted (not schema verification output)
           const output = consoleOutput.slice(outputStartIndex).join('\n');
@@ -578,45 +402,15 @@ withTempDir(({ createTempDir }) => {
 
         try {
           await withDevDatabase(async ({ connectionString }) => {
-            await withClient(connectionString, async (client) => {
-              await client.query(`
-                CREATE TABLE IF NOT EXISTS "user" (
-                  id SERIAL PRIMARY KEY,
-                  email TEXT NOT NULL
-                )
-              `);
-            });
-
-            const testSetup = setupTestDirectoryFromFixtures(
+            const { testSetup, configPath } = await setupDbSignFixture(
+              connectionString,
               createTempDir,
               fixtureSubdir,
-              'prisma-next.config.with-db.ts',
-              { '{{DB_URL}}': connectionString },
             );
-            const configPath = testSetup.configPath;
 
-            // Emit contract first
-            const emitCommand = createContractEmitCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
+            await runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']);
 
-            const command = createDbSignCommand();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            // Check that blank line was added after spinner output
             const output = consoleOutput.join('\n');
-            // The blank line appears after spinner messages, so we check for double newline
-            // or that output contains the sign result after a blank line
             expect(output).toContain('Database signed');
           });
         } finally {

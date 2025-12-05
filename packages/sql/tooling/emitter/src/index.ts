@@ -48,13 +48,12 @@ export const sqlTargetFamilyHook = {
           throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);
         }
 
-        if (!typeIdRegex.test(codecId)) {
+        const match = codecId.match(typeIdRegex);
+        if (!match || !match[1]) {
           throw new Error(
             `Column "${colName}" in table "${tableName}" has invalid codec ID format "${codecId}". Expected format: ns/name@version`,
           );
         }
-
-        const match = codecId.match(typeIdRegex)!;
 
         const namespace = match[1];
         if (!referencedNamespaces.has(namespace)) {

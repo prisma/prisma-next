@@ -389,3 +389,69 @@ export function setupTestDirectory(): {
 
   return { testDir, contractPath, outputDir, configPath, cleanup };
 }
+
+/**
+ * Sets up a database schema and test directory for db-sign e2e tests.
+ * Creates a "user" table with id and email columns, sets up the test directory,
+ * and emits the contract. Returns the test setup and config path.
+ */
+export async function setupDbSignFixture(
+  connectionString: string,
+  createTempDir: () => string,
+  fixtureSubdir: string,
+  schemaSql?: string,
+): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
+  const { withClient } = await import('@prisma-next/test-utils');
+  await withClient(connectionString, async (client) => {
+    await client.query(
+      schemaSql ??
+        `
+        CREATE TABLE IF NOT EXISTS "user" (
+          id SERIAL PRIMARY KEY,
+          email TEXT NOT NULL
+        )
+      `,
+    );
+  });
+
+  const testSetup = setupTestDirectoryFromFixtures(
+    createTempDir,
+    fixtureSubdir,
+    'prisma-next.config.with-db.ts',
+    { '{{DB_URL}}': connectionString },
+  );
+  const configPath = testSetup.configPath;
+
+  // Emit contract first
+  const { createContractEmitCommand } = await import('../../src/commands/contract-emit');
+  const emitCommand = createContractEmitCommand();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testSetup.testDir);
+    await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+  } finally {
+    process.chdir(originalCwd);
+  }
+
+  return { testSetup, configPath };
+}
+
+/**
+ * Runs the db-sign command with the given arguments.
+ * Handles process.chdir and restores the original working directory.
+ */
+export async function runDbSign(
+  testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>,
+  _configPath: string,
+  args: string[],
+): Promise<number> {
+  const { createDbSignCommand } = await import('../../src/commands/db-sign');
+  const command = createDbSignCommand();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testSetup.testDir);
+    return await executeCommand(command, args);
+  } finally {
+    process.chdir(originalCwd);
+  }
+}
