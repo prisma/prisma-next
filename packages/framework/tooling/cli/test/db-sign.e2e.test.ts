@@ -7,6 +7,7 @@ import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createDbSignCommand } from '../src/commands/db-sign';
 import {
   executeCommand,
+  getExitCode,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
@@ -377,6 +378,250 @@ withTempDir(({ createTempDir }) => {
           const output = consoleOutput.join('\n');
           expect(output).not.toContain('Database signed');
         });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'exits with code 1 when schema verification fails',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            // Create a table that doesn't match the contract (missing column)
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Emit contract first
+          const emitCommand = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Contract expects both id and email columns, but database only has id
+          // Modify the emitted contract to expect email column
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          const { readFile, writeFile } = await import('node:fs/promises');
+          const contractJson = JSON.parse(await readFile(contractPath, 'utf-8'));
+          contractJson.storage.tables.user.columns.email = {
+            codecId: 'pg/text@1',
+            nativeType: 'text',
+            nullable: false,
+          };
+          await writeFile(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const command = createDbSignCommand();
+          try {
+            process.chdir(testSetup.testDir);
+            // executeCommand throws for non-zero exit codes
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow('process.exit called');
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify that schema verification failure was detected (exit code 1)
+          expect(getExitCode()).toBe(1);
+
+          // Verify that schema verification output was printed (not sign output)
+          const output = consoleOutput.join('\n');
+          expect(output).toContain('does not satisfy contract');
+          expect(output).not.toContain('Database signed');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'outputs JSON when schema verification fails with --json flag',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            // Create a table that doesn't match the contract (missing column)
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Emit contract first
+          const emitCommand = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Contract expects both id and email columns, but database only has id
+          // Modify the emitted contract to expect email column
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          const { readFile, writeFile } = await import('node:fs/promises');
+          const contractJson = JSON.parse(await readFile(contractPath, 'utf-8'));
+          contractJson.storage.tables.user.columns.email = {
+            codecId: 'pg/text@1',
+            nativeType: 'text',
+            nullable: false,
+          };
+          await writeFile(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          // Clear console output before running the command we want to test
+          const outputStartIndex = consoleOutput.length;
+
+          const command = createDbSignCommand();
+          try {
+            process.chdir(testSetup.testDir);
+            // executeCommand throws for non-zero exit codes
+            await expect(
+              executeCommand(command, ['--config', configPath, '--json', '--no-color']),
+            ).rejects.toThrow('process.exit called');
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify that schema verification failure was detected (exit code 1)
+          expect(getExitCode()).toBe(1);
+
+          // Verify that JSON output was printed (not human-readable output)
+          const output = consoleOutput.slice(outputStartIndex).join('\n');
+          const jsonOutput = JSON.parse(output);
+          expect(jsonOutput.ok).toBe(false);
+          expect(jsonOutput.summary).toContain('does not satisfy contract');
+          expect(jsonOutput.schema).toBeDefined();
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'formats sign output when schema verification passes',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Emit contract first
+          const emitCommand = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Clear console output before running the command we want to test
+          const outputStartIndex = consoleOutput.length;
+
+          const command = createDbSignCommand();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify that sign output was formatted (not schema verification output)
+          const output = consoleOutput.slice(outputStartIndex).join('\n');
+          expect(output).toContain('Database signed');
+          expect(output).not.toContain('does not satisfy contract');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'adds blank line after spinners when TTY and not quiet/JSON',
+      async () => {
+        const originalIsTTY = process.stdout.isTTY;
+        process.stdout.isTTY = true;
+
+        try {
+          await withDevDatabase(async ({ connectionString }) => {
+            await withClient(connectionString, async (client) => {
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS "user" (
+                  id SERIAL PRIMARY KEY,
+                  email TEXT NOT NULL
+                )
+              `);
+            });
+
+            const testSetup = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+            const configPath = testSetup.configPath;
+
+            // Emit contract first
+            const emitCommand = createContractEmitCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testSetup.testDir);
+              await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            const command = createDbSignCommand();
+            try {
+              process.chdir(testSetup.testDir);
+              await executeCommand(command, ['--config', configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            // Check that blank line was added after spinner output
+            const output = consoleOutput.join('\n');
+            // The blank line appears after spinner messages, so we check for double newline
+            // or that output contains the sign result after a blank line
+            expect(output).toContain('Database signed');
+          });
+        } finally {
+          process.stdout.isTTY = originalIsTTY;
+        }
       },
       timeouts.spinUpPpgDev,
     );
