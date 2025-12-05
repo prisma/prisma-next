@@ -6,7 +6,6 @@ import {
   createColumnRef,
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
-import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import {
   errorFailedToBuildWhereClause,
@@ -70,8 +69,6 @@ export function buildWhereExpr(
       codecId: columnMeta.codecId,
       nativeType: columnMeta.nativeType,
     });
-
-    augmentDescriptorWithColumnMeta(descriptors, columnMeta);
 
     codecId = columnMeta.codecId;
     leftExpr = createColumnRef(table, column);

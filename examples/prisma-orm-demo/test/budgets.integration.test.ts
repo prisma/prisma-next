@@ -34,7 +34,7 @@ function getUserIdAndEmailColumns<T extends Record<string, unknown>>(userTable: 
   if (!idColumn || !emailColumn) {
     throw new Error('Columns id or email not found');
   }
-  return { idColumn, emailColumn };
+  return { idColumn: idColumn as T['id'], emailColumn: emailColumn as T['email'] };
 }
 
 describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () => {

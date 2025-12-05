@@ -42,7 +42,7 @@ export const sqlTargetFamilyHook = {
     for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
       const table = tableUnknown as StorageTable;
       for (const [colName, colUnknown] of Object.entries(table.columns)) {
-        const col = colUnknown as { codecId?: string; nullable?: boolean };
+        const col = colUnknown as { codecId?: string };
         const codecId = col.codecId;
         if (!codecId) {
           throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);

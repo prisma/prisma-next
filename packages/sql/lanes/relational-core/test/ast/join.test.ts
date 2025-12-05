@@ -107,10 +107,6 @@ describe('ast/join', () => {
         table,
         on,
       });
-      expect(join.kind).toBe('join');
-      expect(join.joinType).toBe('inner');
-      expect(join.table).toBe(table);
-      expect(join.on).toBe(on);
     });
 
     it('creates left join', () => {
@@ -162,9 +158,6 @@ describe('ast/join', () => {
         left,
         right,
       });
-      expect(joinOnExpr.kind).toBe('eqCol');
-      expect(joinOnExpr.left).toBe(left);
-      expect(joinOnExpr.right).toBe(right);
     });
 
     it('creates join on expr with different columns', () => {

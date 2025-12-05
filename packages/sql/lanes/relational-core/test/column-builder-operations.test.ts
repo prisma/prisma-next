@@ -1,11 +1,11 @@
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import { describe, expect, it } from 'vitest';
-import { vectorColumn as vectorColumnType } from '../../../../extensions/pgvector/src/exports/column-types';
 import {
   int4Column as int4ColumnType,
   textColumn as textColumnType,
-} from '../../../../targets/postgres-adapter/src/exports/column-types';
+  vectorColumn as vectorColumnType,
+} from '@prisma-next/test-utils/column-descriptors';
+import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { createStubAdapter, createTestContext } from './utils';

@@ -149,7 +149,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -184,7 +184,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -214,7 +214,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -246,7 +246,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -281,7 +281,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,

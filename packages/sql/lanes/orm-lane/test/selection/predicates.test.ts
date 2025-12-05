@@ -227,8 +227,7 @@ describe('predicates', () => {
       buildWhereExpr(where, contract, paramsMap, descriptors, values);
 
       // codecId and nativeType come from contract, not columnMeta
-      expect(descriptors[0]?.codecId).toBe('pg/int4@1');
-      expect(descriptors[0]?.nativeType).toBe('int4');
+      expect(descriptors[0]).toMatchObject({ codecId: 'pg/int4@1', nativeType: 'int4' });
     });
 
     it('builds where expr without nullable in descriptor when columnMeta.nullable is missing', () => {

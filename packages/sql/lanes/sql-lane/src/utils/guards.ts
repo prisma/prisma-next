@@ -74,8 +74,9 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
 }
 
 /**
- * Type predicate to check if a ColumnBuilder has an _operationExpr property.
- * Returns the OperationExpr if present, undefined otherwise.
+ * Extracts and returns an OperationExpr from a builder.
+ * Returns the OperationExpr if the builder is an OperationExpr or has an _operationExpr property,
+ * otherwise returns undefined.
  */
 export function getOperationExpr(
   builder: AnyColumnBuilder | OperationExpr,
