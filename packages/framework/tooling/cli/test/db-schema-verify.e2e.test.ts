@@ -17,12 +17,14 @@ const fixtureSubdir = 'db-schema-verify';
 withTempDir(({ createTempDir }) => {
   describe('db schema-verify command (e2e)', () => {
     let consoleOutput: string[] = [];
+    let consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
+      consoleErrors = mocks.consoleErrors;
       cleanupMocks = mocks.cleanup;
     });
 
@@ -433,6 +435,215 @@ withTempDir(({ createTempDir }) => {
 
           // Verify success in permissive mode
           expect(stripped).toContain('✔ Database schema satisfies contract');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles missing contract file (ENOENT error)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Don't create contract.json - it should be missing
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify error output (errors go to stderr/consoleErrors)
+          const errorOutput = consoleErrors.join('\n');
+          expect(errorOutput).toContain('PN-CLI-4');
+          expect(errorOutput).toMatch(/file.*not found|not found.*file/i);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles contract file read errors (non-ENOENT)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Create a contract file with invalid JSON (causes parse error, not ENOENT)
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, 'invalid json content', 'utf-8');
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            // JSON.parse throws SyntaxError, which is caught and wrapped as errorUnexpected
+            // The command should exit with non-zero code or throw
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify error was handled (command failed)
+          // The error path is covered even if we don't check the exact error message format
+          // This tests the branch where file read succeeds but JSON.parse fails
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles quiet mode flag',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          const contractJson = {
+            schemaVersion: '1',
+            target: 'postgres',
+            targetFamily: 'sql',
+            coreHash: 'sha256:test',
+            storage: {
+              tables: {
+                user: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+            },
+            models: {},
+            relations: {},
+            mappings: {},
+            extensions: {},
+            capabilities: {},
+            meta: {},
+            sources: {},
+          };
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, ['--config', configPath, '--quiet', '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // In quiet mode, only errors should be output
+          const output = consoleOutput.join('\n');
+          expect(output).not.toContain('Database schema satisfies contract');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles verbose mode flag',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          const contractJson = {
+            schemaVersion: '1',
+            target: 'postgres',
+            targetFamily: 'sql',
+            coreHash: 'sha256:test',
+            storage: {
+              tables: {
+                user: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+            },
+            models: {},
+            relations: {},
+            mappings: {},
+            extensions: {},
+            capabilities: {},
+            meta: {},
+            sources: {},
+          };
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, ['--config', configPath, '--verbose', '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verbose mode should include additional output
+          const output = consoleOutput.join('\n');
+          expect(output).toContain('Database schema satisfies contract');
         });
       },
       timeouts.spinUpPpgDev,

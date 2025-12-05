@@ -53,4 +53,30 @@ describe('ContractBuilder', () => {
     expect(withHash).toBeInstanceOf(ContractBuilder);
     expect(withHash).not.toBe(builder);
   });
+
+  it('adds table when callback returns undefined', () => {
+    const builder = defineContract();
+    // Callback returns undefined - should fall back to using the original tableBuilder
+    const withTable = builder.table('user', () => undefined);
+    // Verify table was added by adding another table - if first wasn't added, this would fail
+    const withTwoTables = withTable.table('post', (t) =>
+      t.column('id', { type: intColumn }).primaryKey(['id']),
+    );
+    expect(withTwoTables).toBeInstanceOf(ContractBuilder);
+    expect(withTwoTables).not.toBe(withTable);
+  });
+
+  it('adds model when callback returns undefined', () => {
+    const builder = defineContract();
+    // First add a table for the model to reference
+    const withTable = builder.table('user', (t) =>
+      t.column('id', { type: intColumn }).primaryKey(['id']),
+    );
+    // Callback returns undefined - should fall back to using the original modelBuilder
+    const withModel = withTable.model('User', 'user', () => undefined);
+    // Verify model was added by adding another model - if first wasn't added, this would fail
+    const withTwoModels = withModel.model('Post', 'post', (m) => m.field('id', 'id'));
+    expect(withTwoModels).toBeInstanceOf(ContractBuilder);
+    expect(withTwoModels).not.toBe(withModel);
+  });
 });

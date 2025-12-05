@@ -539,6 +539,71 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('SqlMappings');
   });
 
+  it('generates models type with relations missing on/cols properties', () => {
+    const ir = createContractIR({
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: {},
+          relations: {
+            // Missing 'on'
+            invalidRel1: { to: 'Post' },
+            // Missing 'parentCols'
+            invalidRel2: { on: { childCols: ['id'] } },
+          },
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {},
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    // Should run without error and not generate relations output for invalid ones
+    expect(types).not.toContain('invalidRel1');
+    expect(types).not.toContain('invalidRel2');
+  });
+
+  it('generates mappings type with models that have no fields', () => {
+    const ir = createContractIR({
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: {},
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    // Should still generate modelToTable and tableToModel, but not fieldToColumn or columnToField
+    expect(types).toContain("modelToTable: { readonly User: 'user' }");
+    expect(types).toContain("tableToModel: { readonly user: 'User' }");
+    // fieldToColumn and columnToField should not be present when fields are empty
+    expect(types).not.toContain('fieldToColumn');
+    expect(types).not.toContain('columnToField');
+  });
+
   it('gets types imports with multiple extensions', () => {
     const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
       {

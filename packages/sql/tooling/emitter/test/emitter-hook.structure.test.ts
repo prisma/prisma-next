@@ -553,58 +553,6 @@ describe('sql-target-family-hook', () => {
     }).toThrow('is missing required field "relations"');
   });
 
-  it('validates structure with column missing nullable field', () => {
-    const ir = createContractIR({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1' } as {
-                nativeType: string;
-                codecId: string;
-                nullable?: unknown;
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
-    }).toThrow('is missing required field "nullable"');
-  });
-
-  it('validates structure with column nullable not a boolean', () => {
-    const ir = createContractIR({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: 'invalid' as unknown as boolean,
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
-    }).toThrow('is missing required field "nullable"');
-  });
-
   it('validates structure with uniques not an array', () => {
     const ir = createContractIR({
       storage: {

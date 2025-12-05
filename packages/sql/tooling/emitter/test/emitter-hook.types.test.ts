@@ -175,4 +175,53 @@ describe('sql-target-family-hook', () => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).not.toThrow();
   });
+
+  it('validates types with storage but no tables', () => {
+    const ir = createContractIR({
+      storage: {
+        // No tables property - should hit early return at line 16
+      },
+    });
+
+    const ctx: ValidationContext = {};
+
+    expect(() => {
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
+    }).not.toThrow();
+  });
+
+  it('validates types with extensionId that does not match namespace pattern', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+          },
+        },
+      },
+    });
+
+    const ctx: ValidationContext = {
+      extensionIds: ['invalid-extension-id-without-slash'],
+    };
+
+    // Should not throw because namespaceMatch will be null, so namespaceMatch?.[1] will be undefined
+    // and the namespace won't be added to referencedNamespaces, but the codecId 'pg/int4@1' will still
+    // be validated against ir.extensions (which is empty), so it will throw
+    expect(() => {
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
+    }).toThrow('is not referenced in contract.extensions');
+  });
+
+  it('validates types with undefined extensions', () => {
+    const ir = {
+      targetFamily: 'sql',
+      storage: { tables: {} },
+      extensions: undefined,
+    } as unknown as ContractIR;
+
+    expect(() => sqlTargetFamilyHook.validateTypes(ir, {})).not.toThrow();
+  });
 });

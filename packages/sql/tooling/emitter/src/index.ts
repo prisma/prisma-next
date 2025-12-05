@@ -54,10 +54,7 @@ export const sqlTargetFamilyHook = {
           );
         }
 
-        const match = codecId.match(typeIdRegex);
-        if (!match || !match[1]) {
-          continue;
-        }
+        const match = codecId.match(typeIdRegex)!;
 
         const namespace = match[1];
         if (!referencedNamespaces.has(namespace)) {
@@ -133,23 +130,9 @@ export const sqlTargetFamilyHook = {
       const table = tableUnknown as StorageTable;
       const columnNames = new Set(Object.keys(table.columns));
 
-      for (const [colName, col] of Object.entries(table.columns)) {
-        if (typeof col.nullable !== 'boolean') {
-          throw new Error(
-            `Table "${tableName}" column "${colName}" is missing required field "nullable" (must be a boolean)`,
-          );
-        }
-        if (!col.nativeType || typeof col.nativeType !== 'string') {
-          throw new Error(
-            `Table "${tableName}" column "${colName}" is missing required field "nativeType" (must be a string)`,
-          );
-        }
-        if (!col.codecId || typeof col.codecId !== 'string') {
-          throw new Error(
-            `Table "${tableName}" column "${colName}" is missing required field "codecId" (must be a string)`,
-          );
-        }
-      }
+      // Column structure (nullable, nativeType, codecId) and table arrays (uniques, indexes, foreignKeys)
+      // are validated by Arktype schema validation - no need to re-check here.
+      // We only validate logical consistency (foreign key references, model references, etc.)
 
       if (!Array.isArray(table.uniques)) {
         throw new Error(

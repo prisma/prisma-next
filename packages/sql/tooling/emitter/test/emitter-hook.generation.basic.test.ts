@@ -502,4 +502,40 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('Record<string, never>');
     expect(types).toContain('SqlMappings');
   });
+
+  it('generates contract types with column nullable undefined defaults to false', () => {
+    const ir = createContractIR({
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: {
+            id: { column: 'id' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: {
+                nativeType: 'int4',
+                codecId: 'pg/int4@1',
+                nullable: undefined as unknown as boolean,
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    // When nullable is undefined, it should default to false (not nullable)
+    expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
+    expect(types).not.toContain("readonly id: CodecTypes['pg/int4@1']['output'] | null");
+  });
 });

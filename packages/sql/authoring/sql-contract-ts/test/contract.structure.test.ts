@@ -122,4 +122,16 @@ describe('validateContract structure validation', () => {
     expect(result.profileHash).toBe('sha256:profile');
     expect(result.capabilities).toEqual({ feature: { enabled: true } });
   });
+
+  it('preserves existing mappings when provided', () => {
+    const input = {
+      ...validContractInput,
+      mappings: {
+        modelToTable: { CustomModel: 'User' },
+      },
+    };
+    // biome-ignore lint/suspicious/noExplicitAny: testing input with mappings property
+    const result = validateContract<SqlContract<SqlStorage>>(input as any);
+    expect(result.mappings.modelToTable).toEqual({ CustomModel: 'User' });
+  });
 });

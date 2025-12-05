@@ -10,7 +10,7 @@ This package provides the SQL-specific emitter hook implementation for the Prism
 
 - **Contract Validation**: Validates SQL contract structure and types
   - `validateTypes()`: Validates type IDs against referenced extensions (receives `ValidationContext` with `extensionIds`)
-  - `validateStructure()`: Validates SQL-specific contract structure (tables, models, constraints)
+  - `validateStructure()`: Validates SQL-specific logical consistency (foreign key references, model-to-table mappings, constraint consistency). **Note**: Structural properties (required fields, types) are validated by Arktype schema validation - this function focuses on logical validation that schema validators can't perform.
 
 - **Type Generation**: Generates TypeScript type definitions for SQL contracts
   - `generateContractTypes()`: Generates `contract.d.ts` file content (receives separate `codecTypeImports` and `operationTypeImports` arrays)

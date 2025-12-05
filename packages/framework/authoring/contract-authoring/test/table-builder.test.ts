@@ -49,4 +49,24 @@ describe('TableBuilder', () => {
       .foreignKey(['userId'], { table: 'user', columns: ['id'] });
     expect(result).toBeInstanceOf(TableBuilder);
   });
+
+  it('builds table state without primary key', () => {
+    const builder = new TableBuilder('user');
+    const table = builder.column('id', { type: intColumn, nullable: false }).build();
+
+    expect(table.name).toBe('user');
+    expect(table.columns.id).toEqual({
+      name: 'id',
+      type: 'test/int@1',
+      nullable: false,
+      nativeType: 'int4',
+    });
+    expect(table).not.toHaveProperty('primaryKey');
+  });
+
+  it('defaults nullable to false when not provided', () => {
+    const builder = new TableBuilder('user');
+    const table = builder.column('id', { type: intColumn }).build();
+    expect(table.columns.id.nullable).toBe(false);
+  });
 });

@@ -686,6 +686,56 @@ describe('validateContract normalization', () => {
     });
     expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({});
   });
+
+  it('normalizeContract handles storage that is not an object', () => {
+    const contractInput = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      models: {},
+      storage: null, // Storage is null - should hit else branch at line 390
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    } as any;
+    const normalized = normalizeContract(contractInput);
+    // Normalization should pass through null storage unchanged
+    expect(normalized.storage).toBeNull();
+  });
+
+  it('normalizeContract handles storage without tables property', () => {
+    const contractInput = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      models: {},
+      storage: {
+        // No tables property - should hit else branch at line 394
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    } as any;
+    const normalized = normalizeContract(contractInput);
+    // Normalization should pass through storage without tables unchanged
+    expect(normalized.storage).toBeDefined();
+    expect(normalized.storage).not.toHaveProperty('tables');
+  });
+
+  it('normalizeContract handles models that is not an object', () => {
+    const contractInput = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      models: null, // Models is null - should hit else branch at line 436
+      storage: {
+        tables: {},
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    } as any;
+    const normalized = normalizeContract(contractInput);
+    // Normalization should pass through null models unchanged
+    expect(normalized.models).toBeNull();
+  });
 });
 
 describe('computeMappings', () => {
