@@ -82,6 +82,10 @@ flowchart TD
 - Dynamically exposes operations based on column `typeId` and contract capabilities
 - Handles operation chaining when operations return typeIds
 
+### Plan Helpers (`plan.ts`)
+- Defines `SqlQueryPlan<Row>` interface for SQL query plans produced by lanes before lowering
+- Provides `augmentDescriptorWithColumnMeta(descriptors, columnMeta)` helper to update ParamDescriptor with `codecId` and `nativeType` from column metadata
+
 ### Type Definitions (`types.ts`)
 - Defines TypeScript types for column builders, operations, projections
 - Provides type inference utilities for extracting JavaScript types from codec types (e.g., `ExtractJsTypeFromColumnBuilder`)
@@ -107,10 +111,11 @@ This package follows the standard `exports/` directory pattern:
 - `src/exports/param.ts` - Re-exports parameter helpers
 - `src/exports/types.ts` - Re-exports type definitions
 - `src/exports/operations-registry.ts` - Re-exports operations registry
+- `src/exports/plan.ts` - Re-exports plan types and helpers
 - `src/exports/errors.ts` - Re-exports error helpers (from `@prisma-next/plan`)
 - `src/index.ts` - Main entry point that re-exports from `exports/`
 
-This enables subpath imports like `@prisma-next/sql-relational-core/schema`, `@prisma-next/sql-relational-core/param`, etc.
+This enables subpath imports like `@prisma-next/sql-relational-core/schema`, `@prisma-next/sql-relational-core/param`, `@prisma-next/sql-relational-core/plan`, etc.
 
 ## Related Subsystems
 

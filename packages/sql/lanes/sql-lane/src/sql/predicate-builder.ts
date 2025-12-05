@@ -8,7 +8,13 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
-import { errorMissingParameter, errorUnknownColumn, errorUnknownTable } from '../utils/errors';
+import {
+  errorFailedToBuildWhereClause,
+  errorMissingParameter,
+  errorUnknownColumn,
+  errorUnknownTable,
+} from '../utils/errors';
+import { getColumnInfo, getOperationExpr, isColumnBuilder } from '../utils/guards';
 
 export interface BuildWhereExprResult {
   expr: BinaryExpr;
@@ -36,31 +42,30 @@ export function buildWhereExpr(
   let leftExpr: ColumnRef | OperationExpr;
   let codecId: string | undefined;
 
-  const operationExpr = (where.left as { _operationExpr?: OperationExpr })._operationExpr;
+  // Check if where.left is an OperationExpr directly (from operation.eq())
+  // or a ColumnBuilder with _operationExpr property
+  const operationExpr = getOperationExpr(where.left);
   if (operationExpr) {
     leftExpr = operationExpr;
-  } else {
-    // where.left is ColumnBuilder - TypeScript can't narrow properly
-    const colBuilder = where.left as unknown as {
-      table: string;
-      column: string;
-    };
+  } else if (isColumnBuilder(where.left)) {
+    // where.left is a ColumnBuilder - use proper type narrowing
+    const { table, column } = getColumnInfo(where.left);
 
-    const contractTable = contract.storage.tables[colBuilder.table];
+    const contractTable = contract.storage.tables[table];
     if (!contractTable) {
-      errorUnknownTable(colBuilder.table);
+      errorUnknownTable(table);
     }
 
-    const columnMeta: StorageColumn | undefined = contractTable.columns[colBuilder.column];
+    const columnMeta: StorageColumn | undefined = contractTable.columns[column];
     if (!columnMeta) {
-      errorUnknownColumn(colBuilder.column, colBuilder.table);
+      errorUnknownColumn(column, table);
     }
 
     // Construct descriptor directly from validated StorageColumn
     descriptors.push({
       name: paramName,
       source: 'dsl',
-      refs: { table: colBuilder.table, column: colBuilder.column },
+      refs: { table, column },
       nullable: columnMeta.nullable,
       codecId: columnMeta.codecId,
       nativeType: columnMeta.nativeType,
@@ -69,7 +74,10 @@ export function buildWhereExpr(
     augmentDescriptorWithColumnMeta(descriptors, columnMeta);
 
     codecId = columnMeta.codecId;
-    leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
+    leftExpr = createColumnRef(table, column);
+  } else {
+    // where.left is neither OperationExpr nor ColumnBuilder - invalid state
+    errorFailedToBuildWhereClause();
   }
 
   const rightParam = createParamRef(index, paramName);
