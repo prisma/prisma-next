@@ -35,8 +35,8 @@ describe('canonicalization', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: true },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
             },
           },
         },
@@ -83,8 +83,8 @@ describe('canonicalization', () => {
         tables: {
           user: {
             columns: {
-              first: { type: 'pg/text@1' },
-              second: { type: 'pg/text@1' },
+              first: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              second: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: {
               columns: ['second', 'first'],
@@ -101,8 +101,8 @@ describe('canonicalization', () => {
         tables: {
           user: {
             columns: {
-              first: { type: 'pg/text@1' },
-              second: { type: 'pg/text@1' },
+              first: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              second: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: {
               columns: ['first', 'second'],
@@ -123,7 +123,7 @@ describe('canonicalization', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1' },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             },
             indexes: [
               { columns: ['id'], name: 'user_email_idx' },
@@ -150,9 +150,9 @@ describe('canonicalization', () => {
         tables: {
           user: {
             columns: {
-              z_field: { type: 'pg/text@1' },
-              a_field: { type: 'pg/text@1' },
-              m_field: { type: 'pg/text@1' },
+              z_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              a_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              m_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
           },
         },
@@ -191,7 +191,7 @@ describe('canonicalization', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', generated: false },
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false, generated: false },
             },
           },
         },

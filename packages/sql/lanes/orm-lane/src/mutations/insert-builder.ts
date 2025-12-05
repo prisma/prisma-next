@@ -91,8 +91,8 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
     const value = assertParameterExists(paramsMap, paramName);
     const index = paramValues.push(value);
 
-    const codecId = columnMeta.type;
-    if (codecId && paramName) {
+    const codecId = columnMeta.codecId;
+    if (paramName) {
       paramCodecs[paramName] = codecId;
     }
 
@@ -101,7 +101,8 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
         name: paramName,
         table: tableName,
         column: columnName,
-        type: codecId,
+        codecId: codecId,
+        nativeType: columnMeta.nativeType,
         nullable: columnMeta.nullable,
       }),
     );

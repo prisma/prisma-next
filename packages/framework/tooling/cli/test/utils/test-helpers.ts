@@ -9,8 +9,10 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { Command } from 'commander';
-import { vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Use a shared fixture package directory that has the necessary dependencies
@@ -44,7 +46,10 @@ export function getExitCode(): number | undefined {
  */
 export async function executeCommand(command: Command, args: string[]): Promise<number> {
   try {
-    await command.parseAsync(args);
+    // Use { from: 'user' } to tell Commander these are user args, not process.argv format
+    // process.argv format would be ['node', 'script.js', '--option', 'value']
+    // User args format is just ['--option', 'value']
+    await command.parseAsync(args, { from: 'user' });
     // Command completed successfully without calling process.exit()
     return 0;
   } catch (error) {
@@ -95,14 +100,15 @@ export function createContractFile(testDir: string): string {
   writeFileSync(
     contractPath,
     `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 
 const contractObj = defineContract<CodecTypes>()
   .target('postgres')
   .table('user', (t) =>
     t
-      .column('id', { type: 'pg/int4@1', nullable: false })
-      .column('email', { type: 'pg/text@1', nullable: false })
+      .column('id', { type: int4Column, nullable: false })
+      .column('email', { type: textColumn, nullable: false })
       .primaryKey(['id']),
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
@@ -163,19 +169,68 @@ export function setupCommandMocks(): {
 }
 
 /**
+ * Decorator that wraps test suites to automatically manage temporary directory cleanup.
+ * Sets up `beforeEach` and `afterEach` hooks to track and clean up directories per test.
+ *
+ * @example
+ * ```typescript
+ * withTempDir(({ createTempDir }) => {
+ *   describe('test suite', () => {
+ *     it('test', () => {
+ *       const testDir = createTempDir();
+ *       // ... use testDir
+ *       // Directory is automatically cleaned up after the test
+ *     });
+ *   });
+ * });
+ * ```
+ */
+export function withTempDir(callback: (context: { createTempDir: () => string }) => void): void {
+  const tempDirs = new Set<string>();
+
+  beforeEach(() => {
+    // Reset the set of directories for each test
+    tempDirs.clear();
+  });
+
+  afterEach(() => {
+    // Clean up all directories created during this test
+    for (const dir of tempDirs) {
+      try {
+        if (existsSync(dir)) {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      } catch (_error) {
+        // Ignore cleanup errors
+      }
+    }
+    tempDirs.clear();
+  });
+
+  const createTempDir = (): string => {
+    const testDir = createTestDir();
+    tempDirs.add(testDir);
+    return testDir;
+  };
+
+  callback({ createTempDir });
+}
+
+/**
  * Sets up a test directory by copying files from a fixture subdirectory.
  * Test directories are subdirectories of cli-e2e-test-app and inherit workspace
  * dependencies from the parent package.json at the root. jiti will resolve workspace
  * packages by walking up to find the parent package.json.
  * Optionally replaces placeholders in config files.
- * Returns paths and cleanup function.
+ * Returns paths (cleanup is handled automatically by withTempDir decorator).
  */
 export function setupTestDirectoryFromFixtures(
+  createTempDir: () => string,
   fixtureSubdir: string,
   configFileName = 'prisma-next.config.ts',
   replacements?: Record<string, string>,
 ) {
-  const testDir = createTestDir();
+  const testDir = createTempDir();
   const outputDir = join(testDir, 'output');
   mkdirSync(outputDir, { recursive: true });
 
@@ -192,6 +247,19 @@ export function setupTestDirectoryFromFixtures(
     copyFileSync(fixtureContractPath, contractPath);
   }
 
+  // Copy precomputed contract.json and contract.d.ts if they exist
+  // Note: outputDir was already created above, so no need for mkdirSync here
+  const fixtureContractJsonPath = join(fixturesSubdirPath, 'contract.json');
+  const fixtureContractDtsPath = join(fixturesSubdirPath, 'contract.d.ts');
+  if (existsSync(fixtureContractJsonPath)) {
+    const contractJsonPath = join(outputDir, 'contract.json');
+    copyFileSync(fixtureContractJsonPath, contractJsonPath);
+  }
+  if (existsSync(fixtureContractDtsPath)) {
+    const contractDtsPath = join(outputDir, 'contract.d.ts');
+    copyFileSync(fixtureContractDtsPath, contractDtsPath);
+  }
+
   // Copy and process config file
   const configPath = join(testDir, 'prisma-next.config.ts');
   const fixtureConfigPath = join(fixturesSubdirPath, configFileName);
@@ -206,13 +274,7 @@ export function setupTestDirectoryFromFixtures(
     writeFileSync(configPath, configContent, 'utf-8');
   }
 
-  const cleanup = () => {
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
-  };
-
-  return { testDir, contractPath: join(testDir, 'contract.ts'), outputDir, configPath, cleanup };
+  return { testDir, contractPath: join(testDir, 'contract.ts'), outputDir, configPath };
 }
 
 /**
@@ -273,6 +335,37 @@ export function setupIntegrationTestDirectoryFromFixtures(
 }
 
 /**
+ * Loads a contract from disk (already-emitted artifact).
+ * This helper DRYs up the common pattern of loading contracts in e2e tests.
+ * The contract type should be specified from the emitted contract.d.ts file.
+ */
+export function loadContractFromDisk<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+>(contractJsonPath: string): TContract {
+  if (!existsSync(contractJsonPath)) {
+    throw new Error(`Contract file not found: ${contractJsonPath}`);
+  }
+
+  let contractJsonContent: string;
+  try {
+    contractJsonContent = readFileSync(contractJsonPath, 'utf-8');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read contract file ${contractJsonPath}: ${message}`);
+  }
+
+  let contractJson: Record<string, unknown>;
+  try {
+    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse contract JSON from ${contractJsonPath}: ${message}`);
+  }
+
+  return validateContract<TContract>(contractJson);
+}
+
+/**
  * Sets up a test directory with contract.ts file and returns paths.
  * @deprecated Use setupTestDirectoryFromFixtures instead
  */
@@ -295,4 +388,70 @@ export function setupTestDirectory(): {
   };
 
   return { testDir, contractPath, outputDir, configPath, cleanup };
+}
+
+/**
+ * Sets up a database schema and test directory for db-sign e2e tests.
+ * Creates a "user" table with id and email columns, sets up the test directory,
+ * and emits the contract. Returns the test setup and config path.
+ */
+export async function setupDbSignFixture(
+  connectionString: string,
+  createTempDir: () => string,
+  fixtureSubdir: string,
+  schemaSql?: string,
+): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
+  const { withClient } = await import('@prisma-next/test-utils');
+  await withClient(connectionString, async (client) => {
+    await client.query(
+      schemaSql ??
+        `
+        CREATE TABLE IF NOT EXISTS "user" (
+          id SERIAL PRIMARY KEY,
+          email TEXT NOT NULL
+        )
+      `,
+    );
+  });
+
+  const testSetup = setupTestDirectoryFromFixtures(
+    createTempDir,
+    fixtureSubdir,
+    'prisma-next.config.with-db.ts',
+    { '{{DB_URL}}': connectionString },
+  );
+  const configPath = testSetup.configPath;
+
+  // Emit contract first
+  const { createContractEmitCommand } = await import('../../src/commands/contract-emit');
+  const emitCommand = createContractEmitCommand();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testSetup.testDir);
+    await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+  } finally {
+    process.chdir(originalCwd);
+  }
+
+  return { testSetup, configPath };
+}
+
+/**
+ * Runs the db-sign command with the given arguments.
+ * Handles process.chdir and restores the original working directory.
+ */
+export async function runDbSign(
+  testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>,
+  _configPath: string,
+  args: string[],
+): Promise<number> {
+  const { createDbSignCommand } = await import('../../src/commands/db-sign');
+  const command = createDbSignCommand();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testSetup.testDir);
+    return await executeCommand(command, args);
+  } finally {
+    process.chdir(originalCwd);
+  }
 }

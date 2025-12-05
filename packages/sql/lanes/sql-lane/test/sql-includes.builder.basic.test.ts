@@ -7,7 +7,9 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
-import type { CodecTypes } from './fixtures/contract.d';
+
+// Define CodecTypes type for contract mappings
+type CodecTypes = Record<string, { readonly output: unknown }>;
 
 // Define a fully-typed contract type with capabilities
 type ContractWithCapabilities = SqlContract<
@@ -15,8 +17,16 @@ type ContractWithCapabilities = SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly email: { readonly type: 'pg/text@1'; nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
         };
         readonly uniques: readonly [];
         readonly indexes: readonly [];
@@ -24,10 +34,26 @@ type ContractWithCapabilities = SqlContract<
       };
       readonly post: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly title: { readonly type: 'pg/text@1'; nullable: false };
-          readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly userId: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly createdAt: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+          };
         };
         readonly uniques: readonly [];
         readonly indexes: readonly [];
@@ -59,8 +85,8 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
     tables: {
       user: {
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          email: { type: 'pg/text@1', nullable: false },
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
         },
         primaryKey: { columns: ['id'] },
         uniques: [],
@@ -69,10 +95,10 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
       },
       post: {
         columns: {
-          id: { type: 'pg/int4@1', nullable: false },
-          userId: { type: 'pg/int4@1', nullable: false },
-          title: { type: 'pg/text@1', nullable: false },
-          createdAt: { type: 'pg/timestamptz@1', nullable: false },
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          createdAt: { nativeType: 'timestamptz', codecId: 'pg/timestamptz@1', nullable: false },
         },
         primaryKey: { columns: ['id'] },
         uniques: [],
@@ -123,7 +149,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -138,12 +164,17 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes).toBeDefined();
-    expect(ast?.includes?.length).toBe(1);
-    expect(ast?.includes?.[0]?.kind).toBe('includeMany');
-    expect(ast?.includes?.[0]?.alias).toBe('post');
-    expect(ast?.includes?.[0]?.child.table.name).toBe('post');
-    expect(ast?.includes?.[0]?.child.project.length).toBe(2);
+    expect(ast.includes).toMatchObject([
+      {
+        kind: 'includeMany',
+        alias: 'post',
+        child: {
+          table: { name: 'post' },
+          project: expect.any(Array),
+        },
+      },
+    ]);
+    expect(ast.includes?.[0]?.child.project).toHaveLength(2);
   });
 
   it('builds a plan with includeMany using custom alias', () => {
@@ -153,7 +184,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -169,9 +200,11 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes).toBeDefined();
-    expect(ast?.includes?.length).toBe(1);
-    expect(ast?.includes?.[0]?.alias).toBe('posts');
+    expect(ast.includes).toMatchObject([
+      {
+        alias: 'posts',
+      },
+    ]);
   });
 
   it('builds a plan with includeMany with child where clause', () => {
@@ -181,7 +214,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -199,8 +232,11 @@ describe('SQL builder includeMany', () => {
       .build({ params: { title: 'Test' } });
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes?.[0]?.child.where).toBeDefined();
-    expect(ast?.includes?.[0]?.child.where?.kind).toBe('bin');
+    expect(ast.includes?.[0]?.child).toMatchObject({
+      where: {
+        kind: 'bin',
+      },
+    });
   });
 
   it('builds a plan with includeMany with child orderBy clause', () => {
@@ -210,7 +246,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,
@@ -228,9 +264,14 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes?.[0]?.child.orderBy).toBeDefined();
-    expect(ast?.includes?.[0]?.child.orderBy?.length).toBe(1);
-    expect(ast?.includes?.[0]?.child.orderBy?.[0]?.dir).toBe('desc');
+    expect(ast.includes?.[0]?.child).toMatchObject({
+      orderBy: [
+        {
+          dir: 'desc',
+        },
+      ],
+    });
+    expect(ast.includes?.[0]?.child.orderBy).toHaveLength(1);
   });
 
   it('builds a plan with includeMany with child limit clause', () => {
@@ -240,7 +281,7 @@ describe('SQL builder includeMany', () => {
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
 
-    const plan = sql<ContractWithCapabilities, CodecTypes>({ context })
+    const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
       .includeMany(
         tables.post,

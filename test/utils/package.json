@@ -24,6 +24,14 @@
     ".": {
       "types": "./dist/exports/index.d.ts",
       "import": "./dist/exports/index.js"
+    },
+    "./column-descriptors": {
+      "types": "./dist/exports/column-descriptors.d.ts",
+      "import": "./dist/exports/column-descriptors.js"
+    },
+    "./operation-descriptors": {
+      "types": "./dist/exports/operation-descriptors.d.ts",
+      "import": "./dist/exports/operation-descriptors.js"
     }
   }
 }

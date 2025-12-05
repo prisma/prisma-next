@@ -84,7 +84,8 @@ describe('sql DSL builder', () => {
     expect(plan.meta.paramDescriptors).toEqual<ParamDescriptor[]>([
       {
         name: 'userId',
-        type: 'pg/int4@1',
+        codecId: 'pg/int4@1',
+        nativeType: 'int4',
         nullable: false,
         source: 'dsl',
         refs: { table: 'user', column: 'id' },

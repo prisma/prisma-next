@@ -19,7 +19,7 @@ if (!contractTable.columns[columnName]) {
 }
 
 const columnMeta = contractTable.columns[columnName];
-const codecId = columnMeta?.type; // Optional chaining unnecessary
+const codecId = columnMeta?.codecId; // Optional chaining unnecessary
 if (codecId && paramName) {
   paramCodecs[paramName] = codecId;
 }
@@ -47,14 +47,14 @@ if (!contractTable.columns[columnName]) {
 
 // Assert that data exists (non-null assertion or explicit check)
 const columnMeta = contractTable.columns[columnName]!;
-const codecId = columnMeta.type; // Required property, no optional chaining
+const codecId = columnMeta.codecId; // Required property, no optional chaining
 
-if (codecId && paramName) {
+if (paramName) {
   paramCodecs[paramName] = codecId;
 }
 
 paramDescriptors.push({
-  ...(codecId ? { type: codecId } : {}),
+  type: codecId,
   nullable: columnMeta.nullable, // Required property, no optional check
 });
 ```
@@ -93,7 +93,7 @@ Don't use assertions when:
 **Before:**
 ```typescript
 const columnMeta = contractTable.columns[columnName];
-const codecId = columnMeta?.type;
+const codecId = columnMeta?.codecId;
 if (codecId && paramName) {
   paramCodecs[paramName] = codecId;
 }
@@ -102,8 +102,8 @@ if (codecId && paramName) {
 **After:**
 ```typescript
 const columnMeta = contractTable.columns[columnName]!;
-const codecId = columnMeta.type;
-if (codecId && paramName) {
+const codecId = columnMeta.codecId; // Required property
+if (paramName) {
   paramCodecs[paramName] = codecId;
 }
 ```
@@ -118,21 +118,21 @@ After refactoring to use assertions, remove tests that:
 **Example of test to remove:**
 ```typescript
 // ❌ Remove: Tests impossible state
-it('builds plan without codecId when column type is missing', () => {
-  const contractWithoutType = {
+it('builds plan without codecId when column codecId is missing', () => {
+  const contractWithoutCodecId = {
     ...contract,
     storage: {
       tables: {
         user: {
           columns: {
-            email: { nullable: true } as { nullable: true; type?: string },
+            email: { nativeType: 'text', nullable: true } as { nativeType: string; nullable: true; codecId?: string },
           },
         },
       },
     },
   } as SqlContract<SqlStorage>; // Type assertion bypasses validation
 
-  // This test is unrealistic - StorageColumn requires 'type'
+  // This test is unrealistic - StorageColumn requires 'codecId'
 });
 ```
 
@@ -140,16 +140,85 @@ it('builds plan without codecId when column type is missing', () => {
 
 **Good patterns:**
 - Using `columnMeta!` after validating column exists
-- Accessing `columnMeta.type` directly (required property)
+- Accessing `columnMeta.codecId` directly (required property)
+- Accessing `columnMeta.nativeType` directly (required property)
 - Using `columnMeta.nullable` directly (required property)
 
 **Bad patterns (to avoid):**
-- Optional chaining (`columnMeta?.type`) after validation
+- Optional chaining (`columnMeta?.codecId`) after validation
 - Conditional property spreading (`...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {})`) for required properties
 - Tests that use type assertions to test impossible states
+
+## Schema Validation Redundancy
+
+**CRITICAL**: Don't re-validate structural properties that are already validated by schema validators (e.g., Arktype).
+
+**❌ WRONG: Re-validating properties already validated by Arktype**
+
+```typescript
+// validateStructure() re-checking properties that Arktype already validates
+for (const [colName, col] of Object.entries(table.columns)) {
+  if (typeof col.nullable !== 'boolean') {
+    throw new Error(`Column "${colName}" is missing required field "nullable"`);
+  }
+  if (!col.nativeType || typeof col.nativeType !== 'string') {
+    throw new Error(`Column "${colName}" is missing required field "nativeType"`);
+  }
+  if (!col.codecId || typeof col.codecId !== 'string') {
+    throw new Error(`Column "${colName}" is missing required field "codecId"`);
+  }
+}
+```
+
+**Why this is wrong:**
+- Arktype's `StorageColumnSchema` already validates `nullable`, `nativeType`, and `codecId` as required fields
+- These checks create impossible code paths (contracts that pass Arktype validation but fail these checks)
+- Requires awkward tests that bypass type checking to test impossible states
+- Adds maintenance burden when schema changes
+
+**✅ CORRECT: Focus on logical validation that schema validators can't do**
+
+```typescript
+// validateStructure() focuses on logical consistency (references, relationships)
+// Column structure is already validated by Arktype - no need to re-check here
+for (const [tableName, table] of Object.entries(storage.tables)) {
+  const columnNames = new Set(Object.keys(table.columns));
+
+  // Validate foreign key references (logical validation, not structural)
+  for (const fk of table.foreignKeys) {
+    for (const colName of fk.columns) {
+      if (!columnNames.has(colName)) {
+        throw new Error(`ForeignKey references non-existent column "${colName}"`);
+      }
+    }
+    // Validate referenced table exists (logical validation)
+    if (!tableNames.has(fk.references.table)) {
+      throw new Error(`ForeignKey references non-existent table "${fk.references.table}"`);
+    }
+  }
+}
+```
+
+**Validation Responsibility Separation:**
+
+- **Schema Validators (Arktype)**: Validate structural properties (required fields, types, shapes)
+- **Logical Validators (`validateStructure`)**: Validate logical consistency (references, relationships, constraints)
+
+**When to add validation checks:**
+- ✅ Validating references (foreign keys, model references)
+- ✅ Validating relationships (model-to-table mappings)
+- ✅ Validating constraint consistency (primary key columns exist)
+- ❌ Re-validating structural properties already validated by schema validators
+
+**Benefits:**
+- Eliminates redundant code and tests
+- Clear separation of concerns (structural vs logical validation)
+- Easier to maintain (schema changes don't require updating multiple validators)
+- Better error messages (schema validator catches structural issues early)
 
 ## Related Rules
 
 - `.cursor/rules/use-ast-factories.mdc`: Use factory functions for AST nodes
 - `.cursor/rules/typescript-patterns.mdc`: TypeScript best practices
 - `.cursor/rules/testing-guide.mdc`: Testing best practices
+- `.cursor/rules/arktype-usage.mdc`: Arktype validation patterns

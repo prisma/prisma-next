@@ -132,8 +132,8 @@ export class InsertBuilderImpl<
       const index = paramValues.push(value);
 
       const columnMeta = contractTable.columns[columnName];
-      const codecId = columnMeta?.type;
-      if (codecId && paramName) {
+      const codecId = columnMeta?.codecId;
+      if (paramName && codecId) {
         paramCodecs[paramName] = codecId;
       }
 
@@ -141,7 +141,8 @@ export class InsertBuilderImpl<
         name: paramName,
         source: 'dsl',
         refs: { table: this.table.name, column: columnName },
-        ...(codecId ? { type: codecId } : {}),
+        ...(codecId ? { codecId } : {}),
+        ...(columnMeta?.nativeType ? { nativeType: columnMeta.nativeType } : {}),
         ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
       });
 
@@ -281,8 +282,8 @@ export class UpdateBuilderImpl<
       const index = paramValues.push(value);
 
       const columnMeta = contractTable.columns[columnName];
-      const codecId = columnMeta?.type;
-      if (codecId && paramName) {
+      const codecId = columnMeta?.codecId;
+      if (paramName && codecId) {
         paramCodecs[paramName] = codecId;
       }
 
@@ -290,7 +291,8 @@ export class UpdateBuilderImpl<
         name: paramName,
         source: 'dsl',
         refs: { table: this.table.name, column: columnName },
-        ...(codecId ? { type: codecId } : {}),
+        ...(codecId ? { codecId } : {}),
+        ...(columnMeta?.nativeType ? { nativeType: columnMeta.nativeType } : {}),
         ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
       });
 

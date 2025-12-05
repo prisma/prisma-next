@@ -351,9 +351,8 @@ sql schema (tables: 2)
               "id": "column-user-id",
               "label": "id: int4 (not null)",
               "meta": {
-                "typeId": "pg/int4@1",
-                "nullable": false,
-                "nativeType": "int4"
+                "nativeType": "int4",
+                "nullable": false
               }
             }
           ]

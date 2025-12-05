@@ -14,7 +14,7 @@ describe('DSL Lane Codec Type Stamping', () => {
   const context = createTestContext(contract, adapter);
   const tables = schema<Contract>(context).tables;
 
-  it('stamps paramDescriptors.type from columnMeta.type', () => {
+  it('stamps paramDescriptors.codecId and nativeType from columnMeta', () => {
     const builder = sql<Contract>({ context });
     const userTable = tables.user;
     if (!userTable) {
@@ -38,7 +38,8 @@ describe('DSL Lane Codec Type Stamping', () => {
     expect(plan.meta.paramDescriptors.length).toBeGreaterThan(0);
     const paramDesc = plan.meta.paramDescriptors[0];
     expect(paramDesc).toMatchObject({
-      type: expect.anything(),
+      codecId: expect.anything(),
+      nativeType: expect.anything(),
       refs: {
         table: 'user',
         column: 'id',

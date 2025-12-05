@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:45bf7bc3b8a59dc0226dfb0f1e579a29b9dc96233797f5f43b92f9ee75de9317",
+  "coreHash": "sha256:9cde09b180f8286eb0c650c499663ff6a9a24b2e508adb1b0f6ef122a9259680",
   "profileHash": "sha256:685b5ca1c6135f0c44f6545694b75a136addc2d74f3a76e22428cd66e293c4a8",
   "models": {
     "Post": {
@@ -51,20 +51,25 @@
       "post": {
         "columns": {
           "createdAt": {
-            "type": "pg/timestamptz@1"
+            "codecId": "pg/timestamptz@1",
+            "nativeType": "timestamptz"
           },
           "embedding": {
-            "nullable": true,
-            "type": "pg/vector@1"
+            "codecId": "pg/vector@1",
+            "nativeType": "vector",
+            "nullable": true
           },
           "id": {
-            "type": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
           },
           "title": {
-            "type": "pg/text@1"
+            "codecId": "pg/text@1",
+            "nativeType": "text"
           },
           "userId": {
-            "type": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
           }
         },
         "foreignKeys": [],
@@ -79,13 +84,16 @@
       "user": {
         "columns": {
           "createdAt": {
-            "type": "pg/timestamptz@1"
+            "codecId": "pg/timestamptz@1",
+            "nativeType": "timestamptz"
           },
           "email": {
-            "type": "pg/text@1"
+            "codecId": "pg/text@1",
+            "nativeType": "text"
           },
           "id": {
-            "type": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
           }
         },
         "foreignKeys": [],

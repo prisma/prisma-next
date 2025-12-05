@@ -1,4 +1,4 @@
-import type { ColumnBuilderState, TableBuilderState } from './builder-state';
+import type { ColumnBuilderState, ColumnTypeDescriptor, TableBuilderState } from './builder-state';
 
 export class TableBuilder<
   Name extends string,
@@ -20,34 +20,39 @@ export class TableBuilder<
 
   column<
     ColName extends string,
-    TypeId extends string,
+    Descriptor extends ColumnTypeDescriptor,
     Nullable extends boolean | undefined = undefined,
   >(
     name: ColName,
     options: {
-      type: TypeId;
+      type: Descriptor;
       nullable?: Nullable;
     },
   ): TableBuilder<
     Name,
     Columns &
-      Record<ColName, ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>>,
+      Record<
+        ColName,
+        ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
+      >,
     PrimaryKey
   > {
-    if (!options.type || typeof options.type !== 'string' || !options.type.includes('@')) {
-      throw new Error(`type must be in format "namespace/name@version", got "${options.type}"`);
-    }
     const nullable = (options.nullable ?? false) as Nullable extends true ? true : false;
-    const type = options.type;
+    const { codecId, nativeType } = options.type;
+
     const columnState = {
       name,
       nullable,
-      type,
-    } as ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>;
+      type: codecId,
+      nativeType,
+    } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
     return new TableBuilder(
       this._name,
       { ...this._columns, [name]: columnState } as Columns &
-        Record<ColName, ColumnBuilderState<ColName, Nullable extends true ? true : false, TypeId>>,
+        Record<
+          ColName,
+          ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
+        >,
       this._primaryKey,
     );
   }

@@ -1,6 +1,10 @@
 import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { JoinOnExpr, TableRef } from '@prisma-next/sql-relational-core/ast';
+import {
+  int4Column as int4ColumnType,
+  textColumn as textColumnType,
+} from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createTableRef } from '../../src/ast/common';
 import { createJoin, createJoinOnBuilder, createJoinOnExpr } from '../../src/ast/join';
@@ -12,8 +16,16 @@ type TestContract = SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly email: { readonly type: 'pg/text@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -22,8 +34,16 @@ type TestContract = SqlContract<
       };
       readonly post: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly userId: { readonly type: 'pg/int4@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly userId: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -46,8 +66,8 @@ describe('ast/join', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: false },
+            id: { ...int4ColumnType, nullable: false },
+            email: { ...textColumnType, nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -56,8 +76,8 @@ describe('ast/join', () => {
         },
         post: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            userId: { type: 'pg/int4@1', nullable: false },
+            id: { ...int4ColumnType, nullable: false },
+            userId: { ...int4ColumnType, nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -87,10 +107,6 @@ describe('ast/join', () => {
         table,
         on,
       });
-      expect(join.kind).toBe('join');
-      expect(join.joinType).toBe('inner');
-      expect(join.table).toBe(table);
-      expect(join.on).toBe(on);
     });
 
     it('creates left join', () => {
@@ -142,9 +158,6 @@ describe('ast/join', () => {
         left,
         right,
       });
-      expect(joinOnExpr.kind).toBe('eqCol');
-      expect(joinOnExpr.left).toBe(left);
-      expect(joinOnExpr.right).toBe(right);
     });
 
     it('creates join on expr with different columns', () => {

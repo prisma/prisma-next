@@ -16,8 +16,8 @@ function resolveParamCodec(
     }
   }
 
-  if (paramDescriptor.type) {
-    const codec = registry.get(paramDescriptor.type);
+  if (paramDescriptor.codecId) {
+    const codec = registry.get(paramDescriptor.codecId);
     if (codec) {
       return codec;
     }

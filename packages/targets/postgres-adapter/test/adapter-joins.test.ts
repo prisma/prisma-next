@@ -14,8 +14,8 @@ const contract = Object.freeze(
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: false },
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
           uniques: [],
           indexes: [],
@@ -23,9 +23,9 @@ const contract = Object.freeze(
         },
         post: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            userId: { type: 'pg/int4@1', nullable: false },
-            title: { type: 'pg/text@1', nullable: false },
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
           uniques: [],
           indexes: [],

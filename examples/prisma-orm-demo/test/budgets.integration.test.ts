@@ -19,6 +19,24 @@ import contractJson from '../src/prisma-next/contract.json' with { type: 'json' 
 
 const contract = validateContract<Contract>(contractJson);
 
+/**
+ * Extracts id and email columns from user table, throwing if either is missing.
+ */
+function getUserIdAndEmailColumns<T extends Record<string, unknown>>(userTable: {
+  columns: T;
+}): {
+  idColumn: T['id'];
+  emailColumn: T['email'];
+} {
+  const userColumns = userTable.columns;
+  const idColumn = userColumns['id'];
+  const emailColumn = userColumns['email'];
+  if (!idColumn || !emailColumn) {
+    throw new Error('Columns id or email not found');
+  }
+  return { idColumn: idColumn as T['id'], emailColumn: emailColumn as T['email'] };
+}
+
 describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () => {
   it('blocks unbounded SELECT queries', async () => {
     await withDevDatabase(async ({ connectionString }) => {
@@ -82,12 +100,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!userTable) {
           throw new Error('User table not found');
         }
-        const userColumns = userTable.columns;
-        const idColumn = userColumns.id;
-        const emailColumn = userColumns.email;
-        if (!idColumn || !emailColumn) {
-          throw new Error('Columns id or email not found');
-        }
+        const { idColumn, emailColumn } = getUserIdAndEmailColumns(userTable);
         const plan = sql({ context })
           .from(userTable)
           .select({
@@ -175,12 +188,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!userTable) {
           throw new Error('User table not found');
         }
-        const userColumns = userTable.columns;
-        const idColumn = userColumns.id;
-        const emailColumn = userColumns.email;
-        if (!idColumn || !emailColumn) {
-          throw new Error('Columns id or email not found');
-        }
+        const { idColumn, emailColumn } = getUserIdAndEmailColumns(userTable);
         const plan = sql({ context })
           .from(userTable)
           .select({
@@ -266,12 +274,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         if (!userTable) {
           throw new Error('User table not found');
         }
-        const userColumns = userTable.columns;
-        const idColumn = userColumns.id;
-        const emailColumn = userColumns.email;
-        if (!idColumn || !emailColumn) {
-          throw new Error('Columns id or email not found');
-        }
+        const { idColumn, emailColumn } = getUserIdAndEmailColumns(userTable);
         const plan = sql({ context })
           .from(userTable)
           .select({

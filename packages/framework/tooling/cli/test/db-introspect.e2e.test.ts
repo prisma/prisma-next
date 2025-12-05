@@ -6,72 +6,62 @@ import {
   executeCommand,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
+  withTempDir,
 } from './utils/test-helpers';
 
 // Fixture subdirectory for db-introspect e2e tests
 const fixtureSubdir = 'db-introspect';
 
-describe('db introspect command (e2e)', () => {
-  let consoleOutput: string[] = [];
-  let cleanupMocks: () => void;
-  let cleanupDirs: Array<() => void> = [];
+withTempDir(({ createTempDir }) => {
+  describe('db introspect command (e2e)', () => {
+    let consoleOutput: string[] = [];
+    let cleanupMocks: () => void;
 
-  beforeEach(() => {
-    // Set up console and process.exit mocks
-    const mocks = setupCommandMocks();
-    consoleOutput = mocks.consoleOutput;
-    cleanupMocks = mocks.cleanup;
-    cleanupDirs = [];
-  });
+    beforeEach(() => {
+      // Set up console and process.exit mocks
+      const mocks = setupCommandMocks();
+      consoleOutput = mocks.consoleOutput;
+      cleanupMocks = mocks.cleanup;
+    });
 
-  afterEach(() => {
-    cleanupMocks();
-    // Clean up all test directories, even if test failed or timed out
-    for (const cleanupDir of cleanupDirs) {
-      try {
-        cleanupDir();
-      } catch (_error) {
-        // Ignore cleanup errors
-      }
-    }
-  });
+    afterEach(() => {
+      cleanupMocks();
+    });
 
-  it(
-    'outputs tree structure with real database',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up database schema first, then close connection
-        await withClient(connectionString, async (client) => {
-          await client.query(`
+    it(
+      'outputs tree structure with real database',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up database schema first, then close connection
+          await withClient(connectionString, async (client) => {
+            await client.query(`
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY,
                 email TEXT NOT NULL,
                 name TEXT
               )
             `);
-          await client.query(`
+            await client.query(`
               CREATE TABLE IF NOT EXISTS "post" (
                 id SERIAL PRIMARY KEY,
                 title TEXT NOT NULL,
                 "userId" INTEGER REFERENCES "user"(id)
               )
             `);
-          await client.query(`
+            await client.query(`
               CREATE UNIQUE INDEX IF NOT EXISTS "user_email_unique" ON "user"(email)
             `);
-        });
+          });
 
-        // Set up test directory with config
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+          // Set up test directory with config
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
 
-        try {
           const command = createDbIntrospectCommand();
           const originalCwd = process.cwd();
           try {
@@ -90,39 +80,34 @@ describe('db introspect command (e2e)', () => {
 
           // Snapshot test for tree output
           expect(normalized).toMatchSnapshot();
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'outputs JSON envelope with real database',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up database schema first, then close connection
-        await withClient(connectionString, async (client) => {
-          await client.query(`
+    it(
+      'outputs JSON envelope with real database',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up database schema first, then close connection
+          await withClient(connectionString, async (client) => {
+            await client.query(`
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY,
                 email TEXT NOT NULL
               )
             `);
-        });
+          });
 
-        // Set up test directory with config
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+          // Set up test directory with config
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
 
-        try {
           const command = createDbIntrospectCommand();
           const originalCwd = process.cwd();
           try {
@@ -153,11 +138,9 @@ describe('db introspect command (e2e)', () => {
 
           // Snapshot test for JSON output
           expect(normalized).toMatchSnapshot();
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });

@@ -1,3 +1,4 @@
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type { OrderBuilder } from '@prisma-next/sql-relational-core/types';
@@ -18,7 +19,7 @@ describe('ordering', () => {
           column: 'id',
         },
         dir: 'asc' as const,
-      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
+      } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildOrderByClause(orderBy);
       expect({
         defined: result !== undefined,
@@ -51,7 +52,7 @@ describe('ordering', () => {
       const orderBy = {
         expr: operationExpr,
         dir: 'desc' as const,
-      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
+      } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildOrderByClause(orderBy);
       expect({
         defined: result !== undefined,
@@ -73,7 +74,7 @@ describe('ordering', () => {
           column: 'createdAt',
         },
         dir: 'desc' as const,
-      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
+      } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildOrderByClause(orderBy);
       expect({
         defined: result !== undefined,
@@ -98,7 +99,7 @@ describe('ordering', () => {
           column: 'id',
         },
         dir: 'asc' as const,
-      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
+      } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildChildOrderByClause(orderBy);
       expect({
         defined: result !== undefined,
@@ -131,7 +132,7 @@ describe('ordering', () => {
       const orderBy = {
         expr: operationExpr,
         dir: 'desc' as const,
-      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
+      } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildChildOrderByClause(orderBy);
       expect({
         defined: result !== undefined,
@@ -178,7 +179,7 @@ describe('ordering', () => {
       const orderBy = {
         expr: outerOp,
         dir: 'asc' as const,
-      } as OrderBuilder<string, { type: 'pg/int4@1'; nullable: false }, unknown>;
+      } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildChildOrderByClause(orderBy);
       expect({
         defined: result !== undefined,

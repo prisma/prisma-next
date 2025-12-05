@@ -20,6 +20,8 @@ import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relationa
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
+const VECTOR_CODEC_ID = 'pg/vector@1' as const;
+
 const defaultCapabilities = Object.freeze({
   postgres: {
     orderBy: true,
@@ -172,7 +174,7 @@ function renderParam(
   if (contract && tableName && columnName) {
     const tableMeta = contract.storage.tables[tableName];
     const columnMeta = tableMeta?.columns[columnName];
-    if (columnMeta?.type === 'pg/vector@1') {
+    if (columnMeta?.codecId === VECTOR_CODEC_ID) {
       return `$${ref.index}::vector`;
     }
   }
@@ -198,7 +200,7 @@ function renderLiteral(expr: LiteralExpr): string {
 function renderOperation(expr: OperationExpr, contract?: PostgresContract): string {
   const self = renderExpr(expr.self, contract);
   // For vector operations, cast param arguments to vector type
-  const isVectorOperation = expr.forTypeId === 'pg/vector@1';
+  const isVectorOperation = expr.forTypeId === VECTOR_CODEC_ID;
   const args = expr.args.map((arg: ColumnRef | ParamRef | LiteralExpr | OperationExpr) => {
     if (arg.kind === 'col') {
       return renderColumn(arg);
@@ -353,7 +355,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
   const values = Object.entries(ast.values).map(([colName, val]) => {
     if (val.kind === 'param') {
       const columnMeta = tableMeta?.columns[colName];
-      const isVector = columnMeta?.type === 'pg/vector@1';
+      const isVector = columnMeta?.codecId === VECTOR_CODEC_ID;
       return isVector ? `$${val.index}::vector` : `$${val.index}`;
     }
     if (val.kind === 'col') {
@@ -378,7 +380,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     let value: string;
     if (val.kind === 'param') {
       const columnMeta = tableMeta?.columns[col];
-      const isVector = columnMeta?.type === 'pg/vector@1';
+      const isVector = columnMeta?.codecId === VECTOR_CODEC_ID;
       value = isVector ? `$${val.index}::vector` : `$${val.index}`;
     } else if (val.kind === 'col') {
       value = `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;

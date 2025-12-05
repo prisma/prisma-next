@@ -6,7 +6,8 @@ import type {
 } from './builder-state';
 
 export type BuildStorageColumn<Nullable extends boolean, Type extends string> = {
-  readonly type: Type;
+  readonly nativeType: string;
+  readonly codecId: Type;
   readonly nullable: Nullable;
 };
 

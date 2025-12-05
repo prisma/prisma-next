@@ -14,9 +14,18 @@ import type {
   UniqueConstraint,
 } from './types';
 
-export function col(typeId: string, nullable = false): StorageColumn {
+/**
+ * Creates a StorageColumn with nativeType and codecId.
+ *
+ * @param nativeType - Native database type identifier (e.g., 'int4', 'text', 'vector')
+ * @param codecId - Codec identifier (e.g., 'pg/int4@1', 'pg/text@1')
+ * @param nullable - Whether the column is nullable (default: false)
+ * @returns StorageColumn with nativeType and codecId
+ */
+export function col(nativeType: string, codecId: string, nullable = false): StorageColumn {
   return {
-    type: typeId,
+    nativeType,
+    codecId,
     nullable,
   };
 }

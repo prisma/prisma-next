@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:0b5bc570c00d6a3b92ee53427daf07c8507d4ce08246e78043ce45f65d7bb20c",
+  "coreHash": "sha256:26d6cd4f2ab2e9590516c99cd798821a4cf5505d30c69f1399e249e700bf09dc",
   "profileHash": "sha256:5a8d9c14e9293be728f50dac2c2872f0873788bec000cde2cc745e2c92e33a72",
   "models": {
     "Comment": {
@@ -59,13 +59,16 @@
       "comment": {
         "columns": {
           "content": {
-            "type": "pg/text@1"
+            "codecId": "pg/text@1",
+            "nativeType": "text"
           },
           "id": {
-            "type": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
           },
           "postId": {
-            "type": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
           }
         },
         "foreignKeys": [],
@@ -80,16 +83,20 @@
       "post": {
         "columns": {
           "id": {
-            "type": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
           },
           "published": {
-            "type": "pg/bool@1"
+            "codecId": "pg/bool@1",
+            "nativeType": "bool"
           },
           "title": {
-            "type": "pg/text@1"
+            "codecId": "pg/text@1",
+            "nativeType": "text"
           },
           "userId": {
-            "type": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
           }
         },
         "foreignKeys": [],
@@ -104,10 +111,12 @@
       "user": {
         "columns": {
           "email": {
-            "type": "pg/text@1"
+            "codecId": "pg/text@1",
+            "nativeType": "text"
           },
           "id": {
-            "type": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
           }
         },
         "foreignKeys": [],

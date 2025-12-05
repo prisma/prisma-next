@@ -2,48 +2,46 @@ import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
-export function extractTypeIds(contract: SqlContract<SqlStorage>): Set<string> {
-  const typeIds = new Set<string>();
+export function extractCodecIds(contract: SqlContract<SqlStorage>): Set<string> {
+  const codecIds = new Set<string>();
 
   for (const table of Object.values(contract.storage.tables)) {
     for (const column of Object.values(table.columns)) {
-      if (column.type) {
-        typeIds.add(column.type);
-      }
+      const codecId = column.codecId;
+      codecIds.add(codecId);
     }
   }
 
-  return typeIds;
+  return codecIds;
 }
 
-function extractTypeIdsFromColumns(contract: SqlContract<SqlStorage>): Map<string, string> {
-  const typeIds = new Map<string, string>();
+function extractCodecIdsFromColumns(contract: SqlContract<SqlStorage>): Map<string, string> {
+  const codecIds = new Map<string, string>();
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
-      if (column.type) {
-        const key = `${tableName}.${columnName}`;
-        typeIds.set(key, column.type);
-      }
+      const codecId = column.codecId;
+      const key = `${tableName}.${columnName}`;
+      codecIds.set(key, codecId);
     }
   }
 
-  return typeIds;
+  return codecIds;
 }
 
 export function validateContractCodecMappings(
   registry: CodecRegistry,
   contract: SqlContract<SqlStorage>,
 ): void {
-  const typeIds = extractTypeIdsFromColumns(contract);
-  const invalidCodecs: Array<{ table: string; column: string; typeId: string }> = [];
+  const codecIds = extractCodecIdsFromColumns(contract);
+  const invalidCodecs: Array<{ table: string; column: string; codecId: string }> = [];
 
-  for (const [key, typeId] of typeIds.entries()) {
-    if (!registry.has(typeId)) {
+  for (const [key, codecId] of codecIds.entries()) {
+    if (!registry.has(codecId)) {
       const parts = key.split('.');
       const table = parts[0] ?? '';
       const column = parts[1] ?? '';
-      invalidCodecs.push({ table, column, typeId });
+      invalidCodecs.push({ table, column, codecId });
     }
   }
 
@@ -55,7 +53,7 @@ export function validateContractCodecMappings(
 
     throw runtimeError(
       'RUNTIME.CODEC_MISSING',
-      `Missing codec implementations for column typeIds: ${invalidCodecs.map((c) => `${c.table}.${c.column} (${c.typeId})`).join(', ')}`,
+      `Missing codec implementations for column codecIds: ${invalidCodecs.map((c) => `${c.table}.${c.column} (${c.codecId})`).join(', ')}`,
       details,
     );
   }

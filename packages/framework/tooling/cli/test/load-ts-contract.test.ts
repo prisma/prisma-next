@@ -62,13 +62,17 @@ describe('loadContractFromTs', () => {
     );
   });
 
-  it('rejects empty module with no exports', async () => {
-    const contractPath = join(fixturesDir, 'empty-module.ts');
+  it(
+    'rejects empty module with no exports',
+    async () => {
+      const contractPath = join(fixturesDir, 'empty-module.ts');
 
-    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
-      'Contract file must export a contract',
-    );
-  });
+      await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+        'Contract file must export a contract',
+      );
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'rejects non-object contract export',

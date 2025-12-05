@@ -114,7 +114,6 @@ describe('family instance introspect', () => {
         expect(idColumn.name).toBe('id');
         expect(idColumn.nativeType).toBeDefined();
         expect(idColumn.nullable).toBe(false);
-        expect(idColumn.typeId).toBe('unmapped');
 
         const emailColumn = userTable.columns['email'];
         expect(emailColumn).toBeDefined();

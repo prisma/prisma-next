@@ -32,7 +32,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             },
           },
         },
@@ -54,7 +54,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'unknown/type@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'unknown/type@1', nullable: false },
             },
           },
         },
@@ -76,7 +76,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'invalid-format', nullable: false },
+              id: { nativeType: 'int4', codecId: 'invalid-format', nullable: false },
             },
           },
         },
@@ -87,7 +87,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
-    }).toThrow('invalid type ID format');
+    }).toThrow('invalid codec ID format');
   });
 
   it('validates types from loaded packs even if not in extensions', () => {
@@ -96,7 +96,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'postgres/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'postgres/int4@1', nullable: false },
             },
           },
         },
@@ -129,7 +129,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
-    }).toThrow('is missing type');
+    }).toThrow('is missing codecId');
   });
 
   it('validates types with type ID that fails regex match', () => {
@@ -138,7 +138,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'invalid@format', nullable: false },
+              id: { nativeType: 'int4', codecId: 'invalid@format', nullable: false },
             },
           },
         },
@@ -149,7 +149,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
-    }).toThrow('invalid type ID format');
+    }).toThrow('invalid codec ID format');
   });
 
   it('validates types with empty storage', () => {
@@ -174,5 +174,54 @@ describe('sql-target-family-hook', () => {
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).not.toThrow();
+  });
+
+  it('validates types with storage but no tables', () => {
+    const ir = createContractIR({
+      storage: {
+        // No tables property - should hit early return at line 16
+      },
+    });
+
+    const ctx: ValidationContext = {};
+
+    expect(() => {
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
+    }).not.toThrow();
+  });
+
+  it('validates types with extensionId that does not match namespace pattern', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+          },
+        },
+      },
+    });
+
+    const ctx: ValidationContext = {
+      extensionIds: ['invalid-extension-id-without-slash'],
+    };
+
+    // Should not throw because namespaceMatch will be null, so namespaceMatch?.[1] will be undefined
+    // and the namespace won't be added to referencedNamespaces, but the codecId 'pg/int4@1' will still
+    // be validated against ir.extensions (which is empty), so it will throw
+    expect(() => {
+      sqlTargetFamilyHook.validateTypes(ir, ctx);
+    }).toThrow('is not referenced in contract.extensions');
+  });
+
+  it('validates types with undefined extensions', () => {
+    const ir = {
+      targetFamily: 'sql',
+      storage: { tables: {} },
+      extensions: undefined,
+    } as unknown as ContractIR;
+
+    expect(() => sqlTargetFamilyHook.validateTypes(ir, {})).not.toThrow();
   });
 });

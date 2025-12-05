@@ -124,7 +124,7 @@ function executeOperation(
   const returnColumnMeta: StorageColumn = returnTypeId
     ? {
         ...columnMeta,
-        type: returnTypeId,
+        codecId: returnTypeId,
       }
     : columnMeta;
 
@@ -193,9 +193,13 @@ export function attachOperationsToColumnBuilder<
     return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }
 
-  const typeId = columnMeta.type;
+  // Use codecId to look up operations registered for this column's type
+  const codecId = columnMeta.codecId;
+  if (!codecId) {
+    return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
+  }
 
-  const operations = registry.byType(typeId) as SqlOperationSignature[];
+  const operations = registry.byType(codecId) as SqlOperationSignature[];
   if (operations.length === 0) {
     return columnBuilder as ColumnBuilder<ColumnName, ColumnMeta, JsType, Operations>;
   }

@@ -13,8 +13,8 @@ describe('validateContract structure validation', () => {
       tables: {
         User: {
           columns: {
-            id: { type: 'pg/text@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: false },
+            id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -75,7 +75,7 @@ describe('validateContract structure validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 123, nullable: false },
+              id: { nativeType: 123 as unknown as string, codecId: 'pg/text@1', nullable: false },
             },
           },
         },
@@ -83,7 +83,7 @@ describe('validateContract structure validation', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
-      /Column.*validation failed|type.*must be.*string/,
+      /nativeType.*must be.*string|Column.*validation failed/,
     );
   });
 
@@ -94,7 +94,11 @@ describe('validateContract structure validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: 'yes' },
+              id: {
+                nativeType: 'text',
+                codecId: 'pg/text@1',
+                nullable: 'yes' as unknown as boolean,
+              },
             },
           },
         },
@@ -117,5 +121,17 @@ describe('validateContract structure validation', () => {
     const result = validateContract<SqlContract<SqlStorage>>(withOptional);
     expect(result.profileHash).toBe('sha256:profile');
     expect(result.capabilities).toEqual({ feature: { enabled: true } });
+  });
+
+  it('preserves existing mappings when provided', () => {
+    const input = {
+      ...validContractInput,
+      mappings: {
+        modelToTable: { CustomModel: 'User' },
+      },
+    };
+    // biome-ignore lint/suspicious/noExplicitAny: testing input with mappings property
+    const result = validateContract<SqlContract<SqlStorage>>(input as any);
+    expect(result.mappings.modelToTable).toEqual({ CustomModel: 'User' });
   });
 });

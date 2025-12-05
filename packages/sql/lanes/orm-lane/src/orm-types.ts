@@ -55,15 +55,23 @@ type ModelFieldToColumnMap<
     : never
   : never;
 
+type FieldToColumnMapSafe<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelFieldToColumnMap<TContract, ModelName> extends Record<string, string>
+  ? ModelFieldToColumnMap<TContract, ModelName>
+  : never;
+
 type FieldColumnName<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
-> = ModelFieldToColumnMap<TContract, ModelName> extends Record<string, string>
-  ? FieldName extends keyof ModelFieldToColumnMap<TContract, ModelName>
-    ? ModelFieldToColumnMap<TContract, ModelName>[FieldName]
-    : FieldName
-  : FieldName;
+> = (FieldToColumnMapSafe<TContract, ModelName> extends never
+  ? FieldName
+  : FieldName extends keyof FieldToColumnMapSafe<TContract, ModelName>
+    ? FieldToColumnMapSafe<TContract, ModelName>[FieldName]
+    : FieldName) &
+  string;
 
 type ModelColumnMeta<
   TContract extends SqlContract<SqlStorage>,

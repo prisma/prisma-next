@@ -1,6 +1,7 @@
 export type {
   ColumnBuilder,
   ColumnBuilderState,
+  ColumnTypeDescriptor,
   ContractBuilderState,
   ModelBuilderState,
   RelationDefinition,

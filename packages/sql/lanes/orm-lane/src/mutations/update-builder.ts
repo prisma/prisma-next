@@ -67,8 +67,8 @@ export function buildUpdatePlan<
     const value = assertParameterExists(paramsMap, paramName);
     const index = paramValues.push(value);
 
-    const codecId = columnMeta.type;
-    if (codecId && paramName) {
+    const codecId = columnMeta.codecId;
+    if (paramName) {
       paramCodecs[paramName] = codecId;
     }
 
@@ -77,7 +77,8 @@ export function buildUpdatePlan<
         name: paramName,
         table: tableName,
         column: columnName,
-        type: codecId,
+        codecId: codecId,
+        nativeType: columnMeta.nativeType,
         nullable: columnMeta.nullable,
       }),
     );

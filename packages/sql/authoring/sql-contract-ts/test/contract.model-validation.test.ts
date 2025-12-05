@@ -13,8 +13,8 @@ describe('validateContract model validation', () => {
       tables: {
         User: {
           columns: {
-            id: { type: 'pg/text@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: false },
+            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -65,7 +65,7 @@ describe('validateContract model validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             uniques: [],
             indexes: [],
@@ -146,7 +146,7 @@ describe('validateContract model validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -155,8 +155,8 @@ describe('validateContract model validation', () => {
           },
           Post: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
-              userId: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -195,7 +195,7 @@ describe('validateContract model validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -204,8 +204,8 @@ describe('validateContract model validation', () => {
           },
           Post: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
-              userId: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -246,7 +246,7 @@ describe('validateContract model validation', () => {
         tables: {
           User: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -255,8 +255,8 @@ describe('validateContract model validation', () => {
           },
           Post: {
             columns: {
-              id: { type: 'pg/text@1', nullable: false },
-              userId: { type: 'pg/text@1', nullable: false },
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],

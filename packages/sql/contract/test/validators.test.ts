@@ -6,8 +6,8 @@ describe('SQL contract validators', () => {
   describe('validateStorage', () => {
     it('validates valid storage', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
-        email: col('pg/text@1'),
+        id: col('int4', 'pg/int4@1'),
+        email: col('text', 'pg/text@1'),
       });
       const s = storage({ user: userTable });
       expect(() => validateStorage(s)).not.toThrow();
@@ -29,12 +29,12 @@ describe('SQL contract validators', () => {
       expect(() => validateStorage(invalid)).toThrow();
     });
 
-    it('throws on invalid column type', () => {
+    it('throws on invalid nativeType', () => {
       const invalid = {
         tables: {
           user: {
             columns: {
-              id: { type: 123, nullable: false },
+              id: { nativeType: 123, nullable: false },
             },
           },
         },
@@ -47,7 +47,7 @@ describe('SQL contract validators', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: 'yes' },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: 'yes' },
             },
           },
         },
@@ -92,8 +92,8 @@ describe('SQL contract validators', () => {
   describe('validateSqlContract', () => {
     it('validates valid contract', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
-        email: col('pg/text@1'),
+        id: col('int4', 'pg/int4@1'),
+        email: col('text', 'pg/text@1'),
       });
       const s = storage({ user: userTable });
       const m = {
@@ -113,7 +113,7 @@ describe('SQL contract validators', () => {
 
     it('throws on missing targetFamily', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -127,7 +127,7 @@ describe('SQL contract validators', () => {
 
     it('throws on wrong targetFamily', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -141,7 +141,7 @@ describe('SQL contract validators', () => {
 
     it('throws on missing target', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -155,7 +155,7 @@ describe('SQL contract validators', () => {
 
     it('throws on missing coreHash', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -169,7 +169,7 @@ describe('SQL contract validators', () => {
 
     it('throws on missing storage', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -183,7 +183,7 @@ describe('SQL contract validators', () => {
 
     it('throws on missing models', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -197,7 +197,7 @@ describe('SQL contract validators', () => {
 
     it('accepts optional profileHash', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -211,7 +211,7 @@ describe('SQL contract validators', () => {
 
     it('accepts optional capabilities', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -229,7 +229,7 @@ describe('SQL contract validators', () => {
 
     it('accepts optional extensions', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -248,7 +248,7 @@ describe('SQL contract validators', () => {
 
     it('accepts optional meta', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
@@ -264,7 +264,7 @@ describe('SQL contract validators', () => {
 
     it('accepts optional sources', () => {
       const userTable = table({
-        id: col('pg/int4@1'),
+        id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({

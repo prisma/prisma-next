@@ -1,13 +1,17 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import {
+  int4Column as int4ColumnType,
+  textColumn as textColumnType,
+  vectorColumn as vectorColumnType,
+} from '@prisma-next/test-utils/column-descriptors';
 import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { createStubAdapter, createTestContext } from './utils';
 
 describe('ColumnBuilder operations', () => {
-  const contract = validateContract<SqlContract<SqlStorage>>({
+  const contract = validateContract({
     target: 'postgres',
     targetFamily: 'sql',
     coreHash: 'test-hash',
@@ -15,9 +19,9 @@ describe('ColumnBuilder operations', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: false },
-            vector: { type: 'pgvector/vector@1', nullable: false },
+            id: { ...int4ColumnType, nullable: false },
+            email: { ...textColumnType, nullable: false },
+            vector: { ...vectorColumnType, nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -29,13 +33,13 @@ describe('ColumnBuilder operations', () => {
     models: {},
     relations: {},
     mappings: {},
-  });
+  } as const);
 
   it('exposes registered methods on columns with matching typeId', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -65,9 +69,9 @@ describe('ColumnBuilder operations', () => {
 
   it('does not expose registered methods on columns without matching typeId', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -95,9 +99,9 @@ describe('ColumnBuilder operations', () => {
 
   it('exposes multiple operations on same typeId', () => {
     const signature1: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -107,9 +111,9 @@ describe('ColumnBuilder operations', () => {
       },
     };
     const signature2: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'l2Distance',
-      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -139,7 +143,7 @@ describe('ColumnBuilder operations', () => {
 
   it('registered method accepts param argument', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -172,7 +176,7 @@ describe('ColumnBuilder operations', () => {
 
   it('registered method returns ColumnBuilder with correct return type', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -205,7 +209,7 @@ describe('ColumnBuilder operations', () => {
 
   it('operation result can be used in where clause', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -240,7 +244,7 @@ describe('ColumnBuilder operations', () => {
 
   it('operation result can be used in orderBy', () => {
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -275,10 +279,10 @@ describe('ColumnBuilder operations', () => {
 
   it('chains operations producing nested OperationExpr trees', () => {
     const signature1: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'normalize',
       args: [],
-      returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
@@ -287,9 +291,9 @@ describe('ColumnBuilder operations', () => {
       },
     };
     const signature2: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
-      args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',

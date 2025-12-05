@@ -127,9 +127,6 @@ class SqlContractBuilder<
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > extends ContractBuilder<Target, Tables, Models, CoreHash, Extensions, Capabilities> {
   /**
-   * Builds and normalizes the contract.
-   *
-   * **Responsibility: Normalization**
    * This method is responsible for normalizing the contract IR by setting default values
    * for all required fields:
    * - `nullable`: defaults to `false` if not provided
@@ -137,9 +134,13 @@ class SqlContractBuilder<
    * - `indexes`: defaults to `[]` (empty array)
    * - `foreignKeys`: defaults to `[]` (empty array)
    * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
+   * - `nativeType`: required field set from column type descriptor when columns are defined
    *
    * The contract builder is the **only** place where normalization should occur.
    * Validators, parsers, and emitters should assume the contract is already normalized.
+   *
+   * **Required**: Use column type descriptors (e.g., `int4Column`, `textColumn`) when defining columns.
+   * This ensures `nativeType` is set correctly at build time.
    *
    * @returns A normalized SqlContract with all required fields present
    */
@@ -206,8 +207,12 @@ class SqlContractBuilder<
       for (const columnName in tableState.columns) {
         const columnState = tableState.columns[columnName];
         if (!columnState) continue;
+        const codecId = columnState.type;
+        const nativeType = columnState.nativeType;
+
         columns[columnName as keyof ColumnDefs] = {
-          type: columnState.type,
+          nativeType,
+          codecId,
           nullable: (columnState.nullable ?? false) as ColumnDefs[keyof ColumnDefs]['nullable'] &
             boolean,
         } as BuildStorageColumn<

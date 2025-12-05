@@ -72,3 +72,18 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
     (value as { kind: unknown }).kind === 'column'
   );
 }
+
+/**
+ * Extracts and returns an OperationExpr from a builder.
+ * Returns the OperationExpr if the builder is an OperationExpr or has an _operationExpr property,
+ * otherwise returns undefined.
+ */
+export function getOperationExpr(
+  builder: AnyColumnBuilder | OperationExpr,
+): OperationExpr | undefined {
+  if (isOperationExpr(builder)) {
+    return builder;
+  }
+  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
+  return builderWithExpr._operationExpr;
+}

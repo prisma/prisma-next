@@ -1,3 +1,12 @@
+/**
+ * Column type descriptor containing both codec ID and native type.
+ * Used when defining columns with descriptor objects instead of string IDs.
+ */
+export type ColumnTypeDescriptor = {
+  readonly codecId: string;
+  readonly nativeType: string;
+};
+
 export interface ColumnBuilderState<
   Name extends string,
   Nullable extends boolean,
@@ -6,6 +15,7 @@ export interface ColumnBuilderState<
   readonly name: Name;
   readonly nullable: Nullable;
   readonly type: Type;
+  readonly nativeType: string;
 }
 
 export interface TableBuilderState<

@@ -34,6 +34,8 @@ export default defineConfig({
         'src/utils/cli-errors.ts',
         // Exclude config loader - mostly file I/O and error handling, tested via e2e tests
         'src/config-loader.ts',
+        // Exclude spinner utility - UI/UX code that's hard to test meaningfully
+        'src/utils/spinner.ts',
         // Exclude defensive error handling branches that are hard to test meaningfully
         'src/pack-loading.ts', // Non-Error exception handling (lines 12, 20)
         'src/api/emit-contract.ts', // Non-Error exception handling (lines 104-105)

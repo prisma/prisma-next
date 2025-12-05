@@ -3,6 +3,8 @@ import { unstable_startServer } from '@prisma/dev';
 import getPort from 'get-port';
 import { Client } from 'pg';
 
+export * from '../column-descriptors';
+export * from '../operation-descriptors';
 export * from '../timeouts';
 
 function normalizeConnectionString(raw: string): string {

@@ -1,182 +1,111 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createDbSignCommand } from '../src/commands/db-sign';
 import {
   executeCommand,
+  getExitCode,
+  runDbSign,
   setupCommandMocks,
+  setupDbSignFixture,
   setupTestDirectoryFromFixtures,
+  withTempDir,
 } from './utils/test-helpers';
 
 // Fixture subdirectory for db-sign e2e tests
 const fixtureSubdir = 'db-sign';
 
-/**
- * Prepares a database test fixture by setting up schema, test directory, and emitting contract.
- * Returns connection string, config path, test directory, and cleanup function.
- */
-async function prepareDbTestFixture(
-  connectionString: string,
-  schemaSetup: (client: Parameters<Parameters<typeof withClient>[1]>[0]) => Promise<void>,
-): Promise<{
-  connectionString: string;
-  configPath: string;
-  testDir: string;
-  cleanupDir: () => void;
-}> {
-  // Set up database schema first, then close connection
-  await withClient(connectionString, async (client) => {
-    await schemaSetup(client);
-  });
+withTempDir(({ createTempDir }) => {
+  describe('db sign command (e2e)', () => {
+    let consoleOutput: string[] = [];
+    let consoleErrors: string[] = [];
+    let cleanupMocks: () => void;
 
-  // Set up test directory with config and contract
-  const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir, 'prisma-next.config.with-db.ts', {
-    '{{DB_URL}}': connectionString,
-  });
-  const configPath = testSetup.configPath;
-  const cleanupDir = testSetup.cleanup;
+    beforeEach(() => {
+      // Set up console and process.exit mocks
+      const mocks = setupCommandMocks();
+      consoleOutput = mocks.consoleOutput;
+      consoleErrors = mocks.consoleErrors;
+      cleanupMocks = mocks.cleanup;
+    });
 
-  // Emit contract first
-  const emitCommand = createContractEmitCommand();
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(testSetup.testDir);
-    await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-  } finally {
-    process.chdir(originalCwd);
-  }
+    afterEach(() => {
+      cleanupMocks();
+    });
 
-  return {
-    connectionString,
-    configPath,
-    testDir: testSetup.testDir,
-    cleanupDir,
-  };
-}
-
-describe('db sign command (e2e)', () => {
-  let consoleOutput: string[] = [];
-  let cleanupMocks: () => void;
-  let cleanupDirs: Array<() => void> = [];
-
-  beforeEach(() => {
-    // Set up console and process.exit mocks
-    const mocks = setupCommandMocks();
-    consoleOutput = mocks.consoleOutput;
-    cleanupMocks = mocks.cleanup;
-    cleanupDirs = [];
-  });
-
-  afterEach(() => {
-    cleanupMocks();
-    // Clean up all test directories, even if test failed or timed out
-    for (const cleanupDir of cleanupDirs) {
-      try {
-        cleanupDir();
-      } catch (_error) {
-        // Ignore cleanup errors
-      }
-    }
-  });
-
-  it(
-    'creates marker when schema matches contract',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        const {
-          connectionString: testConnectionString,
-          configPath,
-          testDir,
-          cleanupDir,
-        } = await prepareDbTestFixture(connectionString, async (client) => {
-          await client.query(`
-              CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL
-              )
-            `);
-        });
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
-
-        const command = createDbSignCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await executeCommand(command, ['--config', configPath, '--no-color']);
-        } finally {
-          process.chdir(originalCwd);
-        }
-
-        // Get output and strip ANSI for snapshot
-        const output = consoleOutput.join('\n');
-        const stripped = stripAnsi(output);
-
-        // Normalize paths and database URL for snapshot
-        let normalized = stripped;
-        // Replace Unix absolute paths: / at start of line or after whitespace (but not after : to avoid URLs)
-        // Match / followed by path segments, but exclude URLs (://)
-        normalized = normalized.replace(/(^|\s)\/([A-Za-z0-9_\-./]+)/g, '$1<path>');
-        // Replace Windows drive-letter paths: C:\... or C:/... followed by path characters
-        normalized = normalized.replace(/[A-Z]:[\\/][^\s\n:]+/g, '<path>');
-        // Normalize database URL (port number)
-        normalized = normalized.replace(/(127\.0\.0\.1|localhost):\d+/g, '127.0.0.1:XXXXX');
-
-        // Verify marker was created in database
-        await withClient(testConnectionString, async (client) => {
-          const result = await client.query(
-            'select core_hash, profile_hash from prisma_contract.marker where id = $1',
-            [1],
+    it(
+      'creates marker when schema matches contract',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
           );
-          expect(result.rows.length).toBe(1);
-          expect(result.rows[0]?.core_hash).toBeDefined();
+
+          await runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']);
+
+          // Get output and strip ANSI for snapshot
+          const output = consoleOutput.join('\n');
+          const stripped = stripAnsi(output);
+
+          // Normalize paths and database URL for snapshot
+          let normalized = stripped;
+          // Replace file paths
+          normalized = normalized.replace(
+            /\/(?:Users|home|tmp|var|opt|mnt|root|[A-Z]:\\?)[^\s\n]*/g,
+            '<path>',
+          );
+          // Normalize database URL (port number)
+          normalized = normalized.replace(/(127\.0\.0\.1|localhost):\d+/g, '127.0.0.1:XXXXX');
+
+          // Verify marker was created in database
+          await withClient(connectionString, async (client) => {
+            const result = await client.query(
+              'select core_hash, profile_hash from prisma_contract.marker where id = $1',
+              [1],
+            );
+            expect(result.rows.length).toBe(1);
+            expect(result.rows[0]?.core_hash).toBeDefined();
+          });
+
+          // Snapshot test for output
+          expect(normalized).toMatchSnapshot();
         });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-        // Snapshot test for output
-        expect(normalized).toMatchSnapshot();
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'fails when schema does not match contract',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        const {
-          connectionString: testConnectionString,
-          configPath,
-          testDir,
-          cleanupDir,
-        } = await prepareDbTestFixture(connectionString, async (client) => {
-          // Create a different table, not "user"
-          await client.query(`
+    it(
+      'fails when schema does not match contract',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up database schema that does NOT match contract (missing table)
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+            `
               CREATE TABLE IF NOT EXISTS "post" (
                 id SERIAL PRIMARY KEY,
                 title TEXT NOT NULL
               )
-            `);
-        });
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+            `,
+          );
 
-        const command = createDbSignCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
           await expect(
-            executeCommand(command, ['--config', configPath, '--no-color']),
+            runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']),
           ).rejects.toThrow();
-        } finally {
-          process.chdir(originalCwd);
-        }
 
-        // Verify marker was NOT created in database
-        await withClient(testConnectionString, async (client) => {
-          // Ensure marker table exists (might have been created by sign attempt)
-          await client.query(`
+          // Verify marker was NOT created in database
+          await withClient(connectionString, async (client) => {
+            // Ensure marker table exists (might have been created by sign attempt)
+            await client.query(`
                 CREATE SCHEMA IF NOT EXISTS prisma_contract
               `);
-          await client.query(`
+            await client.query(`
                 CREATE TABLE IF NOT EXISTS prisma_contract.marker (
                   id smallint primary key default 1,
                   core_hash text not null,
@@ -188,116 +117,307 @@ describe('db sign command (e2e)', () => {
                   meta jsonb not null default '{}'
                 )
               `);
-          const result = await client.query(
-            'select count(*) as count from prisma_contract.marker where id = $1',
-            [1],
-          );
-          // Marker should not exist (sign should have failed before writing)
-          expect(Number.parseInt(result.rows[0]?.count ?? '0', 10)).toBe(0);
+            const result = await client.query(
+              'select count(*) as count from prisma_contract.marker where id = $1',
+              [1],
+            );
+            // Marker should not exist (sign should have failed before writing)
+            expect(Number.parseInt(result.rows[0]?.count ?? '0', 10)).toBe(0);
+          });
         });
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'outputs JSON envelope with real database',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        const { configPath, testDir, cleanupDir } = await prepareDbTestFixture(
-          connectionString,
-          async (client) => {
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL
-              )
-            `);
-          },
-        );
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+    it(
+      'outputs JSON envelope with real database',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+          );
 
-        const command = createDbSignCommand();
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await executeCommand(command, ['--config', configPath, '--json', '--no-color']);
-        } finally {
-          process.chdir(originalCwd);
-        }
+          // Clear console output before running the command we want to test
+          // (previous commands like 'contract emit' may have added output)
+          const outputStartIndex = consoleOutput.length;
 
-        // Get output and parse JSON
-        // When --json is used, only JSON should be output, but filter out any non-JSON lines just in case
-        const output = consoleOutput.join('\n');
-        // Find the JSON portion by scanning from the end for the last contiguous JSON block
-        const lines = output.split('\n');
-        let jsonText: string | undefined;
-        let jsonOutput: Record<string, unknown> | undefined;
-        let lastParseError: Error | undefined;
+          await runDbSign(testSetup, configPath, ['--config', configPath, '--json', '--no-color']);
 
-        // Try to find JSON starting from the last line and expanding backwards
-        // This handles cases where logs contain braces or output is truncated
-        for (let endLine = lines.length - 1; endLine >= 0; endLine--) {
-          for (let startLine = endLine; startLine >= 0; startLine--) {
-            const candidate = lines
-              .slice(startLine, endLine + 1)
-              .join('\n')
-              .trim();
-            // Only attempt to parse if it looks like JSON (starts with { and ends with })
-            if (candidate.startsWith('{') && candidate.endsWith('}')) {
-              try {
-                jsonOutput = JSON.parse(candidate) as Record<string, unknown>;
-                jsonText = candidate;
-                break;
-              } catch (error) {
-                // Track the last parse error for better error messages
-                lastParseError = error instanceof Error ? error : new Error(String(error));
-                // Continue trying with a larger block
-              }
-            }
+          // Get output and parse JSON (only from this command)
+          const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
+          const jsonOutput = JSON.parse(output) as Record<string, unknown>;
+
+          // Normalize non-deterministic values (timing, contractPath) for snapshot
+          const meta = jsonOutput['meta'] as Record<string, unknown> | undefined;
+          const normalized: Record<string, unknown> = {
+            ...jsonOutput,
+            meta: {
+              ...meta,
+              contractPath: meta?.['contractPath']
+                ? String(meta['contractPath']).replace(/^.*\//, '<path>/')
+                : meta?.['contractPath'],
+            },
+            timings: {
+              total: expect.any(Number),
+            },
+          };
+
+          // Verify structure
+          expect(normalized).toMatchObject({
+            ok: true,
+            summary: expect.any(String),
+            contract: {
+              coreHash: expect.any(String),
+            },
+            marker: {
+              created: true,
+              updated: false,
+            },
+          });
+
+          // Snapshot test for JSON output
+          expect(normalized).toMatchSnapshot();
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles missing contract file (ENOENT error)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Don't create contract.json - it should be missing
+          const command = createDbSignCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
+          } finally {
+            process.chdir(originalCwd);
           }
-          if (jsonText) break;
-        }
 
-        if (!jsonText || !jsonOutput) {
-          const errorDetails = lastParseError ? ` Last parse error: ${lastParseError.message}` : '';
-          throw new Error(
-            `No valid JSON found in output. Output length: ${output.length} chars. First 200 chars: ${output.substring(0, 200)}.${errorDetails}`,
-          );
-        }
-
-        // Normalize non-deterministic values (timing, contractPath) for snapshot
-        const meta = jsonOutput['meta'] as Record<string, unknown> | undefined;
-        const normalized: Record<string, unknown> = {
-          ...jsonOutput,
-          meta: {
-            ...meta,
-            contractPath: meta?.['contractPath']
-              ? String(meta['contractPath']).replace(/^.*\//, '<path>/')
-              : meta?.['contractPath'],
-          },
-          timings: {
-            total: expect.any(Number),
-          },
-        };
-
-        // Verify structure
-        expect(normalized).toMatchObject({
-          ok: true,
-          summary: expect.any(String),
-          contract: {
-            coreHash: expect.any(String),
-          },
-          marker: {
-            created: true,
-            updated: false,
-          },
+          // Verify error output (errors go to stderr/consoleErrors)
+          const errorOutput = consoleErrors.join('\n');
+          expect(errorOutput).toContain('PN-CLI-4');
+          expect(errorOutput).toMatch(/file.*not found|not found.*file/i);
         });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-        // Snapshot test for JSON output
-        expect(normalized).toMatchSnapshot();
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+    it(
+      'handles contract file read errors (non-ENOENT)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Create a contract file with invalid JSON (causes parse error, not ENOENT)
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, 'invalid json content', 'utf-8');
+
+          const command = createDbSignCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            // JSON.parse throws SyntaxError, which is caught and wrapped as errorUnexpected
+            // The command should exit with non-zero code or throw
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify error was handled (command failed)
+          // The error path is covered even if we don't check the exact error message format
+          // This tests the branch where file read succeeds but JSON.parse fails
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles quiet mode flag',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+          );
+
+          await runDbSign(testSetup, configPath, ['--config', configPath, '--quiet', '--no-color']);
+
+          // In quiet mode, only errors should be output
+          const output = consoleOutput.join('\n');
+          expect(output).not.toContain('Database signed');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'exits with code 1 when schema verification fails',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+            `
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY
+              )
+            `,
+          );
+
+          // Contract expects both id and email columns, but database only has id
+          // Modify the emitted contract to expect email column
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          const { readFile, writeFile } = await import('node:fs/promises');
+          const contractJson = JSON.parse(await readFile(contractPath, 'utf-8'));
+          contractJson.storage.tables.user.columns.email = {
+            codecId: 'pg/text@1',
+            nativeType: 'text',
+            nullable: false,
+          };
+          await writeFile(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          // executeCommand throws for non-zero exit codes
+          await expect(
+            runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']),
+          ).rejects.toThrow('process.exit called');
+
+          // Verify that schema verification failure was detected (exit code 1)
+          expect(getExitCode()).toBe(1);
+
+          // Verify that schema verification output was printed (not sign output)
+          const output = consoleOutput.join('\n');
+          expect(output).toContain('does not satisfy contract');
+          expect(output).not.toContain('Database signed');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'outputs JSON when schema verification fails with --json flag',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+            `
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY
+              )
+            `,
+          );
+
+          // Contract expects both id and email columns, but database only has id
+          // Modify the emitted contract to expect email column
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          const { readFile, writeFile } = await import('node:fs/promises');
+          const contractJson = JSON.parse(await readFile(contractPath, 'utf-8'));
+          contractJson.storage.tables.user.columns.email = {
+            codecId: 'pg/text@1',
+            nativeType: 'text',
+            nullable: false,
+          };
+          await writeFile(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          // Clear console output before running the command we want to test
+          const outputStartIndex = consoleOutput.length;
+
+          // executeCommand throws for non-zero exit codes
+          await expect(
+            runDbSign(testSetup, configPath, ['--config', configPath, '--json', '--no-color']),
+          ).rejects.toThrow('process.exit called');
+
+          // Verify that schema verification failure was detected (exit code 1)
+          expect(getExitCode()).toBe(1);
+
+          // Verify that JSON output was printed (not human-readable output)
+          const output = consoleOutput.slice(outputStartIndex).join('\n');
+          const jsonOutput = JSON.parse(output);
+          expect(jsonOutput).toMatchObject({
+            ok: false,
+            summary: expect.stringContaining('does not satisfy contract'),
+            schema: expect.anything(),
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'formats sign output when schema verification passes',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup, configPath } = await setupDbSignFixture(
+            connectionString,
+            createTempDir,
+            fixtureSubdir,
+          );
+
+          // Clear console output before running the command we want to test
+          const outputStartIndex = consoleOutput.length;
+
+          await runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']);
+
+          // Verify that sign output was formatted (not schema verification output)
+          const output = consoleOutput.slice(outputStartIndex).join('\n');
+          expect(output).toContain('Database signed');
+          expect(output).not.toContain('does not satisfy contract');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'adds blank line after spinners when TTY and not quiet/JSON',
+      async () => {
+        const originalIsTTY = process.stdout.isTTY;
+        process.stdout.isTTY = true;
+
+        try {
+          await withDevDatabase(async ({ connectionString }) => {
+            const { testSetup, configPath } = await setupDbSignFixture(
+              connectionString,
+              createTempDir,
+              fixtureSubdir,
+            );
+
+            await runDbSign(testSetup, configPath, ['--config', configPath, '--no-color']);
+
+            const output = consoleOutput.join('\n');
+            expect(output).toContain('Database signed');
+          });
+        } finally {
+          process.stdout.isTTY = originalIsTTY;
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });

@@ -1,5 +1,5 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { BinaryExpr, ColumnRef, OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   createBinaryExpr,
@@ -7,11 +7,17 @@ import {
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
-import { errorMissingParameter } from '../utils/errors';
+import {
+  errorFailedToBuildWhereClause,
+  errorMissingParameter,
+  errorUnknownColumn,
+  errorUnknownTable,
+} from '../utils/errors';
+import { getColumnInfo, getOperationExpr, isColumnBuilder } from '../utils/guards';
 
 export interface BuildWhereExprResult {
   expr: BinaryExpr;
-  codecId?: string;
+  codecId: string | undefined;
   paramName: string;
 }
 
@@ -35,37 +41,46 @@ export function buildWhereExpr(
   let leftExpr: ColumnRef | OperationExpr;
   let codecId: string | undefined;
 
-  const operationExpr = (where.left as { _operationExpr?: OperationExpr })._operationExpr;
+  // Check if where.left is an OperationExpr directly (from operation.eq())
+  // or a ColumnBuilder with _operationExpr property
+  const operationExpr = getOperationExpr(where.left);
   if (operationExpr) {
     leftExpr = operationExpr;
-  } else {
-    // where.left is ColumnBuilder - TypeScript can't narrow properly
-    const colBuilder = where.left as unknown as {
-      table: string;
-      column: string;
-      columnMeta?: { type?: string; nullable?: boolean };
-    };
-    const meta = (colBuilder.columnMeta ?? {}) as { type?: string; nullable?: boolean };
+  } else if (isColumnBuilder(where.left)) {
+    // where.left is a ColumnBuilder - use proper type narrowing
+    const { table, column } = getColumnInfo(where.left);
 
+    const contractTable = contract.storage.tables[table];
+    if (!contractTable) {
+      errorUnknownTable(table);
+    }
+
+    const columnMeta: StorageColumn | undefined = contractTable.columns[column];
+    if (!columnMeta) {
+      errorUnknownColumn(column, table);
+    }
+
+    // Construct descriptor directly from validated StorageColumn
     descriptors.push({
       name: paramName,
       source: 'dsl',
-      refs: { table: colBuilder.table, column: colBuilder.column },
-      ...(typeof meta.type === 'string' ? { type: meta.type } : {}),
-      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+      refs: { table, column },
+      nullable: columnMeta.nullable,
+      codecId: columnMeta.codecId,
+      nativeType: columnMeta.nativeType,
     });
 
-    const contractTable = contract.storage.tables[colBuilder.table];
-    const columnMeta = contractTable?.columns[colBuilder.column];
-    codecId = columnMeta?.type;
-
-    leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
+    codecId = columnMeta.codecId;
+    leftExpr = createColumnRef(table, column);
+  } else {
+    // where.left is neither OperationExpr nor ColumnBuilder - invalid state
+    errorFailedToBuildWhereClause();
   }
 
   const rightParam = createParamRef(index, paramName);
   return {
     expr: createBinaryExpr('eq', leftExpr, rightParam),
-    ...(codecId ? { codecId } : {}),
+    codecId,
     paramName,
   };
 }

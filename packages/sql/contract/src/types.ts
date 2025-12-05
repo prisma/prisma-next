@@ -1,7 +1,8 @@
 import type { ContractBase } from '@prisma-next/contract/types';
 
 export type StorageColumn = {
-  readonly type: string;
+  readonly nativeType: string;
+  readonly codecId: string;
   readonly nullable: boolean;
 };
 

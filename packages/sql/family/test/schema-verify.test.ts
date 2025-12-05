@@ -1,3 +1,4 @@
+import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -57,16 +58,16 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id'])
             .unique(['email']),
         )
         .table('post', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('userId', { type: 'pg/int4@1', nullable: false })
-            .column('title', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('userId', { type: int4Column, nullable: false })
+            .column('title', { type: textColumn, nullable: false })
             .primaryKey(['id'])
             .foreignKey(['userId'], { table: 'user', columns: ['id'] })
             .index(['userId']),
@@ -126,14 +127,14 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .table('post', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('title', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('title', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -191,8 +192,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -252,8 +253,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -312,8 +313,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -374,8 +375,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -443,15 +444,15 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .table('post', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('userId', { type: 'pg/int4@1', nullable: false })
-            .column('title', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('userId', { type: int4Column, nullable: false })
+            .column('title', { type: textColumn, nullable: false })
             .primaryKey(['id'])
             .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
         )
@@ -510,8 +511,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -578,8 +579,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -622,8 +623,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -723,8 +724,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -780,8 +781,8 @@ describe('family instance schemaVerify', () => {
         .target('postgres')
         .table('user', (t) =>
           t
-            .column('id', { type: 'pg/int4@1', nullable: false })
-            .column('email', { type: 'pg/text@1', nullable: false })
+            .column('id', { type: int4Column, nullable: false })
+            .column('email', { type: textColumn, nullable: false })
             .primaryKey(['id']),
         )
         .build();
@@ -799,7 +800,7 @@ describe('family instance schemaVerify', () => {
                 ...contract.storage.tables.user.columns,
                 email: {
                   ...contract.storage.tables.user.columns.email,
-                  type: 'pg/unknown-type@1' as const, // Type not in registry
+                  codecId: 'pg/unknown-type@1' as const, // Type not in registry
                 },
               },
             },

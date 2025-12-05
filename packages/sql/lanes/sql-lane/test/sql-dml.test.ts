@@ -293,9 +293,9 @@ describe('DML builders', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: false },
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              vector: { nativeType: 'vector', codecId: 'pg/vector@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -315,7 +315,7 @@ describe('DML builders', () => {
         {
           operations: () => [
             {
-              forTypeId: 'pgvector/vector@1',
+              forTypeId: 'pg/vector@1',
               method: 'cosineDistance',
               args: [{ kind: 'param' }],
               returns: { kind: 'builtin', type: 'number' },

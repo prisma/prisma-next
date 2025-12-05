@@ -1,3 +1,4 @@
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
@@ -15,6 +16,12 @@ import {
 } from '../../src/utils/guards';
 
 describe('guards', () => {
+  const int4ColumnMeta: StorageColumn = {
+    nativeType: 'int4',
+    codecId: 'pg/int4@1',
+    nullable: false,
+  };
+
   describe('extractBaseColumnRef', () => {
     it('returns column ref when expr is already a column ref', () => {
       const colRef = createColumnRef('user', 'id');
@@ -190,7 +197,7 @@ describe('guards', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: int4ColumnMeta,
       } as unknown as AnyColumnBuilder;
       expect(isOperationExpr(colBuilder)).toBe(false);
     });
@@ -242,7 +249,7 @@ describe('guards', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: int4ColumnMeta,
       } as unknown as AnyColumnBuilder;
       const result = getColumnInfo(colBuilder);
       expect(result).toEqual({ table: 'user', column: 'id' });
@@ -255,7 +262,7 @@ describe('guards', () => {
         kind: 'column',
         table: 'user',
         column: 'id',
-        columnMeta: { type: 'pg/int4@1', nullable: false },
+        columnMeta: int4ColumnMeta,
       } as unknown as AnyColumnBuilder;
       expect(isColumnBuilder(colBuilder)).toBe(true);
     });

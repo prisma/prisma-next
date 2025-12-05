@@ -1,5 +1,9 @@
 import type { ExtractCodecTypes, SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import {
+  int4Column as int4ColumnType,
+  textColumn as textColumnType,
+} from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { param } from '../src/param';
 import type { SchemaHandle } from '../src/schema';
@@ -12,8 +16,16 @@ type TestContract = SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; readonly nullable: false };
-          readonly email: { readonly type: 'pg/text@1'; readonly nullable: false };
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -47,8 +59,8 @@ describe('schema', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: false },
+            id: { ...int4ColumnType, nullable: false },
+            email: { ...textColumnType, nullable: false },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -155,8 +167,8 @@ describe('schema', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
-              email: { type: 'pg/text@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -217,11 +229,11 @@ describe('schema', () => {
 
     expect({
       hasColumnMeta: idColumn.columnMeta !== undefined,
-      type: idColumn.columnMeta.type,
+      codecId: idColumn.columnMeta.codecId,
       nullable: idColumn.columnMeta.nullable,
     }).toMatchObject({
       hasColumnMeta: true,
-      type: 'pg/int4@1',
+      codecId: 'pg/int4@1',
       nullable: false,
     });
   });

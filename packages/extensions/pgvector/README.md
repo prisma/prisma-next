@@ -62,7 +62,9 @@ Add vector columns to your contract:
 ```typescript
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
+import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 
 type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
 
@@ -70,9 +72,9 @@ export const contract = defineContract<AllCodecTypes>()
   .target('postgres')
   .table('post', (t) =>
     t
-      .column('id', { type: 'pg/int4@1', nullable: false })
-      .column('title', { type: 'pg/text@1', nullable: false })
-      .column('embedding', { type: 'pg/vector@1', nullable: true })
+      .column('id', { type: int4Column, nullable: false })
+      .column('title', { type: textColumn, nullable: false })
+      .column('embedding', { type: vectorColumn, nullable: true })
       .primaryKey(['id']),
   )
   .build();

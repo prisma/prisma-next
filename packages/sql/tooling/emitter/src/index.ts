@@ -42,26 +42,23 @@ export const sqlTargetFamilyHook = {
     for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
       const table = tableUnknown as StorageTable;
       for (const [colName, colUnknown] of Object.entries(table.columns)) {
-        const col = colUnknown as { type: string; nullable?: boolean };
-        if (!col.type) {
-          throw new Error(`Column "${colName}" in table "${tableName}" is missing type`);
+        const col = colUnknown as { codecId?: string };
+        const codecId = col.codecId;
+        if (!codecId) {
+          throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);
         }
 
-        if (!typeIdRegex.test(col.type)) {
-          throw new Error(
-            `Column "${colName}" in table "${tableName}" has invalid type ID format "${col.type}". Expected format: ns/name@version`,
-          );
-        }
-
-        const match = col.type.match(typeIdRegex);
+        const match = codecId.match(typeIdRegex);
         if (!match || !match[1]) {
-          continue;
+          throw new Error(
+            `Column "${colName}" in table "${tableName}" has invalid codec ID format "${codecId}". Expected format: ns/name@version`,
+          );
         }
 
         const namespace = match[1];
         if (!referencedNamespaces.has(namespace)) {
           throw new Error(
-            `Column "${colName}" in table "${tableName}" uses type ID "${col.type}" from namespace "${namespace}" which is not referenced in contract.extensions`,
+            `Column "${colName}" in table "${tableName}" uses codec ID "${codecId}" from namespace "${namespace}" which is not referenced in contract.extensions`,
           );
         }
       }
@@ -132,13 +129,9 @@ export const sqlTargetFamilyHook = {
       const table = tableUnknown as StorageTable;
       const columnNames = new Set(Object.keys(table.columns));
 
-      for (const [colName, col] of Object.entries(table.columns)) {
-        if (typeof col.nullable !== 'boolean') {
-          throw new Error(
-            `Table "${tableName}" column "${colName}" is missing required field "nullable" (must be a boolean)`,
-          );
-        }
-      }
+      // Column structure (nullable, nativeType, codecId) and table arrays (uniques, indexes, foreignKeys)
+      // are validated by Arktype schema validation - no need to re-check here.
+      // We only validate logical consistency (foreign key references, model references, etc.)
 
       if (!Array.isArray(table.uniques)) {
         throw new Error(
@@ -277,9 +270,10 @@ export type Relations = Contract['relations'];
       const columns: string[] = [];
       for (const [colName, col] of Object.entries(table.columns)) {
         const nullable = col.nullable ? 'true' : 'false';
-        const type = col.type ? `'${col.type}'` : 'string';
+        const nativeType = `'${col.nativeType}'`;
+        const codecId = `'${col.codecId}'`;
         columns.push(
-          `readonly ${colName}: { readonly type: ${type}; readonly nullable: ${nullable} }`,
+          `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable} }`,
         );
       }
 
@@ -347,7 +341,7 @@ export type Relations = Contract['relations'];
             continue;
           }
 
-          const typeId = column.type || 'string';
+          const typeId = column.codecId;
           const nullable = column.nullable ?? false;
           const jsType = nullable
             ? `CodecTypes['${typeId}']['output'] | null`

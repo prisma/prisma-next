@@ -1,8 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
+import { copyFileSync, mkdirSync } from 'node:fs';
+import { access } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -11,101 +10,66 @@ import {
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
-import { loadConfig } from '../src/config-loader';
 import {
   executeCommand,
   getExitCode,
+  loadContractFromDisk,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
+  withTempDir,
 } from './utils/test-helpers';
 
 // Fixture subdirectory for db-verify tests
 const fixtureSubdir = 'db-verify';
 
-/**
- * Emits the contract to disk using the config file.
- * Returns the validated contract for use in tests.
- */
-async function emitContractFromConfig(
-  configPath: string,
-  testDir: string,
-): Promise<SqlContract<SqlStorage>> {
-  const config = await loadConfig(configPath);
-  if (!config.contract) {
-    throw new Error('Config.contract is required');
-  }
+withTempDir(({ createTempDir }) => {
+  describe('db verify command (e2e)', () => {
+    let consoleOutput: string[] = [];
+    let consoleErrors: string[] = [];
+    let cleanupMocks: () => void;
 
-  const contractConfig = config.contract;
-  let contractRaw: unknown;
-  if (typeof contractConfig.source === 'function') {
-    contractRaw = await contractConfig.source();
-  } else {
-    contractRaw = contractConfig.source;
-  }
+    beforeEach(() => {
+      // Set up console and process.exit mocks
+      const mocks = setupCommandMocks();
+      consoleOutput = mocks.consoleOutput;
+      consoleErrors = mocks.consoleErrors;
+      cleanupMocks = mocks.cleanup;
+    });
 
-  // Create family instance (assembles operation registry, type imports, extension IDs)
-  if (!config.driver) {
-    throw new Error('Config.driver is required');
-  }
-  const familyInstance = config.family.create({
-    target: config.target,
-    adapter: config.adapter,
-    driver: config.driver,
-    extensions: config.extensions ?? [],
-  }) as FamilyInstance<string>;
+    afterEach(() => {
+      cleanupMocks();
+    });
 
-  // emitContract handles stripping mappings and validation internally
-  const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
+    it(
+      'verifies database with matching marker via driver',
+      async () => {
+        await withDevDatabase(
+          async ({ connectionString }) => {
+            // Set up test directory from fixtures with db config
+            const testSetup = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+            const testDir = testSetup.testDir;
+            const configPath = testSetup.configPath;
 
-  // Write contract files
-  const contractJsonPath = resolve(testDir, contractConfig.output ?? 'src/prisma/contract.json');
-  const contractDtsPath = resolve(testDir, contractConfig.types ?? 'src/prisma/contract.d.ts');
-  mkdirSync(dirname(contractJsonPath), { recursive: true });
-  mkdirSync(dirname(contractDtsPath), { recursive: true });
-  writeFileSync(contractJsonPath, emitResult.contractJson, 'utf-8');
-  writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
+            // Emit contract first
+            const emitCommand = createContractEmitCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testDir);
+              await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
 
-  const contractJson = JSON.parse(emitResult.contractJson) as Record<string, unknown>;
-  return validateContract<SqlContract<SqlStorage>>(contractJson);
-}
-
-describe('db verify command (e2e)', () => {
-  let consoleOutput: string[] = [];
-  let consoleErrors: string[] = [];
-  let cleanupMocks: () => void;
-
-  beforeEach(() => {
-    // Set up console and process.exit mocks
-    const mocks = setupCommandMocks();
-    consoleOutput = mocks.consoleOutput;
-    consoleErrors = mocks.consoleErrors;
-    cleanupMocks = mocks.cleanup;
-  });
-
-  afterEach(() => {
-    cleanupMocks();
-    vi.restoreAllMocks();
-  });
-
-  it(
-    'verifies database with matching marker via driver',
-    async () => {
-      await withDevDatabase(
-        async ({ connectionString }) => {
-          // Set up test directory from fixtures with db config
-          const testSetup = setupTestDirectoryFromFixtures(
-            fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
-          );
-          const testDir = testSetup.testDir;
-          const configPath = testSetup.configPath;
-          const cleanupDir = testSetup.cleanup;
-
-          try {
-            // Emit contract using the config
-            const contract = await emitContractFromConfig(configPath, testDir);
+            // Load precomputed contract from disk
+            const contractJsonPath = join(testDir, 'output', 'contract.json');
+            const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
             await withClient(connectionString, async (client) => {
               // Setup marker schema and table
@@ -123,24 +87,27 @@ describe('db verify command (e2e)', () => {
               // withClient will close the client after this callback returns
             });
 
+            // Clear console output before running the command we want to test
+            // (previous commands like 'contract emit' may have added output)
+            const outputStartIndex = consoleOutput.length;
+
             const command = createDbVerifyCommand();
-            const originalCwd = process.cwd();
+            const verifyCwd = process.cwd();
             try {
               process.chdir(testDir);
-              await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+              await executeCommand(command, ['--config', configPath, '--json']);
             } finally {
-              process.chdir(originalCwd);
+              process.chdir(verifyCwd);
             }
 
             // Check exit code is 0 (success)
             const exitCode = getExitCode();
             expect(exitCode).toBe(0);
 
-            // Parse and verify JSON output
-            const jsonOutput = consoleOutput.join('\n');
-            expect(() => JSON.parse(jsonOutput)).not.toThrow();
-
-            const parsed = JSON.parse(jsonOutput);
+            // Parse and verify JSON output (only from this command)
+            // When --json is set, output should be clean JSON only
+            const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
+            const parsed = JSON.parse(output) as Record<string, unknown>;
             expect(parsed).toMatchObject({
               ok: true,
               summary: expect.any(String),
@@ -156,35 +123,41 @@ describe('db verify command (e2e)', () => {
             });
 
             // Verify coreHash matches
-            expect(parsed.contract.coreHash).toBe(contract.coreHash);
-            expect(parsed.marker.coreHash).toBe(contract.coreHash);
+            expect((parsed['contract'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
+            expect((parsed['marker'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
             expect(consoleErrors.length).toBe(0);
-          } finally {
-            cleanupDir();
-          }
-        },
-        // Use random ports to avoid conflicts in CI (no options = random ports)
-        {},
-      );
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'reports error when marker is missing via driver',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up test directory from fixtures with db config
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
+          },
+          // Use random ports to avoid conflicts in CI (no options = random ports)
+          {},
         );
-        const testDir = testSetup.testDir;
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-        try {
+    it(
+      'reports error when marker is missing via driver',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
+
+          // Emit contract first
+          const emitCommand = createContractEmitCommand();
+          const emitCwd1 = process.cwd();
+          try {
+            process.chdir(testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(emitCwd1);
+          }
+
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table but don't write marker
             await executeStatement(client, ensureSchemaStatement);
@@ -192,18 +165,19 @@ describe('db verify command (e2e)', () => {
             // withClient will close the client after this callback returns
           });
 
-          // Emit contract using the config
-          await emitContractFromConfig(configPath, testDir);
+          // Load precomputed contract from disk
+          const contractJsonPath = join(testDir, 'output', 'contract.json');
+          loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
           const command = createDbVerifyCommand();
-          const originalCwd = process.cwd();
+          const verifyCwd1 = process.cwd();
           try {
             process.chdir(testDir);
             await expect(
-              executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+              executeCommand(command, ['--config', configPath, '--json']),
             ).rejects.toThrow('process.exit called');
           } finally {
-            process.chdir(originalCwd);
+            process.chdir(verifyCwd1);
           }
 
           // Check exit code is non-zero (error)
@@ -221,31 +195,38 @@ describe('db verify command (e2e)', () => {
             fix: expect.any(String),
           });
           expect(parsed.summary).toContain('Marker missing');
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'outputs JSON when --json flag is provided via driver',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up test directory from fixtures with db config
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const testDir = testSetup.testDir;
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
+    it(
+      'outputs JSON when --json flag is provided via driver',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
 
-        try {
-          // Emit contract using the config
-          const contract = await emitContractFromConfig(configPath, testDir);
+          // Emit contract first
+          const emitCommand = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Load precomputed contract from disk
+          const contractJsonPath = join(testDir, 'output', 'contract.json');
+          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table
@@ -263,24 +244,27 @@ describe('db verify command (e2e)', () => {
             // withClient will close the client after this callback returns
           });
 
+          // Clear console output before running the command we want to test
+          // (previous commands like 'contract emit' may have added output)
+          const outputStartIndex = consoleOutput.length;
+
           const command = createDbVerifyCommand();
-          const originalCwd = process.cwd();
+          const verifyCwd2 = process.cwd();
           try {
             process.chdir(testDir);
-            await executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']);
+            await executeCommand(command, ['--config', configPath, '--json']);
           } finally {
-            process.chdir(originalCwd);
+            process.chdir(verifyCwd2);
           }
 
           // Check exit code is 0 (success)
           const exitCode = getExitCode();
           expect(exitCode).toBe(0);
 
-          const jsonOutput = consoleOutput.join('\n');
-          expect(jsonOutput).not.toBe('');
-          expect(() => JSON.parse(jsonOutput)).not.toThrow();
-
-          const parsed = JSON.parse(jsonOutput);
+          // Parse and verify JSON output (only from this command)
+          // When --json is used, only JSON should be output
+          const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
+          const parsed = JSON.parse(output) as Record<string, unknown>;
           expect(parsed).toMatchObject({
             ok: true,
             summary: expect.any(String),
@@ -300,29 +284,35 @@ describe('db verify command (e2e)', () => {
               total: expect.any(Number),
             },
           });
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'reports error with JSON when marker is missing and --json flag is provided via driver',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up test directory from fixtures with db config
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const testDir = testSetup.testDir;
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
+    it(
+      'reports error with JSON when marker is missing and --json flag is provided via driver',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up test directory from fixtures with db config
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
 
-        try {
+          // Emit contract first
+          const emitCommand = createContractEmitCommand();
+          const emitCwd2 = process.cwd();
+          try {
+            process.chdir(testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(emitCwd2);
+          }
+
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table but don't write marker
             await executeStatement(client, ensureSchemaStatement);
@@ -330,18 +320,21 @@ describe('db verify command (e2e)', () => {
             // withClient will close the client after this callback returns
           });
 
-          // Emit contract using the config
-          await emitContractFromConfig(configPath, testDir);
+          // Load precomputed contract from disk
+          const contractJsonPath = join(testDir, 'output', 'contract.json');
+          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+          expect(contract).toBeDefined();
+          expect(contract.coreHash).toBeDefined();
 
           const command = createDbVerifyCommand();
-          const originalCwd = process.cwd();
+          const verifyCwd4 = process.cwd();
           try {
             process.chdir(testDir);
             await expect(
-              executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+              executeCommand(command, ['--config', configPath, '--json']),
             ).rejects.toThrow('process.exit called');
           } finally {
-            process.chdir(originalCwd);
+            process.chdir(verifyCwd4);
           }
 
           // Check exit code is non-zero (error)
@@ -359,38 +352,58 @@ describe('db verify command (e2e)', () => {
             fix: expect.any(String),
           });
           expect(parsed.summary).toContain('Marker missing');
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'reports PN-CLI-4010 when driver is missing',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up test directory from fixtures with config that has db.url but no driver
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.no-query-runner.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const testDir = testSetup.testDir;
-        const cleanupDir = testSetup.cleanup;
+    it(
+      'reports PN-CLI-4010 when driver is missing',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up test directory from fixtures with config that has db.url but no driver
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.no-query-runner.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
 
-        // Emit contract using a config with driver (we need driver for emitContractFromConfig)
-        // Use the with-db config which has a driver
-        const emitTestSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const emitConfigPath = emitTestSetup.configPath;
+          // Emit contract first using the with-db config
+          const emitTestSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const emitConfigPath = emitTestSetup.configPath;
 
-        try {
-          const contract = await emitContractFromConfig(emitConfigPath, testDir);
+          const emitCommand = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(emitTestSetup.testDir);
+            await executeCommand(emitCommand, ['--config', emitConfigPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          const contractJsonPath = join(emitTestSetup.testDir, 'output', 'contract.json');
+          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+
+          // Copy contract file to the test directory so the command can read it
+          const testContractJsonPath = join(testDir, 'output', 'contract.json');
+          const testContractDtsPath = join(testDir, 'output', 'contract.d.ts');
+          mkdirSync(join(testDir, 'output'), { recursive: true });
+          copyFileSync(contractJsonPath, testContractJsonPath);
+          const emitContractDtsPath = join(emitTestSetup.testDir, 'output', 'contract.d.ts');
+          try {
+            await access(emitContractDtsPath);
+            copyFileSync(emitContractDtsPath, testContractDtsPath);
+          } catch {
+            // contract.d.ts doesn't exist, skip copying
+          }
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table
@@ -411,7 +424,7 @@ describe('db verify command (e2e)', () => {
           // Now test verify with the no-driver config
           // Mock loadConfig to return config without driver (bypassing validation)
           const originalLoadConfig = await import('../src/config-loader');
-          const loadConfigSpy = vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
+          vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
             family: {
               familyId: 'sql',
               create: vi.fn(),
@@ -430,47 +443,35 @@ describe('db verify command (e2e)', () => {
             },
           } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
 
+          const command = createDbVerifyCommand();
+          const verifyCwd3 = process.cwd();
           try {
-            const command = createDbVerifyCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testDir);
-              await expect(
-                executeCommand(command, [
-                  '--config',
-                  'prisma-next.config.no-query-runner.ts',
-                  '--json',
-                ]),
-              ).rejects.toThrow('process.exit called');
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            // Check exit code is non-zero (error)
-            const exitCode = getExitCode();
-            expect(exitCode).not.toBe(0);
-
-            const errorOutput = consoleErrors.join('\n');
-            expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-            const parsed = JSON.parse(errorOutput);
-            expect(parsed).toMatchObject({
-              code: 'PN-CLI-4010',
-              summary: expect.any(String),
-              why: expect.any(String),
-              fix: expect.any(String),
-            });
-            expect(parsed.summary).toContain('Driver is required for DB-connected commands');
-            expect(parsed.fix).toContain('Add driver to prisma-next.config.ts');
+            process.chdir(testDir);
+            await expect(
+              executeCommand(command, ['--config', configPath, '--json']),
+            ).rejects.toThrow('process.exit called');
           } finally {
-            loadConfigSpy.mockRestore();
+            process.chdir(verifyCwd3);
           }
-        } finally {
-          emitTestSetup.cleanup();
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+
+          // Check exit code is non-zero (error)
+          const exitCode = getExitCode();
+          expect(exitCode).not.toBe(0);
+
+          const errorOutput = consoleErrors.join('\n');
+          expect(() => JSON.parse(errorOutput)).not.toThrow();
+
+          const parsed = JSON.parse(errorOutput);
+          expect(parsed).toMatchObject({
+            code: 'PN-CLI-4010',
+            summary: expect.any(String),
+            why: expect.any(String),
+            fix: expect.any(String),
+          });
+          expect(parsed.summary).toContain('Driver is required');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });

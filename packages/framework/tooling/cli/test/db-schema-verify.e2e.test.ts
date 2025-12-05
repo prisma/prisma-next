@@ -6,96 +6,114 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDbSchemaVerifyCommand } from '../src/commands/db-schema-verify';
 import {
   executeCommand,
+  getExitCode,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
+  withTempDir,
 } from './utils/test-helpers';
 
 // Fixture subdirectory for db-schema-verify e2e tests
 const fixtureSubdir = 'db-schema-verify';
 
-describe('db schema-verify command (e2e)', () => {
-  let consoleOutput: string[] = [];
-  let cleanupMocks: () => void;
-  let cleanupDirs: Array<() => void> = [];
-
-  beforeEach(() => {
-    // Set up console and process.exit mocks
-    const mocks = setupCommandMocks();
-    consoleOutput = mocks.consoleOutput;
-    cleanupMocks = mocks.cleanup;
-    cleanupDirs = [];
-  });
-
-  afterEach(() => {
-    cleanupMocks();
-    // Clean up all test directories, even if test failed or timed out
-    for (const cleanupDir of cleanupDirs) {
-      try {
-        cleanupDir();
-      } catch (_error) {
-        // Ignore cleanup errors
-      }
+/**
+ * Creates a test contract JSON structure with the given tables.
+ * Each table must have columns, and optionally uniques.
+ * Primary key defaults to ['id'] for all tables.
+ */
+function createTestContract(
+  tables: Record<
+    string,
+    {
+      columns: Record<string, { codecId: string; nativeType: string; nullable: boolean }>;
+      uniques?: Array<{ columns: string[] }>;
     }
-  });
+  >,
+) {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    coreHash: 'sha256:test',
+    storage: {
+      tables: Object.fromEntries(
+        Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
+          name,
+          {
+            columns,
+            primaryKey: { columns: ['id'] },
+            uniques,
+            indexes: [],
+            foreignKeys: [],
+          },
+        ]),
+      ),
+    },
+    models: {},
+    relations: {},
+    mappings: {},
+    extensions: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+  };
+}
 
-  it(
-    'outputs verification tree with matching schema (TTY mode)',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up database schema first, then close connection
-        await withClient(connectionString, async (client) => {
-          await client.query(`
+withTempDir(({ createTempDir }) => {
+  describe('db schema-verify command (e2e)', () => {
+    let consoleOutput: string[] = [];
+    let consoleErrors: string[] = [];
+    let cleanupMocks: () => void;
+
+    beforeEach(() => {
+      // Set up console and process.exit mocks
+      const mocks = setupCommandMocks();
+      consoleOutput = mocks.consoleOutput;
+      consoleErrors = mocks.consoleErrors;
+      cleanupMocks = mocks.cleanup;
+    });
+
+    afterEach(() => {
+      cleanupMocks();
+    });
+
+    it(
+      'outputs verification tree with matching schema (TTY mode)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up database schema first, then close connection
+          await withClient(connectionString, async (client) => {
+            await client.query(`
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY,
                 email TEXT NOT NULL,
                 CONSTRAINT "user_email_unique" UNIQUE (email)
               )
             `);
-        });
+          });
 
-        // Set up test directory with config and contract
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+          // Set up test directory with config and contract
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
 
-        // Create contract.json matching the schema
-        const contractJson = {
-          schemaVersion: '1',
-          target: 'postgres',
-          targetFamily: 'sql',
-          coreHash: 'sha256:test',
-          storage: {
-            tables: {
-              user: {
-                columns: {
-                  id: { type: 'pg/int4@1', nullable: false },
-                  email: { type: 'pg/text@1', nullable: false },
-                },
-                primaryKey: { columns: ['id'] },
-                uniques: [{ columns: ['email'] }],
-                indexes: [],
-                foreignKeys: [],
+          // Create contract.json matching the schema
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
+              uniques: [{ columns: ['email'] }],
             },
-          },
-          models: {},
-          relations: {},
-          mappings: {},
-          extensions: {},
-          capabilities: {},
-          meta: {},
-          sources: {},
-        };
-        const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
-        mkdirSync(dirname(contractPath), { recursive: true });
-        writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
-        try {
           const command = createDbSchemaVerifyCommand();
           const originalCwd = process.cwd();
           try {
@@ -116,71 +134,47 @@ describe('db schema-verify command (e2e)', () => {
           expect(normalized).toContain('✔ Database schema satisfies contract');
           expect(normalized).toContain('schema');
           expect(normalized).toContain('user');
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'outputs JSON envelope with matching schema (JSON mode)',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up database schema first, then close connection
-        await withClient(connectionString, async (client) => {
-          await client.query(`
+    it(
+      'outputs JSON envelope with matching schema (JSON mode)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up database schema first, then close connection
+          await withClient(connectionString, async (client) => {
+            await client.query(`
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY,
                 email TEXT NOT NULL
               )
             `);
-        });
+          });
 
-        // Set up test directory with config and contract
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+          // Set up test directory with config and contract
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
 
-        // Create contract.json matching the schema
-        const contractJson = {
-          schemaVersion: '1',
-          target: 'postgres',
-          targetFamily: 'sql',
-          coreHash: 'sha256:test',
-          storage: {
-            tables: {
-              user: {
-                columns: {
-                  id: { type: 'pg/int4@1', nullable: false },
-                  email: { type: 'pg/text@1', nullable: false },
-                },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+          // Create contract.json matching the schema
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-          },
-          models: {},
-          relations: {},
-          mappings: {},
-          extensions: {},
-          capabilities: {},
-          meta: {},
-          sources: {},
-        };
-        const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
-        mkdirSync(dirname(contractPath), { recursive: true });
-        writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
-        try {
           const command = createDbSchemaVerifyCommand();
           const originalCwd = process.cwd();
           try {
@@ -202,81 +196,53 @@ describe('db schema-verify command (e2e)', () => {
           expect(jsonOutput.schema.counts).toBeDefined();
           expect(jsonOutput.schema.counts.fail).toBe(0);
           expect(jsonOutput.schema.counts.pass).toBeGreaterThan(0);
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'outputs failures with non-matching schema',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up database schema first, then close connection
-        await withClient(connectionString, async (client) => {
-          await client.query(`
+    it(
+      'outputs failures with non-matching schema',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up database schema first, then close connection
+          await withClient(connectionString, async (client) => {
+            await client.query(`
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY,
                 email TEXT NOT NULL
               )
             `);
-        });
+          });
 
-        // Set up test directory with config and contract
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+          // Set up test directory with config and contract
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
 
-        // Create contract.json with missing table
-        const contractJson = {
-          schemaVersion: '1',
-          target: 'postgres',
-          targetFamily: 'sql',
-          coreHash: 'sha256:test',
-          storage: {
-            tables: {
-              user: {
-                columns: {
-                  id: { type: 'pg/int4@1', nullable: false },
-                  email: { type: 'pg/text@1', nullable: false },
-                },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
-              post: {
-                columns: {
-                  id: { type: 'pg/int4@1', nullable: false },
-                  title: { type: 'pg/text@1', nullable: false },
-                },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+          // Create contract.json with missing table
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-          },
-          models: {},
-          relations: {},
-          mappings: {},
-          extensions: {},
-          capabilities: {},
-          meta: {},
-          sources: {},
-        };
-        const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
-        mkdirSync(dirname(contractPath), { recursive: true });
-        writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+            post: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
-        try {
           const command = createDbSchemaVerifyCommand();
           const originalCwd = process.cwd();
           try {
@@ -296,72 +262,48 @@ describe('db schema-verify command (e2e)', () => {
           expect(stripped).toContain('✖');
           expect(stripped).toContain('does not satisfy contract');
           expect(stripped).toContain('post');
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'strict mode fails on extra columns',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up database schema with extra column first, then close connection
-        await withClient(connectionString, async (client) => {
-          await client.query(`
+    it(
+      'strict mode fails on extra columns',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up database schema with extra column first, then close connection
+          await withClient(connectionString, async (client) => {
+            await client.query(`
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY,
                 email TEXT NOT NULL,
                 "extraColumn" TEXT
               )
             `);
-        });
+          });
 
-        // Set up test directory with config and contract
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+          // Set up test directory with config and contract
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
 
-        // Create contract.json without extra column
-        const contractJson = {
-          schemaVersion: '1',
-          target: 'postgres',
-          targetFamily: 'sql',
-          coreHash: 'sha256:test',
-          storage: {
-            tables: {
-              user: {
-                columns: {
-                  id: { type: 'pg/int4@1', nullable: false },
-                  email: { type: 'pg/text@1', nullable: false },
-                },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+          // Create contract.json without extra column
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-          },
-          models: {},
-          relations: {},
-          mappings: {},
-          extensions: {},
-          capabilities: {},
-          meta: {},
-          sources: {},
-        };
-        const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
-        mkdirSync(dirname(contractPath), { recursive: true });
-        writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
-        try {
           const command = createDbSchemaVerifyCommand();
           const originalCwd = process.cwd();
           try {
@@ -381,72 +323,48 @@ describe('db schema-verify command (e2e)', () => {
           // Verify failure in strict mode
           expect(stripped).toContain('✖');
           expect(stripped).toContain('does not satisfy contract');
-        } finally {
-          cleanupDir();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-  it(
-    'permissive mode passes with extra columns',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Set up database schema with extra column first, then close connection
-        await withClient(connectionString, async (client) => {
-          await client.query(`
+    it(
+      'permissive mode passes with extra columns',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          // Set up database schema with extra column first, then close connection
+          await withClient(connectionString, async (client) => {
+            await client.query(`
               CREATE TABLE IF NOT EXISTS "user" (
                 id SERIAL PRIMARY KEY,
                 email TEXT NOT NULL,
                 "extraColumn" TEXT
               )
             `);
-        });
+          });
 
-        // Set up test directory with config and contract
-        const testSetup = setupTestDirectoryFromFixtures(
-          fixtureSubdir,
-          'prisma-next.config.with-db.ts',
-          { '{{DB_URL}}': connectionString },
-        );
-        const configPath = testSetup.configPath;
-        const cleanupDir = testSetup.cleanup;
-        cleanupDirs.push(cleanupDir); // Track for afterEach cleanup
+          // Set up test directory with config and contract
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
 
-        // Create contract.json without extra column
-        const contractJson = {
-          schemaVersion: '1',
-          target: 'postgres',
-          targetFamily: 'sql',
-          coreHash: 'sha256:test',
-          storage: {
-            tables: {
-              user: {
-                columns: {
-                  id: { type: 'pg/int4@1', nullable: false },
-                  email: { type: 'pg/text@1', nullable: false },
-                },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+          // Create contract.json without extra column
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
             },
-          },
-          models: {},
-          relations: {},
-          mappings: {},
-          extensions: {},
-          capabilities: {},
-          meta: {},
-          sources: {},
-        };
-        const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
-        mkdirSync(dirname(contractPath), { recursive: true });
-        writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
-        try {
           const command = createDbSchemaVerifyCommand();
           const originalCwd = process.cwd();
           try {
@@ -463,11 +381,472 @@ describe('db schema-verify command (e2e)', () => {
 
           // Verify success in permissive mode
           expect(stripped).toContain('✔ Database schema satisfies contract');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles missing database URL',
+      async () => {
+        const testDir = createTempDir();
+        const configPath = resolve(testDir, 'prisma-next.config.ts');
+
+        // Create config file without db.url
+        const configContent = `import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import postgres from '@prisma-next/targets-postgres/control';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensions: [],
+  contract: {
+    source: './contract.ts',
+    output: './src/prisma/contract.json',
+  },
+  // db.url is intentionally missing - this is what we're testing
+});`;
+        mkdirSync(dirname(configPath), { recursive: true });
+        writeFileSync(configPath, configContent, 'utf-8');
+
+        const contractJson = createTestContract({
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+          },
+        });
+        const contractPath = resolve(testDir, 'src/prisma/contract.json');
+        mkdirSync(dirname(contractPath), { recursive: true });
+        writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+        const command = createDbSchemaVerifyCommand();
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDir);
+          // Don't provide --db flag, and config has no db.url
+          await expect(
+            executeCommand(command, ['--config', configPath, '--no-color']),
+          ).rejects.toThrow();
         } finally {
-          cleanupDir();
+          process.chdir(originalCwd);
         }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+
+        // Verify that database URL required error was thrown
+        const errorOutput = consoleErrors.join('\n');
+        const allOutput = `${consoleOutput.join('\n')}\n${errorOutput}`;
+        // Error should be in either consoleErrors or consoleOutput
+        expect(allOutput).toMatch(/PN-CLI-4005|Database URL is required/i);
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles missing contract file (ENOENT error)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Don't create contract.json - it should be missing
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify error output (errors go to stderr/consoleErrors)
+          const errorOutput = consoleErrors.join('\n');
+          expect(errorOutput).toContain('PN-CLI-4');
+          expect(errorOutput).toMatch(/file.*not found|not found.*file/i);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles contract JSON parse errors (invalid JSON content)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Create a contract file with invalid JSON (causes JSON.parse SyntaxError)
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, 'invalid json content', 'utf-8');
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            // JSON.parse throws SyntaxError, which is caught and wrapped as errorUnexpected
+            // The command should exit with non-zero code or throw
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify error was handled (command failed)
+          // The error path is covered even if we don't check the exact error message format
+          // This tests the branch where file read succeeds but JSON.parse fails
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles quiet mode flag',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, ['--config', configPath, '--quiet', '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // In quiet mode, only errors should be output
+          const output = consoleOutput.join('\n');
+          expect(output).not.toContain('Database schema satisfies contract');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles verbose mode flag',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, ['--config', configPath, '--verbose', '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verbose mode should include additional output
+          const output = consoleOutput.join('\n');
+          expect(output).toContain('Database schema satisfies contract');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'exits with code 1 when schema verification fails',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            // Create a table that doesn't match the contract (missing column)
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Contract expects both id and email columns, but database only has id
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            // executeCommand throws for non-zero exit codes
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow('process.exit called');
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify that schema verification failure was detected (exit code 1)
+          expect(getExitCode()).toBe(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'adds blank line after spinners when TTY and not quiet/JSON',
+      async () => {
+        const originalIsTTY = process.stdout.isTTY;
+        process.stdout.isTTY = true;
+
+        try {
+          await withDevDatabase(async ({ connectionString }) => {
+            await withClient(connectionString, async (client) => {
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS "user" (
+                  id SERIAL PRIMARY KEY,
+                  email TEXT NOT NULL
+                )
+              `);
+            });
+
+            const testSetup = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+            const configPath = testSetup.configPath;
+
+            const contractJson = createTestContract({
+              user: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                },
+              },
+            });
+            const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+            mkdirSync(dirname(contractPath), { recursive: true });
+            writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+            const command = createDbSchemaVerifyCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testSetup.testDir);
+              await executeCommand(command, ['--config', configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            const output = consoleOutput.join('\n');
+            expect(output).toContain('Database schema satisfies contract');
+          });
+        } finally {
+          process.stdout.isTTY = originalIsTTY;
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'includes database URL in header when --db flag is provided',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          // Clear console output before running the command we want to test
+          const outputStartIndex = consoleOutput.length;
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            // Provide --db flag even though config has db.url - this tests the options.db branch
+            await executeCommand(command, [
+              '--config',
+              configPath,
+              '--db',
+              connectionString,
+              '--no-color',
+            ]);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify that database URL was included in header (from --db flag)
+          const output = consoleOutput.slice(outputStartIndex).join('\n');
+          expect(output).toContain('database');
+          // Database URL should be in the output
+          expect(output).toMatch(/127\.0\.0\.1|localhost/);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles missing driver in config',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          // Modify config to remove driver
+          const { readFile, writeFile } = await import('node:fs/promises');
+          const configContent = await readFile(configPath, 'utf-8');
+          // Remove driver line
+          const modifiedConfig = configContent.replace(/driver:\s*postgresDriver,?\s*\n/g, '');
+          await writeFile(configPath, modifiedConfig, 'utf-8');
+
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
+          mkdirSync(dirname(contractPath), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const command = createDbSchemaVerifyCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await expect(
+              executeCommand(command, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          // Verify that driver required error was thrown
+          const errorOutput = consoleErrors.join('\n');
+          expect(errorOutput).toContain('PN-CLI-4');
+          expect(errorOutput).toMatch(/driver.*required|required.*driver/i);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });

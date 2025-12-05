@@ -2,6 +2,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import { vectorColumn as vectorColumnType } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createStubAdapter, createTestContext } from './utils';
 
@@ -20,7 +21,7 @@ describe('Operation capability gating', () => {
         tables: {
           user: {
             columns: {
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              vector: { ...vectorColumnType, nullable: false },
             },
             primaryKey: { columns: ['vector'] },
             uniques: [],
@@ -35,7 +36,7 @@ describe('Operation capability gating', () => {
     });
 
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -75,7 +76,7 @@ describe('Operation capability gating', () => {
         tables: {
           user: {
             columns: {
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              vector: { ...vectorColumnType, nullable: false },
             },
             primaryKey: { columns: ['vector'] },
             uniques: [],
@@ -90,7 +91,7 @@ describe('Operation capability gating', () => {
     });
 
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -130,7 +131,7 @@ describe('Operation capability gating', () => {
         tables: {
           user: {
             columns: {
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              vector: { ...vectorColumnType, nullable: false },
             },
             primaryKey: { columns: ['vector'] },
             uniques: [],
@@ -145,7 +146,7 @@ describe('Operation capability gating', () => {
     });
 
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },
@@ -188,7 +189,7 @@ describe('Operation capability gating', () => {
         tables: {
           user: {
             columns: {
-              vector: { type: 'pgvector/vector@1', nullable: false },
+              vector: { ...vectorColumnType, nullable: false },
             },
             primaryKey: { columns: ['vector'] },
             uniques: [],
@@ -203,7 +204,7 @@ describe('Operation capability gating', () => {
     });
 
     const signature: SqlOperationSignature = {
-      forTypeId: 'pgvector/vector@1',
+      forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
       args: [{ kind: 'param' }],
       returns: { kind: 'builtin', type: 'number' },

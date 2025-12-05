@@ -68,7 +68,8 @@ export interface DocumentContract extends ContractBase {
 export interface ParamDescriptor {
   readonly index?: number;
   readonly name?: string;
-  readonly type?: string;
+  readonly codecId?: string;
+  readonly nativeType?: string;
   readonly nullable?: boolean;
   readonly source: 'dsl' | 'raw';
   readonly refs?: { table: string; column: string };

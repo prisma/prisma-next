@@ -193,10 +193,11 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         projectionTypes[alias] = operationExpr.returns.type;
       }
     } else {
-      const colMeta = col as unknown as { columnMeta?: { type?: string } };
+      const colMeta = col as unknown as { columnMeta?: { codecId: string } };
       const columnMeta = colMeta.columnMeta;
-      if (columnMeta?.type) {
-        projectionTypes[alias] = columnMeta.type;
+      const codecId = columnMeta?.codecId;
+      if (codecId) {
+        projectionTypes[alias] = codecId;
       }
     }
   }
@@ -217,10 +218,11 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         projectionCodecs[alias] = operationExpr.returns.type;
       }
     } else {
-      const col = column as unknown as { columnMeta?: { type?: string } };
+      const col = column as unknown as { columnMeta?: { codecId: string } };
       const columnMeta = col.columnMeta;
-      if (columnMeta?.type) {
-        projectionCodecs[alias] = columnMeta.type;
+      const codecId = columnMeta?.codecId;
+      if (codecId) {
+        projectionCodecs[alias] = codecId;
       }
     }
   }

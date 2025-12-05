@@ -1,5 +1,5 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -8,6 +8,17 @@ import { describe, expect, it } from 'vitest';
 import { buildWhereExpr } from '../../src/selection/predicates';
 
 describe('predicates', () => {
+  const int4ColumnMeta: StorageColumn = {
+    nativeType: 'int4',
+    codecId: 'pg/int4@1',
+    nullable: false,
+  };
+  const textColumnMeta: StorageColumn = {
+    nativeType: 'text',
+    codecId: 'pg/text@1',
+    nullable: true,
+  };
+
   const contract: SqlContract<SqlStorage> = {
     schemaVersion: '1',
     target: 'postgres',
@@ -18,8 +29,8 @@ describe('predicates', () => {
       tables: {
         user: {
           columns: {
-            id: { type: 'pg/int4@1', nullable: false },
-            email: { type: 'pg/text@1', nullable: true },
+            id: int4ColumnMeta,
+            email: textColumnMeta,
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -49,7 +60,7 @@ describe('predicates', () => {
           kind: 'column',
           table: 'user',
           column: 'id',
-          columnMeta: { type: 'pg/int4@1', nullable: false },
+          columnMeta: int4ColumnMeta,
           eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
           asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
           desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -76,7 +87,8 @@ describe('predicates', () => {
         descriptorName: descriptors[0]?.name,
         descriptorSource: descriptors[0]?.source,
         descriptorRefs: descriptors[0]?.refs,
-        descriptorType: descriptors[0]?.type,
+        descriptorCodecId: descriptors[0]?.codecId,
+        descriptorNativeType: descriptors[0]?.nativeType,
         descriptorNullable: descriptors[0]?.nullable,
       }).toMatchObject({
         exprKind: 'bin',
@@ -90,7 +102,8 @@ describe('predicates', () => {
         descriptorName: 'userId',
         descriptorSource: 'dsl',
         descriptorRefs: { table: 'user', column: 'id' },
-        descriptorType: 'pg/int4@1',
+        descriptorCodecId: 'pg/int4@1',
+        descriptorNativeType: 'int4',
         descriptorNullable: false,
       });
     });
@@ -102,7 +115,7 @@ describe('predicates', () => {
           kind: 'column',
           table: 'user',
           column: 'email',
-          columnMeta: { type: 'pg/text@1', nullable: true },
+          columnMeta: textColumnMeta,
           eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
           asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
           desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -173,7 +186,7 @@ describe('predicates', () => {
           kind: 'column',
           table: 'user',
           column: 'unknown',
-          columnMeta: { type: 'pg/int4@1', nullable: false },
+          columnMeta: int4ColumnMeta,
           eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
           asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
           desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -191,7 +204,7 @@ describe('predicates', () => {
       expect(result.codecId).toBeUndefined();
     });
 
-    it('builds where expr without type in descriptor when columnMeta.type is missing', () => {
+    it('builds where expr with codecId from contract when columnMeta.codecId is missing', () => {
       const where: BinaryBuilder = {
         kind: 'binary',
         left: {
@@ -213,7 +226,8 @@ describe('predicates', () => {
 
       buildWhereExpr(where, contract, paramsMap, descriptors, values);
 
-      expect(descriptors[0]?.type).toBeUndefined();
+      // codecId and nativeType come from contract, not columnMeta
+      expect(descriptors[0]).toMatchObject({ codecId: 'pg/int4@1', nativeType: 'int4' });
     });
 
     it('builds where expr without nullable in descriptor when columnMeta.nullable is missing', () => {
@@ -223,7 +237,7 @@ describe('predicates', () => {
           kind: 'column',
           table: 'user',
           column: 'id',
-          columnMeta: { type: 'pg/int4@1' },
+          columnMeta: { codecId: 'pg/int4@1' },
           eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
           asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
           desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -248,7 +262,7 @@ describe('predicates', () => {
           kind: 'column',
           table: 'user',
           column: 'id',
-          columnMeta: { type: 'pg/int4@1', nullable: false },
+          columnMeta: int4ColumnMeta,
           eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
           asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
           desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
@@ -273,7 +287,7 @@ describe('predicates', () => {
           kind: 'column',
           table: 'user',
           column: 'id',
-          columnMeta: { type: 'pg/int4@1', nullable: false },
+          columnMeta: int4ColumnMeta,
           eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
           asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
           desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),

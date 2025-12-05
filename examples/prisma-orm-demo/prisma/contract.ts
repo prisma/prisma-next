@@ -1,14 +1,15 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { textColumn, timestamptzColumn } from '@prisma-next/adapter-postgres/column-types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 
 export const contract = defineContract<CodecTypes>()
   .target('postgres')
   .table('User', (t) =>
     t
-      .column('id', { type: 'pg/text@1', nullable: false })
-      .column('email', { type: 'pg/text@1', nullable: false })
-      .column('name', { type: 'pg/text@1', nullable: false })
-      .column('createdAt', { type: 'pg/timestamptz@1', nullable: false })
+      .column('id', { type: textColumn, nullable: false })
+      .column('email', { type: textColumn, nullable: false })
+      .column('name', { type: textColumn, nullable: false })
+      .column('createdAt', { type: timestamptzColumn, nullable: false })
       .primaryKey(['id']),
   )
   .model('User', 'User', (m) =>

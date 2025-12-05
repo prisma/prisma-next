@@ -1,4 +1,5 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { QueryAst } from './ast/types';
 
 /**
@@ -17,4 +18,22 @@ export interface SqlQueryPlan<_Row = unknown>
   // Phantom property to preserve generic parameter for type extraction
   // This allows ResultType to extract _Row for SqlQueryPlan values.
   readonly _Row?: _Row;
+}
+
+/**
+ * Augments the last ParamDescriptor in the array with codecId and nativeType from columnMeta.
+ * This is used when building WHERE expressions to ensure param descriptors have type information.
+ */
+export function augmentDescriptorWithColumnMeta(
+  descriptors: ParamDescriptor[],
+  columnMeta: StorageColumn | undefined,
+): void {
+  const descriptor = descriptors[descriptors.length - 1];
+  if (descriptor && columnMeta) {
+    descriptors[descriptors.length - 1] = {
+      ...descriptor,
+      codecId: columnMeta.codecId,
+      nativeType: columnMeta.nativeType,
+    };
+  }
 }

@@ -1,12 +1,12 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 
-const contractObj = defineContract<CodecTypes>()
+const contractObj = defineContract<Record<string, never>>()
   .target('postgres')
   .table('user', (t) =>
     t
-      .column('id', { type: 'pg/int4@1', nullable: false })
-      .column('email', { type: 'pg/text@1', nullable: false })
+      .column('id', { type: int4Column, nullable: false })
+      .column('email', { type: textColumn, nullable: false })
       .primaryKey(['id']),
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))

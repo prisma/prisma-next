@@ -3,6 +3,8 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     index: 'src/exports/index.ts',
+    'column-descriptors': 'src/column-descriptors.ts',
+    'operation-descriptors': 'src/operation-descriptors.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],

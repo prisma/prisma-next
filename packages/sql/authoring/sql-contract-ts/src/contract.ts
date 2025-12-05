@@ -21,7 +21,8 @@ import type { O } from 'ts-toolbelt';
  * This validates the shape and types of the contract structure.
  */
 const StorageColumnSchema = type.declare<StorageColumn>().type({
-  type: 'string',
+  nativeType: 'string',
+  codecId: 'string',
   nullable: 'boolean',
 });
 
@@ -402,10 +403,12 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
           const normalizedColumns: Record<string, unknown> = {};
           for (const [columnName, column] of Object.entries(columns)) {
             const columnObj = column as Record<string, unknown>;
-            normalizedColumns[columnName] = {
+            const normalizedColumn: Record<string, unknown> = {
               ...columnObj,
               nullable: columnObj['nullable'] ?? false,
             };
+
+            normalizedColumns[columnName] = normalizedColumn;
           }
 
           // Normalize table arrays: add empty arrays if missing

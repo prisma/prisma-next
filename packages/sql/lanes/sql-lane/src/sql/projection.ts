@@ -95,7 +95,7 @@ export function buildProjectionState(
         kind: 'column',
         table: matchingInclude.table.name,
         column: '',
-        columnMeta: { type: 'core/json@1', nullable: true },
+        columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
       } as AnyColumnBuilder);
     } else if (isColumnBuilder(value)) {
       const alias = tracker.register([key]);

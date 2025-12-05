@@ -24,13 +24,11 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
             "name": "email",
             "nativeType": "text",
             "nullable": false,
-            "typeId": "unmapped",
           },
           "id": {
             "name": "id",
             "nativeType": "int4",
             "nullable": false,
-            "typeId": "unmapped",
           },
         },
         "foreignKeys": [],

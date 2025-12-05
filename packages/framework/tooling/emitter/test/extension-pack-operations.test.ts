@@ -22,9 +22,9 @@ describe('ExtensionPackManifest with operations', () => {
       version: '1.2.0',
       operations: [
         {
-          for: 'pgvector/vector@1',
+          for: 'pg/vector@1',
           method: 'cosineDistance',
-          args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+          args: [{ kind: 'typeId', type: 'pg/vector@1' }],
           returns: { kind: 'builtin', type: 'number' },
           lowering: {
             targetFamily: 'sql',
@@ -41,7 +41,7 @@ describe('ExtensionPackManifest with operations', () => {
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations).toBeDefined();
     expect(loaded.operations).toHaveLength(1);
-    expect(loaded.operations?.[0]?.for).toBe('pgvector/vector@1');
+    expect(loaded.operations?.[0]?.for).toBe('pg/vector@1');
     expect(loaded.operations?.[0]?.method).toBe('cosineDistance');
   });
 
@@ -63,9 +63,9 @@ describe('ExtensionPackManifest with operations', () => {
       version: '1.2.0',
       operations: [
         {
-          for: 'pgvector/vector@1',
+          for: 'pg/vector@1',
           method: 'cosineDistance',
-          args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+          args: [{ kind: 'typeId', type: 'pg/vector@1' }],
           returns: { kind: 'builtin', type: 'number' },
           lowering: {
             targetFamily: 'sql',
@@ -75,9 +75,9 @@ describe('ExtensionPackManifest with operations', () => {
           },
         },
         {
-          for: 'pgvector/vector@1',
+          for: 'pg/vector@1',
           method: 'l2Distance',
-          args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+          args: [{ kind: 'typeId', type: 'pg/vector@1' }],
           returns: { kind: 'builtin', type: 'number' },
           lowering: {
             targetFamily: 'sql',
@@ -101,9 +101,9 @@ describe('ExtensionPackManifest with operations', () => {
       version: '1.2.0',
       operations: [
         {
-          for: 'pgvector/vector@1',
+          for: 'pg/vector@1',
           method: 'cosineDistance',
-          args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
+          args: [{ kind: 'typeId', type: 'pg/vector@1' }],
           returns: { kind: 'builtin', type: 'number' },
           lowering: {
             targetFamily: 'sql',
@@ -128,7 +128,7 @@ describe('ExtensionPackManifest with operations', () => {
       version: '1.2.0',
       operations: [
         {
-          for: 'pgvector/vector@1',
+          for: 'pg/vector@1',
           method: 'cosineDistance',
           args: [{ kind: 'param' }],
           returns: { kind: 'builtin', type: 'number' },
@@ -154,7 +154,7 @@ describe('ExtensionPackManifest with operations', () => {
       version: '1.2.0',
       operations: [
         {
-          for: 'pgvector/vector@1',
+          for: 'pg/vector@1',
           method: 'cosineDistance',
           args: [{ kind: 'literal' }],
           returns: { kind: 'builtin', type: 'number' },
@@ -180,10 +180,10 @@ describe('ExtensionPackManifest with operations', () => {
       version: '1.2.0',
       operations: [
         {
-          for: 'pgvector/vector@1',
+          for: 'pg/vector@1',
           method: 'normalize',
           args: [],
-          returns: { kind: 'typeId', type: 'pgvector/vector@1' },
+          returns: { kind: 'typeId', type: 'pg/vector@1' },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
@@ -199,7 +199,7 @@ describe('ExtensionPackManifest with operations', () => {
     const loaded = loadExtensionPackManifest(tempDir);
     expect(loaded.operations?.[0]?.returns).toEqual({
       kind: 'typeId',
-      type: 'pgvector/vector@1',
+      type: 'pg/vector@1',
     });
   });
 
@@ -209,7 +209,7 @@ describe('ExtensionPackManifest with operations', () => {
       version: '1.2.0',
       operations: [
         {
-          for: 'pgvector/vector@1',
+          for: 'pg/vector@1',
           method: 'cosineDistance',
           args: [{ kind: 'invalid' }],
           returns: { kind: 'builtin', type: 'number' },
