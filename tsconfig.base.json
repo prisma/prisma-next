@@ -16,92 +16,9 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "declaration": true,
+    "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@prisma-next/adapter-postgres/cli": ["packages/targets/postgres-adapter/src/exports/cli.ts"],
-      "@prisma-next/adapter-postgres/runtime": [
-        "packages/targets/postgres-adapter/src/exports/runtime.ts"
-      ],
-      "@prisma-next/adapter-postgres/*": ["packages/targets/postgres-adapter/src/exports/*.ts"],
-      "@prisma-next/driver-postgres/control": [
-        "packages/targets/postgres-driver/src/exports/control.ts"
-      ],
-      "@prisma-next/driver-postgres/runtime": [
-        "packages/targets/postgres-driver/src/exports/runtime.ts"
-      ],
-      "@prisma-next/driver-postgres/*": ["packages/targets/postgres-driver/src/exports/*.ts"],
-      "@prisma-next/contract": ["packages/framework/core-contract/src/exports/types.ts"],
-      "@prisma-next/contract/*": ["packages/framework/core-contract/src/exports/*.ts"],
-      "@prisma-next/control-plane": ["packages/framework/core-control-plane/src/exports/types.ts"],
-      "@prisma-next/control-plane/types": [
-        "packages/framework/core-control-plane/src/exports/types.ts"
-      ],
-      "@prisma-next/control-plane/executor": [
-        "packages/framework/core-control-plane/src/exports/executor.ts"
-      ],
-      "@prisma-next/control-plane/pack-manifest-types": [
-        "packages/framework/core-control-plane/src/pack-manifest-types.ts"
-      ],
-      "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
-      "@prisma-next/cli/*": ["packages/framework/tooling/cli/src/exports/*.ts"],
-      "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
-      "@prisma-next/emitter/*": ["packages/framework/tooling/emitter/src/exports/*.ts"],
-      "@prisma-next/compat-prisma": ["packages/extensions/compat-prisma/src/exports/index.ts"],
-      "@prisma-next/compat-prisma/*": ["packages/extensions/compat-prisma/src/exports/*.ts"],
-      "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
-      "@prisma-next/operations": ["packages/framework/core-operations/src/index.ts"],
-      "@prisma-next/core-control-plane/config-types": [
-        "packages/framework/core-control-plane/src/exports/config-types.ts"
-      ],
-      "@prisma-next/core-control-plane/config-validation": [
-        "packages/framework/core-control-plane/src/exports/config-validation.ts"
-      ],
-      "@prisma-next/core-control-plane/emission": [
-        "packages/framework/core-control-plane/src/exports/emission.ts"
-      ],
-      "@prisma-next/core-control-plane/verify-database": [
-        "packages/framework/core-control-plane/src/exports/verify-database.ts"
-      ],
-      "@prisma-next/core-control-plane/errors": [
-        "packages/framework/core-control-plane/src/exports/errors.ts"
-      ],
-      "@prisma-next/core-control-plane/pack-manifest-types": [
-        "packages/framework/core-control-plane/src/exports/pack-manifest-types.ts"
-      ],
-      "@prisma-next/core-control-plane/types": [
-        "packages/framework/core-control-plane/src/exports/types.ts"
-      ],
-      "@prisma-next/core-execution-plane/types": [
-        "packages/framework/core-execution-plane/src/exports/types.ts"
-      ],
-      "@prisma-next/contract-authoring": [
-        "packages/framework/authoring/contract-authoring/src/index.ts"
-      ],
-      "@prisma-next/contract-ts": ["packages/framework/authoring/contract-ts/src/index.ts"],
-      "@prisma-next/contract-psl": ["packages/framework/authoring/contract-psl/src/index.ts"],
-      "@prisma-next/sql-contract": ["packages/sql/contract/src/index.ts"],
-      "@prisma-next/sql-contract/*": ["packages/sql/contract/src/exports/*.ts"],
-      "@prisma-next/sql-operations": ["packages/sql/operations/src/index.ts"],
-      "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
-      "@prisma-next/family-sql/control": ["packages/sql/family/src/exports/control.ts"],
-      "@prisma-next/family-sql/control-adapter": [
-        "packages/sql/family/src/core/control-adapter.ts"
-      ],
-      "@prisma-next/family-sql/runtime": ["packages/sql/family/src/exports/runtime.ts"],
-      "@prisma-next/targets-postgres/control": ["packages/targets/postgres/src/exports/control.ts"],
-      "@prisma-next/targets-postgres/cli": ["packages/targets/postgres/src/exports/cli.ts"],
-      "@prisma-next/targets-postgres/runtime": ["packages/targets/postgres/src/exports/runtime.ts"],
-      "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
-      "@prisma-next/sql-relational-core/*": ["packages/sql/lanes/relational-core/src/exports/*.ts"],
-      "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
-      "@prisma-next/sql-lane/*": ["packages/sql/lanes/sql-lane/src/exports/*.ts"],
-      "@prisma-next/sql-orm-lane": ["packages/sql/lanes/orm-lane/src/index.ts"],
-      "@prisma-next/sql-contract-ts/*": ["packages/sql/authoring/sql-contract-ts/src/exports/*.ts"],
-      "@prisma-next/runtime-executor": ["packages/framework/runtime-executor/src/index.ts"],
-      "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/exports/index.ts"],
-      "@prisma-next/sql-runtime/test/utils": ["packages/sql/sql-runtime/test/utils.ts"]
-    }
+    "baseUrl": "."
   },
   "references": [
     { "path": "./packages/relational-ir" },

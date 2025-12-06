@@ -1,10 +1,6 @@
 import { planInvalid } from '@prisma-next/plan';
-import type {
-  AnyColumnBuilder,
-  JoinOnBuilder,
-  JoinOnPredicate,
-} from '@prisma-next/sql-relational-core/types';
-import { isColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type { AnyColumnBuilder, JoinOnBuilder, JoinOnPredicate } from '../types';
+import { isColumnBuilder } from '../types';
 import type { ColumnRef, JoinAst, JoinOnExpr, TableRef } from './types';
 
 export function createJoin(

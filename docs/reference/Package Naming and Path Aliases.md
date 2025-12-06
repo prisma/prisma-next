@@ -36,62 +36,39 @@ This document defines the relationship between the repository directory layout a
 - `packages/sql/runtime/drivers/postgres` → `@prisma-next/driver-postgres`
 - `packages/extensions/compat-prisma` → `@prisma-next/compat-prisma`
 
-## TypeScript Path Aliases (dev-time)
+## Workspace Dependencies
 
-Use published package names as canonical import specifiers. Map them to `src/` entries in `tsconfig.base.json` for local development.
+Every import from another `@prisma-next/*` package requires an explicit `workspace:*` dependency in `package.json`. TypeScript resolves imports through `node_modules` symlinks created by pnpm.
 
-```jsonc
+### Adding a Dependency
+
+```bash
+# From the package directory
+pnpm add @prisma-next/some-package@workspace:*
+```
+
+Or manually add to `package.json` (keep alphabetical order):
+
+```json
 {
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@prisma-next/contract": ["packages/contract/src/exports/types.ts"],
-      "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
-      "@prisma-next/operations": ["packages/framework/core-operations/src/index.ts"],
-
-      "@prisma-next/contract-authoring": ["packages/framework/authoring/contract-authoring/src/index.ts"],
-      "@prisma-next/contract-ts": ["packages/framework/authoring/contract-ts/src/index.ts"],
-      "@prisma-next/contract-psl": ["packages/framework/authoring/contract-psl/src/index.ts"],
-      "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
-      "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
-      "@prisma-next/runtime-executor": ["packages/framework/runtime-executor/src/index.ts"],
-
-      "@prisma-next/sql-contract-ts": ["packages/sql/authoring/sql-contract-ts/src/exports/index.ts"],
-      "@prisma-next/sql-contract": ["packages/sql/contract/src/exports/types.ts"],
-      "@prisma-next/sql-operations": ["packages/sql/operations/src/index.ts"],
-      "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
-
-      "@prisma-next/sql-relational-core": ["packages/sql/lanes/relational-core/src/index.ts"],
-      "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
-      "@prisma-next/sql-orm-lane": ["packages/sql/lanes/orm-lane/src/index.ts"],
-
-      "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/index.ts"],
-
-      "@prisma-next/adapter-postgres": ["packages/adapter-postgres/src/exports/index.ts"],
-      "@prisma-next/driver-postgres": ["packages/driver-postgres/src/exports/index.ts"],
-
-      "@prisma-next/compat-prisma": ["packages/compat-prisma/src/exports/index.ts"]
-    }
+  "dependencies": {
+    "@prisma-next/some-package": "workspace:*"
   }
 }
 ```
 
-Optional layer/group aliases for ergonomics (not for published imports):
+Then run `pnpm install` from the repository root to update the lockfile.
 
-```jsonc
-{
-  "compilerOptions": {
-    "paths": {
-      "@framework/core/*": ["packages/framework/core-*/src"],
-      "@framework/authoring/*": ["packages/framework/authoring/*/src"],
-      "@framework/tooling/*": ["packages/framework/tooling/*/src"],
-      "@framework/runtime-executor": ["packages/framework/runtime-executor/src"],
-      "@sql/tooling/*": ["packages/sql/tooling/*/src"],
-      "@sql/*": ["packages/sql/*/src"],
-      "@adapters/*": ["packages/adapter-*/src"]
-    }
-  }
-}
+### Subpath Exports
+
+Packages expose specific entrypoints via the `exports` field. Import from these subpaths, not internal file paths:
+
+```typescript
+// Correct — uses subpath export
+import { createRuntime } from '@prisma-next/adapter-postgres/runtime';
+
+// Incorrect — imports internal path
+import { createRuntime } from '@prisma-next/adapter-postgres/dist/exports/runtime';
 ```
 
 ## Workspace Globs (pnpm)
