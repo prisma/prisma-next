@@ -53,3 +53,4 @@ exports[`db sign command (e2e) > outputs JSON envelope with real database 1`] = 
   },
 }
 `;
+

@@ -16,6 +16,7 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
@@ -32,6 +33,7 @@
     "@prisma-next/test-utils": "workspace:*",
     "@types/pg": "^8.11.10",
     "pg": "^8.11.5",
+    "strip-ansi": "^7.1.0",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^2.1.1",
     "typescript": "^5.9.3"

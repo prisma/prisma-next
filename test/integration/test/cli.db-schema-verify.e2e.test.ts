@@ -1,16 +1,16 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { createDbSchemaVerifyCommand } from '@prisma-next/cli/commands/db-schema-verify';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createDbSchemaVerifyCommand } from '../src/commands/db-schema-verify';
 import {
   executeCommand,
   getExitCode,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/test-helpers';
+} from './utils/cli-test-helpers';
 
 // Fixture subdirectory for db-schema-verify e2e tests
 const fixtureSubdir = 'db-schema-verify';

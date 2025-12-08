@@ -1,9 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createDbSignCommand } from '../src/commands/db-sign';
 import {
   executeCommand,
   getExitCode,
@@ -12,7 +12,7 @@ import {
   setupDbSignFixture,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/test-helpers';
+} from './utils/cli-test-helpers';
 
 // Fixture subdirectory for db-sign e2e tests
 const fixtureSubdir = 'db-sign';

@@ -1,6 +1,8 @@
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
+import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   ensureSchemaStatement,
@@ -10,8 +12,6 @@ import {
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createContractEmitCommand } from '../src/commands/contract-emit';
-import { createDbVerifyCommand } from '../src/commands/db-verify';
 import {
   executeCommand,
   getExitCode,
@@ -19,7 +19,7 @@ import {
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/test-helpers';
+} from './utils/cli-test-helpers';
 
 // Fixture subdirectory for db-verify tests
 const fixtureSubdir = 'db-verify';
@@ -423,7 +423,7 @@ withTempDir(({ createTempDir }) => {
 
           // Now test verify with the no-driver config
           // Mock loadConfig to return config without driver (bypassing validation)
-          const originalLoadConfig = await import('../src/config-loader');
+          const originalLoadConfig = await import('@prisma-next/cli/config-loader');
           vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
             family: {
               familyId: 'sql',

@@ -1,15 +1,15 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type { FamilyInstance, IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDbIntrospectCommand } from '../src/commands/db-introspect';
 import {
   executeCommand,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/test-helpers';
+} from './utils/cli-test-helpers';
 
 // Fixture subdirectory for db-introspect tests
 const fixtureSubdir = 'db-introspect';
@@ -72,7 +72,7 @@ withTempDir(({ createTempDir }) => {
       } as unknown as FamilyInstance<string>;
 
       // Mock loadConfig to return config with mocked family
-      const originalLoadConfig = await import('../src/config-loader');
+      const originalLoadConfig = await import('@prisma-next/cli/config-loader');
       vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
         family: {
           familyId: 'sql',
@@ -124,7 +124,7 @@ withTempDir(({ createTempDir }) => {
         } as unknown as FamilyInstance<string>;
 
         // Mock loadConfig
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -176,7 +176,7 @@ withTempDir(({ createTempDir }) => {
         } as unknown as FamilyInstance<string>;
 
         // Mock loadConfig
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -227,7 +227,7 @@ withTempDir(({ createTempDir }) => {
 
       {
         // Mock loadConfig to return config without db.url (bypassing validation)
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -260,7 +260,7 @@ withTempDir(({ createTempDir }) => {
 
       {
         // Mock loadConfig to return config without driver (bypassing validation)
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -299,7 +299,7 @@ withTempDir(({ createTempDir }) => {
         } as unknown as FamilyInstance<string>;
 
         // Mock loadConfig
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -345,7 +345,7 @@ withTempDir(({ createTempDir }) => {
 
         // Mock loadConfig with contract.output pointing to the real file
         // Note: resolve() in the command resolves relative to CWD, so we use absolute path
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -394,7 +394,7 @@ withTempDir(({ createTempDir }) => {
 
         // Mock loadConfig with contract.output pointing to the invalid file
         // Note: resolve() in the command resolves relative to CWD, so we use absolute path
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -438,7 +438,7 @@ withTempDir(({ createTempDir }) => {
         } as unknown as FamilyInstance<string>;
 
         // Mock loadConfig
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -490,7 +490,7 @@ withTempDir(({ createTempDir }) => {
         } as unknown as FamilyInstance<string>;
 
         // Mock loadConfig
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
@@ -534,7 +534,7 @@ withTempDir(({ createTempDir }) => {
         } as unknown as FamilyInstance<string>;
 
         // Mock loadConfig
-        const originalLoadConfig = await import('../src/config-loader');
+        const originalLoadConfig = await import('@prisma-next/cli/config-loader');
         vi.spyOn(originalLoadConfig, 'loadConfig').mockResolvedValue({
           family: {
             familyId: 'sql',
