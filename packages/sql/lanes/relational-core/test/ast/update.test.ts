@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
 import { createBinaryExpr } from '../../src/ast/predicate';
+import type { BinaryExpr, ColumnRef, ParamRef, TableRef } from '../../src/ast/types';
 import { createUpdateAst } from '../../src/ast/update';
-import type { BinaryExpr, ColumnRef, ParamRef, TableRef } from '../../src/exports/ast';
 
 describe('ast/update', () => {
   describe('createUpdateAst', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createColumnRef } from '../../src/ast/common';
 import { createOrderByItem } from '../../src/ast/order';
-import type { ColumnRef, OperationExpr } from '../../src/exports/ast';
+import type { ColumnRef, OperationExpr } from '../../src/ast/types';
 
 describe('ast/order', () => {
   describe('createOrderByItem', () => {

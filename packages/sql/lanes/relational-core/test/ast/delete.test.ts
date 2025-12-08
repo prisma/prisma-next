@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
 import { createDeleteAst } from '../../src/ast/delete';
 import { createBinaryExpr } from '../../src/ast/predicate';
-import type { BinaryExpr, ColumnRef, TableRef } from '../../src/exports/ast';
+import type { BinaryExpr, ColumnRef, TableRef } from '../../src/ast/types';
 
 describe('ast/delete', () => {
   describe('createDeleteAst', () => {

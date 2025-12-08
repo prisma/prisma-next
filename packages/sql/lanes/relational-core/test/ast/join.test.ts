@@ -7,7 +7,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createTableRef } from '../../src/ast/common';
 import { createJoin, createJoinOnBuilder, createJoinOnExpr } from '../../src/ast/join';
-import type { JoinOnExpr, TableRef } from '../../src/exports/ast';
+import type { JoinOnExpr, TableRef } from '../../src/ast/types';
 import { schema } from '../../src/schema';
 import { createStubAdapter, createTestContext } from '../utils';
 

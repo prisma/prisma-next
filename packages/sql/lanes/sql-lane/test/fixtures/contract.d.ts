@@ -74,10 +74,7 @@ export type Contract = SqlContract<
     readonly codecTypes: CodecTypes;
     readonly operationTypes: OperationTypes;
   }
->;
-
-// Codec type map for type inference in lanes (matches stub codecs in createStubAdapter)
-export type { CodecTypes };
+>;;
 
 // Operation types (empty for now, can be extended by extension packs)
 export type OperationTypes = Record<string, never>;

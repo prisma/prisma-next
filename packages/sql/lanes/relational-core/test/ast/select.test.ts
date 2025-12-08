@@ -12,7 +12,7 @@ import type {
   OperationExpr,
   SelectAst,
   TableRef,
-} from '../../src/exports/ast';
+} from '../../src/ast/types';
 
 describe('ast/select', () => {
   describe('createSelectAst', () => {
