@@ -11,18 +11,18 @@
       "persistent": true
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "inputs": ["src/**", "test/**", "dist/**"],
       "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },
     "test:coverage": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "inputs": ["src/**", "test/**", "dist/**"],
       "outputs": ["coverage/**"],
       "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "inputs": ["src/**", "test/**", "tsconfig.json"]
     },
     "lint": {
