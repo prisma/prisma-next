@@ -2,16 +2,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { createTestRuntime, setupTestDatabase } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import {
-  createTestRuntime,
-  executePlanAndCollect,
-  setupTestDatabase,
-} from '@prisma-next/sql-runtime/test/utils';
+import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';

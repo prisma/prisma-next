@@ -22,8 +22,6 @@
     "@prisma-next/sql-relational-core": "workspace:*"
   },
   "devDependencies": {
-    "@prisma/dev": "^0.1.1",
-    "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/pg": "^8.11.10",
     "pg": "^8.11.5",

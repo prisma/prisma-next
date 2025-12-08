@@ -6,14 +6,13 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import {
   createTestContext,
-  createTestRuntime,
   executePlanAndCollect,
-  setupTestDatabase,
   teardownTestDatabase,
 } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createTestRuntime, setupTestDatabase } from './utils';
 
 const makeColumn = (nativeType: string, codecId: string, nullable: boolean): StorageColumn => ({
   nativeType,

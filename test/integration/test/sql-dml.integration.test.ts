@@ -5,15 +5,11 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import {
-  createTestContext,
-  createTestRuntime,
-  executePlanAndCollect,
-  setupTestDatabase,
-} from '@prisma-next/sql-runtime/test/utils';
+import { createTestContext, executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createTestRuntime, setupTestDatabase } from './utils';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
