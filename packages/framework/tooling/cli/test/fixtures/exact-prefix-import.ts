@@ -1,6 +1,8 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
+
+// Minimal stub CodecTypes for test fixtures (CLI doesn't need full type inference)
+type CodecTypes = Record<string, never>;
 
 const contractObj = defineContract<CodecTypes>()
   .target('postgres')

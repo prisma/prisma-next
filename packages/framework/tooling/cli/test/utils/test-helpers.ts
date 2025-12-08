@@ -99,9 +99,10 @@ export function createContractFile(testDir: string): string {
   const contractPath = join(testDir, 'contract.ts');
   writeFileSync(
     contractPath,
-    `import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+    `import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+
+type CodecTypes = Record<string, never>;
 
 const contractObj = defineContract<CodecTypes>()
   .target('postgres')
