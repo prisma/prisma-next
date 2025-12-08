@@ -1,0 +1,78 @@
+---
+description: CLI package export patterns and import conventions
+alwaysApply: true
+---
+
+# CLI Package Exports
+
+## Export Structure
+
+The `@prisma-next/cli` package exports several subpaths:
+
+- **`@prisma-next/cli`** (main export): Exports `loadContractFromTs` and `createContractEmitCommand`
+- **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
+- **`@prisma-next/cli/pack-loading`**: Exports `loadExtensionPacks` and `loadExtensionPackManifest`
+- **`@prisma-next/cli/commands/*`**: Exports command factory functions (e.g., `createDbIntrospectCommand`, `createDbVerifyCommand`)
+- **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
+
+## Import Patterns
+
+**✅ CORRECT: Import from correct subpath**
+
+```typescript
+// loadContractFromTs is exported from main package, not pack-loading
+import { loadContractFromTs } from '@prisma-next/cli';
+import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
+
+// Commands are exported from their specific subpaths
+import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
+import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
+
+// Config loader is exported from its subpath
+import { loadConfig } from '@prisma-next/cli/config-loader';
+```
+
+**❌ WRONG: Importing from wrong subpath**
+
+```typescript
+// ❌ WRONG: loadContractFromTs is not exported from pack-loading
+import { loadContractFromTs } from '@prisma-next/cli/pack-loading';
+
+// ❌ WRONG: Commands are not exported from main package
+import { createDbIntrospectCommand } from '@prisma-next/cli';
+```
+
+## Why This Structure?
+
+- **Main package** (`@prisma-next/cli`): Exports high-level utilities used by consumers
+- **Subpaths**: Export specific functionality for testing or advanced use cases
+- **Commands**: Each command has its own subpath to allow selective imports and testing
+
+## Adding New Exports
+
+When adding new exports to the CLI package:
+
+1. **Add entry point to `tsup.config.ts`**: Add the file to the entry points in the second config block
+2. **Add export to `package.json`**: Add the export path with types and import mappings
+3. **Update this rule**: Document the new export and its intended usage
+
+Example:
+```typescript
+// tsup.config.ts
+{
+  entry: {
+    'commands/new-command': 'src/commands/new-command.ts',
+  },
+  // ...
+}
+
+// package.json
+{
+  "exports": {
+    "./commands/new-command": {
+      "types": "./dist/commands/new-command.d.ts",
+      "import": "./dist/commands/new-command.js"
+    }
+  }
+}
+```

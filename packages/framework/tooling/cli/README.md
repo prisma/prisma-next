@@ -825,6 +825,22 @@ pnpm test:integration       # Run integration tests only
 pnpm test:e2e               # Run e2e tests only
 ```
 
+## Entrypoints
+
+The CLI package exports several subpaths for different use cases:
+
+- **`@prisma-next/cli`** (main export): Exports `loadContractFromTs` and `createContractEmitCommand`
+- **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
+- **`@prisma-next/cli/pack-loading`**: Exports `loadExtensionPacks` and `loadExtensionPackManifest`
+- **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
+- **`@prisma-next/cli/commands/db-schema-verify`**: Exports `createDbSchemaVerifyCommand`
+- **`@prisma-next/cli/commands/db-sign`**: Exports `createDbSignCommand`
+- **`@prisma-next/cli/commands/db-verify`**: Exports `createDbVerifyCommand`
+- **`@prisma-next/cli/commands/contract-emit`**: Exports `createContractEmitCommand`
+- **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
+
+**Important**: `loadContractFromTs` is exported from the main package (`@prisma-next/cli`), not from `@prisma-next/cli/pack-loading`. See `.cursor/rules/cli-package-exports.mdc` for import patterns.
+
 ## Package Location
 
 This package is part of the **framework domain**, **tooling layer**, **migration plane**:
