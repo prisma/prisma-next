@@ -53,6 +53,10 @@
     "./runtime": {
       "types": "./dist/exports/runtime.d.ts",
       "import": "./dist/exports/runtime.js"
+    },
+    "./verify": {
+      "types": "./dist/exports/verify.d.ts",
+      "import": "./dist/exports/verify.js"
     }
   }
 }

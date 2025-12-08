@@ -1,4 +1,4 @@
-import type { ResultType } from '@prisma-next/contract';
+import type { ResultType } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';

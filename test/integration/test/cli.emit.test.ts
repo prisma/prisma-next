@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadContractFromTs, loadExtensionPacks } from '@prisma-next/cli/pack-loading';
+import { loadContractFromTs } from '@prisma-next/cli';
+import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import { emit } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';

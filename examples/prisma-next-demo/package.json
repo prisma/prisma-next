@@ -14,9 +14,11 @@
   },
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/sql-orm-lane": "workspace:*",
@@ -28,6 +30,8 @@
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma/dev": "^0.1.1",
     "@types/node": "^20.16.5",

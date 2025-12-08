@@ -44,6 +44,9 @@ importers:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../packages/targets/postgres-adapter
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../packages/framework/core-contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/targets/postgres-driver
@@ -53,6 +56,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../packages/sql/family
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../packages/sql/contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../packages/sql/authoring/sql-contract-ts
@@ -81,6 +87,12 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../packages/framework/tooling/cli
+      '@prisma-next/emitter':
+        specifier: workspace:*
+        version: link:../../packages/framework/tooling/emitter
+      '@prisma-next/sql-contract-emitter':
+        specifier: workspace:*
+        version: link:../../packages/sql/tooling/emitter
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../test/utils
@@ -120,9 +132,21 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/targets/postgres-driver
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../packages/sql/family
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../packages/sql/contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../packages/sql/authoring/sql-contract-ts
+      '@prisma-next/sql-lane':
+        specifier: workspace:*
+        version: link:../../packages/sql/lanes/sql-lane
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../../packages/sql/lanes/relational-core
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../packages/sql/sql-runtime
@@ -1077,6 +1101,12 @@ importers:
       '@prisma-next/integration-tests':
         specifier: workspace:*
         version: link:../../integration
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../packages/sql/contract
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../../packages/sql/authoring/sql-contract-ts
       '@prisma-next/sql-lane':
         specifier: workspace:*
         version: link:../../../packages/sql/lanes/sql-lane
@@ -1138,6 +1168,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../packages/sql/family
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../packages/framework/core-operations
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../packages/sql/contract

@@ -9,9 +9,12 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { executeCommand } from '@prisma-next/cli/test/utils/test-helpers';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+// Note: executeCommand and other test helpers are re-exported at the bottom of this file
+// They come from the CLI package's test utilities but are not exported from the package
+// We import them directly from the source file
+import { executeCommand } from '../../../../packages/framework/tooling/cli/test/utils/test-helpers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Use a shared fixture package directory that has the necessary dependencies
@@ -326,9 +329,10 @@ export async function runDbSign(
 }
 
 // Re-export framework-agnostic helpers from CLI package
+// Note: These are imported directly from source since they're not exported from the package
 export {
   executeCommand,
   getExitCode,
   setupCommandMocks,
   withTempDir,
-} from '@prisma-next/cli/test/utils/test-helpers';
+} from '../../../../packages/framework/tooling/cli/test/utils/test-helpers';
