@@ -1,7 +1,7 @@
-import type { ColumnRef, OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef } from '../../src/ast/common';
 import { createOrderByItem } from '../../src/ast/order';
+import type { ColumnRef, OperationExpr } from '../../src/exports/ast';
 
 describe('ast/order', () => {
   describe('createOrderByItem', () => {

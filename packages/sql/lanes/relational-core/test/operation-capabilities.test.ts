@@ -1,9 +1,9 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import { vectorColumn as vectorColumnType } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { schema } from '../src/exports/schema';
 import { createStubAdapter, createTestContext } from './utils';
 
 describe('Operation capability gating', () => {

@@ -1,7 +1,7 @@
-import type { ColumnRef, ParamRef, TableRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
 import { createInsertAst } from '../../src/ast/insert';
+import type { ColumnRef, ParamRef, TableRef } from '../../src/exports/ast';
 
 describe('ast/insert', () => {
   describe('createInsertAst', () => {
