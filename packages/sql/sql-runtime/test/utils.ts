@@ -1,7 +1,7 @@
 import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
@@ -113,15 +113,51 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
 /**
  * Creates a stub adapter for testing.
  * This helper DRYs up the common pattern of adapter creation in tests.
+ *
+ * The stub adapter includes simple codecs for common test types (pg/int4@1, pg/text@1, pg/timestamptz@1)
+ * to enable type inference in tests without requiring the postgres adapter package.
  */
 export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
+  const codecRegistry = createCodecRegistry();
+
+  // Register stub codecs for common test types
+  // These match the codec IDs used in test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1)
+  // but don't require importing from the postgres adapter package
+  codecRegistry.register(
+    codec({
+      typeId: 'pg/int4@1',
+      targetTypes: ['int4'],
+      encode: (value: number) => value,
+      decode: (wire: number) => wire,
+    }),
+  );
+
+  codecRegistry.register(
+    codec({
+      typeId: 'pg/text@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    }),
+  );
+
+  codecRegistry.register(
+    codec({
+      typeId: 'pg/timestamptz@1',
+      targetTypes: ['timestamptz'],
+      encode: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
+      decode: (wire: string | Date) =>
+        typeof wire === 'string' ? wire : wire instanceof Date ? wire.toISOString() : String(wire),
+    }),
+  );
+
   return {
     profile: {
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
       codecs() {
-        return createCodecRegistry();
+        return codecRegistry;
       },
     },
     lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {

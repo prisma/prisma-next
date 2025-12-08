@@ -1,8 +1,6 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { ResultType as CoreResultType, ExecutionPlan } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { sql } from '@prisma-next/sql-lane/sql';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -12,7 +10,9 @@ import type {
   TablesOf,
 } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createStubAdapter } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
+import { sql } from '../src/sql/builder';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
@@ -28,7 +28,7 @@ function getTableColumns<T extends { columns: Record<string, unknown> }>(table: 
 
 test('builder without select() has unknown Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
 
@@ -44,7 +44,7 @@ test('builder without select() has unknown Row type', () => {
 
 test('select() with object projection infers Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -70,7 +70,7 @@ test('select() with object projection infers Row type', () => {
 
 test('build() returns SqlQueryPlan<Row> with inferred Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -99,7 +99,7 @@ test('build() returns SqlQueryPlan<Row> with inferred Row type', () => {
 
 test('ResultType utility extracts Row type from SqlQueryPlan', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -131,7 +131,7 @@ test('ResultType utility extracts Row type from SqlQueryPlan', () => {
 
 test('Core ResultType from @prisma-next/contract works with SqlQueryPlan', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -166,7 +166,7 @@ test('Core ResultType from @prisma-next/contract works with SqlQueryPlan', () =>
 
 test('sql() query builder result works with core ResultType from @prisma-next/contract', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -212,7 +212,7 @@ test('sql() query builder result works with core ResultType from @prisma-next/co
 
 test('execute() preserves Row type through execution', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -238,7 +238,7 @@ test('execute() preserves Row type through execution', () => {
 
 test('builder chain preserves Row type through methods', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -276,7 +276,7 @@ test('builder chain preserves Row type through methods', () => {
 
 test('wrong Row type assignments fail type check', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -310,7 +310,7 @@ test('wrong Row type assignments fail type check', () => {
 
 test('nullable columns are handled correctly', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -335,7 +335,7 @@ test('nullable columns are handled correctly', () => {
 
 test('different column types map correctly', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -361,7 +361,7 @@ test('different column types map correctly', () => {
 
 test('generic contract types are preserved', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   schema(context); // Used for type checking only
 
@@ -417,7 +417,7 @@ test('Contract namespace types are available', () => {
 
 test('schema().tables returns tables graph', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const t = schema(context).tables;
 
@@ -434,7 +434,7 @@ test('schema().tables returns tables graph', () => {
 
 test('sql() preserves contract generic through builder chain', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -450,7 +450,7 @@ test('sql() preserves contract generic through builder chain', () => {
 
 test('codec mapping resolves scalar types correctly', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -486,7 +486,7 @@ test('codec mapping resolves scalar types correctly', () => {
 test('representative contract resolves types correctly end-to-end', () => {
   // Full representative contract with column types as pg/*@1 IDs
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -617,7 +617,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
     } as unknown as ContractWithPosts['mappings'],
   });
 
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract: contractWithPosts, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables['user'];
@@ -661,7 +661,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
 
 test('nested projection infers nested Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -695,7 +695,7 @@ test('nested projection infers nested Row type', () => {
 
 test('multi-level nested projection infers deeply nested Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -730,7 +730,7 @@ test('multi-level nested projection infers deeply nested Row type', () => {
 
 test('mixed leaves and nested objects in projection', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -866,7 +866,7 @@ test('nested projection with joins infers nested Row type', () => {
     } as unknown as ContractWithPosts['mappings'],
   });
 
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract: contractWithPosts, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables['user'];
@@ -908,7 +908,7 @@ test('nested projection with joins infers nested Row type', () => {
 
 test('insert without returning() has unknown Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -926,7 +926,7 @@ test('insert without returning() has unknown Row type', () => {
 
 test('insert with returning() infers Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -957,7 +957,7 @@ test('insert with returning() infers Row type', () => {
 
 test('update with returning() infers Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
@@ -989,7 +989,7 @@ test('update with returning() infers Row type', () => {
 
 test('delete with returning() infers Row type', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const tables = schema(context).tables;
   const userTable = tables.user;
