@@ -1,16 +1,15 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 describe('DSL Lane Codec Type Stamping', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createTestContext(contract, adapter);
   const tables = schema<Contract>(context).tables;
 
