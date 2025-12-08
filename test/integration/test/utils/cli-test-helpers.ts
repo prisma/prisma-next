@@ -9,15 +9,9 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  executeCommand,
-  getExitCode,
-  setupCommandMocks,
-  withTempDir,
-} from '@prisma-next/cli/test/utils/test-helpers';
+import { executeCommand } from '@prisma-next/cli/test/utils/test-helpers';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { afterEach, beforeEach, vi } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Use a shared fixture package directory that has the necessary dependencies

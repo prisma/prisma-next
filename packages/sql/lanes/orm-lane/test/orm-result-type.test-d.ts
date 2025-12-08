@@ -1,9 +1,9 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { ResultType as CoreResultType } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { InferNestedProjectionRow } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createStubAdapter } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
 import { orm } from '../src/orm';
 import type { IncludeAccumulator } from '../src/orm-types';
@@ -12,7 +12,7 @@ import contractJson from './fixtures/contract-with-relations.json' with { type: 
 
 test('ResultType extracts Row type from ORM findMany plan', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const o = orm<Contract>({ context });
 
@@ -53,7 +53,7 @@ test('ResultType extracts Row type from ORM findMany plan', () => {
 
 test('ResultType extracts Row type from ORM findMany plan with includes', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const o = orm<Contract>({ context });
 
@@ -106,7 +106,7 @@ test('ResultType extracts Row type from ORM findMany plan with includes', () => 
 
 test('ResultType keeps include result types after filtering and ordering child rows', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const o = orm<Contract>({ context });
 
@@ -143,7 +143,7 @@ test('ResultType keeps include result types after filtering and ordering child r
 
 test('ResultType infers nested include element shape', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
+  const adapter = createStubAdapter();
   const context = createRuntimeContext({ contract, adapter, extensions: [] });
   const o = orm<Contract>({ context });
 

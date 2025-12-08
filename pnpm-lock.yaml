@@ -197,6 +197,9 @@ importers:
         specifier: workspace:*
         version: link:../../sql/sql-runtime
     devDependencies:
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../sql/authoring/sql-contract-ts
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -249,6 +252,21 @@ importers:
         specifier: ^2.0.0
         version: 2.1.26
     devDependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../targets/postgres-adapter
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../framework/core-operations
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../sql/contract
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../sql/authoring/sql-contract-ts
+      '@prisma-next/sql-lane':
+        specifier: workspace:*
+        version: link:../../sql/lanes/sql-lane
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -687,6 +705,9 @@ importers:
         specifier: workspace:*
         version: link:../relational-core
     devDependencies:
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../../framework/core-operations
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../authoring/sql-contract-ts

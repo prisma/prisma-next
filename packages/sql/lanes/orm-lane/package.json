@@ -21,6 +21,7 @@
     "@prisma-next/sql-relational-core": "workspace:*"
   },
   "devDependencies": {
+    "@prisma-next/operations": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",

@@ -1,4 +1,6 @@
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { SignDatabaseResult } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
@@ -8,8 +10,6 @@ import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/targets-postgres/control';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { CodecTypes } from '../../../targets/postgres-adapter/src/core/codecs';
-import postgresAdapter from '../../../targets/postgres-adapter/src/exports/control';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
