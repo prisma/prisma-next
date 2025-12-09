@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
   workflow_dispatch:
     inputs:
       version:
@@ -22,7 +27,7 @@ on:
         type: string
 
 concurrency:
-  group: npm-publish
+  group: npm-publish-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'main' }}
   cancel-in-progress: false
 
 jobs:
@@ -54,27 +59,18 @@ jobs:
 
       - name: Determine version and tag
         id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            echo "tag=${{ github.event.inputs.dist-tag }}" >> $GITHUB_OUTPUT
-          else
-            # For automatic dev builds, use commit count as version number
-            COMMIT_COUNT=$(git rev-list --count HEAD)
-            BASE_VERSION="0.1.0"
-            DEV_VERSION="${BASE_VERSION}-dev.${COMMIT_COUNT}"
-            echo "version=${DEV_VERSION}" >> $GITHUB_OUTPUT
-            echo "tag=dev" >> $GITHUB_OUTPUT
-          fi
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_TAG: ${{ github.event.inputs.dist-tag }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/determine-version.ts
 
       - name: Set package versions
-        run: |
-          node scripts/set-version.ts ${{ steps.version.outputs.version }}
+        run: node scripts/set-version.ts ${{ steps.version.outputs.version }}
 
       - name: Build packages
-        run: |
-          pnpm build
+        run: pnpm build
 
       - name: Publish packages
-        run: |
-          pnpm -r publish --access public --tag ${{ steps.version.outputs.tag }} --no-git-checks
+        run: pnpm -r publish --access public --tag ${{ steps.version.outputs.tag }} --no-git-checks
