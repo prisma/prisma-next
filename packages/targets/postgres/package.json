@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/targets-postgres",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
   "description": "Postgres target pack for Prisma Next",

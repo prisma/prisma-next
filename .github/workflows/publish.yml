@@ -1,0 +1,80 @@
+name: Publish to npm
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 0.1.0, 0.1.0-beta.1)"
+        required: true
+        type: string
+      dist-tag:
+        description: "npm dist-tag (e.g., latest, dev, beta)"
+        required: true
+        default: "dev"
+        type: string
+      ref:
+        description: "Git ref to publish from (branch, tag, or SHA)"
+        required: false
+        default: "main"
+        type: string
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine version and tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag=${{ github.event.inputs.dist-tag }}" >> $GITHUB_OUTPUT
+          else
+            # For automatic dev builds, use commit count as version number
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            BASE_VERSION="0.1.0"
+            DEV_VERSION="${BASE_VERSION}-dev.${COMMIT_COUNT}"
+            echo "version=${DEV_VERSION}" >> $GITHUB_OUTPUT
+            echo "tag=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set package versions
+        run: |
+          node scripts/set-version.ts ${{ steps.version.outputs.version }}
+
+      - name: Build packages
+        run: |
+          pnpm build
+
+      - name: Publish packages
+        run: |
+          pnpm -r publish --access public --tag ${{ steps.version.outputs.tag }} --no-git-checks

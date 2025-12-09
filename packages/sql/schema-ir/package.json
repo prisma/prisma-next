@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/sql-schema-ir",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
   "description": "SQL Schema IR types for schema introspection and verification",

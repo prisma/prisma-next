@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/sql-orm-lane",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
   "description": "ORM builder, include lowering, and relation filters for Prisma Next",

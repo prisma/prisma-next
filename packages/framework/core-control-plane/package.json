@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/core-control-plane",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
   "description": "Control plane domain actions, config types, validation, and error factories for Prisma Next",
