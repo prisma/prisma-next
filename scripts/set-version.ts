@@ -9,8 +9,8 @@ const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const version = process.argv[2];
 
 if (!version) {
-  console.error('Usage: node set-version.mts <version>');
-  console.error('Example: node set-version.mts 0.1.0-dev.123');
+  console.error('Usage: node set-version.ts <version>');
+  console.error('Example: node set-version.ts 0.1.0-dev.123');
   process.exit(1);
 }
 
