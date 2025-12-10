@@ -44,10 +44,10 @@ export default defineConfig({
       // CLI is tested with integration and end-to-end tests
       // Unit test coverage needs to be reevaluated
       thresholds: {
-        lines: 0,
-        branches: 0,
-        functions: 0,
-        statements: 0,
+        lines: 14,
+        branches: 90,
+        functions: 66,
+        statements: 14,
       },
     },
   },
