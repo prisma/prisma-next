@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { execSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,37 +16,11 @@ if (!version) {
   process.exit(1);
 }
 
-async function findPackageJsonFiles(dir: string): Promise<string[]> {
-  const results: string[] = [];
-
-  async function walk(currentDir: string): Promise<void> {
-    const entries = await fs.readdir(currentDir);
-
-    // If this directory has a package.json, add it and don't recurse
-    if (entries.includes('package.json')) {
-      results.push(path.join(currentDir, 'package.json'));
-      return;
-    }
-
-    // Otherwise, recurse into subdirectories
-    await Promise.all(
-      entries.map(async (entry) => {
-        if (entry === 'node_modules' || entry.startsWith('.')) {
-          return;
-        }
-
-        const fullPath = path.join(currentDir, entry);
-        const stat = await fs.stat(fullPath);
-
-        if (stat.isDirectory()) {
-          await walk(fullPath);
-        }
-      }),
-    );
-  }
-
-  await walk(dir);
-  return results;
+interface PnpmPackage {
+  name: string;
+  version: string;
+  path: string;
+  private: boolean;
 }
 
 interface PackageJson {
@@ -55,24 +30,29 @@ interface PackageJson {
   [key: string]: unknown;
 }
 
+const output = execSync('pnpm list -r --json', {
+  cwd: rootDir,
+  encoding: 'utf-8',
+});
+
+const workspacePackages: PnpmPackage[] = JSON.parse(output);
+
 let updatedCount = 0;
 let skippedCount = 0;
 
-const packagesDir = path.join(rootDir, 'packages');
-const packageJsonFiles = await findPackageJsonFiles(packagesDir);
-
-for (const packageJsonPath of packageJsonFiles) {
-  const content = await fs.readFile(packageJsonPath, 'utf-8');
-  const pkg: PackageJson = JSON.parse(content);
-
+for (const pkg of workspacePackages) {
   if (pkg.private) {
     console.log(`Skipping private package: ${pkg.name}`);
     skippedCount++;
     continue;
   }
 
-  pkg.version = version;
-  await fs.writeFile(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+  const packageJsonPath = path.join(pkg.path, 'package.json');
+  const content = await fs.readFile(packageJsonPath, 'utf-8');
+  const packageJson: PackageJson = JSON.parse(content);
+
+  packageJson.version = version;
+  await fs.writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
 
   console.log(`Updated ${pkg.name} to ${version}`);
   updatedCount++;
