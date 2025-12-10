@@ -114,8 +114,7 @@ let result: VersionResult;
 switch (eventName) {
   case 'workflow_dispatch':
     if (!inputVersion || !inputTag) {
-      console.error('INPUT_VERSION and INPUT_TAG are required for workflow_dispatch');
-      process.exit(1);
+      throw new Error('INPUT_VERSION and INPUT_TAG are required for workflow_dispatch');
     }
     result = { version: inputVersion, tag: inputTag };
     break;
