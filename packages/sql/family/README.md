@@ -76,6 +76,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 - **`./control`**: Control plane entry point for CLI/config usage (exports `SqlFamilyDescriptor`)
 - **`./control-adapter`**: SQL control adapter interface (`SqlControlAdapter`, `SqlControlAdapterDescriptor`) for target-specific adapters
 - **`./runtime`**: Runtime entry point (placeholder for future functionality)
+- **`./verify`**: Verification utilities (`readMarker`, `readMarkerSql`, `parseContractMarkerRow`) for reading contract markers from databases
 
 ## Dependencies
 

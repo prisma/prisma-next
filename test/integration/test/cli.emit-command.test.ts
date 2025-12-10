@@ -1,13 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createContractEmitCommand } from '../src/commands/contract-emit';
 import {
   executeCommand,
   setupCommandMocks,
   setupIntegrationTestDirectoryFromFixtures,
-} from './utils/test-helpers';
+} from './utils/cli-test-helpers';
 
 // Fixture subdirectory for emit-command tests
 const fixtureSubdir = 'emit-command';

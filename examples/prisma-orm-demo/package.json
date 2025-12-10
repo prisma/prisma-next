@@ -16,11 +16,15 @@
   "dependencies": {
     "@prisma/client": "^6.0.0",
     "@prisma-next/compat-prisma": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/targets-postgres": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "pg": "^8.11.5"
   },

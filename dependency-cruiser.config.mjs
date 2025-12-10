@@ -10,7 +10,13 @@
 
 import config from './architecture.config.json' with { type: 'json' };
 
-const { packages: packageConfigs, layerOrder, planeRules, crossDomainExceptions } = config;
+const {
+  packages: packageConfigs,
+  layerOrder,
+  planeRules,
+  crossDomainExceptions,
+  crossDomainRules,
+} = config;
 
 const normalizeGlob = (glob) => {
   let pattern = glob.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
@@ -117,12 +123,69 @@ const createUpwardRules = () => {
 };
 
 const createCrossDomainRules = () => {
+  if (!crossDomainRules) {
+    // Fallback to old behavior if crossDomainRules not defined
+    for (const sourceGroup of moduleGroups) {
+      for (const targetGroup of moduleGroups) {
+        if (sourceGroup.domain === targetGroup.domain) continue;
+        if (targetGroup.domain === 'framework') continue;
+
+        // Check if this import is allowed by an exception
+        const isException = crossDomainExceptions?.some((exception) => {
+          const sourceMatches = matchesGlobPattern(sourceGroup, exception.from);
+          const targetMatches = matchesGlobPattern(targetGroup, exception.to);
+          return sourceMatches && targetMatches;
+        });
+
+        if (isException) continue;
+
+        pushRule(
+          `cross-domain-${sourceGroup.domain}-to-${targetGroup.domain}`,
+          `Cross-domain import: ${sourceGroup.domain} cannot import from ${targetGroup.domain}`,
+          sourceGroup,
+          targetGroup,
+        );
+      }
+    }
+    return;
+  }
+
   for (const sourceGroup of moduleGroups) {
     for (const targetGroup of moduleGroups) {
       if (sourceGroup.domain === targetGroup.domain) continue;
-      if (targetGroup.domain === 'framework') continue;
 
-      // Check if this import is allowed by an exception
+      const sourceDomainRule = crossDomainRules[sourceGroup.domain];
+      if (!sourceDomainRule) {
+        // If domain not in rules, deny all cross-domain imports
+        pushRule(
+          `cross-domain-${sourceGroup.domain}-to-${targetGroup.domain}`,
+          `Cross-domain import: ${sourceGroup.domain} cannot import from ${targetGroup.domain} (domain not in crossDomainRules)`,
+          sourceGroup,
+          targetGroup,
+        );
+        continue;
+      }
+
+      // Check if target domain is in the allowed list
+      const mayImportFrom = sourceDomainRule.mayImportFrom || [];
+      const isAllowed = mayImportFrom.includes(targetGroup.domain);
+
+      if (isAllowed) {
+        // Check if this import is explicitly denied by an exception (exceptions can override rules)
+        const isException = crossDomainExceptions?.some((exception) => {
+          const sourceMatches = matchesGlobPattern(sourceGroup, exception.from);
+          const targetMatches = matchesGlobPattern(targetGroup, exception.to);
+          return sourceMatches && targetMatches;
+        });
+
+        // Exceptions allow imports, so if there's an exception, skip the rule
+        if (isException) continue;
+
+        // Import is allowed by rule, no rule needed
+        continue;
+      }
+
+      // Import is not allowed - check if there's an exception that allows it
       const isException = crossDomainExceptions?.some((exception) => {
         const sourceMatches = matchesGlobPattern(sourceGroup, exception.from);
         const targetMatches = matchesGlobPattern(targetGroup, exception.to);
@@ -131,9 +194,10 @@ const createCrossDomainRules = () => {
 
       if (isException) continue;
 
+      // Import is denied
       pushRule(
         `cross-domain-${sourceGroup.domain}-to-${targetGroup.domain}`,
-        `Cross-domain import: ${sourceGroup.domain} cannot import from ${targetGroup.domain} (except framework)`,
+        `Cross-domain import: ${sourceGroup.domain} cannot import from ${targetGroup.domain}. ${sourceDomainRule.reason || 'Domain rule violation'}`,
         sourceGroup,
         targetGroup,
       );

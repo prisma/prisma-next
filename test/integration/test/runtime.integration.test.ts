@@ -9,15 +9,14 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { budgets, lints } from '@prisma-next/sql-runtime';
 import {
   createTestContext,
-  createTestRuntime,
   drainPlanExecution,
   executePlanAndCollect,
-  setupTestDatabase,
   teardownTestDatabase,
 } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createTestRuntime, setupTestDatabase } from './utils';
 
 const fixtureContract = loadContractFixture();
 const adapter = createPostgresAdapter();

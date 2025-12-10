@@ -1,13 +1,13 @@
+import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createDbIntrospectCommand } from '../src/commands/db-introspect';
 import {
   executeCommand,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/test-helpers';
+} from './utils/cli-test-helpers';
 
 // Fixture subdirectory for db-introspect e2e tests
 const fixtureSubdir = 'db-introspect';

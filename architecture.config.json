@@ -215,9 +215,31 @@
     "sameLayer": "allow",
     "downward": "allow",
     "upward": "deny",
-    "crossDomain": "denyExceptFramework",
+    "crossDomain": "directional",
     "migrationToRuntime": "deny",
     "runtimeToMigration": "allowArtifactsOnly"
+  },
+  "crossDomainRules": {
+    "framework": {
+      "mayImportFrom": [],
+      "reason": "Framework domain is the innermost/core domain and may not import from any other domain"
+    },
+    "sql": {
+      "mayImportFrom": ["framework"],
+      "reason": "SQL domain may import only from framework domain"
+    },
+    "document": {
+      "mayImportFrom": ["framework"],
+      "reason": "Document domain may import only from framework domain"
+    },
+    "targets": {
+      "mayImportFrom": ["framework", "sql"],
+      "reason": "Targets domain may import from framework and sql domains"
+    },
+    "extensions": {
+      "mayImportFrom": ["framework", "sql", "document", "targets", "extensions"],
+      "reason": "Extensions domain may import from any domain"
+    }
   },
   "planeRules": {
     "shared": {

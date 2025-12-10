@@ -6,15 +6,14 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { budgets } from '@prisma-next/sql-runtime';
 import {
   createTestContext,
-  createTestRuntime,
   drainPlanExecution,
   executePlanAndCollect,
-  setupTestDatabase,
   teardownTestDatabase,
 } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createTestRuntime, setupTestDatabase } from './utils';
 
 const textColumn: StorageColumn = { nativeType: 'text', codecId: 'pg/text@1', nullable: false };
 

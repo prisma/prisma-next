@@ -14,6 +14,9 @@
   },
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/contract-authoring": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",

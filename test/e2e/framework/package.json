@@ -20,6 +20,9 @@
   },
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/integration-tests": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",

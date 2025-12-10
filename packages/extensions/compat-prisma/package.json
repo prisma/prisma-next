@@ -12,15 +12,17 @@
     "clean": "node ../../../scripts/clean.mjs"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/sql-relational-core": "workspace:*",
-    "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
-    "@prisma-next/driver-postgres": "workspace:*"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*"
   },
   "devDependencies": {
     "@prisma/dev": "^0.1.1",
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/pg": "^8.11.10",
     "pg": "^8.11.5",

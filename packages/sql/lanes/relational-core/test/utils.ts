@@ -1,14 +1,9 @@
 import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type {
-  Adapter,
-  CodecRegistry,
-  LoweredStatement,
-  SelectAst,
-} from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { Adapter, CodecRegistry, LoweredStatement, SelectAst } from '../src/exports/ast';
+import { createCodecRegistry } from '../src/exports/ast';
+import type { QueryLaneContext } from '../src/exports/query-lane-context';
 
 /**
  * Creates a stub adapter for testing.

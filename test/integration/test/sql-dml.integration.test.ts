@@ -2,18 +2,14 @@ import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { ResultType } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import {
-  createTestContext,
-  createTestRuntime,
-  executePlanAndCollect,
-  setupTestDatabase,
-} from '@prisma-next/sql-runtime/test/utils';
+import { createTestContext, executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { sql } from '../src/sql/builder';
+import { createTestRuntime, setupTestDatabase } from './utils';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',

@@ -1,3 +1,9 @@
+import { describe, expect, it } from 'vitest';
+import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
+import { createJoin, createJoinOnExpr } from '../../src/ast/join';
+import { createOrderByItem } from '../../src/ast/order';
+import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
+import { createSelectAst } from '../../src/ast/select';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -6,13 +12,7 @@ import type {
   OperationExpr,
   SelectAst,
   TableRef,
-} from '@prisma-next/sql-relational-core/ast';
-import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createJoin, createJoinOnExpr } from '../../src/ast/join';
-import { createOrderByItem } from '../../src/ast/order';
-import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
-import { createSelectAst } from '../../src/ast/select';
+} from '../../src/ast/types';
 
 describe('ast/select', () => {
   describe('createSelectAst', () => {

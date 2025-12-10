@@ -1,16 +1,11 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
-import type { PostgresDriverOptions } from '@prisma-next/driver-postgres/runtime';
-import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import sqlFamily from '@prisma-next/family-sql/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import postgresTarget from '@prisma-next/targets-postgres/runtime';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
-import type { Log, Plugin, Runtime, SqlStatement } from '../src/exports';
+import type { SqlStatement } from '../src/exports';
 import {
   type createRuntime,
   createRuntimeContext,
@@ -97,17 +92,6 @@ export async function writeTestContractMarker(
   await executeStatement(client, write.insert);
 }
 
-export interface CreateTestRuntimeOptions {
-  readonly verify?: {
-    mode: 'onFirstUse' | 'startup' | 'always';
-    requireMarker?: boolean;
-  };
-  readonly extensions?: readonly Extension[];
-  readonly plugins?: readonly Plugin[];
-  readonly mode?: 'strict' | 'permissive';
-  readonly log?: Log;
-}
-
 /**
  * Creates a runtime context with standard test configuration.
  * This helper DRYs up the common pattern of context creation in tests.
@@ -127,90 +111,53 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
 }
 
 /**
- * Creates a runtime with standard test configuration using runtime descriptors.
- * This helper DRYs up the common pattern of runtime creation in tests.
- */
-export function createTestRuntime(
-  contract: SqlContract<SqlStorage>,
-  driverOptions: PostgresDriverOptions,
-  options?: CreateTestRuntimeOptions,
-): Runtime {
-  const verify: {
-    mode: 'onFirstUse' | 'startup' | 'always';
-    requireMarker: boolean;
-  } = options?.verify
-    ? {
-        ...options.verify,
-        requireMarker: options.verify.requireMarker ?? false,
-      }
-    : { mode: 'onFirstUse', requireMarker: false };
-
-  // Create runtime family instance from descriptors
-  const familyInstance = sqlFamily.create({
-    target: postgresTarget,
-    adapter: postgresAdapter,
-    driver: postgresDriver,
-    extensions: [],
-  });
-
-  // Create runtime using family instance
-  return familyInstance.createRuntime({
-    contract,
-    driverOptions,
-    verify,
-    ...(options?.extensions ? { extensions: options.extensions } : {}),
-    ...(options?.plugins ? { plugins: options.plugins } : {}),
-    ...(options?.mode ? { mode: options.mode } : {}),
-    ...(options?.log ? { log: options.log } : {}),
-  });
-}
-
-/**
- * Creates a runtime with the given contract and database client using runtime descriptors.
- * This helper DRYs up the common pattern of runtime creation in e2e tests.
- */
-export function createTestRuntimeFromClient(
-  contract: SqlContract<SqlStorage>,
-  client: Client,
-  options?: CreateTestRuntimeOptions,
-): Runtime {
-  return createTestRuntime(
-    contract,
-    {
-      connect: { client },
-      cursor: { disabled: true },
-    },
-    {
-      ...options,
-      verify: options?.verify ?? ({ mode: 'onFirstUse', requireMarker: true } as const),
-    },
-  );
-}
-
-/**
- * Sets up database schema and data, then writes the contract marker.
- * This helper DRYs up the common pattern of database setup in e2e tests.
- */
-export async function setupE2EDatabase(
-  client: Client,
-  contract: SqlContract<SqlStorage>,
-  setupFn: (client: Client) => Promise<void>,
-): Promise<void> {
-  await setupTestDatabase(client, contract, setupFn);
-}
-
-/**
  * Creates a stub adapter for testing.
  * This helper DRYs up the common pattern of adapter creation in tests.
+ *
+ * The stub adapter includes simple codecs for common test types (pg/int4@1, pg/text@1, pg/timestamptz@1)
+ * to enable type inference in tests without requiring the postgres adapter package.
  */
 export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
+  const codecRegistry = createCodecRegistry();
+
+  // Register stub codecs for common test types
+  // These match the codec IDs used in test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1)
+  // but don't require importing from the postgres adapter package
+  codecRegistry.register(
+    codec({
+      typeId: 'pg/int4@1',
+      targetTypes: ['int4'],
+      encode: (value: number) => value,
+      decode: (wire: number) => wire,
+    }),
+  );
+
+  codecRegistry.register(
+    codec({
+      typeId: 'pg/text@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    }),
+  );
+
+  codecRegistry.register(
+    codec({
+      typeId: 'pg/timestamptz@1',
+      targetTypes: ['timestamptz'],
+      encode: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
+      decode: (wire: string | Date) =>
+        typeof wire === 'string' ? wire : wire instanceof Date ? wire.toISOString() : String(wire),
+    }),
+  );
+
   return {
     profile: {
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
       codecs() {
-        return createCodecRegistry();
+        return codecRegistry;
       },
     },
     lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {

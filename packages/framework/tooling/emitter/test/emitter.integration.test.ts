@@ -1,3 +1,4 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   TargetFamilyHook,
   TypesImportSpec,
@@ -8,7 +9,6 @@ import { emit } from '@prisma-next/core-control-plane/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { ContractIR } from '../../../core-contract/src/ir';
 import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {

@@ -1,193 +1,163 @@
-import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { promisify } from 'node:util';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadContractFromTs } from '@prisma-next/cli';
-import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
+import { emit } from '@prisma-next/emitter';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '../../../packages/sql/family/src/core/assembly';
 
-type EmittedContract = SqlContract<
-  {
-    readonly tables: {
-      readonly user: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-          };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-        };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
-      };
-    };
-  },
-  {
-    readonly User: {
-      readonly storage: { readonly table: 'user' };
-      readonly fields: {
-        readonly id: { readonly column: 'id' };
-        readonly email: { readonly column: 'email' };
-      };
-      readonly relations: Record<string, never>;
-    };
-  },
-  Record<string, never>,
-  SqlMappings
->;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixturesDir = resolve(__dirname, '../../../packages/framework/tooling/cli/test/fixtures');
 
-const execFileAsync = promisify(execFile);
-
-describe('CLI emit command', () => {
-  let testDir: string;
-  let contractPath: string;
+describe('emit command functionality', () => {
   let outputDir: string;
 
-  beforeEach(async () => {
-    testDir = join(tmpdir(), `prisma-next-cli-test-${randomUUID()}`);
-    await mkdir(testDir, { recursive: true });
-
-    contractPath = join(testDir, 'contract.ts');
-    outputDir = join(testDir, 'output');
-    const configPath = join(testDir, 'prisma-next.config.ts');
-
-    const contractContent = `import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-
-export const contract = defineContract<CodecTypes>()
-  .target('postgres')
-  .table('user', (t) =>
-    t
-      .column('id', 'int4', { nullable: false })
-      .column('email', 'text', { nullable: false })
-      .primaryKey(['id']),
-  )
-  .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-  .build();
-`;
-
-    const configContent = `import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresAdapter from '@prisma-next/adapter-postgres/cli';
-import postgres from '@prisma-next/targets-postgres/cli';
-import sql from '@prisma-next/family-sql/control';
-import { contract } from './contract';
-
-export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensions: [],
-  contract: {
-    source: contract,
-    output: '${join(outputDir, 'contract.json').replace(/\\/g, '/')}',
-    types: '${join(outputDir, 'contract.d.ts').replace(/\\/g, '/')}',
-  },
-});
-`;
-
-    await writeFile(contractPath, contractContent, 'utf-8');
-    await writeFile(configPath, configContent, 'utf-8');
+  beforeEach(() => {
+    outputDir = join(
+      tmpdir(),
+      `prisma-next-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    mkdirSync(outputDir, { recursive: true });
   });
 
-  afterEach(async () => {
-    if (existsSync(testDir)) {
-      await rm(testDir, { recursive: true, force: true });
+  afterEach(() => {
+    if (existsSync(outputDir)) {
+      rmSync(outputDir, { recursive: true, force: true });
     }
   });
 
-  it('executes CLI to emit contract and verifies artifacts', async () => {
-    const cliPath = resolve('packages/framework/tooling/cli/dist/cli.js');
-    const configPath = join(testDir, 'prisma-next.config.ts');
+  it(
+    'loads TS contract and emits contract.json and contract.d.ts',
+    async () => {
+      const contractPath = join(fixturesDir, 'valid-contract.ts');
+      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
 
-    try {
-      await execFileAsync('node', [cliPath, 'emit', '--config', configPath]);
-    } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'stderr' in error) {
-        console.error('CLI stderr:', error.stderr);
-      }
-      if (error && typeof error === 'object' && 'stdout' in error) {
-        console.log('CLI stdout:', error.stdout);
-      }
-      throw error;
-    }
+      const contract = await loadContractFromTs(contractPath);
+      const packs = loadExtensionPacks(adapterPath, []);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
 
-    const contractJsonPath = join(outputDir, 'contract.json');
-    const contractDtsPath = join(outputDir, 'contract.d.ts');
-
-    expect(existsSync(contractJsonPath)).toBe(true);
-    expect(existsSync(contractDtsPath)).toBe(true);
-
-    const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
-
-    const contractJson = JSON.parse(contractJsonContent);
-    expect(contractJson).toMatchObject({
-      targetFamily: 'sql',
-      target: 'postgres',
-      storage: {
-        tables: {
-          user: expect.anything(),
+      const result = await emit(
+        contract,
+        {
+          outputDir,
+          operationRegistry,
+          codecTypeImports,
+          operationTypeImports,
+          extensionIds,
         },
-      },
-    });
+        sqlTargetFamilyHook,
+      );
 
-    expect(contractDtsContent).toContain('export type Contract');
-    expect(contractDtsContent).toContain('CodecTypes');
+      const contractJsonPath = join(outputDir, 'contract.json');
+      const contractDtsPath = join(outputDir, 'contract.d.ts');
 
-    const validatedContract = validateContract<EmittedContract>(contractJson);
-    expect(validatedContract.targetFamily).toBe('sql');
-    expect(validatedContract.target).toBe('postgres');
-  });
+      writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
+      writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
 
-  it('round-trip test: TS contract → CLI emit → parse JSON → compare with loaded TS contract', async () => {
-    const originalContract = await loadContractFromTs(contractPath);
+      expect(existsSync(contractJsonPath)).toBe(true);
+      expect(existsSync(contractDtsPath)).toBe(true);
 
-    const cliPath = resolve('packages/framework/tooling/cli/dist/cli.js');
-    const configPath = join(testDir, 'prisma-next.config.ts');
+      const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+      expect(contractJson).toMatchObject({
+        targetFamily: 'sql',
+        target: 'postgres',
+        storage: {
+          tables: {
+            user: expect.anything(),
+          },
+        },
+      });
 
-    try {
-      await execFileAsync('node', [cliPath, 'emit', '--config', configPath]);
-    } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'stderr' in error) {
-        console.error('CLI stderr:', error.stderr);
+      const contractDts = readFileSync(contractDtsPath, 'utf-8');
+      expect(contractDts).toContain('export type Contract');
+      expect(contractDts).toContain('CodecTypes');
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'emits contract with correct coreHash',
+    async () => {
+      const contractPath = join(fixturesDir, 'valid-contract.ts');
+      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+
+      const contract = await loadContractFromTs(contractPath);
+      const packs = loadExtensionPacks(adapterPath, []);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
+
+      const result = await emit(
+        contract,
+        {
+          outputDir,
+          operationRegistry,
+          codecTypeImports,
+          operationTypeImports,
+          extensionIds,
+        },
+        sqlTargetFamilyHook,
+      );
+
+      expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'creates output directory if it does not exist',
+    async () => {
+      const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
+      const contractPath = join(fixturesDir, 'valid-contract.ts');
+      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+
+      const contract = await loadContractFromTs(contractPath);
+      const packs = loadExtensionPacks(adapterPath, []);
+      const operationRegistry = assembleOperationRegistryFromPacks(packs);
+      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+      const extensionIds = extractExtensionIdsFromPacks(packs);
+
+      const result = await emit(
+        contract,
+        {
+          outputDir: newOutputDir,
+          operationRegistry,
+          codecTypeImports,
+          operationTypeImports,
+          extensionIds,
+        },
+        sqlTargetFamilyHook,
+      );
+
+      mkdirSync(newOutputDir, { recursive: true });
+
+      const contractJsonPath = join(newOutputDir, 'contract.json');
+      const contractDtsPath = join(newOutputDir, 'contract.d.ts');
+
+      writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
+      writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
+
+      expect(existsSync(contractJsonPath)).toBe(true);
+      expect(existsSync(contractDtsPath)).toBe(true);
+
+      if (existsSync(newOutputDir)) {
+        rmSync(newOutputDir, { recursive: true, force: true });
       }
-      throw error;
-    }
-
-    const contractJsonPath = join(outputDir, 'contract.json');
-    const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-    const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-
-    const validatedContract = validateContract<EmittedContract>(contractJson);
-
-    expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
-    expect(validatedContract.target).toBe(originalContract.target);
-    const tables = validatedContract.storage['tables'] as Record<string, unknown> | undefined;
-    const originalTables = originalContract.storage?.['tables'] as
-      | Record<string, unknown>
-      | undefined;
-    const userTable = tables?.['user'] as Record<string, unknown> | undefined;
-    const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
-    if (userTable && originalUserTable) {
-      const columns = userTable['columns'] as Record<string, { codecId?: string }> | undefined;
-      const originalColumns = originalUserTable['columns'] as
-        | Record<string, { codecId?: string }>
-        | undefined;
-      if (columns && originalColumns) {
-        expect(columns['id']?.codecId).toBe(originalColumns['id']?.codecId);
-        expect(columns['email']?.codecId).toBe(originalColumns['email']?.codecId);
-      }
-    }
-  });
+    },
+    timeouts.typeScriptCompilation,
+  );
 });

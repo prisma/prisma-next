@@ -1,15 +1,12 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   HasIncludeManyCapabilities,
   InferNestedProjectionRow,
   ResultType,
 } from '@prisma-next/sql-relational-core/types';
-import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
 import { sql } from '../src/sql/builder';
 
@@ -220,25 +217,13 @@ const testContractWithCapabilities = validateContract<TestContractWithCapabiliti
   },
 });
 
-function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
-  return {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
-    },
-  };
-}
+// Stub codec types for testing (matches stub codecs in createStubAdapter)
+// These provide type inference without requiring the postgres adapter package
+type CodecTypes = {
+  readonly 'pg/int4@1': { readonly output: number };
+  readonly 'pg/text@1': { readonly output: string };
+  readonly 'pg/timestamptz@1': { readonly output: string };
+};
 
 // Type tests for includeMany result types
 test('ResultType yields Array<ChildShape> for includeMany', () => {

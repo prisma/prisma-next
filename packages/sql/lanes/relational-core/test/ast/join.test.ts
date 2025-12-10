@@ -1,6 +1,5 @@
 import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { JoinOnExpr, TableRef } from '@prisma-next/sql-relational-core/ast';
 import {
   int4Column as int4ColumnType,
   textColumn as textColumnType,
@@ -8,6 +7,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createTableRef } from '../../src/ast/common';
 import { createJoin, createJoinOnBuilder, createJoinOnExpr } from '../../src/ast/join';
+import type { JoinOnExpr, TableRef } from '../../src/ast/types';
 import { schema } from '../../src/schema';
 import { createStubAdapter, createTestContext } from '../utils';
 

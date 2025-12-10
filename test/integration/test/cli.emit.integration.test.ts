@@ -3,17 +3,18 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadContractFromTs } from '@prisma-next/cli';
+import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emit } from '@prisma-next/emitter';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
-import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createStubAdapter } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import {
@@ -21,32 +22,10 @@ import {
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../../sql/family/src/core/assembly';
-import { loadContractFromTs } from '../src/load-ts-contract';
-import { loadExtensionPacks } from '../src/pack-loading';
+} from '../../../packages/sql/family/src/core/assembly';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = join(__dirname, 'fixtures');
-
-function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
-  return {
-    profile: {
-      id: 'stub-profile',
-      target: 'postgres',
-      capabilities: {},
-      codecs() {
-        return createCodecRegistry();
-      },
-    },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
-      const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
-    },
-  };
-}
+const fixturesDir = resolve(__dirname, '../../../packages/framework/tooling/cli/test/fixtures');
 
 describe('emit integration', () => {
   let testDir: string;
@@ -68,7 +47,7 @@ describe('emit integration', () => {
     'loads TS contract, emits artifacts, and uses them with lanes',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -142,7 +121,7 @@ describe('emit integration', () => {
     'round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../../targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
