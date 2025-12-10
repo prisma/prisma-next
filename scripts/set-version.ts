@@ -62,25 +62,20 @@ const packagesDir = path.join(rootDir, 'packages');
 const packageJsonFiles = await findPackageJsonFiles(packagesDir);
 
 for (const packageJsonPath of packageJsonFiles) {
-  try {
-    const content = await fs.readFile(packageJsonPath, 'utf-8');
-    const pkg: PackageJson = JSON.parse(content);
+  const content = await fs.readFile(packageJsonPath, 'utf-8');
+  const pkg: PackageJson = JSON.parse(content);
 
-    if (pkg.private) {
-      console.log(`Skipping private package: ${pkg.name}`);
-      skippedCount++;
-      continue;
-    }
-
-    pkg.version = version;
-
-    await fs.writeFile(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
-    console.log(`Updated ${pkg.name} to ${version}`);
-    updatedCount++;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`Error processing ${packageJsonPath}: ${message}`);
+  if (pkg.private) {
+    console.log(`Skipping private package: ${pkg.name}`);
+    skippedCount++;
+    continue;
   }
+
+  pkg.version = version;
+  await fs.writeFile(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+
+  console.log(`Updated ${pkg.name} to ${version}`);
+  updatedCount++;
 }
 
 console.log(`\nDone! Updated ${updatedCount} packages, skipped ${skippedCount}.`);
