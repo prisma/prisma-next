@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 const version = process.argv[2];
 
 if (!version) {
-  console.error('Usage: node set-version.ts <version>');
-  console.error('Example: node set-version.ts 0.1.0-dev.123');
+  const script = path.relative(process.cwd(), process.argv[1]);
+  console.error(`Usage: node ${script} <version>`);
+  console.error(`Example: node ${script} 0.1.0-dev.123`);
   process.exit(1);
 }
 
@@ -22,7 +23,7 @@ async function findPackageJsonFiles(dir: string): Promise<string[]> {
 
     // If this directory has a package.json, add it and don't recurse
     if (entries.includes('package.json')) {
-      results.push(join(currentDir, 'package.json'));
+      results.push(path.join(currentDir, 'package.json'));
       return;
     }
 
@@ -33,7 +34,7 @@ async function findPackageJsonFiles(dir: string): Promise<string[]> {
           return;
         }
 
-        const fullPath = join(currentDir, entry);
+        const fullPath = path.join(currentDir, entry);
         const stat = await fs.stat(fullPath);
 
         if (stat.isDirectory()) {
@@ -57,7 +58,7 @@ interface PackageJson {
 let updatedCount = 0;
 let skippedCount = 0;
 
-const packagesDir = join(rootDir, 'packages');
+const packagesDir = path.join(rootDir, 'packages');
 const packageJsonFiles = await findPackageJsonFiles(packagesDir);
 
 for (const packageJsonPath of packageJsonFiles) {
