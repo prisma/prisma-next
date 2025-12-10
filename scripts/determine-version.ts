@@ -3,7 +3,7 @@
 import { execSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 
-const PACKAGE_NAME = '@prisma-next/contract';
+const PACKAGE_NAME = process.argv[2] ?? '@prisma-next/contract';
 
 interface VersionResult {
   version: string;
