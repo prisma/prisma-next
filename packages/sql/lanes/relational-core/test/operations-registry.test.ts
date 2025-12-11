@@ -844,7 +844,7 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { ...int4ColumnType, nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -918,7 +918,7 @@ describe('operations-registry', () => {
         tables: {
           user: {
             columns: {
-              id: { type: 'pg/int4@1', nullable: false },
+              id: { ...int4ColumnType, nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -951,7 +951,7 @@ describe('operations-registry', () => {
     expect(result).toHaveProperty('kind', 'column');
     expect(result).toHaveProperty('columnMeta');
     // When return type is 'builtin', columnMeta should use original columnMeta (not modified)
-    const resultWithMeta = result as unknown as { columnMeta: { type: string } };
-    expect(resultWithMeta.columnMeta.type).toBe('pg/int4@1');
+    const resultWithMeta = result as unknown as { columnMeta: { codecId: string } };
+    expect(resultWithMeta.columnMeta.codecId).toBe('pg/int4@1');
   });
 });

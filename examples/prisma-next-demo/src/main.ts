@@ -1,10 +1,11 @@
 import 'dotenv/config';
-import { closeRuntime } from './prisma/runtime';
+import { closeRuntime, getRuntime } from './prisma/runtime';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
 import { getUsersWithPosts } from './queries/get-users-with-posts';
+import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
 import { similaritySearch } from './queries/similarity-search';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
@@ -62,6 +63,24 @@ async function main() {
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const results = await similaritySearch(queryVector, limit);
       console.log(JSON.stringify(results, null, 2));
+    } else if (cmd === 'users-paginate') {
+      const [cursorStr, limitStr] = args;
+      const cursor = cursorStr ? Number.parseInt(cursorStr, 10) : null;
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const runtime = getRuntime();
+      const users = await ormGetUsersByIdCursor(cursor, limit, runtime);
+      console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'users-paginate-back') {
+      const [cursorStr, limitStr] = args;
+      if (!cursorStr) {
+        console.error('Usage: pnpm start -- users-paginate-back <cursor> [limit]');
+        process.exit(1);
+      }
+      const cursor = Number.parseInt(cursorStr, 10);
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const runtime = getRuntime();
+      const users = await ormGetUsersBackward(cursor, limit, runtime);
+      console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'budget-violation') {
       console.log('Running unbounded query to demonstrate budget violation...');
       console.log('This query has no LIMIT clause and will trigger BUDGET.ROWS_EXCEEDED error.\n');
@@ -85,7 +104,10 @@ async function main() {
       }
     } else {
       console.log(
-        'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | users-with-posts [limit] | similarity-search <queryVector> [limit] | budget-violation]',
+        'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
+          'users-with-posts [limit] | users-paginate [cursor] [limit] | ' +
+          'users-paginate-back <cursor> [limit] | similarity-search <queryVector> [limit] | ' +
+          'budget-violation]',
       );
       process.exit(1);
     }

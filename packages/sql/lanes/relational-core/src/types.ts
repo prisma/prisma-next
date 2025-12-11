@@ -6,7 +6,14 @@ import type {
 import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
-import type { ColumnRef, Direction, OperationExpr, ParamRef, QueryAst } from './ast/types';
+import type {
+  BinaryOp,
+  ColumnRef,
+  Direction,
+  OperationExpr,
+  ParamRef,
+  QueryAst,
+} from './ast/types';
 import type { SqlQueryPlan } from './plan';
 import type { QueryLaneContext } from './query-lane-context';
 
@@ -65,7 +72,7 @@ export interface BinaryBuilder<
   JsType = unknown,
 > {
   readonly kind: 'binary';
-  readonly op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
+  readonly op: BinaryOp;
   readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly right: ParamPlaceholder;
 }
