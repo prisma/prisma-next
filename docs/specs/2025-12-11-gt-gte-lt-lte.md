@@ -2,7 +2,7 @@
 
 **Author:** Claude (implementation assist)  
 **Date:** 2025-12-11  
-**Status:** Draft  
+**Status:** ✅ Complete  
 **PR Branch:** Contains commits `a2d86f81` (original) and `b804c1ec` (CI coverage tests)
 
 ---
@@ -25,246 +25,112 @@ This spec documents the implementation of comparison operators (`gt`, `lt`, `gte
 
 ---
 
-## 2. Current State Analysis
+## 2. Implementation Status
 
-### 2.1 What's Implemented (Commits a2d86f81, b804c1ec)
+### 2.1 Summary
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 1 | Extract `BinaryOp` Type (DRY) | ✅ Complete |
+| Phase 2 | DRY up `ColumnBuilderImpl` in `schema.ts` | ✅ Complete |
+| Phase 3 | DRY up `operations-registry.ts` | ✅ Complete |
+| Phase 4 | Review and Fix Tests | ✅ Complete |
+| Phase 5 | Wire Pagination Example into Demo App | ✅ Complete |
+| Phase 6 | Verify Other Adapters | ✅ Complete |
+| Phase 7 | Add Integration/E2E Tests | ✅ Complete |
+
+### 2.2 Detailed Status by Area
 
 | Area | File | Status | Notes |
 |------|------|--------|-------|
-| **AST Types** | `relational-core/src/ast/types.ts` | ✅ Done | Extended `BinaryExpr.op` union |
-| **Builder Types** | `relational-core/src/types.ts` | ✅ Done | Extended `ColumnBuilder` interface, `BinaryBuilder.op` |
-| **Column Implementation** | `relational-core/src/schema.ts` | ⚠️ Needs refactor | Methods work but have code duplication |
-| **Operations Registry** | `relational-core/src/operations-registry.ts` | ⚠️ Needs refactor | Methods work but have code duplication |
-| **AST Factory** | `relational-core/src/ast/predicate.ts` | ⚠️ Needs refactor | Operator type duplicated |
+| **AST Types** | `relational-core/src/ast/types.ts` | ✅ Done | `BinaryOp` type extracted and exported (L45) |
+| **Builder Types** | `relational-core/src/types.ts` | ✅ Done | Imports `BinaryOp` from `./ast/types` (L10) |
+| **Column Implementation** | `relational-core/src/schema.ts` | ✅ Done | `createBinaryBuilder` helper method (L63-76) |
+| **Operations Registry** | `relational-core/src/operations-registry.ts` | ✅ Done | `createComparisonMethod` helper (L129-133) |
+| **AST Factory** | `relational-core/src/ast/predicate.ts` | ✅ Done | Imports `BinaryOp` from `./types` (L3) |
 | **Predicate Builder (SQL)** | `sql-lane/src/sql/predicate-builder.ts` | ✅ Done | Uses `where.op` dynamically |
 | **Predicate Builder (ORM)** | `orm-lane/src/selection/predicates.ts` | ✅ Done | Uses `where.op` dynamically |
 | **Postgres Adapter** | `postgres-adapter/src/core/adapter.ts` | ✅ Done | `operatorMap` translates to SQL |
-| **Unit Tests** | `relational-core/test/schema.test.ts` | ⚠️ Review | Tests exist but quality concerns |
-| **Integration Tests** | `sql-lane/test/sql.test.ts` | ✅ Done | AST structure verified |
+| **Unit Tests** | `relational-core/test/schema.test.ts` | ✅ Done | Parameterized `it.each` tests (L240-270) |
+| **Integration Tests** | `test/integration/test/comparison-operators.integration.test.ts` | ✅ Done | Full coverage with real PostgreSQL |
 | **Adapter Tests** | `postgres-adapter/test/adapter.test.ts` | ✅ Done | SQL rendering verified |
-| **Example Code** | `examples/prisma-next-demo/src/queries/orm-pagination.ts` | ❌ Not executable | Functions exist but not wired |
-
-### 2.2 PR Review Comments to Address
-
-1. **DRY up `BinaryOp` type** — The operator union `'eq' | 'gt' | 'lt' | 'gte' | 'lte'` is repeated in:
-   - `relational-core/src/ast/types.ts` (L48: `BinaryExpr.op`)
-   - `relational-core/src/ast/predicate.ts` (L11: function parameter)
-   - `relational-core/src/types.ts` (L68: `BinaryBuilder.op`)
-   
-2. **DRY up `ColumnBuilderImpl` methods** — The `gt`/`lt`/`gte`/`lte` methods in `schema.ts` (L79-133) are nearly identical to `eq`, differing only in the `op` value.
-
-3. **DRY up `operations-registry.ts` methods** — Same duplication pattern in `executeOperation` (L146-177).
-
-4. **Test assertion has conditional** — Test at `schema.test.ts:279` has a condition in the expectation (needs investigation).
-
-5. **Example not executable** — `orm-pagination.ts` functions are not wired into the demo app.
+| **Example Code** | `examples/prisma-next-demo/src/queries/orm-pagination.ts` | ✅ Done | Functions implemented and exported |
+| **Demo CLI** | `examples/prisma-next-demo/src/main.ts` | ✅ Done | `users-paginate` and `users-paginate-back` commands wired |
 
 ---
 
-## 3. Implementation Plan
+## 3. Implementation Details (Completed)
 
-### Phase 1: Extract `BinaryOp` Type (DRY)
+### Phase 1: Extract `BinaryOp` Type (DRY) ✅
 
 **Goal:** Single source of truth for binary operator types.
 
-#### 3.1.1 Create shared type in `ast/types.ts`
-
-```prisma-next/packages/sql/lanes/relational-core/src/ast/types.ts
-// Add near top of file, before BinaryExpr
-export type BinaryOp = 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
-
-export interface BinaryExpr {
-  readonly kind: 'bin';
-  readonly op: BinaryOp;  // Changed from inline union
-  readonly left: ColumnRef | OperationExpr;
-  readonly right: ParamRef;
-}
-```
-
-#### 3.1.2 Update `predicate.ts` to import `BinaryOp`
-
-```prisma-next/packages/sql/lanes/relational-core/src/ast/predicate.ts
-import type { BinaryOp, ... } from './types';
-
-export function createBinaryExpr(
-  op: BinaryOp,  // Changed from inline union
-  left: ColumnRef | OperationExpr,
-  right: ParamRef,
-): BinaryExpr { ... }
-```
-
-#### 3.1.3 Update `types.ts` to import `BinaryOp`
-
-```prisma-next/packages/sql/lanes/relational-core/src/types.ts
-import type { BinaryOp, OperationExpr } from './ast/types';
-
-export interface BinaryBuilder<...> {
-  readonly kind: 'binary';
-  readonly op: BinaryOp;  // Changed from inline union
-  readonly left: ColumnBuilder<...> | OperationExpr;
-  readonly right: ParamPlaceholder;
-}
-```
-
-#### 3.1.4 Export `BinaryOp` from package entrypoints
-
-Ensure `BinaryOp` is exported from:
-- `relational-core/src/ast/index.ts` (or barrel file)
-- `relational-core/src/types.ts` re-export
-
-**Files to modify:**
-- `packages/sql/lanes/relational-core/src/ast/types.ts`
-- `packages/sql/lanes/relational-core/src/ast/predicate.ts`
-- `packages/sql/lanes/relational-core/src/types.ts`
+**Implementation:**
+- `BinaryOp` type defined in `relational-core/src/ast/types.ts:45`:
+  ```typescript
+  export type BinaryOp = 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
+  ```
+- `predicate.ts` imports `BinaryOp` from `./types` (L1-9)
+- `types.ts` imports `BinaryOp` from `./ast/types` (L9-16)
 
 ---
 
-### Phase 2: DRY up `ColumnBuilderImpl` in `schema.ts`
+### Phase 2: DRY up `ColumnBuilderImpl` in `schema.ts` ✅
 
 **Goal:** Extract helper method for binary builder creation.
 
-#### 3.2.1 Add private helper method
-
-```prisma-next/packages/sql/lanes/relational-core/src/schema.ts
-export class ColumnBuilderImpl<...> {
-  // ... existing code ...
-
-  private createBinaryBuilder(
-    op: BinaryOp,
-    value: ParamPlaceholder,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
-    if (value.kind !== 'param-placeholder') {
-      throw planInvalid('Parameter placeholder required for column comparison');
-    }
-    return Object.freeze({
-      kind: 'binary' as const,
-      op,
-      left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
-      right: value,
-    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+**Implementation:** Private `createBinaryBuilder` method at L63-76:
+```typescript
+private createBinaryBuilder(
+  op: BinaryOp,
+  value: ParamPlaceholder,
+): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  if (value.kind !== 'param-placeholder') {
+    throw planInvalid('Parameter placeholder required for column comparison');
   }
-
-  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
-    return this.createBinaryBuilder('eq', value);
-  }
-
-  gt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
-    return this.createBinaryBuilder('gt', value);
-  }
-
-  lt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
-    return this.createBinaryBuilder('lt', value);
-  }
-
-  gte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
-    return this.createBinaryBuilder('gte', value);
-  }
-
-  lte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
-    return this.createBinaryBuilder('lte', value);
-  }
+  return Object.freeze({
+    kind: 'binary' as const,
+    op,
+    left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+    right: value,
+  }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
 }
 ```
 
-**Files to modify:**
-- `packages/sql/lanes/relational-core/src/schema.ts`
+All comparison methods (`eq`, `gt`, `lt`, `gte`, `lte`) now delegate to this helper.
 
 ---
 
-### Phase 3: DRY up `operations-registry.ts`
+### Phase 3: DRY up `operations-registry.ts` ✅
 
 **Goal:** Extract helper for binary method creation in operation results.
 
-#### 3.3.1 Extract helper function in `executeOperation`
-
-```prisma-next/packages/sql/lanes/relational-core/src/operations-registry.ts
-function executeOperation(...) {
-  // ... existing setup code ...
-
-  const createComparisonMethod = (op: BinaryOp) => (value: ParamPlaceholder) =>
-    Object.freeze({
-      kind: 'binary' as const,
-      op,
-      left: operationExpr,
-      right: value,
-    });
-
-  const baseResult = {
-    kind: 'column' as const,
-    table: selfBuilderWithExpr.table,
-    column: selfBuilderWithExpr.column,
-    get columnMeta() { return returnColumnMeta; },
-    eq: createComparisonMethod('eq'),
-    gt: createComparisonMethod('gt'),
-    lt: createComparisonMethod('lt'),
-    gte: createComparisonMethod('gte'),
-    lte: createComparisonMethod('lte'),
-    asc() { /* ... */ },
-    desc() { /* ... */ },
-    _operationExpr: operationExpr,
-  } as unknown as AnyColumnBuilder & { _operationExpr?: OperationExpr };
-
-  // ... rest of function ...
-}
+**Implementation:** `createComparisonMethod` helper at L129-137:
+```typescript
+const createComparisonMethod = (op: BinaryOp) => (value: ParamPlaceholder) =>
+  Object.freeze({
+    kind: 'binary' as const,
+    op,
+    left: operationExpr,
+    right: value,
+  });
 ```
 
-**Files to modify:**
-- `packages/sql/lanes/relational-core/src/operations-registry.ts`
+All comparison methods in `baseResult` now use this helper (L145-149).
 
 ---
 
-### Phase 4: Review and Fix Tests
+### Phase 4: Review and Fix Tests ✅
 
 **Goal:** Ensure tests are idiomatic and properly cover the feature.
 
-#### 3.4.1 Audit `schema.test.ts`
-
-Current tests in `schema.test.ts` for the operators:
-- `column builder gt creates binary builder` (L270-287)
-- `column builder lt creates binary builder` (L289-306)
-- `column builder gte creates binary builder` (L308-325)
-- `column builder lte creates binary builder` (L327-344)
-- Error tests for invalid params (L346-379)
-
-**Review items:**
-1. **Fix conditional in expectation** (review comment at line 279): The tests use a pattern like:
-   ```typescript
-   expect({
-     defined: binary !== undefined,  // <-- This is the "condition"
-     kind: binary.kind,
-     op: binary.op,
-   }).toMatchObject({
-     defined: true,
-     kind: 'binary',
-     op: 'gt',
-   });
-   ```
-   This is unusual—the `defined: binary !== undefined` evaluates a boolean inside the object literal. **Recommendation:** Either use `expect(binary).toBeDefined()` as a separate assertion, or simply trust that accessing `.kind` and `.op` would throw if `binary` were undefined. Cleaner approach:
-   ```typescript
-   expect(binary).toMatchObject({
-     kind: 'binary',
-     op: 'gt',
-   });
-   ```
-2. Ensure test isolation (each test creates fresh context)
-3. Consider consolidating repetitive tests into parameterized tests using `it.each`
-
-#### 3.4.2 Consider parameterized tests
-
+**Implementation:** Parameterized tests using `it.each` at L240-270:
 ```typescript
-// Example consolidation
 describe('comparison operators', () => {
-  const operators = ['eq', 'gt', 'lt', 'gte', 'lte'] as const;
-  
-  it.each(operators)('%s creates binary builder with correct op', (op) => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
-    const tables = schema(context).tables;
-    const idColumn = tables.user.columns.id;
+  const operators: BinaryOp[] = ['eq', 'gt', 'lt', 'gte', 'lte'];
 
-    const method = idColumn[op] as (p: ParamPlaceholder) => BinaryBuilder;
-    const binary = method(param('value'));
-    
+  it.each(operators)('%s creates binary builder with correct op', (op) => {
+    // ... test implementation
     expect(binary).toMatchObject({
       kind: 'binary',
       op,
@@ -272,108 +138,40 @@ describe('comparison operators', () => {
   });
 
   it.each(operators)('%s throws for invalid param', (op) => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
-    const tables = schema(context).tables;
-    const idColumn = tables.user.columns.id;
-
-    const method = idColumn[op] as (p: unknown) => unknown;
-    expect(() => method({ kind: 'invalid' })).toThrow(
-      'Parameter placeholder required for column comparison'
-    );
+    // ... test implementation
   });
 });
 ```
 
-**Decision:** Use parameterized tests to consolidate the repetitive operator tests. This reduces duplication and makes the test suite easier to maintain.
-
-**Files to modify:**
-- `packages/sql/lanes/relational-core/test/schema.test.ts`
+The conditional assertion pattern (`defined: binary !== undefined`) has been removed in favor of clean `toMatchObject` assertions.
 
 ---
 
-### Phase 5: Wire Pagination Example into Demo App
+### Phase 5: Wire Pagination Example into Demo App ✅
 
 **Goal:** Make `orm-pagination.ts` functions executable via the demo CLI.
 
-#### 3.5.1 Add CLI Commands
+**Implementation:**
+- `orm-pagination.ts` exports:
+  - `ormGetUsersByIdCursor(cursor, pageSize, runtime)`
+  - `ormGetUsersByTimestampCursor(cursor, pageSize, runtime)`
+  - `ormGetUsersBackward(cursor, pageSize, runtime)`
+  - `ormGetUsersFirstPage(pageSize, runtime)`
+  - `ormGetUsersNextPage(lastId, pageSize, runtime)`
 
-The demo app (`examples/prisma-next-demo/src/main.ts`) uses a simple command dispatch pattern. Add new commands for pagination:
+- `main.ts` CLI commands (L62-79):
+  - `users-paginate [cursor] [limit]` - Forward pagination
+  - `users-paginate-back <cursor> [limit]` - Backward pagination
 
-```typescript
-// In main.ts, add imports:
-import {
-  ormGetUsersByIdCursor,
-  ormGetUsersByTimestampCursor,
-  ormGetUsersBackward,
-  ormGetUsersFirstPage,
-  ormGetUsersNextPage,
-} from './queries/orm-pagination';
-
-// Add command handlers:
-} else if (cmd === 'users-paginate') {
-  const [cursorStr, limitStr] = args;
-  const cursor = cursorStr ? Number.parseInt(cursorStr, 10) : null;
-  const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-  const users = await ormGetUsersByIdCursor(cursor, limit, runtime);
-  console.log(JSON.stringify(users, null, 2));
-} else if (cmd === 'users-paginate-back') {
-  const [cursorStr, limitStr] = args;
-  if (!cursorStr) {
-    console.error('Usage: pnpm start -- users-paginate-back <cursor> [limit]');
-    process.exit(1);
-  }
-  const cursor = Number.parseInt(cursorStr, 10);
-  const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-  const users = await ormGetUsersBackward(cursor, limit, runtime);
-  console.log(JSON.stringify(users, null, 2));
-}
-```
-
-#### 3.5.2 Update `orm-pagination.ts`
-
-The current functions take a `runtime` parameter but the demo uses a singleton pattern. Update to match demo conventions:
-
-```typescript
-// Import the shared runtime
-import { runtime } from '../prisma/runtime';
-
-// Update function signatures to use shared runtime (or keep param for flexibility)
-export async function ormGetUsersByIdCursor(
-  cursor: number | null,
-  pageSize: number,
-) {
-  // Use imported runtime instead of parameter
-}
-```
-
-Alternatively, keep the `runtime` parameter and pass the singleton from `main.ts`.
-
-#### 3.5.3 Update Usage Help
-
-Update the help message in `main.ts`:
-
-```typescript
-console.log(
-  'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
-  'users-with-posts [limit] | users-paginate [cursor] [limit] | ' +
-  'users-paginate-back <cursor> [limit] | similarity-search <queryVector> [limit] | ' +
-  'budget-violation]',
-);
-```
-
-**Files to modify:**
-- `examples/prisma-next-demo/src/main.ts`
-- `examples/prisma-next-demo/src/queries/orm-pagination.ts`
+- Help text updated (L95-98)
 
 ---
 
-### Phase 6: Verify Other Adapters (If Any)
+### Phase 6: Verify Other Adapters ✅
 
 **Goal:** Ensure all adapters support the new operators.
 
-Currently only `postgres-adapter` exists. The `operatorMap` approach is correct:
-
+**Result:** Only `postgres-adapter` exists. The `operatorMap` correctly maps all operators:
 ```typescript
 const operatorMap: Record<BinaryExpr['op'], string> = {
   eq: '=',
@@ -384,190 +182,97 @@ const operatorMap: Record<BinaryExpr['op'], string> = {
 };
 ```
 
-**Action:** No changes needed unless other adapters exist. The implementation in `renderBinary()` is clean.
-
 ---
 
-### Phase 7: Add Integration/E2E Tests Against Real Database
+### Phase 7: Add Integration/E2E Tests Against Real Database ✅
 
 **Goal:** Verify comparison operators work correctly against a real PostgreSQL database.
 
-Currently there are **no integration or e2e tests** that execute queries with `gt`/`lt`/`gte`/`lte` against a real database. The existing tests only verify:
-- Unit tests: AST structure is correct
-- Adapter tests: SQL string rendering is correct
-
-But we need to verify the full round-trip actually works.
-
-#### 3.7.1 Add Integration Test
-
-Add tests to `test/integration/test/runtime.integration.test.ts` or create a new file `test/integration/test/comparison-operators.integration.test.ts`:
-
-```typescript
-import { param } from '@prisma-next/sql-relational-core/param';
-import { sql } from '@prisma-next/sql-lane/sql';
-import { schema } from '@prisma-next/sql-relational-core/schema';
-
-describe('comparison operators integration', () => {
-  // Use existing test setup pattern from runtime.integration.test.ts
-  
-  beforeEach(async () => {
-    await setupTestDatabase(client, fixtureContract, async (c) => {
-      await c.query('drop table if exists "user"');
-      await c.query('create table "user" (id serial primary key, email text not null)');
-      // Insert 10 users with sequential IDs
-      for (let i = 1; i <= 10; i++) {
-        await c.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
-      }
-    });
-  });
-
-  it('gt operator returns rows where id > cursor', async () => {
-    const context = createTestContext(fixtureContract, adapter);
-    const tables = schema(context).tables;
-    const plan = sql({ context })
-      .from(tables.user)
-      .select({ id: tables.user.columns.id, email: tables.user.columns.email })
-      .where(tables.user.columns.id.gt(param('cursor')))
-      .orderBy(tables.user.columns.id.asc())
-      .build({ params: { cursor: 5 } });
-
-    const rows = await executePlanAndCollect(runtime, plan);
-    
-    expect(rows.length).toBe(5); // IDs 6, 7, 8, 9, 10
-    expect(rows.every(r => r.id > 5)).toBe(true);
-  });
-
-  it('lt operator returns rows where id < cursor', async () => {
-    // Similar test for lt
-  });
-
-  it('gte operator returns rows where id >= cursor', async () => {
-    // Similar test for gte  
-  });
-
-  it('lte operator returns rows where id <= cursor', async () => {
-    // Similar test for lte
-  });
-
-  it('cursor pagination returns correct pages', async () => {
-    // Test full pagination flow: first page, then next page using last ID
-  });
-});
-```
-
-#### 3.7.2 Add E2E Test
-
-Add to `test/e2e/framework/test/runtime.basic.test.ts` or create new file:
-
-```typescript
-it('cursor pagination with gt operator works end-to-end', async () => {
-  // Full e2e test including contract emission and runtime execution
-});
-```
-
-**Files to modify/create:**
-- `test/integration/test/comparison-operators.integration.test.ts` (new file)
-- OR extend `test/integration/test/runtime.integration.test.ts`
+**Implementation:** `test/integration/test/comparison-operators.integration.test.ts` with tests:
+- `gt operator returns rows where id > cursor`
+- `lt operator returns rows where id < cursor`
+- `gte operator returns rows where id >= cursor`
+- `lte operator returns rows where id <= cursor`
+- `cursor pagination returns correct pages (forward)`
+- `cursor pagination returns correct pages (backward)`
+- `gt returns empty result when cursor exceeds all values`
+- `lt returns empty result when cursor is below all values`
 
 ---
 
-## 4. File Change Summary
+## 4. Testing Checklist
 
-| File | Action | Priority |
-|------|--------|----------|
-| `relational-core/src/ast/types.ts` | Add `BinaryOp` type export | High |
-| `relational-core/src/ast/predicate.ts` | Import `BinaryOp` | High |
-| `relational-core/src/types.ts` | Import `BinaryOp` | High |
-| `relational-core/src/schema.ts` | Extract `createBinaryBuilder` helper | High |
-| `relational-core/src/operations-registry.ts` | Extract `createComparisonMethod` helper | High |
-| `relational-core/test/schema.test.ts` | Refactor to parameterized tests | High |
-| `examples/prisma-next-demo/src/main.ts` | Add pagination CLI commands | High |
-| `examples/prisma-next-demo/src/queries/orm-pagination.ts` | Wire into demo runtime | High |
-| `test/integration/test/comparison-operators.integration.test.ts` | New integration tests | High |
+- [x] `pnpm build` passes
+- [x] `pnpm test:packages` passes
+- [x] `pnpm lint:deps` passes (no import violations)
+- [x] Type exports are accessible from package entrypoints
+- [x] No regressions in existing `eq` operator behavior
+- [x] Integration tests pass against real PostgreSQL
+- [x] Demo pagination commands work (`pnpm start -- users-paginate`)
 
----
+### Manual Verification Commands
 
-## 5. Testing Checklist
-
-After implementation, verify:
-
-- [ ] `pnpm build` passes
-- [ ] `pnpm test:packages` passes
-- [ ] `pnpm lint:deps` passes (no import violations)
-- [ ] Type exports are accessible from package entrypoints
-- [ ] No regressions in existing `eq` operator behavior
-- [ ] Integration tests pass against real PostgreSQL
-- [ ] Demo pagination commands work (`pnpm start -- users-paginate`)
-
-### 5.1 Manual Verification Queries
-
-```typescript
-// SQL Lane
-const plan1 = sql
-  .from(tables.user)
-  .where(tables.user.columns.id.gt(param('cursor')))
-  .select({ id: tables.user.columns.id })
-  .build({ params: { cursor: 100 } });
-
-// Expected AST where clause:
-// { kind: 'bin', op: 'gt', left: { kind: 'col', ... }, right: { kind: 'param', ... } }
-
-// ORM Lane
-const plan2 = orm
-  .user()
-  .where((u) => u.createdAt.lte(param('cutoff')))
-  .findMany({ params: { cutoff: new Date() } });
+```bash
+# Run in examples/prisma-next-demo
+pnpm start -- users-paginate           # First page (no cursor)
+pnpm start -- users-paginate 5         # Page after id=5
+pnpm start -- users-paginate 5 3       # 3 results after id=5
+pnpm start -- users-paginate-back 10 5 # 5 results before id=10
 ```
 
 ---
 
-## 6. Open Questions
+## 5. Remaining Gaps / Areas for Improvement
 
-1. **Should we add compound comparisons?** (e.g., `between(min, max)` as sugar for `gte(min).and(lte(max))`)
-   - **Answer:** Out of scope for this PR. File separate feature request.
+### 5.1 Low Priority Improvements
 
-2. **Type safety on comparisons?** Currently all operators work on all scalar types.
-   - **Answer:** Keep current behavior. SQL databases handle type compatibility at runtime. Adding TypeScript restrictions would be overly complex for limited benefit.
+| Item | Description | Priority |
+|------|-------------|----------|
+| **Compound comparisons** | Add `between(min, max)` as sugar for `gte(min).and(lte(max))` | Low - File separate feature request |
+| **`neq` operator** | Add `neq` (not equal) operator | Low - File separate feature request |
+| **NULL handling** | Support `isNull()` / `isNotNull()` predicates | Low - Different syntax needed |
 
-3. **NULL handling?** `col.gt(null)` behavior?
-   - **Answer:** Current implementation requires `ParamPlaceholder`. Literal NULL comparisons would need different syntax (e.g., `isNull()`/`isNotNull()`). Out of scope.
+### 5.2 Documentation Improvements
 
----
+| Item | Description | Priority |
+|------|-------------|----------|
+| **API docs** | Add JSDoc to comparison methods in `ColumnBuilder` interface | Medium |
+| **Usage guide** | Add pagination example to user-facing docs | Medium |
 
-## 7. Implementation Order
+### 5.3 Test Coverage Opportunities
 
-Execute phases in order:
-
-1. **Phase 1** — Extract `BinaryOp` type (enables cleaner subsequent changes)
-2. **Phase 2** — DRY `ColumnBuilderImpl` 
-3. **Phase 3** — DRY `operations-registry.ts`
-4. **Phase 4** — Refactor to parameterized tests
-5. **Phase 5** — Wire pagination example into demo app
-6. **Phase 6** — Verify adapters (should be no-op)
-7. **Phase 7** — Add integration/e2e tests against real database
-
-Estimated effort: ~4-5 hours for clean implementation with all tests passing.
+| Item | Description | Priority |
+|------|-------------|----------|
+| **ORM lane integration** | Add integration tests using ORM lane (not just SQL lane) | Medium |
+| **Timestamp comparisons** | Add integration tests for `createdAt.lt(param('cutoff'))` patterns | Low |
+| **Operation expression comparisons** | Test `col.someOp().gt(param('value'))` end-to-end | Medium |
 
 ---
 
-## 8. Appendix: Current Code Snippets
+## 6. Current Code References
 
-### A. Current `BinaryExpr` definition (ast/types.ts:46-52)
+### A. `BinaryOp` type (ast/types.ts:45)
+
+```typescript
+export type BinaryOp = 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
+```
+
+### B. `BinaryExpr` interface (ast/types.ts:47-52)
 
 ```typescript
 export interface BinaryExpr {
   readonly kind: 'bin';
-  readonly op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
+  readonly op: BinaryOp;
   readonly left: ColumnRef | OperationExpr;
   readonly right: ParamRef;
 }
 ```
 
-### B. Current `createBinaryExpr` (ast/predicate.ts:10-19)
+### C. `createBinaryExpr` (ast/predicate.ts:11-21)
 
 ```typescript
 export function createBinaryExpr(
-  op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte',
+  op: BinaryOp,
   left: ColumnRef | OperationExpr,
   right: ParamRef,
 ): BinaryExpr {
@@ -580,7 +285,7 @@ export function createBinaryExpr(
 }
 ```
 
-### C. Current `BinaryBuilder` definition (types.ts:62-71)
+### D. `BinaryBuilder` interface (types.ts:69-78)
 
 ```typescript
 export interface BinaryBuilder<
@@ -589,13 +294,13 @@ export interface BinaryBuilder<
   JsType = unknown,
 > {
   readonly kind: 'binary';
-  readonly op: 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
+  readonly op: BinaryOp;
   readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly right: ParamPlaceholder;
 }
 ```
 
-### D. Current `renderBinary` operator map (postgres-adapter:142-149)
+### E. `operatorMap` (postgres-adapter renderBinary)
 
 ```typescript
 const operatorMap: Record<BinaryExpr['op'], string> = {
@@ -609,12 +314,26 @@ const operatorMap: Record<BinaryExpr['op'], string> = {
 
 ---
 
-## 9. Success Criteria
+## 7. Success Criteria ✅
 
-- [ ] All PR review comments addressed
-- [ ] No code duplication for operator type
-- [ ] Helper methods extract common logic
-- [ ] All unit tests pass
-- [ ] Integration tests pass against real PostgreSQL
-- [ ] Build succeeds
-- [ ] Demo pagination commands work end-to-end
+- [x] All PR review comments addressed
+- [x] No code duplication for operator type
+- [x] Helper methods extract common logic
+- [x] All unit tests pass
+- [x] Integration tests pass against real PostgreSQL
+- [x] Build succeeds
+- [x] Demo pagination commands work end-to-end
+
+---
+
+## 8. Conclusion
+
+The comparison operators feature is **fully implemented and tested**. All planned phases have been completed:
+
+1. ✅ DRY refactoring of `BinaryOp` type
+2. ✅ Helper methods in `schema.ts` and `operations-registry.ts`
+3. ✅ Parameterized unit tests
+4. ✅ Demo app integration with CLI commands
+5. ✅ Comprehensive integration tests against real PostgreSQL
+
+The feature supports cursor-based pagination and range queries across both SQL and ORM lanes, with full type safety and clean, maintainable code.
