@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/runtime-executor",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
   "description": "Target-agnostic execution engine for Prisma Next",

@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/extension-pgvector",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
   "scripts": {
@@ -34,6 +33,9 @@
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^2.1.1"
   },
+  "files": [
+    "dist"
+  ],
   "exports": {
     "./control": {
       "types": "./dist/exports/control.d.ts",

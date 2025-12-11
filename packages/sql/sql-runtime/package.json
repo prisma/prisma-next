@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/sql-runtime",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
   "description": "SQL runtime implementation for Prisma Next",

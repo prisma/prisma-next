@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/driver-postgres",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
   "scripts": {
@@ -32,6 +31,9 @@
     "@types/pg": "^8.11.10",
     "@types/pg-cursor": "^2.4.6"
   },
+  "files": [
+    "dist"
+  ],
   "exports": {
     "./control": {
       "types": "./dist/exports/control.d.ts",

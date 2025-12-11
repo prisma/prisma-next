@@ -1,9 +1,11 @@
 {
   "name": "@prisma-next/cli",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run",

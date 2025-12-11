@@ -1,0 +1,76 @@
+name: Publish to npm
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 0.1.0, 0.1.0-beta.1)"
+        required: true
+        type: string
+      dist-tag:
+        description: "npm dist-tag (e.g., latest, dev, beta)"
+        required: true
+        default: "dev"
+        type: string
+      ref:
+        description: "Git ref to publish from (branch, tag, or SHA)"
+        required: false
+        default: "main"
+        type: string
+
+concurrency:
+  group: npm-publish-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine version and tag
+        id: version
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_TAG: ${{ github.event.inputs.dist-tag }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/determine-version.ts
+
+      - name: Set package versions
+        run: node scripts/set-version.ts ${{ steps.version.outputs.version }}
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Publish packages
+        run: pnpm -r publish --access public --tag ${{ steps.version.outputs.tag }} --no-git-checks
