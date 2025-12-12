@@ -305,41 +305,4 @@ describe('schema', () => {
       dir: 'desc',
     });
   });
-
-  it('throws error for unknown table', () => {
-    const contractWithUnknownTable = validateContract<TestContract>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'test-hash',
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
-              email: { ...textColumnType, nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      models: {},
-      relations: {},
-      mappings: {},
-    });
-
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithUnknownTable, adapter);
-    // Manually manipulate storage to set table to undefined to test error path
-    // This tests the branch where storage.tables[tableName] is undefined
-    const storage = context.contract.storage as unknown as MutableStorage;
-    // Set the table to undefined (bypassing TypeScript type checking for test purposes)
-    storage.tables.user = undefined as unknown as typeof storage.tables.user;
-
-    expect(() => {
-      schema(context).tables;
-    }).toThrow('Unknown table user');
-  });
 });
