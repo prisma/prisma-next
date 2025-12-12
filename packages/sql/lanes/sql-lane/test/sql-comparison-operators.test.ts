@@ -25,87 +25,27 @@ describe('sql comparison operators', () => {
   const context = createTestContext(contract, adapter);
   const tables = schema<Contract>(context).tables;
 
-  describe('gt operator', () => {
-    it('builds query with gt filter', () => {
-      const { id, email } = tables.user.columns;
+  it.each([
+    { op: 'gt', method: 'gt', paramName: 'minId', paramValue: 10 },
+    { op: 'lt', method: 'lt', paramName: 'maxId', paramValue: 100 },
+    { op: 'gte', method: 'gte', paramName: 'minId', paramValue: 10 },
+    { op: 'lte', method: 'lte', paramName: 'maxId', paramValue: 100 },
+  ] as const)('builds query with $op filter', ({ op, method, paramName, paramValue }) => {
+    const { id, email } = tables.user.columns;
 
-      const plan = sql({ context })
-        .from(tables.user)
-        .select({ id, email })
-        .where(id.gt(param('minId')))
-        .build({ params: { minId: 10 } });
+    const plan = sql({ context })
+      .from(tables.user)
+      .select({ id, email })
+      .where(id[method](param(paramName)))
+      .build({ params: { [paramName]: paramValue } });
 
-      expect(plan.ast).toMatchObject({
-        kind: 'select',
-        where: {
-          kind: 'bin',
-          op: 'gt',
-          left: createColumnRef('user', 'id'),
-        },
-      });
-    });
-  });
-
-  describe('lt operator', () => {
-    it('builds query with lt filter', () => {
-      const { id, email } = tables.user.columns;
-
-      const plan = sql({ context })
-        .from(tables.user)
-        .select({ id, email })
-        .where(id.lt(param('maxId')))
-        .build({ params: { maxId: 100 } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'select',
-        where: {
-          kind: 'bin',
-          op: 'lt',
-          left: createColumnRef('user', 'id'),
-        },
-      });
-    });
-  });
-
-  describe('gte operator', () => {
-    it('builds query with gte filter', () => {
-      const { id, email } = tables.user.columns;
-
-      const plan = sql({ context })
-        .from(tables.user)
-        .select({ id, email })
-        .where(id.gte(param('minId')))
-        .build({ params: { minId: 10 } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'select',
-        where: {
-          kind: 'bin',
-          op: 'gte',
-          left: createColumnRef('user', 'id'),
-        },
-      });
-    });
-  });
-
-  describe('lte operator', () => {
-    it('builds query with lte filter', () => {
-      const { id, email } = tables.user.columns;
-
-      const plan = sql({ context })
-        .from(tables.user)
-        .select({ id, email })
-        .where(id.lte(param('maxId')))
-        .build({ params: { maxId: 100 } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'select',
-        where: {
-          kind: 'bin',
-          op: 'lte',
-          left: createColumnRef('user', 'id'),
-        },
-      });
+    expect(plan.ast).toMatchObject({
+      kind: 'select',
+      where: {
+        kind: 'bin',
+        op,
+        left: createColumnRef('user', 'id'),
+      },
     });
   });
 
