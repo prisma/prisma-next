@@ -92,6 +92,10 @@ type AnyColumnBuilderBase = {
   readonly column: string;
   readonly columnMeta: StorageColumn;
   eq(value: ParamPlaceholder): AnyBinaryBuilder;
+  gt(value: ParamPlaceholder): AnyBinaryBuilder;
+  lt(value: ParamPlaceholder): AnyBinaryBuilder;
+  gte(value: ParamPlaceholder): AnyBinaryBuilder;
+  lte(value: ParamPlaceholder): AnyBinaryBuilder;
   asc(): AnyOrderBuilder;
   desc(): AnyOrderBuilder;
   readonly __jsType: unknown;
