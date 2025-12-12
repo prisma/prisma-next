@@ -425,4 +425,108 @@ describe('ORM integration tests', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'orm pagination: ormGetUsersByIdCursor returns paginated users with gt cursor',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+          });
+
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query('truncate table "user" restart identity');
+            for (let i = 1; i <= 10; i++) {
+              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+                `user${i}@example.com`,
+              ]);
+            }
+          });
+
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
+
+          const firstPage = await ormGetUsersByIdCursor(null, 3, runtime);
+          expect(firstPage).toHaveLength(3);
+          expect(firstPage.map((u) => u.id)).toEqual([1, 2, 3]);
+
+          const secondPage = await ormGetUsersByIdCursor(3, 3, runtime);
+          expect(secondPage).toHaveLength(3);
+          expect(secondPage.map((u) => u.id)).toEqual([4, 5, 6]);
+
+          const thirdPage = await ormGetUsersByIdCursor(6, 3, runtime);
+          expect(thirdPage).toHaveLength(3);
+          expect(thirdPage.map((u) => u.id)).toEqual([7, 8, 9]);
+
+          const lastPage = await ormGetUsersByIdCursor(9, 3, runtime);
+          expect(lastPage).toHaveLength(1);
+          expect(lastPage.map((u) => u.id)).toEqual([10]);
+
+          const emptyPage = await ormGetUsersByIdCursor(10, 3, runtime);
+          expect(emptyPage).toHaveLength(0);
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'orm pagination: ormGetUsersBackward returns users before cursor with lt operator',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        const { runtime, pool } = createTestRuntime(connectionString, contract);
+
+        try {
+          await stampMarker({
+            connectionString,
+            coreHash: contract.coreHash,
+            profileHash: contract.profileHash ?? contract.coreHash,
+          });
+
+          await withClient(connectionString, async (client) => {
+            await client.query(
+              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+            );
+            await client.query('truncate table "user" restart identity');
+            for (let i = 1; i <= 10; i++) {
+              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+                `user${i}@example.com`,
+              ]);
+            }
+          });
+
+          process.env['DATABASE_URL'] = connectionString;
+          const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
+
+          const page = await ormGetUsersBackward(8, 3, runtime);
+          expect(page).toHaveLength(3);
+          expect(page.map((u) => u.id)).toEqual([7, 6, 5]);
+
+          const earlierPage = await ormGetUsersBackward(4, 3, runtime);
+          expect(earlierPage).toHaveLength(3);
+          expect(earlierPage.map((u) => u.id)).toEqual([3, 2, 1]);
+
+          const partialPage = await ormGetUsersBackward(2, 3, runtime);
+          expect(partialPage).toHaveLength(1);
+          expect(partialPage.map((u) => u.id)).toEqual([1]);
+
+          const emptyPage = await ormGetUsersBackward(1, 3, runtime);
+          expect(emptyPage).toHaveLength(0);
+        } finally {
+          await closeTestRuntime({ runtime, pool });
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
