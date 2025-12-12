@@ -246,7 +246,7 @@ describe('schema', () => {
       const tables = schema(context).tables;
       const idColumn = tables.user.columns.id;
 
-      const method = idColumn[op] as (p: ParamPlaceholder) => BinaryBuilder;
+      const method = idColumn[op];
       const binary = method.call(idColumn, param('value'));
 
       expect(binary).toMatchObject({
