@@ -9,7 +9,7 @@ import type { BinaryOp } from '../src/ast/types';
 import { param } from '../src/param';
 import type { SchemaHandle } from '../src/schema';
 import { schema } from '../src/schema';
-import type { BinaryBuilder, OperationTypes, ParamPlaceholder } from '../src/types';
+import type { OperationTypes } from '../src/types';
 import { createStubAdapter, createTestContext } from './utils';
 
 type TestContract = SqlContract<
