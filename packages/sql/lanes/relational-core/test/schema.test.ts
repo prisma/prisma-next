@@ -5,6 +5,7 @@ import {
   textColumn as textColumnType,
 } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import type { BinaryOp } from '../src/ast/types';
 import { param } from '../src/param';
 import type { SchemaHandle } from '../src/schema';
 import { schema } from '../src/schema';
@@ -208,18 +209,6 @@ describe('schema', () => {
     });
   });
 
-  it('column builder eq throws error for invalid param', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
-    const tables = schema(context).tables;
-    const userTable = tables.user;
-    const idColumn = userTable.columns.id;
-
-    expect(() => {
-      idColumn.eq({ kind: 'invalid' } as unknown as ReturnType<typeof param>);
-    }).toThrow('Parameter placeholder required for column comparison');
-  });
-
   it('column builder has columnMeta property', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
@@ -248,22 +237,34 @@ describe('schema', () => {
     expect(idColumn.__jsType).toBeUndefined();
   });
 
-  it('column builder eq creates binary builder', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
-    const tables = schema(context).tables;
-    const userTable: TestUserTable = tables.user;
-    const idColumn = userTable.columns.id;
+  describe('comparison operators', () => {
+    const operators: BinaryOp[] = ['eq', 'gt', 'lt', 'gte', 'lte'];
 
-    const binary = idColumn.eq(param('userId'));
-    expect({
-      defined: binary !== undefined,
-      kind: binary.kind,
-      op: binary.op,
-    }).toMatchObject({
-      defined: true,
-      kind: 'binary',
-      op: 'eq',
+    it.each(operators)('%s creates binary builder with correct op', (op) => {
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const idColumn = tables.user.columns.id;
+
+      const method = idColumn[op];
+      const binary = method.call(idColumn, param('value'));
+
+      expect(binary).toMatchObject({
+        kind: 'binary',
+        op,
+      });
+    });
+
+    it.each(operators)('%s throws for invalid param', (op) => {
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const idColumn = tables.user.columns.id;
+
+      const method = idColumn[op] as (p: unknown) => unknown;
+      expect(() => method.call(idColumn, { kind: 'invalid' })).toThrow(
+        'Parameter placeholder required for column comparison',
+      );
     });
   });
 

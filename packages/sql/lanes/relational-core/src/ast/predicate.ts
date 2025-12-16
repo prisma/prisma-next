@@ -1,5 +1,6 @@
 import type {
   BinaryExpr,
+  BinaryOp,
   ColumnRef,
   ExistsExpr,
   OperationExpr,
@@ -8,7 +9,7 @@ import type {
 } from './types';
 
 export function createBinaryExpr(
-  op: 'eq',
+  op: BinaryOp,
   left: ColumnRef | OperationExpr,
   right: ParamRef,
 ): BinaryExpr {

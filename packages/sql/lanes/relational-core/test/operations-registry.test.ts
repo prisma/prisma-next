@@ -821,4 +821,137 @@ describe('operations-registry', () => {
     expect(orderDesc).toHaveProperty('kind', 'order');
     expect(orderDesc).toHaveProperty('dir', 'desc');
   });
+
+  it('handles operations with gt, lt, gte, lte methods on result', () => {
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (arg: unknown) => unknown;
+    };
+
+    const result = idColumn.add(5) as unknown as {
+      gt: (value: ReturnType<typeof param>) => unknown;
+      lt: (value: ReturnType<typeof param>) => unknown;
+      gte: (value: ReturnType<typeof param>) => unknown;
+      lte: (value: ReturnType<typeof param>) => unknown;
+    };
+
+    const binaryGt = result.gt(param('value'));
+    expect(binaryGt).toHaveProperty('kind', 'binary');
+    expect(binaryGt).toHaveProperty('op', 'gt');
+
+    const binaryLt = result.lt(param('value'));
+    expect(binaryLt).toHaveProperty('kind', 'binary');
+    expect(binaryLt).toHaveProperty('op', 'lt');
+
+    const binaryGte = result.gte(param('value'));
+    expect(binaryGte).toHaveProperty('kind', 'binary');
+    expect(binaryGte).toHaveProperty('op', 'gte');
+
+    const binaryLte = result.lte(param('value'));
+    expect(binaryLte).toHaveProperty('kind', 'binary');
+    expect(binaryLte).toHaveProperty('op', 'lte');
+  });
+
+  it('handles operations that return builtin type (not typeId)', () => {
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (arg: unknown) => unknown;
+    };
+
+    const result = idColumn.add(5);
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty('kind', 'column');
+    expect(result).toHaveProperty('columnMeta');
+    // When return type is 'builtin', columnMeta should use original columnMeta (not modified)
+    const resultWithMeta = result as unknown as { columnMeta: { codecId: string } };
+    expect(resultWithMeta.columnMeta.codecId).toBe('pg/int4@1');
+  });
 });

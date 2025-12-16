@@ -3,7 +3,7 @@ import { hasAllCapabilities } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from './ast/types';
+import type { BinaryOp, ColumnRef, LiteralExpr, OperationExpr, ParamRef } from './ast/types';
 import type { AnyColumnBuilder, ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
 
 function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
@@ -128,6 +128,14 @@ function executeOperation(
       }
     : columnMeta;
 
+  const createComparisonMethod = (op: BinaryOp) => (value: ParamPlaceholder) =>
+    Object.freeze({
+      kind: 'binary' as const,
+      op,
+      left: operationExpr,
+      right: value,
+    });
+
   const baseResult = {
     kind: 'column' as const,
     table: selfBuilderWithExpr.table,
@@ -135,14 +143,11 @@ function executeOperation(
     get columnMeta() {
       return returnColumnMeta;
     },
-    eq(value: ParamPlaceholder) {
-      return Object.freeze({
-        kind: 'binary' as const,
-        op: 'eq' as const,
-        left: operationExpr,
-        right: value,
-      });
-    },
+    eq: createComparisonMethod('eq'),
+    gt: createComparisonMethod('gt'),
+    lt: createComparisonMethod('lt'),
+    gte: createComparisonMethod('gte'),
+    lte: createComparisonMethod('lte'),
     asc() {
       return Object.freeze({
         kind: 'order' as const,

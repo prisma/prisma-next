@@ -390,18 +390,6 @@ describe('sql DSL builder', () => {
     expect(userTable.columns).toBeDefined();
   });
 
-  it('throws error when column.eq() is called with invalid value', () => {
-    const contract = loadContract('contract');
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
-    const tables = schema(context).tables;
-    const idColumn = tables.user.columns.id;
-
-    expect(() => {
-      (idColumn as { eq: (value: unknown) => unknown }).eq({ kind: 'invalid' } as unknown);
-    }).toThrow('Parameter placeholder required for column comparison');
-  });
-
   it('handles column builder __jsType getter', () => {
     const contract = loadContract('contract');
     const adapter = createStubAdapter();

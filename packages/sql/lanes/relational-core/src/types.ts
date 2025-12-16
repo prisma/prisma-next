@@ -6,7 +6,14 @@ import type {
 import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
-import type { ColumnRef, Direction, OperationExpr, ParamRef, QueryAst } from './ast/types';
+import type {
+  BinaryOp,
+  ColumnRef,
+  Direction,
+  OperationExpr,
+  ParamRef,
+  QueryAst,
+} from './ast/types';
 import type { SqlQueryPlan } from './plan';
 import type { QueryLaneContext } from './query-lane-context';
 
@@ -40,6 +47,10 @@ export type ColumnBuilder<
   readonly column: ColumnName;
   readonly columnMeta: ColumnMeta;
   eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   // Helper property for type extraction (not used at runtime)
@@ -61,7 +72,7 @@ export interface BinaryBuilder<
   JsType = unknown,
 > {
   readonly kind: 'binary';
-  readonly op: 'eq';
+  readonly op: BinaryOp;
   readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
   readonly right: ParamPlaceholder;
 }
@@ -81,6 +92,10 @@ type AnyColumnBuilderBase = {
   readonly column: string;
   readonly columnMeta: StorageColumn;
   eq(value: ParamPlaceholder): AnyBinaryBuilder;
+  gt(value: ParamPlaceholder): AnyBinaryBuilder;
+  lt(value: ParamPlaceholder): AnyBinaryBuilder;
+  gte(value: ParamPlaceholder): AnyBinaryBuilder;
+  lte(value: ParamPlaceholder): AnyBinaryBuilder;
   asc(): AnyOrderBuilder;
   desc(): AnyOrderBuilder;
   readonly __jsType: unknown;

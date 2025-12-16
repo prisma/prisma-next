@@ -7,7 +7,7 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { TableRef } from './ast/types';
+import type { BinaryOp, TableRef } from './ast/types';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type { QueryLaneContext } from './query-lane-context';
 import type {
@@ -60,25 +60,42 @@ export class ColumnBuilderImpl<
     return undefined as unknown as JsType;
   }
 
-  eq(
-    this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
+  private createBinaryBuilder(
+    op: BinaryOp,
     value: ParamPlaceholder,
   ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     if (value.kind !== 'param-placeholder') {
       throw planInvalid('Parameter placeholder required for column comparison');
     }
-
     return Object.freeze({
       kind: 'binary' as const,
-      op: 'eq' as const,
+      op,
       left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
       right: value,
     }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   }
 
-  asc(
-    this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
-  ): OrderBuilder<ColumnName, ColumnMeta, JsType> {
+  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    return this.createBinaryBuilder('eq', value);
+  }
+
+  gt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    return this.createBinaryBuilder('gt', value);
+  }
+
+  lt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    return this.createBinaryBuilder('lt', value);
+  }
+
+  gte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    return this.createBinaryBuilder('gte', value);
+  }
+
+  lte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    return this.createBinaryBuilder('lte', value);
+  }
+
+  asc(): OrderBuilder<ColumnName, ColumnMeta, JsType> {
     return Object.freeze({
       kind: 'order' as const,
       expr: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
@@ -86,9 +103,7 @@ export class ColumnBuilderImpl<
     }) as OrderBuilder<ColumnName, ColumnMeta, JsType>;
   }
 
-  desc(
-    this: ColumnBuilderImpl<ColumnName, ColumnMeta, JsType>,
-  ): OrderBuilder<ColumnName, ColumnMeta, JsType> {
+  desc(): OrderBuilder<ColumnName, ColumnMeta, JsType> {
     return Object.freeze({
       kind: 'order' as const,
       expr: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
