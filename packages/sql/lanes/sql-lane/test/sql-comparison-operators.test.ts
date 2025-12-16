@@ -5,8 +5,9 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createColumnRef, createParamRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
 import type { Contract } from './fixtures/contract.d';
 
@@ -20,10 +21,15 @@ function loadContract(name: string): Contract {
 }
 
 describe('sql comparison operators', () => {
-  const contract = loadContract('contract');
-  const adapter = createStubAdapter();
-  const context = createTestContext(contract, adapter);
-  const tables = schema<Contract>(context).tables;
+  let context: RuntimeContext<Contract>;
+  let tables: ReturnType<typeof schema<Contract>>['tables'];
+
+  beforeEach(() => {
+    const contract = loadContract('contract');
+    const adapter = createStubAdapter();
+    context = createTestContext(contract, adapter);
+    tables = schema<Contract>(context).tables;
+  });
 
   it.each([
     { op: 'gt', method: 'gt', paramName: 'minId', paramValue: 10 },
