@@ -238,7 +238,7 @@ describe('schema', () => {
   });
 
   describe('comparison operators', () => {
-    const operators: BinaryOp[] = ['eq', 'gt', 'lt', 'gte', 'lte'];
+    const operators: BinaryOp[] = ['eq', 'neq', 'gt', 'lt', 'gte', 'lte'];
 
     it.each(operators)('%s creates binary builder with correct op', (op) => {
       const adapter = createStubAdapter();

@@ -36,6 +36,7 @@ describe('sql comparison operators', () => {
     { op: 'lt', method: 'lt', paramName: 'maxId', paramValue: 100 },
     { op: 'gte', method: 'gte', paramName: 'minId', paramValue: 10 },
     { op: 'lte', method: 'lte', paramName: 'maxId', paramValue: 100 },
+    { op: 'neq', method: 'neq', paramName: 'userId', paramValue: 5 },
   ] as const)('builds query with $op filter', ({ op, method, paramName, paramValue }) => {
     const { id, email } = tables.user.columns;
 
@@ -62,6 +63,16 @@ describe('sql comparison operators', () => {
 
       expect(() => {
         (id as { eq: (value: unknown) => unknown }).eq({ kind: 'invalid' } as unknown);
+      }).toThrow('Parameter placeholder required for column comparison');
+    });
+  });
+
+  describe('neq operator', () => {
+    it('throws error when column.neq() is called with invalid value', () => {
+      const { id } = tables.user.columns;
+
+      expect(() => {
+        (id as { neq: (value: unknown) => unknown }).neq({ kind: 'invalid' } as unknown);
       }).toThrow('Parameter placeholder required for column comparison');
     });
   });

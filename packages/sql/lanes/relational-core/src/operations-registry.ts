@@ -144,6 +144,7 @@ function executeOperation(
       return returnColumnMeta;
     },
     eq: createComparisonMethod('eq'),
+    neq: createComparisonMethod('neq'),
     gt: createComparisonMethod('gt'),
     lt: createComparisonMethod('lt'),
     gte: createComparisonMethod('gte'),

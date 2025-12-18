@@ -154,6 +154,7 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   // Map operators to SQL symbols
   const operatorMap: Record<BinaryExpr['op'], string> = {
     eq: '=',
+    neq: '!=',
     gt: '>',
     lt: '<',
     gte: '>=',

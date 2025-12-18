@@ -79,6 +79,10 @@ export class ColumnBuilderImpl<
     return this.createBinaryBuilder('eq', value);
   }
 
+  neq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+    return this.createBinaryBuilder('neq', value);
+  }
+
   gt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('gt', value);
   }

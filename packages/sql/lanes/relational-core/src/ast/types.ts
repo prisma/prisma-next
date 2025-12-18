@@ -42,7 +42,7 @@ export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is Operat
   return expr.kind === 'operation';
 }
 
-export type BinaryOp = 'eq' | 'gt' | 'lt' | 'gte' | 'lte';
+export type BinaryOp = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte';
 
 export interface BinaryExpr {
   readonly kind: 'bin';
