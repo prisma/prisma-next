@@ -63,9 +63,29 @@ describe('delete builder', () => {
     Record<string, never>,
     'User'
   > = () => {
+    const columnBuilder = {
+      kind: 'column' as const,
+      table: 'user',
+      column: 'id',
+      columnMeta: int4Column,
+      eq: () => ({
+        kind: 'binary' as const,
+        op: 'eq' as const,
+        left: {} as unknown,
+        right: {} as unknown,
+      }),
+      asc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'asc' as const }),
+      desc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'desc' as const }),
+      __jsType: undefined,
+    };
     return {
       id: {
-        eq: (p: unknown) => ({ left: { table: 'user', column: 'id' }, right: p, op: 'eq' }),
+        eq: (p: unknown) => ({
+          kind: 'binary' as const,
+          left: columnBuilder,
+          right: p,
+          op: 'eq' as const,
+        }),
       },
     } as unknown as ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>;
   };

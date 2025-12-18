@@ -33,6 +33,20 @@ export function isOperationExpr(expr: AnyColumnBuilder | OperationExpr): expr is
   return typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'operation';
 }
 
+/**
+ * Helper to extract operation expression from builder.
+ * Returns OperationExpr if present, undefined otherwise.
+ */
+export function getOperationExpr(
+  builder: AnyColumnBuilder | OperationExpr,
+): OperationExpr | undefined {
+  if (isOperationExpr(builder)) {
+    return builder;
+  }
+  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
+  return builderWithExpr._operationExpr;
+}
+
 export function getColumnInfo(expr: AnyColumnBuilder | OperationExpr): {
   table: string;
   column: string;

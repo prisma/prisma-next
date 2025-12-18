@@ -63,10 +63,46 @@ describe('update builder', () => {
     Record<string, never>,
     'User'
   > = () => {
+    const idColumnBuilder = {
+      kind: 'column' as const,
+      table: 'user',
+      column: 'id',
+      columnMeta: contract.storage.tables.user.columns.id,
+      eq: () => ({
+        kind: 'binary' as const,
+        op: 'eq' as const,
+        left: {} as unknown,
+        right: {} as unknown,
+      }),
+      asc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'asc' as const }),
+      desc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'desc' as const }),
+      __jsType: undefined,
+    };
+    const emailColumnBuilder = {
+      kind: 'column' as const,
+      table: 'user',
+      column: 'email',
+      columnMeta: contract.storage.tables.user.columns.email,
+      eq: () => ({
+        kind: 'binary' as const,
+        op: 'eq' as const,
+        left: {} as unknown,
+        right: {} as unknown,
+      }),
+      asc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'asc' as const }),
+      desc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'desc' as const }),
+      __jsType: undefined,
+    };
     return {
       id: {
-        eq: (p: unknown) => ({ left: { table: 'user', column: 'id' }, right: p, op: 'eq' }),
+        eq: (p: unknown) => ({
+          kind: 'binary' as const,
+          left: idColumnBuilder,
+          right: p,
+          op: 'eq' as const,
+        }),
       },
+      email: emailColumnBuilder,
     } as unknown as ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>;
   };
 

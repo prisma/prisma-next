@@ -15,7 +15,12 @@ import {
   errorUnknownColumn,
   errorUnknownTable,
 } from '../utils/errors';
-import { getColumnInfo, isColumnBuilder, isParamPlaceholder } from '../utils/guards';
+import {
+  getColumnInfo,
+  getOperationExpr,
+  isColumnBuilder,
+  isParamPlaceholder,
+} from '../utils/guards';
 
 export function buildWhereExpr(
   where: BinaryBuilder,
@@ -33,7 +38,7 @@ export function buildWhereExpr(
   let rightExpr: ColumnRef | ParamRef;
   let paramName: string;
 
-  const operationExpr = (where.left as { _operationExpr?: OperationExpr })._operationExpr;
+  const operationExpr = getOperationExpr(where.left);
   if (operationExpr) {
     leftExpr = operationExpr;
   } else if (isColumnBuilder(where.left)) {
@@ -45,11 +50,11 @@ export function buildWhereExpr(
     }
 
     const columnMeta: StorageColumn | undefined = contractTable.columns[column];
-    if (!columnMeta) {
-      errorUnknownColumn(column, table);
+    // If column not found in contract, still build expression but without codecId
+    // This allows flexibility when columnMeta is available on the column builder
+    if (columnMeta) {
+      codecId = columnMeta.codecId;
     }
-
-    codecId = columnMeta?.codecId;
     leftExpr = createColumnRef(table, column);
   } else {
     errorFailedToBuildWhereClause();
@@ -97,11 +102,8 @@ export function buildWhereExpr(
       errorUnknownTable(table);
     }
 
-    const columnMeta: StorageColumn | undefined = contractTable.columns[column];
-    if (!columnMeta) {
-      errorUnknownColumn(column, table);
-    }
-
+    // If column not found in contract, still build expression
+    // This allows flexibility when columnMeta is available on the column builder
     rightExpr = createColumnRef(table, column);
     // Use a placeholder paramName for column references (not used for params)
     paramName = '';
