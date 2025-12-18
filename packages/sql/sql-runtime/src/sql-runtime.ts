@@ -9,7 +9,7 @@ import type {
   RuntimeVerifyOptions,
   TelemetryOutcome,
 } from '@prisma-next/runtime-executor';
-import { createRuntimeCore } from '@prisma-next/runtime-executor';
+import { AsyncIterableResult, createRuntimeCore } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
@@ -45,7 +45,7 @@ export interface RuntimeOptions<
 export interface Runtime {
   execute<Row = Record<string, unknown>>(
     plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
-  ): AsyncIterable<Row>;
+  ): AsyncIterableResult<Row>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
@@ -110,7 +110,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
 
   execute<Row = Record<string, unknown>>(
     plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
-  ): AsyncIterable<Row> {
+  ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated(this.contract);
 
     // Check if plan is SqlQueryPlan (has ast but no sql)
@@ -144,7 +144,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
       }
     };
 
-    return iterator(this);
+    return new AsyncIterableResult(iterator(this));
   }
 
   telemetry(): RuntimeTelemetryEvent | null {

@@ -1,0 +1,250 @@
+import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { describe, expect, it } from 'vitest';
+import { createRuntime } from '../src/exports';
+import { createStubAdapter, createTestContext, createTestContract } from './utils';
+
+// Mock driver that implements SqlDriver interface
+class MockDriver {
+  private rows: ReadonlyArray<Record<string, unknown>> = [];
+
+  setRows(rows: ReadonlyArray<Record<string, unknown>>): void {
+    this.rows = rows;
+  }
+
+  async query(
+    _sql: string,
+    _params: readonly unknown[],
+  ): Promise<{ rows: ReadonlyArray<unknown> }> {
+    // Return empty marker result for contract verification
+    return { rows: [] };
+  }
+
+  async *execute<Row = Record<string, unknown>>(_options: {
+    sql: string;
+    params: readonly unknown[];
+  }): AsyncIterable<Row> {
+    for (const row of this.rows) {
+      yield row as Row;
+    }
+  }
+
+  async connect(): Promise<void> {
+    // No-op
+  }
+
+  async close(): Promise<void> {
+    // No-op
+  }
+}
+
+const fixtureContract = createTestContract({
+  schemaVersion: '1',
+  targetFamily: 'sql',
+  target: 'postgres',
+  coreHash: 'test-hash',
+  profileHash: 'test-profile-hash',
+  storage: {
+    tables: {
+      user: {
+        columns: {
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    },
+  },
+  models: {},
+  relations: {},
+  mappings: { codecTypes: {}, operationTypes: {} },
+});
+
+describe('SqlRuntime AsyncIterableResult integration', () => {
+  it('returns AsyncIterableResult from execute', async () => {
+    const adapter = createStubAdapter();
+    const driver = new MockDriver();
+    driver.setRows([
+      { id: 1, email: 'test1@example.com' },
+      { id: 2, email: 'test2@example.com' },
+    ]);
+    const context = createTestContext(fixtureContract, adapter);
+    const runtime = createRuntime({
+      adapter,
+      driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
+      context,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const plan: ExecutionPlan<{ id: number; email: string }> = {
+      sql: 'SELECT id, email FROM "user" ORDER BY id',
+      params: [],
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'test-hash',
+        lane: 'sql',
+        paramDescriptors: [],
+      },
+    };
+
+    const result = runtime.execute(plan);
+
+    // Verify it's an AsyncIterableResult
+    expect(result).toBeInstanceOf(Object);
+    expect(typeof result.toArray).toBe('function');
+    expect(typeof result[Symbol.asyncIterator]).toBe('function');
+
+    await runtime.close();
+  });
+
+  it('toArray collects all results correctly', async () => {
+    const adapter = createStubAdapter();
+    const driver = new MockDriver();
+    driver.setRows([
+      { id: 1, email: 'test1@example.com' },
+      { id: 2, email: 'test2@example.com' },
+      { id: 3, email: 'test3@example.com' },
+    ]);
+    const context = createTestContext(fixtureContract, adapter);
+    const runtime = createRuntime({
+      adapter,
+      driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
+      context,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const plan: ExecutionPlan<{ id: number; email: string }> = {
+      sql: 'SELECT id, email FROM "user" ORDER BY id',
+      params: [],
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'test-hash',
+        lane: 'sql',
+        paramDescriptors: [],
+      },
+    };
+
+    const result = runtime.execute(plan);
+    const rows = await result.toArray();
+
+    expect(rows.length).toBe(3);
+    expect(rows[0]?.email).toBe('test1@example.com');
+    expect(rows[1]?.email).toBe('test2@example.com');
+    expect(rows[2]?.email).toBe('test3@example.com');
+
+    await runtime.close();
+  });
+
+  it('for await still works (backward compatibility)', async () => {
+    const adapter = createStubAdapter();
+    const driver = new MockDriver();
+    driver.setRows([
+      { id: 1, email: 'test1@example.com' },
+      { id: 2, email: 'test2@example.com' },
+    ]);
+    const context = createTestContext(fixtureContract, adapter);
+    const runtime = createRuntime({
+      adapter,
+      driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
+      context,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const plan: ExecutionPlan<{ id: number; email: string }> = {
+      sql: 'SELECT id, email FROM "user" ORDER BY id',
+      params: [],
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'test-hash',
+        lane: 'sql',
+        paramDescriptors: [],
+      },
+    };
+
+    const result = runtime.execute(plan);
+    const rows: Array<{ id: number; email: string }> = [];
+
+    for await (const row of result) {
+      rows.push(row);
+    }
+
+    expect(rows.length).toBe(2);
+    expect(rows[0]?.email).toBe('test1@example.com');
+    expect(rows[1]?.email).toBe('test2@example.com');
+
+    await runtime.close();
+  });
+
+  it('handles empty results with toArray', async () => {
+    const adapter = createStubAdapter();
+    const driver = new MockDriver();
+    driver.setRows([]);
+    const context = createTestContext(fixtureContract, adapter);
+    const runtime = createRuntime({
+      adapter,
+      driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
+      context,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const plan: ExecutionPlan<{ id: number; email: string }> = {
+      sql: 'SELECT id, email FROM "user"',
+      params: [],
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'test-hash',
+        lane: 'sql',
+        paramDescriptors: [],
+      },
+    };
+
+    const result = runtime.execute(plan);
+    const rows = await result.toArray();
+
+    expect(rows).toEqual([]);
+
+    await runtime.close();
+  });
+
+  it('preserves type information', async () => {
+    const adapter = createStubAdapter();
+    const driver = new MockDriver();
+    driver.setRows([{ id: 1, email: 'test@example.com' }]);
+    const context = createTestContext(fixtureContract, adapter);
+    const runtime = createRuntime({
+      adapter,
+      driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
+      context,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const plan: ExecutionPlan<{ id: number; email: string }> = {
+      sql: 'SELECT id, email FROM "user" LIMIT 1',
+      params: [],
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'test-hash',
+        lane: 'sql',
+        paramDescriptors: [],
+      },
+    };
+
+    const result: AsyncIterableResult<{ id: number; email: string }> = runtime.execute(plan);
+    const rows = await result.toArray();
+
+    expect(rows.length).toBe(1);
+    if (rows[0]) {
+      expect(typeof rows[0].id).toBe('number');
+      expect(typeof rows[0].email).toBe('string');
+    }
+
+    await runtime.close();
+  });
+});
