@@ -304,5 +304,124 @@ describe('predicates', () => {
 
       expect(result.codecId).toBe('pg/int4@1');
     });
+
+    it('builds where expr with column builder on right side', () => {
+      const where: BinaryBuilder = {
+        kind: 'binary',
+        left: {
+          kind: 'column',
+          table: 'user',
+          column: 'id',
+          columnMeta: int4ColumnMeta,
+          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+          __jsType: undefined,
+        } as unknown as BinaryBuilder['left'],
+        right: {
+          kind: 'column',
+          table: 'user',
+          column: 'id',
+          columnMeta: int4ColumnMeta,
+          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+          __jsType: undefined,
+        } as unknown as BinaryBuilder['right'],
+        op: 'eq',
+      };
+      const paramsMap = {};
+      const descriptors: ParamDescriptor[] = [];
+      const values: unknown[] = [];
+
+      const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
+
+      expect({
+        exprKind: result.expr.kind,
+        exprOp: result.expr.op,
+        exprLeft: result.expr.left,
+        exprRightKind: result.expr.right.kind,
+        paramName: result.paramName,
+        codecId: result.codecId,
+        valuesLength: values.length,
+        descriptorsLength: descriptors.length,
+      }).toMatchObject({
+        exprKind: 'bin',
+        exprOp: 'eq',
+        exprLeft: { kind: 'col', table: 'user', column: 'id' },
+        exprRightKind: 'col',
+        paramName: '',
+        codecId: 'pg/int4@1',
+        valuesLength: 0,
+        descriptorsLength: 0,
+      });
+    });
+
+    it('builds where expr with column builder on right side when column not found in contract', () => {
+      const where: BinaryBuilder = {
+        kind: 'binary',
+        left: {
+          kind: 'column',
+          table: 'user',
+          column: 'id',
+          columnMeta: int4ColumnMeta,
+          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+          __jsType: undefined,
+        } as unknown as BinaryBuilder['left'],
+        right: {
+          kind: 'column',
+          table: 'user',
+          column: 'unknown',
+          columnMeta: int4ColumnMeta,
+          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+          __jsType: undefined,
+        } as unknown as BinaryBuilder['right'],
+        op: 'eq',
+      };
+      const paramsMap = {};
+      const descriptors: ParamDescriptor[] = [];
+      const values: unknown[] = [];
+
+      const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
+
+      expect({
+        exprRightKind: result.expr.right.kind,
+        exprRightTable: (result.expr.right as { table: string }).table,
+        exprRightColumn: (result.expr.right as { column: string }).column,
+      }).toMatchObject({
+        exprRightKind: 'col',
+        exprRightTable: 'user',
+        exprRightColumn: 'unknown',
+      });
+    });
+
+    it('throws error when where.right is neither param nor column builder', () => {
+      const where: BinaryBuilder = {
+        kind: 'binary',
+        left: {
+          kind: 'column',
+          table: 'user',
+          column: 'id',
+          columnMeta: int4ColumnMeta,
+          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+          __jsType: undefined,
+        } as unknown as BinaryBuilder['left'],
+        right: { kind: 'invalid' } as unknown as BinaryBuilder['right'],
+        op: 'eq',
+      };
+      const paramsMap = {};
+      const descriptors: ParamDescriptor[] = [];
+      const values: unknown[] = [];
+
+      expect(() => buildWhereExpr(where, contract, paramsMap, descriptors, values)).toThrow(
+        'Failed to build WHERE clause',
+      );
+    });
   });
 });

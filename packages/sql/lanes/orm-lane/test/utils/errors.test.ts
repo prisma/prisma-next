@@ -141,11 +141,15 @@ describe('error functions', () => {
   });
 
   it('errorMissingColumn throws with correct message', () => {
-    expect(() => errorMissingColumn('user', 0)).toThrow('Missing column for alias user at index 0');
+    expect(() => errorMissingColumn('user', 0)).toThrow(
+      'Missing column for alias "user" at index 0',
+    );
   });
 
   it('errorInvalidColumn throws with correct message', () => {
-    expect(() => errorInvalidColumn('user', 0)).toThrow('Invalid column for alias user at index 0');
+    expect(() => errorInvalidColumn('user', 0)).toThrow(
+      'Invalid column for alias "user" at index 0',
+    );
   });
 
   it('errorRelationNotFound throws with correct message', () => {

@@ -305,4 +305,26 @@ describe('schema', () => {
       dir: 'desc',
     });
   });
+
+  it('table proxy returns undefined for non-string property access (number)', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+
+    // Access with number key
+    const numberAccess = (userTable as unknown as Record<number, unknown>)[0];
+    expect(numberAccess).toBeUndefined();
+  });
+
+  it('table proxy returns undefined for non-string property access (symbol)', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const userTable: TestUserTable = tables.user;
+
+    // Access with symbol key
+    const symbolAccess = (userTable as unknown as Record<symbol, unknown>)[Symbol('test')];
+    expect(symbolAccess).toBeUndefined();
+  });
 });
