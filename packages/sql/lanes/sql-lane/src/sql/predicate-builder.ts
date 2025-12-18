@@ -1,6 +1,11 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
-import type { BinaryExpr, ColumnRef, OperationExpr } from '@prisma-next/sql-relational-core/ast';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  OperationExpr,
+  ParamRef,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   createBinaryExpr,
   createColumnRef,
@@ -13,7 +18,12 @@ import {
   errorUnknownColumn,
   errorUnknownTable,
 } from '../utils/errors';
-import { getColumnInfo, getOperationExpr, isColumnBuilder } from '../utils/guards';
+import {
+  getColumnInfo,
+  getOperationExpr,
+  isColumnBuilder,
+  isParamPlaceholder,
+} from '../utils/guards';
 
 export interface BuildWhereExprResult {
   expr: BinaryExpr;
@@ -28,18 +38,10 @@ export function buildWhereExpr(
   descriptors: ParamDescriptor[],
   values: unknown[],
 ): BuildWhereExprResult {
-  const placeholder = where.right;
-  const paramName = placeholder.name;
-
-  if (!Object.hasOwn(paramsMap, paramName)) {
-    errorMissingParameter(paramName);
-  }
-
-  const value = paramsMap[paramName];
-  const index = values.push(value);
-
   let leftExpr: ColumnRef | OperationExpr;
   let codecId: string | undefined;
+  let rightExpr: ColumnRef | ParamRef;
+  let paramName: string;
 
   // Check if where.left is an OperationExpr directly (from operation.eq())
   // or a ColumnBuilder with _operationExpr property
@@ -60,16 +62,6 @@ export function buildWhereExpr(
       errorUnknownColumn(column, table);
     }
 
-    // Construct descriptor directly from validated StorageColumn
-    descriptors.push({
-      name: paramName,
-      source: 'dsl',
-      refs: { table, column },
-      nullable: columnMeta.nullable,
-      codecId: columnMeta.codecId,
-      nativeType: columnMeta.nativeType,
-    });
-
     codecId = columnMeta.codecId;
     leftExpr = createColumnRef(table, column);
   } else {
@@ -77,9 +69,61 @@ export function buildWhereExpr(
     errorFailedToBuildWhereClause();
   }
 
-  const rightParam = createParamRef(index, paramName);
+  // Handle where.right - can be ParamPlaceholder or AnyColumnBuilder
+  if (isParamPlaceholder(where.right)) {
+    // Handle param placeholder (existing logic)
+    const placeholder = where.right;
+    paramName = placeholder.name;
+
+    if (!Object.hasOwn(paramsMap, paramName)) {
+      errorMissingParameter(paramName);
+    }
+
+    const value = paramsMap[paramName];
+    const index = values.push(value);
+
+    // Construct descriptor directly from validated StorageColumn
+    if (isColumnBuilder(where.left)) {
+      const { table, column } = getColumnInfo(where.left);
+      const contractTable = contract.storage.tables[table];
+      const columnMeta = contractTable?.columns[column];
+      if (columnMeta) {
+        descriptors.push({
+          name: paramName,
+          source: 'dsl',
+          refs: { table, column },
+          nullable: columnMeta.nullable,
+          codecId: columnMeta.codecId,
+          nativeType: columnMeta.nativeType,
+        });
+      }
+    }
+
+    rightExpr = createParamRef(index, paramName);
+  } else if (isColumnBuilder(where.right)) {
+    // Handle column builder on the right
+    const { table, column } = getColumnInfo(where.right);
+
+    const contractTable = contract.storage.tables[table];
+    if (!contractTable) {
+      errorUnknownTable(table);
+    }
+
+    const columnMeta: StorageColumn | undefined = contractTable.columns[column];
+    if (!columnMeta) {
+      errorUnknownColumn(column, table);
+    }
+
+    rightExpr = createColumnRef(table, column);
+    // Use a placeholder paramName for column references (not used for params)
+    paramName = '';
+  } else {
+    // where.right is neither ParamPlaceholder nor ColumnBuilder - invalid state
+    errorFailedToBuildWhereClause();
+  }
+
   return {
-    expr: createBinaryExpr(where.op, leftExpr, rightParam),
+    expr: createBinaryExpr(where.op, leftExpr, rightExpr),
     codecId,
     paramName,
   };

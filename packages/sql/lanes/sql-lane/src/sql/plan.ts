@@ -4,7 +4,12 @@ import { compact } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import type { MetaBuildArgs } from '../types/internal';
 import { errorMissingColumnForAlias } from '../utils/errors';
-import { collectColumnRefs, getColumnInfo, isOperationExpr } from '../utils/guards';
+import {
+  collectColumnRefs,
+  getColumnInfo,
+  isColumnBuilder,
+  isOperationExpr,
+} from '../utils/guards';
 
 export function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();
@@ -83,6 +88,15 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
           table: colInfo.table,
           column: colInfo.column,
         });
+        // Handle right side of child WHERE clause
+        const childWhereRight = include.childWhere.right;
+        if (isColumnBuilder(childWhereRight)) {
+          const rightColInfo = getColumnInfo(childWhereRight);
+          refsColumns.set(`${rightColInfo.table}.${rightColInfo.column}`, {
+            table: rightColInfo.table,
+            column: rightColInfo.column,
+          });
+        }
       }
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
@@ -120,6 +134,16 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
           column: colBuilder.column,
         });
       }
+    }
+
+    // Handle right side of WHERE clause - can be ParamPlaceholder or AnyColumnBuilder
+    const whereRight = args.where.right;
+    if (isColumnBuilder(whereRight)) {
+      const colInfo = getColumnInfo(whereRight);
+      refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+        table: colInfo.table,
+        column: colInfo.column,
+      });
     }
   }
 

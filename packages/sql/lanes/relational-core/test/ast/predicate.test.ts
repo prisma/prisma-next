@@ -54,7 +54,68 @@ describe('ast/predicate', () => {
       const binaryExpr = createBinaryExpr('eq', left, right);
 
       expect(binaryExpr.right).toBe(right);
-      expect(binaryExpr.right.index).toBe(1);
+      if (binaryExpr.right.kind === 'param') {
+        expect(binaryExpr.right.index).toBe(1);
+      }
+    });
+
+    it('creates binary expr with column ref on the right', () => {
+      const left: ColumnRef = createColumnRef('user', 'id');
+      const right: ColumnRef = createColumnRef('post', 'userId');
+
+      const binaryExpr = createBinaryExpr('eq', left, right);
+
+      expect(binaryExpr).toEqual({
+        kind: 'bin',
+        op: 'eq',
+        left,
+        right,
+      });
+      expect(binaryExpr.kind).toBe('bin');
+      expect(binaryExpr.op).toBe('eq');
+      expect(binaryExpr.left).toBe(left);
+      expect(binaryExpr.right).toBe(right);
+      expect(binaryExpr.right.kind).toBe('col');
+      if (binaryExpr.right.kind === 'col') {
+        expect(binaryExpr.right.table).toBe('post');
+        expect(binaryExpr.right.column).toBe('userId');
+      }
+    });
+
+    it('creates binary expr with column ref on the right for different operators', () => {
+      const left: ColumnRef = createColumnRef('user', 'id');
+      const right: ColumnRef = createColumnRef('post', 'userId');
+
+      const operators = ['eq', 'neq', 'gt', 'lt', 'gte', 'lte'] as const;
+      for (const op of operators) {
+        const binaryExpr = createBinaryExpr(op, left, right);
+        expect(binaryExpr.op).toBe(op);
+        expect(binaryExpr.right.kind).toBe('col');
+      }
+    });
+
+    it('creates binary expr with operation expr and column ref on the right', () => {
+      const left: OperationExpr = {
+        kind: 'operation',
+        method: 'test',
+        forTypeId: 'pg/text@1',
+        self: createColumnRef('user', 'email'),
+        args: [],
+        returns: { kind: 'builtin', type: 'string' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: 'test(${self})',
+        },
+      };
+      const right: ColumnRef = createColumnRef('post', 'email');
+
+      const binaryExpr = createBinaryExpr('eq', left, right);
+
+      expect(binaryExpr.left).toBe(left);
+      expect(binaryExpr.right).toBe(right);
+      expect(binaryExpr.right.kind).toBe('col');
     });
   });
 

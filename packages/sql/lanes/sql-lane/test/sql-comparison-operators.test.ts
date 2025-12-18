@@ -63,7 +63,7 @@ describe('sql comparison operators', () => {
 
       expect(() => {
         (id as { eq: (value: unknown) => unknown }).eq({ kind: 'invalid' } as unknown);
-      }).toThrow('Parameter placeholder required for column comparison');
+      }).toThrow('Parameter placeholder or column builder required for column comparison');
     });
   });
 
@@ -73,7 +73,115 @@ describe('sql comparison operators', () => {
 
       expect(() => {
         (id as { neq: (value: unknown) => unknown }).neq({ kind: 'invalid' } as unknown);
-      }).toThrow('Parameter placeholder required for column comparison');
+      }).toThrow('Parameter placeholder or column builder required for column comparison');
+    });
+  });
+
+  describe('column-to-column comparisons', () => {
+    it.each([
+      { op: 'eq', method: 'eq' },
+      { op: 'neq', method: 'neq' },
+      { op: 'gt', method: 'gt' },
+      { op: 'lt', method: 'lt' },
+      { op: 'gte', method: 'gte' },
+      { op: 'lte', method: 'lte' },
+    ] as const)('builds query with $op filter using column reference', ({ op, method }) => {
+      const { id, createdAt } = tables.user.columns;
+
+      const plan = sql({ context })
+        .from(tables.user)
+        .select({ id })
+        .where(id[method](createdAt))
+        .build();
+
+      expect(plan.ast).toMatchObject({
+        kind: 'select',
+        where: {
+          kind: 'bin',
+          op,
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('user', 'createdAt'),
+        },
+      });
+    });
+
+    it('builds query with column-to-column comparison in WHERE clause', () => {
+      const { id, createdAt } = tables.user.columns;
+
+      const plan = sql({ context })
+        .from(tables.user)
+        .select({ id })
+        .where(id.eq(createdAt))
+        .build();
+
+      expect(plan.ast).toMatchObject({
+        kind: 'select',
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('user', 'createdAt'),
+        },
+      });
+    });
+
+    it('builds UPDATE query with column-to-column comparison in WHERE clause', () => {
+      const { id, createdAt } = tables.user.columns;
+
+      const plan = sql({ context })
+        .update(tables.user, { email: param('email') })
+        .where(id.eq(createdAt))
+        .build({ params: { email: 'test@example.com' } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'update',
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('user', 'createdAt'),
+        },
+      });
+    });
+
+    it('builds DELETE query with column-to-column comparison in WHERE clause', () => {
+      const { id, createdAt } = tables.user.columns;
+
+      const plan = sql({ context }).delete(tables.user).where(id.eq(createdAt)).build();
+
+      expect(plan.ast).toMatchObject({
+        kind: 'delete',
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('user', 'createdAt'),
+        },
+      });
+    });
+
+    it('throws error when column comparison is called with invalid value', () => {
+      const { id } = tables.user.columns;
+
+      expect(() => {
+        (id as { eq: (value: unknown) => unknown }).eq({ kind: 'invalid' } as unknown);
+      }).toThrow('Parameter placeholder or column builder required for column comparison');
+    });
+
+    it('throws error when column comparison is called with null', () => {
+      const { id } = tables.user.columns;
+
+      expect(() => {
+        (id as { eq: (value: unknown) => unknown }).eq(null as unknown);
+      }).toThrow('Parameter placeholder or column builder required for column comparison');
+    });
+
+    it('throws error when column comparison is called with undefined', () => {
+      const { id } = tables.user.columns;
+
+      expect(() => {
+        (id as { eq: (value: unknown) => unknown }).eq(undefined as unknown);
+      }).toThrow('Parameter placeholder or column builder required for column comparison');
     });
   });
 });

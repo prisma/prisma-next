@@ -11,6 +11,7 @@ import type { BinaryOp, TableRef } from './ast/types';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type { QueryLaneContext } from './query-lane-context';
 import type {
+  AnyColumnBuilderBase,
   BinaryBuilder,
   CodecTypes as CodecTypesType,
   ColumnBuilder,
@@ -20,6 +21,7 @@ import type {
   OrderBuilder,
   ParamPlaceholder,
 } from './types';
+import { isColumnBuilder } from './types';
 
 type TableColumns<Table extends { columns: Record<string, StorageColumn> }> = Table['columns'];
 
@@ -62,40 +64,63 @@ export class ColumnBuilderImpl<
 
   private createBinaryBuilder(
     op: BinaryOp,
-    value: ParamPlaceholder,
+    value: ParamPlaceholder | AnyColumnBuilderBase,
   ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
-    if (value.kind !== 'param-placeholder') {
-      throw planInvalid('Parameter placeholder required for column comparison');
+    if (value == null) {
+      throw planInvalid('Parameter placeholder or column builder required for column comparison');
     }
-    return Object.freeze({
-      kind: 'binary' as const,
-      op,
-      left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
-      right: value,
-    }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    if (value.kind === 'param-placeholder') {
+      return Object.freeze({
+        kind: 'binary' as const,
+        op,
+        left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+        right: value,
+      }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    }
+    if (isColumnBuilder(value)) {
+      return Object.freeze({
+        kind: 'binary' as const,
+        op,
+        left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+        right: value,
+      }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    }
+    throw planInvalid('Parameter placeholder or column builder required for column comparison');
   }
 
-  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  eq(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('eq', value);
   }
 
-  neq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  neq(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('neq', value);
   }
 
-  gt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  gt(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('gt', value);
   }
 
-  lt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  lt(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('lt', value);
   }
 
-  gte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  gte(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('gte', value);
   }
 
-  lte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  lte(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('lte', value);
   }
 

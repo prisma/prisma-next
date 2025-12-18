@@ -4,7 +4,7 @@ import type {
   OperationExpr,
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type { AnyColumnBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
 
 /**
  * Recursively extracts the base ColumnRef from an OperationExpr.
@@ -86,4 +86,18 @@ export function getOperationExpr(
   }
   const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
   return builderWithExpr._operationExpr;
+}
+
+/**
+ * Type predicate to check if a value is a ParamPlaceholder.
+ */
+export function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'param-placeholder' &&
+    'name' in value &&
+    typeof (value as { name: unknown }).name === 'string'
+  );
 }
