@@ -12,7 +12,6 @@ import { createBinaryExpr, createColumnRef, createParamRef } from '../utils/ast'
 import {
   errorFailedToBuildWhereClause,
   errorMissingParameter,
-  errorUnknownColumn,
   errorUnknownTable,
 } from '../utils/errors';
 import {
