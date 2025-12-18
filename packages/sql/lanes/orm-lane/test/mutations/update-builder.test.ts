@@ -63,11 +63,12 @@ describe('update builder', () => {
     Record<string, never>,
     'User'
   > = () => {
+    const userTable = contract.storage.tables['user']!;
     const idColumnBuilder = {
       kind: 'column' as const,
       table: 'user',
       column: 'id',
-      columnMeta: contract.storage.tables.user.columns.id,
+      columnMeta: userTable.columns['id']!,
       eq: () => ({
         kind: 'binary' as const,
         op: 'eq' as const,
@@ -82,7 +83,7 @@ describe('update builder', () => {
       kind: 'column' as const,
       table: 'user',
       column: 'email',
-      columnMeta: contract.storage.tables.user.columns.email,
+      columnMeta: userTable.columns['email']!,
       eq: () => ({
         kind: 'binary' as const,
         op: 'eq' as const,

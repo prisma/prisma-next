@@ -16,6 +16,7 @@ import {
 } from '../utils/errors';
 import {
   getColumnInfo,
+  getColumnMeta,
   getOperationExpr,
   isColumnBuilder,
   isParamPlaceholder,
@@ -77,15 +78,15 @@ export function buildWhereExpr(
       const { table, column } = getColumnInfo(where.left);
       const contractTable = contract.storage.tables[table];
       const columnMeta = contractTable?.columns[column];
-      const meta =
-        (where.left as unknown as { columnMeta?: { codecId?: string; nullable?: boolean } })
-          .columnMeta ?? {};
+      const builderColumnMeta = getColumnMeta(where.left);
 
       descriptors.push({
         name: paramName,
         source: 'dsl',
         refs: { table, column },
-        ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
+        ...(typeof builderColumnMeta?.nullable === 'boolean'
+          ? { nullable: builderColumnMeta.nullable }
+          : {}),
       });
 
       augmentDescriptorWithColumnMeta(descriptors, columnMeta);

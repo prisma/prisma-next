@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/sql-relational-core/types';
 import type { IncludeState } from '../relations/include-plan';
 import type { ProjectionState } from '../selection/projection';
-import { collectColumnRefs, getColumnInfo, isOperationExpr } from '../utils/guards';
+import { collectColumnRefs, getColumnInfo, getColumnMeta, isOperationExpr } from '../utils/guards';
 
 export interface MetaBuildArgs {
   readonly contract: SqlContract<SqlStorage>;
@@ -193,8 +193,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         projectionTypes[alias] = operationExpr.returns.type;
       }
     } else {
-      const colMeta = col as unknown as { columnMeta?: { codecId: string } };
-      const columnMeta = colMeta.columnMeta;
+      const columnMeta = getColumnMeta(col);
       const codecId = columnMeta?.codecId;
       if (codecId) {
         projectionTypes[alias] = codecId;
@@ -218,8 +217,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         projectionCodecs[alias] = operationExpr.returns.type;
       }
     } else {
-      const col = column as unknown as { columnMeta?: { codecId: string } };
-      const columnMeta = col.columnMeta;
+      const columnMeta = getColumnMeta(column);
       const codecId = columnMeta?.codecId;
       if (codecId) {
         projectionCodecs[alias] = codecId;

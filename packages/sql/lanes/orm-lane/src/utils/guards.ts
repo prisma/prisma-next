@@ -1,3 +1,4 @@
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
   ColumnRef,
   LiteralExpr,
@@ -57,6 +58,22 @@ export function getColumnInfo(expr: AnyColumnBuilder | OperationExpr): {
   }
   const colBuilder = expr as unknown as { table: string; column: string };
   return { table: colBuilder.table, column: colBuilder.column };
+}
+
+/**
+ * Helper to extract columnMeta from a ColumnBuilder.
+ * Returns StorageColumn if present, undefined otherwise.
+ * AnyColumnBuilder is a union that includes types with columnMeta property,
+ * so we can safely access it after checking for existence.
+ */
+export function getColumnMeta(expr: AnyColumnBuilder): StorageColumn | undefined {
+  // AnyColumnBuilder includes AnyColumnBuilderBase which has columnMeta: StorageColumn
+  // and ColumnBuilder which has columnMeta: ColumnMeta extends StorageColumn
+  // TypeScript should narrow the type after the 'in' check
+  if ('columnMeta' in expr) {
+    return expr.columnMeta;
+  }
+  return undefined;
 }
 
 export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
