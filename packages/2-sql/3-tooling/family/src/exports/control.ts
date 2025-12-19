@@ -2,10 +2,10 @@ import { SqlFamilyDescriptor } from '../core/descriptor';
 
 export {
   createMigrationPlan,
-  INIT_ADDITIVE_POLICY,
   plannerFailure,
   plannerSuccess,
 } from '../core/migrations/plan-helpers';
+export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
   CreateMigrationPlanOptions,
   MigrationOperationClass,

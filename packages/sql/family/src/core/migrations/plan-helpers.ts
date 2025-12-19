@@ -89,10 +89,6 @@ export function createMigrationPlan<TTargetDetails = Record<string, never>>(
   });
 }
 
-export const INIT_ADDITIVE_POLICY: MigrationPolicy = Object.freeze({
-  allowedOperationClasses: Object.freeze(['additive'] as const),
-});
-
 export function plannerSuccess<TTargetDetails>(
   plan: MigrationPlan<TTargetDetails>,
 ): PlannerSuccessResult<TTargetDetails> {
