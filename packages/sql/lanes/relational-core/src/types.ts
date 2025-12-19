@@ -47,6 +47,7 @@ export type ColumnBuilder<
   readonly column: ColumnName;
   readonly columnMeta: ColumnMeta;
   eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  neq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   gt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   lt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   gte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
@@ -92,6 +93,7 @@ type AnyColumnBuilderBase = {
   readonly column: string;
   readonly columnMeta: StorageColumn;
   eq(value: ParamPlaceholder): AnyBinaryBuilder;
+  neq(value: ParamPlaceholder): AnyBinaryBuilder;
   gt(value: ParamPlaceholder): AnyBinaryBuilder;
   lt(value: ParamPlaceholder): AnyBinaryBuilder;
   gte(value: ParamPlaceholder): AnyBinaryBuilder;
