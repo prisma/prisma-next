@@ -62,7 +62,7 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
       return plannerFailure([
         {
           kind: 'unsupportedOperation',
-          summary: 'The Postgres init planner currently supports only empty databases',
+          summary: 'The Postgres migration planner currently supports only empty databases',
           why: 'Remove existing tables or use a future planner mode that handles subsets/supersets.',
           ...(firstExistingTable ? { location: { table: firstExistingTable } } : {}),
         },
