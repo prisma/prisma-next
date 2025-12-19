@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { AsyncIterableResult } from '../src/async-iterable-result';
 
+/**
+ * TODO: once we have enough test utilities like this one, we should move them to a shared test utils package.
+ */
+function expectDefined<T>(value: T | undefined): asserts value is T {
+  expect(value).not.toBeUndefined();
+}
+
 describe('AsyncIterableResult', () => {
   it('works with for await loop', async () => {
     async function* generateItems(): AsyncGenerator<number, void, unknown> {
@@ -108,10 +115,9 @@ describe('AsyncIterableResult', () => {
 
     // Type check: items should be TestRow[]
     const firstItem = items[0];
-    if (firstItem) {
-      expect(typeof firstItem.id).toBe('number');
-      expect(typeof firstItem.name).toBe('string');
-    }
+    expectDefined(firstItem);
+    expect(typeof firstItem.id).toBe('number');
+    expect(typeof firstItem.name).toBe('string');
   });
 
   it('throws error when iterating after toArray', async () => {
