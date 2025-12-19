@@ -38,7 +38,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
     - `mode: 'init' | 'update'` (extensible).
     - `allowedOperationClasses: readonly ('additive' | 'widening' | 'destructive')[]`.
   - Document how `db init` uses `mode: 'init'` + `['additive']` and how `db update` will extend this later.
-  - ✅ Implemented via `MigrationPolicy` + `INIT_ADDITIVE_POLICY` in `packages/sql/family/src/core/migrations/types.ts`.
+  - ✅ Implemented via `MigrationPolicy` in `packages/sql/family/src/core/migrations/types.ts` plus `INIT_ADDITIVE_POLICY` in `packages/sql/family/src/core/migrations/policies.ts`. The CLI now keeps "init vs update" context separately while the shared policy carries only the enforcement set (`allowedOperationClasses`), eliminating the incentive for downstream systems to branch on mode.
 
 - [x] **1.2 Define planner result shape**
   - Design a `PlannerResult` type that can represent:
