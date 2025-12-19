@@ -58,12 +58,13 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
 
     const existingTables = Object.keys(options.schema.tables);
     if (existingTables.length > 0) {
+      const firstExistingTable = existingTables[0] ?? '';
       return plannerFailure([
         {
           kind: 'unsupportedOperation',
           summary: 'The Postgres init planner currently supports only empty databases',
           why: 'Remove existing tables or use a future planner mode that handles subsets/supersets.',
-          location: { table: existingTables[0]! },
+          ...(firstExistingTable ? { location: { table: firstExistingTable } } : {}),
         },
       ]);
     }
@@ -204,7 +205,10 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
   ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const tableName of Object.keys(tables).sort()) {
-      const table = tables[tableName]!;
+      const table = tables[tableName];
+      if (!table) {
+        continue;
+      }
       for (const unique of table.uniques) {
         const constraintName = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
         operations.push({
@@ -252,7 +256,10 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const tableName of Object.keys(tables).sort()) {
-      const table = tables[tableName]!;
+      const table = tables[tableName];
+      if (!table) {
+        continue;
+      }
       for (const index of table.indexes) {
         const indexName = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
         operations.push({
@@ -297,7 +304,10 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const tableName of Object.keys(tables).sort()) {
-      const table = tables[tableName]!;
+      const table = tables[tableName];
+      if (!table) {
+        continue;
+      }
       for (const foreignKey of table.foreignKeys) {
         const fkName = foreignKey.name ?? `${tableName}_${foreignKey.columns.join('_')}_fkey`;
         operations.push({
