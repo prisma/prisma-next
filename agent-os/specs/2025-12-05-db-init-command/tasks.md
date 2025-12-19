@@ -241,4 +241,16 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
   - Allow users to configure which forms of extra or non-contract schema objects are tolerated or warned on.
   - Extend conflict taxonomy and CLI reporting accordingly.
 
+## 7. Follow-up Cleanup
+
+- **7.1 Remove pgvector-specific logic from Postgres target**
+  - Strip any hard-coded references to pgvector (extension SQL, naming conventions, etc.) from `@prisma-next/targets-postgres`.
+  - Ensure extension-specific behavior is provided exclusively via extension packs so the target remains neutral.
+
+## 8. Postgres Planner Enhancements
+
+- **8.1 Support additional additive initialization scenarios**
+  - Extend the Postgres migration planner to handle additive “subset” and “superset” database states (e.g., missing columns, indexes, or constraints).
+  - Generate additive operations for partially provisioned schemas and ensure the planner produces full conflict reports when non-additive changes are required.
+
 
