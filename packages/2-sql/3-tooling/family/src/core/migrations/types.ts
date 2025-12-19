@@ -1,4 +1,7 @@
-import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
+import type {
+  ControlDriverInstance,
+  ControlTargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { SqlControlFamilyInstance } from '../instance';
@@ -97,11 +100,37 @@ export interface MigrationPlanner<TTargetDetails = Record<string, never>> {
   plan(options: MigrationPlannerPlanOptions): PlannerResult<TTargetDetails>;
 }
 
+export interface MigrationRunnerExecuteCallbacks<TTargetDetails = Record<string, never>> {
+  onOperationStart?(operation: MigrationPlanOperation<TTargetDetails>): void;
+  onOperationComplete?(operation: MigrationPlanOperation<TTargetDetails>): void;
+}
+
+export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, never>> {
+  readonly plan: MigrationPlan<TTargetDetails>;
+  readonly driver: ControlDriverInstance;
+  readonly contract: SqlContract<SqlStorage>;
+  readonly schemaName?: string;
+  readonly contractPath?: string;
+  readonly configPath?: string;
+  readonly strictVerification?: boolean;
+  readonly callbacks?: MigrationRunnerExecuteCallbacks<TTargetDetails>;
+}
+
+export interface MigrationRunnerResult {
+  readonly operationsPlanned: number;
+  readonly operationsExecuted: number;
+}
+
+export interface MigrationRunner<TTargetDetails = Record<string, never>> {
+  execute(options: MigrationRunnerExecuteOptions<TTargetDetails>): Promise<MigrationRunnerResult>;
+}
+
 export interface SqlControlTargetDescriptor<
   TTargetId extends string,
   TTargetDetails = Record<string, never>,
 > extends ControlTargetDescriptor<'sql', TTargetId> {
   createPlanner(family: SqlControlFamilyInstance): MigrationPlanner<TTargetDetails>;
+  createRunner(family: SqlControlFamilyInstance): MigrationRunner<TTargetDetails>;
 }
 
 export interface CreateMigrationPlanOptions<TTargetDetails> {

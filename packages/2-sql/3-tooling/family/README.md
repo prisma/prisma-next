@@ -12,7 +12,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 
 - **Family Descriptor Export**: Exports the SQL `ControlFamilyDescriptor` for use in CLI configuration files
 - **Family Instance Creation**: Creates `SqlFamilyInstance` objects that implement control-plane domain actions (`verify`, `schemaVerify`, `introspect`, `emitContract`, `validateContractIR`)
-- **Planner SPI**: Owns the `MigrationPlanner` interface plus the `SqlControlTargetDescriptor` helper so targets can expose planners (e.g., Postgres init planner)
+- **Planner & Runner SPI**: Owns the `MigrationPlanner` / `MigrationRunner` interfaces plus the `SqlControlTargetDescriptor` helper so targets can expose planners and runners (e.g., Postgres init planner/runner)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
 
@@ -44,6 +44,10 @@ const emitResult = await familyInstance.emitContract({ contractIR: rawContract }
 // Targets that implement SqlControlTargetDescriptor can build planners
 const planner = postgresTargetDescriptor.createPlanner(familyInstance);
 const planResult = planner.plan({ contract: sqlContract, schema, policy });
+
+// Targets also provide runners for executing plans
+const runner = postgresTargetDescriptor.createRunner(familyInstance);
+const executeResult = await runner.execute({ plan: planResult.plan, driver, contract: sqlContract });
 ```
 
 ## Architecture
@@ -73,7 +77,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 - **`src/core/assembly.ts`**: Assembly helpers for building operation registries and extracting type imports from descriptors. Test utilities import `convertOperationManifest` from the same package via relative path.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
-- **`src/core/migrations/`**: Migration IR helpers plus planner SPI types (`MigrationPlanner`, `SqlControlTargetDescriptor`)
+- **`src/core/migrations/`**: Migration IR helpers plus planner and runner SPI types (`MigrationPlanner`, `MigrationRunner`, `SqlControlTargetDescriptor`)
 - **`src/exports/control.ts`**: Control plane entry point (exports `SqlFamilyDescriptor` instance)
 - **`src/exports/runtime.ts`**: Runtime entry point (placeholder for future functionality)
 

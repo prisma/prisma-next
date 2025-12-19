@@ -10,6 +10,7 @@ import type {
 import { type } from 'arktype';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
+import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -70,6 +71,9 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     },
     createPlanner(_family: SqlControlFamilyInstance) {
       return createPostgresMigrationPlanner();
+    },
+    createRunner(family) {
+      return createPostgresMigrationRunner(family);
     },
   };
 
