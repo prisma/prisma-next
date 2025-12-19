@@ -6,8 +6,8 @@
   "description": "SQL family descriptor for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "test": "vitest run --passWithNoTests",
-    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
     "lint:fix": "biome check --write . --config-path ../../../biome.json",
