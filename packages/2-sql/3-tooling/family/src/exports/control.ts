@@ -1,5 +1,11 @@
 import { SqlFamilyDescriptor } from '../core/descriptor';
 
+export {
+  createMigrationPlan,
+  INIT_ADDITIVE_POLICY,
+  plannerFailure,
+  plannerSuccess,
+} from '../core/migrations/plan-helpers';
 export type {
   CreateMigrationPlanOptions,
   MigrationOperationClass,
@@ -15,12 +21,6 @@ export type {
   PlannerFailureResult,
   PlannerResult,
   PlannerSuccessResult,
-} from '../core/migrations/types';
-export {
-  createMigrationPlan,
-  INIT_ADDITIVE_POLICY,
-  plannerFailure,
-  plannerSuccess,
 } from '../core/migrations/types';
 
 /**

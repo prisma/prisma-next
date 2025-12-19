@@ -1,15 +1,16 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-
 import {
-  type CreateMigrationPlanOptions,
   createMigrationPlan,
   INIT_ADDITIVE_POLICY,
-  type MigrationPlan,
-  type MigrationPlanOperation,
-  type PlannerConflict,
-  type PlannerResult,
   plannerFailure,
   plannerSuccess,
+} from '../../src/core/migrations/plan-helpers';
+import type {
+  CreateMigrationPlanOptions,
+  MigrationPlan,
+  MigrationPlanOperation,
+  PlannerConflict,
+  PlannerResult,
 } from '../../src/core/migrations/types';
 
 type TestTargetDetails = { readonly schema: string };
