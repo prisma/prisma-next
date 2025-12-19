@@ -33,13 +33,14 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 
 ## 1. Planner & Policy Design (SQL Family / Target-Aware)
 
-- **1.1 Define migration policy model**
+- [x] **1.1 Define migration policy model**
   - Specify a `MigrationPolicy` type that supports at least:
     - `mode: 'init' | 'update'` (extensible).
     - `allowedOperationClasses: readonly ('additive' | 'widening' | 'destructive')[]`.
   - Document how `db init` uses `mode: 'init'` + `['additive']` and how `db update` will extend this later.
+  - ✅ Implemented via `MigrationPolicy` + `INIT_ADDITIVE_POLICY` in `packages/sql/family/src/core/migrations/types.ts`.
 
-- **1.2 Define planner result shape**
+- [x] **1.2 Define planner result shape**
   - Design a `PlannerResult` type that can represent:
     - `success` with a `MigrationPlan`.
     - `failure` with a structured list of **all** conflicts (not just the first).
@@ -47,13 +48,15 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
     - Conflict kind (e.g., `typeMismatch`, `nullabilityConflict`, `indexIncompatible`, `missingButNonAdditive`).
     - Location (table, column, constraint, index).
     - Human-oriented `summary`/`why` fields suitable for CLI error mapping.
+  - ✅ `PlannerResult`, `PlannerConflict*`, `plannerSuccess`, and `plannerFailure` live in `packages/sql/family/src/core/migrations/types.ts`.
 
-- **1.3 Define migration plan IR**
+- [x] **1.3 Define migration plan IR**
   - Introduce an in-memory `MigrationPlan` type for additive operations, including:
     - Ordered list of operations.
     - Per-operation identifiers.
     - Per-operation `precheckSql`, `executeSql`, `postcheckSql` (or equivalent execution units).
   - Ensure the IR is target-agnostic at the interface level, but can carry Postgres-specific details via the target implementation.
+  - ✅ `MigrationPlan`, `MigrationPlanOperation`, `MigrationPlanOperationStep`, and `createMigrationPlan()` (same path as above) provide the IR plus helpers and tests under `packages/sql/family/test/migrations/types.test.ts`.
 
 - **1.4 Establish planner SPI between family and target**
   - Define a `MigrationPlanner` interface in the SQL family/control-plane layer (shared plane).
