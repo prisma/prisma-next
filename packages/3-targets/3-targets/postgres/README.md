@@ -17,6 +17,7 @@ Provides the Postgres target descriptor (`TargetDescriptor`) for CLI config. The
 - **Target Descriptor Export**: Exports the Postgres `TargetDescriptor` for use in CLI configuration files
 - **Manifest Loading**: Loads the Postgres target manifest from `packs/manifest.json` with capabilities and type information
 - **Multi-Plane Support**: Provides both migration-plane (CLI) and runtime-plane entry points for the Postgres target
+- **Planner Factory**: Implements the SQL family `SqlControlTargetDescriptor` extension so callers can request a Postgres-specific `MigrationPlanner`
 
 This package spans multiple planes:
 - **Migration plane** (`src/exports/cli.ts`): CLI entry point that exports `TargetDescriptor` for config files
@@ -34,6 +35,11 @@ import postgres from '@prisma-next/target-postgres/control';
 // - id: 'postgres'
 // - family: 'sql'
 // - manifest: ExtensionPackManifest
+
+// When paired with the SQL family, targets can expose planners
+const family = sqlFamilyDescriptor.create({ target: postgres, adapter, driver, extensions: [] });
+const planner = postgres.createPlanner(family);
+const planResult = planner.plan({ contract, schema, policy });
 ```
 
 ### Runtime Plane

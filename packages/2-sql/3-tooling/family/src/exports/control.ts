@@ -11,6 +11,8 @@ export type {
   MigrationOperationClass,
   MigrationPlan,
   MigrationPlanContractInfo,
+  MigrationPlanner,
+  MigrationPlannerPlanOptions,
   MigrationPlanOperation,
   MigrationPlanOperationStep,
   MigrationPlanOperationTarget,
@@ -21,6 +23,7 @@ export type {
   PlannerFailureResult,
   PlannerResult,
   PlannerSuccessResult,
+  SqlControlTargetDescriptor,
 } from '../core/migrations/types';
 
 /**

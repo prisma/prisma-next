@@ -15,8 +15,11 @@
     "clean": "node ../../../../scripts/clean.mjs"
   },
   "dependencies": {
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "arktype": "^2.0.0"

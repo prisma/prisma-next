@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
-import type {
-  ControlTargetDescriptor,
-  ControlTargetInstance,
-} from '@prisma-next/core-control-plane/types';
+import type { ControlTargetInstance } from '@prisma-next/core-control-plane/types';
+import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
 import { type } from 'arktype';
+import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
+import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,22 +52,22 @@ function loadTargetManifest(): ExtensionPackManifest {
 /**
  * Postgres target descriptor for CLI config.
  */
-const postgresTargetDescriptor: ControlTargetDescriptor<
-  'sql',
-  'postgres',
-  ControlTargetInstance<'sql', 'postgres'>
-> = {
-  kind: 'target',
-  familyId: 'sql',
-  targetId: 'postgres',
-  id: 'postgres',
-  manifest: loadTargetManifest(),
-  create(): ControlTargetInstance<'sql', 'postgres'> {
-    return {
-      familyId: 'sql',
-      targetId: 'postgres',
-    };
-  },
-};
+const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
+  {
+    kind: 'target',
+    familyId: 'sql',
+    targetId: 'postgres',
+    id: 'postgres',
+    manifest: loadTargetManifest(),
+    create(): ControlTargetInstance<'sql', 'postgres'> {
+      return {
+        familyId: 'sql',
+        targetId: 'postgres',
+      };
+    },
+    createPlanner() {
+      return createPostgresMigrationPlanner();
+    },
+  };
 
 export default postgresTargetDescriptor;

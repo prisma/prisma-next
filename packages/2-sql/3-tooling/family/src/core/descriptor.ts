@@ -4,10 +4,10 @@ import type {
   ControlDriverDescriptor,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
-  ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './instance';
+import type { SqlControlTargetDescriptor } from './migrations/types';
 
 /**
  * SQL family manifest.
@@ -31,7 +31,7 @@ export class SqlFamilyDescriptor
   readonly hook = sqlTargetFamilyHook;
 
   create<TTargetId extends string>(options: {
-    readonly target: ControlTargetDescriptor<'sql', TTargetId>;
+    readonly target: SqlControlTargetDescriptor<TTargetId>;
     readonly adapter: ControlAdapterDescriptor<'sql', TTargetId>;
     readonly driver: ControlDriverDescriptor<'sql', TTargetId>;
     readonly extensions: readonly ControlExtensionDescriptor<'sql', TTargetId>[];

@@ -1,3 +1,8 @@
+import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlControlFamilyInstance } from '../instance';
+
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
 export type MigrationOperationClass = 'additive' | 'widening' | 'destructive';
@@ -80,6 +85,24 @@ export interface PlannerFailureResult {
 export type PlannerResult<TTargetDetails = Record<string, never>> =
   | PlannerSuccessResult<TTargetDetails>
   | PlannerFailureResult;
+
+export interface MigrationPlannerPlanOptions {
+  readonly contract: SqlContract<SqlStorage>;
+  readonly schema: SqlSchemaIR;
+  readonly policy: MigrationPolicy;
+  readonly schemaName?: string;
+}
+
+export interface MigrationPlanner<TTargetDetails = Record<string, never>> {
+  plan(options: MigrationPlannerPlanOptions): PlannerResult<TTargetDetails>;
+}
+
+export interface SqlControlTargetDescriptor<
+  TTargetId extends string,
+  TTargetDetails = Record<string, never>,
+> extends ControlTargetDescriptor<'sql', TTargetId> {
+  createPlanner(family: SqlControlFamilyInstance): MigrationPlanner<TTargetDetails>;
+}
 
 export interface CreateMigrationPlanOptions<TTargetDetails> {
   readonly targetId: string;
