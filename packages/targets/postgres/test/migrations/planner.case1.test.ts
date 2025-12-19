@@ -60,7 +60,7 @@ const emptySchema: SqlSchemaIR = {
   extensions: [],
 };
 
-describe('PostgresMigrationPlanner (Case 1)', () => {
+describe('PostgresMigrationPlanner - when database is empty', () => {
   it('builds additive plan for empty schema', () => {
     const planner = createPostgresMigrationPlanner();
     const result = planner.plan({
@@ -70,6 +70,9 @@ describe('PostgresMigrationPlanner (Case 1)', () => {
     });
 
     expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
     const operations = result.plan.operations;
     expect(operations.length).toBeGreaterThan(0);
     expect(operations.map((op) => op.id)).toEqual([
