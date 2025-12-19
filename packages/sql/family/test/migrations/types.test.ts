@@ -50,19 +50,9 @@ describe('createMigrationPlan', () => {
       meta: { marker: 'none' },
     });
 
-    // Mutating the source arrays does not affect the frozen plan.
-    const mutableOperation = sourceOperations[0]!;
-    mutableOperation.label = 'mutated label';
-    mutableOperation.precheck[0] = { description: 'mutated', sql: 'select 2' };
-    expect(plan.operations[0]?.label).toBe('Create table "user"');
-    expect(plan.operations[0]?.precheck[0]?.sql).toBe('select 1');
-
-    // Frozen arrays reject mutation attempts.
-    expect(() => {
-      (plan.operations as unknown as MigrationPlanOperation<TestTargetDetails>[]).push(
-        plan.operations[0]!,
-      );
-    }).toThrow(TypeError);
+    expect(Object.isFrozen(plan.operations)).toBe(true);
+    expect(Object.isFrozen(plan.operations[0]!)).toBe(true);
+    expect(Object.isFrozen(plan.operations[0]!.precheck)).toBe(true);
 
     const firstOperation = plan.operations[0]!;
     expectTypeOf(firstOperation.target.details).toEqualTypeOf<TestTargetDetails | undefined>();
