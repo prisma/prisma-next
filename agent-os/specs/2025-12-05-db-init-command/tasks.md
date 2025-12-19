@@ -16,6 +16,12 @@ To keep PRs small and reviewable, implement these tasks as a sequence of **self-
 - **Branch 3 — Runner SPI + Postgres runner + marker/ledger wiring**
   - Covers tasks **2.1**, **2.2**, **2.3**, **2.4**.
   - Deliverables: `MigrationRunner` interface, target-driven runner construction, Postgres runner that executes plans with pre/post checks and integrates marker/ledger updates, plus integration tests using the dev database utilities.
+  - **Manual developer test (between Branch 3 and 4)**: After this branch lands, add a small, ad-hoc harness (script or focused test) that:
+    - Loads a real SQL contract (e.g. from `prisma-next-demo`).
+    - Connects to a dev Postgres instance.
+    - Introspects schema IR via the family/target stack.
+    - Calls `planner.plan(...)` and, on success, `runner.execute(...)`.
+    - Verifies manually (e.g. via psql or a separate script) that tables, marker, and ledger match expectations before proceeding to Branch 4.
 
 - **Branch 4 — Schema IR & verification integration**
   - Covers tasks **4.1**, **4.2**, **4.3**.
