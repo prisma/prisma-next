@@ -2,10 +2,7 @@ type AnyRecord = Readonly<Record<string, unknown>>;
 
 export type MigrationOperationClass = 'additive' | 'widening' | 'destructive';
 
-export type MigrationPolicyMode = 'init' | 'update';
-
 export interface MigrationPolicy {
-  readonly mode: MigrationPolicyMode;
   readonly allowedOperationClasses: readonly MigrationOperationClass[];
 }
 
@@ -140,7 +137,6 @@ function freezeOperations<TTargetDetails>(
 
 function normalizePolicy(policy: MigrationPolicy): MigrationPolicy {
   return Object.freeze({
-    mode: policy.mode,
     allowedOperationClasses: Object.freeze([...policy.allowedOperationClasses]),
   });
 }
@@ -166,7 +162,6 @@ export function createMigrationPlan<TTargetDetails = Record<string, never>>(
 }
 
 export const INIT_ADDITIVE_POLICY: MigrationPolicy = Object.freeze({
-  mode: 'init' as const,
   allowedOperationClasses: Object.freeze(['additive'] as const),
 });
 

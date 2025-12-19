@@ -9,7 +9,6 @@ export type {
   MigrationPlanOperationStep,
   MigrationPlanOperationTarget,
   MigrationPolicy,
-  MigrationPolicyMode,
   PlannerConflict,
   PlannerConflictKind,
   PlannerConflictLocation,
