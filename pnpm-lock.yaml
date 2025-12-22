@@ -4,6 +4,12 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@prisma/dev':
+      specifier: ^0.1.1
+      version: 0.1.1
+
 importers:
 
   .:
@@ -97,7 +103,7 @@ importers:
         specifier: workspace:*
         version: link:../../test/utils
       '@prisma/dev':
-        specifier: ^0.1.1
+        specifier: 'catalog:'
         version: 0.1.1(typescript@5.9.3)
       '@types/node':
         specifier: ^20.16.5
@@ -167,7 +173,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/framework/tooling/cli
       '@prisma/dev':
-        specifier: ^0.1.1
+        specifier: 'catalog:'
         version: 0.1.1(typescript@5.9.3)
       '@types/node':
         specifier: ^20.16.5
@@ -228,7 +234,7 @@ importers:
         specifier: workspace:*
         version: link:../../../test/utils
       '@prisma/dev':
-        specifier: ^0.1.1
+        specifier: 'catalog:'
         version: 0.1.1(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.11.10
@@ -466,7 +472,7 @@ importers:
         specifier: workspace:*
         version: link:../../../test/utils
       '@prisma/dev':
-        specifier: ^0.1.1
+        specifier: 'catalog:'
         version: 0.1.1(typescript@5.9.3)
       tsup:
         specifier: ^8.3.0
@@ -1290,7 +1296,7 @@ importers:
   test/utils:
     devDependencies:
       '@prisma/dev':
-        specifier: ^0.1.1
+        specifier: 'catalog:'
         version: 0.1.1(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.11.10

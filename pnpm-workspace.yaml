@@ -9,3 +9,6 @@ packages:
   - examples/*
   - test/**
 
+catalog:
+  "@prisma/dev": "^0.1.1"
+
