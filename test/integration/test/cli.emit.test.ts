@@ -13,10 +13,10 @@ import {
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/sql/family/src/core/assembly';
+} from '../../../packages/2-sql/3-tooling/family/src/core/assembly';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = resolve(__dirname, '../../../packages/framework/tooling/cli/test/fixtures');
+const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');
 
 describe('emit command functionality', () => {
   let outputDir: string;
@@ -39,7 +39,7 @@ describe('emit command functionality', () => {
     'loads TS contract and emits contract.json and contract.d.ts',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -91,7 +91,7 @@ describe('emit command functionality', () => {
     'emits contract with correct coreHash',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -122,7 +122,7 @@ describe('emit command functionality', () => {
     async () => {
       const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);

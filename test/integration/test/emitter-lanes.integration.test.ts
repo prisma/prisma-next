@@ -16,13 +16,13 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
-import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
+import { loadExtensionPacks } from '../../../packages/1-framework/3-tooling/cli/src/pack-loading';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/sql/family/src/core/assembly';
+} from '../../../packages/2-sql/3-tooling/family/src/core/assembly';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
@@ -98,7 +98,7 @@ describe('emitter → lanes integration', () => {
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/targets/postgres-adapter'),
+        join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -202,7 +202,7 @@ describe('emitter → lanes integration', () => {
     };
 
     const packs = loadExtensionPacks(
-      join(__dirname, '../../../packages/targets/postgres-adapter'),
+      join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
       [],
     );
     const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -285,7 +285,7 @@ describe('emitter → lanes integration', () => {
     };
 
     const packs = loadExtensionPacks(
-      join(__dirname, '../../../packages/targets/postgres-adapter'),
+      join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
       [],
     );
     const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -308,7 +308,7 @@ describe('emitter → lanes integration', () => {
     const ir2 = validatedContract as unknown as ContractIR;
 
     const packs2 = loadExtensionPacks(
-      join(__dirname, '../../../packages/targets/postgres-adapter'),
+      join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
       [],
     );
     const operationRegistry2 = assembleOperationRegistryFromPacks(packs2);

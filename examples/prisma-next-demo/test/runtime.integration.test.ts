@@ -16,13 +16,13 @@ import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-r
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
+import { loadExtensionPacks } from '../../../packages/1-framework/3-tooling/cli/src/pack-loading';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/sql/family/src/core/assembly';
+} from '../../../packages/2-sql/3-tooling/family/src/core/assembly';
 import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
 
@@ -31,8 +31,8 @@ let contract: ReturnType<typeof validateContract>;
 beforeAll(async () => {
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
-  const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
-  const pgvectorPath = resolve(__dirname, '../../../packages/extensions/pgvector');
+  const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
+  const pgvectorPath = resolve(__dirname, '../../../packages/3-extensions/pgvector');
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, [pgvectorPath]);

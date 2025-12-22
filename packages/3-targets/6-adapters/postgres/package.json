@@ -1,0 +1,63 @@
+{
+  "name": "@prisma-next/adapter-postgres",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "clean": "node ../../../../scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/contract-authoring": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-schema-ir": "workspace:*",
+    "arktype": "^2.0.0"
+  },
+  "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.1"
+  },
+  "exports": {
+    "./adapter": {
+      "types": "./dist/exports/adapter.d.ts",
+      "import": "./dist/exports/adapter.js"
+    },
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
+    },
+    "./codec-types": {
+      "types": "./dist/exports/codec-types.d.ts",
+      "import": "./dist/exports/codec-types.js"
+    },
+    "./column-types": {
+      "types": "./dist/exports/column-types.d.ts",
+      "import": "./dist/exports/column-types.js"
+    },
+    "./control": {
+      "types": "./dist/exports/control.d.ts",
+      "import": "./dist/exports/control.js"
+    },
+    "./runtime": {
+      "types": "./dist/exports/runtime.d.ts",
+      "import": "./dist/exports/runtime.js"
+    }
+  }
+}

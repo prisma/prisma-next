@@ -1,214 +1,172 @@
 {
   "packages": [
     {
-      "glob": "packages/framework/core-plan/**",
+      "glob": "packages/1-framework/1-core/shared/**",
       "domain": "framework",
       "layer": "core",
       "plane": "shared"
     },
     {
-      "glob": "packages/framework/core-operations/**",
-      "domain": "framework",
-      "layer": "core",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/framework/core-control-plane/**",
+      "glob": "packages/1-framework/1-core/migration/**",
       "domain": "framework",
       "layer": "core",
       "plane": "migration"
     },
     {
-      "glob": "packages/framework/core-execution-plane/**",
+      "glob": "packages/1-framework/1-core/runtime/**",
       "domain": "framework",
       "layer": "core",
       "plane": "runtime"
     },
     {
-      "glob": "packages/framework/authoring/contract-authoring/**",
+      "glob": "packages/1-framework/2-authoring/**",
       "domain": "framework",
       "layer": "authoring",
       "plane": "migration"
     },
     {
-      "glob": "packages/framework/authoring/contract-ts/**",
-      "domain": "framework",
-      "layer": "authoring",
-      "plane": "migration"
-    },
-    {
-      "glob": "packages/framework/authoring/contract-psl/**",
-      "domain": "framework",
-      "layer": "authoring",
-      "plane": "migration"
-    },
-    {
-      "glob": "packages/framework/tooling/cli/**",
+      "glob": "packages/1-framework/3-tooling/**",
       "domain": "framework",
       "layer": "tooling",
       "plane": "migration"
     },
     {
-      "glob": "packages/framework/tooling/emitter/**",
-      "domain": "framework",
-      "layer": "tooling",
-      "plane": "migration"
-    },
-    {
-      "glob": "packages/framework/runtime-executor/**",
+      "glob": "packages/1-framework/4-runtime-executor/**",
       "domain": "framework",
       "layer": "runtime-executor",
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/authoring/**",
+      "glob": "packages/2-sql/1-core/**",
+      "domain": "sql",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/2-sql/2-authoring/**",
       "domain": "sql",
       "layer": "authoring",
       "plane": "migration"
     },
     {
-      "glob": "packages/sql/lanes/**",
+      "glob": "packages/2-sql/3-tooling/emitter/**",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/2-sql/3-tooling/family/src/core/**",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/2-sql/3-tooling/family/src/exports/control.ts",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/2-sql/3-tooling/family/src/exports/runtime.ts",
+      "domain": "sql",
+      "layer": "tooling",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/2-sql/4-lanes/**",
       "domain": "sql",
       "layer": "lanes",
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/sql-runtime/**",
+      "glob": "packages/2-sql/5-runtime/**",
       "domain": "sql",
       "layer": "runtime",
       "plane": "runtime"
     },
     {
-      "glob": "packages/sql/family/src/core/**",
-      "domain": "sql",
-      "layer": "tooling",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/sql/family/src/exports/control.ts",
-      "domain": "sql",
-      "layer": "tooling",
-      "plane": "migration"
-    },
-    {
-      "glob": "packages/sql/family/src/exports/runtime.ts",
-      "domain": "sql",
-      "layer": "tooling",
-      "plane": "runtime"
-    },
-    {
-      "glob": "packages/targets/postgres-adapter/src/core/**",
-      "domain": "targets",
-      "layer": "adapters",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/targets/postgres-adapter/src/exports/control.ts",
-      "domain": "targets",
-      "layer": "adapters",
-      "plane": "migration"
-    },
-    {
-      "glob": "packages/targets/postgres-adapter/src/exports/runtime.ts",
-      "domain": "targets",
-      "layer": "adapters",
-      "plane": "runtime"
-    },
-    {
-      "glob": "packages/targets/postgres/src/exports/control.ts",
+      "glob": "packages/3-targets/3-targets/postgres/src/exports/control.ts",
       "domain": "extensions",
       "layer": "targets",
       "plane": "migration"
     },
     {
-      "glob": "packages/targets/postgres/src/exports/runtime.ts",
+      "glob": "packages/3-targets/3-targets/postgres/src/exports/runtime.ts",
       "domain": "extensions",
       "layer": "targets",
       "plane": "runtime"
     },
     {
-      "glob": "packages/targets/postgres-driver/src/exports/control.ts",
+      "glob": "packages/3-targets/6-adapters/postgres/src/core/**",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-targets/6-adapters/postgres/src/exports/control.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-targets/6-adapters/postgres/src/exports/runtime.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-targets/7-drivers/postgres/src/exports/control.ts",
       "domain": "targets",
       "layer": "drivers",
       "plane": "migration"
     },
     {
-      "glob": "packages/targets/postgres-driver/src/exports/runtime.ts",
+      "glob": "packages/3-targets/7-drivers/postgres/src/exports/runtime.ts",
       "domain": "targets",
       "layer": "drivers",
       "plane": "runtime"
     },
     {
-      "glob": "packages/extensions/compat-prisma/**",
+      "glob": "packages/3-extensions/compat-prisma/**",
       "domain": "extensions",
       "layer": "compat",
       "plane": "runtime"
     },
     {
-      "glob": "packages/extensions/pgvector/src/core/**",
+      "glob": "packages/3-extensions/pgvector/src/core/**",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "shared"
     },
     {
-      "glob": "packages/extensions/pgvector/src/types/**",
+      "glob": "packages/3-extensions/pgvector/src/types/**",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "shared"
     },
     {
-      "glob": "packages/extensions/pgvector/src/exports/control.ts",
+      "glob": "packages/3-extensions/pgvector/src/exports/control.ts",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "migration"
     },
     {
-      "glob": "packages/extensions/pgvector/src/exports/runtime.ts",
+      "glob": "packages/3-extensions/pgvector/src/exports/runtime.ts",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "runtime"
     },
     {
-      "glob": "packages/extensions/pgvector/src/exports/codec-types.ts",
+      "glob": "packages/3-extensions/pgvector/src/exports/codec-types.ts",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "shared"
     },
     {
-      "glob": "packages/extensions/pgvector/src/exports/operation-types.ts",
+      "glob": "packages/3-extensions/pgvector/src/exports/operation-types.ts",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "shared"
-    },
-    {
-      "glob": "packages/framework/core-contract/**",
-      "domain": "framework",
-      "layer": "core",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/sql/contract/**",
-      "domain": "sql",
-      "layer": "core",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/sql/schema-ir/**",
-      "domain": "sql",
-      "layer": "core",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/sql/operations/**",
-      "domain": "sql",
-      "layer": "core",
-      "plane": "shared"
-    },
-    {
-      "glob": "packages/sql/tooling/**",
-      "domain": "sql",
-      "layer": "tooling",
-      "plane": "migration"
     }
   ],
   "rules": {
@@ -257,8 +215,8 @@
       "forbid": ["migration"],
       "exceptions": [
         {
-          "from": "packages/extensions/compat-prisma/**",
-          "to": "packages/sql/**",
+          "from": "packages/3-extensions/compat-prisma/**",
+          "to": "packages/2-sql/**",
           "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
         }
       ]
@@ -266,8 +224,8 @@
   },
   "crossDomainExceptions": [
     {
-      "from": "packages/extensions/compat-prisma/**",
-      "to": "packages/sql/**",
+      "from": "packages/3-extensions/compat-prisma/**",
+      "to": "packages/2-sql/**",
       "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
     }
   ],

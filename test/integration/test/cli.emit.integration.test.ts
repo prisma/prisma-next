@@ -22,10 +22,10 @@ import {
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/sql/family/src/core/assembly';
+} from '../../../packages/2-sql/3-tooling/family/src/core/assembly';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = resolve(__dirname, '../../../packages/framework/tooling/cli/test/fixtures');
+const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');
 
 describe('emit integration', () => {
   let testDir: string;
@@ -47,7 +47,7 @@ describe('emit integration', () => {
     'loads TS contract, emits artifacts, and uses them with lanes',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -121,7 +121,7 @@ describe('emit integration', () => {
     'round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
 
       const contract1 = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);

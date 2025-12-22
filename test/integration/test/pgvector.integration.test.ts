@@ -9,14 +9,14 @@ import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/sql/family/src/core/assembly';
+} from '../../../packages/2-sql/3-tooling/family/src/core/assembly';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('pgvector extension pack integration', () => {
   it('loads extension pack manifest', () => {
-    const packPath = join(__dirname, '../../../packages/extensions/pgvector');
+    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
     const packs = loadExtensionPacks(undefined, [packPath]);
 
     expect(packs.length).toBe(1);
@@ -27,7 +27,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('extracts codec type imports from pack', () => {
-    const packPath = join(__dirname, '../../../packages/extensions/pgvector');
+    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
     const packs = loadExtensionPacks(undefined, [packPath]);
 
     const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
@@ -40,7 +40,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('extracts operation type imports from pack', () => {
-    const packPath = join(__dirname, '../../../packages/extensions/pgvector');
+    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
     const packs = loadExtensionPacks(undefined, [packPath]);
 
     const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
@@ -53,7 +53,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('assembles operation registry from pack', () => {
-    const packPath = join(__dirname, '../../../packages/extensions/pgvector');
+    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
     const packs = loadExtensionPacks(undefined, [packPath]);
 
     const registry = assembleOperationRegistryFromPacks(packs);

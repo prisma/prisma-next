@@ -14,7 +14,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 // Note: executeCommand and other test helpers are re-exported at the bottom of this file
 // They come from the CLI package's test utilities but are not exported from the package
 // We import them directly from the source file
-import { executeCommand } from '../../../../packages/framework/tooling/cli/test/utils/test-helpers';
+import { executeCommand } from '../../../../packages/1-framework/3-tooling/cli/test/utils/test-helpers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Use a shared fixture package directory that has the necessary dependencies
@@ -292,7 +292,7 @@ export async function setupDbSignFixture(
 
   // Emit contract first
   const { createContractEmitCommand } = await import(
-    '../../../../packages/framework/tooling/cli/src/commands/contract-emit'
+    '../../../../packages/1-framework/3-tooling/cli/src/commands/contract-emit'
   );
   const emitCommand = createContractEmitCommand();
   const originalCwd = process.cwd();
@@ -316,7 +316,7 @@ export async function runDbSign(
   args: string[],
 ): Promise<number> {
   const { createDbSignCommand } = await import(
-    '../../../../packages/framework/tooling/cli/src/commands/db-sign'
+    '../../../../packages/1-framework/3-tooling/cli/src/commands/db-sign'
   );
   const command = createDbSignCommand();
   const originalCwd = process.cwd();
@@ -335,4 +335,4 @@ export {
   getExitCode,
   setupCommandMocks,
   withTempDir,
-} from '../../../../packages/framework/tooling/cli/test/utils/test-helpers';
+} from '../../../../packages/1-framework/3-tooling/cli/test/utils/test-helpers';

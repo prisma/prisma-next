@@ -1,7 +1,7 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { boolColumn, int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 // Use relative import to avoid module resolution issues in test context
-import { defineContract } from '../../../../../packages/sql/authoring/sql-contract-ts/src/exports/contract-builder';
+import { defineContract } from '../../../../../packages/2-sql/2-authoring/contract-ts/src/exports/contract-builder';
 
 export const contract = defineContract<CodecTypes>()
   .target('postgres')
